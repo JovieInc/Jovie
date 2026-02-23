@@ -11,6 +11,7 @@ import {
   EVENT_BADGE_CONFIG,
   formatDate,
   formatEventType,
+  formatStatus,
   LINEAR_EASE,
 } from './billing-constants';
 
@@ -58,10 +59,16 @@ export function BillingHistorySection({
                   const config = EVENT_BADGE_CONFIG[entry.eventType];
                   const IconComponent = config?.icon ?? Clock;
                   const badgeVariant = config?.variant ?? 'secondary';
+                  const badgeLabel = entry.status
+                    ? formatStatus(entry.status)
+                    : 'Billing';
 
                   return (
                     <div
-                      key={entry.id}
+                      key={
+                        entry.maskedIdentifier ??
+                        `${entry.eventType}-${entry.timestamp}`
+                      }
                       className='flex items-center justify-between px-6 py-4 transition-colors hover:bg-[var(--color-interactive-hover)]'
                     >
                       <div className='flex items-center gap-3'>
@@ -77,14 +84,12 @@ export function BillingHistorySection({
                             size='sm'
                             className='mt-0.5'
                           >
-                            {entry.source === 'webhook'
-                              ? 'Stripe'
-                              : entry.source}
+                            {badgeLabel}
                           </Badge>
                         </div>
                       </div>
                       <time className='shrink-0 text-xs text-tertiary-token'>
-                        {formatDate(entry.createdAt)}
+                        {formatDate(entry.timestamp)}
                       </time>
                     </div>
                   );

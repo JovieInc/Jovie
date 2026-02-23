@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
   Skeleton,
 } from '@jovie/ui';
-import { Ellipsis, Trash2 } from 'lucide-react';
+import { Ellipsis, MessageSquare, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -101,7 +101,11 @@ export function RecentChats() {
 
   if (isLoading) {
     return (
-      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
+      <SidebarCollapsibleGroup
+        label='Threads'
+        defaultOpen={false}
+        icon={MessageSquare}
+      >
         <SidebarMenu>
           {(['a', 'b', 'c'] as const).map(id => (
             <SidebarMenuItem key={`skeleton-${id}`}>
@@ -121,7 +125,11 @@ export function RecentChats() {
 
   return (
     <>
-      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
+      <SidebarCollapsibleGroup
+        label='Threads'
+        defaultOpen={false}
+        icon={MessageSquare}
+      >
         <SidebarMenu>
           {conversations.map(convo => {
             const href = `${APP_ROUTES.CHAT}/${convo.id}`;

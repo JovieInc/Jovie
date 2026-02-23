@@ -5,6 +5,20 @@ import type { DashboardData } from './actions';
 
 const DashboardDataContext = createContext<DashboardData | null>(null);
 
+const EMPTY_PROFILE_COMPLETION: DashboardData['profileCompletion'] = {
+  percentage: 0,
+  completedCount: 0,
+  totalCount: 0,
+  steps: [],
+};
+
+function normalizeDashboardData(value: DashboardData): DashboardData {
+  return {
+    ...value,
+    profileCompletion: value.profileCompletion ?? EMPTY_PROFILE_COMPLETION,
+  };
+}
+
 interface DashboardDataProviderProps {
   readonly value: DashboardData;
   readonly children: React.ReactNode;
@@ -14,8 +28,10 @@ export function DashboardDataProvider({
   value,
   children,
 }: Readonly<DashboardDataProviderProps>) {
+  const normalizedValue = normalizeDashboardData(value);
+
   return (
-    <DashboardDataContext.Provider value={value}>
+    <DashboardDataContext.Provider value={normalizedValue}>
       {children}
     </DashboardDataContext.Provider>
   );

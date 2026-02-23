@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { captureWarning } from '@/lib/error-tracking';
 import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import { getRedis } from '@/lib/redis';
 
@@ -32,6 +33,9 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    void captureWarning('Redis health check failed', error, {
+      route: '/api/health/redis',
+    });
     return NextResponse.json(
       {
         status: 'unhealthy',

@@ -19,7 +19,110 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
 jobs:
+
+  # ── Centralized path-change detection ──────────────────────────────────
+  # Runs once, outputs change flags for all job types.
+  # Downstream jobs read outputs instead of fetching git history independently.
+  ci-path-changes:
+    name: Path Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run_build: ${{ steps.detect.outputs.run_build }}
+      run_test: ${{ steps.detect.outputs.run_test }}
+      run_e2e: ${{ steps.detect.outputs.run_e2e }}
+      run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
+      has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Detect path changes for all job types
+        id: detect
+        shell: bash
+        run: |
+          IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
+          FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
+
+          # Force run all if the 'testing' label is present
+          if [[ "$FULL_CI_LABEL" == "true" ]]; then
+            echo "Forcing full CI run due to 'testing' label"
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
+              echo "$t=true" >> $GITHUB_OUTPUT
+            done
+            exit 0
+          fi
+
+          # Determine changed files
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}"
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual dispatch: run everything
+            echo "Manual dispatch: running all checks"
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
+              echo "$t=true" >> $GITHUB_OUTPUT
+            done
+            exit 0
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+
+          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
+          if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
+            echo "Only documentation files changed"
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
+              echo "$t=false" >> $GITHUB_OUTPUT
+            done
+            exit 0
+          fi
+
+          echo "has_code_changes=true" >> $GITHUB_OUTPUT
+
+          # Build paths
+          BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|package.*\.json|turbo\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
+            echo "run_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_build=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Test paths
+          TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
+            echo "run_test=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_test=false" >> $GITHUB_OUTPUT
+          fi
+
+          # E2E paths
+          E2E_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$E2E_PATTERN"; then
+            echo "run_e2e=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_e2e=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Drizzle paths
+          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+          if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
+            echo "run_drizzle=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_drizzle=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Fork guard: disable E2E for forks (no secrets)
+          if [[ "$IS_FORK" == "true" ]]; then
+            echo "Fork PR: disabling e2e and build"
+            echo "run_e2e=false" >> $GITHUB_OUTPUT
+            echo "run_build=false" >> $GITHUB_OUTPUT
+            echo "run_test=false" >> $GITHUB_OUTPUT
+          fi
 
   ci-env-example-guard:
     name: Env Example Guard
@@ -236,9 +339,6 @@ jobs:
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         run: pnpm turbo typecheck --affected
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
 
   neon-db:
     name: Neon DB
@@ -335,6 +435,7 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
+    needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
@@ -347,13 +448,8 @@ jobs:
           fetch-depth: 0
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -377,7 +473,7 @@ jobs:
 
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
+    needs: [neon-db, ci-path-changes]
     # Drizzle check runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -387,18 +483,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
-      # Check if Drizzle-related changes require running this job
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -455,8 +545,10 @@ jobs:
 
   ci-pr-ready:
     name: PR Ready
-    # Single merge gate for PRs and merge queue: fast checks + unit tests must pass. A11y + layout guard are informational.
-    # This is the only required status check in the branch ruleset.
+    # Single merge gate for PRs and merge queue.
+    # On PRs: gates on ci-fast + unit tests (a11y + layout guard are informational).
+    # On merge queue: only ci-fast runs; unit tests/a11y/layout-guard are skipped
+    # (already passed on PR) and their "skipped" result passes the checks below.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
@@ -495,8 +587,11 @@ jobs:
 
   ci-build-public:
     name: Build (public routes)
+    needs: [ci-path-changes]
     # Shared Next.js build for a11y + layout-guard — build once, test twice
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' || github.event_name == 'push' }}
+    # Skipped in merge queue: a11y + layout-guard are non-blocking and already
+    # ran on the PR. Merge queue only needs ci-fast for integration conflict detection.
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -504,17 +599,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -599,6 +689,7 @@ jobs:
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
+    needs: [ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -607,7 +698,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Cleanup old Neon branches (prevent limit errors)
         uses: ./.github/actions/neon-branch-cleanup
@@ -620,13 +711,8 @@ jobs:
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -734,9 +820,10 @@ jobs:
 
   ci-build:
     name: Build
-    # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
+    needs: [ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Skipped in merge queue: no merge-queue jobs depend on the full build.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -744,18 +831,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
-      # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'build'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_build }}" >> $GITHUB_OUTPUT
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -824,10 +905,11 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
-    # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
-    # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on all PRs, merge queue, and push to main
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs: [ci-path-changes]
+    # Runs in parallel with typecheck/build for faster CI.
+    # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy.
+    # Skipped in merge queue — unit tests already passed on the PR.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -841,18 +923,10 @@ jobs:
         with:
           fetch-depth: 0  # Full history for vitest --changed
 
-      # Check if test-related changes require running this job
-      # For PRs: use path guard to skip docs-only changes (unless 'testing' label)
-      # For push to main: only run if test-related paths changed
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -953,24 +1027,19 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact
-    needs: [ci-build-public]
+    needs: [ci-build-public, ci-path-changes]
     if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1039,27 +1108,21 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label to save CI time on most PRs
     # Full E2E runs on merge to main anyway
-    needs: [ci-fast]
+    needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
-    # Reduced from 15 to 10 min after consolidating smoke tests (19 → 6 tests)
     timeout-minutes: 10
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: false
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1138,24 +1201,19 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label (admin tests need auth credentials)
     # Also runs on push to main for full coverage
-    needs: [ci-fast]
+    needs: [ci-fast, ci-path-changes]
     if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1263,7 +1321,7 @@ jobs:
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
-    needs: [ci-fast, ci-build, neon-db]
+    needs: [ci-fast, ci-build, neon-db, ci-path-changes]
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1272,17 +1330,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1344,7 +1397,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1352,7 +1405,7 @@ jobs:
 
       - name: Set shard env
         run: |
-          echo "SHARD_TOTAL=2" >> $GITHUB_ENV
+          echo "SHARD_TOTAL=4" >> $GITHUB_ENV
           echo "SHARD_INDEX=${{ matrix.shard }}" >> $GITHUB_ENV
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
@@ -1517,23 +1570,21 @@ jobs:
 
   ci-test-performance:
     name: Test Performance Budgets
-    # No dependencies — test profiling is independent and can run fully parallel
+    needs: [ci-path-changes]
+    # Post-merge only: takes ~6.5 min and is not a merge gate.
+    # Running on PRs adds wall time without blocking merge.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1551,12 +1602,7 @@ jobs:
       - name: Enforce test performance budgets
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          SUITE="critical"
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            SUITE="full"
-          fi
-
-          TEST_PERFORMANCE_SUITE="$SUITE" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="$SUITE" --use-baseline
+          TEST_PERFORMANCE_SUITE="full" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="full" --use-baseline
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
     # Gated: only runs with 'deploy-preview' label to save CI time on most PRs
@@ -1585,6 +1631,9 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Share Turbo remote cache with ci-build to avoid redundant rebuilds
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
@@ -2043,6 +2092,9 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+          # Share Turbo remote cache with ci-build to avoid redundant rebuilds
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |

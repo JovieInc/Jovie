@@ -25,19 +25,21 @@ import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
+import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
 /** Tab for organizing sidebar content into focused views */
-type SidebarTab = 'catalog' | 'links' | 'details';
+type SidebarTab = 'catalog' | 'links' | 'details' | 'lyrics';
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
   { value: 'catalog' as const, label: 'Catalog' },
   { value: 'links' as const, label: 'Links' },
   { value: 'details' as const, label: 'Details' },
+  { value: 'lyrics' as const, label: 'Lyrics' },
 ];
 
 export function ReleaseSidebar({
@@ -343,6 +345,12 @@ export function ReleaseSidebar({
               {activeTab === 'details' && (
                 <>
                   <div className='pb-5'>
+                    <ReleaseSmartLinkAnalytics
+                      release={release}
+                      providerConfig={providerConfig}
+                    />
+                  </div>
+                  <div className='pb-5'>
                     <ReleaseMetadata
                       release={release}
                       onCanvasStatusChange={
@@ -353,23 +361,24 @@ export function ReleaseSidebar({
                     />
                   </div>
 
-                  <div className='pt-5'>
-                    <ReleaseLyricsSection
-                      releaseId={release.id}
-                      lyrics={release.lyrics}
-                      isEditable={isEditable}
-                      isSaving={isLyricsSaving}
-                      onSaveLyrics={onSaveLyrics}
-                      onFormatLyrics={onFormatLyrics}
-                    />
-                  </div>
-
                   {isEditable && (
                     <div className='pt-5'>
                       <ReleaseSettings allowDownloads={allowDownloads} />
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Lyrics tab: Lyrics editor */}
+              {activeTab === 'lyrics' && (
+                <ReleaseLyricsSection
+                  releaseId={release.id}
+                  lyrics={release.lyrics}
+                  isEditable={isEditable}
+                  isSaving={isLyricsSaving}
+                  onSaveLyrics={onSaveLyrics}
+                  onFormatLyrics={onFormatLyrics}
+                />
               )}
 
               {isEditable && onSave && (

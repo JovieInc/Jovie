@@ -16,6 +16,7 @@ import {
   VIDEO_PROVIDER_KEYS,
 } from '@/lib/discography/video-providers';
 import { trackServerEvent } from '@/lib/server-analytics';
+import { extractUTMParams } from '@/lib/utm';
 import { getContentBySlug, getCreatorByUsername } from '../_lib/data';
 import { SoundsLandingPage } from './SoundsLandingPage';
 
@@ -23,10 +24,24 @@ export const revalidate = 300;
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function SoundsPage({ params }: Readonly<PageProps>) {
+export default async function SoundsPage({
+  params,
+  searchParams,
+}: Readonly<PageProps>) {
   const { username, slug } = await params;
+  const allSearchParams = await searchParams;
+  const requestSearchParams = new URLSearchParams(
+    Object.entries(allSearchParams).flatMap(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map(v => [key, v]);
+      }
+      return typeof value === 'string' ? [[key, value]] : [];
+    })
+  );
+  const utmParams = extractUTMParams(requestSearchParams);
 
   if (!username || !slug) {
     notFound();
@@ -51,7 +66,9 @@ export default async function SoundsPage({ params }: Readonly<PageProps>) {
 
   // No video links — redirect to the main smart link
   if (videoLinks.length === 0) {
-    redirect(`/${creator.usernameNormalized}/${content.slug}`);
+    const queryString = requestSearchParams.toString();
+    const suffix = queryString ? `?${queryString}` : '';
+    redirect(`/${creator.usernameNormalized}/${content.slug}${suffix}`);
   }
 
   // Build video provider data for the page
@@ -101,6 +118,7 @@ export default async function SoundsPage({ params }: Readonly<PageProps>) {
       }}
       videoProviders={videoProviders}
       smartLinkPath={smartLinkPath}
+      utmParams={utmParams}
     />
   );
 }

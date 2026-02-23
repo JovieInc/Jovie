@@ -20,6 +20,7 @@ import {
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
+import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { isContentClean } from '@/lib/validation/content-filter';
@@ -199,6 +200,8 @@ export async function completeOnboarding({
       },
       { isolationLevel: 'serializable' }
     );
+
+    await cacheHandleAvailability(completion.username, false);
 
     // Immediately invalidate user state cache so middleware sees fresh state
     // This prevents stale cache from causing redirect loops
