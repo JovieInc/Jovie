@@ -398,7 +398,7 @@ describe('ErrorBoundary', () => {
       );
     });
 
-    it('applies correct button classes', () => {
+    it('renders buttons with correct variant styling', () => {
       render(
         <ErrorBoundary
           error={mockError}
