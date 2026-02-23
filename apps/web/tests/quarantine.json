@@ -1,4 +1,7 @@
 {
-  "unit": ["tests/contracts/dashboard-apis.spec.ts"],
+  "unit": [
+    "tests/contracts/dashboard-apis.spec.ts",
+    "tests/unit/dashboard/SettingsAdPixelsSection.test.tsx"
+  ],
   "e2e": ["apps/web/tests/e2e/dashboard-pages-health.spec.ts"]
 }
