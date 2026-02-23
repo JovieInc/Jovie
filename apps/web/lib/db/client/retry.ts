@@ -4,7 +4,9 @@
  * Retry logic for transient database failures with exponential backoff.
  */
 
+import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { PERFORMANCE_THRESHOLDS } from '../config';
+import { DbCircuitOpenError, dbCircuitBreaker } from './circuit-breaker';
 import { logDbError, logDbInfo } from './logging';
 
 const DB_CONFIG = {
@@ -55,49 +57,65 @@ export function isRetryableError(error: unknown): boolean {
 export async function withRetry<T>(
   operation: () => Promise<T>,
   context: string,
-  maxRetries = DB_CONFIG.maxRetries
+  maxRetries: number = DB_CONFIG.maxRetries
 ): Promise<T> {
   let lastError: unknown;
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await operation();
-      if (attempt > 1) {
-        logDbInfo(
-          'retry_success',
-          `Operation succeeded on attempt ${attempt}`,
-          { context }
-        );
+  try {
+    return await dbCircuitBreaker.execute(async () => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await operation();
+          if (attempt > 1) {
+            logDbInfo(
+              'retry_success',
+              `Operation succeeded on attempt ${attempt}`,
+              { context }
+            );
+          }
+          return result;
+        } catch (error) {
+          lastError = error;
+
+          // Check if error is retryable
+          const isRetryable = isRetryableError(error);
+
+          logDbError('retry_attempt', error, {
+            context,
+            attempt,
+            maxRetries,
+            isRetryable,
+            willRetry: attempt < maxRetries && isRetryable,
+          });
+
+          // Don't retry if not retryable or on last attempt
+          if (!isRetryable || attempt >= maxRetries) {
+            break;
+          }
+
+          // Exponential backoff delay
+          const delay =
+            DB_CONFIG.retryDelay *
+            Math.pow(DB_CONFIG.retryBackoffMultiplier, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
       }
-      return result;
-    } catch (error) {
-      lastError = error;
 
-      // Check if error is retryable
-      const isRetryable = isRetryableError(error);
-
-      logDbError('retry_attempt', error, {
-        context,
-        attempt,
-        maxRetries,
-        isRetryable,
-        willRetry: attempt < maxRetries && isRetryable,
-      });
-
-      // Don't retry if not retryable or on last attempt
-      if (!isRetryable || attempt >= maxRetries) {
-        break;
-      }
-
-      // Exponential backoff delay
-      const delay =
-        DB_CONFIG.retryDelay *
-        Math.pow(DB_CONFIG.retryBackoffMultiplier, attempt - 1);
-      await new Promise(resolve => setTimeout(resolve, delay));
+      throw lastError;
+    });
+  } catch (error) {
+    if (error instanceof CircuitOpenError) {
+      const circuitError = new DbCircuitOpenError(error.stats, context);
+      logDbError(
+        'circuit_open',
+        circuitError,
+        { context, circuitState: error.stats.state },
+        { asBreadcrumb: true }
+      );
+      throw circuitError;
     }
+    throw error;
   }
-
-  throw lastError;
 }
 
 export { DB_CONFIG };

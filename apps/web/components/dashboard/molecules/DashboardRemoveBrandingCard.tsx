@@ -1,6 +1,7 @@
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 export interface DashboardRemoveBrandingCardProps {
@@ -12,7 +13,7 @@ export function DashboardRemoveBrandingCard({
 }: DashboardRemoveBrandingCardProps) {
   return (
     <Link
-      href='/billing/remove-branding'
+      href={APP_ROUTES.BILLING_REMOVE_BRANDING}
       className={cn(
         'group relative block overflow-hidden rounded-xl border border-sidebar-border bg-sidebar-surface px-3 py-3 text-primary-token',
         'transition-colors duration-150 ease-out hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',

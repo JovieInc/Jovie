@@ -18,6 +18,7 @@ import {
   DialogBody,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { type Consent, saveConsent } from '@/lib/cookies/consent';
 
@@ -147,7 +148,7 @@ function CookieCategories({
       >
         For more details, see our{' '}
         <Link
-          href='/legal/cookies'
+          href={APP_ROUTES.LEGAL_COOKIES}
           className='underline hover:opacity-80'
           style={{ color: 'var(--linear-text-secondary)' }}
         >
