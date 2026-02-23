@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries/keys';
 import {
   countMatchesByStatus,
@@ -59,13 +59,17 @@ describe('useDspMatchesQuery', () => {
         queries: {
           retry: false,
           gcTime: 0,
-          retryDelay: 0,
+          // retryDelay is intentionally omitted — the hook overrides it via its own retry config
         },
       },
     });
   });
 
   describe('useDspMatchesQuery hook', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('fetches matches successfully', async () => {
       const mockMatches = [
         createMockMatch({ id: 'match-1', providerId: 'apple_music' }),
@@ -216,7 +220,6 @@ describe('useDspMatchesQuery', () => {
 
       expect(result.current.isError).toBe(true);
       expect(result.current.error?.message).toBe('Profile not found');
-      vi.useRealTimers();
     });
 
     it('handles HTTP error', async () => {
@@ -237,7 +240,6 @@ describe('useDspMatchesQuery', () => {
       await vi.advanceTimersByTimeAsync(10000);
 
       expect(result.current.isError).toBe(true);
-      vi.useRealTimers();
     });
   });
 

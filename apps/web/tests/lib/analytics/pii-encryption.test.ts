@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 // Pre-derive a fast test key to avoid expensive scryptSync in every encrypt/decrypt call
 const FAST_TEST_KEY = crypto.randomBytes(32);
-const originalScryptSync = crypto.scryptSync;
+const originalScryptSync = crypto.scryptSync.bind(crypto);
 
 // Mock scryptSync to return a fast key instead of doing expensive key derivation (N=2^17)
 vi.spyOn(crypto, 'scryptSync').mockImplementation((...args: unknown[]) => {
@@ -17,7 +17,7 @@ vi.spyOn(crypto, 'scryptSync').mockImplementation((...args: unknown[]) => {
     return FAST_TEST_KEY;
   }
   // Fall through for any other usage
-  return (originalScryptSync as Function).apply(crypto, args);
+  return originalScryptSync(...(args as Parameters<typeof crypto.scryptSync>));
 });
 
 import {
