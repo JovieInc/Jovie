@@ -129,6 +129,8 @@ export const ServerEnvSchema = z.object({
   // Sentry server-side
   SENTRY_DSN: z.string().optional(),
   SENTRY_WEBHOOK_SECRET: z.string().optional(),
+  SENTRY_AUTH_TOKEN: z.string().optional(),
+  SENTRY_ORG_SLUG: z.string().optional(),
 
   // Linear webhook automation
   LINEAR_WEBHOOK_SECRET: z.string().optional(),
@@ -220,6 +222,8 @@ export const ENV_KEYS = [
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
   'SENTRY_WEBHOOK_SECRET',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',

@@ -11,6 +11,7 @@
 
 import { usePathname } from 'next/navigation';
 import { Header } from '@/components/site/Header';
+import { APP_ROUTES } from '@/constants/routes';
 import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 
 export interface MarketingHeaderProps
@@ -43,11 +44,11 @@ export function MarketingHeader({
 
   // Anchor nav links for the /launch landing page
   const launchNavLinks =
-    pathname === '/launch'
+    pathname === APP_ROUTES.LAUNCH
       ? [
           { href: '#how-it-works', label: 'How it works' },
           { href: '#features', label: 'Features' },
-          { href: '/launch/pricing', label: 'Pricing' },
+          { href: APP_ROUTES.LAUNCH_PRICING, label: 'Pricing' },
         ]
       : undefined;
 
