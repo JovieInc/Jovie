@@ -6,27 +6,17 @@
  * Read-only fields for release title and date display
  */
 
-import { Label } from '@jovie/ui';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 import { formatReleaseDate } from './utils';
 
 interface ReleaseFieldsProps {
   readonly title: string;
   readonly releaseDate: string | undefined;
-  readonly smartLinkPath: string;
 }
 
-export function ReleaseFields({
-  title,
-  releaseDate,
-  smartLinkPath,
-}: ReleaseFieldsProps) {
-  const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
-
+export function ReleaseFields({ title, releaseDate }: ReleaseFieldsProps) {
   return (
     <div className='space-y-3'>
       {/* Title field - always read-only, 2 lines max with tooltip */}
@@ -58,12 +48,6 @@ export function ReleaseFields({
           </span>
         }
       />
-
-      {/* Smart link field with copy functionality */}
-      <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-        <Label className='text-xs text-tertiary-token'>Smart link</Label>
-        <CopyLinkInput url={smartLinkUrl} size='sm' />
-      </div>
     </div>
   );
 }

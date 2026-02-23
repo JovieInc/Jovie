@@ -17,8 +17,17 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
-  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
-    <section data-testid='drawer-section'>{children}</section>
+  DrawerSection: ({
+    title,
+    children,
+  }: {
+    title?: string;
+    children?: React.ReactNode;
+  }) => (
+    <section data-testid='drawer-section'>
+      {title ? <span>{title}</span> : null}
+      {children}
+    </section>
   ),
   DrawerLinkSection: ({
     title,
@@ -79,6 +88,15 @@ vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
 }));
+
+vi.mock(
+  '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
+  () => ({
+    ReleaseSmartLinkSection: () => (
+      <div data-testid='smart-link-section'>Smart Link Content</div>
+    ),
+  })
+);
 
 // Mock utilities
 vi.mock('sonner', () => ({
@@ -154,6 +172,9 @@ describe('ReleaseSidebar Links tab', () => {
 
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
+    expect(screen.getByText('Analytics')).toBeInTheDocument();
+    expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
@@ -187,11 +208,16 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
   });
 
-  it('Links tab renders DSP links component', async () => {
+  it('Links tab renders smart link and DSP links sections', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     await user.click(screen.getByRole('tab', { name: /links/i }));
+    expect(screen.getByText('Smart Link')).toBeInTheDocument();
+    expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
+      'Smart Link Content'
+    );
+    expect(screen.getByText('Distribution')).toBeInTheDocument();
     expect(screen.getByTestId('dsp-links')).toHaveTextContent(
       'DSP Links Content'
     );

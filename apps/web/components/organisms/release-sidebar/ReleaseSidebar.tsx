@@ -12,7 +12,7 @@ import { Button, SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerEmptyState, DrawerSection } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -26,6 +26,7 @@ import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
+import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
@@ -304,7 +305,6 @@ export function ReleaseSidebar({
                     <ReleaseFields
                       title={release.title}
                       releaseDate={release.releaseDate}
-                      smartLinkPath={release.smartLinkPath}
                     />
                   </div>
 
@@ -319,38 +319,47 @@ export function ReleaseSidebar({
 
               {/* Links tab: DSP links management */}
               {activeTab === 'links' && (
-                <div className='pt-0'>
-                  <ReleaseDspLinks
-                    release={release}
-                    providerConfig={providerConfig}
-                    isEditable={isEditable}
-                    isAddingLink={isAddingLink}
-                    newLinkUrl={newLinkUrl}
-                    selectedProvider={selectedProvider}
-                    isAddingDspLink={isAddingDspLink}
-                    isRemovingDspLink={isRemovingDspLink}
-                    onSetIsAddingLink={setIsAddingLink}
-                    onSetNewLinkUrl={setNewLinkUrl}
-                    onSetSelectedProvider={setSelectedProvider}
-                    onAddLink={handleAddLink}
-                    onRemoveLink={handleRemoveLink}
-                    onNewLinkKeyDown={handleNewLinkKeyDown}
-                    onRescanIsrc={onRescanIsrc}
-                    isRescanningIsrc={isRescanningIsrc}
-                  />
+                <div className='space-y-5'>
+                  <DrawerSection title='Smart Link'>
+                    <ReleaseSmartLinkSection
+                      smartLinkPath={release.smartLinkPath}
+                    />
+                  </DrawerSection>
+
+                  <DrawerSection title='Distribution'>
+                    <ReleaseDspLinks
+                      release={release}
+                      providerConfig={providerConfig}
+                      isEditable={isEditable}
+                      isAddingLink={isAddingLink}
+                      newLinkUrl={newLinkUrl}
+                      selectedProvider={selectedProvider}
+                      isAddingDspLink={isAddingDspLink}
+                      isRemovingDspLink={isRemovingDspLink}
+                      onSetIsAddingLink={setIsAddingLink}
+                      onSetNewLinkUrl={setNewLinkUrl}
+                      onSetSelectedProvider={setSelectedProvider}
+                      onAddLink={handleAddLink}
+                      onRemoveLink={handleRemoveLink}
+                      onNewLinkKeyDown={handleNewLinkKeyDown}
+                      onRescanIsrc={onRescanIsrc}
+                      isRescanningIsrc={isRescanningIsrc}
+                    />
+                  </DrawerSection>
                 </div>
               )}
 
               {/* Details tab: Metadata + Settings */}
               {activeTab === 'details' && (
-                <>
-                  <div className='pb-5'>
+                <div className='space-y-5'>
+                  <DrawerSection title='Analytics'>
                     <ReleaseSmartLinkAnalytics
                       release={release}
                       providerConfig={providerConfig}
                     />
-                  </div>
-                  <div className='pb-5'>
+                  </DrawerSection>
+
+                  <DrawerSection title='Metadata'>
                     <ReleaseMetadata
                       release={release}
                       onCanvasStatusChange={
@@ -359,14 +368,14 @@ export function ReleaseSidebar({
                           : undefined
                       }
                     />
-                  </div>
+                  </DrawerSection>
 
                   {isEditable && (
-                    <div className='pt-5'>
+                    <DrawerSection title='Settings'>
                       <ReleaseSettings allowDownloads={allowDownloads} />
-                    </div>
+                    </DrawerSection>
                   )}
-                </>
+                </div>
               )}
 
               {/* Lyrics tab: Lyrics editor */}
