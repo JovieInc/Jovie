@@ -4,7 +4,7 @@ import { type ReactNode, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerPropertyRowProps {
-  readonly label: string;
+  readonly label: ReactNode;
   readonly value: ReactNode;
   readonly labelWidth?: number;
   readonly interactive?: boolean;
