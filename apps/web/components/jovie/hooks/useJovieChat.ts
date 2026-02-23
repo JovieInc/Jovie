@@ -180,10 +180,11 @@ export function useJovieChat({
 
   // Sync initial messages when loaded
   useEffect(() => {
+    if (status !== 'ready') return;
     if (initialMessages && initialMessages.length > 0) {
       setMessages(initialMessages);
     }
-  }, [initialMessages, setMessages]);
+  }, [initialMessages, setMessages, status]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
