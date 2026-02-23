@@ -14,11 +14,11 @@ name: CodeQL Security Analysis
 on:
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
   merge_group:
   schedule:
     - cron: '36 13 * * 1' # Weekly on Monday at 13:36 UTC
+  # Note: pull_request trigger removed — CodeQL was too slow on every PR push.
+  # It now only runs on main pushes, merge queue, and weekly schedule.
 
 permissions:
   security-events: write
