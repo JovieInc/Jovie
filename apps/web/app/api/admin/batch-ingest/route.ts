@@ -6,7 +6,7 @@ import {
   BillingUnavailableError,
   getCurrentUserEntitlements,
 } from '@/lib/entitlements/server';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { findAvailableHandle } from '@/lib/ingestion/flows/profile-operations';
 import {
@@ -83,20 +83,15 @@ async function ingestSpotifyArtist(
       return handleExistingUnclaimedProfile(tx, existing, socialContext);
     }
 
-    let finalHandle = fallbackHandle;
-
-    if (existing?.isClaimed) {
-      const availableHandle = await findAvailableHandle(tx, fallbackHandle);
-      if (!availableHandle) {
-        return NextResponse.json(
-          {
-            error: 'Unable to allocate unique username',
-            details: 'All fallback username attempts exhausted.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
-        );
-      }
-      finalHandle = availableHandle;
+    const finalHandle = await findAvailableHandle(tx, fallbackHandle);
+    if (!finalHandle) {
+      return NextResponse.json(
+        {
+          error: 'Unable to allocate unique username',
+          details: 'All fallback username attempts exhausted.',
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
     }
 
     const response = await createNewSocialProfile(
@@ -227,13 +222,19 @@ export async function POST(request: Request) {
         const result = await ingestSpotifyArtist(spotifyArtistId);
         results.push(result);
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
+        await captureError('Batch ingest: artist ingestion failed', error, {
+          route: '/api/admin/batch-ingest',
+          spotifyArtistId,
+          input: entry,
+        });
         results.push({
           input: entry,
           status: 'error',
           spotifyArtistId,
-          reason: message,
+          reason: getSafeErrorMessage(
+            error,
+            'Failed to ingest artist profile.'
+          ),
         });
       }
     }
@@ -251,9 +252,14 @@ export async function POST(request: Request) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    await captureError('Batch ingest: request processing failed', error, {
+      route: '/api/admin/batch-ingest',
+    });
     return NextResponse.json(
-      { error: 'Failed to process batch ingest', details: message },
+      {
+        error: 'Failed to process batch ingest',
+        details: getSafeErrorMessage(error, 'An unexpected error occurred.'),
+      },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
