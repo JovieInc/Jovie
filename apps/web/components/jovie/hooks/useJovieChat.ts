@@ -61,6 +61,7 @@ export function useJovieChat({
 }: UseJovieChatOptions) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
+  const hasHydratedRef = useRef<string | null>(null);
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -178,13 +179,17 @@ export function useJovieChat({
     },
   });
 
-  // Sync initial messages when loaded
+  // Sync initial messages when loaded — but only once per conversation to avoid
+  // overwriting freshly streamed messages when the effect re-fires after
+  // persistence refetch updates initialMessages.
   useEffect(() => {
     if (status !== 'ready') return;
-    if (initialMessages && initialMessages.length > 0) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages, setMessages, status]);
+    if (!initialMessages || initialMessages.length === 0) return;
+    if (hasHydratedRef.current === activeConversationId) return;
+
+    setMessages(initialMessages);
+    hasHydratedRef.current = activeConversationId;
+  }, [initialMessages, setMessages, status, activeConversationId]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
