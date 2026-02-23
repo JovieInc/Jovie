@@ -79,7 +79,7 @@ export function DspConnectionPill({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium text-primary-token',
+          'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium',
           className
         )}
         style={{
@@ -88,10 +88,13 @@ export function DspConnectionPill({
         }}
       >
         <SocialIcon platform={style.platform} className='h-4 w-4' />
-        <span className='truncate max-w-[120px]'>
+        <span className='truncate max-w-[120px] text-secondary-token'>
           {artistName || 'Connected'}
         </span>
-        <CheckCircle2 className='h-4 w-4 shrink-0' />
+        <CheckCircle2
+          className='h-4 w-4 shrink-0'
+          style={{ color: style.accent }}
+        />
       </span>
     );
   }
@@ -106,7 +109,7 @@ export function DspConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium text-primary-token transition-colors cursor-pointer',
+              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               className
@@ -120,13 +123,19 @@ export function DspConnectionPill({
             }
           >
             <SocialIcon platform={style.platform} className='h-4 w-4' />
-            <span className='truncate max-w-[120px]'>
+            <span className='truncate max-w-[120px] text-secondary-token'>
               {artistName || 'Connected'}
             </span>
             {hovered || menuOpen ? (
-              <MoreHorizontal className='h-4 w-4 shrink-0' />
+              <MoreHorizontal
+                className='h-4 w-4 shrink-0'
+                style={{ color: style.accent }}
+              />
             ) : (
-              <CheckCircle2 className='h-4 w-4 shrink-0' />
+              <CheckCircle2
+                className='h-4 w-4 shrink-0'
+                style={{ color: style.accent }}
+              />
             )}
           </button>
         </DropdownMenuTrigger>

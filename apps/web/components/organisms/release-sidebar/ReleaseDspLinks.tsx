@@ -233,6 +233,7 @@ export function ReleaseDspLinks({
                 icon={icon}
                 label={config?.label || provider.key}
                 url={provider.url}
+                deepLinkPlatform={provider.key}
                 badge={isManual ? 'Custom' : undefined}
                 isEditable={isEditable}
                 isRemoving={isRemovingDspLink === provider.key}

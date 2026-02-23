@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { type NextRequest, NextResponse } from 'next/server';
 import { resolveScreenshotPath } from '@/lib/admin/screenshots';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -40,7 +41,11 @@ export async function GET(
         'Cache-Control': 'private, max-age=3600, stale-while-revalidate=86400',
       },
     });
-  } catch {
+  } catch (error) {
+    captureError('Failed to read screenshot file', error, {
+      route: '/api/admin/screenshots/[filename]',
+      filename,
+    });
     return NextResponse.json(
       { error: 'Screenshot not found' },
       { status: 404 }

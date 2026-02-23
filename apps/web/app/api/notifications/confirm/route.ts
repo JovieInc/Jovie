@@ -5,6 +5,7 @@ import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { verifySubscribeConfirmToken } from '@/lib/email/subscribe-confirm-token';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -72,6 +73,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${baseUrl}/${username}?subscribed=confirmed`);
   } catch (error) {
     logger.error('[Notifications Confirm] Error:', error);
+    captureError('Notification confirmation failed', error, {
+      route: '/api/notifications/confirm',
+    });
     return NextResponse.redirect(`${baseUrl}?error=server_error`);
   }
 }
