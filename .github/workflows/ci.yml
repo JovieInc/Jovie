@@ -1924,7 +1924,9 @@ jobs:
       - name: Run Required Smoke Tests
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-auth.spec.ts tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
+          # Keep required smoke focused on deterministic public-path coverage.
+          # Auth coverage is enforced separately in the PR auth smoke gate.
+          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
