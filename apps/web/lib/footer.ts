@@ -1,4 +1,5 @@
 import { APP_NAME } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { Artist } from '@/types/db';
 
 interface FooterOptions {
@@ -63,7 +64,7 @@ export async function generateFooterHTML({
 
         <div class="mt-4 pt-4 border-t border-gray-100">
           <a
-            href="/legal/privacy"
+            href="${APP_ROUTES.LEGAL_PRIVACY}"
             class="text-xs text-gray-400 hover:text-gray-600 transition-colors"
           >
             Privacy

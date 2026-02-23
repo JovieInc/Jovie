@@ -1,4 +1,5 @@
 import { FooterLink } from '@/components/atoms/FooterLink';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface FooterNavigationProps {
   readonly variant?: 'light' | 'dark';
@@ -12,8 +13,8 @@ interface FooterNavigationProps {
 }
 
 const defaultLinks = [
-  { href: '/legal/privacy', label: 'Privacy' },
-  { href: '/legal/terms', label: 'Terms' },
+  { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy' },
+  { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' },
 ];
 
 export function FooterNavigation({
