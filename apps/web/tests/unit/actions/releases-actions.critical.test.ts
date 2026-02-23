@@ -111,7 +111,7 @@ vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: { id: 'id', settings: 'settings' },
+  creatorProfiles: { id: 'id', settings: 'settings', spotifyId: 'spotifyId' },
 }));
 
 vi.mock('@/lib/discography/config', () => ({
@@ -206,6 +206,7 @@ vi.mock('@/lib/env-public', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
+  ne: vi.fn((a: unknown, b: unknown) => [a, b]),
 }));
 
 // ---------------------------------------------------------------------------
@@ -275,7 +276,7 @@ function makeTrack(overrides: Record<string, unknown> = {}) {
 
 /** Set up a chain mock for db.select().from().where().limit() */
 function setupDbSelectChain(result: unknown[]) {
-  mockDbSelect.mockReturnValue({
+  mockDbSelect.mockReturnValueOnce({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue(result),
@@ -317,6 +318,10 @@ function setupDbInsertChain(returnResult: unknown[]) {
 describe('@critical releases/actions.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDbSelect.mockReset();
+    mockDbInsert.mockReset();
+    mockDbUpdate.mockReset();
+    mockDbDelete.mockReset();
     mockGetCachedAuth.mockResolvedValue({ userId: MOCK_USER_ID });
     mockGetDashboardData.mockResolvedValue(makeDashboardData());
     mockRedirect.mockImplementation((url: string) => {
@@ -797,7 +802,6 @@ describe('@critical releases/actions.ts', () => {
         '@/app/app/(shell)/dashboard/releases/actions'
       );
       const result = await connectSpotifyArtist(connectParams);
-
       expect(result.success).toBe(true);
       expect(result.imported).toBe(3);
       expect(result.artistName).toBe('Test Artist');
@@ -834,6 +838,36 @@ describe('@critical releases/actions.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.imported).toBe(0);
+    });
+
+    it('handles unique constraint race conflicts gracefully', async () => {
+      setupDbSelectChain([{ settings: {} }]);
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockRejectedValue(
+            Object.assign(
+              new Error(
+                'duplicate key value violates unique constraint "creator_profiles_spotify_id_unique"'
+              ),
+              {
+                code: '23505',
+                constraint: 'creator_profiles_spotify_id_unique',
+              }
+            )
+          ),
+        }),
+      });
+
+      const { connectSpotifyArtist } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await connectSpotifyArtist(connectParams);
+
+      expect(result.success).toBe(false);
+      expect(result.imported).toBe(0);
+      expect(result.message).toMatch(
+        /already linked to another jovie account/i
+      );
     });
   });
 
