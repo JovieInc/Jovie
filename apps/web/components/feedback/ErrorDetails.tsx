@@ -72,11 +72,11 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
     <>
       <div className='space-y-2 border-t border-subtle pt-4'>
         {displayId && (
-          <p className='text-xs text-muted-foreground text-center'>
+          <p className='text-xs text-quaternary-token text-center'>
             Error ID: {displayId}
           </p>
         )}
-        <p className='text-xs text-muted-foreground text-center'>
+        <p className='text-xs text-quaternary-token text-center'>
           Occurred at: {timestamp.toLocaleString()}
         </p>
 
@@ -84,21 +84,21 @@ export function ErrorDetails({ error, extraContext }: ErrorDetailsProps) {
           <button
             type='button'
             onClick={handleCopy}
-            className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors'
+            className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors duration-normal ease-interactive'
             aria-label='Copy error details to clipboard'
           >
-            <Copy className='h-4 w-4' aria-hidden='true' />
-            Copy Error Details
+            <Copy className='h-3.5 w-3.5' aria-hidden='true' />
+            Copy error details
           </button>
         </div>
       </div>
 
       {process.env.NODE_ENV === 'development' && error?.message && (
         <details className='mt-4 rounded-md bg-surface-2 p-3'>
-          <summary className='cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground'>
+          <summary className='cursor-pointer text-xs font-medium text-tertiary-token hover:text-primary-token'>
             Developer Info (dev only)
           </summary>
-          <pre className='mt-2 overflow-auto text-xs text-muted-foreground whitespace-pre-wrap break-words'>
+          <pre className='mt-2 overflow-auto text-xs text-quaternary-token whitespace-pre-wrap break-words'>
             {error.message}
             {error.stack && `\n\n${error.stack}`}
           </pre>
