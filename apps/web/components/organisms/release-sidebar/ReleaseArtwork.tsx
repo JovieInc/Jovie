@@ -87,10 +87,10 @@ export function ReleaseArtwork({
         alt={altText}
         name={title}
         size='lg'
+        rounded='md'
         uploadable={canUploadArtwork}
         onUpload={onArtworkUpload}
         showHoverOverlay
-        className='rounded'
       />
     ) : (
       staticImage
