@@ -4,7 +4,9 @@ import { Badge } from '@jovie/ui';
 import { memo } from 'react';
 import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { PopularityIcon } from './PopularityIcon';
 
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
@@ -19,6 +21,8 @@ interface ReleaseCellProps {
  * Shows:
  * - Album artwork thumbnail (40x40px)
  * - Release title with tooltip (only when truncated)
+ * - Release type badge (Single, EP, Album, etc.)
+ * - Popularity signal-bars icon
  * - Optional "edited" badge if manual overrides exist
  * - Artist name if provided
  */
@@ -30,6 +34,10 @@ export const ReleaseCell = memo(function ReleaseCell({
   const manualOverrideCount = release.providers.filter(
     provider => provider.source === 'manual'
   ).length;
+
+  const typeStyle = release.releaseType
+    ? getReleaseTypeStyle(release.releaseType)
+    : null;
 
   return (
     <div className='flex items-center gap-3'>
@@ -51,11 +59,15 @@ export const ReleaseCell = memo(function ReleaseCell({
           >
             {release.title}
           </TruncatedText>
-          {showType && release.releaseType && (
-            <span className='shrink-0 text-[10px] uppercase tracking-wide text-tertiary-token'>
-              {release.releaseType}
-            </span>
+          {showType && typeStyle && (
+            <Badge
+              variant='secondary'
+              className={`shrink-0 border bg-transparent text-[10px] font-medium ${typeStyle.border} ${typeStyle.text}`}
+            >
+              {typeStyle.label}
+            </Badge>
           )}
+          <PopularityIcon popularity={release.spotifyPopularity} />
           {/* Year - mobile only (meta column is hidden on mobile) */}
           {release.releaseDate && (
             <span className='shrink-0 text-[10px] tabular-nums text-tertiary-token sm:hidden'>
