@@ -15,6 +15,11 @@ permissions:
   issues: read
   pull-requests: read
 
+# Prevent multiple Claude runs on the same PR/issue — only latest matters
+concurrency:
+  group: claude-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   claude:
     if: |
@@ -60,4 +65,3 @@ jobs:
 
           # Use Opus 4.5 for GitHub-triggered tasks (complex by nature)
           claude_args: '--model claude-opus-4-5-20251101'
-
