@@ -10,6 +10,7 @@ import {
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { queryKeys } from '@/lib/queries/keys';
 import {
@@ -93,26 +94,45 @@ export function ConnectedDspList({
   });
 
   const { mutate: triggerDiscovery } = useTriggerDiscoveryMutation();
-  const { mutate: rejectMatch } = useRejectDspMatchMutation();
+  const { mutateAsync: rejectMatchAsync, isPending: isDisconnectPending } =
+    useRejectDspMatchMutation();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteProvider, setPaletteProvider] =
     useState<DspProvider>('apple_music');
+  const [matchToDisconnect, setMatchToDisconnect] = useState<
+    DspMatch | undefined
+  >(undefined);
 
-  const handleDisconnect = useCallback(
-    (match: DspMatch | undefined) => {
-      if (!match) return;
-      const label = getProviderLabel(match.providerId as DspProvider);
-      rejectMatch(
-        { matchId: match.id, profileId, reason: 'user_disconnected' },
-        {
-          onSuccess: () => toast.success(`${label} disconnected`),
-          onError: err =>
-            toast.error(err.message || `Failed to disconnect ${label}`),
-        }
+  const handleDisconnect = useCallback((match: DspMatch | undefined) => {
+    if (!match) return;
+    setMatchToDisconnect(match);
+  }, []);
+
+  const handleDisconnectConfirm = useCallback(async () => {
+    if (!matchToDisconnect) return;
+    const label = getProviderLabel(matchToDisconnect.providerId as DspProvider);
+    try {
+      await rejectMatchAsync({
+        matchId: matchToDisconnect.id,
+        profileId,
+        reason: 'user_disconnected',
+      });
+      toast.success(`${label} disconnected`);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error ? err.message : `Failed to disconnect ${label}`
       );
+    }
+  }, [matchToDisconnect, profileId, rejectMatchAsync]);
+
+  const handleDisconnectCancel = useCallback(
+    (open: boolean) => {
+      if (open) return;
+      if (isDisconnectPending) return;
+      setMatchToDisconnect(undefined);
     },
-    [profileId, rejectMatch]
+    [isDisconnectPending]
   );
 
   const handleSyncNow = useCallback(
@@ -203,20 +223,31 @@ export function ConnectedDspList({
   const hasNoConnections = !spotifyId && !spotifyMatch && !appleMusicMatch;
 
   return (
-    <ConnectedDspListContent
-      isSpotifyConnected={isSpotifyConnected}
-      spotifyId={spotifyId}
-      spotifyMatch={spotifyMatch}
-      appleMusicMatch={appleMusicMatch}
-      hasNoConnections={hasNoConnections}
-      handleOpenPalette={handleOpenPalette}
-      handleSyncNow={handleSyncNow}
-      handleDisconnect={handleDisconnect}
-      paletteOpen={paletteOpen}
-      setPaletteOpen={setPaletteOpen}
-      paletteProvider={paletteProvider}
-      handlePaletteSelect={handlePaletteSelect}
-    />
+    <>
+      <ConnectedDspListContent
+        isSpotifyConnected={isSpotifyConnected}
+        spotifyId={spotifyId}
+        spotifyMatch={spotifyMatch}
+        appleMusicMatch={appleMusicMatch}
+        hasNoConnections={hasNoConnections}
+        handleOpenPalette={handleOpenPalette}
+        handleSyncNow={handleSyncNow}
+        handleDisconnect={handleDisconnect}
+        paletteOpen={paletteOpen}
+        setPaletteOpen={setPaletteOpen}
+        paletteProvider={paletteProvider}
+        handlePaletteSelect={handlePaletteSelect}
+      />
+      <ConfirmDialog
+        open={!!matchToDisconnect}
+        onOpenChange={handleDisconnectCancel}
+        title={`Disconnect ${matchToDisconnect ? getProviderLabel(matchToDisconnect.providerId as DspProvider) : 'provider'}?`}
+        description='Disconnecting will stop sync updates for this provider until you reconnect it.'
+        confirmLabel='Disconnect'
+        variant='destructive'
+        onConfirm={handleDisconnectConfirm}
+      />
+    </>
   );
 }
 
