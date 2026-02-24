@@ -140,6 +140,12 @@ const SwipeActions = memo(function SwipeActions({
   );
 });
 
+function getReleaseYear(release: ReleaseViewModel): number | null {
+  return release.releaseDate
+    ? new Date(release.releaseDate).getFullYear()
+    : null;
+}
+
 /** Single release row in the mobile list — Apple Music layout, Linear tokens */
 const MobileReleaseRow = memo(function MobileReleaseRow({
   release,
@@ -162,32 +168,25 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     releaseId: string
   ) => 'scheduled' | 'cap' | null;
 }) {
-  const year = release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
-    : null;
+  const year = getReleaseYear(release);
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
 
-  const actions = useMemo(
-    () => (
-      <SwipeActions
-        release={release}
-        onEdit={onEdit}
-        onCopy={onCopy}
-        isLocked={isLocked}
-        lockReason={lockReason}
-      />
-    ),
-    [release, onEdit, onCopy, isLocked, lockReason]
-  );
-
   return (
     <SwipeToReveal
       itemId={release.id}
       actionsWidth={SWIPE_ACTIONS_WIDTH}
-      actions={actions}
+      actions={
+        <SwipeActions
+          release={release}
+          onEdit={onEdit}
+          onCopy={onCopy}
+          isLocked={isLocked}
+          lockReason={lockReason}
+        />
+      }
       className='border-b border-subtle'
       contentClassName='bg-base'
     >

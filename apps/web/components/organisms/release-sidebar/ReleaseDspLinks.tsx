@@ -212,7 +212,7 @@ export function ReleaseDspLinks({
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='divide-y divide-subtle/50'>
+        <div className='space-y-0.5'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const dspId = PROVIDER_TO_DSP[provider.key];

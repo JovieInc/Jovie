@@ -1,6 +1,6 @@
 'use client';
 
-import { PanelRight, PanelRightOpen } from 'lucide-react';
+import { PanelRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
@@ -14,7 +14,10 @@ export function DrawerToggleButton() {
     setIsOpen((tableMeta.rightPanelWidth ?? 0) > 0);
   }, [tableMeta.rightPanelWidth]);
 
-  const Icon = isOpen ? PanelRightOpen : PanelRight;
+  // Hide when drawer is open — the drawer's X button handles closing
+  if (isOpen) return null;
+
+  const Icon = PanelRight;
 
   return (
     <DashboardHeaderActionButton

@@ -102,7 +102,7 @@ export async function saveReleaseToSpotifyLibrary(params: {
   isTrack: boolean;
 }) {
   const endpoint = params.isTrack ? 'tracks' : 'albums';
-  const key = params.isTrack ? 'ids' : 'ids';
+  const key = 'ids';
   const url = `${SPOTIFY_API_BASE}/me/${endpoint}?${key}=${encodeURIComponent(params.spotifyReleaseId)}`;
 
   const response = await fetch(url, {
