@@ -3,7 +3,23 @@
  * Validates AES-256-GCM encryption for personally identifiable information
  */
 
+import crypto from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// Pre-derive a fast test key to avoid expensive scryptSync in every encrypt/decrypt call
+const FAST_TEST_KEY = crypto.randomBytes(32);
+const originalScryptSync = crypto.scryptSync.bind(crypto);
+
+// Mock scryptSync to return a fast key instead of doing expensive key derivation (N=2^17)
+vi.spyOn(crypto, 'scryptSync').mockImplementation((...args: unknown[]) => {
+  // If called with our PII salt, return the fast key
+  if (args[1] === 'jovie-pii-salt' && args[2] === 32) {
+    return FAST_TEST_KEY;
+  }
+  // Fall through for any other usage
+  return originalScryptSync(...(args as Parameters<typeof crypto.scryptSync>));
+});
+
 import {
   decryptEmail,
   decryptIP,
@@ -109,13 +125,11 @@ describe('PII Encryption', () => {
       expect(decryptPII(encrypted2)).toBe(value);
     });
 
-    it('should use strong scrypt work factor parameters for key derivation', async () => {
-      const cryptoModule = await import('node:crypto');
-      const scryptSpy = vi.spyOn(cryptoModule.default, 'scryptSync');
-
+    it('should use strong scrypt work factor parameters for key derivation', () => {
+      // The scryptSync mock captures all calls — verify it was called with correct params
       encryptPII('harden@example.com');
 
-      expect(scryptSpy).toHaveBeenCalledWith(
+      expect(crypto.scryptSync).toHaveBeenCalledWith(
         TEST_ENCRYPTION_KEY,
         'jovie-pii-salt',
         32,

@@ -90,12 +90,19 @@ export function useReleaseProviderMatrix({
   );
 
   const openEditor = useCallback((release: ReleaseViewModel) => {
-    setEditingRelease(release);
-    const nextDrafts: DraftState = {};
-    release.providers.forEach(provider => {
-      nextDrafts[provider.key] = provider.url ?? '';
+    // Toggle: clicking the same release closes the editor
+    setEditingRelease(current => {
+      if (current?.id === release.id) {
+        setDrafts({});
+        return null;
+      }
+      const nextDrafts: DraftState = {};
+      release.providers.forEach(provider => {
+        nextDrafts[provider.key] = provider.url ?? '';
+      });
+      setDrafts(nextDrafts);
+      return release;
     });
-    setDrafts(nextDrafts);
   }, []);
 
   const closeEditor = useCallback(() => {
@@ -260,12 +267,18 @@ export function useReleaseProviderMatrix({
       refreshReleaseMutation.mutate(
         { releaseId },
         {
-          onSuccess: updated => {
-            updateRow(updated);
-            setFlashedReleaseId(updated.id);
+          onSuccess: result => {
+            if (result.rateLimited) {
+              toast.error(
+                `Refresh is rate limited. Available again in ${result.retryAfter}.`
+              );
+              return;
+            }
+            updateRow(result.release);
+            setFlashedReleaseId(result.release.id);
             globalThis.setTimeout(() => {
               setFlashedReleaseId(current =>
-                current === updated.id ? null : current
+                current === result.release.id ? null : current
               );
             }, 1200);
             toast.success('Release refreshed');

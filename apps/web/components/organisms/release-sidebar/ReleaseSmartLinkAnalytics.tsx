@@ -102,12 +102,14 @@ export function ReleaseSmartLinkAnalytics({
       {isLoading && (
         <div className='grid grid-cols-2 gap-3'>
           <div className='rounded-lg border border-subtle bg-surface-2/40 px-3 py-2.5'>
-            <div className='h-3 w-16 rounded skeleton' />
-            <div className='mt-2 h-5 w-12 rounded skeleton' />
+            <div className='h-[10px] w-16 rounded skeleton' />
+            <div className='mt-1 h-[22px] w-12 rounded skeleton' />
+            <div className='mt-0.5 h-[11px] w-10 rounded skeleton' />
           </div>
           <div className='rounded-lg border border-subtle bg-surface-2/40 px-3 py-2.5'>
-            <div className='h-3 w-16 rounded skeleton' />
-            <div className='mt-2 h-5 w-12 rounded skeleton' />
+            <div className='h-[10px] w-16 rounded skeleton' />
+            <div className='mt-1 h-[22px] w-12 rounded skeleton' />
+            <div className='mt-0.5 h-[11px] w-10 rounded skeleton' />
           </div>
         </div>
       )}

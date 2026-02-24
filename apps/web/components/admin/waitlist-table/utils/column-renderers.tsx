@@ -5,7 +5,6 @@ import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';
 import type { RefObject } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
-import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
@@ -146,17 +145,17 @@ export function renderStatusCell(status: WaitlistEntryRow['status']) {
 
   const statusVariants: Record<
     WaitlistEntryRow['status'],
-    'blue' | 'green' | 'purple' | 'orange' | 'red' | 'gray'
+    'primary' | 'secondary' | 'success' | 'warning' | 'error'
   > = {
-    new: 'blue',
-    invited: 'orange',
-    claimed: 'green',
+    new: 'primary',
+    invited: 'warning',
+    claimed: 'success',
   };
 
   return (
-    <StatusBadge variant={statusVariants[status]}>
+    <Badge size='sm' variant={statusVariants[status]}>
       {statusLabels[status]}
-    </StatusBadge>
+    </Badge>
   );
 }
 
