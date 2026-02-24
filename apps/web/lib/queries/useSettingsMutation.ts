@@ -20,7 +20,7 @@ import { handleMutationError, handleMutationSuccess } from './mutation-utils';
  * Input type for settings updates.
  * Supports partial updates to different settings sections.
  */
-export interface SettingsUpdateInput {
+export type SettingsUpdateInput = {
   updates: {
     theme?: {
       preference: 'light' | 'dark' | 'system';
@@ -35,7 +35,7 @@ export interface SettingsUpdateInput {
       require_double_opt_in?: boolean;
     };
   };
-}
+};
 
 /**
  * Response from the settings update API.
