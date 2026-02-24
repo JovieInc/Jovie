@@ -156,8 +156,8 @@ export async function GET(request: NextRequest) {
 
   const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
 
-  const clientIp = getClientIP(request);
-  const rateLimitResult = await appleMusicSearchLimiter.limit(clientIp);
+  const identifier = userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
+  const rateLimitResult = await appleMusicSearchLimiter.limit(identifier);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,
     ...createRateLimitHeaders(rateLimitResult),
