@@ -55,7 +55,7 @@ const getRecordBoolean = (
 
 const maskIdentifier = (value: string | null | undefined): string | null => {
   if (!value) return null;
-  const sanitized = value.replace(/[^a-zA-Z0-9]/g, '');
+  const sanitized = value.replaceAll(/[^a-zA-Z0-9]/g, '');
   if (!sanitized) return null;
   const suffix = sanitized.slice(-4);
   return `****${suffix}`;

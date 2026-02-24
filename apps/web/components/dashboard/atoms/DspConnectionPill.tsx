@@ -87,7 +87,9 @@ export function DspConnectionPill({
           backgroundColor: `${style.accent}10`,
         }}
       >
-        <SocialIcon platform={style.platform} className='h-4 w-4' />
+        <span style={{ color: style.accent }}>
+          <SocialIcon platform={style.platform} className='h-4 w-4' />
+        </span>
         <span className='truncate max-w-[120px] text-secondary-token'>
           {artistName || 'Connected'}
         </span>
@@ -122,7 +124,9 @@ export function DspConnectionPill({
               } as React.CSSProperties
             }
           >
-            <SocialIcon platform={style.platform} className='h-4 w-4' />
+            <span style={{ color: style.accent }}>
+              <SocialIcon platform={style.platform} className='h-4 w-4' />
+            </span>
             <span className='truncate max-w-[120px] text-secondary-token'>
               {artistName || 'Connected'}
             </span>
@@ -175,7 +179,9 @@ export function DspConnectionPill({
         } as React.CSSProperties
       }
     >
-      <SocialIcon platform={style.platform} className='h-4 w-4' />
+      <span style={{ color: style.accent }}>
+        <SocialIcon platform={style.platform} className='h-4 w-4' />
+      </span>
       <span>Not Connected</span>
       <Plus className='h-4 w-4 shrink-0' />
     </button>
