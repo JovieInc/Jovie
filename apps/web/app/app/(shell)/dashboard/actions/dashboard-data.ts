@@ -140,6 +140,13 @@ export interface DashboardData {
   tippingStats: TippingStats;
   /** Profile setup completion percentage and recommended next steps */
   profileCompletion: ProfileCompletion;
+  /** Optional diagnostic payload when dashboard data loading partially fails */
+  dashboardLoadError?: {
+    stage: 'core_fetch' | 'core_cache';
+    message: string;
+    code: string | null;
+    errorType: string;
+  };
 }
 
 export interface ProfileCompletionStep {
@@ -450,6 +457,7 @@ async function fetchDashboardCoreWithSession(
         hasLinks,
         hasMusicLinks
       ),
+      dashboardLoadError: undefined,
     };
   } catch (error) {
     // Handle both standard and non-standard error objects
@@ -493,6 +501,12 @@ async function fetchDashboardCoreWithSession(
       hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message,
+        code: code ?? null,
+        errorType,
+      },
     };
   }
 }
@@ -658,8 +672,21 @@ async function resolveDashboardData(): Promise<DashboardData> {
     return {
       ...coreData,
       isAdmin,
+      dashboardLoadError: coreData.dashboardLoadError,
     };
   } catch (error) {
+    const errorObj = error as
+      | Error
+      | { code?: string; message?: string; cause?: unknown };
+    const message =
+      (errorObj as Error).message ??
+      (errorObj as { message?: string }).message ??
+      'Unknown error';
+    const code =
+      (errorObj as { code?: string }).code ??
+      (errorObj as { cause?: { code?: string } }).cause?.code;
+    const errorType = errorObj?.constructor?.name ?? typeof errorObj;
+
     Sentry.captureException(error, {
       tags: { context: 'get_dashboard_data' },
     });
@@ -675,6 +702,12 @@ async function resolveDashboardData(): Promise<DashboardData> {
       isAdmin,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
+      dashboardLoadError: {
+        stage: 'core_cache',
+        message,
+        code: code ?? null,
+        errorType,
+      },
     };
   }
 }

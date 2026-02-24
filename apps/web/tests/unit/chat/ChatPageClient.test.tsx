@@ -11,6 +11,12 @@ const mockSetHeaderBadge = vi.fn();
 const mockSetHeaderActions = vi.fn();
 const mockSuccessNotification = vi.fn();
 const mockErrorNotification = vi.fn();
+const { mockSentryAddBreadcrumb, mockSentryCaptureMessage } = vi.hoisted(
+  () => ({
+    mockSentryAddBreadcrumb: vi.fn(),
+    mockSentryCaptureMessage: vi.fn(),
+  })
+);
 
 let mockSearchParams = new URLSearchParams();
 
@@ -22,6 +28,11 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/app/chat',
+}));
+
+vi.mock('@sentry/nextjs', () => ({
+  addBreadcrumb: mockSentryAddBreadcrumb,
+  captureMessage: mockSentryCaptureMessage,
 }));
 
 // Mock the HeaderActionsContext
@@ -241,5 +252,36 @@ describe('ChatPageClient', () => {
 
     // Should show spinner, not JovieChat
     expect(container.querySelector('[data-testid="jovie-chat"]')).toBeNull();
+    expect(container.textContent).toContain(
+      'Looks like your profile is still being set up. This usually takes a few seconds.'
+    );
+    expect(mockSentryAddBreadcrumb).toHaveBeenCalled();
+  });
+
+  it('shows load failed message when dashboard load error exists', () => {
+    const dataWithoutProfile: DashboardData = {
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message: 'DB timeout',
+        code: 'QUERY_TIMEOUT',
+        errorType: 'QueryTimeoutError',
+      },
+    };
+
+    const { container } = fastRender(
+      <DashboardDataProvider value={dataWithoutProfile}>
+        <ChatPageClient />
+      </DashboardDataProvider>
+    );
+
+    expect(container.textContent).toContain(
+      'We hit a problem loading your profile. Please retry in a moment.'
+    );
+    expect(mockSentryCaptureMessage).toHaveBeenCalledWith(
+      'Chat selectedProfile missing due to dashboard load failure',
+      expect.any(Object)
+    );
   });
 });
