@@ -152,6 +152,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const rawQuery = searchParams.get('q');
   const initialQuery =
     !initialQueryHandled && !conversationId ? rawQuery : null;
+  const isFirstSession = !conversationId;
 
   // Mark as handled after first render so re-renders don't re-submit
   useEffect(() => {
@@ -194,6 +195,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
       username={selectedProfile.username ?? undefined}
+      isFirstSession={isFirstSession}
     />
   );
 }
