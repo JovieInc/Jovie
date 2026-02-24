@@ -39,6 +39,16 @@ const DEFAULT_THROTTLING: ThrottlingConfig = {
 /** Threshold for showing confirmation modal */
 const LARGE_BATCH_THRESHOLD = 25;
 
+function formatEngagementStatus(engagement: {
+  clicked: boolean;
+  clickCount: number;
+  opened: boolean;
+}): string {
+  if (engagement.clicked) return `Clicked (${engagement.clickCount})`;
+  if (engagement.opened) return 'Opened';
+  return 'No events';
+}
+
 export function InviteCampaignManager() {
   const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
   const [limit, setLimit] = useState(20);
@@ -474,11 +484,7 @@ export function InviteCampaignManager() {
                       {invite.status}
                     </td>
                     <td className='px-4 py-2 text-secondary-token'>
-                      {invite.engagement.clicked
-                        ? `Clicked (${invite.engagement.clickCount})`
-                        : invite.engagement.opened
-                          ? 'Opened'
-                          : 'No events'}
+                      {formatEngagementStatus(invite.engagement)}
                     </td>
                     <td className='px-4 py-2'>
                       <span

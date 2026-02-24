@@ -22,11 +22,11 @@ function ToggleSwitch({
   label,
   checked,
   onToggle,
-}: {
+}: Readonly<{
   label: string;
   checked: boolean;
   onToggle: () => void;
-}) {
+}>) {
   return (
     <button
       type='button'

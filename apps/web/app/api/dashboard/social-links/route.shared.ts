@@ -238,7 +238,7 @@ const buildEvidencePayload = (link: LinkInput): LinkEvidencePayload => ({
 });
 
 const buildVerificationToken = (): string =>
-  `jovie-verify=${randomUUID().replace(/-/g, '')}`;
+  `jovie-verify=${randomUUID().replaceAll(/-/g, '')}`;
 
 const scoreLinkConfidence = (
   link: LinkInput,

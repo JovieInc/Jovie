@@ -162,14 +162,6 @@ function slugify(name: string): string {
     .replaceAll('-', ''); // compact for socials (e.g., the1975)
 }
 
-function _slugifyWithDashes(name: string): string {
-  return name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/(^-|-$)/g, '');
-}
-
 function makeArtist(
   name: string,
   options: {
@@ -533,7 +525,7 @@ const billieDiscography: DiscographySeed[] = [
         isrc: 'USUM72100001',
       },
       {
-        title: 'I Didnt Change My Number',
+        title: "I Didn't Change My Number",
         slug: 'i-didnt-change-my-number',
         durationMs: 157000,
         trackNumber: 2,
@@ -584,7 +576,7 @@ const duaLipaDiscography: DiscographySeed[] = [
         isrc: 'GBAHT2000001',
       },
       {
-        title: 'Dont Start Now',
+        title: "Don't Start Now",
         slug: 'dont-start-now',
         durationMs: 183000,
         trackNumber: 2,
@@ -1163,7 +1155,7 @@ async function seedProviderLinksForRelease(
     ownerType: 'release' as const,
     releaseId,
     externalId: `${providerId}-${slug}`,
-    url: `https://${providerId.replace('_', '.')}.com/album/${username}-${slug}`,
+    url: `https://${providerId.replaceAll('_', '.')}.com/album/${username}-${slug}`,
     country: 'US',
     isPrimary: providerId === 'spotify',
     sourceType: 'admin' as const,

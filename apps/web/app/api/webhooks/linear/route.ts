@@ -148,8 +148,8 @@ function parseAutomationContract(body: string): AutomationContract {
   const modelMatch = body.match(/model_tier=(premium|economy)/i)?.[1];
 
   return {
-    verifyRequired: verifyMatch?.toLowerCase() === 'false' ? false : true,
-    simplifyBounded: simplifyMatch?.toLowerCase() === 'false' ? false : true,
+    verifyRequired: verifyMatch?.toLowerCase() !== 'false',
+    simplifyBounded: simplifyMatch?.toLowerCase() !== 'false',
     modelTier: modelMatch?.toLowerCase() === 'economy' ? 'economy' : 'premium',
   };
 }

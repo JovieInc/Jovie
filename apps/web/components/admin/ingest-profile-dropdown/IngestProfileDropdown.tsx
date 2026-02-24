@@ -81,9 +81,7 @@ export function IngestProfileDropdown({
 
           <SegmentControl
             value={network}
-            onValueChange={value =>
-              setNetwork(value as (typeof INGEST_NETWORKS)[number]['id'])
-            }
+            onValueChange={value => setNetwork(value)}
             options={networkOptions}
             size='sm'
             aria-label='Select social network for ingestion'

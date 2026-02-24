@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries/keys';
 import {
   countMatchesByStatus,
@@ -59,12 +59,17 @@ describe('useDspMatchesQuery', () => {
         queries: {
           retry: false,
           gcTime: 0,
+          // retryDelay is intentionally omitted — the hook overrides it via its own retry config
         },
       },
     });
   });
 
   describe('useDspMatchesQuery hook', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
     it('fetches matches successfully', async () => {
       const mockMatches = [
         createMockMatch({ id: 'match-1', providerId: 'apple_music' }),
@@ -193,6 +198,7 @@ describe('useDspMatchesQuery', () => {
     });
 
     it('throws error when API returns success: false', async () => {
+      vi.useFakeTimers();
       // Use mockResolvedValue (not Once) because hook has retry: 3
       mockFetch.mockResolvedValue({
         ok: true,
@@ -209,17 +215,15 @@ describe('useDspMatchesQuery', () => {
         { wrapper }
       );
 
-      await waitFor(
-        () => {
-          expect(result.current.isError).toBe(true);
-        },
-        { timeout: 10000 }
-      );
+      // Fast-forward through retry delays (1s + 2s + 4s)
+      await vi.advanceTimersByTimeAsync(10000);
 
+      expect(result.current.isError).toBe(true);
       expect(result.current.error?.message).toBe('Profile not found');
     });
 
     it('handles HTTP error', async () => {
+      vi.useFakeTimers();
       // Use mockResolvedValue (not Once) because hook has retry: 3
       mockFetch.mockResolvedValue({
         ok: false,
@@ -232,12 +236,10 @@ describe('useDspMatchesQuery', () => {
         { wrapper }
       );
 
-      await waitFor(
-        () => {
-          expect(result.current.isError).toBe(true);
-        },
-        { timeout: 10000 }
-      );
+      // Fast-forward through retry delays
+      await vi.advanceTimersByTimeAsync(10000);
+
+      expect(result.current.isError).toBe(true);
     });
   });
 

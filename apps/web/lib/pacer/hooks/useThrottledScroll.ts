@@ -36,7 +36,7 @@ export function useThrottledScroll(
   const { wait = PACER_TIMING.THROTTLE_MS, threshold = 0 } = options;
 
   const [scrollY, setScrollY] = useState(() =>
-    typeof window === 'undefined' ? 0 : globalThis.scrollY
+    typeof globalThis.window === 'undefined' ? 0 : globalThis.scrollY
   );
 
   const throttler = useThrottler(

@@ -104,7 +104,7 @@ export function DspConnectionPill({
                 '--tw-ring-color': `${accent}50`,
               } as React.CSSProperties
             }
-            aria-label={`${label} connection`}
+            aria-label={`${label} connection: ${artistName || 'Connected'}`}
           >
             <DspProviderIcon provider={provider} size='sm' className='gap-0' />
             <span className='truncate max-w-[120px] text-secondary-token'>

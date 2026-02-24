@@ -50,4 +50,22 @@ describe('DspConnectionPill', () => {
     ).toBeInTheDocument();
     expect(screen.getByTestId('provider-icon-apple_music')).toBeInTheDocument();
   });
+
+  it('includes provider-aware accessible name for connected pill with actions', () => {
+    render(
+      <DspConnectionPill
+        provider='spotify'
+        connected
+        artistName='Jovie Artist'
+        onSyncNow={() => {}}
+        onDisconnect={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Spotify connection: Jovie Artist',
+      })
+    ).toBeInTheDocument();
+  });
 });

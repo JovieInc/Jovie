@@ -56,27 +56,32 @@ export function ReleaseSidebarHeader({
   const overflowActions: DrawerHeaderAction[] = [];
 
   if (showActions) {
-    // Copy smart link - primary action
-    // eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs
-    primaryActions.push({
-      id: 'copy',
-      label: isCopied ? 'Copied!' : 'Copy smart link',
-      icon: Copy,
-      activeIcon: Check,
-      isActive: isCopied,
-      onClick: handleCopySmartLink,
-    });
-
-    // Open smart link - always visible primary action
-    primaryActions.push({
-      id: 'open',
-      label: 'Open smart link',
-      icon: ExternalLink,
-      onClick: () => {
-        if (!release?.smartLinkPath) return;
-        globalThis.open(release.smartLinkPath, '_blank', 'noopener,noreferrer');
+    // Copy smart link + Open smart link - primary actions
+    /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
+    primaryActions.push(
+      {
+        id: 'copy',
+        label: isCopied ? 'Copied!' : 'Copy smart link',
+        icon: Copy,
+        activeIcon: Check,
+        isActive: isCopied,
+        onClick: handleCopySmartLink,
       },
-    });
+      {
+        id: 'open',
+        label: 'Open smart link',
+        icon: ExternalLink,
+        onClick: () => {
+          if (!release?.smartLinkPath) return;
+          globalThis.open(
+            release.smartLinkPath,
+            '_blank',
+            'noopener,noreferrer'
+          );
+        },
+      }
+    );
+    /* eslint-enable react-hooks/refs */
 
     // Refresh - overflow action
     overflowActions.push({
