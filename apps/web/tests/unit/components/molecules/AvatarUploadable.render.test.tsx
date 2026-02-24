@@ -43,6 +43,32 @@ describe('AvatarUploadable - Display Mode (Non-uploadable)', () => {
     expect(button).toHaveAttribute('tabIndex', '-1');
   });
 
+  it('uses circular shape by default for people avatars', () => {
+    const { container } = render(
+      <AvatarUploadable
+        src='https://example.com/avatar.jpg'
+        alt='User avatar'
+        name='John Doe'
+        uploadable={false}
+      />
+    );
+
+    expect(container.querySelector('.rounded-full')).toBeInTheDocument();
+  });
+
+  it('supports non-circular shape overrides when provided', () => {
+    const { container } = render(
+      <AvatarUploadable
+        src='https://example.com/avatar.jpg'
+        alt='Release artwork'
+        name='Midnight Echo'
+        rounded='md'
+        uploadable={false}
+      />
+    );
+
+    expect(container.querySelector('.rounded-md')).toBeInTheDocument();
+  });
   it('does not show hover overlay when not uploadable', () => {
     render(
       <AvatarUploadable

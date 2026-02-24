@@ -410,10 +410,10 @@ describe('ErrorBoundary', () => {
       const tryAgainButton = screen.getByRole('button', { name: /try again/i });
       const goHomeButton = screen.getByRole('button', { name: /go home/i });
 
-      // Primary button should have primary bg styling (CVA utility classes)
+      // Button uses CVA with Tailwind classes (variant='primary', size='sm')
       expect(tryAgainButton).toHaveClass('bg-btn-primary');
-      // Outline/secondary button should have border styling
-      expect(goHomeButton).toHaveClass('border');
+      // Button uses CVA with Tailwind classes (variant='outline', size='sm')
+      expect(goHomeButton).toHaveClass('border-border');
     });
   });
 });
