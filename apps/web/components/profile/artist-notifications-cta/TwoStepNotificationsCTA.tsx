@@ -6,10 +6,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@jovie/ui';
-import { AlertCircle, Bell } from 'lucide-react';
+import { AlertCircle, Mail, Phone } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import { CountrySelector } from '@/components/profile/notifications';
+import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import type { Artist } from '@/types/db';
 import {
@@ -19,6 +21,7 @@ import {
   SubscriptionSuccess,
 } from './shared';
 import { useSubscriptionForm } from './useSubscriptionForm';
+import { formatPhoneDigitsForDisplay, getMaxNationalDigits } from './utils';
 
 type Step = 'button' | 'input';
 
@@ -75,20 +78,61 @@ function useImpressionTracking(handle: string) {
   }, [tracked, handle]);
 }
 
+function getInputConfig(channel: 'email' | 'sms') {
+  return channel === 'sms'
+    ? {
+        type: 'tel' as const,
+        inputMode: 'numeric' as const,
+        placeholder: '(555) 123-4567',
+        autoComplete: 'tel-national',
+        maxLength: 32,
+      }
+    : {
+        type: 'email' as const,
+        inputMode: 'email' as const,
+        placeholder: 'your@email.com',
+        autoComplete: 'email',
+        maxLength: 254,
+      };
+}
+
+function getPhonePrefillValue(
+  phone: string | null | undefined,
+  dialCode: string
+): string {
+  if (!phone) return '';
+  const digitsOnly = phone.replaceAll(/[^\d]/g, '');
+  const dialDigits = dialCode.replace('+', '');
+  const withoutCountryCode = digitsOnly.startsWith(dialDigits)
+    ? digitsOnly.slice(dialDigits.length)
+    : digitsOnly;
+  return withoutCountryCode.slice(0, getMaxNationalDigits(dialCode));
+}
+
 export function TwoStepNotificationsCTA({
   artist,
 }: TwoStepNotificationsCTAProps) {
   const {
+    country,
+    setCountry,
+    phoneInput,
     emailInput,
     error,
+    otpStep,
     isSubmitting,
+    isCountryOpen,
+    setIsCountryOpen,
+    channel,
+    subscribedChannels,
+    handleChannelChange,
+    handlePhoneChange,
     handleEmailChange,
     handleFieldBlur,
     handleSubscribe,
+    handleVerifyOtp,
     handleKeyDown,
     notificationsState,
     notificationsEnabled,
-    subscribedChannels,
     openSubscription,
     hydrationStatus,
   } = useSubscriptionForm({ artist });
@@ -99,6 +143,7 @@ export function TwoStepNotificationsCTA({
   const disclaimerId = useId();
   const [isInputFocused, setIsInputFocused] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const { user } = useUserSafe();
 
   useImpressionTracking(artist.handle);
 
@@ -111,7 +156,39 @@ export function TwoStepNotificationsCTA({
     });
   }, [artist.handle, openSubscription]);
 
-  // Auto-focus the email input after transition to step 2
+  useEffect(() => {
+    if (notificationsState === 'editing') {
+      setStep('input');
+    }
+  }, [notificationsState]);
+
+  useEffect(() => {
+    if (step !== 'input' || notificationsState !== 'editing') return;
+
+    const primaryEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+    const primaryPhone = user?.primaryPhoneNumber?.phoneNumber ?? '';
+
+    if (channel === 'email' && !emailInput && primaryEmail) {
+      handleEmailChange(primaryEmail);
+      return;
+    }
+
+    if (channel === 'sms' && !phoneInput && primaryPhone) {
+      handlePhoneChange(getPhonePrefillValue(primaryPhone, country.dialCode));
+    }
+  }, [
+    channel,
+    country.dialCode,
+    emailInput,
+    handleEmailChange,
+    handlePhoneChange,
+    notificationsState,
+    phoneInput,
+    step,
+    user,
+  ]);
+
+  // Auto-focus the input after transition
   useEffect(() => {
     if (step !== 'input') return;
     const timeoutId = globalThis.setTimeout(
@@ -140,27 +217,39 @@ export function TwoStepNotificationsCTA({
     return <SubscriptionSuccess artistName={artist.name} />;
   }
 
-  // If notifications aren't enabled, don't render (parent handles fallback)
   if (!notificationsEnabled) {
     return null;
   }
 
   const instant = prefersReducedMotion === true;
   const enterVariant = getEnterVariant(instant);
+  const shouldShowCountrySelector =
+    otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
+  const inputConfig = getInputConfig(channel);
+  const inputValue =
+    channel === 'sms'
+      ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
+      : emailInput;
 
   return (
     <div className='space-y-3'>
+      <p
+        className='text-center text-sm font-semibold text-emerald-400'
+        style={noFontSynthesisStyle}
+      >
+        Never miss a release.
+      </p>
+
       <AnimatePresence mode='wait' initial={false}>
         {step === 'button' ? (
           <motion.div key='cta-button' exit={getExitVariant(instant)}>
             <button
               type='button'
               onClick={handleReveal}
-              className='w-full inline-flex items-center justify-center gap-2.5 rounded-xl bg-btn-primary px-8 py-4 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
+              className='w-full inline-flex items-center justify-center rounded-xl bg-btn-primary px-8 py-4 text-base font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
               style={noFontSynthesisStyle}
             >
-              <Bell className='w-5 h-5' aria-hidden='true' />
-              Turn on Notifications
+              Turn on notifications
             </button>
           </motion.div>
         ) : (
@@ -170,32 +259,55 @@ export function TwoStepNotificationsCTA({
             animate={enterVariant.animate}
           >
             <div className='space-y-3'>
-              <p
-                className='text-center text-[13px] font-[450] tracking-wide text-tertiary-token'
-                style={noFontSynthesisStyle}
-              >
-                Get notified about new releases &amp; more.
-              </p>
-
               <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
                 <div className='flex items-center'>
-                  <div className='h-12 pl-4 pr-3 flex items-center text-tertiary-token'>
-                    <Bell className='w-4 h-4' aria-hidden='true' />
-                  </div>
+                  {shouldShowCountrySelector ? (
+                    <CountrySelector
+                      country={country}
+                      isOpen={isCountryOpen}
+                      onOpenChange={setIsCountryOpen}
+                      onSelect={setCountry}
+                    />
+                  ) : (
+                    <button
+                      type='button'
+                      className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+                      aria-label={
+                        channel === 'sms'
+                          ? 'Switch to email updates'
+                          : 'Switch to text updates'
+                      }
+                      onClick={() =>
+                        handleChannelChange(channel === 'sms' ? 'email' : 'sms')
+                      }
+                      disabled={isSubmitting}
+                    >
+                      {channel === 'sms' ? (
+                        <Phone className='w-4 h-4' aria-hidden='true' />
+                      ) : (
+                        <Mail className='w-4 h-4' aria-hidden='true' />
+                      )}
+                    </button>
+                  )}
+
                   <div className='flex-1 min-w-0'>
                     <label htmlFor={inputId} className='sr-only'>
-                      Email address
+                      {channel === 'sms' ? 'Phone number' : 'Email address'}
                     </label>
                     <input
                       ref={inputRef}
                       id={inputId}
                       aria-describedby={disclaimerId}
-                      type='email'
-                      inputMode='email'
+                      type={inputConfig.type}
+                      inputMode={inputConfig.inputMode}
                       className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
-                      placeholder='your@email.com'
-                      value={emailInput}
-                      onChange={event => handleEmailChange(event.target.value)}
+                      placeholder={inputConfig.placeholder}
+                      value={inputValue}
+                      onChange={event =>
+                        channel === 'sms'
+                          ? handlePhoneChange(event.target.value)
+                          : handleEmailChange(event.target.value)
+                      }
                       onFocus={() => setIsInputFocused(true)}
                       onBlur={() => {
                         setIsInputFocused(false);
@@ -203,23 +315,31 @@ export function TwoStepNotificationsCTA({
                       }}
                       onKeyDown={handleKeyDown}
                       disabled={isSubmitting}
-                      autoComplete='email'
-                      maxLength={254}
+                      autoComplete={inputConfig.autoComplete}
+                      maxLength={inputConfig.maxLength}
                       style={noFontSynthesisStyle}
                     />
                   </div>
+
+                  <button
+                    type='button'
+                    onClick={() =>
+                      void (otpStep === 'verify'
+                        ? handleVerifyOtp()
+                        : handleSubscribe())
+                    }
+                    disabled={isSubmitting}
+                    className='mr-1.5 inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-btn-primary px-3 text-sm font-medium text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed'
+                    style={noFontSynthesisStyle}
+                  >
+                    {isSubmitting
+                      ? 'Working…'
+                      : otpStep === 'verify'
+                        ? 'Verify'
+                        : 'Get notified'}
+                  </button>
                 </div>
               </div>
-
-              <button
-                type='button'
-                onClick={() => void handleSubscribe()}
-                disabled={isSubmitting}
-                className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
-                style={noFontSynthesisStyle}
-              >
-                {isSubmitting ? 'Subscribing…' : 'Get Notified'}
-              </button>
 
               <div className='flex items-center justify-center gap-2'>
                 <p

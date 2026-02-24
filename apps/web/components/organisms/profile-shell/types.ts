@@ -40,6 +40,7 @@ export interface ProfileShellProps {
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
   readonly showTipButton?: boolean;
+  readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
   readonly showFooter?: boolean;
   readonly showNotificationButton?: boolean;
