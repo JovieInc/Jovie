@@ -79,11 +79,15 @@ describe('ProfilePageChat', () => {
   });
 
   it('shows skeleton state when no selected profile is available', () => {
-    const { queryByTestId } = renderProfilePageChat({
+    const { queryByTestId, container } = renderProfilePageChat({
       ...baseDashboardData,
       selectedProfile: null,
     });
 
     expect(queryByTestId('jovie-chat')).toBeNull();
+
+    // Verify skeleton elements are rendered
+    const skeletons = container.querySelectorAll('.skeleton');
+    expect(skeletons.length).toBeGreaterThanOrEqual(2); // message area + input bar skeletons
   });
 });
