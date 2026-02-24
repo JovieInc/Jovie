@@ -119,12 +119,9 @@ export function ConnectedDspList({
         reason: 'user_disconnected',
       });
       toast.success(`${label} disconnected`);
-      setMatchToDisconnect(undefined);
     } catch (err: unknown) {
       toast.error(
-        err instanceof Error
-          ? err.message
-          : `Failed to disconnect ${label}`
+        err instanceof Error ? err.message : `Failed to disconnect ${label}`
       );
     }
   }, [matchToDisconnect, profileId, rejectMatchAsync]);
@@ -248,7 +245,6 @@ export function ConnectedDspList({
         description='Disconnecting will stop sync updates for this provider until you reconnect it.'
         confirmLabel='Disconnect'
         variant='destructive'
-        isLoading={isDisconnectPending}
         onConfirm={handleDisconnectConfirm}
       />
     </>
