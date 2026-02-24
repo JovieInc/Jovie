@@ -2,8 +2,6 @@ import {
   AlertTriangle,
   Banknote,
   CircleDollarSign,
-  ClipboardList,
-  Clock,
   TrendingDown,
   Users,
 } from 'lucide-react';
@@ -19,9 +17,7 @@ interface KpiCardsProps {
   readonly mrrUsd: number;
   readonly balanceUsd: number;
   readonly burnRateUsd: number;
-  readonly runwayMonths: number | null;
-  readonly waitlistCount: number;
-  readonly activeSubscribers: number;
+  readonly claimedCreators: number;
   /** Stripe data availability status */
   readonly stripeAvailability?: DataAvailability;
   /** Mercury data availability status */
@@ -57,9 +53,7 @@ export function KpiCards({
   mrrUsd,
   balanceUsd,
   burnRateUsd,
-  runwayMonths,
-  waitlistCount,
-  activeSubscribers,
+  claimedCreators,
   stripeAvailability,
   mercuryAvailability,
 }: Readonly<KpiCardsProps>) {
@@ -70,50 +64,22 @@ export function KpiCards({
       maximumFractionDigits: value >= 1000 ? 0 : 2,
     });
 
-  // Determine if Stripe data is available
   const stripeIsAvailable = stripeAvailability?.isAvailable !== false;
   const stripeIsConfigured = stripeAvailability?.isConfigured !== false;
 
-  // Determine if Mercury data is available
   const mercuryIsAvailable = mercuryAvailability?.isAvailable !== false;
   const mercuryIsConfigured = mercuryAvailability?.isConfigured !== false;
 
-  // Format values or show N/A for unavailable sources
   const mrrLabel =
     stripeIsConfigured && stripeIsAvailable ? formatUsd(mrrUsd) : '—';
-  const subscribersLabel =
-    stripeIsConfigured && stripeIsAvailable
-      ? activeSubscribers.toLocaleString('en-US')
-      : '—';
 
   const balanceLabel =
     mercuryIsConfigured && mercuryIsAvailable ? formatUsd(balanceUsd) : '—';
   const burnRateLabel =
     mercuryIsConfigured && mercuryIsAvailable ? formatUsd(burnRateUsd) : '—';
 
-  // Runway depends on both Mercury and Stripe data
-  const canCalculateRunway =
-    stripeIsConfigured &&
-    stripeIsAvailable &&
-    mercuryIsConfigured &&
-    mercuryIsAvailable;
-  const getRunwayLabel = (): string => {
-    if (!canCalculateRunway) return '—';
-    if (runwayMonths == null) return '∞ mo';
-    return `${runwayMonths.toFixed(1)} mo`;
-  };
-  const runwayLabel = getRunwayLabel();
+  const claimedCreatorsLabel = claimedCreators.toLocaleString('en-US');
 
-  const getRunwayMetadata = (): string => {
-    if (!canCalculateRunway) return 'Requires Stripe and Mercury data';
-    if (runwayMonths == null) return 'Profitable at the current run rate';
-    return 'Estimated months of runway';
-  };
-  const runwayMetadata = getRunwayMetadata();
-
-  const waitlistLabel = waitlistCount.toLocaleString('en-US');
-
-  // Helper to render metadata with availability badge
   const renderStripeMetadata = (text: string) => {
     if (!stripeIsConfigured) {
       return <NotConfiguredBadge message={stripeAvailability?.errorMessage} />;
@@ -134,18 +100,8 @@ export function KpiCards({
     return text;
   };
 
-  const renderRunwayMetadata = () => {
-    if (!stripeIsConfigured || !mercuryIsConfigured) {
-      return <NotConfiguredBadge message='Requires Stripe and Mercury' />;
-    }
-    if (!stripeIsAvailable || !mercuryIsAvailable) {
-      return <UnavailableBadge message='Requires Stripe and Mercury data' />;
-    }
-    return runwayMetadata;
-  };
-
   return (
-    <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
+    <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
       <KpiItem
         title='MRR'
         value={mrrLabel}
@@ -171,27 +127,11 @@ export function KpiCards({
       />
 
       <KpiItem
-        title='Runway'
-        value={runwayLabel}
-        metadata={renderRunwayMetadata()}
-        icon={Clock}
-        iconClassName='text-amber-500 dark:text-amber-300'
-      />
-
-      <KpiItem
-        title='Waitlist'
-        value={waitlistLabel}
-        metadata='Future customers on deck'
-        icon={ClipboardList}
-        iconClassName='text-indigo-500 dark:text-indigo-300'
-      />
-
-      <KpiItem
-        title='Active subs'
-        value={subscribersLabel}
-        metadata={renderStripeMetadata('Paying customers this month')}
+        title='Claimed creators'
+        value={claimedCreatorsLabel}
+        metadata='Primary user growth metric'
         icon={Users}
-        iconClassName='text-purple-500 dark:text-purple-300'
+        iconClassName='text-violet-500 dark:text-violet-300'
       />
     </div>
   );
