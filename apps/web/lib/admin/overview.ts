@@ -1,11 +1,10 @@
 import 'server-only';
 
-import { and, desc, sql as drizzleSql, inArray } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 
 import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
@@ -27,16 +26,25 @@ function shouldDisableStripeEventsTable(error: unknown): boolean {
 }
 
 /**
- * Fetches waitlist count with error handling
+ * Fetches claimed creator count with error handling
  */
-async function getWaitlistCount(): Promise<number> {
+async function getClaimedCreatorCount(): Promise<number> {
   try {
+    const hasCreatorProfiles = await doesTableExist(
+      TABLE_NAMES.creatorProfiles
+    );
+    if (!hasCreatorProfiles) {
+      return 0;
+    }
+
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(waitlistEntries);
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.isClaimed, true));
+
     return Number(row?.count ?? 0);
   } catch (error) {
-    captureError('Error fetching waitlist count', error);
+    captureError('Error fetching claimed creator count', error);
     return 0;
   }
 }
@@ -391,13 +399,12 @@ export interface DataAvailability {
 export interface AdminOverviewMetrics {
   mrrUsd: number;
   mrrGrowth30dUsd: number;
-  activeSubscribers: number;
+  claimedCreators: number;
   balanceUsd: number;
   burnRateUsd: number;
   runwayMonths: number | null;
   defaultStatus: 'alive' | 'dead';
   defaultStatusDetail: string;
-  waitlistCount: number;
   stripeAvailability: DataAvailability;
   mercuryAvailability: DataAvailability;
 }
@@ -406,13 +413,12 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
   const defaultUnavailableMetrics: AdminOverviewMetrics = {
     mrrUsd: 0,
     mrrGrowth30dUsd: 0,
-    activeSubscribers: 0,
+    claimedCreators: 0,
     balanceUsd: 0,
     burnRateUsd: 0,
     runwayMonths: null,
     defaultStatus: 'dead',
     defaultStatusDetail: 'Unable to compute default status.',
-    waitlistCount: 0,
     stripeAvailability: { isConfigured: false, isAvailable: false },
     mercuryAvailability: { isConfigured: false, isAvailable: false },
   };
@@ -427,10 +433,10 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
       };
     }
 
-    const [stripeMetrics, mercuryMetrics, waitlistCount] = await Promise.all([
+    const [stripeMetrics, mercuryMetrics, claimedCreators] = await Promise.all([
       getAdminStripeOverviewMetrics(),
       getAdminMercuryMetrics(),
-      getWaitlistCount(),
+      getClaimedCreatorCount(),
     ]);
 
     const stripeAvailability: DataAvailability = {
@@ -483,13 +489,12 @@ export async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
     return {
       mrrUsd: stripeMetrics.mrrUsd,
       mrrGrowth30dUsd: stripeMetrics.mrrGrowth30dUsd,
-      activeSubscribers: stripeMetrics.activeSubscribers,
+      claimedCreators,
       balanceUsd: mercuryMetrics.balanceUsd,
       burnRateUsd: mercuryMetrics.burnRateUsd,
       runwayMonths,
       defaultStatus: isAlive ? 'alive' : 'dead',
       defaultStatusDetail,
-      waitlistCount,
       stripeAvailability,
       mercuryAvailability,
     };
