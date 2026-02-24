@@ -188,14 +188,12 @@ export function createSelectHeaderRenderer(
  */
 export function createSelectCellRenderer(
   selectedIdsRef: RefObject<Set<string>>,
-  page: number,
-  pageSize: number,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<WaitlistEntryRow, unknown>) {
     const entry = row.original;
     const isChecked = selectedIdsRef.current?.has(entry.id) ?? false;
-    const rowNumber = (page - 1) * pageSize + row.index + 1;
+    const rowNumber = row.index + 1;
 
     return (
       <TableCheckboxCell

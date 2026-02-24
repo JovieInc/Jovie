@@ -6,10 +6,8 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
-import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
@@ -17,6 +15,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { useAdminCreatorsInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { cn } from '@/lib/utils';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -63,7 +62,6 @@ const ContactSidebar = dynamic(
 
 export function AdminCreatorProfilesUnified({
   profiles: initialProfiles,
-  page,
   pageSize,
   total,
   search,
@@ -103,26 +101,22 @@ export function AdminCreatorProfilesUnified({
     clearInviteProfile,
   } = useDialogState();
 
-  const {
-    totalPages,
-    canPrev,
-    canNext,
-    from,
-    to,
-    prevHref,
-    nextHref,
-    clearHref,
-    buildHref,
-  } = useAdminTablePaginationLinks({
-    basePath,
-    page,
-    pageSize,
-    search,
-    sort,
-    total,
-  });
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAdminCreatorsInfiniteQuery({
+      sort,
+      search,
+      pageSize,
+      initialData: { rows: profilesWithActions, total },
+    });
 
-  const filteredProfiles = profilesWithActions;
+  const filteredProfiles = useMemo(
+    () => data?.pages.flatMap(page => page.rows) ?? profilesWithActions,
+    [data, profilesWithActions]
+  );
+
+  const from = filteredProfiles.length > 0 ? 1 : 0;
+  const to = filteredProfiles.length;
+  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -308,7 +302,7 @@ export function AdminCreatorProfilesUnified({
   const columns = useMemo(
     () =>
       createCreatorProfileColumns({
-        page,
+        page: 1,
         pageSize,
         selectedIdsRef,
         headerCheckboxStateRef,
@@ -318,7 +312,6 @@ export function AdminCreatorProfilesUnified({
       }),
     /* eslint-enable react-hooks/refs */
     [
-      page,
       pageSize,
       // Note: selectedIds and headerCheckboxState are intentionally excluded
       // - they use refs to prevent column recreation on selection change
@@ -408,24 +401,6 @@ export function AdminCreatorProfilesUnified({
               onClearSelection={handleClearSelection}
             />
           }
-          footer={
-            <AdminTablePagination
-              page={page}
-              totalPages={totalPages}
-              from={from}
-              to={to}
-              total={total}
-              canPrev={canPrev}
-              canNext={canNext}
-              prevHref={prevHref}
-              nextHref={nextHref}
-              pageSize={pageSize}
-              onPageSizeChange={nextPageSize => {
-                router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-              }}
-              entityLabel='profiles'
-            />
-          }
         >
           {() => (
             <UnifiedTable
@@ -452,6 +427,11 @@ export function AdminCreatorProfilesUnified({
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[13px]'
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => {
+                void fetchNextPage();
+              }}
             />
           )}
         </AdminTableShell>

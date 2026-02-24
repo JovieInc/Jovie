@@ -15,6 +15,9 @@ export interface WaitlistTableProps {
   readonly pageSize: number;
   readonly total: number;
   readonly groupingEnabled?: boolean;
+  readonly hasNextPage?: boolean;
+  readonly isFetchingNextPage?: boolean;
+  readonly onLoadMore?: () => void;
   // Optional external selection state (for bulk actions in parent)
   readonly externalSelection?: {
     readonly selectedIds: Set<string>;
