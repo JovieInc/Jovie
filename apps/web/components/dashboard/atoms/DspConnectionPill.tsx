@@ -15,38 +15,23 @@ import {
   Unlink,
 } from 'lucide-react';
 import { useState } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { type DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
+import {
+  DspProviderIcon,
+  PROVIDER_COLORS,
+  PROVIDER_LABELS,
+} from './DspProviderIcon';
 
-const PROVIDER_STYLES = {
-  spotify: {
-    accent: '#1DB954',
-    label: 'Spotify',
-    platform: 'spotify',
-  },
-  apple_music: {
-    accent: '#FA243C',
-    label: 'Apple Music',
-    platform: 'applemusic',
-  },
-  youtube_music: {
-    accent: '#FF0000',
-    label: 'YouTube Music',
-    platform: 'youtube_music',
-  },
-  soundcloud: {
-    accent: '#FF5500',
-    label: 'SoundCloud',
-    platform: 'soundcloud',
-  },
-  tidal: {
-    accent: '#000000',
-    label: 'Tidal',
-    platform: 'tidal',
-  },
-} as const;
+const CONNECTION_PILL_PROVIDERS = [
+  'spotify',
+  'apple_music',
+  'youtube_music',
+  'soundcloud',
+  'tidal',
+] as const satisfies ReadonlyArray<DspProviderId>;
 
-type DspProvider = keyof typeof PROVIDER_STYLES;
+type DspProvider = (typeof CONNECTION_PILL_PROVIDERS)[number];
 
 interface DspConnectionPillProps {
   readonly provider: DspProvider;
@@ -69,7 +54,8 @@ export function DspConnectionPill({
   disabled,
   className,
 }: DspConnectionPillProps) {
-  const style = PROVIDER_STYLES[provider];
+  const accent = PROVIDER_COLORS[provider];
+  const label = PROVIDER_LABELS[provider];
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -83,20 +69,15 @@ export function DspConnectionPill({
           className
         )}
         style={{
-          borderColor: `${style.accent}30`,
-          backgroundColor: `${style.accent}10`,
+          borderColor: `${accent}30`,
+          backgroundColor: `${accent}10`,
         }}
       >
-        <span style={{ color: style.accent }}>
-          <SocialIcon platform={style.platform} className='h-4 w-4' />
-        </span>
+        <DspProviderIcon provider={provider} size='sm' className='gap-0' />
         <span className='truncate max-w-[120px] text-secondary-token'>
           {artistName || 'Connected'}
         </span>
-        <CheckCircle2
-          className='h-4 w-4 shrink-0'
-          style={{ color: style.accent }}
-        />
+        <CheckCircle2 className='h-4 w-4 shrink-0' style={{ color: accent }} />
       </span>
     );
   }
@@ -118,27 +99,26 @@ export function DspConnectionPill({
             )}
             style={
               {
-                borderColor: `${style.accent}30`,
-                backgroundColor: `${style.accent}10`,
-                '--tw-ring-color': `${style.accent}50`,
+                borderColor: `${accent}30`,
+                backgroundColor: `${accent}10`,
+                '--tw-ring-color': `${accent}50`,
               } as React.CSSProperties
             }
+            aria-label={`${label} connection: ${artistName || 'Connected'}`}
           >
-            <span style={{ color: style.accent }}>
-              <SocialIcon platform={style.platform} className='h-4 w-4' />
-            </span>
+            <DspProviderIcon provider={provider} size='sm' className='gap-0' />
             <span className='truncate max-w-[120px] text-secondary-token'>
               {artistName || 'Connected'}
             </span>
             {hovered || menuOpen ? (
               <MoreHorizontal
                 className='h-4 w-4 shrink-0'
-                style={{ color: style.accent }}
+                style={{ color: accent }}
               />
             ) : (
               <CheckCircle2
                 className='h-4 w-4 shrink-0'
-                style={{ color: style.accent }}
+                style={{ color: accent }}
               />
             )}
           </button>
@@ -175,13 +155,12 @@ export function DspConnectionPill({
       )}
       style={
         {
-          '--tw-ring-color': `${style.accent}50`,
+          '--tw-ring-color': `${accent}50`,
         } as React.CSSProperties
       }
+      aria-label={`Connect ${label}`}
     >
-      <span style={{ color: style.accent }}>
-        <SocialIcon platform={style.platform} className='h-4 w-4' />
-      </span>
+      <DspProviderIcon provider={provider} size='sm' className='gap-0' />
       <span>Not Connected</span>
       <Plus className='h-4 w-4 shrink-0' />
     </button>

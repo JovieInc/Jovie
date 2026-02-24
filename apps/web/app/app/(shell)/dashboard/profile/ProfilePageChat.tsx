@@ -30,6 +30,7 @@ export function ProfilePageChat() {
       profileId={selectedProfile.id}
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
+      username={selectedProfile.username ?? undefined}
     />
   );
 }
