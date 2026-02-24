@@ -18,6 +18,7 @@ const {
   mockValidateProviderUrl,
   mockSyncReleasesFromSpotify,
   mockCheckIsrcRescanRateLimit,
+  mockCheckReleaseRefreshRateLimit,
   mockFormatTimeRemaining,
   mockProcessReleaseEnrichmentJobStandalone,
   mockTrackServerEvent,
@@ -45,6 +46,7 @@ const {
   mockValidateProviderUrl: vi.fn(),
   mockSyncReleasesFromSpotify: vi.fn(),
   mockCheckIsrcRescanRateLimit: vi.fn(),
+  mockCheckReleaseRefreshRateLimit: vi.fn(),
   mockFormatTimeRemaining: vi.fn(),
   mockProcessReleaseEnrichmentJobStandalone: vi.fn(),
   mockTrackServerEvent: vi.fn(),
@@ -171,6 +173,7 @@ vi.mock('@/lib/ingestion/jobs', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   checkIsrcRescanRateLimit: mockCheckIsrcRescanRateLimit,
+  checkReleaseRefreshRateLimit: mockCheckReleaseRefreshRateLimit,
   formatTimeRemaining: mockFormatTimeRemaining,
 }));
 
@@ -327,6 +330,7 @@ describe('@critical releases/actions.ts', () => {
     mockRedirect.mockImplementation((url: string) => {
       throw new Error(`NEXT_REDIRECT:${url}`);
     });
+    mockCheckReleaseRefreshRateLimit.mockResolvedValue({ success: true });
   });
 
   // =========================================================================

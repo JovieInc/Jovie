@@ -329,8 +329,8 @@ function SuggestionCard({
 // Main Component
 // ============================================================================
 
-interface SuggestedProfilesCarouselProps
-  extends Pick<
+type SuggestedProfilesCarouselProps = Readonly<
+  Pick<
     UseSuggestedProfilesReturn,
     | 'suggestions'
     | 'isLoading'
@@ -341,11 +341,12 @@ interface SuggestedProfilesCarouselProps
     | 'confirm'
     | 'reject'
     | 'isActioning'
-  > {
-  readonly username?: string;
-  readonly displayName?: string;
-  readonly avatarUrl?: string | null;
-}
+  > & {
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  }
+>;
 
 export function SuggestedProfilesCarousel({
   suggestions,

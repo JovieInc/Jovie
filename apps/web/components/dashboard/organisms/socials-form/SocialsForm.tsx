@@ -407,7 +407,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                 {socialLinks.find(link => link.platform === 'website')
                   ?.verificationToken ?? 'jovie-verify=...'}
               </code>
-              . Then click Verify.
+              {'. Then click Verify.'}
             </p>
           )}
 
