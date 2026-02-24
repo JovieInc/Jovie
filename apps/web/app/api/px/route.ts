@@ -6,6 +6,7 @@ import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
+import { ensureClaimRetargetingCreatives } from '@/lib/retargeting/claim-creatives';
 import { forwardEvent } from '@/lib/tracking/forwarding';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -15,6 +16,24 @@ import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+function getClaimRetargetingLink(pageUrl: string | undefined): string | null {
+  if (!pageUrl) return null;
+
+  try {
+    const parsed = new URL(pageUrl);
+    const token = parsed.searchParams.get('token');
+    const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+    if (pathParts.length !== 2 || pathParts[1] !== 'claim' || !token) {
+      return null;
+    }
+
+    return `${parsed.pathname}?token=${encodeURIComponent(token)}`;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Hash an IP address for privacy-preserving storage
@@ -94,7 +113,11 @@ export async function POST(request: NextRequest) {
 
     // Validate profile exists and is public
     const [profile] = await db
-      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
+      .select({
+        id: creatorProfiles.id,
+        isPublic: creatorProfiles.isPublic,
+        username: creatorProfiles.username,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -154,6 +177,17 @@ export async function POST(request: NextRequest) {
     if (insertedEvent) {
       after(async () => {
         try {
+          const claimLink =
+            eventType === 'page_view' ? getClaimRetargetingLink(pageUrl) : null;
+
+          if (claimLink) {
+            await ensureClaimRetargetingCreatives({
+              profileId,
+              username: profile.username,
+              claimLink,
+            });
+          }
+
           await forwardEvent(insertedEvent);
         } catch (error) {
           logger.error('[Pixel] After-response forwarding failed', {
