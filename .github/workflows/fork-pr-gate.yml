@@ -46,6 +46,7 @@ concurrency:
 jobs:
   fork-gate:
     name: Fork PR Gate
+    if: github.actor != 'copilot-swe-agent[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:

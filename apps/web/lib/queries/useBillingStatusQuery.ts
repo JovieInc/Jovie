@@ -10,6 +10,8 @@ export interface BillingStatusData {
   plan: string | null;
   hasStripeCustomer: boolean;
   stripeSubscriptionId: string | null;
+  stale: boolean;
+  staleReason: string | null;
 }
 
 interface BillingStatusResponse {
@@ -17,6 +19,8 @@ interface BillingStatusResponse {
   plan?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
+  _stale?: boolean;
+  _staleReason?: string;
 }
 
 // Create the base fetch function using createQueryFn for consistent error handling
@@ -37,6 +41,8 @@ async function fetchBillingStatus({
     plan: payload?.plan ?? null,
     hasStripeCustomer: Boolean(payload?.stripeCustomerId),
     stripeSubscriptionId: payload?.stripeSubscriptionId ?? null,
+    stale: Boolean(payload?._stale),
+    staleReason: payload?._staleReason ?? null,
   };
 }
 

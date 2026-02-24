@@ -35,6 +35,10 @@ export interface JovieChatProps {
   readonly avatarUrl?: string | null;
   /** Artist username for profile links */
   readonly username?: string;
+  /** Whether the user is in their first post-onboarding chat session */
+  readonly isFirstSession?: boolean;
+  /** Optional latest release title for contextual first-session prompts */
+  readonly latestReleaseTitle?: string | null;
 }
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
@@ -159,6 +163,27 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
     icon: 'Music',
     label: 'Format lyrics for Apple Music',
     prompt: 'Format my lyrics for Apple Music.',
+    accent: 'green',
+  },
+] as const;
+
+export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
+  {
+    icon: 'Link2',
+    label: 'Set up a link for my latest release',
+    prompt: 'Set up a link for my latest release.',
+    accent: 'blue',
+  },
+  {
+    icon: 'Eye',
+    label: 'Preview my profile',
+    prompt: 'Preview my profile.',
+    accent: 'purple',
+  },
+  {
+    icon: 'DollarSign',
+    label: 'How do I get paid?',
+    prompt: 'How do I get paid?',
     accent: 'green',
   },
 ] as const;

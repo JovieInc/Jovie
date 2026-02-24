@@ -135,6 +135,8 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: '3100',
             NEXT_DISABLE_TOOLBAR: '1',
+            NODE_OPTIONS:
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,

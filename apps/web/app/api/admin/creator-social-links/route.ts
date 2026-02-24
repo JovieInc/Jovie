@@ -20,7 +20,7 @@ import { detectPlatform } from '@/lib/utils/platform-detection';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const SOCIAL_LINKS_LOCK_TTL_SECONDS = 15;
+const SOCIAL_LINKS_LOCK_TTL_SECONDS = 45;
 
 /**
  * Schema for updating social links via admin

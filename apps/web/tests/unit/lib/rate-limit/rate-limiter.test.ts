@@ -172,6 +172,32 @@ describe('rate-limiter.ts', () => {
       expect(result.reason).toBe('test-limiter rate limit exceeded');
     });
 
+    it('persists limits across new limiter instances when using Redis backend', async () => {
+      const counters = new Map<string, number>();
+      mockCreateRedisRateLimiter.mockImplementation(() => ({
+        limit: vi.fn(async (identifier: string) => {
+          const next = (counters.get(identifier) ?? 0) + 1;
+          counters.set(identifier, next);
+          return {
+            success: next <= 2,
+            limit: 2,
+            remaining: Math.max(0, 2 - next),
+            reset: Date.now() + 60_000,
+          };
+        }),
+      }));
+
+      const firstInstance = new RateLimiter({ ...baseConfig, limit: 2 });
+      await firstInstance.limit('user:redeploy');
+      await firstInstance.limit('user:redeploy');
+
+      const secondInstance = new RateLimiter({ ...baseConfig, limit: 2 });
+      const result = await secondInstance.limit('user:redeploy');
+
+      expect(result.success).toBe(false);
+      expect(result.remaining).toBe(0);
+    });
+
     it('falls back to memory limiter when Redis throws', async () => {
       const logger = vi.fn();
       mockRedisLimiter.limit.mockRejectedValue(new Error('Redis down'));

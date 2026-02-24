@@ -14,6 +14,7 @@ type ArtistPageShellProps = {
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
   readonly showTipButton?: boolean;
+  readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
   readonly showFooter?: boolean;
   readonly maxWidthClass?: string;
@@ -33,6 +34,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   children,
   showSocialBar = true,
   showTipButton = false,
+  isTipModeActive = false,
   showBackButton = false,
   showFooter = true,
   maxWidthClass = 'w-full max-w-md',
@@ -48,6 +50,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       subtitle={subtitle}
       showSocialBar={showSocialBar}
       showTipButton={showTipButton}
+      isTipModeActive={isTipModeActive}
       showBackButton={showBackButton}
       showFooter={showFooter}
       showNotificationButton={showNotificationButton}

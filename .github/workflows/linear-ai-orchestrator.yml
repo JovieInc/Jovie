@@ -143,6 +143,19 @@ jobs:
             exit 0
           fi
 
+          # Rate limit: don't start new Codex work if too many agent PRs are open
+          MAX_OPEN_AGENT_PRS=10
+          OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
+            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/"))] | length')
+
+          echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS"
+
+          if [[ "$OPEN_AGENT_PRS" -ge "$MAX_OPEN_AGENT_PRS" ]]; then
+            echo "::warning::Rate limit reached ($OPEN_AGENT_PRS open agent PRs >= $MAX_OPEN_AGENT_PRS). Deferring ${ISSUE_IDENTIFIER} — Linear issue stays in queue for next cycle."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           echo "should_run=true" >> "$GITHUB_OUTPUT"
           echo "issue_id=$ISSUE_ID" >> "$GITHUB_OUTPUT"
           echo "issue_identifier=$ISSUE_IDENTIFIER" >> "$GITHUB_OUTPUT"

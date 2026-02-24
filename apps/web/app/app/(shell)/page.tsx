@@ -15,5 +15,5 @@ export default async function AppRootPage() {
     redirect('/onboarding');
   }
 
-  return <ChatPageClient />;
+  return <ChatPageClient isFirstSession={dashboardData.isFirstSession} />;
 }

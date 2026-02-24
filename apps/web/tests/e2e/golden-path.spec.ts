@@ -25,9 +25,25 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.describe('Golden Path - Complete User Journey', () => {
-  // Run serially: listen/tip mode tests share a Turbopack route that compiles slowly
-  // when two parallel requests hit it simultaneously
+  // Run serially: parallel mode overloads the Turbopack dev server causing all tests
+  // to timeout. Serial ensures each test gets full server capacity.
   test.describe.configure({ mode: 'serial' });
+
+  // Intercept fire-and-forget tracking API calls that trigger slow Turbopack
+  // compilation cascades (60-75s per route) and block the dev server.
+  // These are analytics-only calls that don't affect page functionality.
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+  });
+
   test.beforeEach(async ({ page }, testInfo) => {
     // Check if we have test user credentials
     const username = process.env.E2E_CLERK_USER_USERNAME;
@@ -75,7 +91,7 @@ test.describe('Golden Path - Complete User Journey', () => {
   test('Authenticated user can access dashboard and view profile', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000); // 2 minutes — signInUser includes Turbopack cold compile + Clerk CDN + React 19 stabilization
+    test.setTimeout(180_000); // 3 minutes — includes sign-in + Turbopack compilation
 
     // STEP 1: Sign in with test user
     try {
@@ -92,12 +108,11 @@ test.describe('Golden Path - Complete User Journey', () => {
         return;
       }
 
-      // Handle webkit navigation race and timeout issues
+      // Handle navigation race and timeout issues
       const msg = error instanceof Error ? error.message : String(error);
       if (
         msg.includes('Navigation interrupted') ||
         msg.includes('net::ERR_') ||
-        msg.includes('Timeout') ||
         msg.includes('page.goto') ||
         msg.includes('Target closed') ||
         msg.includes('browser has disconnected')
@@ -172,9 +187,7 @@ test.describe('Golden Path - Complete User Journey', () => {
     });
 
     // At least one dashboard nav link should be present (Profile, Releases, etc.)
-    const dashboardNavLink = page
-      .locator('nav a[href*="/app/dashboard/"], nav a[href*="/app/settings/"]')
-      .first();
+    const dashboardNavLink = page.locator('nav a[href*="/app/"]').first();
     await expect(dashboardNavLink).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
@@ -190,17 +203,17 @@ test.describe('Golden Path - Complete User Journey', () => {
   });
 
   test('Golden path with listen mode', async ({ page }, testInfo) => {
-    test.setTimeout(120_000); // Turbopack cold compile can be slow
+    test.setTimeout(180_000); // Turbopack cold compile + API calls can be slow
 
     // Navigate to existing profile in listen mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
 
     // Use domcontentloaded + hydration instead of networkidle for stability
-    // Turbopack cold compile for [username]/[...slug] route can take 60s+
+    // Turbopack cold compile for [username] route + background API calls can take 120s+
     try {
       await page.goto(`/${testProfile}?mode=listen`, {
         waitUntil: 'domcontentloaded',
-        timeout: 90_000,
+        timeout: 120_000,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -219,8 +232,9 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Listen mode shows artist name in h1 and subtitle "Choose a Service"
     // Use .first() to avoid strict mode violation when multiple h1 elements exist
+    // 60s timeout: after domcontentloaded, Turbopack still compiles client chunks
     await expect(page.locator('h1').first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 60_000,
     });
 
     // Should show DSP options (e.g., "Open in Spotify") or "not available" message
@@ -229,22 +243,22 @@ test.describe('Golden Path - Complete User Journey', () => {
     );
     const noLinksMsg = page.getByText(/streaming links aren.t available/i);
     await expect(spotifyButton.first().or(noLinksMsg)).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 60_000,
     });
   });
 
   test('Golden path with tip mode', async ({ page }, testInfo) => {
-    test.setTimeout(120_000); // Turbopack cold compile can be slow
+    test.setTimeout(180_000); // Turbopack cold compile + API calls can be slow
 
     // Navigate to existing profile in tip mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
 
     // Use domcontentloaded + hydration instead of networkidle for stability
-    // Turbopack cold compile for [username]/[...slug] route can take 60s+
+    // Even with warmed routes, background API calls (audience/visit) can block the server
     try {
       await page.goto(`/${testProfile}?mode=tip`, {
         waitUntil: 'domcontentloaded',
-        timeout: 90_000,
+        timeout: 120_000,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -263,8 +277,9 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Tip mode shows artist name in h1 and subtitle "Tip with Venmo"
     // Use .first() to avoid strict mode violation when multiple h1 elements exist
+    // 60s timeout: after domcontentloaded, Turbopack still compiles client chunks
     await expect(page.locator('h1').first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 60_000,
     });
 
     // Should show either tip selector or "not available" message
@@ -275,7 +290,7 @@ test.describe('Golden Path - Complete User Journey', () => {
     await expect(
       tipSelector.or(tipHeading).or(noTipMsg).or(venmoNotAvail)
     ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 60_000,
     });
   });
 });
