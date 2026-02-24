@@ -351,9 +351,9 @@ describe('Public Profile Page Logic', () => {
       expect(subtitle).toBe('Artist');
     });
 
-    it('shows tip button only in profile mode with venmo link', () => {
+    it('shows tip button whenever a venmo link exists', () => {
       const hasVenmoLink = mockLinks.some(link => link.platform === 'venmo');
-      const showTipButton = 'profile' === 'profile' && hasVenmoLink;
+      const showTipButton = hasVenmoLink;
       expect(showTipButton).toBe(false);
 
       const linksWithVenmo = [
@@ -368,7 +368,7 @@ describe('Public Profile Page Logic', () => {
         },
       ];
       const hasVenmo2 = linksWithVenmo.some(link => link.platform === 'venmo');
-      const showTipButton2 = 'profile' === 'profile' && hasVenmo2;
+      const showTipButton2 = hasVenmo2;
       expect(showTipButton2).toBe(true);
     });
 

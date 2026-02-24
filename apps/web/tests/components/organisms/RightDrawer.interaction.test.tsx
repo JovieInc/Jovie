@@ -131,4 +131,66 @@ describe('RightDrawer', () => {
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');
   });
+
+  it('sets tab focusability only while open', () => {
+    const { rerender } = render(
+      <RightDrawer isOpen={false} width={320} ariaLabel='Focusable drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+
+    const drawer = screen.getByLabelText('Focusable drawer');
+    expect(drawer).not.toHaveAttribute('tabindex');
+
+    rerender(
+      <RightDrawer isOpen={true} width={320} ariaLabel='Focusable drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+
+    expect(drawer).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('keeps rendering children content while closed for transition safety', () => {
+    render(
+      <RightDrawer isOpen={false} width={360} ariaLabel='Transition drawer'>
+        <p>Always mounted content</p>
+      </RightDrawer>
+    );
+
+    expect(screen.getByText('Always mounted content')).toBeInTheDocument();
+    expect(screen.getByLabelText('Transition drawer')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+  });
+
+  it('supports rapid open and close cycles without stale width state', () => {
+    const { rerender } = render(
+      <RightDrawer isOpen={false} width={300} ariaLabel='Rapid drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+
+    const drawer = screen.getByLabelText('Rapid drawer');
+
+    rerender(
+      <RightDrawer isOpen={true} width={420} ariaLabel='Rapid drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+    rerender(
+      <RightDrawer isOpen={false} width={420} ariaLabel='Rapid drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+    rerender(
+      <RightDrawer isOpen={true} width={280} ariaLabel='Rapid drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+
+    expect(drawer).toHaveStyle({ width: '280px' });
+    expect(drawer).toHaveAttribute('aria-hidden', 'false');
+  });
 });

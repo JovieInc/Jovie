@@ -478,9 +478,9 @@ export default async function ArtistPage({
 
   const subtitle = PAGE_SUBTITLES[mode] ?? PAGE_SUBTITLES.profile;
 
-  // Show tip button only in profile/default mode and when artist has venmo
+  // Show tip button whenever artist has Venmo, and style active state in tip mode.
   const hasVenmoLink = links.some(link => link.platform === 'venmo');
-  const showTipButton = mode === 'profile' && hasVenmoLink;
+  const showTipButton = hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
   // Read profile photo download settings
@@ -535,6 +535,7 @@ export default async function ArtistPage({
         contacts={publicContacts}
         subtitle={subtitle}
         showTipButton={showTipButton}
+        isTipModeActive={mode === 'tip'}
         showBackButton={showBackButton}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
