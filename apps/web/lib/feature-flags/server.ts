@@ -47,8 +47,11 @@ async function initializeStatsig(): Promise<void> {
 }
 
 /**
- * Evaluate a feature gate for a given user
- * Returns the gate value or the default if Statsig is not initialized
+ * Evaluate a feature gate for a given user.
+ * Returns the gate value, or defaultValue when:
+ * - Statsig SDK is not initialized (no secret configured)
+ * - The gate is not registered in Statsig (reason: 'Unrecognized')
+ * - An error occurs during evaluation
  */
 export async function checkGate(
   userId: string | null,
@@ -62,12 +65,15 @@ export async function checkGate(
   }
 
   try {
-    return Statsig.checkGate(
-      {
-        userID: userId ?? 'anonymous',
-      },
+    const gate = Statsig.getFeatureGateSync(
+      { userID: userId ?? 'anonymous' },
       gateKey
     );
+    // If the gate doesn't exist in Statsig, fall back to code default
+    if (gate.evaluationDetails?.reason === 'Unrecognized') {
+      return defaultValue;
+    }
+    return gate.value;
   } catch (error) {
     console.error(`[Statsig] Error checking gate ${gateKey}:`, error);
     return defaultValue;

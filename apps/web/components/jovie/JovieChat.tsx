@@ -63,6 +63,8 @@ export function JovieChat({
   displayName,
   avatarUrl,
   username,
+  isFirstSession: isFirstSessionProp = false,
+  latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -73,8 +75,18 @@ export function JovieChat({
   // Suggested profiles carousel data — lifted here so we can hide
   // the help text and suggested prompts while the carousel has items.
   const suggestedProfiles = useSuggestedProfiles(profileId);
+  const detectedFirstSession =
+    (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0;
+  const isFirstSession = isFirstSessionProp || detectedFirstSession;
+  const latestReleaseTitle =
+    latestReleaseTitleProp ??
+    suggestedProfiles.starterContext?.latestReleaseTitle ??
+    null;
+  const showSuggestedProfiles = Boolean(profileId) && !isFirstSession;
   const hasCarouselItems =
-    !suggestedProfiles.isLoading && suggestedProfiles.total > 0;
+    showSuggestedProfiles &&
+    !suggestedProfiles.isLoading &&
+    suggestedProfiles.total > 0;
 
   const {
     input,
@@ -369,7 +381,7 @@ export function JovieChat({
           <div className='flex flex-1 flex-col items-center justify-center px-4'>
             <div className='chat-stagger w-full max-w-2xl space-y-4'>
               {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
-              {profileId && (
+              {showSuggestedProfiles && (
                 <SuggestedProfilesCarousel
                   suggestions={suggestedProfiles.suggestions}
                   isLoading={suggestedProfiles.isLoading}
@@ -389,11 +401,34 @@ export function JovieChat({
               {/* Hide help text and prompts while the carousel has items */}
               {!hasCarouselItems && (
                 <>
-                  <p className='text-center text-[15px] text-secondary-token'>
-                    What can I help you with?
-                  </p>
+                  {isFirstSession ? (
+                    <p className='text-center text-[15px] text-secondary-token'>
+                      Welcome, {displayName ?? 'there'}. Your profile is live at{' '}
+                      <a
+                        href={
+                          username
+                            ? `https://jov.ie/${username}`
+                            : 'https://jov.ie'
+                        }
+                        target='_blank'
+                        rel='noreferrer'
+                        className='font-medium text-primary-token underline-offset-2 hover:underline'
+                      >
+                        {username ? `jov.ie/${username}` : 'jov.ie'}
+                      </a>
+                      .
+                    </p>
+                  ) : (
+                    <p className='text-center text-[15px] text-secondary-token'>
+                      What can I help you with?
+                    </p>
+                  )}
 
-                  <SuggestedPrompts onSelect={handleSuggestedPrompt} />
+                  <SuggestedPrompts
+                    onSelect={handleSuggestedPrompt}
+                    isFirstSession={isFirstSession}
+                    latestReleaseTitle={latestReleaseTitle}
+                  />
                 </>
               )}
             </div>

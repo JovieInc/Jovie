@@ -22,13 +22,13 @@ export function LabelLogosBar() {
   return (
     <section
       aria-label='Record labels using Jovie'
-      className='bg-[var(--linear-bg-page)] pb-14 pt-0 sm:pb-20'
+      className='bg-[var(--linear-bg-page)] pb-10 pt-0 sm:pb-14'
     >
       <Container size='homepage'>
         {/* Centered gradient separator — Linear uses subtle gradient dividers */}
         <div
           aria-hidden='true'
-          className='mb-10 h-px sm:mb-14'
+          className='mb-8 h-px sm:mb-10'
           style={{
             background:
               'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
