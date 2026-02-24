@@ -1979,7 +1979,11 @@ jobs:
 
       - name: Build app for smoke tests
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        run: pnpm turbo build --filter=@jovie/web
+        run: |
+          pnpm turbo build --filter=@jovie/web
+          # Standalone output needs static assets alongside server.js
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
