@@ -23,6 +23,8 @@ import { cn } from '@/lib/utils';
 export interface CopyLinkInputProps {
   /** The URL to display and copy */
   readonly url: string;
+  /** Optional display value shown in the input (copies `url` to clipboard) */
+  readonly displayValue?: string;
   /** Size variant */
   readonly size?: 'sm' | 'md';
   /** Additional CSS classes */
@@ -40,6 +42,7 @@ export interface CopyLinkInputProps {
 
 export function CopyLinkInput({
   url,
+  displayValue,
   size = 'md',
   className,
   stopPropagation = false,
@@ -100,7 +103,7 @@ export function CopyLinkInput({
         ref={inputRef}
         type='text'
         readOnly
-        value={url}
+        value={displayValue ?? url}
         onClick={handleInputClick}
         aria-label='URL to copy'
         className={cn(

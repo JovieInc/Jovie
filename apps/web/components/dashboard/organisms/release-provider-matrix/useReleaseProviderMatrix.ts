@@ -90,12 +90,19 @@ export function useReleaseProviderMatrix({
   );
 
   const openEditor = useCallback((release: ReleaseViewModel) => {
-    setEditingRelease(release);
-    const nextDrafts: DraftState = {};
-    release.providers.forEach(provider => {
-      nextDrafts[provider.key] = provider.url ?? '';
+    // Toggle: clicking the same release closes the editor
+    setEditingRelease(current => {
+      if (current?.id === release.id) {
+        setDrafts({});
+        return null;
+      }
+      const nextDrafts: DraftState = {};
+      release.providers.forEach(provider => {
+        nextDrafts[provider.key] = provider.url ?? '';
+      });
+      setDrafts(nextDrafts);
+      return release;
     });
-    setDrafts(nextDrafts);
   }, []);
 
   const closeEditor = useCallback(() => {
@@ -253,6 +260,13 @@ export function useReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
   }, [syncMutation.mutate]);
 
+  const flashRelease = useCallback((releaseId: string) => {
+    setFlashedReleaseId(releaseId);
+    globalThis.setTimeout(() => {
+      setFlashedReleaseId(current => (current === releaseId ? null : current));
+    }, 1200);
+  }, []);
+
   // Refresh a single release from the database (no Spotify sync)
   const handleRefreshRelease = useCallback(
     (releaseId: string) => {
@@ -260,14 +274,15 @@ export function useReleaseProviderMatrix({
       refreshReleaseMutation.mutate(
         { releaseId },
         {
-          onSuccess: updated => {
-            updateRow(updated);
-            setFlashedReleaseId(updated.id);
-            globalThis.setTimeout(() => {
-              setFlashedReleaseId(current =>
-                current === updated.id ? null : current
+          onSuccess: result => {
+            if (result.rateLimited) {
+              toast.error(
+                `Refresh is rate limited. Available again in ${result.retryAfter}.`
               );
-            }, 1200);
+              return;
+            }
+            updateRow(result.release);
+            flashRelease(result.release.id);
             toast.success('Release refreshed');
           },
           onError: error => {
@@ -287,7 +302,7 @@ export function useReleaseProviderMatrix({
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
-    [refreshReleaseMutation.mutate]
+    [refreshReleaseMutation.mutate, flashRelease]
   );
 
   // Rescan ISRC links for a single release

@@ -4,7 +4,7 @@ const VIEW_MODE_STORAGE_KEY = 'waitlist-view-mode';
 const GROUPING_STORAGE_KEY = 'waitlist-grouping-enabled';
 
 function getStorage(): Storage | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof globalThis.window === 'undefined') return null;
   return globalThis.localStorage;
 }
 

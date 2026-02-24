@@ -15,9 +15,10 @@ export const HeaderChatUsageIndicator = memo(
     }
 
     const isExhausted = data.isExhausted;
+    const pluralSuffix = data.remaining === 1 ? '' : 's';
     const label = isExhausted
       ? 'Daily chat limit reached'
-      : `${data.remaining} message${data.remaining === 1 ? '' : 's'} left`;
+      : `${data.remaining} message${pluralSuffix} left`;
 
     return (
       <Link

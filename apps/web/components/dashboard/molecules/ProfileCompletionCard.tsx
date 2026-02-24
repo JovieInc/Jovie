@@ -78,19 +78,14 @@ export const ProfileCompletionCard = memo(
               </p>
             </div>
 
-            <div
-              className='h-2 w-full overflow-hidden rounded-full bg-surface-2'
-              role='progressbar'
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={completionPercentage}
+            <progress
+              className='h-2 w-full overflow-hidden rounded-full bg-surface-2 [&::-webkit-progress-bar]:bg-surface-2 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-gradient-to-r [&::-webkit-progress-value]:from-brand-400 [&::-webkit-progress-value]:to-brand-500 [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-gradient-to-r [&::-moz-progress-bar]:from-brand-400 [&::-moz-progress-bar]:to-brand-500'
+              max={100}
+              value={completionPercentage}
               aria-label='Profile completion'
             >
-              <div
-                className='h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-500 transition-all duration-500'
-                style={{ width: `${completionPercentage}%` }}
-              />
-            </div>
+              {completionPercentage}%
+            </progress>
 
             <ul className='space-y-2'>
               {primarySteps.map(step => (
