@@ -2,9 +2,10 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/calendar/[eventId]/route';
 
-const { mockEq, mockCaptureError } = vi.hoisted(() => ({
+const { mockEq, mockCaptureError, mockAfter } = vi.hoisted(() => ({
   mockEq: vi.fn(),
   mockCaptureError: vi.fn(),
+  mockAfter: vi.fn((cb: () => void) => cb()),
 }));
 
 const { db } = vi.hoisted(() => {
@@ -57,6 +58,14 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
+vi.mock('next/server', async importOriginal => {
+  const actual = await importOriginal<typeof import('next/server')>();
+  return {
+    ...actual,
+    after: mockAfter,
+  };
+});
+
 const VALID_EVENT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 describe('GET /api/calendar/[eventId]', () => {
@@ -95,7 +104,7 @@ describe('GET /api/calendar/[eventId]', () => {
     });
   });
 
-  it('returns a clean 500 and captures sentry context on db failure', async () => {
+  it('calls captureError with route and eventId context on DB failure', async () => {
     const dbError = new Error('database is down');
     db.select().from().innerJoin().where().limit.mockRejectedValue(dbError);
 
@@ -108,7 +117,10 @@ describe('GET /api/calendar/[eventId]', () => {
     });
 
     expect(response.status).toBe(500);
-    await expect(response.text()).resolves.toBe('Internal Server Error');
+    await expect(response.json()).resolves.toEqual({
+      error: 'Internal Server Error',
+    });
+    expect(mockAfter).toHaveBeenCalledOnce();
     expect(mockCaptureError).toHaveBeenCalledWith(
       'Calendar ICS generation failed',
       dbError,
@@ -117,5 +129,51 @@ describe('GET /api/calendar/[eventId]', () => {
         eventId: VALID_EVENT_ID,
       }
     );
+  });
+
+  it('returns 200 with text/calendar content for valid event', async () => {
+    db.select()
+      .from()
+      .innerJoin()
+      .where()
+      .limit.mockResolvedValue([
+        {
+          tourDate: {
+            id: VALID_EVENT_ID,
+            startDate: '2026-06-15T20:00:00Z',
+            venueName: 'Madison Square Garden',
+            city: 'New York',
+            region: 'NY',
+            country: 'US',
+            startTime: '8:00 PM',
+            ticketUrl: 'https://tickets.example.com',
+            title: 'Summer Tour',
+            profileId: 'profile-1',
+          },
+          profile: {
+            displayName: 'Test Artist',
+            username: 'testartist',
+          },
+        },
+      ]);
+
+    const request = new NextRequest(
+      `https://jov.ie/api/calendar/${VALID_EVENT_ID}`
+    );
+
+    const response = await GET(request, {
+      params: Promise.resolve({ eventId: VALID_EVENT_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Type')).toBe(
+      'text/calendar; charset=utf-8'
+    );
+
+    const body = await response.text();
+    expect(body).toContain('BEGIN:VCALENDAR');
+    expect(body).toContain('END:VCALENDAR');
+    expect(body).toContain('Test Artist');
+    expect(body).toContain('Madison Square Garden');
   });
 });

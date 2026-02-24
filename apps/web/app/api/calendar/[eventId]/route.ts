@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
@@ -9,20 +9,17 @@ const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
- * Generate ICS calendar file for a tour date
+ * Generate ICS calendar file for a tour date.
+ *
+ * This endpoint is intentionally public (no auth) so that external calendar
+ * applications (Google Calendar, Apple Calendar, Outlook, etc.) can subscribe
+ * to and periodically refresh the .ics feed.
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   const { eventId } = await params;
-
-  if (!eventId) {
-    return NextResponse.json(
-      { error: 'Event ID is required' },
-      { status: 400 }
-    );
-  }
 
   if (!UUID_REGEX.test(eventId)) {
     return NextResponse.json(
@@ -139,11 +136,16 @@ export async function GET(
       },
     });
   } catch (error) {
-    void captureError('Calendar ICS generation failed', error, {
-      route: '/api/calendar/[eventId]',
-      eventId,
-    });
-    return new Response('Internal Server Error', { status: 500 });
+    after(() =>
+      captureError('Calendar ICS generation failed', error, {
+        route: '/api/calendar/[eventId]',
+        eventId,
+      })
+    );
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    );
   }
 }
 
