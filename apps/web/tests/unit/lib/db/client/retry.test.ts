@@ -41,6 +41,7 @@ describe('withRetry circuit breaker', () => {
 
     try {
       await withRetry(() => Promise.resolve('ok'), 'test-error-shape', 1);
+      expect.fail('Expected withRetry to throw DbCircuitOpenError');
     } catch (error) {
       expect(error).toBeInstanceOf(DbCircuitOpenError);
       if (error instanceof DbCircuitOpenError) {
