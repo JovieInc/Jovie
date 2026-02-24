@@ -48,6 +48,7 @@ jobs:
   # ==========================================================================
   guard:
     name: Trigger Guard
+    if: github.actor != 'Copilot'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:
