@@ -5,12 +5,6 @@
  * session helpers, and health checks.
  */
 
-// Circuit Breaker
-export {
-  DbCircuitOpenError,
-  dbCircuitBreaker,
-  getDbCircuitBreakerStats,
-} from './circuit-breaker';
 // Connection
 export {
   db,
