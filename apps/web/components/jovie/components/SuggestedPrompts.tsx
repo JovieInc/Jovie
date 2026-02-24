@@ -13,12 +13,8 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Music,
 };
 
-const ACCENT_TEXT_CLASSES = {
-  blue: 'text-accent',
-  green: 'text-accent',
-  purple: 'text-accent',
-  orange: 'text-accent',
-} as const;
+/** All suggestion accents use the single accent color from the design system. */
+const ACCENT_TEXT_CLASS = 'text-accent';
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
@@ -50,7 +46,7 @@ function SuggestionPill({
         <IconComponent
           className={cn(
             'h-3.5 w-3.5 shrink-0',
-            ACCENT_TEXT_CLASSES[suggestion.accent]
+            ACCENT_TEXT_CLASS
           )}
         />
       )}

@@ -94,7 +94,7 @@ export function ChatLinkRemovalCard({
           </p>
           <p className='truncate text-xs text-tertiary-token'>{url}</p>
           {errorMessage && (
-            <output className='mt-1 block text-xs text-danger-token'>
+            <output className='mt-1 block text-xs text-error'>
               {errorMessage}
             </output>
           )}

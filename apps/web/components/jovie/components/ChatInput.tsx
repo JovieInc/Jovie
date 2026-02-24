@@ -114,7 +114,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             'rounded-lg border bg-surface-1 transition-colors duration-fast',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-subtle focus-within:border-default'
+              : 'border-subtle focus-within:border-default focus-within:ring-2 focus-within:ring-accent/20'
           )}
         >
           {hasPendingImages && onRemoveImage && (
@@ -178,7 +178,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               disabled={!canSend}
               className={cn(
                 'absolute rounded-md flex items-center justify-center',
-                'bg-accent text-on-accent transition-all duration-fast',
+                'bg-accent text-accent-foreground transition-all duration-fast',
                 'hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed',
                 isCompact
                   ? 'bottom-2 right-2 h-7 w-7'

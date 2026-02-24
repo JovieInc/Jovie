@@ -1279,6 +1279,7 @@ body {
   --color-info: var(--color-info);
   --color-info-subtle: var(--color-info-subtle);
   --color-error-subtle: var(--color-error-subtle);
+  --color-error-foreground: var(--color-error-foreground);
 
   /* Accent token — enables bg-accent-subtle, text-accent, border-accent */
   --color-accent: var(--color-accent);
