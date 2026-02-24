@@ -14,6 +14,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureWarning } from '@/lib/error-tracking';
+import { getRedis } from '@/lib/redis';
+
+const BILLING_STATUS_CACHE_KEY_PREFIX = 'billing:status:v1:';
 
 /**
  * Safely extract the Stripe object ID from a webhook event.
@@ -195,9 +198,22 @@ export function isActiveSubscription(
  * await invalidateBillingCache();
  * ```
  */
-export async function invalidateBillingCache(): Promise<void> {
+export async function invalidateBillingCache(userId?: string): Promise<void> {
   // Revalidate the dashboard and any pages that display billing info
   revalidatePath(APP_ROUTES.DASHBOARD);
   revalidatePath(APP_ROUTES.BILLING);
   revalidatePath(APP_ROUTES.SETTINGS);
+
+  if (!userId) {
+    return;
+  }
+
+  const redis = getRedis();
+  if (!redis) {
+    return;
+  }
+
+  await redis
+    .del(`${BILLING_STATUS_CACHE_KEY_PREFIX}${userId}`)
+    .catch(() => undefined);
 }
