@@ -49,7 +49,7 @@ export function formatLyricsForAppleMusic(raw: string): {
   }
 
   // 6. Normalize repeated exclamation/question marks (max 1)
-  const hadRepeatedPunctuation = /[!]{2,}|[?]{2,}/.test(text);
+  const hadRepeatedPunctuation = /!{2,}|\?{2,}/.test(text);
   text = text.replaceAll(/!{2,}/g, '!');
   text = text.replaceAll(/\?{2,}/g, '?');
   if (hadRepeatedPunctuation) {

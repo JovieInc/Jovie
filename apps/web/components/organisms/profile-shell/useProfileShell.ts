@@ -9,12 +9,43 @@ import {
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { detectPlatform } from '@/lib/utils/platform-detection';
+import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import type { LegacySocialLink } from '@/types/db';
 import type {
   ProfileNotificationsContextValue,
   ProfileShellProps,
 } from './types';
 import { SOCIAL_NETWORK_PLATFORMS } from './types';
+
+function isSafePublicSocialLink(link: LegacySocialLink): boolean {
+  const rawPlatform = link.platform?.toLowerCase();
+  const rawUrl = link.url?.trim();
+
+  if (!rawPlatform || !rawUrl) {
+    return false;
+  }
+
+  if (
+    !SOCIAL_NETWORK_PLATFORMS.includes(
+      rawPlatform as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
+    )
+  ) {
+    return false;
+  }
+
+  const urlValidation = validateSocialLinkUrl(rawUrl);
+  if (!urlValidation.valid) {
+    return false;
+  }
+
+  const detected = detectPlatform(rawUrl).platform.id;
+  if (detected === rawPlatform) {
+    return true;
+  }
+
+  return rawPlatform === 'youtube' && detected === 'youtube_music';
+}
 
 export interface UseProfileShellReturn {
   isTipNavigating: boolean;
@@ -153,13 +184,7 @@ export function useProfileShell({
   );
 
   const socialNetworkLinks = socialLinks.filter(
-    link =>
-      link.is_visible !== false &&
-      link.platform &&
-      link.url &&
-      SOCIAL_NETWORK_PLATFORMS.includes(
-        link.platform.toLowerCase() as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
-      )
+    link => link.is_visible !== false && isSafePublicSocialLink(link)
   );
   const hasSocialLinks = socialNetworkLinks.length > 0;
   const hasContacts = contacts.length > 0;
