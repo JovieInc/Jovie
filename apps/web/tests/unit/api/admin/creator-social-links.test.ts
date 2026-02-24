@@ -22,13 +22,11 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/batch', () => ({
-  batchUpdateSocialLinks: (...args: any[]) =>
-    mockBatchUpdateSocialLinks(...args),
+  batchUpdateSocialLinks: mockBatchUpdateSocialLinks,
 }));
 
 vi.mock('@/lib/cache', () => ({
-  invalidateSocialLinksCache: (...args: any[]) =>
-    mockInvalidateSocialLinksCache(...args),
+  invalidateSocialLinksCache: mockInvalidateSocialLinksCache,
 }));
 
 vi.mock('@/lib/idempotency', async () => {
@@ -38,7 +36,7 @@ vi.mock('@/lib/idempotency', async () => {
     );
   return {
     ...actual,
-    withIdempotency: (...args: any[]) => mockWithIdempotency(...args),
+    withIdempotency: mockWithIdempotency,
   };
 });
 
@@ -193,6 +191,7 @@ describe('Admin Creator Social Links API', () => {
         45,
         expect.any(Function)
       );
+      expect(mockInvalidateSocialLinksCache).toHaveBeenCalledOnce();
     });
 
     it('returns 409 when another update is in progress', async () => {

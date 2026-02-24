@@ -17,38 +17,33 @@ const mockHandleTestProfileUpdate = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
-  withDbSession: (...args: any[]) => mockWithDbSession(...args),
+  withDbSession: mockWithDbSession,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
-  getCurrentUserEntitlements: (...args: any[]) =>
-    mockGetCurrentUserEntitlements(...args),
+  getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
 vi.mock('@/lib/http/parse-json', () => ({
-  parseJsonBody: (...args: any[]) => mockParseJsonBody(...args),
+  parseJsonBody: mockParseJsonBody,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
-  captureError: (...args: any[]) => mockCaptureError(...args),
+  captureError: mockCaptureError,
 }));
 
 vi.mock('@/app/api/dashboard/profile/lib', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
-  validateUpdatesPayload: (...args: any[]) =>
-    mockValidateUpdatesPayload(...args),
-  parseProfileUpdates: (...args: any[]) => mockParseProfileUpdates(...args),
-  buildProfileUpdateContext: (...args: any[]) =>
-    mockBuildProfileUpdateContext(...args),
-  guardUsernameUpdate: (...args: any[]) => mockGuardUsernameUpdate(...args),
-  buildClerkUpdates: (...args: any[]) => mockBuildClerkUpdates(...args),
-  syncClerkProfile: (...args: any[]) => mockSyncClerkProfile(...args),
-  updateProfileRecords: (...args: any[]) => mockUpdateProfileRecords(...args),
-  finalizeProfileResponse: (...args: any[]) =>
-    mockFinalizeProfileResponse(...args),
-  addAvatarCacheBust: (...args: any[]) => mockAddAvatarCacheBust(...args),
-  handleTestProfileUpdate: (...args: any[]) =>
-    mockHandleTestProfileUpdate(...args),
+  validateUpdatesPayload: mockValidateUpdatesPayload,
+  parseProfileUpdates: mockParseProfileUpdates,
+  buildProfileUpdateContext: mockBuildProfileUpdateContext,
+  guardUsernameUpdate: mockGuardUsernameUpdate,
+  buildClerkUpdates: mockBuildClerkUpdates,
+  syncClerkProfile: mockSyncClerkProfile,
+  updateProfileRecords: mockUpdateProfileRecords,
+  finalizeProfileResponse: mockFinalizeProfileResponse,
+  addAvatarCacheBust: mockAddAvatarCacheBust,
+  handleTestProfileUpdate: mockHandleTestProfileUpdate,
   getProfileByClerkId: vi.fn(),
 }));
 
