@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
+import type React from 'react';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ExportCSVButton } from '@/components/organisms/table';
@@ -69,6 +70,12 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
+  /** DSP connection badges to display on the left */
+  readonly dspBadges?: React.ReactNode;
+  /** Whether search is currently active */
+  readonly isSearchOpen?: boolean;
+  /** Callback to toggle search open/close */
+  readonly onSearchToggle?: () => void;
 }
 
 /** Options for release view segmented control */
@@ -300,6 +307,9 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
+  dspBadges,
+  isSearchOpen,
+  onSearchToggle,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
@@ -309,15 +319,27 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: release count */}
-      <div className='flex items-center gap-2'>
-        <span className='text-xs text-tertiary-token tabular-nums'>
-          {releases.length} {releases.length === 1 ? 'release' : 'releases'}
-        </span>
-      </div>
+      {/* Left: DSP connection badges */}
+      <div className='flex items-center gap-2'>{dspBadges}</div>
 
-      {/* Right: Filter + Display + Export (hidden on mobile where list view is used) */}
+      {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
       <div className='hidden md:flex items-center gap-2'>
+        {onSearchToggle && (
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={onSearchToggle}
+            className={cn(
+              pillButtonClass,
+              isSearchOpen && 'bg-interactive-active text-primary-token'
+            )}
+            aria-label={isSearchOpen ? 'Close search' : 'Search releases'}
+            aria-pressed={isSearchOpen}
+          >
+            <Icon name='Search' className='h-3.5 w-3.5' />
+            Search
+          </Button>
+        )}
         <ReleaseFilterDropdown
           filters={filters}
           onFiltersChange={onFiltersChange}

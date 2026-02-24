@@ -170,7 +170,9 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         id: 'copy-qr-code',
         label: 'Copy QR code',
         icon: QrCode,
-        onClick: () => void handleCopyQrCode(),
+        onClick: () => {
+          handleCopyQrCode().catch(() => {});
+        },
       },
       ...utmShareItems,
       {

@@ -140,9 +140,8 @@ export function SessionManagementCard({
 
             {!isCurrent && (
               <Button
-                variant='ghost'
+                variant='destructive'
                 size='sm'
-                className='text-destructive hover:text-destructive hover:bg-destructive/10'
                 disabled={endingSessionId === session.id}
                 onClick={() => setSessionToEnd(session)}
               >
