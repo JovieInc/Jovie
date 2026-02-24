@@ -23,8 +23,8 @@ describe('Switch', () => {
     it('applies base styling classes', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
-      expect(switchElement.className).toContain('h-5');
-      expect(switchElement.className).toContain('w-9');
+      expect(switchElement.className).toContain('h-4');
+      expect(switchElement.className).toContain('w-7');
       expect(switchElement.className).toContain('rounded-full');
     });
   });
