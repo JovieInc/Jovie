@@ -1,15 +1,22 @@
 'use client';
 
-import { Camera, Music } from 'lucide-react';
+import { Camera, DollarSign, Eye, Link2, Music } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
 
-import { type ChatSuggestion, DEFAULT_SUGGESTIONS } from '../types';
+import {
+  type ChatSuggestion,
+  DEFAULT_SUGGESTIONS,
+  FIRST_SESSION_SUGGESTIONS,
+} from '../types';
 
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Camera,
+  DollarSign,
+  Eye,
+  Link2,
   Music,
 };
 
@@ -18,6 +25,8 @@ const ACCENT_TEXT_CLASS = 'text-accent';
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
+  readonly isFirstSession?: boolean;
+  readonly latestReleaseTitle?: string | null;
 }
 
 function SuggestionPill({
@@ -54,10 +63,33 @@ function SuggestionPill({
   );
 }
 
-export function SuggestedPrompts({ onSelect }: SuggestedPromptsProps) {
+export function SuggestedPrompts({
+  onSelect,
+  isFirstSession = false,
+  latestReleaseTitle,
+}: SuggestedPromptsProps) {
+  const suggestions = isFirstSession
+    ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
+        if (
+          suggestion.icon === 'Link2' &&
+          typeof latestReleaseTitle === 'string' &&
+          latestReleaseTitle.trim().length > 0
+        ) {
+          const cleanTitle = latestReleaseTitle.trim();
+          return {
+            ...suggestion,
+            label: `Set up a link for “${cleanTitle}”`,
+            prompt: `Set up a link for ${cleanTitle}.`,
+          };
+        }
+
+        return suggestion;
+      })
+    : DEFAULT_SUGGESTIONS;
+
   return (
     <div className='flex flex-col gap-2'>
-      {DEFAULT_SUGGESTIONS.map(suggestion => (
+      {suggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
           suggestion={suggestion}
