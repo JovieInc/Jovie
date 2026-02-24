@@ -126,11 +126,15 @@ export function BatchIngestForm({
     }
   };
 
-  const summaryText = result
-    ? `${result.summary.success} created, ${result.summary.skipped} skipped, ${result.summary.error} errors`
-    : parsedCount > 0
-      ? `${parsedCount} URL${parsedCount === 1 ? '' : 's'} ready`
-      : null;
+  let summaryText: string | null;
+  if (result) {
+    summaryText = `${result.summary.success} created, ${result.summary.skipped} skipped, ${result.summary.error} errors`;
+  } else if (parsedCount > 0) {
+    const urlSuffix = parsedCount === 1 ? '' : 's';
+    summaryText = `${parsedCount} URL${urlSuffix} ready`;
+  } else {
+    summaryText = null;
+  }
 
   return (
     <Card>

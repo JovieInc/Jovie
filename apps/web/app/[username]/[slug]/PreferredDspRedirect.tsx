@@ -43,7 +43,7 @@ export function PreferredDspRedirect({
     if (!matchingLink?.url) return;
 
     // Redirect to the DSP via the server-side redirect endpoint
-    window.location.replace(
+    globalThis.location.replace(
       `${redirectBasePath}?dsp=${encodeURIComponent(providerKey)}`
     );
   }, [providerLinks, redirectBasePath]);
