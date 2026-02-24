@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { revalidateTag, updateTag } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -44,14 +44,13 @@ export async function POST(request: Request) {
       }
     }
 
-    updateTag('featured-creators');
     revalidateTag('featured-creators', 'max');
     return NextResponse.json(
       { revalidated: true },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    captureError('Featured creators revalidation failed', error, {
+    await captureError('Featured creators revalidation failed', error, {
       context: 'api-revalidate-featured-creators',
       endpoint: '/api/revalidate/featured-creators',
     });

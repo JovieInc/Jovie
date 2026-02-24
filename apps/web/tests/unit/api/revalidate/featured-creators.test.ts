@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRevalidateTag = vi.hoisted(() => vi.fn());
-const mockUpdateTag = vi.hoisted(() => vi.fn());
-const mockCaptureError = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock('next/cache', () => ({
   revalidateTag: mockRevalidateTag,
-  updateTag: mockUpdateTag,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -56,12 +54,11 @@ describe('POST /api/revalidate/featured-creators', () => {
 
     expect(response.status).toBe(200);
     expect(data.revalidated).toBe(true);
-    expect(mockUpdateTag).toHaveBeenCalledWith('featured-creators');
     expect(mockRevalidateTag).toHaveBeenCalledWith('featured-creators', 'max');
   });
 
   it('captures errors when revalidation fails', async () => {
-    mockUpdateTag.mockImplementationOnce(() => {
+    mockRevalidateTag.mockImplementationOnce(() => {
       throw new Error('cache unavailable');
     });
 

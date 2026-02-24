@@ -1,3 +1,4 @@
+import type { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCaptureException = vi.hoisted(() => vi.fn());
@@ -34,7 +35,7 @@ describe('/api/waitlist-debug', () => {
     const response = await GET(
       new Request('http://localhost/api/waitlist-debug', {
         method: 'GET',
-      }) as never
+      }) as unknown as NextRequest
     );
     const body = await response.json();
 
@@ -55,7 +56,7 @@ describe('/api/waitlist-debug', () => {
       POST(
         new Request('http://localhost/api/waitlist-debug', {
           method: 'POST',
-        }) as never
+        }) as unknown as NextRequest
       )
     ).rejects.toThrow('logger failed');
 
