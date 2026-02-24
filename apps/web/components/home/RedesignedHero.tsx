@@ -37,7 +37,7 @@ export async function RedesignedHero() {
         style={{ background: 'var(--linear-hero-glow)' }}
       />
 
-      <div className='relative grid w-full grid-cols-1 items-center gap-10 py-12 md:grid-cols-[1fr_auto] md:gap-12 lg:gap-16 lg:py-16'>
+      <div className='relative grid w-full grid-cols-1 items-center gap-8 py-10 md:grid-cols-[1fr_auto] md:gap-10 lg:gap-14 lg:py-14'>
         <div>
           <h1
             style={{
@@ -66,7 +66,7 @@ export async function RedesignedHero() {
           </h1>
 
           <p
-            className='mt-4 max-w-[400px]'
+            className='mt-3 max-w-[400px]'
             style={{
               fontSize: '15px',
               fontWeight: 400,
@@ -78,12 +78,12 @@ export async function RedesignedHero() {
             Your entire music career. One link. Ready in seconds.
           </p>
 
-          <div className='mt-8 max-w-[400px]'>
+          <div className='mt-6 max-w-[400px]'>
             <HeroSpotifySearch />
           </div>
 
           <p
-            className='mt-4 flex items-center gap-2'
+            className='mt-3 flex items-center gap-2'
             style={{
               fontSize: '13px',
               letterSpacing: '0.01em',

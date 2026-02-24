@@ -82,7 +82,7 @@ export function DashboardShowcase() {
 
       <Container size='homepage'>
         {/* Section header — 2-col layout matching smartlinks section */}
-        <div className='mx-auto mb-8 max-w-6xl'>
+        <div className='mx-auto mb-6 max-w-6xl'>
           <div className='grid gap-6 md:grid-cols-2 md:items-start'>
             <h2
               className='max-w-md'
@@ -115,7 +115,7 @@ export function DashboardShowcase() {
 
         {/* Tabs */}
         <div
-          className='mx-auto mb-6 flex max-w-lg justify-center gap-1 rounded-lg p-1'
+          className='mx-auto mb-5 flex max-w-lg justify-center gap-1 rounded-lg p-1'
           style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
           role='tablist'
         >
