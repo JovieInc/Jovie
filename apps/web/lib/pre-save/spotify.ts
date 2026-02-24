@@ -18,7 +18,8 @@ function spotifyAuthHeader(): string {
     throw new Error('Spotify OAuth credentials are not configured');
   }
 
-  return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+  const credentials = `${clientId}:${clientSecret}`;
+  return `Basic ${Buffer.from(credentials).toString('base64')}`;
 }
 
 export function buildSpotifyAuthorizeUrl(state: string, redirectUri: string) {

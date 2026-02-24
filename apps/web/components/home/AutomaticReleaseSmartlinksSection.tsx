@@ -209,6 +209,18 @@ function ActivityThread() {
   );
 }
 
+function getStatusColor(status: string): string {
+  if (status === 'Live') return '#4EC98C';
+  if (status === 'Syncing') return '#6C7AFF';
+  return 'var(--linear-text-tertiary)';
+}
+
+function getStatusBgColor(status: string): string {
+  if (status === 'Live') return 'rgba(78, 201, 140, 0.12)';
+  if (status === 'Syncing') return 'rgba(108, 122, 255, 0.12)';
+  return 'rgba(255,255,255,0.05)';
+}
+
 function ReleaseKanban() {
   return (
     <div style={{ backgroundColor: 'rgba(13, 18, 28, 0.88)' }}>
@@ -317,18 +329,8 @@ function ReleaseKanban() {
                       style={{
                         fontSize: '10px',
                         fontWeight: 510,
-                        color:
-                          card.status === 'Live'
-                            ? '#4EC98C'
-                            : card.status === 'Syncing'
-                              ? '#6C7AFF'
-                              : 'var(--linear-text-tertiary)',
-                        backgroundColor:
-                          card.status === 'Live'
-                            ? 'rgba(78, 201, 140, 0.12)'
-                            : card.status === 'Syncing'
-                              ? 'rgba(108, 122, 255, 0.12)'
-                              : 'rgba(255,255,255,0.05)',
+                        color: getStatusColor(card.status),
+                        backgroundColor: getStatusBgColor(card.status),
                       }}
                     >
                       {card.status}

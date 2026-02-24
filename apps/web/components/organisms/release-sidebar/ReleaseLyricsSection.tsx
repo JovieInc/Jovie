@@ -102,7 +102,7 @@ export function ReleaseLyricsSection({
 
     autoSaveTimerRef.current = setTimeout(() => {
       startTransition(() => {
-        void performAutoSave();
+        performAutoSave();
       });
     }, AUTO_SAVE_DELAY_MS);
 
