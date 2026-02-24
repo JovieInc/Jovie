@@ -1,13 +1,13 @@
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
-interface ProviderOverride {
+export interface ProviderOverride {
   key: ProviderKey;
   url: string;
   source?: 'ingested' | 'manual';
   updatedAt?: string;
 }
 
-interface MockReleaseOptions {
+export interface MockReleaseOptions {
   id?: string;
   title?: string;
   providers?: ProviderOverride[];
@@ -18,6 +18,9 @@ export function createMockRelease(
   options: MockReleaseOptions = {}
 ): ReleaseViewModel {
   const id = options.id ?? 'release_1';
+  const title = options.title ?? 'Test Release';
+  const slug = title.toLowerCase().replace(/\s+/g, '-');
+  const smartLinkPath = `/r/${slug}--${id}`;
   const providers = (options.providers ?? []).map(provider => ({
     key: provider.key,
     url: provider.url,
@@ -31,11 +34,11 @@ export function createMockRelease(
   return {
     id,
     profileId: 'profile_1',
-    title: options.title ?? 'Test Release',
+    title,
     releaseDate: '2025-06-01T00:00:00.000Z',
     artworkUrl: 'https://cdn.jovie.test/releases/artwork.jpg',
-    slug: 'test-release',
-    smartLinkPath: '/r/test-release--profile_1',
+    slug,
+    smartLinkPath,
     spotifyPopularity: 72,
     providers,
     releaseType: 'single',

@@ -65,11 +65,9 @@ vi.mock('@jovie/ui', async () => {
       options,
     }: {
       value: string;
-      onValueChange: (
-        value: 'catalog' | 'links' | 'details' | 'lyrics'
-      ) => void;
+      onValueChange: (value: string) => void;
       options: Array<{
-        value: 'catalog' | 'links' | 'details' | 'lyrics';
+        value: string;
         label: string;
       }>;
     }) => (
@@ -190,7 +188,15 @@ vi.mock(
   })
 );
 
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }));
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+    promise: vi.fn(),
+  },
+}));
 vi.mock('@/lib/constants/layout', () => ({ SIDEBAR_WIDTH: 360 }));
 vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jovie.com',
