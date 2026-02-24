@@ -69,6 +69,11 @@ vi.mock('@/lib/db/schema/links', () => ({
   },
 }));
 
+// Mock verification column support (always available in tests)
+vi.mock('@/lib/db/queries/social-links-verification', () => ({
+  getSocialLinksVerificationColumnSupport: vi.fn().mockResolvedValue(true),
+}));
+
 // Mock headers
 vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
