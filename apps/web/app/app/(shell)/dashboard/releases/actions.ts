@@ -785,10 +785,12 @@ export async function rescanAppleMusicLinks(): Promise<{
     rateLimited: false,
     retryAfter: null,
     linksFound: result.releasesEnriched,
-    message:
-      result.releasesEnriched > 0
-        ? `Found ${result.releasesEnriched} new Apple Music link${result.releasesEnriched === 1 ? '' : 's'}.`
-        : 'No new Apple Music links found.',
+    message: (() => {
+      if (result.releasesEnriched === 0)
+        return 'No new Apple Music links found.';
+      const suffix = result.releasesEnriched === 1 ? '' : 's';
+      return `Found ${result.releasesEnriched} new Apple Music link${suffix}.`;
+    })(),
   };
 }
 

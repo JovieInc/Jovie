@@ -10,7 +10,7 @@ import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
 export const runtime = 'nodejs';
 
-interface ChatUsageSnapshot {
+type ChatUsageSnapshot = {
   plan: 'free' | 'pro' | 'growth';
   dailyLimit: number;
   used: number;
@@ -18,7 +18,7 @@ interface ChatUsageSnapshot {
   isExhausted: boolean;
   warningThreshold: number;
   isNearLimit: boolean;
-}
+};
 
 function resolvePlan(
   plan: string | null | undefined
