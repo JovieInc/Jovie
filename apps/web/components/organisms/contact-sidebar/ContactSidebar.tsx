@@ -38,6 +38,7 @@ export const ContactSidebar = memo(function ContactSidebar({
   onContactChange,
   onSave,
   isSaving,
+  contextMenuItems: providedContextMenuItems,
   onAvatarUpload,
 }: ContactSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('details');
@@ -69,7 +70,7 @@ export const ContactSidebar = memo(function ContactSidebar({
 
   // Only depend on specific contact fields, not the entire contact object
   const username = contact?.username;
-  const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
+  const fallbackContextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!hasContact) return [];
 
     const items: ContextMenuItemType[] = [
@@ -106,6 +107,8 @@ export const ContactSidebar = memo(function ContactSidebar({
 
     return convertToCommonDropdownItems(items);
   }, [hasContact, username, handleCopyProfileUrl, onRefresh]);
+
+  const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
 
   return (
     <RightDrawer
