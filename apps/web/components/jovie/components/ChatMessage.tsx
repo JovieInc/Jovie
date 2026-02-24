@@ -180,7 +180,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='rounded-md p-1.5 text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token'
+                  className='flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

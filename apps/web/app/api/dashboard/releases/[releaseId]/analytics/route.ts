@@ -50,7 +50,7 @@ export async function GET(
     const { releaseId } = await params;
 
     const release = await getReleaseById(releaseId);
-    if (!release || release.creatorProfileId !== profile.id) {
+    if (release?.creatorProfileId !== profile.id) {
       return NextResponse.json(
         { error: 'Release not found' },
         { status: 404, headers: NO_STORE_HEADERS }
