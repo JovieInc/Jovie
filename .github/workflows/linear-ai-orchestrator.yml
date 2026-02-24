@@ -310,11 +310,19 @@ jobs:
       issues: write
       id-token: write
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Checkout main
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: main
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
@@ -386,8 +394,8 @@ jobs:
             exit 1
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
 
           git add -A
           git commit -m "feat: implement ${ISSUE_IDENTIFIER} - ${ISSUE_TITLE}"
@@ -458,7 +466,7 @@ jobs:
           ISSUE_ID: ${{ needs.guard.outputs.issue_id }}
           ISSUE_IDENTIFIER: ${{ needs.guard.outputs.issue_identifier }}
           BRANCH_NAME: ${{ needs.guard.outputs.branch_name }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ -z "$LINEAR_API_KEY" ]]; then
             echo "Missing LINEAR_API_KEY; skipping Linear sync"
