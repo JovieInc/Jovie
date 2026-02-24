@@ -56,8 +56,8 @@ vi.mock('@/lib/queries', () => ({
   }),
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({
+const { useQueryMock } = vi.hoisted(() => ({
+  useQueryMock: vi.fn(() => ({
     data: {
       pixels: {
         facebookPixelId: '1234567890123456',
@@ -77,11 +77,13 @@ vi.mock('@tanstack/react-query', () => ({
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
-  }),
+  })),
 }));
 
-// Quarantined in tests/quarantine.json: component's deep import tree causes OOM in vitest forks.
-// TODO: Re-enable after extracting heavy deps or increasing Node heap limit in CI.
+vi.mock('@tanstack/react-query', () => ({
+  useQuery: useQueryMock,
+}));
+
 describe('SettingsAdPixelsSection', () => {
   it('renders each retargeting platform as a separate setting card with status', () => {
     const { getByText, getAllByText } = fastRender(
@@ -100,5 +102,16 @@ describe('SettingsAdPixelsSection', () => {
 
     expect(getAllByText('Configured')).toHaveLength(2);
     expect(getAllByText('Not configured')).toHaveLength(1);
+  });
+
+  it('configures query gcTime to allow cache cleanup after inactivity', () => {
+    fastRender(<SettingsAdPixelsSection isPro />);
+
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+      })
+    );
   });
 });
