@@ -43,6 +43,8 @@ const BILLING_STATUS_PRO = {
   plan: 'pro',
   hasStripeCustomer: true,
   stripeSubscriptionId: 'sub_123',
+  stale: false,
+  staleReason: null,
 };
 
 const BILLING_STATUS_FREE = {
@@ -50,6 +52,17 @@ const BILLING_STATUS_FREE = {
   plan: 'free',
   hasStripeCustomer: false,
   stripeSubscriptionId: null,
+  stale: false,
+  staleReason: null,
+};
+
+const BILLING_STATUS_STALE = {
+  isPro: true,
+  plan: 'pro',
+  stripeCustomerId: 'cus_123',
+  stripeSubscriptionId: 'sub_123',
+  _stale: true,
+  _staleReason: 'Payment service temporarily unavailable',
 };
 
 const PRICING_OPTIONS = {
@@ -226,6 +239,22 @@ describe('BillingDashboard', () => {
     });
 
     expect(screen.getByText('Active')).toBeInTheDocument();
+  });
+
+  it('shows stale billing indicator when fallback data is served', async () => {
+    mockFetchResponses({
+      '/api/billing/status': BILLING_STATUS_STALE,
+      '/api/stripe/pricing-options': PRICING_OPTIONS,
+      '/api/billing/history': EMPTY_HISTORY,
+    });
+
+    renderBillingDashboard();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Payment service temporarily unavailable')
+      ).toBeInTheDocument();
+    });
   });
 
   it('shows free plan card for non-pro users', async () => {
