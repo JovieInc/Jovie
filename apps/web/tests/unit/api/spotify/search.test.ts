@@ -94,6 +94,10 @@ describe('GET /api/spotify/search', () => {
       remaining: 0,
       reset: new Date(Date.now() + 60_000),
     });
+    mockCreateRateLimitHeaders.mockReturnValue({
+      'X-RateLimit-Limit': '30',
+      'X-RateLimit-Remaining': '0',
+    });
 
     const response = await GET(
       new NextRequest('http://localhost/api/spotify/search?q=artist')
@@ -101,7 +105,7 @@ describe('GET /api/spotify/search', () => {
 
     expect(response.status).toBe(429);
     expect(response.headers.get('X-RateLimit-Limit')).toBe('30');
-    expect(response.headers.get('X-RateLimit-Remaining')).toBe('29');
+    expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
   });
 
   it('returns empty array for single-letter query with no alphabet cache', async () => {

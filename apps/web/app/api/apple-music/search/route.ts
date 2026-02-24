@@ -109,13 +109,6 @@ async function searchArtistWithRetry(query: string, limit: number) {
  */
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json(
-      { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
@@ -156,7 +149,8 @@ export async function GET(request: NextRequest) {
 
   const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
 
-  const identifier = userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
+  const hasUser = !!userId;
+  const identifier = hasUser ? `user:${userId}` : `ip:${getClientIP(request)}`;
   const rateLimitResult = await appleMusicSearchLimiter.limit(identifier);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,

@@ -75,6 +75,10 @@ describe('GET /api/apple-music/search', () => {
       remaining: 0,
       reset: new Date(Date.now() + 60_000),
     });
+    mockCreateRateLimitHeaders.mockReturnValue({
+      'X-RateLimit-Limit': '30',
+      'X-RateLimit-Remaining': '0',
+    });
 
     const response = await GET(
       new NextRequest('http://localhost/api/apple-music/search?q=artist')
@@ -82,7 +86,7 @@ describe('GET /api/apple-music/search', () => {
 
     expect(response.status).toBe(429);
     expect(response.headers.get('X-RateLimit-Limit')).toBe('30');
-    expect(response.headers.get('X-RateLimit-Remaining')).toBe('29');
+    expect(response.headers.get('X-RateLimit-Remaining')).toBe('0');
   });
 
   it('applies independent limits per user key', async () => {
@@ -103,6 +107,19 @@ describe('GET /api/apple-music/search', () => {
     expect(mockAppleMusicSearchLimiterLimit).toHaveBeenNthCalledWith(
       2,
       'user:user_b'
+    );
+  });
+
+  it('falls back to IP-based rate limiting for unauthenticated users', async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/apple-music/search?q=artist')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockAppleMusicSearchLimiterLimit).toHaveBeenCalledWith(
+      'ip:127.0.0.1'
     );
   });
 });
