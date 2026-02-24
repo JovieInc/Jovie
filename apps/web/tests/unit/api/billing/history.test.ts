@@ -89,5 +89,75 @@ describe('GET /api/billing/history', () => {
       status: 'past_due',
       maskedIdentifier: '****1234',
     });
+
+    expect(Object.keys(data.entries[0]).sort()).toEqual([
+      'amount',
+      'currency',
+      'eventType',
+      'maskedIdentifier',
+      'status',
+      'timestamp',
+    ]);
+  });
+
+  it('does not leak Stripe identifiers or internal metadata fields', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        userId: 'db_user_123',
+        email: 'user@example.com',
+        isAdmin: false,
+        isPro: true,
+        plan: 'pro',
+        stripeCustomerId: 'cus_123',
+        stripeSubscriptionId: 'sub_123',
+        billingVersion: 3,
+        lastBillingEventAt: null,
+      },
+    });
+    mockGetBillingAuditLog.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 'log_987',
+          eventType: 'invoice_payment_failed',
+          previousState: { stripeCustomerId: 'cus_abc1234' },
+          newState: {
+            isPro: true,
+            plan: 'pro',
+            internalNotes: 'sensitive-note',
+          },
+          stripeEventId: 'evt_abc123456789',
+          source: 'webhook',
+          metadata: {
+            amountDue: 2500,
+            currency: 'usd',
+            subscriptionId: 'sub_abc123456789',
+            stripeCustomerId: 'cus_abc123456789',
+            rawPayload: { customer: 'cus_abc123456789' },
+          },
+          createdAt: new Date('2025-01-20T10:30:00Z'),
+        },
+      ],
+    });
+
+    const { GET } = await import('@/app/api/billing/history/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    const serializedEntry = JSON.stringify(data.entries[0]);
+
+    expect(serializedEntry).not.toMatch(/cus_/);
+    expect(serializedEntry).not.toMatch(/sub_/);
+    expect(serializedEntry).not.toMatch(/evt_/);
+
+    expect(data.entries[0]).not.toHaveProperty('id');
+    expect(data.entries[0]).not.toHaveProperty('previousState');
+    expect(data.entries[0]).not.toHaveProperty('newState');
+    expect(data.entries[0]).not.toHaveProperty('metadata');
+    expect(data.entries[0]).not.toHaveProperty('rawPayload');
+    expect(data.entries[0]).not.toHaveProperty('internalNotes');
   });
 });
