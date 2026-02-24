@@ -1,24 +1,17 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+import { withSentryApiRoute } from '@/lib/sentry/api-wrapper';
 import { logger } from '@/lib/utils/logger';
 
-/**
- * Minimal debug endpoint to test if API routes are working
- * No auth, no validation, just returns a simple JSON response
- */
-export async function POST() {
-  logger.info('[Waitlist Debug] POST request received');
-  return NextResponse.json({
-    success: true,
-    message: 'Debug endpoint working',
-    timestamp: new Date().toISOString(),
-  });
-}
+const routeName = '/api/waitlist-debug';
 
-export async function GET() {
-  logger.info('[Waitlist Debug] GET request received');
+const handler = async (_request: NextRequest) => {
+  logger.info('[Waitlist Debug] request received');
   return NextResponse.json({
     success: true,
     message: 'Debug endpoint working',
     timestamp: new Date().toISOString(),
   });
-}
+};
+
+export const POST = withSentryApiRoute(handler, { routeName });
+export const GET = withSentryApiRoute(handler, { routeName });
