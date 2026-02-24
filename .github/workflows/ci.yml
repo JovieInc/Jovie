@@ -22,6 +22,10 @@ concurrency:
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  # Larger runner for CPU-heavy jobs (typecheck, build, tests).
+  # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
+  # or leave as "ubuntu-latest" for default 2-core runners.
+  FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
 
 jobs:
 
@@ -295,7 +299,7 @@ jobs:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -829,7 +833,7 @@ jobs:
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Skipped in merge queue: no merge-queue jobs depend on the full build.
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -915,7 +919,7 @@ jobs:
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy.
     # Skipped in merge queue — unit tests already passed on the PR.
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false

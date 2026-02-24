@@ -100,7 +100,7 @@ export async function POST(req: Request) {
       const records = await resolveTxt(hostname);
       const flattened = records.map(chunks => chunks.join(''));
       verified = flattened.some(record =>
-        record.includes(link.verificationToken!)
+        record.includes(link.verificationToken as string)
       );
     } catch {
       verified = false;
