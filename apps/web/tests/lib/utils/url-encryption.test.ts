@@ -4,7 +4,28 @@
  */
 
 import crypto from 'crypto';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Pre-derive a fast test key to avoid expensive scryptSync (N=2^17) in every encrypt/decrypt
+const FAST_TEST_KEY = crypto.randomBytes(32);
+const originalScryptSync = crypto.scryptSync.bind(crypto);
+const scryptSpy = vi
+  .spyOn(crypto, 'scryptSync')
+  .mockImplementation((...args: unknown[]) => {
+    // If called with key length 32 and scrypt options (encryption key derivation), use fast key
+    if (
+      args[2] === 32 &&
+      typeof args[3] === 'object' &&
+      args[3] !== null &&
+      'N' in args[3]
+    ) {
+      return FAST_TEST_KEY;
+    }
+    return originalScryptSync(
+      ...(args as Parameters<typeof crypto.scryptSync>)
+    );
+  });
+
 import {
   type EncryptionResult,
   extractDomain,
@@ -21,10 +42,6 @@ import {
 } from '@/lib/utils/url-encryption.server';
 
 describe('URL Encryption', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe('encryptUrl', () => {
     it('should encrypt a URL and return encryption result', () => {
       const url = 'https://example.com/path?query=value';
@@ -66,7 +83,7 @@ describe('URL Encryption', () => {
     });
 
     it('should use strong scrypt work factor parameters', () => {
-      const scryptSpy = vi.spyOn(crypto, 'scryptSync');
+      scryptSpy.mockClear();
 
       const result = encryptUrl('https://example.com/scrypt');
       decryptUrl(result);
@@ -92,8 +109,12 @@ describe('URL Encryption', () => {
           throw new Error('cipher failure');
         });
 
-      expect(() => encryptUrl(url)).toThrow('Failed to encrypt URL');
-      expect(cipherSpy).toHaveBeenCalled();
+      try {
+        expect(() => encryptUrl(url)).toThrow('Failed to encrypt URL');
+        expect(cipherSpy).toHaveBeenCalled();
+      } finally {
+        cipherSpy.mockRestore();
+      }
     });
   });
 

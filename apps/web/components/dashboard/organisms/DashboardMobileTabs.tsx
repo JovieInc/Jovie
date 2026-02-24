@@ -31,8 +31,8 @@ export function DashboardMobileTabs({
   const { isAdmin } = useDashboardData();
   const { signOut } = useClerk();
 
-  const handleSignOut = useCallback(() => {
-    void signOut({ redirectUrl: '/' });
+  const handleSignOut = useCallback(async () => {
+    await signOut({ redirectUrl: '/' });
   }, [signOut]);
 
   return (

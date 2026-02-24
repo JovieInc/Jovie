@@ -236,7 +236,7 @@ export const UniversalLinkInput = forwardRef<
 
     const handleVoiceInput = useCallback(async () => {
       if (!voiceInputEnabled) return;
-      if (typeof window === 'undefined') return;
+      if (typeof globalThis.window === 'undefined') return;
       if (!navigator.mediaDevices?.getUserMedia) return;
 
       try {
@@ -256,7 +256,7 @@ export const UniversalLinkInput = forwardRef<
         });
 
         recorder.start();
-        window.setTimeout(() => {
+        globalThis.setTimeout(() => {
           recorder.stop();
         }, 250);
       } catch {

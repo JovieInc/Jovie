@@ -370,71 +370,114 @@ export default async function ContentSmartLinkPage({
         />
       )}
 
-      {isUnreleased && showUnreleasedHero ? (
-        <UnreleasedReleaseHero
-          release={{
-            id:
-              content.type === 'release'
-                ? content.id
-                : (content.releaseId ?? content.id),
-            trackId: content.type === 'track' ? content.id : null,
-            slug: content.slug,
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-            releaseDate: content.releaseDate!,
-            hasSpotify: content.providerLinks.some(
-              link => link.providerId === 'spotify'
-            ),
-            hasAppleMusic: content.providerLinks.some(
-              link => link.providerId === 'apple_music'
-            ),
-          }}
-          artist={{
-            id: creator.id,
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-          }}
-        />
-      ) : isUnreleased ? (
-        <ScheduledReleasePage
-          release={{
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-          }}
-          artist={{
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-          }}
-        />
-      ) : (
-        <ReleaseLandingPage
-          release={{
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-            releaseDate: toISOStringOrNull(content.releaseDate),
-          }}
-          artist={{
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-          }}
-          providers={allProviders}
-          utmParams={utmParams}
-          artworkSizes={content.artworkSizes}
-          allowDownloads={
-            (creator.settings as Record<string, unknown> | null)
-              ?.allowArtworkDownloads === true
-          }
-          soundsUrl={soundsUrl}
-          tracking={{
-            contentType: content.type,
-            contentId: content.id,
-            smartLinkSlug: content.slug,
-          }}
-        />
-      )}
+      <ContentPageBody
+        isUnreleased={!!isUnreleased}
+        showUnreleasedHero={showUnreleasedHero}
+        content={content}
+        creator={creator}
+        allProviders={allProviders}
+        utmParams={utmParams}
+        soundsUrl={soundsUrl}
+      />
     </>
+  );
+}
+
+function ContentPageBody({
+  isUnreleased,
+  showUnreleasedHero,
+  content,
+  creator,
+  allProviders,
+  utmParams,
+  soundsUrl,
+}: Readonly<{
+  isUnreleased: boolean;
+  showUnreleasedHero: boolean;
+  content: Content;
+  creator: Creator;
+  allProviders: Array<{
+    key: ProviderKey;
+    label: string;
+    accent: string;
+    url: string | null;
+  }>;
+  utmParams: ReturnType<typeof extractUTMParams>;
+  soundsUrl: string | null;
+}>) {
+  const artistName = creator.displayName ?? creator.username;
+
+  if (isUnreleased && showUnreleasedHero) {
+    return (
+      <UnreleasedReleaseHero
+        release={{
+          id:
+            content.type === 'release'
+              ? content.id
+              : (content.releaseId ?? content.id),
+          trackId: content.type === 'track' ? content.id : null,
+          slug: content.slug,
+          title: content.title,
+          artworkUrl: content.artworkUrl,
+          releaseDate: content.releaseDate!,
+          hasSpotify: content.providerLinks.some(
+            link => link.providerId === 'spotify'
+          ),
+          hasAppleMusic: content.providerLinks.some(
+            link => link.providerId === 'apple_music'
+          ),
+        }}
+        artist={{
+          id: creator.id,
+          name: artistName,
+          handle: creator.usernameNormalized,
+          avatarUrl: creator.avatarUrl,
+        }}
+      />
+    );
+  }
+
+  if (isUnreleased) {
+    return (
+      <ScheduledReleasePage
+        release={{
+          title: content.title,
+          artworkUrl: content.artworkUrl,
+        }}
+        artist={{
+          name: artistName,
+          handle: creator.usernameNormalized,
+        }}
+      />
+    );
+  }
+
+  return (
+    <ReleaseLandingPage
+      release={{
+        title: content.title,
+        artworkUrl: content.artworkUrl,
+        releaseDate: toISOStringOrNull(content.releaseDate),
+      }}
+      artist={{
+        name: artistName,
+        handle: creator.usernameNormalized,
+        avatarUrl: creator.avatarUrl,
+      }}
+      providers={allProviders}
+      utmParams={utmParams}
+      artworkSizes={content.artworkSizes}
+      allowDownloads={
+        (creator.settings as Record<string, unknown> | null)
+          ?.allowArtworkDownloads === true
+      }
+      soundsUrl={soundsUrl}
+      tracking={{
+        contentType: content.type,
+        contentId: content.id,
+        smartLinkSlug: content.slug,
+      }}
+    />
   );
 }
 

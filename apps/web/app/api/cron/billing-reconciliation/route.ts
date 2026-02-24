@@ -30,6 +30,7 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
 // Safety limit: process max 5000 users per run
@@ -244,8 +245,8 @@ async function reconcileProUsersWithoutSubscription(
       if (user.stripeCustomerId) {
         // Look up subscriptions from the pre-fetched customer map
         const customerSubs = customerMap?.get(user.stripeCustomerId);
-        const activeSubscription = customerSubs?.find(
-          s => s.status === 'active'
+        const activeSubscription = customerSubs?.find(subscription =>
+          isActiveSubscription(subscription.status)
         );
 
         if (activeSubscription) {

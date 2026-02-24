@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import { Check, ChevronDown } from 'lucide-react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   DrawerPropertyRow,
   DrawerSection,
@@ -124,7 +125,12 @@ export function ReleaseMetadata({
           label='Label'
           value={
             release.label ? (
-              <span className='text-xs'>{release.label}</span>
+              <CopyableMonospaceCell
+                value={release.label}
+                label='Label'
+                maxWidth={140}
+                className='font-sans'
+              />
             ) : (
               <span className='text-xs text-tertiary-token'>Unknown</span>
             )
@@ -149,14 +155,9 @@ export function ReleaseMetadata({
                 <DropdownMenuTrigger asChild>
                   <button
                     type='button'
-                    className='inline-flex items-center gap-1 rounded-md px-0.5 -mx-0.5 py-0.5 transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
+                    className='inline-flex items-center gap-1 rounded-md px-1 -mx-1 py-0.5 text-xs text-secondary-token transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
                   >
-                    <Badge
-                      variant='secondary'
-                      className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
-                    >
-                      {canvasStatusDisplayLabel}
-                    </Badge>
+                    <span>{canvasStatusDisplayLabel}</span>
                     <ChevronDown
                       size={12}
                       className='text-tertiary-token'
@@ -237,7 +238,16 @@ export function ReleaseMetadata({
 
         {release.spotifyPopularity != null && (
           <DrawerPropertyRow
-            label='Popularity'
+            label={
+              <span title='Spotify Popularity'>
+                <SocialIcon
+                  platform='spotify'
+                  className='h-3.5 w-3.5 text-tertiary-token'
+                  aria-label='Spotify Popularity'
+                  aria-hidden={false}
+                />
+              </span>
+            }
             value={<PopularityBar value={release.spotifyPopularity} />}
           />
         )}

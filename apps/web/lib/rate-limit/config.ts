@@ -369,6 +369,42 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Apple Music rescan (free): 1 per day per profile */
+  appleMusicRescanFree: {
+    name: 'Apple Music Rescan (Free)',
+    limit: 1,
+    window: '1 d',
+    prefix: 'dsp:apple-music:rescan:free',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Apple Music rescan (paid): 1 per hour per profile */
+  appleMusicRescanPaid: {
+    name: 'Apple Music Rescan (Paid)',
+    limit: 1,
+    window: '1 h',
+    prefix: 'dsp:apple-music:rescan:paid',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Release refresh (free): 1 per day per release */
+  releaseRefreshFree: {
+    name: 'Release Refresh (Free)',
+    limit: 1,
+    window: '1 d',
+    prefix: 'release:refresh:free',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Release refresh (paid): 1 per hour per release */
+  releaseRefreshPaid: {
+    name: 'Release Refresh (Paid)',
+    limit: 1,
+    window: '1 h',
+    prefix: 'release:refresh:paid',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // AI Chat Operations
   // ---------------------------------------------------------------------------

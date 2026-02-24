@@ -9,7 +9,7 @@ import {
   type PreviewPanelLink,
   usePreviewPanelData,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -103,14 +103,11 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       <>
         {conversationId && (
           <SimpleTooltip content='Copy session ID'>
-            <CircleIconButton
-              size='sm'
-              variant='outline'
+            <DashboardHeaderActionButton
               ariaLabel='Copy session ID'
               onClick={handleCopyConversationId}
-            >
-              <Copy aria-hidden='true' className='size-4' />
-            </CircleIconButton>
+              icon={<Copy aria-hidden='true' className='size-4' />}
+            />
           </SimpleTooltip>
         )}
         <PreviewToggleButton />

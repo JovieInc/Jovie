@@ -106,8 +106,8 @@ export function formatEventType(eventType: string): string {
 }
 
 export function formatStatus(status: string): string {
-  const normalized = status.replace(/[_-]/g, ' ');
-  return normalized.replace(/\b\w/g, char => char.toUpperCase());
+  const normalized = status.replaceAll(/[_-]/g, ' ');
+  return normalized.replaceAll(/\b\w/g, char => char.toUpperCase());
 }
 
 export function formatDate(dateStr: string): string {

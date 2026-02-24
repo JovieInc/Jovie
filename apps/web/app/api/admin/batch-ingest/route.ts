@@ -6,7 +6,7 @@ import {
   BillingUnavailableError,
   getCurrentUserEntitlements,
 } from '@/lib/entitlements/server';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { findAvailableHandle } from '@/lib/ingestion/flows/profile-operations';
 import {
@@ -83,20 +83,30 @@ async function ingestSpotifyArtist(
       return handleExistingUnclaimedProfile(tx, existing, socialContext);
     }
 
-    let finalHandle = fallbackHandle;
-
-    if (existing?.isClaimed) {
-      const availableHandle = await findAvailableHandle(tx, fallbackHandle);
-      if (!availableHandle) {
-        return NextResponse.json(
-          {
-            error: 'Unable to allocate unique username',
-            details: 'All fallback username attempts exhausted.',
+    if (existing) {
+      // Profile exists and is already claimed — nothing to ingest
+      return NextResponse.json(
+        {
+          profile: {
+            id: existing.id,
+            username: existing.usernameNormalized,
           },
-          { status: 409, headers: NO_STORE_HEADERS }
-        );
-      }
-      finalHandle = availableHandle;
+          skipped: true,
+          note: 'Artist profile already claimed.',
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const finalHandle = await findAvailableHandle(tx, fallbackHandle);
+    if (!finalHandle) {
+      return NextResponse.json(
+        {
+          error: 'Unable to allocate unique username',
+          details: 'All fallback username attempts exhausted.',
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
     }
 
     const response = await createNewSocialProfile(
@@ -125,9 +135,21 @@ async function ingestSpotifyArtist(
     profile?: { id?: string; username?: string; usernameNormalized?: string };
     error?: string;
     details?: string;
+    skipped?: boolean;
+    note?: string;
   };
 
   if (ingestResponse.status >= 200 && ingestResponse.status < 300) {
+    if (payload.skipped) {
+      return {
+        input: normalizedUrl,
+        status: 'skipped',
+        spotifyArtistId,
+        followers,
+        reason: payload.note ?? 'Artist profile already exists.',
+      };
+    }
+
     return {
       input: normalizedUrl,
       status: 'success',
@@ -149,58 +171,99 @@ async function ingestSpotifyArtist(
   };
 }
 
-export async function POST(request: Request) {
+async function resolveAdminEntitlements(
+  route: string
+): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+  let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
   try {
-    let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
-    try {
-      entitlements = await getCurrentUserEntitlements();
-    } catch (error) {
-      if (error instanceof BillingUnavailableError && error.isAdmin) {
-        await captureError(
-          'Admin batch ingest proceeding despite billing unavailability',
-          error,
-          { route: '/api/admin/batch-ingest', userId: error.userId },
-          'warning'
-        );
-        const freeEnt = getEntitlements('free');
-        entitlements = {
-          userId: error.userId,
-          email: null,
-          isAuthenticated: true,
-          isAdmin: true,
-          plan: 'free',
-          isPro: false,
-          hasAdvancedFeatures: false,
-          ...freeEnt.booleans,
-          ...freeEnt.limits,
-        };
-      } else {
-        throw error;
-      }
+    entitlements = await getCurrentUserEntitlements();
+  } catch (error) {
+    if (error instanceof BillingUnavailableError && error.isAdmin) {
+      await captureError(
+        'Admin batch ingest proceeding despite billing unavailability',
+        error,
+        { route, userId: error.userId },
+        'warning'
+      );
+      const freeEnt = getEntitlements('free');
+      entitlements = {
+        userId: error.userId,
+        email: null,
+        isAuthenticated: true,
+        isAdmin: true,
+        plan: 'free',
+        isPro: false,
+        hasAdvancedFeatures: false,
+        ...freeEnt.booleans,
+        ...freeEnt.limits,
+      };
+    } else {
+      throw error;
     }
+  }
 
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
+  if (!entitlements.isAuthenticated) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
 
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
+  if (!entitlements.isAdmin) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { error: 'Forbidden' },
         { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
+
+  return { ok: true };
+}
+
+async function processSpotifyEntry(entry: string): Promise<BatchIngestResult> {
+  const spotifyArtistId = extractSpotifyArtistId(entry);
+  if (!spotifyArtistId) {
+    return {
+      input: entry,
+      status: 'error',
+      reason: 'Invalid Spotify artist URL or artist ID.',
+    };
+  }
+
+  try {
+    return await ingestSpotifyArtist(spotifyArtistId);
+  } catch (error) {
+    await captureError('Batch ingest: artist ingestion failed', error, {
+      route: '/api/admin/batch-ingest',
+      spotifyArtistId,
+      input: entry,
+    });
+    return {
+      input: entry,
+      status: 'error',
+      spotifyArtistId,
+      reason: getSafeErrorMessage(error, 'Failed to ingest artist profile.'),
+    };
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const authResult = await resolveAdminEntitlements(
+      '/api/admin/batch-ingest'
+    );
+    if (!authResult.ok) return authResult.response;
 
     const parsedBody = await parseJsonBody<unknown>(request, {
       route: 'POST /api/admin/batch-ingest',
       headers: NO_STORE_HEADERS,
     });
-
-    if (!parsedBody.ok) {
-      return parsedBody.response;
-    }
+    if (!parsedBody.ok) return parsedBody.response;
 
     const parsed = batchCreatorIngestSchema.safeParse(parsedBody.data);
     if (!parsed.success) {
@@ -211,31 +274,8 @@ export async function POST(request: Request) {
     }
 
     const results: BatchIngestResult[] = [];
-
     for (const entry of parsed.data.spotifyUrls) {
-      const spotifyArtistId = extractSpotifyArtistId(entry);
-      if (!spotifyArtistId) {
-        results.push({
-          input: entry,
-          status: 'error',
-          reason: 'Invalid Spotify artist URL or artist ID.',
-        });
-        continue;
-      }
-
-      try {
-        const result = await ingestSpotifyArtist(spotifyArtistId);
-        results.push(result);
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
-        results.push({
-          input: entry,
-          status: 'error',
-          spotifyArtistId,
-          reason: message,
-        });
-      }
+      results.push(await processSpotifyEntry(entry));
     }
 
     return NextResponse.json(
@@ -251,9 +291,14 @@ export async function POST(request: Request) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    await captureError('Batch ingest: request processing failed', error, {
+      route: '/api/admin/batch-ingest',
+    });
     return NextResponse.json(
-      { error: 'Failed to process batch ingest', details: message },
+      {
+        error: 'Failed to process batch ingest',
+        details: getSafeErrorMessage(error, 'An unexpected error occurred.'),
+      },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
