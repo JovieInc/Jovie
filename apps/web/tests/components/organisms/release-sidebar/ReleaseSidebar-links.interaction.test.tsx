@@ -235,18 +235,23 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByText('Save changes')).not.toBeInTheDocument();
   });
 
-  it('Links tab renders smart link and DSP links sections', async () => {
+  it('Links tab renders DSP links section', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     await user.click(screen.getByRole('tab', { name: /links/i }));
-    expect(screen.getByText('Smart Link')).toBeInTheDocument();
-    expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
-      'Smart Link Content'
-    );
     expect(screen.getByText('Distribution')).toBeInTheDocument();
     expect(screen.getByTestId('dsp-links')).toHaveTextContent(
       'DSP Links Content'
+    );
+  });
+
+  it('Catalog tab renders smart link section', async () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    // Catalog is the default tab, so smart link should be visible
+    expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
+      'Smart Link Content'
     );
   });
 });
