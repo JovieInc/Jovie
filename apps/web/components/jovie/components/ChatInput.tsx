@@ -111,10 +111,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'rounded-lg border bg-white/[0.02] transition-colors duration-fast',
+            'rounded-lg border bg-surface-1 transition-colors duration-fast',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-white/[0.08] focus-within:border-white/[0.12]'
+              : 'border-subtle focus-within:border-default'
           )}
         >
           {hasPendingImages && onRemoveImage && (
@@ -178,8 +178,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               disabled={!canSend}
               className={cn(
                 'absolute rounded-md flex items-center justify-center',
-                'bg-white/[0.9] text-black transition-all duration-fast',
-                'hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed',
+                'bg-accent text-on-accent transition-all duration-fast',
+                'hover:bg-accent/90 disabled:opacity-30 disabled:cursor-not-allowed',
                 isCompact
                   ? 'bottom-2 right-2 h-7 w-7'
                   : 'bottom-3 right-3 h-8 w-8'

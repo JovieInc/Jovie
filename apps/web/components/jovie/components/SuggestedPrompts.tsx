@@ -14,10 +14,10 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
 };
 
 const ACCENT_TEXT_CLASSES = {
-  blue: 'text-blue-400',
-  green: 'text-emerald-400',
-  purple: 'text-purple-400',
-  orange: 'text-orange-400',
+  blue: 'text-accent',
+  green: 'text-accent',
+  purple: 'text-accent',
+  orange: 'text-accent',
 } as const;
 
 interface SuggestedPromptsProps {

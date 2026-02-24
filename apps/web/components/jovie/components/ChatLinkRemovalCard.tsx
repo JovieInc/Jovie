@@ -81,7 +81,7 @@ export function ChatLinkRemovalCard({
   }
 
   return (
-    <div className='rounded-xl border border-error/20 bg-error/5 p-4'>
+    <div className='rounded-xl border border-error/20 bg-error-subtle p-4'>
       <div className='flex items-center gap-3'>
         <SocialIcon
           platform={platform.toLowerCase()}
@@ -106,7 +106,7 @@ export function ChatLinkRemovalCard({
             disabled={state === 'removing'}
             className={cn(
               'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium',
-              'bg-error text-white hover:bg-error/90',
+              'bg-error text-error-foreground hover:bg-error/90',
               'disabled:opacity-50 transition-colors'
             )}
           >

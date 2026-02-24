@@ -26,9 +26,9 @@ import type { UseSuggestedProfilesReturn } from '../hooks/useSuggestedProfiles';
 type SlideDirection = 'left' | 'right' | null;
 
 function confidenceBadgeClass(confidence: number): string {
-  if (confidence >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
-  if (confidence >= 0.5) return 'bg-amber-500/15 text-amber-400';
-  return 'bg-red-500/15 text-red-400';
+  if (confidence >= 0.8) return 'bg-success-subtle text-success';
+  if (confidence >= 0.5) return 'bg-warning-subtle text-warning';
+  return 'bg-error-subtle text-error';
 }
 
 const ICON_PLATFORM_MAP: Record<string, string> = {
@@ -126,7 +126,7 @@ function ProfileReadyCard({
 
         {/* Header */}
         <div className='flex items-center gap-2 mb-4'>
-          <CheckCircle2 className='h-4 w-4 text-emerald-400' />
+          <CheckCircle2 className='h-4 w-4 text-success' />
           <p className='text-sm font-medium text-primary-token'>
             Your profile is live
           </p>
