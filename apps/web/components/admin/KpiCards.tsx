@@ -129,7 +129,7 @@ export function KpiCards({
       <KpiItem
         title='Claimed creators'
         value={claimedCreatorsLabel}
-        metadata='Primary user growth metric'
+        metadata='Artists who claimed their profile'
         icon={Users}
         iconClassName='text-violet-500 dark:text-violet-300'
       />
