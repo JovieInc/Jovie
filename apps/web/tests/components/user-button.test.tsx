@@ -343,4 +343,23 @@ describe('UserButton billing actions', () => {
       expect.any(Object)
     );
   });
+
+  it('renders a custom trigger while user data is still loading', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUseUser.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    } as any);
+
+    render(<UserButton trigger={<div>Jovie Menu</div>} />);
+
+    expect(screen.getByText('Jovie Menu')).toBeInTheDocument();
+    expect(document.querySelector('.animate-pulse')).toBeNull();
+  });
 });
