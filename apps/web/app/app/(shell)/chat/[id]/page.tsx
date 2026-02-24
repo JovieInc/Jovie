@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { getDashboardData } from '../../dashboard/actions';
 import { ChatPageClient } from '../ChatPageClient';
 
@@ -17,7 +18,7 @@ export default async function ChatConversationPage({ params }: Props) {
   const dashboardData = await getDashboardData();
 
   if (dashboardData.needsOnboarding) {
-    redirect('/onboarding');
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   const { id } = await params;

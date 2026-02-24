@@ -171,10 +171,12 @@ function hasText(value: string | null | undefined): boolean {
 
 function deriveIsFirstSession(
   selectedProfile: CreatorProfile | null,
-  windowMs = 5 * 60 * 1000
+  now = Date.now(),
+  windowMs = 15 * 60 * 1000
 ): boolean {
   if (!selectedProfile?.createdAt) return false;
-  return Date.now() - selectedProfile.createdAt.getTime() < windowMs;
+  const ageMs = now - selectedProfile.createdAt.getTime();
+  return ageMs >= 0 && ageMs < windowMs;
 }
 
 function buildProfileCompletion(
@@ -514,7 +516,6 @@ async function fetchDashboardCoreWithSession(
       hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
-<<<<<<< HEAD
       dashboardLoadError: {
         stage: 'core_fetch',
         message,
@@ -718,7 +719,6 @@ async function resolveDashboardData(): Promise<DashboardData> {
       isAdmin,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
-<<<<<<< HEAD
       dashboardLoadError: {
         stage: 'core_cache',
         message,

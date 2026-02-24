@@ -137,10 +137,13 @@ const baseDashboardData: DashboardData = {
   },
 };
 
-function renderChatPage(conversationId?: string) {
+function renderChatPage(conversationId?: string, isFirstSession?: boolean) {
   return fastRender(
     <DashboardDataProvider value={baseDashboardData}>
-      <ChatPageClient conversationId={conversationId} />
+      <ChatPageClient
+        conversationId={conversationId}
+        isFirstSession={isFirstSession}
+      />
     </DashboardDataProvider>
   );
 }
@@ -167,7 +170,7 @@ describe('ChatPageClient', () => {
   });
 
   it('marks no-conversation route as first session', () => {
-    const { getByTestId } = renderChatPage();
+    const { getByTestId } = renderChatPage(undefined, true);
     const chat = getByTestId('jovie-chat');
     expect(chat.getAttribute('data-is-first-session')).toBe('true');
   });
