@@ -5,16 +5,33 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
 import { captureError } from '@/lib/error-tracking';
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /**
  * Generate ICS calendar file for a tour date
  */
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
-  try {
-    const { eventId } = await params;
+  const { eventId } = await params;
 
+  if (!eventId) {
+    return NextResponse.json(
+      { error: 'Event ID is required' },
+      { status: 400 }
+    );
+  }
+
+  if (!UUID_REGEX.test(eventId)) {
+    return NextResponse.json(
+      { error: 'Invalid event ID format' },
+      { status: 400 }
+    );
+  }
+
+  try {
     // Fetch tour date with profile info
     const [result] = await db
       .select({
@@ -124,11 +141,9 @@ export async function GET(
   } catch (error) {
     void captureError('Calendar ICS generation failed', error, {
       route: '/api/calendar/[eventId]',
+      eventId,
     });
-    return NextResponse.json(
-      { error: 'Failed to generate calendar file' },
-      { status: 500 }
-    );
+    return new Response('Internal Server Error', { status: 500 });
   }
 }
 
