@@ -57,7 +57,7 @@ export function ReleaseSidebarHeader({
 
   if (showActions) {
     // Copy smart link + Open smart link - primary actions
-    /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
+    // eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs
     primaryActions.push(
       {
         id: 'copy',
@@ -81,7 +81,6 @@ export function ReleaseSidebarHeader({
         },
       }
     );
-    /* eslint-enable react-hooks/refs */
 
     // Refresh - overflow action
     overflowActions.push({
