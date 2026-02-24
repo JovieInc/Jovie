@@ -76,13 +76,15 @@ export function MethodSelector({
   // Order methods with last used first
   const orderedMethods = useMemo((): AuthMethod[] => {
     const base: AuthMethod[] = spotifyOauthEnabled
-      ? ['google', 'email', 'spotify']
+      ? mode === 'signup'
+        ? ['spotify', 'google', 'email']
+        : ['google', 'email', 'spotify']
       : ['google', 'email'];
 
     if (!lastMethod) return base;
     if (!base.includes(lastMethod)) return base;
     return [lastMethod, ...base.filter(method => method !== lastMethod)];
-  }, [lastMethod, spotifyOauthEnabled]);
+  }, [lastMethod, mode, spotifyOauthEnabled]);
 
   const isGoogleLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'google';
