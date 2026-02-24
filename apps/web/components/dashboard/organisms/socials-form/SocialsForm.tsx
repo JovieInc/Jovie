@@ -406,6 +406,17 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             ))}
           </DashboardCard>
 
+          {socialLinks.some(link => link.platform === 'website') && (
+            <p className='pt-3 text-xs text-secondary-token'>
+              Add this TXT record to your domain:{' '}
+              <code>
+                {socialLinks.find(link => link.platform === 'website')
+                  ?.verificationToken ?? 'jovie-verify=...'}
+              </code>
+              {'. Then click Verify.'}
+            </p>
+          )}
+
           <div className='flex flex-col gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
             <Button
               type='button'

@@ -128,11 +128,14 @@ export function ReleaseTable({
       const isRefreshing = refreshingReleaseId === row.id;
       const isFlashed = flashedReleaseId === row.id;
 
-      const baseClassName = isSelected
-        ? 'bg-surface-2/60 hover:bg-surface-2/70'
-        : isRowExpanded
-          ? 'bg-surface-2/30 hover:bg-surface-2/50'
-          : 'hover:bg-surface-2/50';
+      let baseClassName: string;
+      if (isSelected) {
+        baseClassName = 'bg-surface-2/60 hover:bg-surface-2/70';
+      } else if (isRowExpanded) {
+        baseClassName = 'bg-surface-2/30 hover:bg-surface-2/50';
+      } else {
+        baseClassName = 'hover:bg-surface-2/50';
+      }
 
       const refreshClassName = isRefreshing
         ? 'relative overflow-hidden skeleton'
