@@ -1977,11 +1977,36 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
+      - name: Build app for smoke tests
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
       - name: Run Required Smoke Tests
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          # Public smoke + golden path (authenticated dashboard) must both pass before deploy.
-          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts --project=chromium --reporter=line
+          cd apps/web
+          # Start production server (not dev) to avoid SWC/Turbopack OOM on CI runners
+          PORT=3100 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+
+          # Wait for server
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+          # Run smoke tests with BASE_URL set (skips Playwright webServer)
+          cd /home/runner/work/Jovie/Jovie
+          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts --project=chromium --reporter=line
+          EXIT_CODE=$?
+          kill $SERVER_PID 2>/dev/null || true
+          exit $EXIT_CODE
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
