@@ -147,6 +147,46 @@ test.describe('Golden Path - Complete User Journey', () => {
     await expect(appShellContent).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+
+    // STEP 5: Verify real data loaded (not silent error → empty state)
+    // When fetchDashboardCoreWithSession() fails silently it returns
+    // needsOnboarding: true, which redirects to /onboarding. Catch that.
+    const currentUrl = page.url();
+    expect(
+      currentUrl,
+      'Dashboard silently failed — redirected to onboarding'
+    ).not.toContain('/onboarding');
+    expect(
+      currentUrl,
+      'Dashboard silently failed — redirected to sign-in'
+    ).not.toContain('/sign-in');
+
+    // Verify no error banner rendered (shell-level catch renders data-testid="dashboard-error")
+    const errorBanner = page.locator('[data-testid="dashboard-error"]');
+    await expect(errorBanner).not.toBeVisible({ timeout: 2000 });
+
+    // Verify sidebar navigation rendered with real links (proves DashboardDataProvider has data)
+    const sidebarNav = page.locator('nav').first();
+    await expect(sidebarNav).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    // At least one dashboard nav link should be present (Profile, Releases, etc.)
+    const dashboardNavLink = page
+      .locator('nav a[href*="/app/dashboard/"], nav a[href*="/app/settings/"]')
+      .first();
+    await expect(dashboardNavLink).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    // Verify the Clerk user button rendered (proves auth context is intact)
+    const userButton = page
+      .locator('[data-clerk-element="userButton"], [data-testid="user-button"]')
+      .first();
+    const hasUserButton = await userButton.isVisible().catch(() => false);
+    if (!hasUserButton) {
+      console.warn('User button not visible — auth context may be degraded');
+    }
   });
 
   test('Golden path with listen mode', async ({ page }, testInfo) => {

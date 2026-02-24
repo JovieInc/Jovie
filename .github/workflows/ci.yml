@@ -2018,7 +2018,7 @@ jobs:
           # Run smoke tests with BASE_URL set (skips Playwright webServer config)
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/content-gate.spec.ts --project=chromium --reporter=line
           EXIT_CODE=$?
           set -e
           exit $EXIT_CODE

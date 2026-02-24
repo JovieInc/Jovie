@@ -42,12 +42,14 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     onConversationCreate?: (id: string) => void;
     onTitleChange?: (title: string | null) => void;
     initialQuery?: string;
+    isFirstSession?: boolean;
   }) => {
     capturedOnTitleChange = props.onTitleChange;
     return React.createElement('div', {
       'data-testid': 'jovie-chat',
       'data-profile-id': props.profileId,
       'data-conversation-id': props.conversationId ?? '',
+      'data-is-first-session': props.isFirstSession ? 'true' : 'false',
     });
   },
 }));
@@ -151,6 +153,18 @@ describe('ChatPageClient', () => {
     const { getByTestId } = renderChatPage('conv-123');
     const chat = getByTestId('jovie-chat');
     expect(chat.getAttribute('data-conversation-id')).toBe('conv-123');
+  });
+
+  it('marks no-conversation route as first session', () => {
+    const { getByTestId } = renderChatPage();
+    const chat = getByTestId('jovie-chat');
+    expect(chat.getAttribute('data-is-first-session')).toBe('true');
+  });
+
+  it('marks conversation route as not first session', () => {
+    const { getByTestId } = renderChatPage('conv-123');
+    const chat = getByTestId('jovie-chat');
+    expect(chat.getAttribute('data-is-first-session')).toBe('false');
   });
 
   it('passes onTitleChange callback to JovieChat', () => {
