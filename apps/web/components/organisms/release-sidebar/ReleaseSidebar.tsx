@@ -26,6 +26,7 @@ import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
+import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
@@ -294,8 +295,12 @@ export function ReleaseSidebar({
                     <ReleaseFields
                       title={release.title}
                       releaseDate={release.releaseDate}
-                      smartLinkPath={release.smartLinkPath}
                     />
+                    <div className='mt-3'>
+                      <ReleaseSmartLinkSection
+                        smartLinkPath={release.smartLinkPath}
+                      />
+                    </div>
                   </div>
 
                   <ReleaseTrackList
