@@ -34,6 +34,7 @@ export async function GET() {
     });
   } catch (error) {
     void captureWarning('Redis health check failed', error, {
+      service: 'redis',
       route: '/api/health/redis',
     });
     return NextResponse.json(
