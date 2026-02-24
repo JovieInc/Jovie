@@ -1908,7 +1908,7 @@ jobs:
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
     environment: Preview - jovie
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Gate required smoke on PRs
         if: ${{ github.event_name == 'pull_request' }}
@@ -1991,21 +1991,32 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           cd apps/web
-          # Start production server (not dev) to avoid SWC/Turbopack OOM on CI runners
+          # Start standalone production server (not Turbopack dev) to avoid SWC OOM on CI runners
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
 
-          # Wait for server
+          # Wait for server readiness
+          SERVER_READY=false
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
             sleep 1
           done
 
-          # Run smoke tests with BASE_URL set (skips Playwright webServer)
-          cd /home/runner/work/Jovie/Jovie
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "::error::Standalone server failed to start within 30s"
+            exit 1
+          fi
+
+          # Run smoke tests with BASE_URL set (skips Playwright webServer config)
+          cd "$GITHUB_WORKSPACE"
+          set +e
           CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts --project=chromium --reporter=line
           EXIT_CODE=$?
-          kill $SERVER_PID 2>/dev/null || true
+          set -e
           exit $EXIT_CODE
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
