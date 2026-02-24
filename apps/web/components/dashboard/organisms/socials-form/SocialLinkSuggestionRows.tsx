@@ -56,7 +56,7 @@ export function SocialLinkSuggestionRows({
                   disabled={isActioning}
                   className={cn(
                     'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md',
-                    'bg-accent text-on-accent hover:bg-accent/90',
+                    'bg-accent text-accent-foreground hover:bg-accent/90',
                     'disabled:opacity-50 transition-colors'
                   )}
                 >

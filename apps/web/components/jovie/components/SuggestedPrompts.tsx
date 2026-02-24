@@ -44,10 +44,7 @@ function SuggestionPill({
     >
       {IconComponent && (
         <IconComponent
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            ACCENT_TEXT_CLASS
-          )}
+          className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
         />
       )}
       <span className='text-[13px] leading-snug text-secondary-token'>
