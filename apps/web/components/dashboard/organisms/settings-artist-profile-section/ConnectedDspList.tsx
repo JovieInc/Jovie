@@ -94,7 +94,7 @@ export function ConnectedDspList({
   });
 
   const { mutate: triggerDiscovery } = useTriggerDiscoveryMutation();
-  const { mutate: rejectMatch, isPending: isDisconnectPending } =
+  const { mutateAsync: rejectMatchAsync, isPending: isDisconnectPending } =
     useRejectDspMatchMutation();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -104,30 +104,30 @@ export function ConnectedDspList({
     DspMatch | undefined
   >(undefined);
 
-  const handleDisconnectRequest = useCallback((match: DspMatch | undefined) => {
+  const handleDisconnect = useCallback((match: DspMatch | undefined) => {
     if (!match) return;
     setMatchToDisconnect(match);
   }, []);
 
-  const handleDisconnectConfirm = useCallback(() => {
+  const handleDisconnectConfirm = useCallback(async () => {
     if (!matchToDisconnect) return;
     const label = getProviderLabel(matchToDisconnect.providerId as DspProvider);
-    rejectMatch(
-      {
+    try {
+      await rejectMatchAsync({
         matchId: matchToDisconnect.id,
         profileId,
         reason: 'user_disconnected',
-      },
-      {
-        onSuccess: () => {
-          toast.success(`${label} disconnected`);
-          setMatchToDisconnect(undefined);
-        },
-        onError: err =>
-          toast.error(err.message || `Failed to disconnect ${label}`),
-      }
-    );
-  }, [matchToDisconnect, profileId, rejectMatch]);
+      });
+      toast.success(`${label} disconnected`);
+      setMatchToDisconnect(undefined);
+    } catch (err: unknown) {
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : `Failed to disconnect ${label}`
+      );
+    }
+  }, [matchToDisconnect, profileId, rejectMatchAsync]);
 
   const handleDisconnectCancel = useCallback(
     (open: boolean) => {
@@ -136,14 +136,6 @@ export function ConnectedDspList({
       setMatchToDisconnect(undefined);
     },
     [isDisconnectPending]
-  );
-
-  const handleDisconnect = useCallback(
-    (match: DspMatch | undefined) => {
-      if (!match) return;
-      handleDisconnectRequest(match);
-    },
-    [handleDisconnectRequest]
   );
 
   const handleSyncNow = useCallback(
