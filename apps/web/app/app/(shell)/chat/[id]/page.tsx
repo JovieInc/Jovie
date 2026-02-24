@@ -1,3 +1,5 @@
+import { redirect } from 'next/navigation';
+import { getDashboardData } from '../../dashboard/actions';
 import { ChatPageClient } from '../ChatPageClient';
 
 interface Props {
@@ -12,6 +14,17 @@ export const metadata = {
 };
 
 export default async function ChatConversationPage({ params }: Props) {
+  const dashboardData = await getDashboardData();
+
+  if (dashboardData.needsOnboarding) {
+    redirect('/onboarding');
+  }
+
   const { id } = await params;
-  return <ChatPageClient conversationId={id} />;
+  return (
+    <ChatPageClient
+      conversationId={id}
+      isFirstSession={dashboardData.isFirstSession}
+    />
+  );
 }

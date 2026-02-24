@@ -147,6 +147,8 @@ export interface DashboardData {
     code: string | null;
     errorType: string;
   };
+  /** Whether the user appears to be in their first chat session window */
+  isFirstSession?: boolean;
 }
 
 export interface ProfileCompletionStep {
@@ -165,6 +167,14 @@ export interface ProfileCompletion {
 
 function hasText(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function deriveIsFirstSession(
+  selectedProfile: CreatorProfile | null,
+  windowMs = 5 * 60 * 1000
+): boolean {
+  if (!selectedProfile?.createdAt) return false;
+  return Date.now() - selectedProfile.createdAt.getTime() < windowMs;
 }
 
 function buildProfileCompletion(
@@ -294,6 +304,7 @@ async function fetchDashboardCoreWithSession(
         hasMusicLinks: false,
         tippingStats: createEmptyTippingStats(),
         profileCompletion: buildProfileCompletion(null, false, false),
+        isFirstSession: false,
       };
     }
 
@@ -336,6 +347,7 @@ async function fetchDashboardCoreWithSession(
         hasMusicLinks: false,
         tippingStats: createEmptyTippingStats(),
         profileCompletion: buildProfileCompletion(null, false, false),
+        isFirstSession: false,
       };
     }
 
@@ -458,6 +470,7 @@ async function fetchDashboardCoreWithSession(
         hasMusicLinks
       ),
       dashboardLoadError: undefined,
+      isFirstSession: deriveIsFirstSession(selected),
     };
   } catch (error) {
     // Handle both standard and non-standard error objects
@@ -501,12 +514,14 @@ async function fetchDashboardCoreWithSession(
       hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
+<<<<<<< HEAD
       dashboardLoadError: {
         stage: 'core_fetch',
         message,
         code: code ?? null,
         errorType,
       },
+      isFirstSession: false,
     };
   }
 }
@@ -657,6 +672,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       isAdmin,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
+      isFirstSession: false,
     };
   }
 
@@ -702,12 +718,14 @@ async function resolveDashboardData(): Promise<DashboardData> {
       isAdmin,
       tippingStats: createEmptyTippingStats(),
       profileCompletion: buildProfileCompletion(null, false, false),
+<<<<<<< HEAD
       dashboardLoadError: {
         stage: 'core_cache',
         message,
         code: code ?? null,
         errorType,
       },
+      isFirstSession: false,
     };
   }
 }
