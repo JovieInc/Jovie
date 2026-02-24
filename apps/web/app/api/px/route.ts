@@ -21,7 +21,8 @@ function getClaimRetargetingLink(pageUrl: string | undefined): string | null {
   if (!pageUrl) return null;
 
   try {
-    const parsed = new URL(pageUrl);
+    // Support both absolute URLs and relative paths (e.g. "/user/claim?token=abc")
+    const parsed = new URL(pageUrl, 'https://example.invalid');
     const token = parsed.searchParams.get('token');
     const pathParts = parsed.pathname.split('/').filter(Boolean);
 
@@ -181,11 +182,27 @@ export async function POST(request: NextRequest) {
             eventType === 'page_view' ? getClaimRetargetingLink(pageUrl) : null;
 
           if (claimLink) {
-            await ensureClaimRetargetingCreatives({
-              profileId,
-              username: profile.username,
-              claimLink,
-            });
+            // Validate that the claim link's username matches the profile
+            // being acted on to prevent cross-profile creative generation
+            const claimPathParts = claimLink
+              .split('?')[0]
+              ?.split('/')
+              .filter(Boolean);
+            const claimUsername = claimPathParts?.[0];
+
+            if (claimUsername && claimUsername === profile.username) {
+              await ensureClaimRetargetingCreatives({
+                profileId,
+                username: profile.username,
+                claimLink,
+              });
+            } else {
+              logger.warn('[Pixel] Claim link username mismatch', {
+                expected: profile.username,
+                got: claimUsername,
+                profileId,
+              });
+            }
           }
 
           await forwardEvent(insertedEvent);

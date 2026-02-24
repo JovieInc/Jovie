@@ -2,7 +2,21 @@ import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
+
+/**
+ * Escape special XML characters to prevent injection when
+ * interpolating user-controlled values into SVG markup.
+ */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 const CLAIM_CREATIVE_LAYOUTS = [
   { key: 'square', width: 1080, height: 1080 },
@@ -65,7 +79,9 @@ export function renderClaimCreativeSvg(params: {
   const ctaX = Math.round((width - ctaWidth) / 2);
   const ctaY = Math.round(height * 0.73);
 
-  const title = `jov.ie/${username}`;
+  const safeUsername = escapeXml(username);
+  const safeClaimLink = escapeXml(claimLink);
+  const title = `jov.ie/${safeUsername}`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -73,7 +89,7 @@ export function renderClaimCreativeSvg(params: {
   <text x="50%" y="42%" fill="#FFFFFF" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${primary}" font-weight="700" text-anchor="middle" letter-spacing="0.3">${title}</text>
   <rect x="${ctaX}" y="${ctaY}" width="${ctaWidth}" height="${ctaHeight}" rx="999" fill="#FFFFFF"/>
   <text x="50%" y="${ctaY + Math.round(ctaHeight * 0.62)}" fill="#111827" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${secondary}" font-weight="600" text-anchor="middle">Claim your Jovie profile</text>
-  <text x="50%" y="${Math.round(height * 0.92)}" fill="#9CA3AF" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${Math.max(24, Math.round(primary * 0.28))}" text-anchor="middle">${claimLink}</text>
+  <text x="50%" y="${Math.round(height * 0.92)}" fill="#9CA3AF" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${Math.max(24, Math.round(primary * 0.28))}" text-anchor="middle">${safeClaimLink}</text>
 </svg>`;
 }
 
@@ -106,7 +122,7 @@ export async function ensureClaimRetargetingCreatives(params: {
     }
 
     const { put } = await import('@vercel/blob');
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    const token = env.BLOB_READ_WRITE_TOKEN;
     if (!token) {
       logger.warn(
         '[Retargeting] Skipping creative upload: BLOB_READ_WRITE_TOKEN missing'
