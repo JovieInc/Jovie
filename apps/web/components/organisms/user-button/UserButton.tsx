@@ -258,6 +258,21 @@ export function UserButton({
 
   // Handle loading state or no user
   if (!isLoaded || !user) {
+    if (trigger) {
+      return (
+        <CommonDropdown
+          variant='dropdown'
+          items={[]}
+          trigger={trigger}
+          align='start'
+          open={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          disabled
+          contentClassName='w-[220px]'
+        />
+      );
+    }
+
     return showUserInfo ? (
       <div className='flex w-full items-center gap-2 rounded-md px-2 py-1'>
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
