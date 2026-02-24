@@ -1,4 +1,4 @@
-import { CheckCircle, Mail, Sparkles } from 'lucide-react';
+import { CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
 
@@ -55,27 +55,27 @@ export function WaitlistMetrics({ metrics }: Readonly<WaitlistMetricsProps>) {
         <MetricCard
           label='New'
           value={metrics.new}
-          icon={Sparkles}
-          colorClass='text-blue-600 dark:text-blue-400'
-          bgClass='bg-blue-500/10 dark:bg-blue-500/15'
+          icon={UserPlus2}
+          colorClass='text-accent'
+          bgClass='bg-accent/10'
         />
       </div>
       <div className='border-b border-subtle sm:border-b-0 sm:border-r'>
         <MetricCard
           label='Invited'
           value={metrics.invited}
-          icon={Mail}
-          colorClass='text-indigo-600 dark:text-indigo-400'
-          bgClass='bg-indigo-500/10 dark:bg-indigo-500/15'
+          icon={MailCheck}
+          colorClass='text-secondary-token'
+          bgClass='bg-secondary/10'
         />
       </div>
       <div>
         <MetricCard
           label='Claimed'
           value={metrics.claimed}
-          icon={CheckCircle}
-          colorClass='text-emerald-600 dark:text-emerald-400'
-          bgClass='bg-emerald-500/10 dark:bg-emerald-500/15'
+          icon={CheckCircle2}
+          colorClass='text-success-token'
+          bgClass='bg-success/10'
         />
       </div>
     </div>
