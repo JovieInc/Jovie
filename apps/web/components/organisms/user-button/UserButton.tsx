@@ -259,7 +259,18 @@ export function UserButton({
   // Handle loading state or no user
   if (!isLoaded || !user) {
     if (trigger) {
-      return trigger;
+      return (
+        <CommonDropdown
+          variant='dropdown'
+          items={[]}
+          trigger={trigger}
+          align='start'
+          open={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          disabled
+          contentClassName='w-[220px]'
+        />
+      );
     }
 
     return showUserInfo ? (
