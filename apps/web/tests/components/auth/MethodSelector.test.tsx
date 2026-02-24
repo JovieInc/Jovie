@@ -62,5 +62,14 @@ describe('MethodSelector', () => {
 
     const buttons = screen.getAllByRole('button');
     expect(buttons[0]).toHaveTextContent('Continue with email');
+    expect(buttons[1]).toHaveTextContent('Continue with Spotify');
+    expect(buttons[2]).toHaveTextContent('Continue with Google');
+  });
+
+  it('keeps Google first for signup when Spotify flag is disabled', () => {
+    render(<MethodSelector {...commonProps} mode='signup' />);
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons[0]).toHaveTextContent('Continue with Google');
   });
 });

@@ -178,8 +178,9 @@ export function MethodSelector({
         </h1>
         {mode === 'signup' && (
           <p className={FORM_LAYOUT.hint}>
-            Sign up with Google or email in seconds, then make it unmistakably
-            yours.
+            {spotifyOauthEnabled
+              ? 'Sign up with Spotify, Google, or email in seconds, then make it unmistakably yours.'
+              : 'Sign up with Google or email in seconds, then make it unmistakably yours.'}
           </p>
         )}
       </div>
