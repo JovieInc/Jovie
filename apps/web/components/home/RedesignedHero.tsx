@@ -1,5 +1,7 @@
+import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 import { getFeaturedCreators } from '@/lib/featured-creators';
+import { ClaimHandleForm } from './claim-handle';
 import { HeroSpotifySearch } from './HeroSpotifySearch';
 import { MobileProfilePreview } from './MobileProfilePreview';
 import { PhoneFrame } from './PhoneFrame';
@@ -20,12 +22,11 @@ const FALLBACK_CREATOR: FeaturedCreator = {
  * Linear.app-inspired: floating card with browser chrome, deep shadows, slight 3D tilt.
  */
 export async function RedesignedHero() {
-  let creators: FeaturedCreator[] = [];
-  try {
-    creators = await getFeaturedCreators();
-  } catch {
-    // Fall through to fallback
-  }
+  const [creators, showSpotifySearch, showClaimHandle] = await Promise.all([
+    getFeaturedCreators().catch(() => [] as FeaturedCreator[]),
+    checkGate(null, FEATURE_FLAG_KEYS.HERO_SPOTIFY_CLAIM_FLOW, false),
+    checkGate(null, FEATURE_FLAG_KEYS.CLAIM_HANDLE, true),
+  ]);
   const featuredCreator = creators[0] ?? FALLBACK_CREATOR;
 
   return (
@@ -41,28 +42,18 @@ export async function RedesignedHero() {
         <div>
           <h1
             style={{
-              fontSize: 'clamp(36px, calc(18px + 3.2vw), 56px)',
+              fontSize: 'clamp(36px, calc(16px + 4vw), 64px)',
               fontWeight: 510,
-              lineHeight: 1.05,
+              lineHeight: 1,
               letterSpacing: '-0.022em',
               color: 'var(--linear-text-primary)',
               fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
-              fontVariationSettings: '"opsz" 56',
+              fontVariationSettings: '"opsz" 64',
             }}
           >
             One-click artist profiles
             <br />
-            <span
-              style={{
-                background:
-                  'linear-gradient(to right, var(--linear-hero-gradient-from), var(--linear-hero-gradient-to))',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
-              that actually convert.
-            </span>
+            that actually convert.
           </h1>
 
           <p
@@ -79,7 +70,13 @@ export async function RedesignedHero() {
           </p>
 
           <div className='mt-8 max-w-[400px]'>
-            <HeroSpotifySearch />
+            {showSpotifySearch ? (
+              <HeroSpotifySearch />
+            ) : showClaimHandle ? (
+              <ClaimHandleForm />
+            ) : (
+              <HeroSpotifySearch />
+            )}
           </div>
 
           <p
