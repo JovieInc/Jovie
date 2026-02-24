@@ -75,6 +75,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
   return (
     <CopyLinkInput
       url={smartLinkUrl}
+      displayValue={release.smartLinkPath}
       size='sm'
       stopPropagation
       onCopy={handleCopySuccess}

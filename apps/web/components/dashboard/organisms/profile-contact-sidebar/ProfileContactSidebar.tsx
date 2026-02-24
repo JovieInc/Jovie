@@ -238,7 +238,7 @@ export function ProfileContactSidebar() {
   const handleAddLinkKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') {
-        void handleConfirmAddLink();
+        handleConfirmAddLink().catch(() => {});
       }
       if (e.key === 'Escape') {
         setIsAddingLink(false);
@@ -402,7 +402,9 @@ export function ProfileContactSidebar() {
               />
               <button
                 type='button'
-                onClick={() => void handleConfirmAddLink()}
+                onClick={() => {
+                  handleConfirmAddLink().catch(() => {});
+                }}
                 disabled={!newLinkUrl.trim()}
                 className={cn(
                   'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium',

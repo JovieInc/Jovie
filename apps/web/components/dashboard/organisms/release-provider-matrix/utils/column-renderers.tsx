@@ -249,7 +249,7 @@ export function createSmartLinkCellRenderer(
   };
 }
 
-/** Combined right column: smart link + popularity + year (responsive) */
+/** Combined right column: smart link + year (responsive) */
 export function createRightMetaCellRenderer(
   isSmartLinkLocked?: (releaseId: string) => boolean,
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null
@@ -273,9 +273,6 @@ export function createRightMetaCellRenderer(
         </div>
 
         <div className='hidden sm:flex items-center gap-2 tabular-nums text-secondary-token shrink-0'>
-          <div className='w-4 flex justify-center'>
-            <PopularityIcon popularity={release.spotifyPopularity} />
-          </div>
           <span className='w-10 text-right'>{year ?? '—'}</span>
         </div>
       </div>

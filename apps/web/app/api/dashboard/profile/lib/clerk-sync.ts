@@ -76,6 +76,70 @@ async function updateClerkAvatar(
   });
 }
 
+async function initClerkClient(
+  clerkUserId: string
+): Promise<Awaited<ReturnType<typeof clerkClient>> | null> {
+  try {
+    return await clerkClient();
+  } catch (error) {
+    logger.error('Failed to initialize Clerk client:', {
+      error: error instanceof Error ? error.message : error,
+      userId: clerkUserId,
+    });
+    return null;
+  }
+}
+
+async function loadRollbackSnapshot(
+  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  clerkUserId: string
+): Promise<{
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl: string | null;
+} | null> {
+  try {
+    const user = await clerk.users.getUser(clerkUserId);
+    return {
+      firstName: user.firstName ?? null,
+      lastName: user.lastName ?? null,
+      imageUrl: user.imageUrl ?? null,
+    };
+  } catch (error) {
+    logger.error('Failed to load Clerk user for rollback:', {
+      error: error instanceof Error ? error.message : error,
+      userId: clerkUserId,
+    });
+    return null;
+  }
+}
+
+function buildRollbackFn(
+  clerk: Awaited<ReturnType<typeof clerkClient>>,
+  clerkUserId: string,
+  rollbackSnapshot: {
+    firstName: string | null;
+    lastName: string | null;
+    imageUrl: string | null;
+  },
+  updatedName: boolean,
+  updatedAvatar: boolean
+): (() => Promise<void>) | undefined {
+  if (!updatedName && !updatedAvatar) return undefined;
+
+  return async () => {
+    if (updatedName) {
+      await clerk.users.updateUser(clerkUserId, {
+        firstName: rollbackSnapshot.firstName ?? undefined,
+        lastName: rollbackSnapshot.lastName ?? undefined,
+      });
+    }
+    if (updatedAvatar && rollbackSnapshot.imageUrl) {
+      await updateClerkAvatar(clerkUserId, rollbackSnapshot.imageUrl, clerk);
+    }
+  };
+}
+
 export async function syncClerkProfile({
   clerkUserId,
   clerkUpdates,
@@ -87,51 +151,20 @@ export async function syncClerkProfile({
     return { clerkSyncFailed: false };
   }
 
-  let clerkSyncFailed = false;
-  let rollback: (() => Promise<void>) | undefined;
-  let clerk: Awaited<ReturnType<typeof clerkClient>> | null = null;
-  let rollbackSnapshot: {
-    firstName: string | null;
-    lastName: string | null;
-    imageUrl: string | null;
-  } | null = null;
+  const clerk = await initClerkClient(clerkUserId);
+  if (!clerk) return { clerkSyncFailed: true };
 
-  try {
-    clerk = await clerkClient();
-  } catch (error) {
-    logger.error('Failed to initialize Clerk client:', {
-      error: error instanceof Error ? error.message : error,
-      userId: clerkUserId,
-    });
-    return { clerkSyncFailed: true };
-  }
-
-  if (!clerk) {
-    return { clerkSyncFailed: true };
-  }
-
-  try {
-    const user = await clerk.users.getUser(clerkUserId);
-    rollbackSnapshot = {
-      firstName: user.firstName ?? null,
-      lastName: user.lastName ?? null,
-      imageUrl: user.imageUrl ?? null,
-    };
-  } catch (error) {
-    logger.error('Failed to load Clerk user for rollback:', {
-      error: error instanceof Error ? error.message : error,
-      userId: clerkUserId,
-    });
-  }
+  const rollbackSnapshot = await loadRollbackSnapshot(clerk, clerkUserId);
 
   let updatedName = false;
   let updatedAvatar = false;
+  let clerkSyncFailed = false;
+
   try {
     if (hasClerkUpdates) {
       await clerk.users.updateUser(clerkUserId, clerkUpdates);
       updatedName = true;
     }
-
     if (avatarUrl) {
       await updateClerkAvatar(clerkUserId, avatarUrl, clerk);
       updatedAvatar = true;
@@ -145,20 +178,15 @@ export async function syncClerkProfile({
     });
   }
 
-  if (rollbackSnapshot && (updatedName || updatedAvatar)) {
-    rollback = async () => {
-      if (updatedName) {
-        await clerk.users.updateUser(clerkUserId, {
-          firstName: rollbackSnapshot?.firstName ?? undefined,
-          lastName: rollbackSnapshot?.lastName ?? undefined,
-        });
-      }
-
-      if (updatedAvatar && rollbackSnapshot.imageUrl) {
-        await updateClerkAvatar(clerkUserId, rollbackSnapshot.imageUrl, clerk);
-      }
-    };
-  }
+  const rollback = rollbackSnapshot
+    ? buildRollbackFn(
+        clerk,
+        clerkUserId,
+        rollbackSnapshot,
+        updatedName,
+        updatedAvatar
+      )
+    : undefined;
 
   return { clerkSyncFailed, rollback };
 }

@@ -39,16 +39,27 @@ permissions:
   pull-requests: read
   statuses: write
 
+concurrency:
+  group: fork-pr-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   fork-gate:
     name: Fork PR Gate
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Resolve PR metadata
         id: pr-meta
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           # For pull_request events, metadata is directly available.
           # For pull_request_review events, we need to fetch it.
@@ -71,7 +82,7 @@ jobs:
       - name: Auto-pass for non-fork PRs
         if: steps.pr-meta.outputs.is_fork != 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           echo "Non-fork PR — auto-passing gate."
           gh api repos/${{ github.repository }}/statuses/${{ steps.pr-meta.outputs.head_sha }} \
@@ -84,7 +95,7 @@ jobs:
         id: sensitive-check
         if: steps.pr-meta.outputs.is_fork == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
 
@@ -128,7 +139,7 @@ jobs:
       - name: Comment on sensitive file changes
         if: steps.pr-meta.outputs.is_fork == 'true' && steps.sensitive-check.outputs.has_sensitive == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         # Only comment once — check for existing comment marker first
         run: |
           PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
@@ -160,7 +171,7 @@ jobs:
         id: approval-check
         if: steps.pr-meta.outputs.is_fork == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ steps.pr-meta.outputs.pr_number }}"
 
@@ -181,7 +192,7 @@ jobs:
       - name: Set gate status (fork PRs)
         if: steps.pr-meta.outputs.is_fork == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           HEAD_SHA="${{ steps.pr-meta.outputs.head_sha }}"
           APPROVED="${{ steps.approval-check.outputs.approved }}"

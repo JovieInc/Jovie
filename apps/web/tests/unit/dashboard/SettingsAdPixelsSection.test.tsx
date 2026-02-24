@@ -2,18 +2,52 @@ import { describe, expect, it, vi } from 'vitest';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { fastRender } from '@/tests/utils/fast-render';
 
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
-
-  return {
-    ...actual,
-    Switch: ({ checked }: { checked: boolean }) => (
-      <button type='button' aria-label='Enable pixel tracking'>
-        {checked ? 'on' : 'off'}
-      </button>
-    ),
-  };
-});
+// Mock @jovie/ui with lightweight stubs instead of vi.importActual (which OOMs)
+vi.mock('@jovie/ui', () => ({
+  Switch: ({ checked }: { checked: boolean }) => (
+    <button type='button' aria-label='Enable pixel tracking'>
+      {checked ? 'on' : 'off'}
+    </button>
+  ),
+  Card: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid='card' className={className}>
+      {children}
+    </div>
+  ),
+  CardContent: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardHeader: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  CardTitle: ({ children }: { children: React.ReactNode }) => (
+    <h3>{children}</h3>
+  ),
+  CardDescription: ({ children }: { children: React.ReactNode }) => (
+    <p>{children}</p>
+  ),
+  Badge: ({ children }: { children: React.ReactNode }) => (
+    <span>{children}</span>
+  ),
+  Button: ({ children, ...props }: { children: React.ReactNode }) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
+  Input: (props: Record<string, unknown>) => <input {...props} />,
+  Label: ({ children }: { children: React.ReactNode }) => (
+    // biome-ignore lint/a11y/noLabelWithoutControl: test mock
+    <label>{children}</label>
+  ),
+  Skeleton: () => <div data-testid='skeleton' />,
+  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
+}));
 
 vi.mock('@/lib/queries', () => ({
   usePixelSettingsMutation: () => ({
@@ -46,6 +80,8 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
+// Quarantined in tests/quarantine.json: component's deep import tree causes OOM in vitest forks.
+// TODO: Re-enable after extracting heavy deps or increasing Node heap limit in CI.
 describe('SettingsAdPixelsSection', () => {
   it('renders each retargeting platform as a separate setting card with status', () => {
     const { getByText, getAllByText } = fastRender(

@@ -64,9 +64,9 @@ const ROTATION_INTERVAL = 4000;
 /* ------------------------------------------------------------------ */
 function ProfileMockupCard({
   profile,
-}: {
+}: Readonly<{
   profile: (typeof EXAMPLE_PROFILES)[number];
-}) {
+}>) {
   return (
     <div className='relative flex flex-col items-center px-8 py-10'>
       {/* Avatar */}

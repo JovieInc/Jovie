@@ -29,6 +29,10 @@ permissions:
   pull-requests: read
   statuses: write
 
+concurrency:
+  group: scope-judge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   judge:
     name: Scope Alignment Check
@@ -44,6 +48,13 @@ jobs:
         startsWith(github.event.pull_request.head.ref, 'codex/')
       )
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -52,7 +63,7 @@ jobs:
       - name: Extract ticket intent from PR body
         id: intent
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
           PR_BODY=$(gh pr view $PR_NUMBER --json body --jq '.body // ""')
@@ -89,7 +100,7 @@ jobs:
         id: diff
         if: steps.intent.outputs.has_intent == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
 
@@ -203,7 +214,7 @@ jobs:
       - name: Report scope judge status
         if: steps.intent.outputs.has_intent == 'true' && steps.diff.outputs.has_diff == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           VERDICT="${{ steps.judge.outputs.verdict }}"
           REASON="${{ steps.judge.outputs.reason }}"
@@ -232,7 +243,7 @@ jobs:
       - name: Skip status (no Linear intent found)
         if: steps.intent.outputs.has_intent != 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           SHA="${{ github.event.pull_request.head.sha }}"
 
@@ -246,7 +257,7 @@ jobs:
       - name: Comment on PR if scope creep detected
         if: steps.judge.outputs.verdict == 'fail'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
           REASON="${{ steps.judge.outputs.reason }}"

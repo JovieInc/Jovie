@@ -9,10 +9,10 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, SegmentControl } from '@jovie/ui';
-import { Copy, ExternalLink, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { Copy, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerEmptyState, DrawerSection } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -26,6 +26,7 @@ import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleaseSettings } from './ReleaseSettings';
 import { ReleaseSidebarHeader } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
+import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { ReleaseSidebarProps } from './types';
@@ -113,11 +114,9 @@ export function ReleaseSidebar({
     null
   );
 
-  // Reset selected track and tab when release changes to avoid stale views
+  // Reset selected track when release changes (preserve active tab for workflow continuity)
   useEffect(() => {
     setSelectedTrack(null);
-    setActiveTab('catalog');
-    setPanelMode('edit');
   }, [release?.id]);
 
   const handleTrackClick = useCallback((track: TrackForDetail) => {
@@ -216,29 +215,8 @@ export function ReleaseSidebar({
       }
     );
 
-    if (!readOnly) {
-      items.push(
-        { type: 'separator', id: 'sep-danger' },
-        {
-          type: 'action',
-          id: 'delete',
-          label: 'Delete release',
-          icon: <Trash2 className='h-4 w-4' />,
-          onClick: () => toast.info('Delete not implemented'),
-          variant: 'destructive',
-        }
-      );
-    }
-
     return items;
-  }, [
-    release,
-    handleCopySmartLink,
-    onRefresh,
-    isRefreshing,
-    artistName,
-    readOnly,
-  ]);
+  }, [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]);
 
   return (
     <RightDrawer
@@ -261,7 +239,7 @@ export function ReleaseSidebar({
 
         {/* Always-visible artwork + release name */}
         {release && !selectedTrack && (
-          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+          <div className='shrink-0 px-4 py-3'>
             <ReleaseArtwork
               artworkUrl={release.artworkUrl}
               title={release.title}
@@ -280,7 +258,7 @@ export function ReleaseSidebar({
 
         {/* Tab navigation (edit mode only) */}
         {release && !selectedTrack && panelMode === 'edit' && (
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+          <div className='px-3 py-1.5 shrink-0'>
             <SegmentControl
               value={activeTab}
               onValueChange={setActiveTab}
@@ -291,7 +269,7 @@ export function ReleaseSidebar({
           </div>
         )}
 
-        <div className='flex-1 divide-y divide-subtle overflow-auto px-4 py-4'>
+        <div className='flex-1 space-y-5 overflow-auto px-4 py-4'>
           {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}
@@ -317,53 +295,58 @@ export function ReleaseSidebar({
                     <ReleaseFields
                       title={release.title}
                       releaseDate={release.releaseDate}
-                      smartLinkPath={release.smartLinkPath}
                     />
+                    <div className='mt-3'>
+                      <ReleaseSmartLinkSection
+                        smartLinkPath={release.smartLinkPath}
+                      />
+                    </div>
                   </div>
 
-                  <div className='pt-5'>
-                    <ReleaseTrackList
-                      release={release}
-                      onTrackClick={handleTrackClick}
-                    />
-                  </div>
+                  <ReleaseTrackList
+                    release={release}
+                    onTrackClick={handleTrackClick}
+                  />
                 </>
               )}
 
               {/* Links tab: DSP links management */}
               {panelMode === 'edit' && activeTab === 'links' && (
-                <div className='pt-0'>
-                  <ReleaseDspLinks
-                    release={release}
-                    providerConfig={providerConfig}
-                    isEditable={isEditable}
-                    isAddingLink={isAddingLink}
-                    newLinkUrl={newLinkUrl}
-                    selectedProvider={selectedProvider}
-                    isAddingDspLink={isAddingDspLink}
-                    isRemovingDspLink={isRemovingDspLink}
-                    onSetIsAddingLink={setIsAddingLink}
-                    onSetNewLinkUrl={setNewLinkUrl}
-                    onSetSelectedProvider={setSelectedProvider}
-                    onAddLink={handleAddLink}
-                    onRemoveLink={handleRemoveLink}
-                    onNewLinkKeyDown={handleNewLinkKeyDown}
-                    onRescanIsrc={onRescanIsrc}
-                    isRescanningIsrc={isRescanningIsrc}
-                  />
+                <div className='space-y-5'>
+                  <DrawerSection title='Distribution'>
+                    <ReleaseDspLinks
+                      release={release}
+                      providerConfig={providerConfig}
+                      isEditable={isEditable}
+                      isAddingLink={isAddingLink}
+                      newLinkUrl={newLinkUrl}
+                      selectedProvider={selectedProvider}
+                      isAddingDspLink={isAddingDspLink}
+                      isRemovingDspLink={isRemovingDspLink}
+                      onSetIsAddingLink={setIsAddingLink}
+                      onSetNewLinkUrl={setNewLinkUrl}
+                      onSetSelectedProvider={setSelectedProvider}
+                      onAddLink={handleAddLink}
+                      onRemoveLink={handleRemoveLink}
+                      onNewLinkKeyDown={handleNewLinkKeyDown}
+                      onRescanIsrc={onRescanIsrc}
+                      isRescanningIsrc={isRescanningIsrc}
+                    />
+                  </DrawerSection>
                 </div>
               )}
 
               {/* Details tab: Metadata + Settings */}
               {panelMode === 'edit' && activeTab === 'details' && (
-                <>
-                  <div className='pb-5'>
+                <div className='space-y-5'>
+                  <DrawerSection title='Analytics'>
                     <ReleaseSmartLinkAnalytics
                       release={release}
                       providerConfig={providerConfig}
                     />
-                  </div>
-                  <div className='pb-5'>
+                  </DrawerSection>
+
+                  <DrawerSection title='Metadata'>
                     <ReleaseMetadata
                       release={release}
                       onCanvasStatusChange={
@@ -372,14 +355,14 @@ export function ReleaseSidebar({
                           : undefined
                       }
                     />
-                  </div>
+                  </DrawerSection>
 
                   {isEditable && (
-                    <div className='pt-5'>
+                    <DrawerSection title='Settings'>
                       <ReleaseSettings allowDownloads={allowDownloads} />
-                    </div>
+                    </DrawerSection>
                   )}
-                </>
+                </div>
               )}
 
               {/* Lyrics tab: Lyrics editor */}
