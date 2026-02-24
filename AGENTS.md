@@ -10,27 +10,64 @@
 
 | Tool | Required Version | Enforcement |
 |------|------------------|-------------|
-| **Node.js** | **24.x** (24.0.0+) | `.nvmrc`, `package.json` engines |
+| **Node.js** | **22.x** (22.13.0+) | `.nvmrc`, `package.json` engines |
 | **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
 | **Turbo** | 2.8+ | Root devDependencies |
 
 ### Why This Matters
 
-AI agents frequently default to Node 18/20/22 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 24.
+AI agents frequently default to Node 18/20 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 22 LTS.
 
 ### Pre-Flight Checklist (Run Before Any Task)
 
 ```bash
-# 1. Verify Node version - MUST be 24.x
-node --version  # Expected: v24.0.0 or higher
+# 1. Verify Node version - MUST be 22.x (22.13+)
+node --version  # Expected: v22.13.0 or higher
 
 # 2. Verify pnpm version - MUST be 9.15.4
 pnpm --version  # Expected: 9.15.4
 
 # 3. If wrong version, fix it:
-nvm use 24       # or: nvm install 24
+nvm use 22       # or: nvm install 22
 corepack enable && corepack prepare pnpm@9.15.4 --activate
 ```
+
+### Cloud Container Bootstrap (AI Agent Platforms)
+
+For headless/container environments (Codex, cloud sandboxes, CI runners). Requires `DOPPLER_TOKEN` env var set to a service token.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 1. Node 22 LTS + pnpm
+curl -fsSL https://fnm.vercel.app/install | bash
+export PATH="$HOME/.local/share/fnm:$PATH"
+eval "$(fnm env)"
+fnm install 22 && fnm use 22
+corepack enable && corepack prepare pnpm@9.15.4 --activate
+
+# 2. Doppler CLI (secrets manager)
+apt-get update && apt-get install -y apt-transport-https ca-certificates curl gnupg
+curl -sLf --retry 3 --tlsv1.2 --proto "=https" \
+  'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' \
+  | gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" \
+  | tee /etc/apt/sources.list.d/doppler-cli.list
+apt-get update && apt-get install -y doppler
+
+# 3. Configure secrets (DOPPLER_TOKEN must be set)
+doppler setup --project jovie-web --config dev --no-interactive
+doppler secrets download --no-file --format env-no-quotes > apps/web/.env.local
+
+# 4. Install dependencies + verify
+pnpm install
+pnpm turbo build --filter=@jovie/web
+```
+
+**Creating a Doppler service token:** Doppler dashboard → Project `jovie-web` → Config `dev` → Access → Service Tokens → Generate. Pass as `DOPPLER_TOKEN` env var.
+
+**Alternative:** Run `./scripts/codex-setup.sh` which handles OS detection (macOS/Linux), Doppler installation, and `.env.local` generation automatically.
 
 ### Common Mistakes to Avoid
 
@@ -41,7 +78,7 @@ corepack enable && corepack prepare pnpm@9.15.4 --activate
 | `npx turbo ...` | `pnpm turbo ...` |
 | Running turbo from wrong directory | Always run from repo root |
 | `cd apps/web && pnpm dev` | `pnpm --filter web dev` (from root) |
-| `node script.js` with Node < 24 | Verify `node --version` first |
+| `node script.js` with Node < 22 | Verify `node --version` first |
 
 ---
 
@@ -276,7 +313,7 @@ Jovie/
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
-| Runtime | Node.js 24 |
+| Runtime | Node.js 22 LTS |
 
 ### API Runtime
 
@@ -699,7 +736,7 @@ corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 ### "Node version mismatch"
 ```bash
-nvm install 24 && nvm use 24
+nvm install 22 && nvm use 22
 # Or check .nvmrc: cat .nvmrc
 ```
 

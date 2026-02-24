@@ -6,7 +6,7 @@
 # Run this automatically on every worktree creation.
 #
 # Requirements:
-#   - Node.js 24.x
+#   - Node.js 22.x
 #   - pnpm 9.15.4 (exact)
 #   - Doppler CLI (for secrets)
 #
