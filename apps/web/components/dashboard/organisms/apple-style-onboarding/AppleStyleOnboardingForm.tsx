@@ -8,9 +8,9 @@ import {
   OnboardingHandleStep,
 } from '@/components/dashboard/organisms/onboarding';
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
-import { APP_ROUTES } from '@/constants/routes';
 import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
 import type { AppleStyleOnboardingFormProps } from './types';
