@@ -48,7 +48,7 @@ jobs:
   # ==========================================================================
   guard:
     name: Trigger Guard
-    if: github.actor != 'Copilot'
+    if: github.actor != 'copilot-swe-agent[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     outputs:

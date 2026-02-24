@@ -41,7 +41,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # ==============================================================================
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REQUIRED_NODE_VERSION="$(cat "${REPO_ROOT}/.nvmrc" 2>/dev/null || echo "24")"
+REQUIRED_NODE_VERSION="$(cat "${REPO_ROOT}/.nvmrc" 2>/dev/null || echo "22")"
 REQUIRED_NODE_MAJOR="${REQUIRED_NODE_VERSION%%.*}"
 REQUIRED_PNPM_VERSION="9.15.4"
 DOPPLER_PROJECT="${DOPPLER_PROJECT:-jovie-web}"

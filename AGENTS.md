@@ -44,7 +44,7 @@ set -euo pipefail
 curl -fsSL https://fnm.vercel.app/install | bash
 export PATH="$HOME/.local/share/fnm:$PATH"
 eval "$(fnm env)"
-fnm install 22 && fnm use 22
+fnm install 22.13.0 && fnm use 22.13.0
 corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 # 2. Doppler CLI (secrets manager)
