@@ -16,29 +16,53 @@ interface WaitlistSettingsResponse {
 export function WaitlistSettingsPanel() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState<WaitlistSettingsResponse | null>(
     null
   );
 
   useEffect(() => {
-    let mounted = true;
-    fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, { cache: 'no-store' })
-      .then(async response => {
-        if (!response.ok) throw new Error('Failed to load waitlist settings');
+    const controller = new AbortController();
+
+    async function loadSettings() {
+      try {
+        setError(null);
+        const response = await fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load waitlist settings');
+        }
+
         const payload = (await response.json()) as {
-          settings: WaitlistSettingsResponse;
+          settings?: WaitlistSettingsResponse;
         };
-        if (mounted) setSettings(payload.settings);
-      })
-      .catch(() => {
-        toast.error('Unable to load waitlist settings');
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
+
+        if (!payload.settings) {
+          throw new Error('Invalid waitlist settings response');
+        }
+
+        setSettings(payload.settings);
+      } catch {
+        if (!controller.signal.aborted) {
+          setError(
+            'Unable to load waitlist settings. Please refresh and try again.'
+          );
+          toast.error('Unable to load waitlist settings');
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadSettings();
 
     return () => {
-      mounted = false;
+      controller.abort();
     };
   }, []);
 
@@ -61,6 +85,7 @@ export function WaitlistSettingsPanel() {
         settings: WaitlistSettingsResponse;
       };
       setSettings(payload.settings);
+      setError(null);
       toast.success('Waitlist settings saved');
     } catch {
       toast.error('Failed to save waitlist settings');
@@ -69,10 +94,19 @@ export function WaitlistSettingsPanel() {
     }
   }
 
-  if (loading || !settings) {
+  if (loading) {
     return (
       <div className='border-b border-subtle px-4 py-4 text-sm text-secondary-token'>
         Loading waitlist settings…
+      </div>
+    );
+  }
+
+  if (error || !settings) {
+    return (
+      <div className='border-b border-subtle px-4 py-4 text-sm text-destructive'>
+        {error ??
+          'Unable to load waitlist settings. Please refresh and try again.'}
       </div>
     );
   }
