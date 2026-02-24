@@ -10,6 +10,7 @@ import {
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { queryKeys } from '@/lib/queries/keys';
 import {
@@ -93,26 +94,56 @@ export function ConnectedDspList({
   });
 
   const { mutate: triggerDiscovery } = useTriggerDiscoveryMutation();
-  const { mutate: rejectMatch } = useRejectDspMatchMutation();
+  const { mutate: rejectMatch, isPending: isDisconnectPending } =
+    useRejectDspMatchMutation();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteProvider, setPaletteProvider] =
     useState<DspProvider>('apple_music');
+  const [matchToDisconnect, setMatchToDisconnect] = useState<
+    DspMatch | undefined
+  >(undefined);
+
+  const handleDisconnectRequest = useCallback((match: DspMatch | undefined) => {
+    if (!match) return;
+    setMatchToDisconnect(match);
+  }, []);
+
+  const handleDisconnectConfirm = useCallback(() => {
+    if (!matchToDisconnect) return;
+    const label = getProviderLabel(matchToDisconnect.providerId as DspProvider);
+    rejectMatch(
+      {
+        matchId: matchToDisconnect.id,
+        profileId,
+        reason: 'user_disconnected',
+      },
+      {
+        onSuccess: () => {
+          toast.success(`${label} disconnected`);
+          setMatchToDisconnect(undefined);
+        },
+        onError: err =>
+          toast.error(err.message || `Failed to disconnect ${label}`),
+      }
+    );
+  }, [matchToDisconnect, profileId, rejectMatch]);
+
+  const handleDisconnectCancel = useCallback(
+    (open: boolean) => {
+      if (open) return;
+      if (isDisconnectPending) return;
+      setMatchToDisconnect(undefined);
+    },
+    [isDisconnectPending]
+  );
 
   const handleDisconnect = useCallback(
     (match: DspMatch | undefined) => {
       if (!match) return;
-      const label = getProviderLabel(match.providerId as DspProvider);
-      rejectMatch(
-        { matchId: match.id, profileId, reason: 'user_disconnected' },
-        {
-          onSuccess: () => toast.success(`${label} disconnected`),
-          onError: err =>
-            toast.error(err.message || `Failed to disconnect ${label}`),
-        }
-      );
+      handleDisconnectRequest(match);
     },
-    [profileId, rejectMatch]
+    [handleDisconnectRequest]
   );
 
   const handleSyncNow = useCallback(
@@ -203,20 +234,32 @@ export function ConnectedDspList({
   const hasNoConnections = !spotifyId && !spotifyMatch && !appleMusicMatch;
 
   return (
-    <ConnectedDspListContent
-      isSpotifyConnected={isSpotifyConnected}
-      spotifyId={spotifyId}
-      spotifyMatch={spotifyMatch}
-      appleMusicMatch={appleMusicMatch}
-      hasNoConnections={hasNoConnections}
-      handleOpenPalette={handleOpenPalette}
-      handleSyncNow={handleSyncNow}
-      handleDisconnect={handleDisconnect}
-      paletteOpen={paletteOpen}
-      setPaletteOpen={setPaletteOpen}
-      paletteProvider={paletteProvider}
-      handlePaletteSelect={handlePaletteSelect}
-    />
+    <>
+      <ConnectedDspListContent
+        isSpotifyConnected={isSpotifyConnected}
+        spotifyId={spotifyId}
+        spotifyMatch={spotifyMatch}
+        appleMusicMatch={appleMusicMatch}
+        hasNoConnections={hasNoConnections}
+        handleOpenPalette={handleOpenPalette}
+        handleSyncNow={handleSyncNow}
+        handleDisconnect={handleDisconnect}
+        paletteOpen={paletteOpen}
+        setPaletteOpen={setPaletteOpen}
+        paletteProvider={paletteProvider}
+        handlePaletteSelect={handlePaletteSelect}
+      />
+      <ConfirmDialog
+        open={!!matchToDisconnect}
+        onOpenChange={handleDisconnectCancel}
+        title={`Disconnect ${matchToDisconnect ? getProviderLabel(matchToDisconnect.providerId as DspProvider) : 'provider'}?`}
+        description='Disconnecting will stop sync updates for this provider until you reconnect it.'
+        confirmLabel='Disconnect'
+        variant='destructive'
+        isLoading={isDisconnectPending}
+        onConfirm={handleDisconnectConfirm}
+      />
+    </>
   );
 }
 
