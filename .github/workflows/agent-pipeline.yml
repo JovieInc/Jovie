@@ -332,9 +332,16 @@ jobs:
       issues: write
       id-token: write
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Validate PR is not from a fork
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           IS_FORK=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.head.repo.fork // false')
@@ -355,7 +362,7 @@ jobs:
 
       - name: Mark attempt in progress
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
           HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
           TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
@@ -535,7 +542,7 @@ jobs:
       - name: Commit and push fixes
         if: steps.final-status.outputs.final_passed == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_HEAD_REF: ${{ needs.guard.outputs.pr_head_ref }}
         run: |
           if git diff --quiet && git diff --staged --quiet; then
@@ -543,8 +550,8 @@ jobs:
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
 
           # Configure credentials for push (checkout used persist-credentials: false)
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
@@ -572,7 +579,7 @@ jobs:
       - name: Escalate to human
         if: steps.final-status.outputs.final_passed == 'false'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
@@ -605,7 +612,7 @@ jobs:
       - name: Clean up stale attempt labels
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
           HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
@@ -634,10 +641,17 @@ jobs:
       pull-requests: write
       statuses: read
     steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Check all required statuses
         id: check-statuses
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_SHA="${{ needs.guard.outputs.pr_head_sha }}"
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
@@ -686,7 +700,7 @@ jobs:
         id: sensitive-check
         if: steps.check-statuses.outputs.all_passed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
@@ -733,7 +747,7 @@ jobs:
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
@@ -763,7 +777,7 @@ jobs:
           steps.check-statuses.outputs.all_passed == 'true' &&
           steps.sensitive-check.outputs.is_safe == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
