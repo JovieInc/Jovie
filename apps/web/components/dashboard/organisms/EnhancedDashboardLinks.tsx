@@ -211,6 +211,10 @@ export function EnhancedDashboardLinks({
       avatarUrl: avatarUrl || null,
       links: dashboardLinks,
       profilePath,
+      dspConnections: {
+        spotify: { connected: false, artistName: null },
+        appleMusic: { connected: false, artistName: null },
+      },
     });
   }, [
     avatarUrl,

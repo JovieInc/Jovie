@@ -32,8 +32,16 @@ function convertSocialLinksToPreviewLinks(
  */
 export function PreviewDataHydrator({
   initialLinks,
+  spotifyConnected,
+  spotifyArtistName,
+  appleMusicConnected,
+  appleMusicArtistName,
 }: {
   readonly initialLinks: ProfileSocialLink[];
+  readonly spotifyConnected: boolean;
+  readonly spotifyArtistName: string | null;
+  readonly appleMusicConnected: boolean;
+  readonly appleMusicArtistName: string | null;
 }) {
   const { setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
@@ -58,8 +66,26 @@ export function PreviewDataHydrator({
       avatarUrl: selectedProfile.avatarUrl ?? null,
       links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
+      dspConnections: {
+        spotify: {
+          connected: spotifyConnected,
+          artistName: spotifyArtistName,
+        },
+        appleMusic: {
+          connected: appleMusicConnected,
+          artistName: appleMusicArtistName,
+        },
+      },
     });
-  }, [selectedProfile, previewLinks, setPreviewData]);
+  }, [
+    selectedProfile,
+    previewLinks,
+    setPreviewData,
+    spotifyConnected,
+    spotifyArtistName,
+    appleMusicConnected,
+    appleMusicArtistName,
+  ]);
 
   return null;
 }
