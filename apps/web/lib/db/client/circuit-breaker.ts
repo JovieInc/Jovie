@@ -53,8 +53,13 @@ class DbCircuitBreaker {
       this.onSuccess();
       return result;
     } catch (error) {
-      if (options.shouldCountFailure(error)) {
+      const shouldCount = options.shouldCountFailure(error);
+      if (shouldCount) {
         this.onCountedFailure();
+      } else if (this.state === 'HALF_OPEN') {
+        // Non-transient probe failures should not keep global DB traffic throttled.
+        this.failureTimestamps = [];
+        this.transitionTo('CLOSED');
       }
       throw error;
     } finally {
@@ -85,8 +90,8 @@ class DbCircuitBreaker {
 
   private onSuccess(): void {
     if (this.state === 'HALF_OPEN') {
-      this.transitionTo('CLOSED');
       this.failureTimestamps = [];
+      this.transitionTo('CLOSED');
       return;
     }
 
@@ -99,9 +104,9 @@ class DbCircuitBreaker {
     const now = Date.now();
 
     if (this.state === 'HALF_OPEN') {
-      this.transitionTo('OPEN');
       this.openedAt = now;
       this.failureTimestamps = [now];
+      this.transitionTo('OPEN');
       return;
     }
 
@@ -110,8 +115,8 @@ class DbCircuitBreaker {
       this.failureTimestamps.push(now);
 
       if (this.failureTimestamps.length >= this.config.failureThreshold) {
-        this.transitionTo('OPEN');
         this.openedAt = now;
+        this.transitionTo('OPEN');
       }
     }
   }

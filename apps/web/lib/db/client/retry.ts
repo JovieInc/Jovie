@@ -58,6 +58,12 @@ export async function withRetry<T>(
   context: string,
   maxRetries: number = DB_CONFIG.maxRetries
 ): Promise<T> {
+  if (!Number.isInteger(maxRetries) || maxRetries < 1) {
+    throw new RangeError(
+      `Invalid maxRetries: ${maxRetries}. Expected a positive integer.`
+    );
+  }
+
   return dbCircuitBreaker.execute(
     async () => {
       let lastError: unknown;
@@ -100,7 +106,9 @@ export async function withRetry<T>(
         }
       }
 
-      throw lastError;
+      throw lastError instanceof Error
+        ? lastError
+        : new Error(String(lastError));
     },
     {
       shouldCountFailure: isRetryableError,
