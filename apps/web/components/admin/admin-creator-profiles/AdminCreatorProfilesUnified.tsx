@@ -448,7 +448,7 @@ export function AdminCreatorProfilesUnified({
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
               onLoadMore={() => {
-                void fetchNextPage();
+                fetchNextPage().catch(() => {});
               }}
             />
           )}

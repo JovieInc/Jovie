@@ -43,16 +43,15 @@ export function PreSaveActions({
     setAppleState('loading');
 
     try {
-      const music =
-        typeof window !== 'undefined'
-          ? (
-              window as Window & {
-                MusicKit?: {
-                  getInstance: () => { authorize: () => Promise<string> };
-                };
-              }
-            ).MusicKit
-          : undefined;
+      const music = globalThis.window
+        ? (
+            globalThis.window as Window & {
+              MusicKit?: {
+                getInstance: () => { authorize: () => Promise<string> };
+              };
+            }
+          ).MusicKit
+        : undefined;
 
       if (!music?.getInstance) {
         throw new Error('MusicKit unavailable');

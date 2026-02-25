@@ -10,7 +10,10 @@ import { AlertCircle, Mail, Phone } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
-import { CountrySelector } from '@/components/profile/notifications';
+import {
+  type CountryOption,
+  CountrySelector,
+} from '@/components/profile/notifications';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import type { Artist } from '@/types/db';
@@ -107,6 +110,172 @@ function getPhonePrefillValue(
     ? digitsOnly.slice(dialDigits.length)
     : digitsOnly;
   return withoutCountryCode.slice(0, getMaxNationalDigits(dialCode));
+}
+
+function getSubmitLabel(isSubmitting: boolean, otpStep: string): string {
+  if (isSubmitting) return 'Working\u2026';
+  if (otpStep === 'verify') return 'Verify';
+  return 'Get notified';
+}
+
+function getChannelToggleLabel(channel: 'email' | 'sms'): string {
+  return channel === 'sms'
+    ? 'Switch to email updates'
+    : 'Switch to text updates';
+}
+
+interface ChannelInputRowProps {
+  readonly shouldShowCountrySelector: boolean;
+  readonly country: CountryOption;
+  readonly isCountryOpen: boolean;
+  readonly setIsCountryOpen: (open: boolean) => void;
+  readonly setCountry: (c: CountryOption) => void;
+  readonly channel: 'email' | 'sms';
+  readonly handleChannelChange: (ch: 'email' | 'sms') => void;
+  readonly isSubmitting: boolean;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+  readonly inputId: string;
+  readonly disclaimerId: string;
+  readonly inputConfig: ReturnType<typeof getInputConfig>;
+  readonly inputValue: string;
+  readonly handlePhoneChange: (v: string) => void;
+  readonly handleEmailChange: (v: string) => void;
+  readonly setIsInputFocused: (f: boolean) => void;
+  readonly handleFieldBlur: () => void;
+  readonly handleKeyDown: React.KeyboardEventHandler<HTMLInputElement>;
+  readonly otpStep: string;
+  readonly handleVerifyOtp: () => Promise<void>;
+  readonly handleSubscribe: () => Promise<void>;
+}
+
+function ChannelInputRow({
+  shouldShowCountrySelector,
+  country,
+  isCountryOpen,
+  setIsCountryOpen,
+  setCountry,
+  channel,
+  handleChannelChange,
+  isSubmitting,
+  inputRef,
+  inputId,
+  disclaimerId,
+  inputConfig,
+  inputValue,
+  handlePhoneChange,
+  handleEmailChange,
+  setIsInputFocused,
+  handleFieldBlur,
+  handleKeyDown,
+  otpStep,
+  handleVerifyOtp,
+  handleSubscribe,
+}: ChannelInputRowProps) {
+  const handleSubmit = () => {
+    const action = otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe();
+    action.catch(() => {});
+  };
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (channel === 'sms') {
+      handlePhoneChange(event.target.value);
+    } else {
+      handleEmailChange(event.target.value);
+    }
+  };
+
+  return (
+    <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
+      <div className='flex items-center'>
+        {shouldShowCountrySelector ? (
+          <CountrySelector
+            country={country}
+            isOpen={isCountryOpen}
+            onOpenChange={setIsCountryOpen}
+            onSelect={setCountry}
+          />
+        ) : (
+          <button
+            type='button'
+            className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
+            aria-label={getChannelToggleLabel(channel)}
+            onClick={() =>
+              handleChannelChange(channel === 'sms' ? 'email' : 'sms')
+            }
+            disabled={isSubmitting}
+          >
+            {channel === 'sms' ? (
+              <Phone className='w-4 h-4' aria-hidden='true' />
+            ) : (
+              <Mail className='w-4 h-4' aria-hidden='true' />
+            )}
+          </button>
+        )}
+
+        <div className='flex-1 min-w-0'>
+          <label htmlFor={inputId} className='sr-only'>
+            {channel === 'sms' ? 'Phone number' : 'Email address'}
+          </label>
+          <input
+            ref={inputRef}
+            id={inputId}
+            aria-describedby={disclaimerId}
+            type={inputConfig.type}
+            inputMode={inputConfig.inputMode}
+            className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
+            placeholder={inputConfig.placeholder}
+            value={inputValue}
+            onChange={handleInputChange}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={() => {
+              setIsInputFocused(false);
+              handleFieldBlur();
+            }}
+            onKeyDown={handleKeyDown}
+            disabled={isSubmitting}
+            autoComplete={inputConfig.autoComplete}
+            maxLength={inputConfig.maxLength}
+            style={noFontSynthesisStyle}
+          />
+        </div>
+
+        <button
+          type='button'
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+          className='mr-1.5 inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-btn-primary px-3 text-sm font-medium text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed'
+          style={noFontSynthesisStyle}
+        >
+          {getSubmitLabel(isSubmitting, otpStep)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ErrorTooltip({ error }: { readonly error: string }) {
+  return (
+    <TooltipProvider delayDuration={0}>
+      <Tooltip defaultOpen>
+        <TooltipTrigger>
+          <span
+            className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
+            role='alert'
+            aria-live='assertive'
+          >
+            <AlertCircle className='h-4 w-4' aria-hidden='true' />
+            <span className='sr-only'>{error}</span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent
+          side='bottom'
+          className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
+        >
+          {error}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 export function TwoStepNotificationsCTA({
@@ -259,87 +428,29 @@ export function TwoStepNotificationsCTA({
             animate={enterVariant.animate}
           >
             <div className='space-y-3'>
-              <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
-                <div className='flex items-center'>
-                  {shouldShowCountrySelector ? (
-                    <CountrySelector
-                      country={country}
-                      isOpen={isCountryOpen}
-                      onOpenChange={setIsCountryOpen}
-                      onSelect={setCountry}
-                    />
-                  ) : (
-                    <button
-                      type='button'
-                      className='h-12 pl-4 pr-3 flex items-center bg-transparent text-tertiary-token hover:bg-surface-2 transition-colors focus-visible:outline-none'
-                      aria-label={
-                        channel === 'sms'
-                          ? 'Switch to email updates'
-                          : 'Switch to text updates'
-                      }
-                      onClick={() =>
-                        handleChannelChange(channel === 'sms' ? 'email' : 'sms')
-                      }
-                      disabled={isSubmitting}
-                    >
-                      {channel === 'sms' ? (
-                        <Phone className='w-4 h-4' aria-hidden='true' />
-                      ) : (
-                        <Mail className='w-4 h-4' aria-hidden='true' />
-                      )}
-                    </button>
-                  )}
-
-                  <div className='flex-1 min-w-0'>
-                    <label htmlFor={inputId} className='sr-only'>
-                      {channel === 'sms' ? 'Phone number' : 'Email address'}
-                    </label>
-                    <input
-                      ref={inputRef}
-                      id={inputId}
-                      aria-describedby={disclaimerId}
-                      type={inputConfig.type}
-                      inputMode={inputConfig.inputMode}
-                      className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
-                      placeholder={inputConfig.placeholder}
-                      value={inputValue}
-                      onChange={event =>
-                        channel === 'sms'
-                          ? handlePhoneChange(event.target.value)
-                          : handleEmailChange(event.target.value)
-                      }
-                      onFocus={() => setIsInputFocused(true)}
-                      onBlur={() => {
-                        setIsInputFocused(false);
-                        handleFieldBlur();
-                      }}
-                      onKeyDown={handleKeyDown}
-                      disabled={isSubmitting}
-                      autoComplete={inputConfig.autoComplete}
-                      maxLength={inputConfig.maxLength}
-                      style={noFontSynthesisStyle}
-                    />
-                  </div>
-
-                  <button
-                    type='button'
-                    onClick={() =>
-                      void (otpStep === 'verify'
-                        ? handleVerifyOtp()
-                        : handleSubscribe())
-                    }
-                    disabled={isSubmitting}
-                    className='mr-1.5 inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-btn-primary px-3 text-sm font-medium text-btn-primary-foreground transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed'
-                    style={noFontSynthesisStyle}
-                  >
-                    {isSubmitting
-                      ? 'Working…'
-                      : otpStep === 'verify'
-                        ? 'Verify'
-                        : 'Get notified'}
-                  </button>
-                </div>
-              </div>
+              <ChannelInputRow
+                shouldShowCountrySelector={shouldShowCountrySelector}
+                country={country}
+                isCountryOpen={isCountryOpen}
+                setIsCountryOpen={setIsCountryOpen}
+                setCountry={setCountry}
+                channel={channel}
+                handleChannelChange={handleChannelChange}
+                isSubmitting={isSubmitting}
+                inputRef={inputRef}
+                inputId={inputId}
+                disclaimerId={disclaimerId}
+                inputConfig={inputConfig}
+                inputValue={inputValue}
+                handlePhoneChange={handlePhoneChange}
+                handleEmailChange={handleEmailChange}
+                setIsInputFocused={setIsInputFocused}
+                handleFieldBlur={handleFieldBlur}
+                handleKeyDown={handleKeyDown}
+                otpStep={otpStep}
+                handleVerifyOtp={handleVerifyOtp}
+                handleSubscribe={handleSubscribe}
+              />
 
               <div className='flex items-center justify-center gap-2'>
                 <p
@@ -353,28 +464,7 @@ export function TwoStepNotificationsCTA({
                   No spam. Opt-out anytime.
                 </p>
 
-                {error && (
-                  <TooltipProvider delayDuration={0}>
-                    <Tooltip defaultOpen>
-                      <TooltipTrigger>
-                        <span
-                          className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
-                          role='alert'
-                          aria-live='assertive'
-                        >
-                          <AlertCircle className='h-4 w-4' aria-hidden='true' />
-                          <span className='sr-only'>{error}</span>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side='bottom'
-                        className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
-                      >
-                        {error}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+                {error && <ErrorTooltip error={error} />}
               </div>
             </div>
           </motion.div>

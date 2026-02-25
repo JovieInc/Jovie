@@ -189,7 +189,7 @@ export function useWaitlistColumns({
                 variant='secondary'
                 disabled={isApproving || isDisapproving}
                 onClick={() => {
-                  void onApprove(entry);
+                  onApprove(entry);
                 }}
               >
                 {(() => {

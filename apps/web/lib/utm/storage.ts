@@ -37,7 +37,7 @@ function getEmptyUsageData(): UTMUsageData {
  * Load usage data from localStorage
  */
 export function loadUsageData(): UTMUsageData {
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return getEmptyUsageData();
   }
 
@@ -75,7 +75,7 @@ export function loadUsageData(): UTMUsageData {
  * Save usage data to localStorage
  */
 export function saveUsageData(data: UTMUsageData): void {
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return;
   }
 
@@ -195,7 +195,7 @@ export function calculateScore(record: UTMUsageRecord): number {
  * Clear all usage data
  */
 export function clearUsageData(): void {
-  if (typeof globalThis.window === 'undefined') {
+  if (globalThis.window === undefined) {
     return;
   }
 
