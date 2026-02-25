@@ -4,8 +4,10 @@ import { Input } from '@jovie/ui';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
@@ -34,7 +36,6 @@ export function NotificationsPageClient() {
   const [success, setSuccess] = useState(false);
   const { success: notifySuccess, error: notifyError } = useNotifications();
   const subscribeMutation = useSubscribeNotificationsMutation();
-  const notificationsEnabled = true;
 
   const {
     data: artistData,
@@ -42,7 +43,7 @@ export function NotificationsPageClient() {
     error: artistQueryError,
   } = usePublicProfileQuery({
     username,
-    enabled: notificationsEnabled && Boolean(username),
+    enabled: Boolean(username),
   });
 
   const artistId = artistData?.id ?? null;
@@ -51,20 +52,6 @@ export function NotificationsPageClient() {
     artistQueryError || !username
       ? NOTIFICATION_COPY.errors.artistNotFound
       : null;
-
-  if (!notificationsEnabled) {
-    return (
-      <div className='container mx-auto px-4 py-8 max-w-xl'>
-        <StarterEmptyState
-          title='Notifications are not available yet'
-          description="We're focused on the core Jovie experience. Opt-in will be back soon once we're confident in reliability."
-          primaryAction={{ label: 'Return home', href: '/' }}
-          secondaryAction={{ label: 'View profile', href: `/${username}` }}
-          testId='notifications-disabled'
-        />
-      </div>
-    );
-  }
 
   if (!isArtistLoading && artistLookupError) {
     return (
@@ -195,10 +182,10 @@ export function NotificationsPageClient() {
           <p className='text-xs text-secondary-token mt-2'>
             By subscribing, you agree to receive automated updates. Reply STOP
             to unsubscribe.{' '}
-            <Link href='/terms' className='underline'>
+            <Link href={APP_ROUTES.LEGAL_TERMS} className='underline'>
               Terms
             </Link>{' '}
-            <Link href='/privacy' className='underline'>
+            <Link href={APP_ROUTES.LEGAL_PRIVACY} className='underline'>
               Privacy
             </Link>
           </p>

@@ -45,12 +45,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: {
-      canonical: `${BASE_URL}/${username}/tour`,
+      canonical: `${BASE_URL}/${username.toLowerCase()}/tour`,
     },
     openGraph: {
       title,
       description,
-      url: `${BASE_URL}/${username}/tour`,
+      url: `${BASE_URL}/${username.toLowerCase()}/tour`,
       siteName: 'Jovie',
       type: 'website',
     },

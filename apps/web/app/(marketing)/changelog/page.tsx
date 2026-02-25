@@ -6,7 +6,7 @@ import { unstable_cache } from 'next/cache';
 import { remark } from 'remark';
 import html from 'remark-html';
 import { Container } from '@/components/site/Container';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, APP_URL } from '@/constants/app';
 
 const CHANGELOG_CANDIDATE_PATHS = [
   path.join(process.cwd(), 'CHANGELOG.md'),
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
   title: `Changelog | ${APP_NAME}`,
   description: `${APP_NAME} product changelog and release notes`,
   alternates: {
-    canonical: `${BASE_URL}/changelog`,
+    canonical: `${APP_URL}/changelog`,
   },
 };
 
