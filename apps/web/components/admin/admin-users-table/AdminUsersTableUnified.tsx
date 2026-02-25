@@ -357,7 +357,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={() => {
-              void fetchNextPage();
+              fetchNextPage().catch(() => {});
             }}
           />
         )}

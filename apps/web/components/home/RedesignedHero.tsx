@@ -70,13 +70,11 @@ export async function RedesignedHero() {
           </p>
 
           <div className='mt-6 max-w-[400px]'>
-            {showSpotifySearch ? (
-              <HeroSpotifySearch />
-            ) : showClaimHandle ? (
-              <ClaimHandleForm />
-            ) : (
-              <HeroSpotifySearch />
-            )}
+            {(() => {
+              if (showSpotifySearch) return <HeroSpotifySearch />;
+              if (showClaimHandle) return <ClaimHandleForm />;
+              return <HeroSpotifySearch />;
+            })()}
           </div>
 
           <p

@@ -11,10 +11,10 @@ export function formatLyricsForAppleMusic(raw: string): {
 
   // 1. Remove section labels like [Verse], [Chorus 2], [Bridge], [Pre-Chorus], etc.
   const sectionLabelPattern =
-    /^\[(?:Verse|Chorus|Bridge|Intro|Outro|Hook|Pre-Chorus|Interlude|Refrain|Coda|Break|Tag|Adlib|Post-Chorus)(?:\s*\d*)?\]\s*$/gim;
+    /^\[(?:Verse|Chorus|Bridge|Intro|Outro|Hook|Pre-Chorus|Interlude|Refrain|Coda|Break|Tag|Adlib|Post-Chorus)(?:\s+\d+)?\]\s*$/gim;
   const sectionMatches = text.match(sectionLabelPattern);
   if (sectionMatches) {
-    text = text.replace(sectionLabelPattern, '');
+    text = text.replaceAll(sectionLabelPattern, '');
     changes.push(`Removed ${sectionMatches.length} section label(s)`);
   }
 
@@ -22,7 +22,7 @@ export function formatLyricsForAppleMusic(raw: string): {
   const timestampPattern = /\[\d{1,2}:\d{2}\]/g;
   const timestampMatches = text.match(timestampPattern);
   if (timestampMatches) {
-    text = text.replace(timestampPattern, '');
+    text = text.replaceAll(timestampPattern, '');
     changes.push(`Removed ${timestampMatches.length} timestamp marker(s)`);
   }
 

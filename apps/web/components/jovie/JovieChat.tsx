@@ -415,7 +415,7 @@ export function JovieChat({
                         className='font-medium text-primary-token underline-offset-2 hover:underline'
                       >
                         {username ? `jov.ie/${username}` : 'jov.ie'}
-                      </a>
+                      </a>{' '}
                       .
                     </p>
                   ) : (

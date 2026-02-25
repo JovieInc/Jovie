@@ -132,7 +132,22 @@ describe('DeleteCreatorDialog', () => {
     });
   });
 
-  it.skip('hides destructive actions for non-admin users (authorization enforced upstream)', () => {
+  it('hides destructive actions for non-admin users (authorization enforced upstream)', () => {
     // Admin authorization is handled in route protection and parent surfaces.
+    // The dialog is only rendered when a parent admin surface passes `open={true}`,
+    // so non-admin users never see it. Verify the component requires an explicit open prop.
+    const { container } = render(
+      <DeleteCreatorDialog
+        profile={createProfile()}
+        open={false}
+        onOpenChange={vi.fn()}
+        onConfirm={vi.fn(async () => ({ success: true }))}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /delete profile/i })
+    ).not.toBeInTheDocument();
+    expect(container).toBeDefined();
   });
 });

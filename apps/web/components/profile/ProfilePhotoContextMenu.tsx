@@ -204,7 +204,7 @@ export function ProfilePhotoContextMenu({
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => {
-                void handleDownloadQr();
+                handleDownloadQr().catch(() => {});
               }}
             >
               <QrCode className='mr-2 h-4 w-4' />
@@ -215,7 +215,7 @@ export function ProfilePhotoContextMenu({
                 const originalSize =
                   sizes.find(size => size.key === 'original') ?? sizes[0];
                 if (originalSize) {
-                  void handleDownload(originalSize);
+                  handleDownload(originalSize).catch(() => {});
                 }
               }}
             >

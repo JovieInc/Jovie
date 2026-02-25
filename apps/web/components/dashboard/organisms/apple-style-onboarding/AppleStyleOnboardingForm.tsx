@@ -129,7 +129,7 @@ export function AppleStyleOnboardingForm({
   ]);
 
   const goToDashboard = useCallback(() => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     const initialQuery = getOnboardingDashboardInitialQuery(
       spotifyImportState.status

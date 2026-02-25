@@ -139,13 +139,11 @@ export function WaitlistKanbanCard({
             }
             onClick={onApprove}
           >
-            {approveStatus === 'approving'
-              ? 'Approving…'
-              : approveStatus === 'disapproving'
-                ? 'Disapproving…'
-                : isApproved
-                  ? 'Disapprove'
-                  : 'Approve'}
+            {(() => {
+              if (approveStatus === 'approving') return 'Approving…';
+              if (approveStatus === 'disapproving') return 'Disapproving…';
+              return isApproved ? 'Disapprove' : 'Approve';
+            })()}
           </Button>
         </div>
       )}

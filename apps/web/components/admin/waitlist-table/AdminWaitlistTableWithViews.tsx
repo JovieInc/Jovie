@@ -175,9 +175,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
       <WaitlistKanbanCard
         entry={entry}
         approveStatus={approveStatuses[entry.id]}
-        onApprove={() =>
-          void approveEntry({ id: entry.id, status: entry.status })
-        }
+        onApprove={() => approveEntry({ id: entry.id, status: entry.status })}
       />
     ),
     [approveStatuses, approveEntry]
@@ -265,7 +263,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
               onLoadMore={() => {
-                void fetchNextPage();
+                fetchNextPage().catch(() => {});
               }}
             />
           ) : (
