@@ -169,7 +169,8 @@ export function MobileNav({
 
       {/* Portal: render overlay + nav panel outside header to avoid
           backdrop-filter creating a containing block that clips fixed positioning */}
-      {portalTarget &&
+      {isOpen &&
+        portalTarget &&
         createPortal(
           <>
             {/* Full-screen overlay */}
@@ -177,9 +178,7 @@ export function MobileNav({
               className={cn(
                 'fixed inset-0 z-[99]',
                 'transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
-                isOpen
-                  ? 'opacity-100 pointer-events-auto'
-                  : 'opacity-0 pointer-events-none'
+                'opacity-100 pointer-events-auto'
               )}
               onClick={close}
               aria-hidden='true'
@@ -197,9 +196,7 @@ export function MobileNav({
                 'fixed inset-x-0 bottom-0 z-[100]',
                 'rounded-t-[20px]',
                 'transition-all duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
-                isOpen
-                  ? 'translate-y-0 opacity-100 pointer-events-auto'
-                  : 'translate-y-full opacity-0 pointer-events-none'
+                'translate-y-0 opacity-100 pointer-events-auto'
               )}
               style={{
                 backgroundColor:
@@ -211,7 +208,6 @@ export function MobileNav({
                 paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
               }}
               aria-label='Mobile navigation'
-              inert={isOpen ? undefined : true}
             >
               {/* Grabber handle */}
               <div className='flex justify-center pt-3 pb-2' aria-hidden='true'>
@@ -237,12 +233,10 @@ export function MobileNav({
                       'transition-all duration-150 ease-out',
                       'active:scale-[0.98]',
                       'hover:bg-[var(--linear-bg-hover)]',
-                      // Staggered entrance animation
-                      isOpen &&
-                        'animate-[mobile-nav-item-in_400ms_ease-out_both]'
+                      'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                     )}
                     style={{
-                      animationDelay: isOpen ? `${80 + index * 50}ms` : '0ms',
+                      animationDelay: `${80 + index * 50}ms`,
                     }}
                     onClick={close}
                   >
@@ -252,14 +246,9 @@ export function MobileNav({
 
                 {/* Primary CTA */}
                 <div
-                  className={cn(
-                    'pt-2',
-                    isOpen && 'animate-[mobile-nav-item-in_400ms_ease-out_both]'
-                  )}
+                  className='pt-2 animate-[mobile-nav-item-in_400ms_ease-out_both]'
                   style={{
-                    animationDelay: isOpen
-                      ? `${80 + navLinks.length * 50}ms`
-                      : '0ms',
+                    animationDelay: `${80 + navLinks.length * 50}ms`,
                   }}
                 >
                   <MobileNavCta
@@ -275,12 +264,10 @@ export function MobileNav({
                   className={cn(
                     'mx-4 mt-4 pt-4',
                     'border-t border-[var(--linear-border-subtle)]',
-                    isOpen && 'animate-[mobile-nav-item-in_400ms_ease-out_both]'
+                    'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                   )}
                   style={{
-                    animationDelay: isOpen
-                      ? `${80 + (navLinks.length + 1) * 50}ms`
-                      : '0ms',
+                    animationDelay: `${80 + (navLinks.length + 1) * 50}ms`,
                   }}
                 >
                   <UserButton />
