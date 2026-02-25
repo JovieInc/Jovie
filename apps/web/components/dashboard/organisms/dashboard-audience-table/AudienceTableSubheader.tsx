@@ -1,7 +1,11 @@
 'use client';
 
 import { memo } from 'react';
-import { ExportCSVButton } from '@/components/organisms/table';
+import {
+  ActionBar,
+  ActionBarItem,
+  ExportCSVButton,
+} from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import { AudienceFilterDropdown } from './AudienceFilterDropdown';
 import { AudienceHeaderBadge } from './AudienceHeaderBadge';
@@ -30,9 +34,6 @@ interface AudienceTableSubheaderProps {
   readonly total: number;
 }
 
-const pillButtonClass =
-  'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
-
 /**
  * AudienceTableSubheader - Subheader with audience view selector and table actions.
  */
@@ -57,25 +58,33 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
         </div>
 
         {/* Right: Filter + Export CSV */}
-        <div className='flex items-center gap-2'>
-          <AudienceFilterDropdown
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            buttonClassName={pillButtonClass}
-          />
-          <ExportCSVButton
-            getData={() => getAudienceForExport(rows, selectedIds)}
-            columns={AUDIENCE_CSV_COLUMNS}
-            filename='audience'
-            label={
+        <ActionBar>
+          <ActionBarItem tooltipLabel='Filter' shortcut='F'>
+            <AudienceFilterDropdown
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              buttonClassName='focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1'
+            />
+          </ActionBarItem>
+          <ActionBarItem
+            tooltipLabel={
               selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'
             }
-            disabled={!hasData && subscriberCount === 0}
-            variant='ghost'
-            size='sm'
-            className={pillButtonClass}
-          />
-        </div>
+          >
+            <ExportCSVButton
+              getData={() => getAudienceForExport(rows, selectedIds)}
+              columns={AUDIENCE_CSV_COLUMNS}
+              filename='audience'
+              label={
+                selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'
+              }
+              disabled={!hasData && subscriberCount === 0}
+              variant='ghost'
+              size='sm'
+              className='focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1'
+            />
+          </ActionBarItem>
+        </ActionBar>
       </div>
     </div>
   );

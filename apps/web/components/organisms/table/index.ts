@@ -67,6 +67,12 @@ export { TableRow } from './atoms/TableRow';
 // Molecules
 // =============================================================================
 
+export {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarButton,
+  ActionBarItem,
+} from './molecules/ActionBar';
 export { ContextMenuSubmenu } from './molecules/ContextMenuSubmenu';
 export type { ViewMode } from './molecules/DisplayMenuDropdown';
 export { DisplayMenuDropdown } from './molecules/DisplayMenuDropdown';
