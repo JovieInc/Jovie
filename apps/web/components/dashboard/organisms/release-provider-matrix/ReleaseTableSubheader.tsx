@@ -335,15 +335,19 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onReleaseViewChange={onReleaseViewChange}
           triggerClassName={pillButtonClass}
         />
-        <ExportCSVButton
-          getData={() => getReleasesForExport(releases, selectedIds)}
-          columns={RELEASES_CSV_COLUMNS}
-          filename='releases'
-          label='Export'
-          variant='ghost'
-          size='sm'
-          className={pillButtonClass}
-        />
+        <TooltipShortcut label='Export' shortcut='E' side='bottom'>
+          <div>
+            <ExportCSVButton
+              getData={() => getReleasesForExport(releases, selectedIds)}
+              columns={RELEASES_CSV_COLUMNS}
+              filename='releases'
+              label='Export'
+              variant='ghost'
+              size='sm'
+              className={pillButtonClass}
+            />
+          </div>
+        </TooltipShortcut>
       </div>
     </div>
   );
