@@ -10,10 +10,8 @@ import {
 } from '@/components/admin/creator-sort-config';
 import { AdminCreatorsTableHeader } from '@/components/admin/table/AdminCreatorsTableHeader';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
-import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
@@ -69,7 +67,6 @@ const ContactSidebar = dynamic(
 
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
-  page,
   pageSize,
   total,
   search,
@@ -108,33 +105,23 @@ export function AdminCreatorProfilesWithSidebar({
     (typeof profilesWithActions)[number] | null
   >(null);
 
-  const {
-    totalPages,
-    canPrev,
-    canNext,
-    from,
-    to,
-    prevHref,
-    nextHref,
-    clearHref,
-    buildHref,
-  } = useAdminTablePaginationLinks({
-    basePath,
-    page,
-    pageSize,
-    search,
-    sort,
-    total,
-  });
-
   const handleSortChange = useCallback(
     (column: SortableColumnKey) => {
-      router.push(buildHref({ page: 1, sort: getNextSort(sort, column) }));
+      const params = new URLSearchParams();
+      params.set('sort', getNextSort(sort, column));
+      if (search) {
+        params.set('q', search);
+      }
+      params.set('pageSize', String(pageSize));
+      router.push(`${basePath}?${params.toString()}`);
     },
-    [buildHref, router, sort]
+    [basePath, pageSize, router, search, sort]
   );
 
   const filteredProfiles = profilesWithActions;
+  const from = filteredProfiles.length > 0 ? 1 : 0;
+  const to = filteredProfiles.length;
+  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -281,13 +268,6 @@ export function AdminCreatorProfilesWithSidebar({
     getId: getProfileId,
   });
 
-  const handlePageSizeChange = useCallback(
-    (nextPageSize: number) => {
-      router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-    },
-    [buildHref, router]
-  );
-
   const handleSidebarRefresh = useCallback(() => {
     router.refresh();
     refetchSocialLinks();
@@ -369,22 +349,6 @@ export function AdminCreatorProfilesWithSidebar({
                 profiles={profilesWithActions}
               />
             }
-            footer={
-              <AdminTablePagination
-                page={page}
-                totalPages={totalPages}
-                from={from}
-                to={to}
-                total={total}
-                canPrev={canPrev}
-                canNext={canNext}
-                prevHref={prevHref}
-                nextHref={nextHref}
-                pageSize={pageSize}
-                onPageSizeChange={handlePageSizeChange}
-                entityLabel='profiles'
-              />
-            }
           >
             {({ headerElevated, stickyTopPx }) => (
               <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
@@ -429,7 +393,7 @@ export function AdminCreatorProfilesWithSidebar({
                         <CreatorProfileTableRow
                           key={profile.id}
                           profile={profile}
-                          rowNumber={(page - 1) * pageSize + index + 1}
+                          rowNumber={index + 1}
                           isSelected={profile.id === selectedId}
                           isChecked={selectedIds.has(profile.id)}
                           isMobile={isMobile}

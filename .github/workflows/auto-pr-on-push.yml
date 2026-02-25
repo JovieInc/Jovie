@@ -27,12 +27,34 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   open-pr:
     name: Open PR
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
+      - name: Stagger start to avoid CI stampede
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Hash the branch name to get a deterministic delay (0-120s).
+          # When 50 Codex branches push simultaneously, this spreads PR creation
+          # over ~2 minutes instead of all hitting at once.
+          HASH=$(echo -n "$BRANCH" | md5sum | tr -d -c '0-9' | head -c 8)
+          DELAY=$((HASH % 120))
+          echo "Stagger delay for $BRANCH: ${DELAY}s (hash-based)"
+          sleep $DELAY
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -68,12 +90,14 @@ jobs:
             echo "has_code_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check for existing PR
+      - name: Check for existing PR and rate limit
         if: steps.diff.outputs.has_code_changes == 'true'
         id: check
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BRANCH: ${{ github.ref_name }}
+          MAX_OPEN_AGENT_PRS: '10'
+          MAX_WAIT_MINUTES: '6'
         run: |
           echo "Branch: $BRANCH"
 
@@ -84,10 +108,36 @@ jobs:
           if [[ "$EXISTING" -gt 0 ]]; then
             echo "PR already exists for $BRANCH. Skipping."
             echo "should_create=false" >> $GITHUB_OUTPUT
-          else
-            echo "No PR found for $BRANCH. Will create one."
-            echo "should_create=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          # Rate limit with retry: wait for capacity instead of silently dropping
+          MAX_WAIT=$((MAX_WAIT_MINUTES * 60))
+          WAITED=0
+          POLL_INTERVAL=30
+
+          while true; do
+            OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
+              | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/"))] | length')
+
+            echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
+
+            if [[ "$OPEN_AGENT_PRS" -lt "$MAX_OPEN_AGENT_PRS" ]]; then
+              echo "Capacity available. Will create PR."
+              echo "should_create=true" >> $GITHUB_OUTPUT
+              break
+            fi
+
+            if [[ "$WAITED" -ge "$MAX_WAIT" ]]; then
+              echo "::warning::Rate limit still hit after waiting ${MAX_WAIT}s ($OPEN_AGENT_PRS open agent PRs). Skipping PR for $BRANCH."
+              echo "should_create=false" >> $GITHUB_OUTPUT
+              break
+            fi
+
+            echo "Rate limit reached. Waiting ${POLL_INTERVAL}s for capacity..."
+            sleep $POLL_INTERVAL
+            WAITED=$((WAITED + POLL_INTERVAL))
+          done
 
       - name: Parse branch name
         id: parse
@@ -168,7 +218,7 @@ jobs:
       - name: Create PR
         if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BRANCH: ${{ github.ref_name }}
           TICKET: ${{ steps.parse.outputs.ticket }}
           HAS_LINEAR: ${{ steps.linear.outputs.has_details }}

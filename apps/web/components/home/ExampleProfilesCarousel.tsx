@@ -64,9 +64,9 @@ const ROTATION_INTERVAL = 4000;
 /* ------------------------------------------------------------------ */
 function ProfileMockupCard({
   profile,
-}: {
+}: Readonly<{
   profile: (typeof EXAMPLE_PROFILES)[number];
-}) {
+}>) {
   return (
     <div className='relative flex flex-col items-center px-8 py-10'>
       {/* Avatar */}
@@ -263,7 +263,7 @@ export function ExampleProfilesCarousel() {
       `}</style>
 
       <Container size='homepage'>
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center'>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-14 items-center'>
           {/* Left column */}
           <div>
             <p
@@ -303,7 +303,7 @@ export function ExampleProfilesCarousel() {
             </p>
 
             {/* Avatar selector row */}
-            <div className='flex items-center gap-3 mt-8'>
+            <div className='flex items-center gap-3 mt-6'>
               {EXAMPLE_PROFILES.map((p, i) => (
                 <button
                   key={p.name}

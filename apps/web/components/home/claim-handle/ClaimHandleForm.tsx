@@ -1,6 +1,5 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -11,8 +10,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { BASE_URL } from '@/constants/app';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
@@ -21,115 +18,11 @@ import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
-const getFormErrors = ({
-  formSubmitted,
-  handleError,
-  availError,
-  available,
-}: {
-  formSubmitted: boolean;
-  handleError: string | null;
-  availError: string | null;
-  available: boolean | null;
-}) => {
-  const errors: Record<string, string> = {};
-
-  if (!formSubmitted) {
-    return errors;
-  }
-
-  if (handleError) {
-    errors.handle = handleError;
-  } else if (availError) {
-    errors.handle = availError;
-  } else if (available === false) {
-    errors.handle = 'Handle already taken';
-  }
-
-  return errors;
-};
-
-const getValidationState = ({
-  handle,
-  unavailable,
-  available,
-  checkingAvail,
-}: {
-  handle: string;
-  unavailable: boolean;
-  available: boolean | null;
-  checkingAvail: boolean;
-}) => {
-  if (!handle) return null;
-  if (unavailable) return 'invalid';
-  if (available === true) return 'valid';
-  if (checkingAvail) return 'pending';
-  return null;
-};
-
-const getInputClassName = ({
-  isShaking,
-  available,
-}: {
-  isShaking: boolean;
-  available: boolean | null;
-}) =>
-  cn(
-    isShaking && 'jv-shake',
-    available === true && 'jv-available',
-    'transition-all duration-150 hover:shadow-lg focus-within:shadow-lg'
-  );
-
-const getButtonContent = ({
-  showChecking,
-  navigating,
-  available,
-  handle,
-}: {
-  showChecking: boolean;
-  navigating: boolean;
-  available: boolean | null;
-  handle: string;
-}): ReactNode => {
-  if (showChecking) {
-    return (
-      <>
-        <LoadingSpinner size='sm' className='text-white' />
-        <span>Checking availability…</span>
-      </>
-    );
-  }
-
-  if (navigating) {
-    return (
-      <>
-        <LoadingSpinner size='sm' className='text-white' />
-        <span>Creating your profile…</span>
-      </>
-    );
-  }
-
-  if (available === true) {
-    return (
-      <>
-        <span>Claim @{handle}</span>
-        <ChevronRight
-          className='w-4 h-4 transition-transform group-hover:translate-x-1'
-          aria-hidden='true'
-        />
-      </>
-    );
-  }
-
-  return 'Request Early Access';
-};
-
 export function ClaimHandleForm({
   onHandleChange,
 }: Readonly<ClaimHandleFormProps>) {
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
-  const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -143,56 +36,37 @@ export function ClaimHandleForm({
   const { handleError, checkingAvail, available, availError } =
     useHandleValidation(handle);
 
-  // Notify parent component about handle changes
   useEffect(() => {
-    if (onHandleChange) {
-      onHandleChange(handle);
-    }
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('jovie-hero-handle-change', {
-          detail: { handle },
-        })
-      );
-    }
+    onHandleChange?.(handle);
   }, [handle, onHandleChange]);
 
-  // Optimistic prefetch when handle becomes available
   useEffect(() => {
     if (available === true && handle) {
-      const target = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
-      router.prefetch(target);
+      router.prefetch(
+        `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
+      );
     }
   }, [available, handle, router]);
 
-  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
-      if (shakeTimeoutRef.current) {
-        clearTimeout(shakeTimeoutRef.current);
-      }
+      if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
     };
   }, []);
 
   const onSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    (e: React.FormEvent) => {
       e.preventDefault();
       setFormSubmitted(true);
 
       if (handleError || checkingAvail || available !== true) {
         setIsShaking(true);
-        if (shakeTimeoutRef.current) {
-          clearTimeout(shakeTimeoutRef.current);
-        }
+        if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
         shakeTimeoutRef.current = setTimeout(() => {
           setIsShaking(false);
           shakeTimeoutRef.current = null;
         }, 180);
-
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
+        inputRef.current?.focus();
         return;
       }
 
@@ -203,24 +77,11 @@ export function ClaimHandleForm({
         );
       } catch {}
 
-      const target = `/onboarding?handle=${encodeURIComponent(
-        handle.toLowerCase()
-      )}`;
-
+      const target = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
       setNavigating(true);
 
-      const loadingMessage = document.getElementById('loading-announcement');
-      if (loadingMessage) {
-        loadingMessage.textContent = 'Creating your profile. Please wait...';
-      }
-
       if (!isSignedIn) {
-        // Send to signup with redirect_url pointing to onboarding with the handle.
-        // This preserves the handle through the auth flow so onboarding can pre-fill it.
-        const onboardingUrl = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
-        router.push(
-          `/signup?redirect_url=${encodeURIComponent(onboardingUrl)}`
-        );
+        router.push(`/signup?redirect_url=${encodeURIComponent(target)}`);
         return;
       }
 
@@ -232,19 +93,6 @@ export function ClaimHandleForm({
   const showChecking = checkingAvail;
   const unavailable = available === false || !!handleError || !!availError;
   const canSubmit = available === true && !checkingAvail && !navigating;
-  const btnDisabled = !canSubmit;
-
-  const fieldId = 'handle-input';
-  const helperId = `${fieldId}-hint`;
-
-  const formErrors = useMemo(() => {
-    return getFormErrors({
-      formSubmitted,
-      handleError,
-      availError,
-      available,
-    });
-  }, [formSubmitted, handleError, availError, available]);
 
   const helperState = useHelperState({
     handle,
@@ -256,100 +104,142 @@ export function ClaimHandleForm({
   });
 
   const helperToneClass = HELPER_TONE_CLASSES[helperState.tone];
-  const helperAriaLive = helperState.tone === 'error' ? 'assertive' : 'polite';
+
+  const buttonContent = useMemo((): ReactNode => {
+    if (showChecking) {
+      return (
+        <>
+          <div className='h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent motion-reduce:animate-none' />
+          <span>Checking…</span>
+        </>
+      );
+    }
+    if (navigating) {
+      return (
+        <>
+          <div className='h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent motion-reduce:animate-none' />
+          <span>Creating…</span>
+        </>
+      );
+    }
+    if (available === true) {
+      return (
+        <>
+          <span>Claim @{handle}</span>
+          <ChevronRight
+            className='h-4 w-4 transition-transform group-hover:translate-x-0.5'
+            aria-hidden='true'
+          />
+        </>
+      );
+    }
+    return 'Claim handle';
+  }, [showChecking, navigating, available, handle]);
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className='space-y-4' noValidate>
+    <form onSubmit={onSubmit} className='w-full' noValidate>
+      {/* Input row — matches HeroSpotifySearch layout */}
       <div
-        className='sr-only'
-        aria-live='assertive'
-        aria-atomic='true'
-        id='loading-announcement'
-      ></div>
-
-      <ErrorSummary
-        errors={formErrors}
-        onFocusField={fieldName => {
-          if (fieldName === 'handle' && inputRef.current) {
-            inputRef.current.focus();
-          }
-        }}
-      />
-
-      <div className='space-y-2'>
-        <label
-          htmlFor={fieldId}
-          className='text-sm font-semibold text-primary-token'
+        className={cn(
+          'flex w-full items-center gap-3 rounded-xl border px-4 py-3',
+          'transition-all duration-200',
+          'border-strong bg-surface-0 hover:border-focus',
+          isShaking && 'jv-shake',
+          available === true && 'border-[var(--linear-success)]'
+        )}
+        style={{ minHeight: 48 }}
+      >
+        <span
+          className='shrink-0 select-none'
+          style={{
+            fontSize: '13px',
+            fontWeight: 510,
+            color: 'var(--linear-text-tertiary)',
+          }}
         >
-          Choose your handle
-        </label>
+          {displayDomain}/
+        </span>
 
-        <div className='relative'>
-          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-secondary-token'>
-            {displayDomain}/
-          </span>
-          <Input
-            ref={inputRef}
-            id={fieldId}
-            type='text'
-            value={handle}
-            onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='your-handle'
-            required
-            autoCapitalize='none'
-            autoCorrect='off'
-            aria-describedby={helperState.text ? helperId : undefined}
-            validationState={getValidationState({
-              handle,
-              unavailable,
-              available,
-              checkingAvail,
-            })}
+        <input
+          ref={inputRef}
+          id='handle-input'
+          type='text'
+          value={handle}
+          onChange={e => setHandle(e.target.value.toLowerCase())}
+          placeholder='your-handle'
+          required
+          autoCapitalize='none'
+          autoCorrect='off'
+          autoComplete='off'
+          aria-label='Choose your handle'
+          aria-describedby={helperState.text ? 'handle-hint' : undefined}
+          className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none'
+          style={{
+            fontSize: '14px',
+            fontWeight: 450,
+            letterSpacing: '-0.01em',
+          }}
+        />
+
+        <HandleStatusIcon
+          showChecking={showChecking}
+          handle={handle}
+          available={available}
+          handleError={handleError}
+          unavailable={unavailable}
+        />
+
+        {handle && (
+          <button
+            type='submit'
+            disabled={!canSubmit}
             className={cn(
-              getInputClassName({ isShaking, available }),
-              'text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-500 dark:placeholder:text-zinc-400 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
+              'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-ring-themed',
+              canSubmit
+                ? 'bg-btn-primary text-btn-primary-foreground'
+                : 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
             )}
-            statusIcon={
-              <HandleStatusIcon
-                showChecking={showChecking}
-                handle={handle}
-                available={available}
-                handleError={handleError}
-                unavailable={unavailable}
-              />
-            }
-          />
-        </div>
-
-        {helperState.text && (
-          <div id='handle-preview-text' className='min-h-5'>
-            <p
-              id={helperId}
-              className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
-              aria-live={helperAriaLive}
-            >
-              {helperState.text}
-            </p>
-          </div>
+            style={{ height: 32 }}
+          >
+            <span className='inline-flex items-center gap-1.5'>
+              {buttonContent}
+            </span>
+          </button>
         )}
       </div>
 
-      <Button
-        type='submit'
-        variant='primary'
-        size='lg'
-        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 group h-[54px]! px-6! text-base font-semibold tracking-wide bg-linear-to-br! from-blue-600/95! via-indigo-600/85! to-cyan-500/90! text-white! shadow-[0_18px_35px_rgba(15,23,42,0.25)]'
-        disabled={btnDisabled || !handle}
-      >
-        <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>
-          {getButtonContent({
-            showChecking,
-            navigating,
-            available,
-            handle,
-          })}
-        </span>
-      </Button>
+      {/* Helper text */}
+      {helperState.text && (
+        <p
+          id='handle-hint'
+          className={cn(
+            'mt-2 text-sm transition-colors duration-200',
+            helperToneClass
+          )}
+          aria-live={helperState.tone === 'error' ? 'assertive' : 'polite'}
+          style={{
+            fontSize: '13px',
+            lineHeight: '20px',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          {helperState.text}
+        </p>
+      )}
+
+      {/* Error summary for form validation */}
+      {formSubmitted && handleError && (
+        <p
+          className='mt-1.5'
+          style={{
+            fontSize: '12px',
+            color: 'var(--linear-warning)',
+          }}
+          role='alert'
+        >
+          {handleError}
+        </p>
+      )}
     </form>
   );
 }

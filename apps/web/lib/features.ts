@@ -32,7 +32,7 @@ const feature = ({
   slug,
   title,
   blurb,
-  href: `/link-in-bio#${anchor}`,
+  href: `/#${anchor}`,
   icon,
   colorVar: `--accent-${accent}`,
   aiPowered,

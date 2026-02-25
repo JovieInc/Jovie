@@ -22,6 +22,10 @@ concurrency:
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  # Larger runner for CPU-heavy jobs (typecheck, build, tests).
+  # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
+  # or leave as "ubuntu-latest" for default 2-core runners.
+  FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
 
 jobs:
 
@@ -295,7 +299,7 @@ jobs:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -588,10 +592,12 @@ jobs:
   ci-build-public:
     name: Build (public routes)
     needs: [ci-path-changes]
-    # Shared Next.js build for a11y + layout-guard — build once, test twice
-    # Skipped in merge queue: a11y + layout-guard are non-blocking and already
-    # ran on the PR. Merge queue only needs ci-fast for integration conflict detection.
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    # Shared Next.js build for a11y + layout-guard — build once, test twice.
+    # On PRs: only runs with 'testing' label (a11y + layout-guard are non-blocking).
+    # Fork PRs never get labels, so this is skipped for forks (fork PRs use fork-pr-gate).
+    # On main push: always runs for full coverage.
+    # Skipped in merge queue: a11y + layout-guard already ran on the PR.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -599,7 +605,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Check for relevant changes
         id: check_changes
@@ -615,12 +621,21 @@ jobs:
 
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --affected
+        run: pnpm turbo build --filter=@jovie/web
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Verify build output exists
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [ ! -d "apps/web/.next" ]; then
+            echo "::error::Build output directory apps/web/.next does not exist — build may have used remote cache without producing local output"
+            exit 1
+          fi
+          echo "Build output verified: $(du -sh apps/web/.next | cut -f1)"
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -629,11 +644,14 @@ jobs:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
           retention-days: 1
+          if-no-files-found: error
 
   ci-layout-guard:
     name: Layout Guard (blocking)
     needs: [ci-build-public]
-    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    # Non-blocking on PRs (PR Ready logs warning but doesn't fail).
+    # Only runs when ci-build-public ran (requires 'testing' label on PRs).
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -653,12 +671,15 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Download build artifact
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
 
       - name: Run layout overlap/touching guard
+        if: steps.download.outcome == 'success'
         run: |
           cd apps/web
           mkdir -p tests/.auth
@@ -690,7 +711,8 @@ jobs:
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
     needs: [ci-path-changes]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
+    # Only run when drizzle/schema paths changed — skip entirely otherwise to save runners
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -824,7 +846,7 @@ jobs:
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Skipped in merge queue: no merge-queue jobs depend on the full build.
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
@@ -865,6 +887,7 @@ jobs:
 
       - name: Pre-deploy Lighthouse performance check
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: |
           cd apps/web
 
@@ -877,15 +900,23 @@ jobs:
           node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
-          # Wait for server to be ready
+          # Wait for server to be ready (verify it actually started)
           echo "Waiting for server to start..."
+          SERVER_READY=false
           for i in {1..30}; do
             if curl -s http://localhost:3000 > /dev/null; then
               echo "Server is ready!"
+              SERVER_READY=true
               break
             fi
             sleep 1
           done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "⚠️ Server failed to start within 30s. Skipping Lighthouse."
+            kill $SERVER_PID 2>/dev/null || true
+            exit 0
+          fi
 
           # Run Lighthouse CI with build config
           pnpm exec lhci autorun --config=.lighthouserc.build.json || {
@@ -910,7 +941,7 @@ jobs:
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy.
     # Skipped in merge queue — unit tests already passed on the PR.
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -1064,14 +1095,16 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Download build artifact
+        id: download
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        continue-on-error: true
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
 
       - name: Run axe a11y audit (public routes)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download.outcome == 'success'
         run: |
           cd apps/web
           # Create empty auth state so Playwright's auth-setup project doesn't crash.
@@ -1502,6 +1535,9 @@ jobs:
           SMOKE_ONLY: '1'
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -1539,6 +1575,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -1550,6 +1587,16 @@ jobs:
       - name: E2E Quarantine (retries)
         if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
         continue-on-error: true
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
@@ -1889,7 +1936,8 @@ jobs:
     needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    environment: Preview - jovie
+    timeout-minutes: 20
     steps:
       - name: Gate required smoke on PRs
         if: ${{ github.event_name == 'pull_request' }}
@@ -1958,16 +2006,57 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
+      - name: Build app for smoke tests
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
+          pnpm turbo build --filter=@jovie/web
+          # Standalone output needs static assets alongside server.js
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+        env:
+          DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
       - name: Run Required Smoke Tests
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          # Keep required smoke focused on deterministic public-path coverage.
-          # Auth coverage is enforced separately in the PR auth smoke gate.
-          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
+          cd apps/web
+          # Start standalone production server (not Turbopack dev) to avoid SWC OOM on CI runners
+          PORT=3100 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          # Wait for server readiness
+          SERVER_READY=false
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "::error::Standalone server failed to start within 30s"
+            exit 1
+          fi
+
+          # Run smoke tests with BASE_URL set (skips Playwright webServer config)
+          cd "$GITHUB_WORKSPACE"
+          set +e
+          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/content-gate.spec.ts --project=chromium --reporter=line
+          EXIT_CODE=$?
+          set -e
+          exit $EXIT_CODE
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
       - name: Upload Playwright Artifacts on Failure

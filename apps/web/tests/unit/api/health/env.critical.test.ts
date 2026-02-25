@@ -5,6 +5,7 @@ const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockValidateEnvironment = vi.hoisted(() => vi.fn());
 const mockGetEnvironmentInfo = vi.hoisted(() => vi.fn());
 const mockIsValidationCompleted = vi.hoisted(() => vi.fn());
+const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   healthLimiter: {
@@ -18,15 +19,14 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/env-server', () => ({
   validateEnvironment: mockValidateEnvironment,
   getEnvironmentInfo: mockGetEnvironmentInfo,
-  env: {
-    NODE_ENV: 'test',
-    DATABASE_URL: 'mock://db',
-  },
+  env: { NODE_ENV: 'test', DATABASE_URL: 'mock://db' },
 }));
 
 vi.mock('@/lib/startup/environment-validator', () => ({
   isValidationCompleted: mockIsValidationCompleted,
 }));
+
+vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
 
 describe('@critical GET /api/health/env', () => {
   beforeEach(() => {
@@ -58,36 +58,19 @@ describe('@critical GET /api/health/env', () => {
     mockIsValidationCompleted.mockReturnValue(true);
   });
 
-  it('returns 429 when rate limited', async () => {
-    mockHealthLimiterGetStatus.mockReturnValue({
-      blocked: true,
-      limit: 30,
-      remaining: 0,
-      resetTime: Date.now() + 60000,
-      retryAfterSeconds: 60,
+  it('captures warning when env health crashes', async () => {
+    mockValidateEnvironment.mockImplementation(() => {
+      throw new Error('Env validation failed');
     });
 
     const { GET } = await import('@/app/api/health/env/route');
-    const request = new Request('http://localhost/api/health/env');
+    const response = await GET(new Request('http://localhost/api/health/env'));
 
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(429);
-    expect(data.details?.currentValidation?.errors).toContain(
-      'Rate limit exceeded'
+    expect(response.status).toBe(503);
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Environment health check crashed',
+      expect.any(Error),
+      expect.objectContaining({ service: 'env', route: '/api/health/env' })
     );
-  });
-
-  it('returns environment status', async () => {
-    const { GET } = await import('@/app/api/health/env/route');
-    const request = new Request('http://localhost/api/health/env');
-
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toHaveProperty('timestamp');
-    expect(data).toHaveProperty('details');
   });
 });

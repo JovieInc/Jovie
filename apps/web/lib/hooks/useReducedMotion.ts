@@ -25,7 +25,7 @@ export function useReducedMotion(): boolean {
 
   useEffect(() => {
     // Check if window is defined (client-side)
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
     // Gracefully handle environments without matchMedia (e.g., some test runs)
     if (typeof globalThis.matchMedia !== 'function') {
       // On client without matchMedia, default to false (no reduced motion preference)

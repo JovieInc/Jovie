@@ -27,21 +27,22 @@ describe('Copyright', () => {
   it('applies dark variant classes by default', () => {
     render(<Copyright />);
     const el = screen.getByText('© 2026 Jovie');
-    expect(el).toHaveClass('text-white/70');
+    expect(el).toHaveClass('text-white/40');
   });
 
   it('applies light variant classes', () => {
     render(<Copyright variant='light' />);
     const el = screen.getByText('© 2026 Jovie');
-    expect(el).toHaveClass('text-tertiary-token');
+    expect(el).toHaveClass('text-quaternary-token');
   });
 
   it('applies base styles', () => {
     render(<Copyright />);
     const el = screen.getByText('© 2026 Jovie');
-    expect(el).toHaveClass('text-sm');
-    expect(el).toHaveClass('font-medium');
+    expect(el).toHaveClass('text-xs');
+    expect(el).toHaveClass('font-normal');
     expect(el).toHaveClass('tracking-tight');
+    expect(el).toHaveClass('opacity-50');
   });
 
   it('applies custom className', () => {

@@ -68,7 +68,7 @@ export function ProductShowcase() {
       style={{ backgroundColor: 'var(--linear-bg-page)' }}
     >
       <Container size='homepage'>
-        <div className='grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16'>
+        <div className='grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14'>
           {/* Left — text */}
           <div className='text-center lg:text-left'>
             <p

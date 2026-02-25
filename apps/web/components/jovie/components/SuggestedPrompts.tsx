@@ -1,27 +1,32 @@
 'use client';
 
-import { Camera, Music } from 'lucide-react';
+import { Camera, DollarSign, Eye, Link2, Music } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
 
-import { type ChatSuggestion, DEFAULT_SUGGESTIONS } from '../types';
+import {
+  type ChatSuggestion,
+  DEFAULT_SUGGESTIONS,
+  FIRST_SESSION_SUGGESTIONS,
+} from '../types';
 
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Camera,
+  DollarSign,
+  Eye,
+  Link2,
   Music,
 };
 
-const ACCENT_TEXT_CLASSES = {
-  blue: 'text-blue-400',
-  green: 'text-emerald-400',
-  purple: 'text-purple-400',
-  orange: 'text-orange-400',
-} as const;
+/** All suggestion accents use the single accent color from the design system. */
+const ACCENT_TEXT_CLASS = 'text-accent';
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
+  readonly isFirstSession?: boolean;
+  readonly latestReleaseTitle?: string | null;
 }
 
 function SuggestionPill({
@@ -48,10 +53,7 @@ function SuggestionPill({
     >
       {IconComponent && (
         <IconComponent
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            ACCENT_TEXT_CLASSES[suggestion.accent]
-          )}
+          className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
         />
       )}
       <span className='text-[13px] leading-snug text-secondary-token'>
@@ -61,10 +63,33 @@ function SuggestionPill({
   );
 }
 
-export function SuggestedPrompts({ onSelect }: SuggestedPromptsProps) {
+export function SuggestedPrompts({
+  onSelect,
+  isFirstSession = false,
+  latestReleaseTitle,
+}: SuggestedPromptsProps) {
+  const suggestions = isFirstSession
+    ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
+        if (
+          suggestion.icon === 'Link2' &&
+          typeof latestReleaseTitle === 'string' &&
+          latestReleaseTitle.trim().length > 0
+        ) {
+          const cleanTitle = latestReleaseTitle.trim();
+          return {
+            ...suggestion,
+            label: `Set up a link for “${cleanTitle}”`,
+            prompt: `Set up a link for ${cleanTitle}.`,
+          };
+        }
+
+        return suggestion;
+      })
+    : DEFAULT_SUGGESTIONS;
+
   return (
     <div className='flex flex-col gap-2'>
-      {DEFAULT_SUGGESTIONS.map(suggestion => (
+      {suggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
           suggestion={suggestion}

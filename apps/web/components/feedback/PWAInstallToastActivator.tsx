@@ -40,8 +40,8 @@ export function PWAInstallToastActivator() {
         : {
             action: {
               label: 'Install',
-              onClick: () => {
-                install();
+              onClick: async () => {
+                await install();
               },
             },
           }),

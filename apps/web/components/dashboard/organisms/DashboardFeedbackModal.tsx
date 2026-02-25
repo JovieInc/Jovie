@@ -84,16 +84,16 @@ export function DashboardFeedbackModal({
   return (
     <Dialog open={isOpen} onClose={handleClose} size='sm' hideClose>
       {isSubmitted ? (
-        <div className='px-6 py-8 text-center'>
+        <div className='px-6 py-8 text-center bg-surface-1'>
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
-          <DialogTitle className='mt-4 text-balance text-lg font-semibold'>
+          <DialogTitle className='mt-4 text-balance text-lg font-semibold text-primary-token'>
             Thank you!
           </DialogTitle>
           <DialogDescription className='mt-2 text-sm text-secondary-token'>
-            Your feedback is on its way to the team. We appreciate you helping
-            us refine Jovie.
+            Your note has been delivered to the team. Thank you for helping us
+            make Jovie feel effortlessly better.
           </DialogDescription>
         </div>
       ) : (
@@ -102,8 +102,8 @@ export function DashboardFeedbackModal({
             <div>
               <DialogTitle className='text-balance'>Send feedback</DialogTitle>
               <DialogDescription className='mt-1 text-sm text-secondary-token'>
-                Tell us what would make this dashboard feel even more
-                effortless.
+                Tell us where the experience feels delightful, where it falls
+                short, or what you'd love us to build next.
               </DialogDescription>
             </div>
             <Button
@@ -121,17 +121,18 @@ export function DashboardFeedbackModal({
 
           <DialogBody className='space-y-4'>
             <FormField
-              label='What can we do to improve Jovie?'
+              label='What should we improve next?'
               required
-              helpText='Press ⌘ + Enter to send'
+              helpText='Press ⌘ + Enter to send instantly'
             >
               <Textarea
                 value={feedback}
                 onChange={event => setFeedback(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Share what's working, what feels rough, or ideas you'd love to see."
-                rows={4}
+                placeholder='Share what feels great, what slows you down, or the next capability you want to unlock.'
+                rows={5}
                 autoFocus
+                className='bg-surface-1 border-subtle text-primary-token placeholder:text-secondary-token'
               />
             </FormField>
           </DialogBody>

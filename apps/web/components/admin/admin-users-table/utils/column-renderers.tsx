@@ -113,14 +113,12 @@ export function createSelectHeaderRenderer(
  */
 export function createSelectCellRenderer(
   selectedIdsRef: RefObject<Set<string>>,
-  page: number,
-  pageSize: number,
   onToggleSelect: (id: string) => void
 ) {
   return function SelectCell({ row }: CellContext<AdminUserRow, unknown>) {
     const user = row.original;
     const isChecked = selectedIdsRef.current?.has(user.id) ?? false;
-    const rowNumber = (page - 1) * pageSize + row.index + 1;
+    const rowNumber = row.index + 1;
 
     return (
       <TableCheckboxCell

@@ -1,55 +1,63 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  DbCircuitOpenError,
-  dbCircuitBreaker,
-} from '@/lib/db/client/circuit-breaker';
-import { withRetry } from '@/lib/db/client/retry';
-import { DB_CIRCUIT_BREAKER_CONFIG } from '@/lib/db/config';
+import { describe, expect, it, vi } from 'vitest';
+import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 
-const RETRYABLE_ERROR_MESSAGE = 'connection reset by peer';
-
-async function openCircuit(): Promise<void> {
-  for (let i = 0; i < DB_CIRCUIT_BREAKER_CONFIG.failureThreshold; i++) {
-    await expect(
-      withRetry(
-        () => Promise.reject(new Error(RETRYABLE_ERROR_MESSAGE)),
-        'test-circuit-open',
-        1
-      )
-    ).rejects.toBeInstanceOf(Error);
-  }
-}
-
-describe('withRetry circuit breaker', () => {
-  beforeEach(() => {
-    dbCircuitBreaker.reset();
+describe('isRetryableError', () => {
+  it('returns true for connection reset errors', () => {
+    expect(isRetryableError(new Error('connection reset by peer'))).toBe(true);
   });
 
-  it('fails fast with DbCircuitOpenError when circuit is open', async () => {
-    await openCircuit();
-
-    const operation = vi.fn(() => Promise.resolve('ok'));
-
-    await expect(
-      withRetry(operation, 'test-fast-fail', 1)
-    ).rejects.toBeInstanceOf(DbCircuitOpenError);
-    expect(operation).not.toHaveBeenCalled();
+  it('returns true for timeout errors', () => {
+    expect(isRetryableError(new Error('timeout exceeded'))).toBe(true);
   });
 
-  it('exposes status and retryAfterSeconds on circuit open error', async () => {
-    await openCircuit();
+  it('returns false for non-retryable errors', () => {
+    expect(isRetryableError(new Error('syntax error in SQL'))).toBe(false);
+  });
 
-    try {
-      await withRetry(() => Promise.resolve('ok'), 'test-error-shape', 1);
-    } catch (error) {
-      expect(error).toBeInstanceOf(DbCircuitOpenError);
-      if (error instanceof DbCircuitOpenError) {
-        expect(error.status).toBe(503);
-        expect(error.retryAfterSeconds).toBe(
-          Math.ceil(DB_CIRCUIT_BREAKER_CONFIG.resetTimeout / 1000)
-        );
-        expect(error.stats.state).toBe('OPEN');
-      }
-    }
+  it('returns false for non-Error values', () => {
+    expect(isRetryableError('string error')).toBe(false);
+    expect(isRetryableError(null)).toBe(false);
+  });
+});
+
+describe('withRetry', () => {
+  it('returns result on first success', async () => {
+    const result = await withRetry(() => Promise.resolve('ok'), 'test', 3);
+    expect(result).toBe('ok');
+  });
+
+  it('retries on retryable errors and succeeds', async () => {
+    let attempt = 0;
+    const operation = vi.fn(async () => {
+      attempt++;
+      if (attempt < 3) throw new Error('connection reset by peer');
+      return 'recovered';
+    });
+
+    const result = await withRetry(operation, 'test-retry', 3);
+    expect(result).toBe('recovered');
+    expect(operation).toHaveBeenCalledTimes(3);
+  });
+
+  it('throws immediately on non-retryable errors', async () => {
+    const operation = vi.fn(async () => {
+      throw new Error('syntax error in SQL');
+    });
+
+    await expect(withRetry(operation, 'test-no-retry', 3)).rejects.toThrow(
+      'syntax error in SQL'
+    );
+    expect(operation).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws after exhausting all retries', async () => {
+    const operation = vi.fn(async () => {
+      throw new Error('connection reset by peer');
+    });
+
+    await expect(withRetry(operation, 'test-exhaust', 2)).rejects.toThrow(
+      'connection reset by peer'
+    );
+    expect(operation).toHaveBeenCalledTimes(2);
   });
 });

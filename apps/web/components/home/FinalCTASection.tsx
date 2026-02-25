@@ -5,7 +5,7 @@ export function FinalCTASection() {
   return (
     <section className='bg-[var(--linear-bg-page)]'>
       <Container size='homepage'>
-        <div className='mx-auto flex max-w-2xl flex-col items-center text-center py-32'>
+        <div className='mx-auto flex max-w-2xl flex-col items-center text-center py-24'>
           <h2
             style={{
               fontSize: 'clamp(36px, 4.5vw, 72px)',
@@ -18,7 +18,7 @@ export function FinalCTASection() {
             Your fans are waiting.
           </h2>
           <p
-            className='mt-4 mb-10'
+            className='mt-3 mb-8'
             style={{
               fontSize: '15px',
               lineHeight: '24px',

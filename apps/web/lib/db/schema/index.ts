@@ -32,6 +32,8 @@ export * from './dsp-enrichment';
 export * from './email-engagement';
 // Enums
 export * from './enums';
+// Feedback
+export * from './feedback';
 // Ingestion
 export * from './ingestion';
 // AI Insights (AI-generated analytics insights)

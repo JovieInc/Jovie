@@ -7,15 +7,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Full A11y Scan', () => {
   test.setTimeout(180_000);
 
-  const routes = [
-    '/',
-    '/signin',
-    '/signup',
-    '/pricing',
-    '/support',
-    '/link-in-bio',
-    '/blog',
-  ];
+  const routes = ['/', '/signin', '/signup', '/pricing', '/support', '/blog'];
 
   for (const route of routes) {
     test(`${route} full scan`, async ({ page }) => {

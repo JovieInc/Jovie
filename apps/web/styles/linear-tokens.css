@@ -245,16 +245,16 @@
   --linear-gap-buttons: 8px;
   --linear-gap-cards: 24px;
 
-  --linear-section-pt-sm: 64px;
-  --linear-section-pb-sm: 80px;
-  --linear-section-pt-md: 80px;
-  --linear-section-pb-md: 96px;
-  --linear-section-pt-lg: 96px;
-  --linear-section-pb-lg: 128px;
+  --linear-section-pt-sm: 48px;
+  --linear-section-pb-sm: 64px;
+  --linear-section-pt-md: 64px;
+  --linear-section-pb-md: 80px;
+  --linear-section-pt-lg: 80px;
+  --linear-section-pb-lg: 96px;
 
-  --linear-content-gap-sm: 48px;
-  --linear-content-gap-md: 64px;
-  --linear-content-gap-lg: 80px;
+  --linear-content-gap-sm: 40px;
+  --linear-content-gap-md: 48px;
+  --linear-content-gap-lg: 64px;
 
   --linear-footer-py: 48px;
   --linear-footer-py-lg: 64px;

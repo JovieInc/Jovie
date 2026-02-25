@@ -133,7 +133,7 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
     }
 
     // Invalidate client cache
-    await invalidateBillingCache();
+    await invalidateBillingCache(userId);
 
     return result;
   }

@@ -18,7 +18,7 @@ export function ProfilePageChat() {
           </div>
         </div>
         {/* Input bar skeleton */}
-        <div className='shrink-0 border-t border-subtle p-4'>
+        <div className='shrink-0 p-4'>
           <div className='h-10 rounded-lg skeleton' />
         </div>
       </div>
@@ -30,6 +30,7 @@ export function ProfilePageChat() {
       profileId={selectedProfile.id}
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
+      username={selectedProfile.username ?? undefined}
     />
   );
 }

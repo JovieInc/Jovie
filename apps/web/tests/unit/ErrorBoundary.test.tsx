@@ -398,7 +398,7 @@ describe('ErrorBoundary', () => {
       );
     });
 
-    it('applies correct button classes', () => {
+    it('renders buttons with correct variant styling', () => {
       render(
         <ErrorBoundary
           error={mockError}
@@ -410,18 +410,10 @@ describe('ErrorBoundary', () => {
       const tryAgainButton = screen.getByRole('button', { name: /try again/i });
       const goHomeButton = screen.getByRole('button', { name: /go home/i });
 
-      expect(tryAgainButton).toHaveClass(
-        'btn',
-        'btn-md',
-        'btn-primary',
-        'btn-press'
-      );
-      expect(goHomeButton).toHaveClass(
-        'btn',
-        'btn-md',
-        'btn-secondary',
-        'btn-press'
-      );
+      // Button uses CVA with Tailwind classes (variant='primary', size='sm')
+      expect(tryAgainButton).toHaveClass('bg-btn-primary');
+      // Button uses CVA with Tailwind classes (variant='outline', size='sm')
+      expect(goHomeButton).toHaveClass('border-border');
     });
   });
 });
