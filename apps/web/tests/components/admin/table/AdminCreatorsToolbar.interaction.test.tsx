@@ -5,27 +5,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
-vi.mock('next/link', () => ({
-  default: ({
-    children,
-    href,
-    ...props
-  }: {
-    children: React.ReactNode;
-    href: string;
-    [key: string]: unknown;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
-
 vi.mock('@/components/organisms/table', () => ({
   ExportCSVButton: ({ disabled }: { disabled: boolean }) => (
     <button type='button' disabled={disabled}>
       Export
     </button>
+  ),
+  ACTION_BAR_BUTTON_CLASS: 'mock-action-bar-button',
+  ActionBar: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
+  ActionBarItem: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
   ),
 }));
 
@@ -66,15 +61,11 @@ function renderToolbar(
 
   render(
     <AdminCreatorsToolbar
-      basePath='/admin/creators'
-      search=''
-      sort='newest'
-      pageSize={20}
       from={1}
       to={2}
       total={2}
-      clearHref='/admin/creators'
       profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
+      onSearchToggle={vi.fn()}
       {...handlers}
       {...props}
     />
@@ -128,7 +119,9 @@ describe('AdminCreatorsToolbar interactions', () => {
   it('renders normal toolbar mode without bulk actions when no rows are selected', () => {
     renderToolbar({ selectedIds: new Set() });
 
-    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Search creators' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Delete' })
     ).not.toBeInTheDocument();

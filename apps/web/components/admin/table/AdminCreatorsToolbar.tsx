@@ -1,25 +1,25 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { CheckCircle, Star, Trash2, XCircle } from 'lucide-react';
-import Link from 'next/link';
-import { useState } from 'react';
-import { ExportCSVButton } from '@/components/organisms/table';
+import { Icon } from '@/components/atoms/Icon';
+import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarItem,
+  ExportCSVButton,
+} from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
   creatorsCSVColumns,
 } from '@/lib/admin/csv-configs/creators';
+import { cn } from '@/lib/utils';
 
 export interface AdminCreatorsToolbarProps {
-  readonly basePath: string;
-  readonly search: string;
-  readonly sort: string;
-  readonly pageSize: number;
   readonly from: number;
   readonly to: number;
   readonly total: number;
-  readonly clearHref: string;
   readonly profiles: AdminCreatorProfileRow[];
   readonly selectedIds?: ReadonlySet<string>;
   readonly onBulkVerify?: () => void;
@@ -27,17 +27,16 @@ export interface AdminCreatorsToolbarProps {
   readonly onBulkFeature?: () => void;
   readonly onBulkDelete?: () => void;
   readonly onClearSelection?: () => void;
+  /** Whether search is currently active */
+  readonly isSearchOpen?: boolean;
+  /** Callback to toggle search open/close */
+  readonly onSearchToggle?: () => void;
 }
 
 export function AdminCreatorsToolbar({
-  basePath,
-  search,
-  sort,
-  pageSize,
   from,
   to,
   total,
-  clearHref,
   profiles,
   selectedIds = new Set(),
   onBulkVerify,
@@ -45,8 +44,9 @@ export function AdminCreatorsToolbar({
   onBulkFeature,
   onBulkDelete,
   onClearSelection,
+  isSearchOpen,
+  onSearchToggle,
 }: AdminCreatorsToolbarProps) {
-  const [searchTerm, setSearchTerm] = useState(search);
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
 
@@ -55,9 +55,9 @@ export function AdminCreatorsToolbar({
   const someSelectedVerified = selectedProfiles.some(p => p.isVerified);
 
   return (
-    <div className='flex min-h-14 w-full flex-wrap items-center gap-3 px-3 py-2 sm:px-4 sm:py-0'>
+    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
       {hasSelection ? (
-        // Bulk Actions Mode - replaces "Creator" text
+        // Bulk Actions Mode
         <>
           <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3'>
             <div className='text-sm font-medium text-primary-token'>
@@ -122,41 +122,39 @@ export function AdminCreatorsToolbar({
             Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
             {total.toLocaleString()} profiles
           </div>
-          <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3'>
-            <form
-              action={basePath}
-              method='get'
-              className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
-            >
-              <input type='hidden' name='sort' value={sort} />
-              <input type='hidden' name='pageSize' value={pageSize} />
-              <Input
-                name='q'
-                placeholder='Search by handle'
-                value={searchTerm}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  setSearchTerm(event.target.value)
-                }
-                className='w-full sm:w-[240px]'
-              />
-              <input type='hidden' name='page' value='1' />
-              <Button type='submit' size='sm' variant='secondary'>
+
+          {/* Right: Search + Export */}
+          <ActionBar className='hidden md:flex ml-auto'>
+            {onSearchToggle && (
+              <Button
+                variant='ghost'
+                size='sm'
+                onClick={onSearchToggle}
+                className={cn(
+                  ACTION_BAR_BUTTON_CLASS,
+                  isSearchOpen && 'bg-interactive-active text-primary-token'
+                )}
+                aria-label={isSearchOpen ? 'Close search' : 'Search creators'}
+                aria-pressed={isSearchOpen}
+              >
+                <Icon name='Search' className='h-3.5 w-3.5' />
                 Search
               </Button>
-              {search && search.length > 0 && (
-                <Button asChild size='sm' variant='ghost'>
-                  <Link href={clearHref}>Clear</Link>
-                </Button>
-              )}
-            </form>
-            <ExportCSVButton<AdminCreatorProfileRow>
-              getData={() => profiles}
-              columns={creatorsCSVColumns}
-              filename={CREATORS_CSV_FILENAME_PREFIX}
-              disabled={profiles.length === 0}
-              ariaLabel='Export creator profiles to CSV file'
-            />
-          </div>
+            )}
+            <ActionBarItem tooltipLabel='Export'>
+              <ExportCSVButton<AdminCreatorProfileRow>
+                getData={() => profiles}
+                columns={creatorsCSVColumns}
+                filename={CREATORS_CSV_FILENAME_PREFIX}
+                disabled={profiles.length === 0}
+                ariaLabel='Export creator profiles to CSV file'
+                variant='ghost'
+                size='sm'
+                label='Export'
+                className={ACTION_BAR_BUTTON_CLASS}
+              />
+            </ActionBarItem>
+          </ActionBar>
         </>
       )}
     </div>

@@ -4,18 +4,27 @@ import type { RowSelectionState } from '@tanstack/react-table';
 import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { Icon } from '@/components/atoms/Icon';
 import {
   convertToCommonDropdownItems,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
@@ -84,6 +93,14 @@ export function AdminCreatorProfilesUnified({
     deleteCreatorOrUser,
   } = useCreatorActions(profiles);
 
+  // Search state — same pattern as releases table
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const searchInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) node.focus();
+  }, []);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
@@ -113,14 +130,24 @@ export function AdminCreatorProfilesUnified({
       initialData: { rows: profilesWithActions, total },
     });
 
-  const filteredProfiles = useMemo(
+  const allProfiles = useMemo(
     () => data?.pages.flatMap(page => page.rows) ?? profilesWithActions,
     [data, profilesWithActions]
   );
 
+  // Client-side search filtering (same pattern as releases)
+  const filteredProfiles = useMemo(() => {
+    if (!deferredSearchQuery) return allProfiles;
+    const query = deferredSearchQuery.toLowerCase();
+    return allProfiles.filter(
+      profile =>
+        profile.username?.toLowerCase().includes(query) ||
+        profile.displayName?.toLowerCase().includes(query)
+    );
+  }, [allProfiles, deferredSearchQuery]);
+
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -137,10 +164,8 @@ export function AdminCreatorProfilesUnified({
 
   // Refs for selection state to avoid column recreation on every selection change
   const selectedIdsRef = useRef(selectedIds);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   const confirmBulkDelete = useCallback((count: number) => {
@@ -262,13 +287,10 @@ export function AdminCreatorProfilesUnified({
 
   // Refs to avoid recreating handleRowSelectionChange when selection state changes
   const rowSelectionRef = useRef(rowSelection);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
   rowSelectionRef.current = rowSelection;
   const filteredProfilesLengthRef = useRef(filteredProfiles.length);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
   filteredProfilesLengthRef.current = filteredProfiles.length;
   const selectedIdsSizeRef = useRef(selectedIds.size);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
   selectedIdsSizeRef.current = selectedIds.size;
 
   const handleRowSelectionChange = useCallback(
@@ -302,7 +324,6 @@ export function AdminCreatorProfilesUnified({
 
   // Define columns using factory function
   // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
-  /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
   const columns = useMemo(
     () =>
       createCreatorProfileColumns({
@@ -314,7 +335,6 @@ export function AdminCreatorProfilesUnified({
         toggleSelect,
         getContextMenuItems,
       }),
-    /* eslint-enable react-hooks/refs */
     [
       pageSize,
       // Note: selectedIds and headerCheckboxState are intentionally excluded
@@ -327,7 +347,6 @@ export function AdminCreatorProfilesUnified({
 
   // Ref for selectedId to prevent callback recreation
   const selectedIdRef = useRef(selectedId);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdRef.current = selectedId;
 
   // Get row className based on selection state - uses unified tokens
@@ -390,6 +409,57 @@ export function AdminCreatorProfilesUnified({
 
   useRegisterRightPanel(sidebarPanel);
 
+  // Header search input — same pattern as releases table
+  const { setHeaderBadge } = useSetHeaderActions();
+
+  const handleSearchClose = useCallback(() => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+  }, []);
+
+  const headerBadgeContent = useMemo(() => {
+    if (!isSearchOpen) return null;
+
+    return (
+      <div className='flex flex-1 items-center gap-2'>
+        <Icon
+          name='Search'
+          className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+        />
+        <input
+          ref={searchInputRef}
+          type='text'
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') handleSearchClose();
+          }}
+          placeholder='Search creators…'
+          className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
+          aria-label='Search creators'
+        />
+        {searchQuery && (
+          <button
+            type='button'
+            onClick={() => setSearchQuery('')}
+            className='rounded p-0.5 text-tertiary-token hover:text-secondary-token transition-colors'
+            aria-label='Clear search'
+          >
+            <Icon name='X' className='h-3.5 w-3.5' />
+          </button>
+        )}
+      </div>
+    );
+  }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
+
+  useEffect(() => {
+    setHeaderBadge(headerBadgeContent);
+    return () => {
+      setHeaderBadge(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge is a stable context setter
+  }, [headerBadgeContent]);
+
   return (
     <>
       <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
@@ -402,14 +472,9 @@ export function AdminCreatorProfilesUnified({
           }}
           toolbar={
             <AdminCreatorsToolbar
-              basePath={basePath}
-              search={search}
-              sort={sort}
-              pageSize={pageSize}
               from={from}
               to={to}
               total={total}
-              clearHref={clearHref}
               profiles={profilesWithActions}
               selectedIds={selectedIds}
               onBulkVerify={handleBulkVerify}
@@ -417,6 +482,8 @@ export function AdminCreatorProfilesUnified({
               onBulkFeature={handleBulkFeature}
               onBulkDelete={handleBulkDelete}
               onClearSelection={handleClearSelection}
+              isSearchOpen={isSearchOpen}
+              onSearchToggle={() => setIsSearchOpen(open => !open)}
             />
           }
         >

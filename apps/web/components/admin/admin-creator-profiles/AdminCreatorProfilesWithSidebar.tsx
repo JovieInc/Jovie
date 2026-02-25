@@ -121,7 +121,6 @@ export function AdminCreatorProfilesWithSidebar({
   const filteredProfiles = profilesWithActions;
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -338,14 +337,9 @@ export function AdminCreatorProfilesWithSidebar({
             }}
             toolbar={
               <AdminCreatorsToolbar
-                basePath={basePath}
-                search={search}
-                sort={sort}
-                pageSize={pageSize}
                 from={from}
                 to={to}
                 total={total}
-                clearHref={clearHref}
                 profiles={profilesWithActions}
               />
             }
