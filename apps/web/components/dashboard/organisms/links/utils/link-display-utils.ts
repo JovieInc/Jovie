@@ -123,6 +123,8 @@ export function buildPrefillUrl(platformId: string): string {
       return 'https://www.youtube.com/@';
     case 'twitter':
       return 'https://x.com/';
+    case 'stripe':
+      return 'https://dashboard.stripe.com/';
     case 'venmo':
       return 'https://venmo.com/';
     case 'website':

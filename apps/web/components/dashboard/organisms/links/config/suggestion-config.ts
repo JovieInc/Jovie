@@ -41,6 +41,7 @@ export const SUGGESTION_PILLS: SuggestionPillConfig[] = [
   { id: 'tiktok', label: 'TikTok', simpleIconId: 'tiktok' },
   { id: 'youtube', label: 'YouTube', simpleIconId: 'youtube' },
   { id: 'twitter', label: 'X / Twitter', simpleIconId: 'x' },
+  { id: 'stripe', label: 'Stripe Connect', simpleIconId: 'stripe' },
   { id: 'venmo', label: 'Venmo', simpleIconId: 'venmo' },
   { id: 'website', label: 'Website', simpleIconId: 'website' },
 ];
@@ -59,6 +60,7 @@ export const MUSIC_FIRST_ORDER = [
   'instagram',
   'tiktok',
   'twitter',
+  'stripe',
   'venmo',
   'website',
 ] as const;
@@ -76,6 +78,7 @@ export const SOCIAL_FIRST_ORDER = [
   'twitter',
   'apple-music',
   'youtube-music',
+  'stripe',
   'venmo',
   'website',
 ] as const;

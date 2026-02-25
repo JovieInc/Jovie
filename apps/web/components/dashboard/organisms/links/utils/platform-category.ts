@@ -26,6 +26,7 @@ const EARNINGS_PLATFORMS = new Set([
   'buy_me_a_coffee',
   'kofi',
   'paypal',
+  'stripe',
   'venmo',
   'cashapp',
   'shopify',
