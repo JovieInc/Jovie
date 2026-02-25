@@ -56,6 +56,7 @@ export const APP_ROUTES = {
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing
+  DEMO: '/demo',
   PRICING: '/pricing',
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',
