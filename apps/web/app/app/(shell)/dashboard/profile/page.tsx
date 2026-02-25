@@ -5,6 +5,10 @@ import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData, getProfileSocialLinks } from '../actions';
+import {
+  checkAppleMusicConnection,
+  checkSpotifyConnection,
+} from '../releases/actions';
 import { ProfilePageChat } from './ProfilePageChat';
 import { ProfilePreviewOpener } from './ProfilePreviewOpener';
 
@@ -33,10 +37,30 @@ export default async function ProfilePage() {
       ? await getProfileSocialLinks(profileId)
       : [];
 
+    const [spotifyResult, appleMusicResult] = await Promise.allSettled([
+      checkSpotifyConnection(),
+      checkAppleMusicConnection(),
+    ]);
+
+    const spotifyStatus =
+      spotifyResult.status === 'fulfilled'
+        ? spotifyResult.value
+        : { connected: false, spotifyId: null, artistName: null };
+    const appleMusicStatus =
+      appleMusicResult.status === 'fulfilled'
+        ? appleMusicResult.value
+        : { connected: false, artistName: null, artistId: null };
+
     return (
       <>
         <ProfilePreviewOpener />
-        <PreviewDataHydrator initialLinks={initialLinks} />
+        <PreviewDataHydrator
+          initialLinks={initialLinks}
+          spotifyConnected={spotifyStatus.connected}
+          spotifyArtistName={spotifyStatus.artistName}
+          appleMusicConnected={appleMusicStatus.connected}
+          appleMusicArtistName={appleMusicStatus.artistName}
+        />
         <ProfilePageChat />
       </>
     );
