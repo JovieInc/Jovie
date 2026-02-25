@@ -4,10 +4,14 @@ import { SimpleTooltip } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import type {
+  PreviewPanelData,
+  PreviewPanelLink,
+} from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
+import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
@@ -16,11 +20,14 @@ import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
 
+type PreviewDspConnections = PreviewPanelData['dspConnections'];
+
 export interface ProfileLinkListProps {
   readonly links: PreviewPanelLink[];
   readonly selectedCategory: CategoryOption;
   readonly onAddLink?: (category: LinkSection) => void;
   readonly onRemoveLink?: (linkId: string) => void;
+  readonly dspConnections?: PreviewDspConnections;
 }
 
 function getLinkSection(platform: string): LinkSection {
@@ -202,11 +209,52 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   );
 }
 
+function ConnectedDspPills({
+  dspConnections,
+}: {
+  dspConnections: PreviewDspConnections;
+}) {
+  const connectedProviders = [
+    {
+      provider: 'spotify' as const,
+      connected: dspConnections.spotify.connected,
+      artistName: dspConnections.spotify.artistName,
+    },
+    {
+      provider: 'apple_music' as const,
+      connected: dspConnections.appleMusic.connected,
+      artistName: dspConnections.appleMusic.artistName,
+    },
+  ].filter(provider => provider.connected);
+
+  if (connectedProviders.length === 0) {
+    return (
+      <p className='text-sm text-secondary-token'>
+        No music platforms connected yet
+      </p>
+    );
+  }
+
+  return (
+    <div className='flex flex-wrap gap-2'>
+      {connectedProviders.map(provider => (
+        <DspConnectionPill
+          key={provider.provider}
+          provider={provider.provider}
+          connected={provider.connected}
+          artistName={provider.artistName}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function ProfileLinkList({
   links,
   selectedCategory,
   onAddLink,
   onRemoveLink,
+  dspConnections,
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -233,7 +281,10 @@ export function ProfileLinkList({
     return groupedLinks[selectedCategory] ?? [];
   }, [selectedCategory, groupedLinks, links]);
 
-  if (filteredLinks.length === 0) {
+  if (
+    filteredLinks.length === 0 &&
+    !(selectedCategory === 'dsp' && dspConnections)
+  ) {
     return (
       <div className='py-8 text-center'>
         <p className='text-sm text-secondary-token'>
@@ -245,6 +296,14 @@ export function ProfileLinkList({
 
   // When viewing a specific category, use shared DrawerLinkSection
   if (selectedCategory !== 'all') {
+    if (selectedCategory === 'dsp' && dspConnections) {
+      return (
+        <DrawerLinkSection title='Music connections' isEmpty={false}>
+          <ConnectedDspPills dspConnections={dspConnections} />
+        </DrawerLinkSection>
+      );
+    }
+
     return (
       <DrawerLinkSection
         title={`${SECTION_LABELS[selectedCategory]} links`}
