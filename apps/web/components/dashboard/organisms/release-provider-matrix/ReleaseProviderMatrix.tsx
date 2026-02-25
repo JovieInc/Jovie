@@ -34,7 +34,6 @@ import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
-import { getPopularityLevel } from './hooks/useReleaseFilterCounts';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
@@ -48,6 +47,7 @@ import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import { SpotifyConnectDialog } from './SpotifyConnectDialog';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
+import { filterReleases } from './utils/filterReleases';
 
 // Lazy load ReleaseSidebar - reduces initial bundle by ~30-50KB
 const ReleaseSidebar = lazy(() =>
@@ -128,36 +128,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const showTracksFromView = releaseView === 'tracks';
 
   // Apply filters and search to rows
-  const filteredRows = useMemo(() => {
-    return rows.filter(release => {
-      // Text search filter
-      if (deferredSearchQuery) {
-        const query = deferredSearchQuery.toLowerCase();
-        if (!release.title.toLowerCase().includes(query)) return false;
-      }
-
-      // Filter by release type (from advanced filters)
-      const matchesType =
-        filters.releaseTypes.length === 0 ||
-        filters.releaseTypes.includes(release.releaseType);
-
-      if (!matchesType) return false;
-
-      // Filter by popularity level
-      if (filters.popularity.length > 0) {
-        const level = getPopularityLevel(release.spotifyPopularity);
-        if (!level || !filters.popularity.includes(level)) return false;
-      }
-
-      // Filter by label
-      if (filters.labels.length > 0) {
-        if (!release.label || !filters.labels.includes(release.label))
-          return false;
-      }
-
-      return true;
-    });
-  }, [rows, filters, deferredSearchQuery]);
+  const filteredRows = useMemo(
+    () => filterReleases(rows, filters, deferredSearchQuery),
+    [rows, filters, deferredSearchQuery]
+  );
 
   // Smart link gating
   const {
