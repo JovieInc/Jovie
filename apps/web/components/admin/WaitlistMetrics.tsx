@@ -19,20 +19,20 @@ function MetricCard({
   bgClass,
 }: Readonly<MetricCardProps>) {
   return (
-    <div className='flex items-center gap-3 px-3 py-3 sm:px-4'>
+    <div className='flex items-center gap-2.5 px-3 py-2.5 sm:px-4'>
       <div
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full sm:h-10 sm:w-10',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
           bgClass
         )}
       >
-        <Icon className={cn('h-3.5 w-3.5 sm:h-5 sm:w-5', colorClass)} />
+        <Icon className={cn('h-4 w-4', colorClass)} />
       </div>
       <div className='min-w-0'>
-        <p className='text-xs text-tertiary-token uppercase tracking-wide'>
+        <p className='text-[11px] font-medium text-tertiary-token uppercase tracking-wider'>
           {label}
         </p>
-        <p className='text-lg font-semibold text-primary-token tabular-nums sm:text-xl'>
+        <p className='text-base font-semibold text-primary-token tabular-nums leading-tight'>
           {value.toLocaleString()}
         </p>
       </div>

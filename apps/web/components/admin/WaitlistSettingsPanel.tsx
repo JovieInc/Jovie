@@ -1,7 +1,7 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
-import { Loader2 } from 'lucide-react';
+import { Button, Input, Switch } from '@jovie/ui';
+import { Loader2, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { APP_ROUTES } from '@/constants/routes';
@@ -112,22 +112,40 @@ export function WaitlistSettingsPanel() {
   }
 
   return (
-    <section className='border-b border-subtle px-4 py-4 sm:px-6'>
-      <div className='mb-4'>
-        <h2 className='text-sm font-semibold text-primary-token'>
-          Waitlist gate controls
-        </h2>
-        <p className='text-xs text-secondary-token mt-1'>
-          Control whether signup is gated and how many creators are
-          auto-approved each day.
-        </p>
+    <section className='border-b border-subtle px-4 py-3 sm:px-6'>
+      <div className='flex items-start justify-between gap-4'>
+        <div className='min-w-0'>
+          <h2 className='text-[13px] font-medium text-primary-token'>
+            Waitlist gate controls
+          </h2>
+          <p className='text-xs text-tertiary-token mt-0.5'>
+            Control whether signup is gated and how many creators are
+            auto-approved each day.
+          </p>
+        </div>
+        <Button
+          variant='secondary'
+          size='sm'
+          onClick={() => void save()}
+          disabled={saving}
+          className='shrink-0'
+        >
+          {saving ? (
+            <Loader2 className='h-3.5 w-3.5 animate-spin' />
+          ) : (
+            <Save className='h-3.5 w-3.5' />
+          )}
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
       </div>
 
-      <div className='space-y-4'>
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='text-sm text-primary-token'>Waitlist gate</p>
-            <p className='text-xs text-secondary-token'>
+      <div className='mt-3 space-y-2'>
+        <div className='flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1/40 px-3 py-2.5'>
+          <div className='min-w-0'>
+            <p className='text-[13px] font-medium text-primary-token'>
+              Waitlist gate
+            </p>
+            <p className='text-xs text-tertiary-token'>
               When off, new signups can continue without waiting for manual
               approval.
             </p>
@@ -144,10 +162,12 @@ export function WaitlistSettingsPanel() {
           />
         </div>
 
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='text-sm text-primary-token'>Auto-accept</p>
-            <p className='text-xs text-secondary-token'>
+        <div className='flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1/40 px-3 py-2.5'>
+          <div className='min-w-0'>
+            <p className='text-[13px] font-medium text-primary-token'>
+              Auto-accept
+            </p>
+            <p className='text-xs text-tertiary-token'>
               Automatically approve a limited number of new waitlist submissions
               each day.
             </p>
@@ -164,11 +184,19 @@ export function WaitlistSettingsPanel() {
           />
         </div>
 
-        <label className='block'>
-          <span className='text-sm text-primary-token'>
-            Daily auto-accept limit
-          </span>
-          <input
+        <div className='flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1/40 px-3 py-2.5'>
+          <div className='min-w-0 flex-1'>
+            <p className='text-[13px] font-medium text-primary-token'>
+              Daily auto-accept limit
+            </p>
+            <p className='text-xs text-tertiary-token'>
+              Auto-accepted today:{' '}
+              <span className='tabular-nums font-medium'>
+                {settings.autoAcceptedToday}
+              </span>
+            </p>
+          </div>
+          <Input
             type='number'
             min={0}
             max={10000}
@@ -184,23 +212,10 @@ export function WaitlistSettingsPanel() {
                   : current
               );
             }}
-            className='mt-1 h-10 w-32 rounded-md border border-subtle bg-background px-3 text-sm'
+            className='w-20 text-center tabular-nums'
             disabled={saving}
           />
-          <p className='mt-1 text-xs text-secondary-token'>
-            Auto-accepted today: {settings.autoAcceptedToday}
-          </p>
-        </label>
-
-        <button
-          type='button'
-          onClick={() => void save()}
-          disabled={saving}
-          className='inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60'
-        >
-          {saving && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-          Save settings
-        </button>
+        </div>
       </div>
     </section>
   );
