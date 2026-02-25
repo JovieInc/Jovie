@@ -40,7 +40,7 @@ export const ReleaseCell = memo(function ReleaseCell({
     : null;
 
   return (
-    <div className='flex items-center gap-3'>
+    <div className='flex items-center gap-2'>
       {/* Artwork thumbnail - hidden on mobile to save space */}
       <ReleaseArtworkThumb
         src={release.artworkUrl}
@@ -53,7 +53,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         <div className='flex items-center gap-2'>
           <TruncatedText
             lines={1}
-            className='text-sm font-semibold text-primary-token'
+            className='text-[13px] font-medium text-primary-token'
             tooltipSide='top'
             tooltipAlign='start'
           >

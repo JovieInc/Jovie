@@ -55,7 +55,7 @@ export function TableRow({
         // Base styles
         'group transition-colors',
         // Fixed height to prevent layout shift
-        'h-[60px]',
+        'h-9',
         // Hover state - uses design token for consistent dark/light mode
         'hover:bg-(--color-cell-hover)',
         // Selected state
@@ -79,7 +79,7 @@ export function TableRow({
         isVirtual
           ? {
               transform: `translateY(${virtualRow.start}px)`,
-              height: '60px',
+              height: '36px',
             }
           : undefined
       }

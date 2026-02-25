@@ -25,9 +25,9 @@ interface ReleaseArtworkThumbProps {
 export function ReleaseArtworkThumb({
   src,
   alt,
-  size = 40,
+  size = 28,
   className,
-  fallbackIconClass = 'h-5 w-5',
+  fallbackIconClass = 'h-3.5 w-3.5',
 }: ReleaseArtworkThumbProps) {
   const [imgError, setImgError] = useState(false);
 

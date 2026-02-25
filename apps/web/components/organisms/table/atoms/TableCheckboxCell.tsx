@@ -148,7 +148,7 @@ function LegacyCheckboxCell({
   return (
     <Component
       className={cn(
-        'px-4 py-3 border-b border-subtle w-14 text-center',
+        'px-3 py-1.5 border-b border-subtle w-10 text-center',
         isHeader && 'sticky z-20 bg-surface-1/80 backdrop-blur',
         !isHeader && 'group-hover:bg-transparent',
         className
