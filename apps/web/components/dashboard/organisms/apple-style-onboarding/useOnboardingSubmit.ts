@@ -27,6 +27,10 @@ import {
   isDatabaseError,
   mapErrorToUserMessage,
 } from './errors';
+import {
+  getSpotifyImportStageMessage,
+  getSpotifyImportSuccessMessage,
+} from './spotifyImportCopy';
 import type { HandleValidationState, OnboardingState } from './types';
 import { getResolvedHandle, validateDisplayName } from './validation';
 
@@ -34,6 +38,26 @@ interface SpotifyImportState {
   status: 'idle' | 'importing' | 'success' | 'error';
   stage: 0 | 1 | 2;
   message: string;
+}
+
+const SPOTIFY_STAGE_TRANSITION_DELAY_MS = 600;
+
+async function waitForStageTransition(
+  signal: AbortSignal,
+  delayMs: number = SPOTIFY_STAGE_TRANSITION_DELAY_MS
+): Promise<void> {
+  await new Promise<void>(resolve => {
+    const timeoutId = setTimeout(resolve, delayMs);
+
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timeoutId);
+        resolve();
+      },
+      { once: true }
+    );
+  });
 }
 
 async function tryAutoConnectSpotify(
@@ -68,7 +92,7 @@ async function tryAutoConnectSpotify(
       safeSetter({
         status: 'importing',
         stage: 0,
-        message: 'Connecting your Spotify artist…',
+        message: getSpotifyImportStageMessage(0),
       });
       const stageTimer = setInterval(() => {
         if (signal.aborted) {
@@ -79,16 +103,10 @@ async function tryAutoConnectSpotify(
           if (prev.status !== 'importing') return prev;
 
           const nextStage = Math.min(prev.stage + 1, 2) as 0 | 1 | 2;
-          const messages = [
-            'Connecting your Spotify artist…',
-            'Importing your latest releases…',
-            'Finalizing your profile setup…',
-          ] as const;
-
           return {
             ...prev,
             stage: nextStage,
-            message: messages[nextStage],
+            message: getSpotifyImportStageMessage(nextStage),
           };
         });
       }, 1200);
@@ -107,10 +125,34 @@ async function tryAutoConnectSpotify(
         });
 
         if (importResult.success) {
+          clearInterval(stageTimer);
+
+          safeSetter({
+            status: 'importing',
+            stage: 1,
+            message: getSpotifyImportStageMessage(1, importResult.imported),
+          });
+
+          await waitForStageTransition(signal);
+          if (signal.aborted) {
+            return;
+          }
+
+          safeSetter({
+            status: 'importing',
+            stage: 2,
+            message: getSpotifyImportStageMessage(2),
+          });
+
+          await waitForStageTransition(signal);
+          if (signal.aborted) {
+            return;
+          }
+
           safeSetter({
             status: 'success',
             stage: 2,
-            message: `Spotify connected — imported ${importResult.imported} release${importResult.imported === 1 ? '' : 's'}.`,
+            message: getSpotifyImportSuccessMessage(importResult.imported),
           });
         } else {
           safeSetter({
