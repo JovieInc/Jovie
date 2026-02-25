@@ -1,14 +1,20 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
+
+const { previewPanelProviderMock } = vi.hoisted(() => ({
+  previewPanelProviderMock: vi.fn(
+    ({ children }: { children: ReactNode }) => children
+  ),
+}));
 // AuthShellWrapper pulls in context providers, @jovie/ui Sheet components,
 // ErrorBoundary (which loads Sentry init chain), and keyboard shortcut hooks.
 // Mocking them avoids ~3s of transitive module resolution.
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  PreviewPanelProvider: ({ children }: { children: ReactNode }) => children,
+  PreviewPanelProvider: previewPanelProviderMock,
 }));
 
 vi.mock('@/contexts/KeyboardShortcutsContext', () => ({
@@ -87,6 +93,10 @@ vi.mock('@/components/dashboard/atoms/DrawerToggleButton', () => ({
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 
 describe('AuthShellWrapper', () => {
+  beforeEach(() => {
+    previewPanelProviderMock.mockClear();
+  });
+
   it('renders children without throwing runtime ReferenceError', () => {
     render(
       <AuthShellWrapper>
@@ -95,5 +105,18 @@ describe('AuthShellWrapper', () => {
     );
 
     expect(screen.getByText('child content')).toBeInTheDocument();
+  });
+
+  it('passes preview panel default-open state through to provider on dashboard routes', () => {
+    render(
+      <AuthShellWrapper previewPanelDefaultOpen>
+        <div>child content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(previewPanelProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultOpen: true, enabled: true }),
+      undefined
+    );
   });
 });
