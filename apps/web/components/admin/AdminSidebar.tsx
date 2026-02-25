@@ -7,6 +7,7 @@ import {
   ImageIcon,
   LayoutDashboard,
   Mail,
+  MessageSquare,
   ShieldCheck,
   User,
   UserPlus,
@@ -36,6 +37,7 @@ const navItems = [
   { label: 'Creators', href: APP_ROUTES.ADMIN_CREATORS, icon: Users },
   { label: 'Campaigns', href: `${APP_ROUTES.ADMIN}/campaigns`, icon: Mail },
   { label: 'Users', href: APP_ROUTES.ADMIN_USERS, icon: User },
+  { label: 'Feedback', href: APP_ROUTES.ADMIN_FEEDBACK, icon: MessageSquare },
   { label: 'Usage', href: `${APP_ROUTES.ADMIN}#usage`, icon: BarChart2 },
   {
     label: 'Reliability',
