@@ -43,7 +43,8 @@
         "@radix-ui/react-tabs",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
-        "@radix-ui/react-tooltip"
+        "@radix-ui/react-tooltip",
+        "glob"
       ],
       "playwright": {
         "config": [
@@ -92,6 +93,15 @@
       "vitest": {
         "config": ["vitest.config.ts"],
         "entry": ["**/*.test.{ts,tsx}"]
+      }
+    },
+    "apps/docs": {
+      "entry": ["next.config.{js,ts,mjs}"],
+      "project": ["**/*.{ts,tsx,js,jsx,mjs}"],
+      "ignore": [".next/**"],
+      "ignoreDependencies": ["tailwindcss"],
+      "next": {
+        "entry": ["next.config.{js,ts,mjs}"]
       }
     }
   }
