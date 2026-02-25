@@ -252,6 +252,7 @@ export function ReleaseSidebar({
         <ReleaseSidebarHeader
           release={release}
           hasRelease={hasRelease}
+          onClose={onClose}
           onRefresh={onRefresh}
           isRefreshing={isRefreshing}
           onCopySmartLink={handleCopySmartLink}

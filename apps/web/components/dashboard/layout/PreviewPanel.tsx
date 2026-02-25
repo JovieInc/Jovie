@@ -172,6 +172,7 @@ export function PreviewPanel() {
             <DrawerHeaderActions
               primaryActions={primaryActions}
               overflowActions={overflowActions}
+              onClose={close}
             />
           }
         />

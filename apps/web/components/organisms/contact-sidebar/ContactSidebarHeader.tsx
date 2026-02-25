@@ -172,6 +172,7 @@ export function ContactSidebarHeader({
           <DrawerHeaderActions
             primaryActions={primaryActions}
             overflowActions={overflowActions}
+            onClose={onClose}
           />
         ) : undefined
       }
