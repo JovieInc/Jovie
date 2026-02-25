@@ -1,4 +1,13 @@
-import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gt,
+  gte,
+  or,
+} from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -7,13 +16,21 @@ import { audienceMembers } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
-import { membersQuerySchema } from '@/lib/validation/schemas';
+import {
+  type MembersQueryParams,
+  membersQuerySchema,
+} from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const segmentToCondition = (segment: string) => {
+type AudienceSegment = MembersQueryParams['segments'][number];
+
+/**
+ * Maps a validated segment value to its corresponding SQL condition.
+ */
+const segmentToCondition = (segment: AudienceSegment) => {
   switch (segment) {
     case 'highIntent':
       return eq(audienceMembers.intentLevel, 'high');
@@ -26,28 +43,22 @@ const segmentToCondition = (segment: string) => {
         audienceMembers.lastSeenAt,
         drizzleSql`NOW() - INTERVAL '24 hours'`
       );
-    default:
-      return null;
   }
 };
 
-const buildSegmentCondition = (segments: string[]) => {
+/**
+ * Builds a combined SQL condition from multiple segment filters using OR
+ * semantics: selecting multiple segments shows members matching ANY of the
+ * selected segments (union), not all of them (intersection).
+ */
+const buildSegmentCondition = (segments: AudienceSegment[]) => {
   if (segments.length === 0) {
     return drizzleSql<boolean>`true`;
   }
 
-  const conditions = segments
-    .map(segmentToCondition)
-    .filter(
-      (condition): condition is NonNullable<typeof condition> =>
-        condition !== null
-    );
+  const conditions = segments.map(segmentToCondition);
 
-  if (conditions.length === 0) {
-    return drizzleSql<boolean>`true`;
-  }
-
-  return conditions.length === 1 ? conditions[0] : and(...conditions)!;
+  return conditions.length === 1 ? conditions[0] : or(...conditions)!;
 };
 
 const MEMBER_SORT_COLUMNS = {
@@ -86,7 +97,7 @@ export async function GET(request: NextRequest) {
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
-          { members: [], total: 0 },
+          { rows: [], total: 0 },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
@@ -171,7 +182,7 @@ export async function GET(request: NextRequest) {
       }));
 
       return NextResponse.json(
-        { members, total: Number(total ?? 0) },
+        { rows: members, total: Number(total ?? 0) },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
