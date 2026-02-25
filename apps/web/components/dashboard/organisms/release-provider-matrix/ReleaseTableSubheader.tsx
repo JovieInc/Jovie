@@ -5,6 +5,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  SimpleTooltip,
   TooltipShortcut,
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
@@ -179,14 +180,15 @@ function LinearStyleDisplayMenu({
         <PopoverTrigger asChild>
           <Button
             variant='ghost'
-            size='sm'
+            size='icon'
             className={cn(
-              'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
+              'h-7 w-7 gap-1.5 rounded-md border border-transparent px-0 text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token md:w-auto md:px-3 [&_span]:sr-only md:[&_span]:not-sr-only',
               triggerClassName
             )}
+            aria-label='Display'
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
-            Display
+            <span>Display</span>
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
@@ -316,8 +318,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
         </span>
       </div>
 
-      {/* Right: Filter + Display + Export (hidden on mobile where list view is used) */}
-      <div className='hidden md:flex items-center gap-2'>
+      {/* Right: Filter + Display + Export */}
+      <div className='flex items-center gap-2'>
         <ReleaseFilterDropdown
           filters={filters}
           onFiltersChange={onFiltersChange}
@@ -335,15 +337,21 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onReleaseViewChange={onReleaseViewChange}
           triggerClassName={pillButtonClass}
         />
-        <ExportCSVButton
-          getData={() => getReleasesForExport(releases, selectedIds)}
-          columns={RELEASES_CSV_COLUMNS}
-          filename='releases'
-          label='Export'
-          variant='ghost'
-          size='sm'
-          className={pillButtonClass}
-        />
+        <SimpleTooltip content='Export'>
+          <ExportCSVButton
+            getData={() => getReleasesForExport(releases, selectedIds)}
+            columns={RELEASES_CSV_COLUMNS}
+            filename='releases'
+            label='Export'
+            ariaLabel='Export'
+            variant='ghost'
+            size='icon'
+            className={cn(
+              pillButtonClass,
+              'w-7 px-0 md:w-auto md:px-3 [&_span]:sr-only md:[&_span]:not-sr-only'
+            )}
+          />
+        </SimpleTooltip>
       </div>
     </div>
   );

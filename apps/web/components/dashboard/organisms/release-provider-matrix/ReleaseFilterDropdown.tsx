@@ -490,14 +490,15 @@ export function ReleaseFilterDropdown({
           <DropdownMenuTrigger asChild>
             <Button
               variant='ghost'
-              size='sm'
+              size='icon'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
+                'h-7 w-7 gap-1.5 rounded-md border border-transparent px-0 text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token md:w-auto md:px-3 [&_span]:sr-only md:[&_span]:not-sr-only',
                 buttonClassName
               )}
+              aria-label='Filter'
             >
               <Icon name='Filter' className='h-3.5 w-3.5' />
-              Filter
+              <span>Filter</span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>
