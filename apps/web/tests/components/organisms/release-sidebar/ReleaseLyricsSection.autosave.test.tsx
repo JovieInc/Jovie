@@ -160,6 +160,38 @@ describe('ReleaseLyricsSection auto-save', () => {
     expect(textarea).toHaveAttribute('rows', '10');
   });
 
+  it('formats lyrics with selected platform target', async () => {
+    const onFormatLyrics = vi.fn().mockResolvedValue([]);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <ReleaseLyricsSection
+        releaseId='r1'
+        lyrics='[Verse 1]
+Hello'
+        isEditable={true}
+        onFormatLyrics={onFormatLyrics}
+      />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: /choose lyrics format target/i })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Genius' }));
+
+    await user.click(
+      screen.getByRole('button', { name: /format for genius/i })
+    );
+
+    await waitFor(() => {
+      expect(onFormatLyrics).toHaveBeenCalledWith(
+        'r1',
+        '[Verse 1]\nHello',
+        'genius'
+      );
+    });
+  });
+
   it('debounces — only the last change triggers save', async () => {
     const onSaveLyrics = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

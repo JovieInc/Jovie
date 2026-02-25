@@ -389,7 +389,11 @@ export function useReleaseProviderMatrix({
   );
 
   const handleFormatLyrics = useCallback(
-    async (releaseId: string, lyrics: string) => {
+    async (
+      releaseId: string,
+      lyrics: string,
+      target: 'apple_music' | 'deezer' | 'genius' = 'apple_music'
+    ) => {
       const release = rawRowsRef.current.find(r => r.id === releaseId);
       if (!release) return [];
 
@@ -397,9 +401,9 @@ export function useReleaseProviderMatrix({
         profileId: release.profileId,
         releaseId,
         lyrics,
+        target,
       });
 
-      toast.success('Lyrics formatted for Apple Music');
       return result.changesSummary;
     },
     [formatLyricsMutation]

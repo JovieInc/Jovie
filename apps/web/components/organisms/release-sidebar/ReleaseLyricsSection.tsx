@@ -1,11 +1,17 @@
 'use client';
 
-import { Button, Textarea } from '@jovie/ui';
-import { Check, Copy, Loader2, Sparkles } from 'lucide-react';
+import {
+  Button,
+  CommonDropdown,
+  type CommonDropdownItem,
+  Textarea,
+} from '@jovie/ui';
+import { Check, ChevronDown, Copy, Loader2, Sparkles } from 'lucide-react';
 import {
   startTransition,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -16,6 +22,29 @@ import { DrawerSection } from '@/components/molecules/drawer';
 const AUTO_SAVE_DELAY_MS = 1500;
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
+type LyricsFormatTarget = 'apple_music' | 'deezer' | 'genius';
+
+const FORMAT_OPTIONS: ReadonlyArray<{
+  target: LyricsFormatTarget;
+  label: string;
+  helper: string;
+}> = [
+  {
+    target: 'apple_music',
+    label: 'Apple Music',
+    helper: 'Plain structure for DSP ingestion',
+  },
+  {
+    target: 'deezer',
+    label: 'Deezer',
+    helper: 'Clean lines without section headers',
+  },
+  {
+    target: 'genius',
+    label: 'Genius',
+    helper: 'Keep section headers for annotation context',
+  },
+] as const;
 
 interface ReleaseLyricsSectionProps {
   readonly releaseId: string;
@@ -25,7 +54,8 @@ interface ReleaseLyricsSectionProps {
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
-    lyrics: string
+    lyrics: string,
+    target?: LyricsFormatTarget
   ) => Promise<string[]>;
 }
 
@@ -41,6 +71,8 @@ export function ReleaseLyricsSection({
   const [isCopying, setIsCopying] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [selectedFormatTarget, setSelectedFormatTarget] =
+    useState<LyricsFormatTarget>('apple_music');
 
   // Refs for auto-save to avoid stale closures
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -55,6 +87,54 @@ export function ReleaseLyricsSection({
   draftRef.current = draftLyrics;
   releaseIdRef.current = releaseId;
   lyricsRef.current = lyrics;
+
+  const selectedFormat = useMemo(
+    () =>
+      FORMAT_OPTIONS.find(option => option.target === selectedFormatTarget) ??
+      FORMAT_OPTIONS[0],
+    [selectedFormatTarget]
+  );
+
+  const handleFormatLyrics = useCallback(async () => {
+    if (!onFormatLyrics) {
+      return;
+    }
+
+    setIsFormatting(true);
+    try {
+      const changes = await onFormatLyrics(
+        releaseId,
+        draftLyrics,
+        selectedFormatTarget
+      );
+      if (changes.length > 0) {
+        toast.info(changes.join(' · '));
+      }
+      toast.success(`Lyrics formatted for ${selectedFormat.label}`);
+    } catch {
+      toast.error('Unable to format lyrics right now');
+    } finally {
+      setIsFormatting(false);
+    }
+  }, [
+    draftLyrics,
+    onFormatLyrics,
+    releaseId,
+    selectedFormat.label,
+    selectedFormatTarget,
+  ]);
+
+  const formatDropdownItems = useMemo<CommonDropdownItem[]>(
+    () =>
+      FORMAT_OPTIONS.map(option => ({
+        type: 'action',
+        id: option.target,
+        label: option.label,
+        description: option.helper,
+        onClick: () => setSelectedFormatTarget(option.target),
+      })),
+    []
+  );
 
   // Sync draft when lyrics or releaseId changes externally
   useEffect(() => {
@@ -154,28 +234,36 @@ export function ReleaseLyricsSection({
 
       <div className='mt-3 flex flex-wrap items-center gap-2'>
         {isEditable && onFormatLyrics && (
-          <Button
-            type='button'
-            size='sm'
-            variant='secondary'
-            onClick={async () => {
-              setIsFormatting(true);
-              try {
-                const changes = await onFormatLyrics(releaseId, draftLyrics);
-                if (changes.length > 0) {
-                  toast.info(changes.join(' · '));
-                }
-              } catch {
-                toast.error('Unable to format lyrics right now');
-              } finally {
-                setIsFormatting(false);
+          <div className='flex items-center overflow-hidden rounded-full border border-border/70 bg-surface-2'>
+            <Button
+              type='button'
+              size='sm'
+              variant='ghost'
+              className='rounded-none border-0'
+              onClick={handleFormatLyrics}
+              disabled={isFormatting || isSaving || !draftLyrics.trim()}
+            >
+              <Sparkles className='h-4 w-4' />
+              {isFormatting
+                ? 'Formatting…'
+                : `Format for ${selectedFormat.label}`}
+            </Button>
+            <CommonDropdown
+              size='compact'
+              align='end'
+              items={formatDropdownItems}
+              trigger={
+                <button
+                  type='button'
+                  className='flex h-8 items-center justify-center border-l border-border/70 px-2 text-secondary-token transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50'
+                  aria-label='Choose lyrics format target'
+                  disabled={isFormatting || isSaving || !draftLyrics.trim()}
+                >
+                  <ChevronDown className='h-4 w-4' aria-hidden='true' />
+                </button>
               }
-            }}
-            disabled={isFormatting || isSaving || !draftLyrics.trim()}
-          >
-            <Sparkles className='h-4 w-4' />
-            {isFormatting ? 'Formatting…' : 'Format for Apple Music'}
-          </Button>
+            />
+          </div>
         )}
 
         <Button

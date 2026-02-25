@@ -64,7 +64,11 @@ export interface UseReleaseProviderMatrixReturn {
     url: string
   ) => Promise<void>;
   handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
-  handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
+  handleFormatLyrics: (
+    releaseId: string,
+    lyrics: string,
+    target?: 'apple_music' | 'deezer' | 'genius'
+  ) => Promise<string[]>;
   isLyricsSaving: boolean;
   setDrafts: React.Dispatch<React.SetStateAction<DraftState>>;
 }
