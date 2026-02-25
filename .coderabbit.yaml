@@ -10,6 +10,10 @@ reviews:
   high_level_summary: true
   collapse_walkthrough: true
 
+  finishing_touches:
+    unit_tests:
+      enabled: true
+
   tools:
     biome:
       enabled: true
@@ -190,9 +194,8 @@ chat:
 
 code_generation:
   unit_tests:
-    enabled: true
     path_instructions:
-      - path: "apps/web/lib/**/*.ts"
+      - path: "apps/web/lib/**/*.{ts,tsx}"
         instructions: |
           Use vitest as the test framework. Import from 'vitest' explicitly (describe, it, expect, vi).
           Place test files co-located as `<filename>.test.ts` next to the source, OR in `apps/web/tests/lib/` mirroring the source structure.
@@ -216,7 +219,7 @@ code_generation:
       - path: "apps/web/hooks/**/*.ts"
         instructions: |
           Use vitest with @testing-library/react's renderHook() for custom hook tests.
-          Place test files co-located as `<hookName>.test.ts` next to the source.
+          Place test files co-located as `<hookName>.test.ts` next to the source, OR in `apps/web/tests/hooks/` mirroring the source structure.
           Test return values, state transitions, and cleanup behavior.
           Mock browser APIs (IntersectionObserver, matchMedia, etc.) when needed.
 
@@ -243,10 +246,18 @@ code_generation:
           Test accessibility: ensure proper ARIA attributes and keyboard navigation.
           These are shared components — test the public API (props), not internals.
 
+      - path: "**/*.{ts,tsx}"
+        instructions: |
+          Fallback for files outside the specific paths above.
+          Use vitest as the test framework. Import from 'vitest' explicitly (describe, it, expect, vi).
+          Place test files co-located as `<filename>.test.ts` next to the source.
+          Use vi.fn() for function mocks, never jest.fn().
+          Target <200ms per test. Include edge cases and error scenarios.
+
   docstrings:
     language: en-US
     path_instructions:
-      - path: "apps/web/lib/**/*.ts"
+      - path: "apps/web/lib/**/*.{ts,tsx}"
         instructions: |
           Use JSDoc format (/** ... */) for all exported functions, types, and constants.
           Include @param tags for each parameter with a short description.
@@ -260,7 +271,7 @@ code_generation:
         instructions: |
           Use JSDoc format on exported React components.
           Document the component's purpose and when to use it (1-2 sentences).
-          Use @param or @prop tags for non-obvious props only — skip self-evident ones like `className`.
+          Use @param or @property tags for non-obvious props only — skip self-evident ones like `className`.
           Do NOT document internal helper components that aren't exported.
 
       - path: "apps/web/hooks/**/*.ts"
