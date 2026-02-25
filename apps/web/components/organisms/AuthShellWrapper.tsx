@@ -171,6 +171,7 @@ function AuthShellWrapperInner({
     <TableMetaContext.Provider value={tableMetaContextValue}>
       <RightPanelProvider>
         <PreviewPanelProvider
+          key={config.section}
           defaultOpen={shouldDefaultOpenPreviewPanel}
           enabled={previewEnabled}
         >
