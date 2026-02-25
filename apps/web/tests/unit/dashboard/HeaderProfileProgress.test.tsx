@@ -60,6 +60,17 @@ describe('HeaderProfileProgress', () => {
     expect(getByText('57%')).toBeDefined();
   });
 
+  it('uses accent semantic tokens for progress ring gradient', () => {
+    const { container } = renderProgress();
+
+    const stops = container.querySelectorAll('linearGradient stop');
+    expect(stops).toHaveLength(2);
+    expect(stops[0]?.getAttribute('stop-color')).toBe('var(--color-accent)');
+    expect(stops[1]?.getAttribute('stop-color')).toBe(
+      'var(--color-accent-hover)'
+    );
+  });
+
   it('does not crash when profileCompletion is missing', () => {
     const { queryByRole } = renderProgress({
       profileCompletion:

@@ -550,7 +550,7 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
-    # On PRs: gates on ci-fast + unit tests (a11y + layout guard are informational).
+    # On PRs: gates on ci-fast + unit tests + a11y (layout guard remains informational).
     # On merge queue: only ci-fast runs; unit tests/a11y/layout-guard are skipped
     # (already passed on PR) and their "skipped" result passes the checks below.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
@@ -577,9 +577,10 @@ jobs:
             exit 1
           fi
 
-          # ci-a11y: informational — log but do not block merge
-          if [[ "${{ needs.ci-a11y.result }}" == "failure" ]]; then
-            echo "⚠️ ci-a11y failed — accessibility violations detected (non-blocking)"
+          # ci-a11y: blocking — accessibility violations must fail PR
+          if [[ "${{ needs.ci-a11y.result }}" == "failure" || "${{ needs.ci-a11y.result }}" == "cancelled" || "${{ needs.ci-a11y.result }}" == "skipped" ]]; then
+            echo "❌ ci-a11y did not pass"
+            exit 1
           fi
 
           # ci-layout-guard: allow skip (path-gated / artifact missing) but block on failure
@@ -593,11 +594,11 @@ jobs:
     name: Build (public routes)
     needs: [ci-path-changes]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
-    # On PRs: only runs with 'testing' label (a11y + layout-guard are non-blocking).
+    # On PRs: always runs for first-class accessibility/layout verification.
     # Fork PRs never get labels, so this is skipped for forks (fork PRs use fork-pr-gate).
     # On main push: always runs for full coverage.
     # Skipped in merge queue: a11y + layout-guard already ran on the PR.
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -610,7 +611,7 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
+        run: echo "run_full_ci=true" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
