@@ -94,21 +94,12 @@ async function tryAutoConnectSpotify(
         stage: 0,
         message: getSpotifyImportStageMessage(0),
       });
+      // Timer stays at stage 0 — stages 1+ use data-aware messages
+      // that are only set after the API call resolves.
       const stageTimer = setInterval(() => {
         if (signal.aborted) {
           clearInterval(stageTimer);
-          return;
         }
-        safeSetter(prev => {
-          if (prev.status !== 'importing') return prev;
-
-          const nextStage = Math.min(prev.stage + 1, 2) as 0 | 1 | 2;
-          return {
-            ...prev,
-            stage: nextStage,
-            message: getSpotifyImportStageMessage(nextStage),
-          };
-        });
       }, 1200);
 
       // Clear interval on abort (component unmount)
@@ -124,9 +115,10 @@ async function tryAutoConnectSpotify(
           artistName,
         });
 
-        if (importResult.success) {
-          clearInterval(stageTimer);
+        // Clear timer immediately to prevent it from firing after completion
+        clearInterval(stageTimer);
 
+        if (importResult.success) {
           safeSetter({
             status: 'importing',
             stage: 1,
