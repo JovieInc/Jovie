@@ -140,7 +140,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[13px] font-medium text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[13px] font-medium text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2'
     >
       <Settings2 className='h-3.5 w-3.5' />
       Display

@@ -79,6 +79,21 @@ describe('ExportCSVButton', () => {
       expect(container.querySelector('svg')).toBeInTheDocument();
     });
 
+    it('should include focus-visible ring offset styles for keyboard navigation', () => {
+      render(
+        <ExportCSVButton
+          getData={() => mockUsers}
+          columns={mockUserColumns}
+          filename='users'
+        />
+      );
+
+      expect(screen.getByRole('button')).toHaveClass(
+        'focus-visible:ring-offset-2'
+      );
+      expect(screen.getByRole('button')).toHaveClass('focus-visible:ring-2');
+    });
+
     it('should apply custom className', () => {
       render(
         <ExportCSVButton

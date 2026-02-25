@@ -31,7 +31,7 @@ interface AudienceTableSubheaderProps {
 }
 
 const pillButtonClass =
-  'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token';
+  'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2';
 
 /**
  * AudienceTableSubheader - Subheader with audience view selector and table actions.
