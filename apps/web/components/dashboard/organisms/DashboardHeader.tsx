@@ -47,7 +47,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[52px] w-full items-center gap-2 px-4 sm:flex border-b border-subtle'>
+      <div className='relative hidden h-11 w-full items-center gap-2 px-4 sm:flex border-b border-subtle'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
