@@ -43,7 +43,9 @@
         "@radix-ui/react-tabs",
         "@radix-ui/react-toggle",
         "@radix-ui/react-toggle-group",
-        "@radix-ui/react-tooltip"
+        "@radix-ui/react-tooltip",
+        "@sentry/node",
+        "glob"
       ],
       "playwright": {
         "config": [
