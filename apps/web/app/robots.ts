@@ -22,7 +22,15 @@ export default function robots(): MetadataRoute.Robots {
         {
           userAgent: '*',
           allow: '/',
-          disallow: ['/app/', '/api/', '/out/'],
+          disallow: [
+            '/app/',
+            '/api/',
+            '/out/',
+            '/*?ref=*',
+            '/*?utm_*',
+            '/*?fbclid=*',
+            '/*?gclid=*',
+          ],
         },
       ],
       sitemap: `${BASE_URL}/sitemap.xml`,

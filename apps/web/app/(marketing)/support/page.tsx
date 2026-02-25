@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 import { Container } from '@/components/site/Container';
-import { APP_NAME } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { SupportContent } from './SupportContent';
 
 export const metadata: Metadata = {
   title: `Support - ${APP_NAME}`,
   description:
     'Get help with your Jovie profile. Contact our support team for assistance with setup, troubleshooting, and account management.',
+  alternates: {
+    canonical: `${BASE_URL}/support`,
+  },
 };
 
 export default function SupportPage() {
