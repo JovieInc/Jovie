@@ -175,7 +175,6 @@ const MARKETING_PREFIXES = [
   '/changelog',
   '/engagement-engine',
   '/investors',
-  '/link-in-bio',
   '/pricing',
   '/support',
   '/waitlist',

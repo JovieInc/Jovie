@@ -188,8 +188,7 @@ const nextConfig = {
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
-        source:
-          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog)',
+        source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {

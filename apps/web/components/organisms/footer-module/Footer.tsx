@@ -90,7 +90,6 @@ export function Footer({
 
   if (variant === 'regular') {
     const productLinks = [
-      { href: '/link-in-bio', label: 'Profile' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
       ...FEATURES.map(f => ({ href: f.href, label: f.title })),
     ];
@@ -236,8 +235,11 @@ export function Footer({
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
-                className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] order-2 sm:order-1'
-                style={{ color: 'var(--linear-text-tertiary)' }}
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-40 order-2 sm:order-1'
+                style={{
+                  color:
+                    'var(--linear-text-quaternary, var(--linear-text-tertiary))',
+                }}
               />
               {showThemeToggle && (
                 <div className='flex items-center gap-3 order-1 sm:order-2'>
@@ -294,8 +296,11 @@ export function Footer({
             >
               <Copyright
                 variant={config.colorVariant}
-                className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em]'
-                style={{ color: 'var(--linear-text-tertiary)' }}
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-40'
+                style={{
+                  color:
+                    'var(--linear-text-quaternary, var(--linear-text-tertiary))',
+                }}
               />
               {variant === 'minimal' && (
                 <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
