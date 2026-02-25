@@ -605,7 +605,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 1
+          fetch-depth: 2
 
       - name: Check for relevant changes
         id: check_changes
@@ -621,12 +621,21 @@ jobs:
 
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm turbo build --affected
+        run: pnpm turbo build --filter=@jovie/web
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Verify build output exists
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [ ! -d "apps/web/.next" ]; then
+            echo "::error::Build output directory apps/web/.next does not exist — build may have used remote cache without producing local output"
+            exit 1
+          fi
+          echo "Build output verified: $(du -sh apps/web/.next | cut -f1)"
 
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -635,6 +644,7 @@ jobs:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
           retention-days: 1
+          if-no-files-found: error
 
   ci-layout-guard:
     name: Layout Guard (blocking)
@@ -661,12 +671,15 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Download build artifact
+        id: download
+        continue-on-error: true
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
 
       - name: Run layout overlap/touching guard
+        if: steps.download.outcome == 'success'
         run: |
           cd apps/web
           mkdir -p tests/.auth
@@ -1082,14 +1095,16 @@ jobs:
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Download build artifact
+        id: download
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        continue-on-error: true
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
 
       - name: Run axe a11y audit (public routes)
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download.outcome == 'success'
         run: |
           cd apps/web
           # Create empty auth state so Playwright's auth-setup project doesn't crash.
