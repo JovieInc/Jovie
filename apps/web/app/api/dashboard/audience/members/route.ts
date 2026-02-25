@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
-          { members: [], total: 0 },
+          { rows: [], total: 0 },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
       }));
 
       return NextResponse.json(
-        { members, total: Number(total ?? 0) },
+        { rows: members, total: Number(total ?? 0) },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });

@@ -128,7 +128,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) node.focus();
+  }, []);
 
   // Derive showTracks from releaseView toggle
   const showTracksFromView = releaseView === 'tracks';
@@ -521,17 +523,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         )}
       </div>
     );
-  }, [isSearchOpen, searchQuery, handleSearchClose]);
-
-  // Auto-focus search input when opened
-  useEffect(() => {
-    if (isSearchOpen) {
-      // Use requestAnimationFrame to ensure the input is rendered before focusing
-      requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
-      });
-    }
-  }, [isSearchOpen]);
+  }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
 
   useEffect(() => {
     // Search input or null (for default breadcrumb) on left side of header
