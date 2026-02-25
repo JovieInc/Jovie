@@ -279,9 +279,24 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     await user.click(getProfileRow('alice'));
     const sidebar = await expectSidebarOpen();
 
-    await user.click(
-      within(sidebar).getByRole('button', { name: /close sidebar|go back/i })
-    );
+    // Close is inside the "More actions" overflow menu
+    const moreButton = within(sidebar).queryByRole('button', {
+      name: /more actions/i,
+    });
+    const closeButton = within(sidebar).queryByRole('button', {
+      name: /close sidebar|go back/i,
+    });
+
+    if (moreButton) {
+      // Overflow menu: open it, then click Close
+      await user.click(moreButton);
+      const closeMenuItem = await screen.findByRole('menuitem', {
+        name: /close/i,
+      });
+      await user.click(closeMenuItem);
+    } else if (closeButton) {
+      await user.click(closeButton);
+    }
 
     await waitFor(() => {
       expect(screen.getByTestId('contact-sidebar')).toHaveAttribute(

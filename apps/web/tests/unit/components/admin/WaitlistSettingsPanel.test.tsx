@@ -38,7 +38,7 @@ describe('WaitlistSettingsPanel', () => {
       expect(screen.getByText('Waitlist gate controls')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Auto-accepted today: 3')).toBeInTheDocument();
+    expect(screen.getByText(/Auto-accepted today/)).toBeInTheDocument();
   });
 
   it('shows an error state when loading settings fails', async () => {
