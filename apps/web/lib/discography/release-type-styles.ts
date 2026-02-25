@@ -17,49 +17,50 @@ export interface ReleaseTypeStyle {
 
 /**
  * Styling configuration for each release type.
- * Uses bordered badge style for subtle visual distinction.
+ * Uses soft opacity-based colors for subtle visual distinction
+ * that adapts cleanly to both light and dark modes.
  */
 export const RELEASE_TYPE_STYLES: Record<string, ReleaseTypeStyle> = {
   single: {
-    border: 'border-blue-300 dark:border-blue-700',
-    text: 'text-blue-600 dark:text-blue-400',
-    bg: 'bg-blue-50 dark:bg-blue-950/40',
+    border: 'border-blue-500/20',
+    text: 'text-blue-600 dark:text-blue-300',
+    bg: 'bg-blue-500/10',
     label: 'Single',
   },
   ep: {
-    border: 'border-purple-300 dark:border-purple-700',
-    text: 'text-purple-600 dark:text-purple-400',
-    bg: 'bg-purple-50 dark:bg-purple-950/40',
+    border: 'border-violet-500/20',
+    text: 'text-violet-600 dark:text-violet-300',
+    bg: 'bg-violet-500/10',
     label: 'EP',
   },
   album: {
-    border: 'border-green-300 dark:border-green-700',
-    text: 'text-green-600 dark:text-green-400',
-    bg: 'bg-green-50 dark:bg-green-950/40',
+    border: 'border-emerald-500/20',
+    text: 'text-emerald-600 dark:text-emerald-300',
+    bg: 'bg-emerald-500/10',
     label: 'Album',
   },
   compilation: {
-    border: 'border-amber-300 dark:border-amber-700',
-    text: 'text-amber-600 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    border: 'border-amber-500/20',
+    text: 'text-amber-600 dark:text-amber-300',
+    bg: 'bg-amber-500/10',
     label: 'Compilation',
   },
   live: {
-    border: 'border-red-300 dark:border-red-700',
-    text: 'text-red-600 dark:text-red-400',
-    bg: 'bg-red-50 dark:bg-red-950/40',
+    border: 'border-rose-500/20',
+    text: 'text-rose-600 dark:text-rose-300',
+    bg: 'bg-rose-500/10',
     label: 'Live',
   },
   mixtape: {
-    border: 'border-pink-300 dark:border-pink-700',
-    text: 'text-pink-600 dark:text-pink-400',
-    bg: 'bg-pink-50 dark:bg-pink-950/40',
+    border: 'border-pink-500/20',
+    text: 'text-pink-600 dark:text-pink-300',
+    bg: 'bg-pink-500/10',
     label: 'Mixtape',
   },
   other: {
-    border: 'border-gray-300 dark:border-gray-600',
+    border: 'border-gray-500/20',
     text: 'text-gray-600 dark:text-gray-400',
-    bg: 'bg-gray-50 dark:bg-gray-900/40',
+    bg: 'bg-gray-500/10',
     label: 'Other',
   },
 };
