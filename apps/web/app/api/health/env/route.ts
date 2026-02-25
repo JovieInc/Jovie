@@ -204,6 +204,7 @@ export async function GET(request: Request) {
       'health/env'
     );
     void captureWarning('Environment health check crashed', error, {
+      service: 'env',
       route: '/api/health/env',
     });
 

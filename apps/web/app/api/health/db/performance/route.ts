@@ -175,6 +175,7 @@ export async function GET(request: Request) {
       'health/db/performance'
     );
     void captureWarning('DB performance health check failed', undefined, {
+      service: 'db-performance',
       route: '/api/health/db/performance',
       error: performanceResult.error,
       metrics: performanceResult.metrics,
