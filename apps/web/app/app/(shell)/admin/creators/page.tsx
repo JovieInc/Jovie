@@ -18,16 +18,15 @@ export const runtime = 'nodejs';
 export default async function AdminCreatorsPage({
   searchParams,
 }: Readonly<AdminCreatorsPageProps>) {
-  const { page, pageSize, sort, q } =
+  const { pageSize, sort, q } =
     await adminCreatorsSearchParams.parse(searchParams);
 
   const {
     profiles,
-    page: currentPage,
     pageSize: resolvedPageSize,
     total,
   } = await getAdminCreatorProfiles({
-    page,
+    page: 1,
     pageSize,
     search: q ?? '',
     sort,
@@ -36,7 +35,7 @@ export default async function AdminCreatorsPage({
   return (
     <AdminCreatorsPageWrapper
       profiles={profiles}
-      page={currentPage}
+      page={1}
       pageSize={resolvedPageSize}
       total={total}
       search={q ?? ''}
