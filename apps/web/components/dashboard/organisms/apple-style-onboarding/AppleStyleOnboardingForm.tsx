@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton } from '@/components/auth';
 import {
@@ -9,9 +8,11 @@ import {
   OnboardingHandleStep,
 } from '@/components/dashboard/organisms/onboarding';
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
-import { navigateToDashboard } from './navigation';
+import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
+
 import type { AppleStyleOnboardingFormProps } from './types';
 import { ONBOARDING_STEPS } from './types';
 import { useHandleValidation } from './useHandleValidation';
@@ -26,8 +27,6 @@ export function AppleStyleOnboardingForm({
   userId,
   shouldAutoSubmitHandle = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
-  const router = useRouter();
-
   const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
   const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
 
@@ -52,18 +51,23 @@ export function AppleStyleOnboardingForm({
       fullName,
     });
 
-  const { state, handleSubmit, isPendingSubmit, spotifyImportState } =
-    useOnboardingSubmit({
-      userId,
-      userEmail,
-      fullName,
-      handle,
-      handleInput,
-      handleValidation,
-      goToNextStep,
-      setProfileReadyHandle,
-      shouldAutoSubmitHandle,
-    });
+  const {
+    state,
+    handleSubmit,
+    isPendingSubmit,
+    spotifyImportState,
+    autoSubmitClaimed,
+  } = useOnboardingSubmit({
+    userId,
+    userEmail,
+    fullName,
+    handle,
+    handleInput,
+    handleValidation,
+    goToNextStep,
+    setProfileReadyHandle,
+    shouldAutoSubmitHandle,
+  });
 
   useEffect(() => {
     if (userId) {
@@ -125,8 +129,15 @@ export function AppleStyleOnboardingForm({
   ]);
 
   const goToDashboard = useCallback(() => {
-    navigateToDashboard(router);
-  }, [router]);
+    if (globalThis.window === undefined) return;
+
+    const initialQuery = getOnboardingDashboardInitialQuery(
+      spotifyImportState.status
+    );
+    const dashboardUrl = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
+
+    globalThis.location.href = dashboardUrl;
+  }, [spotifyImportState.status]);
 
   const renderStepContent = () => {
     switch (currentStepIndex) {
@@ -146,6 +157,7 @@ export function AppleStyleOnboardingForm({
             onHandleChange={setHandleInput}
             onSubmit={handleSubmit}
             isPendingSubmit={isPendingSubmit}
+            autoSubmitClaimed={autoSubmitClaimed}
           />
         );
 

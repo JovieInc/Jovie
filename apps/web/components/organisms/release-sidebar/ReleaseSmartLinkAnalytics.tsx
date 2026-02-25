@@ -47,14 +47,14 @@ function StatTile({
   readonly hint?: string;
 }) {
   return (
-    <div className='rounded-lg border border-subtle bg-surface-2/40 px-3 py-2.5'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.2em] text-tertiary-token'>
+    <div className='space-y-1'>
+      <p className='text-[10px] font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
         {label}
       </p>
-      <p className='mt-1 text-[18px] font-semibold tracking-tight text-primary-token tabular-nums'>
+      <p className='text-2xl font-semibold leading-none tracking-tight text-primary-token tabular-nums'>
         {value}
       </p>
-      {hint && <p className='text-[11px] text-tertiary-token'>{hint}</p>}
+      {hint && <p className='text-[11px] text-secondary-token'>{hint}</p>}
     </div>
   );
 }
@@ -100,16 +100,16 @@ export function ReleaseSmartLinkAnalytics({
   return (
     <DrawerSection title='Smart link analytics'>
       {isLoading && (
-        <div className='grid grid-cols-2 gap-3'>
-          <div className='rounded-lg border border-subtle bg-surface-2/40 px-3 py-2.5'>
+        <div className='grid grid-cols-2 divide-x divide-subtle rounded-md border border-subtle/70 bg-surface/40 p-3'>
+          <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-1 h-[22px] w-12 rounded skeleton' />
-            <div className='mt-0.5 h-[11px] w-10 rounded skeleton' />
+            <div className='mt-2 h-7 w-14 rounded skeleton' />
+            <div className='mt-1 h-[11px] w-12 rounded skeleton' />
           </div>
-          <div className='rounded-lg border border-subtle bg-surface-2/40 px-3 py-2.5'>
+          <div className='pl-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-1 h-[22px] w-12 rounded skeleton' />
-            <div className='mt-0.5 h-[11px] w-10 rounded skeleton' />
+            <div className='mt-2 h-7 w-14 rounded skeleton' />
+            <div className='mt-1 h-[11px] w-12 rounded skeleton' />
           </div>
         </div>
       )}
@@ -122,17 +122,21 @@ export function ReleaseSmartLinkAnalytics({
 
       {!isLoading && !hasError && (
         <>
-          <div className='grid grid-cols-2 gap-3'>
-            <StatTile
-              label='Total clicks'
-              value={numberFormatter.format(totalClicks)}
-              hint='All time'
-            />
-            <StatTile
-              label='Last 7 days'
-              value={numberFormatter.format(last7DaysClicks)}
-              hint='Recent'
-            />
+          <div className='grid grid-cols-2 divide-x divide-subtle rounded-md border border-subtle/70 bg-surface/40 p-3'>
+            <div className='pr-3'>
+              <StatTile
+                label='Total clicks'
+                value={numberFormatter.format(totalClicks)}
+                hint='All time'
+              />
+            </div>
+            <div className='pl-3'>
+              <StatTile
+                label='Last 7 days'
+                value={numberFormatter.format(last7DaysClicks)}
+                hint='Recent activity'
+              />
+            </div>
           </div>
 
           {showEmpty && (
@@ -142,11 +146,11 @@ export function ReleaseSmartLinkAnalytics({
           )}
 
           {!showEmpty && topProviders.length > 0 && (
-            <div className='space-y-1.5'>
+            <div className='space-y-2'>
               <p className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
                 Top platforms
               </p>
-              <div className='space-y-1'>
+              <div className='divide-y divide-subtle/60 rounded-md border border-subtle/70 bg-surface/30'>
                 {topProviders.map(provider => {
                   const key = provider.provider as ProviderKey;
                   const label =
@@ -155,7 +159,7 @@ export function ReleaseSmartLinkAnalytics({
                   return (
                     <div
                       key={provider.provider}
-                      className='flex items-center justify-between text-xs'
+                      className='flex items-center justify-between px-3 py-2 text-xs'
                     >
                       <div className='flex items-center gap-2 text-secondary-token'>
                         <span

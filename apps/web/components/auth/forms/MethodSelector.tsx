@@ -75,14 +75,20 @@ export function MethodSelector({
 
   // Order methods with last used first
   const orderedMethods = useMemo((): AuthMethod[] => {
-    const base: AuthMethod[] = spotifyOauthEnabled
-      ? ['google', 'email', 'spotify']
-      : ['google', 'email'];
+    let base: AuthMethod[];
+    if (spotifyOauthEnabled) {
+      base =
+        mode === 'signup'
+          ? ['spotify', 'google', 'email']
+          : ['google', 'email', 'spotify'];
+    } else {
+      base = ['google', 'email'];
+    }
 
     if (!lastMethod) return base;
     if (!base.includes(lastMethod)) return base;
     return [lastMethod, ...base.filter(method => method !== lastMethod)];
-  }, [lastMethod, spotifyOauthEnabled]);
+  }, [lastMethod, mode, spotifyOauthEnabled]);
 
   const isGoogleLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'google';
@@ -176,8 +182,9 @@ export function MethodSelector({
         </h1>
         {mode === 'signup' && (
           <p className={FORM_LAYOUT.hint}>
-            Sign up with Google or email in seconds, then make it unmistakably
-            yours.
+            {spotifyOauthEnabled
+              ? 'Sign up with Spotify, Google, or email in seconds, then make it unmistakably yours.'
+              : 'Sign up with Google or email in seconds, then make it unmistakably yours.'}
           </p>
         )}
       </div>

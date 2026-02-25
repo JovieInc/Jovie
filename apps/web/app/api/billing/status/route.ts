@@ -38,6 +38,11 @@ interface BillingStatusPayload {
   stripeSubscriptionId: string | null;
 }
 
+interface BillingStatusStalePayload extends BillingStatusPayload {
+  _stale: true;
+  _staleReason: string;
+}
+
 interface BillingStatusCacheEntry {
   payload: BillingStatusPayload;
   cachedAt: string;
@@ -117,6 +122,16 @@ function writeBillingStatusCache(
         error,
       });
     });
+}
+
+function buildStaleBillingStatusPayload(
+  payload: BillingStatusPayload
+): BillingStatusStalePayload {
+  return {
+    ...payload,
+    _stale: true,
+    _staleReason: 'Payment service temporarily unavailable',
+  };
 }
 
 async function healStripeBillingMismatch(
@@ -217,7 +232,7 @@ export async function GET() {
       const cached = await readCachedBillingStatus(userId);
       if (cached) {
         return NextResponse.json(
-          { ...cached.payload, stale: true },
+          buildStaleBillingStatusPayload(cached.payload),
           { headers: CACHE_HEADERS }
         );
       }

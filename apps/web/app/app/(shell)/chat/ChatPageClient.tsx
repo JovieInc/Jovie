@@ -23,6 +23,7 @@ import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLi
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
+  readonly isFirstSession?: boolean;
 }
 
 /**
@@ -38,7 +39,10 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
   );
 }
 
-export function ChatPageClient({ conversationId }: ChatPageClientProps) {
+export function ChatPageClient({
+  conversationId,
+  isFirstSession = false,
+}: ChatPageClientProps) {
   const {
     selectedProfile,
     creatorProfiles,
@@ -166,7 +170,6 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const rawQuery = searchParams.get('q');
   const initialQuery =
     !initialQueryHandled && !conversationId ? rawQuery : null;
-  const isFirstSession = !conversationId;
 
   // Mark as handled after first render so re-renders don't re-submit
   useEffect(() => {

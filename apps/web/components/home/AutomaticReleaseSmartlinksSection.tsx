@@ -51,7 +51,7 @@ export function AutomaticReleaseSmartlinksSection() {
                   border: '1px solid rgba(255,255,255,0.05)',
                 }}
               >
-                Smartlinks · Auto-generated
+                Smartlinks · Auto-generated{' '}
                 <span style={{ color: 'var(--linear-text-tertiary)' }}>→</span>
               </span>
             </div>

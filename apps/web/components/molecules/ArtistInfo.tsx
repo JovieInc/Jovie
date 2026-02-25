@@ -82,6 +82,8 @@ export function ArtistInfo({
     >
       <ProfilePhotoContextMenu
         name={artist.name}
+        handle={artist.handle}
+        tagline={resolvedSubtitle}
         sizes={photoDownloadSizes}
         allowDownloads={allowPhotoDownloads}
       >

@@ -51,16 +51,13 @@ interface AdminWaitlistPageProps {
 export default async function AdminWaitlistPage({
   searchParams,
 }: Readonly<AdminWaitlistPageProps>) {
-  const { page, pageSize } =
-    await adminWaitlistSearchParams.parse(searchParams);
+  const { pageSize } = await adminWaitlistSearchParams.parse(searchParams);
 
-  const [
-    { entries, page: currentPage, pageSize: resolvedPageSize, total },
-    metrics,
-  ] = await Promise.all([
-    getAdminWaitlistEntries({ page, pageSize }),
-    getWaitlistMetrics(),
-  ]);
+  const [{ entries, pageSize: resolvedPageSize, total }, metrics] =
+    await Promise.all([
+      getAdminWaitlistEntries({ page: 1, pageSize }),
+      getWaitlistMetrics(),
+    ]);
 
   return (
     <PageShell>
@@ -69,7 +66,7 @@ export default async function AdminWaitlistPage({
         <WaitlistMetrics metrics={metrics} />
         <AdminWaitlistTableWithViews
           entries={entries}
-          page={currentPage}
+          page={1}
           pageSize={resolvedPageSize}
           total={total}
         />
