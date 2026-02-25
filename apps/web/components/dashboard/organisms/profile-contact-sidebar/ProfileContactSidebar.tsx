@@ -331,7 +331,14 @@ export function ProfileContactSidebar() {
     );
   }
 
-  const { username, displayName, avatarUrl, links, profilePath } = previewData;
+  const {
+    username,
+    displayName,
+    avatarUrl,
+    links,
+    profilePath,
+    dspConnections,
+  } = previewData;
 
   return (
     <RightDrawer
@@ -381,6 +388,7 @@ export function ProfileContactSidebar() {
             selectedCategory={resolvedCategory}
             onAddLink={handleAddLink}
             onRemoveLink={handleRemoveLink}
+            dspConnections={dspConnections}
           />
 
           {/* Inline add link form */}
