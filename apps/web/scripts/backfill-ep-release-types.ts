@@ -4,12 +4,26 @@ import { and, between, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 async function main() {
   const creatorProfileId = process.argv[2];
 
+  if (creatorProfileId && !UUID_REGEX.test(creatorProfileId)) {
+    console.error('Invalid creatorProfileId argument (expected UUID).');
+    process.exit(1);
+  }
+
   const baseWhere = and(
     eq(discogReleases.releaseType, 'single'),
-    between(discogReleases.totalTracks, 4, 6)
+    between(discogReleases.totalTracks, 4, 6),
+    drizzleSql`EXISTS (
+      SELECT 1
+      FROM provider_links pl
+      WHERE pl.release_id = ${discogReleases.id}
+        AND pl.provider_id = 'spotify'
+    )`
   );
 
   const whereClause = creatorProfileId
