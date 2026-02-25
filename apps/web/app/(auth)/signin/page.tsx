@@ -11,7 +11,9 @@ export default function SignInPage() {
     <AuthLayout
       formTitle="What's your email?"
       showFormTitle={false}
-      showFooterPrompt={false}
+      footerPrompt="Don't have an account?"
+      footerLinkText='Sign up'
+      footerLinkHref='/signup'
     >
       <SignInForm />
     </AuthLayout>

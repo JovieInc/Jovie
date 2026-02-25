@@ -67,7 +67,9 @@ export default function SignUpPage() {
     <AuthLayout
       formTitle='Create your account'
       showFormTitle={false}
-      showFooterPrompt={false}
+      footerPrompt='Already have an account?'
+      footerLinkText='Sign in'
+      footerLinkHref='/signin'
     >
       <Suspense>
         <SignUpClaimDataPersistence />
