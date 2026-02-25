@@ -3,7 +3,6 @@ import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
 
 import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { getAdminUsers } from '@/lib/admin/users';
 import { adminUsersSearchParams } from '@/lib/nuqs';
 
@@ -57,17 +56,13 @@ export default async function AdminUsersPage({
   });
 
   return (
-    <PageShell>
-      <PageContent noPadding>
-        <AdminUsersTableUnified
-          users={users}
-          page={1}
-          pageSize={pageSize}
-          total={total}
-          search={q ?? ''}
-          sort={sort}
-        />
-      </PageContent>
-    </PageShell>
+    <AdminUsersTableUnified
+      users={users}
+      page={1}
+      pageSize={pageSize}
+      total={total}
+      search={q ?? ''}
+      sort={sort}
+    />
   );
 }

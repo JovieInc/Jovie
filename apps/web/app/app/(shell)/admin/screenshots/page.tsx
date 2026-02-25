@@ -1,11 +1,6 @@
 import { Skeleton } from '@jovie/ui';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
-import {
-  PageContent,
-  PageHeader,
-  PageShell,
-} from '@/components/organisms/PageShell';
 import { getScreenshots } from '@/lib/admin/screenshots';
 
 const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-skel-${i}`);
@@ -40,14 +35,16 @@ export default async function AdminScreenshotsPage() {
   const screenshots = await getScreenshots();
 
   return (
-    <PageShell>
-      <PageHeader
-        title='Screenshots'
-        description={`${screenshots.length} screenshots from docs and e2e tests`}
-      />
-      <PageContent>
-        <ScreenshotGallery screenshots={screenshots} />
-      </PageContent>
-    </PageShell>
+    <>
+      <header className='mb-6'>
+        <h1 className='text-[15px] font-semibold text-primary-token'>
+          Screenshots
+        </h1>
+        <p className='text-xs text-secondary-token'>
+          {screenshots.length} screenshots from docs and e2e tests
+        </p>
+      </header>
+      <ScreenshotGallery screenshots={screenshots} />
+    </>
   );
 }

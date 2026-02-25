@@ -185,7 +185,7 @@ export function WaitlistSettingsPanel() {
         </div>
 
         <div className='flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1/40 px-3 py-2.5'>
-          <div className='min-w-0 flex-1'>
+          <div className='shrink-0'>
             <p className='text-[13px] font-medium text-primary-token'>
               Daily auto-accept limit
             </p>
@@ -212,7 +212,7 @@ export function WaitlistSettingsPanel() {
                   : current
               );
             }}
-            className='w-20 text-center tabular-nums'
+            className='w-20 shrink-0 text-center tabular-nums'
             disabled={saving}
           />
         </div>

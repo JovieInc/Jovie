@@ -64,10 +64,13 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   // have persistent navigation on mobile (dashboard, settings, and admin).
   const showMobileTabs = true;
 
-  // Table routes that need different overflow behavior
+  // Table routes (and full-bleed pages) that need overflow-hidden on the shell
   const isTableRoute =
+    pathname === APP_ROUTES.ADMIN ||
+    pathname.includes('/activity') ||
     pathname.includes('/creators') ||
     pathname.includes('/audience') ||
+    pathname.includes('/feedback') ||
     pathname.includes('/users') ||
     pathname.includes('/waitlist') ||
     pathname.includes('/releases');

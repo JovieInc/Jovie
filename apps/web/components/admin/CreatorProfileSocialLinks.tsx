@@ -32,7 +32,11 @@ export const CreatorProfileSocialLinks = memo(
             extractUsernameFromUrl(link.url) ??
             extractUsernameFromLabel(link.displayText ?? '') ??
             '';
-          const displayUsername = formatUsername(username);
+          const isWebsite =
+            link.platformType === 'website' || link.platform === 'website';
+          const displayUsername = isWebsite
+            ? username
+            : formatUsername(username);
 
           return (
             <PlatformPill

@@ -1,5 +1,3 @@
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-
 const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
   { length: 8 },
   (_, i) => `activity-row-${i + 1}`
@@ -64,11 +62,5 @@ export function AdminActivitySkeleton() {
 }
 
 export default function AdminActivityLoading() {
-  return (
-    <PageShell>
-      <PageContent noPadding>
-        <AdminActivitySkeleton />
-      </PageContent>
-    </PageShell>
-  );
+  return <AdminActivitySkeleton />;
 }

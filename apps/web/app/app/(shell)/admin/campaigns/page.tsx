@@ -1,8 +1,6 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-
 const InviteCampaignManager = dynamic(
   () =>
     import('@/components/admin/campaigns/InviteCampaignManager').then(mod => ({
@@ -27,20 +25,18 @@ export const runtime = 'nodejs';
 
 export default function AdminCampaignsPage() {
   return (
-    <PageShell>
-      <PageContent className='mx-auto max-w-4xl'>
-        <div className='mb-8'>
-          <h1 className='text-2xl font-bold text-primary-token'>
-            Invite Campaigns
-          </h1>
-          <p className='mt-2 text-sm text-secondary-token'>
-            Send claim invites to unclaimed creator profiles. Emails are
-            throttled and randomized to avoid spam filters.
-          </p>
-        </div>
+    <div className='mx-auto max-w-4xl'>
+      <div className='mb-8'>
+        <h1 className='text-2xl font-bold text-primary-token'>
+          Invite Campaigns
+        </h1>
+        <p className='mt-2 text-sm text-secondary-token'>
+          Send claim invites to unclaimed creator profiles. Emails are throttled
+          and randomized to avoid spam filters.
+        </p>
+      </div>
 
-        <InviteCampaignManager />
-      </PageContent>
-    </PageShell>
+      <InviteCampaignManager />
+    </div>
   );
 }

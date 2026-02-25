@@ -59,6 +59,14 @@ const SIZE_MAP = {
   'display-4xl': 384,
 };
 
+const OVERLAY_ROUNDED_MAP = {
+  none: 'rounded-none',
+  sm: 'rounded-sm',
+  md: 'rounded-md',
+  lg: 'rounded-lg',
+  full: 'rounded-full',
+} as const;
+
 function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
   return (node: T) => {
     refs.forEach(ref => {
@@ -134,6 +142,8 @@ export const AvatarUploadable = React.memo(
 
       const avatarSize = avatarProps.size || 'md';
       const numericSize = SIZE_MAP[avatarSize];
+      const overlayRoundedClass =
+        OVERLAY_ROUNDED_MAP[avatarProps.rounded ?? 'full'];
       const acceptedTypeList = useMemo(
         () => acceptedTypes.join(','),
         [acceptedTypes]
@@ -213,11 +223,18 @@ export const AvatarUploadable = React.memo(
             />
 
             {isInteractive && showHoverOverlay && !isDragOver && (
-              <AvatarUploadOverlay iconSize={numericSize * 0.3} />
+              <AvatarUploadOverlay
+                iconSize={numericSize * 0.3}
+                roundedClass={overlayRoundedClass}
+              />
             )}
 
             {isDragOver && (
-              <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
+              <AvatarUploadOverlay
+                iconSize={numericSize * 0.3}
+                isDragOver
+                roundedClass={overlayRoundedClass}
+              />
             )}
 
             {showProgress && (

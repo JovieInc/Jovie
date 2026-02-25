@@ -1,42 +1,33 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { isAdmin } from '@/lib/admin/roles';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * Admin layout — lightweight auth gate.
+ *
+ * The parent (shell)/layout.tsx already fetches full entitlements and
+ * provides DashboardDataContext. This layout only needs to verify the
+ * user has admin role before rendering admin pages.
+ */
 export default async function AdminLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  let entitlements;
-  try {
-    entitlements = await getCurrentUserEntitlements();
-  } catch (error) {
-    if (error instanceof BillingUnavailableError) {
-      // Billing is down but admin status is available — allow access
-      entitlements = {
-        isAuthenticated: true,
-        userId: error.userId,
-        isAdmin: error.isAdmin,
-      };
-    } else {
-      throw error;
-    }
-  }
+  const { userId } = await getCachedAuth();
 
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
+  if (!userId) {
     redirect('/sign-in?redirect_url=/app/admin');
   }
 
-  // Redirect non-admins to dashboard instead of returning 404.
-  // A 404 is misleading — the routes exist, the user just lacks permission.
-  if (!entitlements.isAdmin) {
+  const hasAdminRole = await isAdmin(userId);
+
+  if (!hasAdminRole) {
     redirect(APP_ROUTES.DASHBOARD);
   }
 

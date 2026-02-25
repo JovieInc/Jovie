@@ -1,4 +1,3 @@
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   AdminActivitySectionSkeleton,
   AdminKpiSectionSkeleton,
@@ -10,14 +9,12 @@ import {
  */
 export default function AdminLoading() {
   return (
-    <PageShell>
-      <PageContent>
-        <div className='space-y-8'>
-          <AdminKpiSectionSkeleton />
-          <AdminUsageSectionSkeleton />
-          <AdminActivitySectionSkeleton />
-        </div>
-      </PageContent>
-    </PageShell>
+    <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6'>
+      <div className='space-y-8'>
+        <AdminKpiSectionSkeleton />
+        <AdminUsageSectionSkeleton />
+        <AdminActivitySectionSkeleton />
+      </div>
+    </div>
   );
 }
