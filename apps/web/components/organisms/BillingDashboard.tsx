@@ -1,6 +1,7 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { AlertCircle } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { track } from '@/lib/analytics';
@@ -89,6 +90,19 @@ export const BillingDashboard = memo(function BillingDashboard() {
 
   return (
     <div className='space-y-8'>
+      {billingInfo?.stale && (
+        <div className='flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
+          <AlertCircle
+            className='mt-0.5 h-4 w-4 shrink-0 text-amber-700'
+            aria-hidden='true'
+          />
+          <p>
+            {billingInfo.staleReason ??
+              'Billing details are temporarily unavailable. Displaying your latest saved status.'}
+          </p>
+        </div>
+      )}
+
       <BillingHeader plan={currentPlan} />
 
       {billingInfo && (

@@ -47,6 +47,8 @@ interface ReleaseTableProps {
   readonly refreshingReleaseId?: string | null;
   /** Release that should briefly flash after refresh success */
   readonly flashedReleaseId?: string | null;
+  /** Currently selected release ID for active row highlighting */
+  readonly selectedReleaseId?: string | null;
   /** Check if a release's smart link is locked behind the pro gate */
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   /** Get the reason a smartlink is locked ('scheduled' | 'cap' | null) */
@@ -82,6 +84,7 @@ export function ReleaseTable({
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
+  selectedReleaseId,
   refreshingReleaseId,
   flashedReleaseId,
   isSmartLinkLocked,
@@ -121,12 +124,18 @@ export function ReleaseTable({
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
       const isRowExpanded = showTracks && isExpanded(row.id);
+      const isSelected = selectedReleaseId === row.id;
       const isRefreshing = refreshingReleaseId === row.id;
       const isFlashed = flashedReleaseId === row.id;
 
-      const baseClassName = isRowExpanded
-        ? 'bg-surface-2/30 hover:bg-surface-2/50'
-        : 'hover:bg-surface-2/50';
+      let baseClassName: string;
+      if (isSelected) {
+        baseClassName = 'bg-surface-2/60 hover:bg-surface-2/70';
+      } else if (isRowExpanded) {
+        baseClassName = 'bg-surface-2/30 hover:bg-surface-2/50';
+      } else {
+        baseClassName = 'hover:bg-surface-2/50';
+      }
 
       const refreshClassName = isRefreshing
         ? 'relative overflow-hidden skeleton'
@@ -139,7 +148,13 @@ export function ReleaseTable({
         .filter(Boolean)
         .join(' ');
     },
-    [showTracks, isExpanded, refreshingReleaseId, flashedReleaseId]
+    [
+      showTracks,
+      isExpanded,
+      selectedReleaseId,
+      refreshingReleaseId,
+      flashedReleaseId,
+    ]
   );
 
   // Keyboard navigation callback - open sidebar for focused row

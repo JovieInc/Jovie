@@ -256,7 +256,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align='start' className='w-80 p-0'>
+      <PopoverContent align='start' className='w-80'>
         <div className='border-b border-subtle px-3 py-2'>
           <p className='text-xs font-medium text-primary-token'>
             Platform Availability

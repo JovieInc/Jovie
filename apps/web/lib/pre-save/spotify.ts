@@ -18,7 +18,8 @@ function spotifyAuthHeader(): string {
     throw new Error('Spotify OAuth credentials are not configured');
   }
 
-  return `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+  const credentials = `${clientId}:${clientSecret}`;
+  return `Basic ${Buffer.from(credentials).toString('base64')}`;
 }
 
 export function buildSpotifyAuthorizeUrl(state: string, redirectUri: string) {
@@ -101,7 +102,7 @@ export async function saveReleaseToSpotifyLibrary(params: {
   isTrack: boolean;
 }) {
   const endpoint = params.isTrack ? 'tracks' : 'albums';
-  const key = params.isTrack ? 'ids' : 'ids';
+  const key = 'ids';
   const url = `${SPOTIFY_API_BASE}/me/${endpoint}?${key}=${encodeURIComponent(params.spotifyReleaseId)}`;
 
   const response = await fetch(url, {

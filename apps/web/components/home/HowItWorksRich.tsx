@@ -34,7 +34,7 @@ export function HowItWorksRich() {
     >
       <Container size='homepage'>
         {/* Section label */}
-        <div className='text-center heading-gap-linear'>
+        <div className='text-center mb-8 md:mb-10'>
           <p
             style={{
               fontSize: '13px',
@@ -66,7 +66,7 @@ export function HowItWorksRich() {
               className='flex flex-col'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                padding: '32px',
+                padding: '24px 28px',
               }}
             >
               {/* Step number + line */}
@@ -95,7 +95,7 @@ export function HowItWorksRich() {
                   letterSpacing: '-0.012em',
                   lineHeight: '26.6px',
                   color: 'var(--linear-text-primary)',
-                  marginTop: '16px',
+                  marginTop: '12px',
                 }}
               >
                 {step.title}

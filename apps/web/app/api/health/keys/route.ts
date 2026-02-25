@@ -89,6 +89,7 @@ export async function GET() {
 
   if (!allRequiredPresent) {
     void captureWarning('Required keys health check failed', undefined, {
+      service: 'keys',
       route: '/api/health/keys',
       missingRequired: missingRequired.map(r => r.label),
     });

@@ -23,13 +23,15 @@ describe('MethodSelector', () => {
     );
   };
 
-  it('prioritizes Google then email for signup by default', () => {
-    render(<MethodSelector {...commonProps} mode='signup' />);
+  it('prioritizes Spotify then Google then email for signup when flag is enabled', () => {
+    renderWithFlags(<MethodSelector {...commonProps} mode='signup' />, {
+      [FEATURE_FLAG_KEYS.SPOTIFY_OAUTH]: true,
+    });
 
     const buttons = screen.getAllByRole('button');
-    expect(buttons[0]).toHaveTextContent('Continue with Google');
-    expect(buttons[1]).toHaveTextContent('Continue with email');
-    expect(screen.queryByText('Continue with Spotify')).not.toBeInTheDocument();
+    expect(buttons[0]).toHaveTextContent('Continue with Spotify');
+    expect(buttons[1]).toHaveTextContent('Continue with Google');
+    expect(buttons[2]).toHaveTextContent('Continue with email');
   });
 
   it('keeps Google first for signin', () => {
@@ -48,5 +50,26 @@ describe('MethodSelector', () => {
     expect(buttons[0]).toHaveTextContent('Continue with Google');
     expect(buttons[1]).toHaveTextContent('Continue with email');
     expect(buttons[2]).toHaveTextContent('Continue with Spotify');
+  });
+
+  it('keeps last method override for returning users', () => {
+    renderWithFlags(
+      <MethodSelector {...commonProps} mode='signup' lastMethod='email' />,
+      {
+        [FEATURE_FLAG_KEYS.SPOTIFY_OAUTH]: true,
+      }
+    );
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons[0]).toHaveTextContent('Continue with email');
+    expect(buttons[1]).toHaveTextContent('Continue with Spotify');
+    expect(buttons[2]).toHaveTextContent('Continue with Google');
+  });
+
+  it('keeps Google first for signup when Spotify flag is disabled', () => {
+    render(<MethodSelector {...commonProps} mode='signup' />);
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons[0]).toHaveTextContent('Continue with Google');
   });
 });

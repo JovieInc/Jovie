@@ -41,6 +41,7 @@ import type {
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   enqueueDspArtistDiscoveryJob,
@@ -49,7 +50,9 @@ import {
 } from '@/lib/ingestion/jobs';
 import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import {
+  checkAppleMusicRescanRateLimit,
   checkIsrcRescanRateLimit,
+  checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -61,6 +64,25 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
+
+const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
+  'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
+
+function isSpotifyIdUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const dbError = error as Error & { code?: string; constraint?: string };
+  const message = dbError.message.toLowerCase();
+
+  return (
+    dbError.code === '23505' &&
+    (dbError.constraint === 'creator_profiles_spotify_id_unique' ||
+      message.includes('creator_profiles_spotify_id_unique') ||
+      (message.includes('spotify_id') && message.includes('duplicate')))
+  );
+}
 
 function buildProviderLabels() {
   return Object.entries(PROVIDER_CONFIG).reduce(
@@ -500,10 +522,13 @@ export async function formatReleaseLyrics(params: {
 /**
  * Refresh a single release from the database.
  * Re-fetches the release data (including provider links) without hitting Spotify API.
+ * Rate limited: free 1/day, paid 1/hour per release.
  */
-export async function refreshRelease(params: {
-  releaseId: string;
-}): Promise<ReleaseViewModel> {
+export async function refreshRelease(params: { releaseId: string }): Promise<{
+  release: ReleaseViewModel;
+  rateLimited: boolean;
+  retryAfter: string | null;
+}> {
   noStore();
 
   const { userId } = await getCachedAuth();
@@ -518,14 +543,46 @@ export async function refreshRelease(params: {
     throw new TypeError('Release not found');
   }
 
+  // Check rate limit (plan-aware)
+  let isPaidPlan = false;
+  try {
+    const ent = await getCurrentUserEntitlements();
+    isPaidPlan = ent.isPro;
+  } catch {
+    // Default to free tier on billing errors
+  }
+
+  const rateLimitResult = await checkReleaseRefreshRateLimit(
+    params.releaseId,
+    isPaidPlan
+  );
+
+  if (!rateLimitResult.success) {
+    const providerLabels = buildProviderLabels();
+    return {
+      release: mapReleaseToViewModel(
+        release,
+        providerLabels,
+        profile.id,
+        profile.handle
+      ),
+      rateLimited: true,
+      retryAfter: formatTimeRemaining(rateLimitResult.reset),
+    };
+  }
+
   const providerLabels = buildProviderLabels();
 
-  return mapReleaseToViewModel(
-    release,
-    providerLabels,
-    profile.id,
-    profile.handle
-  );
+  return {
+    release: mapReleaseToViewModel(
+      release,
+      providerLabels,
+      profile.id,
+      profile.handle
+    ),
+    rateLimited: false,
+    retryAfter: null,
+  };
 }
 
 /**
@@ -631,6 +688,109 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
     rateLimited: false,
     retryAfter: null,
     linksFound,
+  };
+}
+
+/**
+ * Rescan Apple Music links across all releases for the current profile.
+ * Rate limited: free 1/day, paid 1/hour per profile.
+ */
+export async function rescanAppleMusicLinks(): Promise<{
+  success: boolean;
+  rateLimited: boolean;
+  retryAfter: string | null;
+  linksFound: number;
+  message: string;
+}> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new TypeError('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Check rate limit (plan-aware)
+  let isPaidPlan = false;
+  try {
+    const ent = await getCurrentUserEntitlements();
+    isPaidPlan = ent.isPro;
+  } catch {
+    // Default to free tier on billing errors
+  }
+
+  const rateLimitResult = await checkAppleMusicRescanRateLimit(
+    profile.id,
+    isPaidPlan
+  );
+
+  if (!rateLimitResult.success) {
+    return {
+      success: false,
+      rateLimited: true,
+      retryAfter: formatTimeRemaining(rateLimitResult.reset),
+      linksFound: 0,
+      message: `Apple Music refresh is rate limited. Try again in ${formatTimeRemaining(rateLimitResult.reset)}.`,
+    };
+  }
+
+  // Look up the Apple Music match for this profile
+  const [match] = await db
+    .select({
+      id: dspArtistMatches.id,
+      externalArtistId: dspArtistMatches.externalArtistId,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.id),
+        eq(dspArtistMatches.providerId, 'apple_music')
+      )
+    )
+    .limit(1);
+
+  if (
+    !match ||
+    (match.status !== 'confirmed' && match.status !== 'auto_confirmed')
+  ) {
+    return {
+      success: false,
+      rateLimited: false,
+      retryAfter: null,
+      linksFound: 0,
+      message: 'No Apple Music artist connected.',
+    };
+  }
+
+  const result = await processReleaseEnrichmentJobStandalone({
+    creatorProfileId: profile.id,
+    matchId: match.id,
+    providerId: 'apple_music',
+    externalArtistId: match.externalArtistId,
+  });
+
+  // Invalidate cache
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('apple_music_rescan', {
+    profileId: profile.id,
+    linksFound: result.releasesEnriched,
+  });
+
+  return {
+    success: true,
+    rateLimited: false,
+    retryAfter: null,
+    linksFound: result.releasesEnriched,
+    message: (() => {
+      if (result.releasesEnriched === 0)
+        return 'No new Apple Music links found.';
+      const suffix = result.releasesEnriched === 1 ? '' : 's';
+      return `Found ${result.releasesEnriched} new Apple Music link${suffix}.`;
+    })(),
   };
 }
 
@@ -771,18 +931,32 @@ export async function connectSpotifyArtist(params: {
   >;
 
   // Update the profile with the Spotify artist ID, URL, and artist name in settings
-  await db
-    .update(creatorProfiles)
-    .set({
-      spotifyId: params.spotifyArtistId,
-      spotifyUrl: params.spotifyArtistUrl,
-      settings: {
-        ...currentSettings,
-        spotifyArtistName: params.artistName,
-      },
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+  try {
+    await db
+      .update(creatorProfiles)
+      .set({
+        spotifyId: params.spotifyArtistId,
+        spotifyUrl: params.spotifyArtistUrl,
+        settings: {
+          ...currentSettings,
+          spotifyArtistName: params.artistName,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  } catch (error) {
+    if (isSpotifyIdUniqueViolation(error)) {
+      return {
+        success: false,
+        message: SPOTIFY_ALREADY_CLAIMED_MESSAGE,
+        imported: 0,
+        releases: [],
+        artistName: params.artistName,
+      };
+    }
+
+    throw error;
+  }
 
   // Sync releases from the connected artist
   const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);

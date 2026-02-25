@@ -26,9 +26,9 @@ import type { UseSuggestedProfilesReturn } from '../hooks/useSuggestedProfiles';
 type SlideDirection = 'left' | 'right' | null;
 
 function confidenceBadgeClass(confidence: number): string {
-  if (confidence >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
-  if (confidence >= 0.5) return 'bg-amber-500/15 text-amber-400';
-  return 'bg-red-500/15 text-red-400';
+  if (confidence >= 0.8) return 'bg-success-subtle text-success';
+  if (confidence >= 0.5) return 'bg-warning-subtle text-warning';
+  return 'bg-error-subtle text-error';
 }
 
 const ICON_PLATFORM_MAP: Record<string, string> = {
@@ -126,7 +126,7 @@ function ProfileReadyCard({
 
         {/* Header */}
         <div className='flex items-center gap-2 mb-4'>
-          <CheckCircle2 className='h-4 w-4 text-emerald-400' />
+          <CheckCircle2 className='h-4 w-4 text-success' />
           <p className='text-sm font-medium text-primary-token'>
             Your profile is live
           </p>
@@ -171,7 +171,7 @@ function ProfileReadyCard({
           rel='noopener noreferrer'
           className={cn(
             'flex w-full items-center justify-center gap-1.5 rounded-lg',
-            'bg-accent px-3 py-2.5 text-[13px] font-medium text-on-accent',
+            'bg-accent px-3 py-2.5 text-[13px] font-medium text-accent-foreground',
             'transition-colors hover:bg-accent/90',
             'focus:outline-none'
           )}
@@ -306,7 +306,7 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'bg-accent px-3 py-3 text-[13px] font-medium text-on-accent sm:py-2',
+              'bg-accent px-3 py-3 text-[13px] font-medium text-accent-foreground sm:py-2',
               'transition-colors hover:bg-accent/90',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -329,8 +329,8 @@ function SuggestionCard({
 // Main Component
 // ============================================================================
 
-interface SuggestedProfilesCarouselProps
-  extends Pick<
+type SuggestedProfilesCarouselProps = Readonly<
+  Pick<
     UseSuggestedProfilesReturn,
     | 'suggestions'
     | 'isLoading'
@@ -341,11 +341,12 @@ interface SuggestedProfilesCarouselProps
     | 'confirm'
     | 'reject'
     | 'isActioning'
-  > {
-  readonly username?: string;
-  readonly displayName?: string;
-  readonly avatarUrl?: string | null;
-}
+  > & {
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  }
+>;
 
 export function SuggestedProfilesCarousel({
   suggestions,

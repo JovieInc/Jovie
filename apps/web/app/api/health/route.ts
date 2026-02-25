@@ -79,6 +79,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     void captureWarning('Health check degraded', error, {
+      service: 'health',
       route: '/api/health',
     });
     summary.status = 'degraded';

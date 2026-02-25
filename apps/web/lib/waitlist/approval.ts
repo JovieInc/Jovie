@@ -16,6 +16,11 @@ export type WaitlistApprovalResult =
       clerkId: string | null;
     };
 
+export type WaitlistDisapprovalResult =
+  | { outcome: 'not_found' }
+  | { outcome: 'already_new' }
+  | { outcome: 'disapproved'; clerkId: string | null };
+
 export async function approveWaitlistEntryInTx(
   tx: DbOrTransaction,
   entryId: string
@@ -96,6 +101,73 @@ export async function approveWaitlistEntryInTx(
 
 export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {
   if (result.outcome === 'approved' && result.clerkId) {
+    await invalidateProxyUserStateCache(result.clerkId);
+  }
+}
+
+export async function disapproveWaitlistEntryInTx(
+  tx: DbOrTransaction,
+  entryId: string
+): Promise<WaitlistDisapprovalResult> {
+  const now = new Date();
+
+  const [entry] = await tx
+    .select({
+      id: waitlistEntries.id,
+      email: waitlistEntries.email,
+      status: waitlistEntries.status,
+    })
+    .from(waitlistEntries)
+    .where(eq(waitlistEntries.id, entryId))
+    .for('update')
+    .limit(1);
+
+  if (!entry) return { outcome: 'not_found' };
+  if (entry.status === 'new') return { outcome: 'already_new' };
+
+  const [user] = await tx
+    .select({ id: users.id, clerkId: users.clerkId })
+    .from(users)
+    .where(drizzleSql`lower(${users.email}) = lower(${entry.email})`)
+    .limit(1);
+
+  const [profile] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.waitlistEntryId, entry.id))
+    .limit(1);
+
+  if (profile) {
+    await tx
+      .update(creatorProfiles)
+      .set({
+        userId: null,
+        isClaimed: false,
+        onboardingCompletedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  }
+
+  await tx
+    .update(waitlistEntries)
+    .set({ status: 'new', updatedAt: now })
+    .where(eq(waitlistEntries.id, entry.id));
+
+  if (user) {
+    await tx
+      .update(users)
+      .set({ userStatus: 'waitlist_pending', updatedAt: now })
+      .where(eq(users.id, user.id));
+  }
+
+  return { outcome: 'disapproved', clerkId: user?.clerkId ?? null };
+}
+
+export async function finalizeWaitlistDisapproval(
+  result: WaitlistDisapprovalResult
+) {
+  if (result.outcome === 'disapproved' && result.clerkId) {
     await invalidateProxyUserStateCache(result.clerkId);
   }
 }

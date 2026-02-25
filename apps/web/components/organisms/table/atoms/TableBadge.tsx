@@ -6,11 +6,21 @@ export interface TableBadgeProps
     readonly variant: 'primary' | 'secondary' | 'success' | 'warning' | 'error';
     readonly children: React.ReactNode;
     readonly className?: string;
+    readonly size?: 'sm' | 'md' | 'lg';
   }> {}
 
-export function TableBadge({ variant, children, className }: TableBadgeProps) {
+export function TableBadge({
+  variant,
+  children,
+  className,
+  size = 'sm',
+}: TableBadgeProps) {
   return (
-    <Badge variant={variant} className={cn('line-clamp-1', className)}>
+    <Badge
+      size={size}
+      variant={variant}
+      className={cn('line-clamp-1', className)}
+    >
       {children}
     </Badge>
   );

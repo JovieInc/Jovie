@@ -4,7 +4,7 @@ import { Suspense } from 'react';
 import { ActivityTableUnified } from '@/components/admin/ActivityTableUnified';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
-import AdminActivityLoading from './loading';
+import { AdminActivitySkeleton } from './loading';
 
 export const metadata: Metadata = {
   title: 'Admin activity',
@@ -25,7 +25,7 @@ async function ActivityContent() {
 export default function AdminActivityPage() {
   return (
     <PageShell>
-      <Suspense fallback={<AdminActivityLoading />}>
+      <Suspense fallback={<AdminActivitySkeleton />}>
         <ActivityContent />
       </Suspense>
     </PageShell>

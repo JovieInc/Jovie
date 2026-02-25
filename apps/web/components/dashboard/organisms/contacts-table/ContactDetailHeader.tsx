@@ -79,6 +79,7 @@ export function ContactDetailHeader({
           <DrawerHeaderActions
             primaryActions={primaryActions}
             overflowActions={overflowActions}
+            onClose={onClose}
           />
         ) : undefined
       }

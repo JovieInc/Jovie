@@ -278,7 +278,7 @@ export function DeeplinksGrid() {
                     color: 'var(--linear-text-tertiary)',
                   }}
                 >
-                  jov.ie/tim/
+                  {'jov.ie/tim/'}
                   <span style={{ color: 'var(--linear-text-primary)' }}>
                     {card.slugPath}
                   </span>

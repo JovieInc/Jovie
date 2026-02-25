@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="9" failures="0" errors="0" time="0.19153963">
+    <testsuite name="tests/unit/organisms/TipSection.test.tsx" timestamp="2026-02-23T05:58:00.278Z" hostname="runnervmwffz4" tests="7" failures="0" errors="0" skipped="0" time="0.185314512">
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; shows success toast when Stripe payment succeeds" time="0.055391505">
+        </testcase>
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; shows error toast when Stripe payment fails" time="0.011712775">
+            <system-err>
+[ERROR] Tip payment failed {
+  &quot;message&quot;: &quot;Payment failed&quot;,
+  &quot;stack&quot;: &quot;Error: Payment failed\n    at /home/runner/work/Jovie/Jovie/apps/web/tests/unit/organisms/TipSection.test.tsx:61:47\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:145:11\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:26\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1243:20\n    at new Promise (&lt;anonymous&gt;)\n    at runWithTimeout (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1209:10)\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:37\n    at Traces.$ (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/vitest@4.0.18_@opentelemetry+api@1.9.0_@types+node@25.0.3_@vitest+browser-playwright@4.0.18_j_fxxl7ayq2proqgahacydracwhm/node_modules/vitest/dist/chunks/traces.CCmnQaNT.js:142:27)\n    at trace (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/vitest@4.0.18_@opentelemetry+api@1.9.0_@types+node@25.0.3_@vitest+browser-playwright@4.0.18_j_fxxl7ayq2proqgahacydracwhm/node_modules/vitest/dist/chunks/test.B8ej_ZHS.js:239:21)\n    at runTest (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:12)&quot;,
+  &quot;type&quot;: &quot;Error&quot;,
+  &quot;handle&quot;: &quot;artist123&quot;,
+  &quot;amount&quot;: 2,
+  &quot;paymentMethod&quot;: &quot;stripe&quot;,
+  &quot;sentryMode&quot;: &quot;none&quot;
+}
+
+            </system-err>
+        </testcase>
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders payment method selection when both Stripe and Venmo are available" time="0.046648014">
+        </testcase>
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; calls onVenmoPayment with a properly constructed URL when Venmo is used" time="0.033678443">
+        </testcase>
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders QR code fallback when no Stripe or Venmo payment methods are available" time="0.007790569">
+        </testcase>
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; returns to payment method selection when back button is clicked after choosing a payment method" time="0.020595402">
+        </testcase>
+        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders Venmo payment flow directly when only Venmo is available" time="0.007841326">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/lib/db/client/retry.test.ts" timestamp="2026-02-23T05:58:00.280Z" hostname="runnervmwffz4" tests="2" failures="0" errors="0" skipped="0" time="0.006225118">
+        <testcase classname="tests/unit/lib/db/client/retry.test.ts" name="withRetry circuit breaker &gt; fails fast with DbCircuitOpenError when circuit is open" time="0.003738909">
+        </testcase>
+        <testcase classname="tests/unit/lib/db/client/retry.test.ts" name="withRetry circuit breaker &gt; exposes status and retryAfterSeconds on circuit open error" time="0.001288974">
+        </testcase>
+    </testsuite>
+</testsuites>

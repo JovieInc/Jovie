@@ -10,9 +10,9 @@
  * @see https://tanstack.com/pacer
  */
 
-import { useAsyncDebouncer } from '@tanstack/react-pacer';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
+import { useAsyncDebouncer } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { SEARCH_CACHE } from './cache-strategies';
 import { FetchError, fetchWithTimeout } from './fetch';

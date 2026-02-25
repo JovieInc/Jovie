@@ -188,8 +188,7 @@ const nextConfig = {
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
-        source:
-          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog)',
+        source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
@@ -321,6 +320,9 @@ const nextConfig = {
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-radio-group',
+      'recharts',
+      '@tanstack/react-pacer',
+      '@sentry/nextjs',
       'clsx',
       'class-variance-authority',
       '@dnd-kit/core',

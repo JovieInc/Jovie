@@ -134,7 +134,8 @@ describe('GET /api/billing/status', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.stale).toBe(true);
+    expect(data._stale).toBe(true);
+    expect(data._staleReason).toBe('Payment service temporarily unavailable');
     expect(data.isPro).toBe(true);
     expect(data.plan).toBe('pro');
     expect(data.stripeCustomerId).toBe('cus_cached');

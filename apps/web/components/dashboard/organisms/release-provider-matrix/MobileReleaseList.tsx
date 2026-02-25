@@ -12,6 +12,8 @@ import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 
+type SmartLinkLockReason = 'scheduled' | 'cap' | null;
+
 interface MobileReleaseListProps {
   readonly releases: ReleaseViewModel[];
   readonly artistName?: string | null;
@@ -22,9 +24,7 @@ interface MobileReleaseListProps {
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
   readonly groupByYear?: boolean;
 }
 
@@ -57,6 +57,14 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   }));
 }
 
+function getLockIconName(
+  isLocked: boolean,
+  lockReason?: SmartLinkLockReason
+): string {
+  if (!isLocked) return 'Link2';
+  return lockReason === 'scheduled' ? 'Clock' : 'Lock';
+}
+
 /** Swipe action buttons revealed on left-swipe */
 const SwipeActions = memo(function SwipeActions({
   release,
@@ -73,7 +81,7 @@ const SwipeActions = memo(function SwipeActions({
     testId: string
   ) => Promise<string>;
   readonly isLocked: boolean;
-  readonly lockReason?: 'scheduled' | 'cap' | null;
+  readonly lockReason?: SmartLinkLockReason;
 }) {
   const handleCopy = useCallback(() => {
     if (onCopy && !isLocked) {
@@ -120,9 +128,7 @@ const SwipeActions = memo(function SwipeActions({
         }
       >
         <Icon
-          name={
-            isLocked ? (lockReason === 'scheduled' ? 'Clock' : 'Lock') : 'Link2'
-          }
+          name={getLockIconName(isLocked, lockReason)}
           className='h-4 w-4'
           aria-hidden='true'
         />
@@ -133,6 +139,12 @@ const SwipeActions = memo(function SwipeActions({
     </div>
   );
 });
+
+function getReleaseYear(release: ReleaseViewModel): number | null {
+  return release.releaseDate
+    ? new Date(release.releaseDate).getFullYear()
+    : null;
+}
 
 /** Single release row in the mobile list — Apple Music layout, Linear tokens */
 const MobileReleaseRow = memo(function MobileReleaseRow({
@@ -152,36 +164,27 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
-  const year = release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
-    : null;
+  const year = getReleaseYear(release);
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
 
-  const actions = useMemo(
-    () => (
-      <SwipeActions
-        release={release}
-        onEdit={onEdit}
-        onCopy={onCopy}
-        isLocked={isLocked}
-        lockReason={lockReason}
-      />
-    ),
-    [release, onEdit, onCopy, isLocked, lockReason]
-  );
-
   return (
     <SwipeToReveal
       itemId={release.id}
       actionsWidth={SWIPE_ACTIONS_WIDTH}
-      actions={actions}
+      actions={
+        <SwipeActions
+          release={release}
+          onEdit={onEdit}
+          onCopy={onCopy}
+          isLocked={isLocked}
+          lockReason={lockReason}
+        />
+      }
       className='border-b border-subtle'
       contentClassName='bg-base'
     >

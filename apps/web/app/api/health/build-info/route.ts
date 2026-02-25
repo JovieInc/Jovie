@@ -25,6 +25,7 @@ export function GET() {
     });
   } catch (error) {
     void captureWarning('Build info health check failed', error, {
+      service: 'build-info',
       route: '/api/health/build-info',
     });
     return NextResponse.json({

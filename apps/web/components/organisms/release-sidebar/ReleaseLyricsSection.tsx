@@ -1,10 +1,21 @@
 'use client';
 
 import { Button, Textarea } from '@jovie/ui';
-import { Copy, Sparkles } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, Copy, Loader2, Sparkles } from 'lucide-react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import { DrawerSection } from '@/components/molecules/drawer';
+
+/** Auto-save debounce delay in milliseconds */
+const AUTO_SAVE_DELAY_MS = 1500;
+
+type SaveStatus = 'idle' | 'saving' | 'saved';
 
 interface ReleaseLyricsSectionProps {
   readonly releaseId: string;
@@ -29,28 +40,116 @@ export function ReleaseLyricsSection({
   const [draftLyrics, setDraftLyrics] = useState(lyrics ?? '');
   const [isCopying, setIsCopying] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
 
+  // Refs for auto-save to avoid stale closures
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedIndicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const draftRef = useRef(draftLyrics);
+  const releaseIdRef = useRef(releaseId);
+  const lyricsRef = useRef(lyrics);
+
+  // Keep refs in sync
+  draftRef.current = draftLyrics;
+  releaseIdRef.current = releaseId;
+  lyricsRef.current = lyrics;
+
+  // Sync draft when lyrics or releaseId changes externally
   useEffect(() => {
     setDraftLyrics(lyrics ?? '');
+    setSaveStatus('idle');
   }, [lyrics, releaseId]);
 
-  const hasUnsavedChanges = useMemo(
-    () => draftLyrics !== (lyrics ?? ''),
-    [draftLyrics, lyrics]
-  );
+  // Auto-save implementation
+  const performAutoSave = useCallback(async () => {
+    if (!onSaveLyrics) return;
+    const currentDraft = draftRef.current;
+    const currentLyrics = lyricsRef.current ?? '';
+    const currentReleaseId = releaseIdRef.current;
+
+    // Only save if there are actual changes
+    if (currentDraft === currentLyrics) return;
+
+    setSaveStatus('saving');
+    try {
+      await onSaveLyrics(currentReleaseId, currentDraft);
+      setSaveStatus('saved');
+
+      // Clear "Saved" indicator after 2s
+      if (savedIndicatorTimerRef.current) {
+        clearTimeout(savedIndicatorTimerRef.current);
+      }
+      savedIndicatorTimerRef.current = setTimeout(
+        () => setSaveStatus('idle'),
+        2000
+      );
+    } catch {
+      setSaveStatus('idle');
+      toast.error('Failed to auto-save lyrics');
+    }
+  }, [onSaveLyrics]);
+
+  // Debounced auto-save on draft changes
+  useEffect(() => {
+    const currentLyrics = lyrics ?? '';
+    if (!isEditable || !onSaveLyrics || draftLyrics === currentLyrics) return;
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      startTransition(() => {
+        performAutoSave();
+      });
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [draftLyrics, lyrics, isEditable, onSaveLyrics, performAutoSave]);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (savedIndicatorTimerRef.current)
+        clearTimeout(savedIndicatorTimerRef.current);
+    };
+  }, []);
 
   return (
     <DrawerSection title='Lyrics'>
       <div className='space-y-2'>
-        <p className='text-xs font-medium text-secondary-token'>Raw lyrics</p>
         <Textarea
           placeholder='Paste your lyrics here'
           value={draftLyrics}
           onChange={event => setDraftLyrics(event.target.value)}
-          rows={10}
+          rows={draftLyrics ? 10 : 4}
           disabled={!isEditable || isSaving}
           className='resize-y'
         />
+        {/* Auto-save status indicator */}
+        {saveStatus !== 'idle' && (
+          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
+            {saveStatus === 'saving' && (
+              <>
+                <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
+                <span>Saving…</span>
+              </>
+            )}
+            {saveStatus === 'saved' && (
+              <>
+                <Check className='h-3 w-3 text-success' aria-hidden='true' />
+                <span>Saved</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className='mt-3 flex flex-wrap items-center gap-2'>
@@ -103,18 +202,6 @@ export function ReleaseLyricsSection({
           <Copy className='h-4 w-4' />
           {isCopying ? 'Copying…' : 'Copy lyrics'}
         </Button>
-
-        {isEditable && onSaveLyrics && (
-          <Button
-            type='button'
-            size='sm'
-            variant='primary'
-            onClick={() => void onSaveLyrics(releaseId, draftLyrics)}
-            disabled={!hasUnsavedChanges || isSaving || isFormatting}
-          >
-            {isSaving ? 'Saving…' : 'Save lyrics'}
-          </Button>
-        )}
       </div>
     </DrawerSection>
   );
