@@ -331,6 +331,7 @@ export function ReleaseTable({
       enableVirtualization={shouldVirtualize && !groupByYear}
       rowHeight={rowHeight}
       minWidth={minWidth}
+      hideHeader
       className='text-[13px]'
       containerClassName='h-full'
       columnVisibility={tanstackColumnVisibility}

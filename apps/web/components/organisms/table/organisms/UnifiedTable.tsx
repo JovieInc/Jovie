@@ -225,6 +225,12 @@ export interface UnifiedTableProps<TData> {
   readonly onLoadMore?: () => void;
 
   /**
+   * Hide the column header row
+   * @default false
+   */
+  readonly hideHeader?: boolean;
+
+  /**
    * Set of expanded row IDs for expandable rows.
    * When provided with renderExpandedContent, enables row expansion.
    */
@@ -321,6 +327,7 @@ export function UnifiedTable<TData>({
   hasNextPage,
   isFetchingNextPage,
   onLoadMore,
+  hideHeader = false,
   expandedRowIds,
   renderExpandedContent,
   getExpandableRowId,
@@ -490,7 +497,9 @@ export function UnifiedTable<TData>({
       >
         <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Loading table data</caption>
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          {!hideHeader && (
+            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          )}
           <LoadingTableBody
             rows={skeletonRows}
             columns={columnCount}
@@ -510,7 +519,9 @@ export function UnifiedTable<TData>({
       >
         <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Empty table</caption>
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          {!hideHeader && (
+            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          )}
           <tbody>
             <tr>
               <td colSpan={columnCount} className='p-0'>
@@ -539,7 +550,9 @@ export function UnifiedTable<TData>({
       >
         <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Grouped table data</caption>
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          {!hideHeader && (
+            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          )}
           <GroupedTableBody
             groupedData={groupedData}
             observeGroupHeader={observeGroupHeader}
