@@ -167,9 +167,9 @@ export default async function RootLayout({
     )
     ?.split('=')[1];
   const cookieBannerRequired =
-    cookieRequirement != null
-      ? cookieRequirement !== '0'
-      : isCookieBannerRequired(headersList.get('x-vercel-ip-country'));
+    cookieRequirement == null
+      ? isCookieBannerRequired(headersList.get('x-vercel-ip-country'))
+      : cookieRequirement !== '0';
 
   const headContent = (
     <head>

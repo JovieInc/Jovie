@@ -63,7 +63,6 @@ screenshot-reports/
 - Homepage (`/`)
 - Pricing (`/pricing`)
 - Sign up (`/sign-up`)
-- Link in bio feature (`/link-in-bio`)
 - Engagement engine (`/engagement-engine`)
 - Support (`/support`)
 

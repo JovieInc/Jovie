@@ -47,7 +47,12 @@ const STATUS_VARIANTS: Record<
 
 export interface WaitlistMobileCardProps {
   readonly entry: WaitlistEntryRow;
-  readonly approveStatus: 'idle' | 'loading' | 'success' | 'error';
+  readonly approveStatus:
+    | 'idle'
+    | 'approving'
+    | 'disapproving'
+    | 'success'
+    | 'error';
   readonly onApprove: () => void;
 }
 
@@ -66,7 +71,8 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
   const [isExpanded, setIsExpanded] = useState(false);
 
   const isApproved = entry.status === 'invited' || entry.status === 'claimed';
-  const isApproving = approveStatus === 'loading';
+  const isApproving = approveStatus === 'approving';
+  const isDisapproving = approveStatus === 'disapproving';
   const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
   const platformLabel =
     PLATFORM_LABELS[entry.primarySocialPlatform] ?? entry.primarySocialPlatform;
@@ -84,8 +90,9 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 
   // Determine button label based on approval state
   const getApproveButtonLabel = (): string => {
-    if (isApproved) return 'Approved';
     if (isApproving) return 'Approving…';
+    if (isDisapproving) return 'Disapproving…';
+    if (isApproved) return 'Disapprove';
     return 'Approve';
   };
   const approveButtonLabel = getApproveButtonLabel();
@@ -137,7 +144,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           <Button
             size='sm'
             variant='secondary'
-            disabled={isApproved || isApproving}
+            disabled={isApproving || isDisapproving}
             onClick={onApprove}
             className='flex-1'
           >

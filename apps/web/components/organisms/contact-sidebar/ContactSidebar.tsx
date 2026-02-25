@@ -38,6 +38,7 @@ export const ContactSidebar = memo(function ContactSidebar({
   onContactChange,
   onSave,
   isSaving,
+  contextMenuItems: providedContextMenuItems,
   onAvatarUpload,
 }: ContactSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('details');
@@ -69,7 +70,7 @@ export const ContactSidebar = memo(function ContactSidebar({
 
   // Only depend on specific contact fields, not the entire contact object
   const username = contact?.username;
-  const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
+  const fallbackContextMenuItems = useMemo<CommonDropdownItem[]>(() => {
     if (!hasContact) return [];
 
     const items: ContextMenuItemType[] = [
@@ -107,6 +108,8 @@ export const ContactSidebar = memo(function ContactSidebar({
     return convertToCommonDropdownItems(items);
   }, [hasContact, username, handleCopyProfileUrl, onRefresh]);
 
+  const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
+
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -127,7 +130,7 @@ export const ContactSidebar = memo(function ContactSidebar({
       {contact ? (
         <>
           {/* Always-visible avatar + name */}
-          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+          <div className='shrink-0 px-4 py-3'>
             <ContactAvatar
               avatarUrl={contact.avatarUrl ?? null}
               fullName={fullName}
@@ -139,7 +142,7 @@ export const ContactSidebar = memo(function ContactSidebar({
           </div>
 
           {/* Tab navigation */}
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+          <div className='px-3 py-1.5 shrink-0'>
             <SegmentControl
               value={activeTab}
               onValueChange={setActiveTab}

@@ -9,9 +9,15 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
+import type React from 'react';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ExportCSVButton } from '@/components/organisms/table';
+import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarItem,
+  ExportCSVButton,
+} from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
@@ -69,6 +75,12 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
+  /** DSP connection badges to display on the left */
+  readonly dspBadges?: React.ReactNode;
+  /** Whether search is currently active */
+  readonly isSearchOpen?: boolean;
+  /** Callback to toggle search open/close */
+  readonly onSearchToggle?: () => void;
 }
 
 /** Options for release view segmented control */
@@ -190,7 +202,7 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent align='end' className='w-[260px] p-0'>
+      <PopoverContent align='end' className='w-[260px]'>
         {/* Header */}
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
           <span className='text-[13px] font-semibold text-primary-token'>
@@ -300,29 +312,41 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
+  dspBadges,
+  isSearchOpen,
+  onSearchToggle,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
 
-  const pillButtonClass =
-    'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token';
-
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: release count */}
-      <div className='flex items-center gap-2'>
-        <span className='text-xs text-tertiary-token tabular-nums'>
-          {releases.length} {releases.length === 1 ? 'release' : 'releases'}
-        </span>
-      </div>
+      {/* Left: DSP connection badges */}
+      <div className='flex items-center gap-2'>{dspBadges}</div>
 
-      {/* Right: Filter + Display + Export (hidden on mobile where list view is used) */}
-      <div className='hidden md:flex items-center gap-2'>
+      {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
+      <ActionBar className='hidden md:flex'>
+        {onSearchToggle && (
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={onSearchToggle}
+            className={cn(
+              ACTION_BAR_BUTTON_CLASS,
+              isSearchOpen && 'bg-interactive-active text-primary-token'
+            )}
+            aria-label={isSearchOpen ? 'Close search' : 'Search releases'}
+            aria-pressed={isSearchOpen}
+          >
+            <Icon name='Search' className='h-3.5 w-3.5' />
+            Search
+          </Button>
+        )}
         <ReleaseFilterDropdown
           filters={filters}
           onFiltersChange={onFiltersChange}
           counts={counts}
-          buttonClassName={pillButtonClass}
+          buttonClassName={ACTION_BAR_BUTTON_CLASS}
         />
         <LinearStyleDisplayMenu
           columnVisibility={columnVisibility}
@@ -333,18 +357,20 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}
           onReleaseViewChange={onReleaseViewChange}
-          triggerClassName={pillButtonClass}
+          triggerClassName={ACTION_BAR_BUTTON_CLASS}
         />
-        <ExportCSVButton
-          getData={() => getReleasesForExport(releases, selectedIds)}
-          columns={RELEASES_CSV_COLUMNS}
-          filename='releases'
-          label='Export'
-          variant='ghost'
-          size='sm'
-          className={pillButtonClass}
-        />
-      </div>
+        <ActionBarItem tooltipLabel='Export'>
+          <ExportCSVButton
+            getData={() => getReleasesForExport(releases, selectedIds)}
+            columns={RELEASES_CSV_COLUMNS}
+            filename='releases'
+            label='Export'
+            variant='ghost'
+            size='sm'
+            className={ACTION_BAR_BUTTON_CLASS}
+          />
+        </ActionBarItem>
+      </ActionBar>
     </div>
   );
 });

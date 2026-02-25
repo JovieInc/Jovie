@@ -43,16 +43,15 @@ export function PreSaveActions({
     setAppleState('loading');
 
     try {
-      const music =
-        typeof window !== 'undefined'
-          ? (
-              window as Window & {
-                MusicKit?: {
-                  getInstance: () => { authorize: () => Promise<string> };
-                };
-              }
-            ).MusicKit
-          : undefined;
+      const music = globalThis.window
+        ? (
+            globalThis.window as Window & {
+              MusicKit?: {
+                getInstance: () => { authorize: () => Promise<string> };
+              };
+            }
+          ).MusicKit
+        : undefined;
 
       if (!music?.getInstance) {
         throw new Error('MusicKit unavailable');
@@ -81,14 +80,14 @@ export function PreSaveActions({
 
   return (
     <div className='mt-5 space-y-2'>
-      <p className='text-center text-xs text-white/55'>
+      <p className='text-muted-foreground text-center text-xs'>
         Save it now. Listen instantly on release day.
       </p>
       <div className='grid grid-cols-1 gap-2'>
         {hasSpotify ? (
           <a
             href={spotifyHref}
-            className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1ed760] px-4 text-sm font-semibold text-black transition hover:brightness-95'
+            className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-spotify px-4 text-sm font-semibold text-background transition-colors hover:bg-brand-spotify-hover'
           >
             <Music2 className='size-4' aria-hidden='true' />
             Pre-save on Spotify
@@ -99,7 +98,7 @@ export function PreSaveActions({
           <button
             type='button'
             onClick={handleApplePreAdd}
-            className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-black transition hover:bg-white/90'
+            className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-apple px-4 text-sm font-semibold text-background transition-colors hover:bg-brand-apple-hover'
           >
             {appleState === 'done' ? (
               <>

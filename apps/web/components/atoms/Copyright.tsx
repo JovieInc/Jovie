@@ -9,11 +9,11 @@ interface CopyrightProps {
   readonly year?: number;
 }
 
-const baseStyles = 'text-sm font-medium tracking-tight';
+const baseStyles = 'text-xs font-normal tracking-tight opacity-50';
 // Use semantic tokens for proper dark mode support
 const variantStyles = {
-  light: 'text-tertiary-token',
-  dark: 'text-white/70',
+  light: 'text-quaternary-token',
+  dark: 'text-white/40',
 } as const;
 
 export function Copyright({

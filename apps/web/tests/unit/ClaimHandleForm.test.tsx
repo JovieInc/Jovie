@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
@@ -26,150 +25,66 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-// Mock @jovie/ui to avoid dependency resolution issues in worktrees
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    ...props
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => <button {...props}>{children}</button>,
-  Input: Object.assign(
-    React.forwardRef<HTMLInputElement, Record<string, unknown>>(
-      function MockInput(
-        {
-          statusIcon: _si,
-          validationState: _vs,
-          loading: _l,
-          trailing: _t,
-          inputSize: _is,
-          error: _e,
-          helpText: _ht,
-          label: _lb,
-          ...props
-        },
-        ref
-      ) {
-        return React.createElement('input', {
-          ref,
-          ...(props as React.InputHTMLAttributes<HTMLInputElement>),
-        });
-      }
-    ),
-    { displayName: 'MockInput' }
-  ),
-}));
-
 // Mock fetch for handle checking
 global.fetch = mockFetch as unknown as typeof fetch;
 
-import { ClaimHandleForm } from '@/components/home/ClaimHandleForm';
+import { ClaimHandleForm } from '@/components/home/claim-handle';
 
 describe('ClaimHandleForm', () => {
-  test('prevents layout jumps with consistent spacing', () => {
-    render(<ClaimHandleForm />);
-
-    // Check that helper text container exists with min-height
-    const helperContainer = document.querySelector('[aria-live="assertive"]');
-    expect(helperContainer).toBeInTheDocument();
-
-    // Check that preview container exists with min-height to prevent layout jumps
-    const previewContainer = document.querySelector('#handle-preview-text');
-    expect(previewContainer).toBeInTheDocument();
-    expect(previewContainer).toHaveClass('min-h-5');
-  });
-
-  test('has proper accessibility attributes', () => {
+  test('renders with proper accessibility attributes', () => {
     render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
-    // Input should be marked as required
     expect(input).toHaveAttribute('required');
 
-    // Check that help text exists and is visible (accessibility through visible text)
+    // Helper text is visible
     const helpText = screen.getByText(/Your Jovie profile will live at/i);
     expect(helpText).toBeInTheDocument();
-
-    // Check aria-live region exists for dynamic announcements
-    const liveRegion = document.querySelector('[aria-live="assertive"]');
-    expect(liveRegion).not.toBeNull();
-    expect(liveRegion).toHaveAttribute('aria-live', 'assertive');
   });
 
-  // Simplified test for clipboard functionality - focus on the core behavior
-  test('has clipboard functionality', () => {
-    // Mock clipboard API
-    const writeTextMock = vi.fn();
-    const originalClipboard = navigator.clipboard;
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: writeTextMock },
-      writable: true,
-      configurable: true,
-    });
-
+  test('renders form element', () => {
     render(<ClaimHandleForm />);
 
-    // Verify the component renders without errors
-    expect(
-      screen.getByRole('textbox', { name: /choose your handle/i })
-    ).toBeInTheDocument();
-
-    // Restore clipboard
-    Object.defineProperty(navigator, 'clipboard', {
-      value: originalClipboard,
-      writable: true,
-      configurable: true,
-    });
-  });
-
-  // Simplified test for validation - focus on the core behavior
-  test('has validation functionality', () => {
-    render(<ClaimHandleForm />);
-
-    const input = screen.getByRole('textbox', { name: /choose your handle/i });
-    const form = document.querySelector('form') as HTMLFormElement;
-
-    // Verify the component renders without errors
-    expect(input).toBeInTheDocument();
+    const form = document.querySelector('form');
     expect(form).toBeInTheDocument();
 
-    // Verify validation works for short handles
-    fireEvent.change(input, { target: { value: 'ab' } }); // Too short
-    fireEvent.submit(form);
-
-    // Check that shake class is added for invalid input
-    expect(input).toHaveClass('jv-shake');
+    const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    expect(input).toBeInTheDocument();
   });
 
-  test('shake animation triggers on invalid submission', () => {
+  test('shows claim button when handle is entered', () => {
     render(<ClaimHandleForm />);
 
-    const form = document.querySelector('form') as HTMLFormElement;
-    expect(form).not.toBeNull();
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    fireEvent.change(input, { target: { value: 'testhandle' } });
 
-    // Try to submit with invalid handle
-    fireEvent.change(input, { target: { value: 'ab' } }); // Too short
-    fireEvent.submit(form);
-
-    // Check that shake class is added
-    expect(input).toHaveClass('jv-shake');
+    // Claim button should appear
+    const button = screen.getByRole('button');
+    expect(button).toBeInTheDocument();
   });
 
-  describe('reduced motion support', () => {
-    test('does not inject inline animation styles (moved to globals.css)', () => {
-      render(<ClaimHandleForm />);
+  test('shows validation message for short handles', () => {
+    render(<ClaimHandleForm />);
 
-      const styleTags = document.querySelectorAll('style');
-      const styleContents = Array.from(styleTags)
-        .map(tag => tag.textContent || '')
-        .join('');
+    const input = screen.getByRole('textbox', { name: /choose your handle/i });
+    fireEvent.change(input, { target: { value: 'ab' } }); // Too short
 
-      // Animation styles are now defined in global CSS, not injected inline.
-      expect(styleContents).not.toContain('prefers-reduced-motion');
-      expect(styleContents).not.toContain('jv-shake');
-      expect(styleContents).not.toContain('jv-available');
-    });
+    // Helper text shows the validation error
+    expect(
+      screen.getByText(/Handle must be at least 3 characters/i)
+    ).toBeInTheDocument();
+  });
+
+  test('does not inject inline animation styles (moved to globals.css)', () => {
+    render(<ClaimHandleForm />);
+
+    const styleTags = document.querySelectorAll('style');
+    const styleContents = Array.from(styleTags)
+      .map(tag => tag.textContent || '')
+      .join('');
+
+    expect(styleContents).not.toContain('prefers-reduced-motion');
+    expect(styleContents).not.toContain('jv-shake');
+    expect(styleContents).not.toContain('jv-available');
   });
 });

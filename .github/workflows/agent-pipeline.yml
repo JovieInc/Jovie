@@ -1,0 +1,810 @@
+# Agent Pipeline
+#
+# PURPOSE: Unified automation pipeline for agent-generated PRs. Handles both
+# failure remediation (CI failures, CodeRabbit blocking reviews) and success
+# auto-approval in a single workflow.
+#
+# REPLACES: agent-remediation.yml, auto-approve-agent-prs.yml, coderabbit-autofix.yml
+#
+# TRIGGERS:
+# 1. CI failure on agent branches → fix job (Claude Code fixes)
+# 2. CodeRabbit blocking review → fix job (Claude Code fixes)
+# 3. CI + Scope Judge both pass → approve job (auto-approve + auto-merge)
+#
+# SAFETY:
+# - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*)
+# - Max 3 fix attempts per SHA to prevent infinite loops
+# - Escalates to 'needs-human' label after exhaustion
+# - Sensitive path detection prevents auto-merge on high-risk changes
+# - Uses least-privilege credentials
+# - Does NOT execute untrusted PR code
+
+name: Agent Pipeline
+
+on:
+  # Trigger when CI or Scope Judge workflow completes
+  workflow_run:
+    workflows: ["CI", "Scope Judge"]
+    types: [completed]
+
+  # Trigger on CodeRabbit blocking review
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+  actions: read
+
+concurrency:
+  group: agent-pipeline-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================================================
+  # GUARD: Determine trigger type and validate all conditions
+  # Routes to either the fix job or the approve job
+  # ==========================================================================
+  guard:
+    name: Trigger Guard
+    if: github.actor != 'copilot-swe-agent[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      should_fix: ${{ steps.evaluate.outputs.should_fix }}
+      should_approve: ${{ steps.evaluate.outputs.should_approve }}
+      trigger_type: ${{ steps.evaluate.outputs.trigger_type }}
+      pr_number: ${{ steps.evaluate.outputs.pr_number }}
+      pr_head_ref: ${{ steps.evaluate.outputs.pr_head_ref }}
+      pr_head_sha: ${{ steps.evaluate.outputs.pr_head_sha }}
+      attempt_number: ${{ steps.retry-guard.outputs.attempt_number }}
+      error_context: ${{ steps.error-context.outputs.error_context }}
+    steps:
+      - name: Determine trigger type and PR context
+        id: trigger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          PR_REVIEW_USER: ${{ github.event.review.user.login }}
+          PR_REVIEW_STATE: ${{ github.event.review.state }}
+          PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF_EVENT: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_SHA_EVENT: ${{ github.event.pull_request.head.sha }}
+          PR_IS_DRAFT_EVENT: ${{ github.event.pull_request.draft }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          EVENT="$EVENT_NAME"
+
+          if [[ "$EVENT" == "workflow_run" ]]; then
+            if [[ "$CONCLUSION" == "failure" ]]; then
+              echo "CI failed — routing to fix path"
+              echo "trigger_type=ci_failure" >> $GITHUB_OUTPUT
+            elif [[ "$CONCLUSION" == "success" ]]; then
+              echo "$WORKFLOW_NAME succeeded — routing to approve path"
+              echo "trigger_type=approval_candidate" >> $GITHUB_OUTPUT
+            else
+              echo "Workflow conclusion: $CONCLUSION. Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            # Find the PR for this branch using jq --arg to avoid injection
+            PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
+              | jq --arg branch "$HEAD_BRANCH" '.[] | select(.head.ref == $branch and .state == "open") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [.labels[].name]}' \
+              | head -1)
+
+            if [[ -z "$PR_DATA" ]]; then
+              echo "No open PR found for branch. Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+            PR_HEAD_REF=$(echo "$PR_DATA" | jq -r '.head_ref')
+            PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
+            IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
+            HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '.labels | map(select(. == "needs-human")) | length > 0')
+
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
+            echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
+            echo "is_draft=$IS_DRAFT" >> $GITHUB_OUTPUT
+            echo "has_needs_human=$HAS_NEEDS_HUMAN" >> $GITHUB_OUTPUT
+            echo "should_continue=true" >> $GITHUB_OUTPUT
+
+          elif [[ "$EVENT" == "pull_request_review" ]]; then
+            REVIEWER="$PR_REVIEW_USER"
+            STATE="$PR_REVIEW_STATE"
+
+            if [[ "$REVIEWER" != "coderabbitai[bot]" ]]; then
+              echo "Reviewer is not CodeRabbit (got: $REVIEWER). Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            if [[ "$STATE" != "changes_requested" ]]; then
+              echo "Review state is not blocking (got: $STATE). Skipping."
+              echo "should_continue=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            echo "trigger_type=coderabbit_review" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER_EVENT" >> $GITHUB_OUTPUT
+            echo "pr_head_ref=$PR_HEAD_REF_EVENT" >> $GITHUB_OUTPUT
+            echo "pr_head_sha=$PR_HEAD_SHA_EVENT" >> $GITHUB_OUTPUT
+            echo "is_draft=$PR_IS_DRAFT_EVENT" >> $GITHUB_OUTPUT
+            echo "has_needs_human=false" >> $GITHUB_OUTPUT
+            echo "should_continue=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check agent branch pattern
+        id: branch-check
+        if: steps.trigger.outputs.should_continue == 'true'
+        env:
+          BRANCH: ${{ steps.trigger.outputs.pr_head_ref }}
+        run: |
+          echo "Branch: $BRANCH"
+
+          if [[ "$BRANCH" =~ ^(linear/|claude/|codegen-bot/|codex/) ]]; then
+            echo "Agent branch detected"
+            echo "is_agent_branch=true" >> $GITHUB_OUTPUT
+          else
+            echo "Not an agent branch. Skipping."
+            echo "is_agent_branch=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check not draft
+        id: draft-check
+        if: steps.trigger.outputs.should_continue == 'true'
+        run: |
+          IS_DRAFT="${{ steps.trigger.outputs.is_draft }}"
+          if [[ "$IS_DRAFT" == "true" ]]; then
+            echo "PR is a draft. Skipping."
+            echo "is_ready=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_ready=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Retry guard (fix path only, max 3 attempts per SHA)
+        id: retry-guard
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          (steps.trigger.outputs.trigger_type == 'ci_failure' || steps.trigger.outputs.trigger_type == 'coderabbit_review')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ steps.trigger.outputs.pr_number }}"
+          HEAD_SHA="${{ steps.trigger.outputs.pr_head_sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
+          PREFIX="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}"
+
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name')
+
+          HAS_3=$(echo "$LABELS" | grep -c "^${PREFIX}-3$" || true)
+          HAS_2=$(echo "$LABELS" | grep -c "^${PREFIX}-2$" || true)
+          HAS_1=$(echo "$LABELS" | grep -c "^${PREFIX}-1$" || true)
+
+          if [[ "$HAS_3" -gt 0 ]]; then
+            echo "SHA $SHORT_SHA has exhausted retries (3/3) for $TRIGGER_TYPE"
+            echo "retries_available=false" >> $GITHUB_OUTPUT
+            echo "attempt_number=0" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_2" -gt 0 ]]; then
+            echo "SHA $SHORT_SHA on attempt 3/3 (final) for $TRIGGER_TYPE"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=3" >> $GITHUB_OUTPUT
+          elif [[ "$HAS_1" -gt 0 ]]; then
+            echo "SHA $SHORT_SHA on attempt 2/3 for $TRIGGER_TYPE"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=2" >> $GITHUB_OUTPUT
+          else
+            echo "SHA $SHORT_SHA on attempt 1/3 for $TRIGGER_TYPE"
+            echo "retries_available=true" >> $GITHUB_OUTPUT
+            echo "attempt_number=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Extract error context (fix path only)
+        id: error-context
+        if: >-
+          steps.trigger.outputs.should_continue == 'true' &&
+          steps.branch-check.outputs.is_agent_branch == 'true' &&
+          steps.retry-guard.outputs.retries_available == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TRIGGER_TYPE="${{ steps.trigger.outputs.trigger_type }}"
+          PR_NUMBER="${{ steps.trigger.outputs.pr_number }}"
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            # Extract failed job names and annotations from the CI run
+            RUN_ID="${{ github.event.workflow_run.id }}"
+
+            FAILED_JOBS=$(gh api repos/${{ github.repository }}/actions/runs/$RUN_ID/jobs \
+              --jq '[.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[] | select(.conclusion == "failure") | .name]}] | tostring')
+
+            # Get annotations (error messages) from the failed run
+            ANNOTATIONS=$(gh api repos/${{ github.repository }}/check-runs \
+              --method GET \
+              -f "check_suite_id=${{ github.event.workflow_run.check_suite_id }}" \
+              --jq '[.check_runs[] | select(.conclusion == "failure") | {name: .name, output: .output.summary}] | .[0:5] | tostring' 2>/dev/null || echo "[]")
+
+            ERROR_CONTEXT=$(cat <<ERREOF
+          ## CI Failure Context
+
+          **Failed Jobs:** $FAILED_JOBS
+
+          **Error Annotations:** $ANNOTATIONS
+
+          Fix the CI failures above. Focus on:
+          1. TypeScript type errors (run pnpm turbo typecheck)
+          2. Biome lint/format errors (run pnpm biome check . --write then pnpm biome check .)
+          3. Unit test failures (run pnpm --filter=@jovie/web vitest run --config=vitest.config.mts)
+          4. ESLint server boundary violations (run pnpm --filter=@jovie/web lint:server-boundaries)
+          5. Knip dead code detection (run pnpm knip)
+          ERREOF
+          )
+
+          elif [[ "$TRIGGER_TYPE" == "coderabbit_review" ]]; then
+            REVIEW_ID="${{ github.event.review.id }}"
+            REVIEW_BODY=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID --jq '.body // ""')
+            INLINE_COMMENTS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews/$REVIEW_ID/comments \
+              --jq '[.[] | {path: .path, line: .line, body: .body}]')
+
+            ERROR_CONTEXT=$(cat <<ERREOF
+          ## CodeRabbit Review Feedback
+
+          **Review Summary:**
+          $REVIEW_BODY
+
+          **Inline Comments:**
+          $(echo "$INLINE_COMMENTS" | jq -r '.[] | "- **\(.path):\(.line)**: \(.body)"')
+
+          Fix ONLY the issues described above. Do not make any other changes.
+          ERREOF
+          )
+          fi
+
+          # Base64 encode to handle multiline safely
+          echo "error_context=$(echo "$ERROR_CONTEXT" | base64 -w0)" >> $GITHUB_OUTPUT
+
+      - name: Evaluate all guards
+        id: evaluate
+        env:
+          SHOULD_CONTINUE: ${{ steps.trigger.outputs.should_continue }}
+          IS_AGENT: ${{ steps.branch-check.outputs.is_agent_branch }}
+          IS_READY: ${{ steps.draft-check.outputs.is_ready }}
+          RETRIES: ${{ steps.retry-guard.outputs.retries_available }}
+          TRIGGER_TYPE: ${{ steps.trigger.outputs.trigger_type }}
+          PR_NUMBER: ${{ steps.trigger.outputs.pr_number }}
+          PR_HEAD_REF: ${{ steps.trigger.outputs.pr_head_ref }}
+          PR_HEAD_SHA: ${{ steps.trigger.outputs.pr_head_sha }}
+          HAS_NEEDS_HUMAN: ${{ steps.trigger.outputs.has_needs_human }}
+        run: |
+          echo "=== Guard Summary ==="
+          echo "Should continue: $SHOULD_CONTINUE"
+          echo "Is agent branch: $IS_AGENT"
+          echo "Is ready (not draft): $IS_READY"
+          echo "Trigger type: $TRIGGER_TYPE"
+          echo "Has needs-human: $HAS_NEEDS_HUMAN"
+
+          SHOULD_FIX="false"
+          SHOULD_APPROVE="false"
+
+          if [[ "$SHOULD_CONTINUE" != "true" || "$IS_AGENT" != "true" || "$IS_READY" != "true" ]]; then
+            echo "Basic guards failed"
+          elif [[ "$HAS_NEEDS_HUMAN" == "true" ]]; then
+            echo "PR has needs-human label. Skipping all automation."
+          elif [[ "$TRIGGER_TYPE" == "ci_failure" || "$TRIGGER_TYPE" == "coderabbit_review" ]]; then
+            if [[ "$RETRIES" == "true" ]]; then
+              SHOULD_FIX="true"
+              echo "Routing to fix path"
+            else
+              echo "Retries exhausted for fix path"
+            fi
+          elif [[ "$TRIGGER_TYPE" == "approval_candidate" ]]; then
+            SHOULD_APPROVE="true"
+            echo "Routing to approve path"
+          fi
+
+          echo "should_fix=$SHOULD_FIX" >> $GITHUB_OUTPUT
+          echo "should_approve=$SHOULD_APPROVE" >> $GITHUB_OUTPUT
+          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
+          echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
+
+  # ==========================================================================
+  # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
+  # ==========================================================================
+  fix:
+    name: Apply Fixes (${{ needs.guard.outputs.trigger_type }})
+    needs: guard
+    if: needs.guard.outputs.should_fix == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Validate PR is not from a fork
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          IS_FORK=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.head.repo.fork // false')
+          SAME_REPO=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER --jq '.head.repo.full_name == .base.repo.full_name')
+
+          if [[ "$IS_FORK" == "true" || "$SAME_REPO" != "true" ]]; then
+            echo "PR is from a fork or different repo. Refusing to run remediation."
+            exit 1
+          fi
+          echo "PR is from the same repository. Proceeding."
+
+      - name: Checkout PR branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.guard.outputs.pr_head_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Mark attempt in progress
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          HEAD_SHA: ${{ needs.guard.outputs.pr_head_sha }}
+          TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
+          ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
+        run: |
+          SHORT_SHA="${HEAD_SHA:0:7}"
+
+          LABEL="agent-fix-${TRIGGER_TYPE}-${SHORT_SHA}-${ATTEMPT}"
+          echo "Adding attempt marker: $LABEL"
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=$LABEL" || true
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Prepare fix instructions
+        id: prepare
+        env:
+          ERROR_CONTEXT_B64: ${{ needs.guard.outputs.error_context }}
+          TRIGGER_TYPE: ${{ needs.guard.outputs.trigger_type }}
+          ATTEMPT: ${{ needs.guard.outputs.attempt_number }}
+        run: |
+          ERROR_CONTEXT=$(echo "$ERROR_CONTEXT_B64" | base64 -d)
+
+          cat > /tmp/fix-instructions.md << 'HEADER'
+          # Agent Remediation Instructions
+
+          ## CRITICAL CONSTRAINTS
+
+          1. **Minimal diff**: Make the smallest possible changes to fix the issues
+          2. **Only fix what's broken**: Do not refactor, restructure, or "improve" unrelated code
+          3. **Preserve formatting**: Do not reformat code not related to the fix
+          4. **No dead code**: Do not introduce unused imports, variables, or functions
+          5. **No lint silencing**: Never add // biome-ignore or @ts-ignore unless absolutely necessary
+          6. **Node 24 + pnpm only**: Use pnpm commands, run from repo root
+
+          HEADER
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "$ERROR_CONTEXT" >> /tmp/fix-instructions.md
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "## Attempt $ATTEMPT of 3" >> /tmp/fix-instructions.md
+          echo "" >> /tmp/fix-instructions.md
+          echo "## VALIDATION (run after fixing)" >> /tmp/fix-instructions.md
+          echo "" >> /tmp/fix-instructions.md
+          echo "1. \`pnpm turbo typecheck --affected\` (verify types)" >> /tmp/fix-instructions.md
+          echo "2. \`pnpm turbo lint --affected\` (verify lint)" >> /tmp/fix-instructions.md
+          echo "3. \`pnpm turbo test --affected\` (verify tests)" >> /tmp/fix-instructions.md
+          echo "4. \`pnpm biome check . --write\` (auto-fix formatting)" >> /tmp/fix-instructions.md
+          echo "5. \`pnpm biome check .\` (verify no remaining issues)" >> /tmp/fix-instructions.md
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "## BOUNDED SIMPLIFICATION PASS" >> /tmp/fix-instructions.md
+          echo "- touched files only" >> /tmp/fix-instructions.md
+          echo "- no behavior/API contract changes" >> /tmp/fix-instructions.md
+          echo "- skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)" >> /tmp/fix-instructions.md
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            echo "6. \`pnpm --filter=@jovie/web vitest run --config=vitest.config.mts\` (run unit tests)" >> /tmp/fix-instructions.md
+            echo "7. \`pnpm knip\` (check for dead code)" >> /tmp/fix-instructions.md
+          fi
+
+          echo "" >> /tmp/fix-instructions.md
+          echo "Do NOT commit — just make the fixes and leave changes in working tree." >> /tmp/fix-instructions.md
+
+      - name: Run Claude agent to fix issues
+        id: claude-fix
+        uses: anthropics/claude-code-action@edd85d61533cbba7b57ed0ca4af1750b1fdfd3c4 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Read the file at /tmp/fix-instructions.md and apply the fixes described.
+
+            After making changes, run these validation commands:
+            1. bash scripts/automation-verify.sh affected (verify typecheck/lint/tests)
+            2. pnpm biome check . --write (auto-fix formatting)
+            3. pnpm biome check . (verify no remaining issues)
+
+            Also run a bounded simplification pass:
+            - touched files only
+            - no behavior/API contract changes
+            - skip sensitive paths (.github/, drizzle/migrations/, auth/billing/security-critical)
+
+            If validation fails, analyze the errors and fix them.
+            Do NOT commit the changes - just make the fixes.
+
+      - name: Run validation
+        id: validate
+        run: |
+          set +e
+
+          echo "=== Running automation verify bundle (affected) ==="
+          bash scripts/automation-verify.sh affected 2>&1 | tee /tmp/verify-bundle.log
+          VERIFY_BUNDLE_EXIT=$?
+
+          echo "=== Running Biome auto-fix ==="
+          pnpm biome check . --write 2>&1 | tail -20
+
+          echo "=== Running Biome check ==="
+          pnpm biome check . 2>&1 | tee /tmp/biome-check.log
+          BIOME_EXIT=$?
+
+          if [[ $VERIFY_BUNDLE_EXIT -eq 0 && $BIOME_EXIT -eq 0 ]]; then
+            echo "Validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Validation failed (verify_bundle=$VERIFY_BUNDLE_EXIT, biome=$BIOME_EXIT)"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+
+            # Capture structured error summary (last 50 lines of each, not full logs)
+            {
+              echo "## Verify Bundle Errors"
+              tail -50 /tmp/verify-bundle.log
+              echo ""
+              echo "## Biome Errors"
+              tail -50 /tmp/biome-check.log
+            } > /tmp/validation-errors.log
+
+            echo "validation_errors=$(cat /tmp/validation-errors.log | base64 -w0)" >> $GITHUB_OUTPUT
+          fi
+
+      # RETRY: If validation fails, re-invoke agent with error context (single retry within this attempt)
+      - name: Retry with error context
+        id: retry
+        if: steps.validate.outputs.validation_passed == 'false'
+        uses: anthropics/claude-code-action@edd85d61533cbba7b57ed0ca4af1750b1fdfd3c4 # v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            The previous fix attempt failed validation. Here are the errors:
+
+            ```
+            $(echo "${{ steps.validate.outputs.validation_errors }}" | base64 -d)
+            ```
+
+            Fix these validation errors. Remember:
+            - Make minimal changes
+            - Do not silence errors with comments
+            - Run `bash scripts/automation-verify.sh affected`
+            - Run `pnpm biome check . --write` followed by `pnpm biome check .`
+
+      - name: Re-validate after retry
+        id: revalidate
+        if: steps.retry.outcome == 'success'
+        run: |
+          set +e
+
+          bash scripts/automation-verify.sh affected 2>&1 | tee /tmp/verify-bundle-2.log
+          VERIFY_BUNDLE_EXIT=$?
+
+          pnpm biome check . --write 2>&1 | tail -20
+          pnpm biome check . 2>&1 | tee /tmp/biome-check-2.log
+          BIOME_EXIT=$?
+
+          if [[ $VERIFY_BUNDLE_EXIT -eq 0 && $BIOME_EXIT -eq 0 ]]; then
+            echo "Retry validation passed"
+            echo "validation_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Retry validation failed"
+            echo "validation_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine final status
+        id: final-status
+        run: |
+          FIRST="${{ steps.validate.outputs.validation_passed }}"
+          RETRY="${{ steps.revalidate.outputs.validation_passed }}"
+
+          if [[ "$FIRST" == "true" || "$RETRY" == "true" ]]; then
+            echo "final_passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "final_passed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push fixes
+        if: steps.final-status.outputs.final_passed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_HEAD_REF: ${{ needs.guard.outputs.pr_head_ref }}
+        run: |
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config user.name "jovie-bot[bot]"
+          git config user.email "jovie-bot[bot]@users.noreply.github.com"
+
+          # Configure credentials for push (checkout used persist-credentials: false)
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+
+          git add -A
+
+          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            MSG="fix: resolve CI failures (auto-remediation attempt $ATTEMPT)"
+          else
+            MSG="fix: apply CodeRabbit review fixes (auto-remediation attempt $ATTEMPT)"
+          fi
+
+          git commit -m "$MSG
+
+          Automated fixes applied by agent-pipeline workflow.
+
+          Co-authored-by: Claude <claude@anthropic.com>"
+
+          git push origin "HEAD:$PR_HEAD_REF"
+          echo "Changes committed and pushed"
+
+      - name: Escalate to human
+        if: steps.final-status.outputs.final_passed == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          TRIGGER_TYPE="${{ needs.guard.outputs.trigger_type }}"
+          ATTEMPT="${{ needs.guard.outputs.attempt_number }}"
+
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=needs-human" || true
+
+          if [[ "$TRIGGER_TYPE" == "ci_failure" ]]; then
+            REASON="CI check failures"
+          else
+            REASON="CodeRabbit review feedback"
+          fi
+
+          gh pr comment $PR_NUMBER --body "## Agent Remediation Failed
+
+          The automated fix workflow was unable to resolve **$REASON** after attempt $ATTEMPT.
+
+          **Trigger:** $TRIGGER_TYPE
+          **What happened:**
+          - The agent attempted to fix the issues automatically
+          - Validation (Biome + TypeScript) still fails after fixes
+
+          **Next steps:**
+          A human developer needs to manually address the failures.
+
+          The \`needs-human\` label has been added to this PR."
+
+      - name: Clean up stale attempt labels
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          HEAD_SHA="${{ needs.guard.outputs.pr_head_sha }}"
+          SHORT_SHA="${HEAD_SHA:0:7}"
+
+          LABELS=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels --jq '.[].name' 2>/dev/null || echo "")
+
+          echo "$LABELS" | grep "^agent-fix-" | while read -r label; do
+            if [[ ! "$label" =~ $SHORT_SHA ]]; then
+              echo "Removing stale label: $label"
+              gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels/$label --method DELETE || true
+            fi
+          done
+
+  # ==========================================================================
+  # APPROVE: Auto-approve and enable auto-merge for passing agent PRs
+  # ==========================================================================
+  approve:
+    name: Auto-Approve Check
+    needs: guard
+    if: needs.guard.outputs.should_approve == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: read
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Check all required statuses
+        id: check-statuses
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_SHA="${{ needs.guard.outputs.pr_head_sha }}"
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          # Get all commit statuses and check runs
+          STATUSES=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/status --jq '.statuses')
+          CHECK_RUNS=$(gh api repos/${{ github.repository }}/commits/$PR_SHA/check-runs --jq '.check_runs')
+
+          # 1. Check scope-judge status
+          SCOPE_STATUS=$(echo "$STATUSES" | jq -r '[.[] | select(.context == "scope-judge")] | sort_by(.updated_at) | last | .state // "pending"')
+          echo "Scope judge: $SCOPE_STATUS"
+
+          if [[ "$SCOPE_STATUS" != "success" ]]; then
+            echo "Scope judge has not passed (status: $SCOPE_STATUS). Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=scope-judge: $SCOPE_STATUS" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 2. Check CI PR Ready (the aggregate required check)
+          CI_PR_READY=$(echo "$CHECK_RUNS" | jq -r '[.[] | select(.name == "PR Ready")] | sort_by(.completed_at) | last | .conclusion // "pending"')
+          echo "CI PR Ready: $CI_PR_READY"
+
+          if [[ "$CI_PR_READY" != "success" ]]; then
+            echo "CI PR Ready has not passed (conclusion: $CI_PR_READY). Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=PR Ready: $CI_PR_READY" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # 3. Check CodeRabbit is not blocking
+          REVIEWS=$(gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews --jq '[.[] | select(.user.login == "coderabbitai[bot]")] | sort_by(.submitted_at) | last | .state // "none"')
+          echo "CodeRabbit review state: $REVIEWS"
+
+          if [[ "$REVIEWS" == "CHANGES_REQUESTED" ]]; then
+            echo "CodeRabbit has requested changes. Cannot auto-approve."
+            echo "all_passed=false" >> $GITHUB_OUTPUT
+            echo "blocking_reason=CodeRabbit: changes_requested" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "All status checks passed"
+          echo "all_passed=true" >> $GITHUB_OUTPUT
+
+      - name: Check for sensitive file changes
+        id: sensitive-check
+        if: steps.check-statuses.outputs.all_passed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          # Get changed files
+          CHANGED_FILES=$(gh pr diff $PR_NUMBER --name-only 2>/dev/null || echo "")
+
+          # Define sensitive paths that require human review
+          SENSITIVE_PATTERNS=(
+            "^\.github/"                         # CI/CD and workflow changes
+            "^drizzle/migrations/"               # Database migrations
+            "^apps/web/lib/auth/"                 # Authentication
+            "^apps/web/lib/db/"                   # Database layer
+            "^apps/web/app/api/.*/billing"        # Billing API routes
+            "^apps/web/lib/stripe/"               # Stripe/payment code
+            "^apps/web/middleware"                 # Middleware (security surface)
+            "^\.env"                              # Environment files
+            "^CODEOWNERS"                         # Code ownership
+            "^agents\.md"                         # Agent guidelines
+            "^CLAUDE\.md"                         # Agent guidelines
+            "package\.json$"                      # Dependency changes
+            "pnpm-lock\.yaml$"                    # Lock file changes
+          )
+
+          SENSITIVE_FOUND=""
+          for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            MATCHES=$(echo "$CHANGED_FILES" | grep -E "$pattern" || true)
+            if [[ -n "$MATCHES" ]]; then
+              SENSITIVE_FOUND="${SENSITIVE_FOUND}${MATCHES}\n"
+            fi
+          done
+
+          if [[ -n "$SENSITIVE_FOUND" ]]; then
+            echo "Sensitive files changed — requires human review:"
+            echo -e "$SENSITIVE_FOUND"
+            echo "is_safe=false" >> $GITHUB_OUTPUT
+            echo "sensitive_files=$(echo -e "$SENSITIVE_FOUND" | head -5 | tr '\n' ', ')" >> $GITHUB_OUTPUT
+          else
+            echo "No sensitive files changed"
+            echo "is_safe=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Auto-approve PR
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          echo "All gates passed. Auto-approving PR #$PR_NUMBER"
+
+          # Submit approval review
+          gh api repos/${{ github.repository }}/pulls/$PR_NUMBER/reviews \
+            --method POST \
+            -f event="APPROVE" \
+            -f body="## Auto-Approved by Agent Pipeline
+
+          All quality gates passed:
+          - [x] CI checks (typecheck, lint, unit tests, a11y, layout guard)
+          - [x] Scope judge (diff aligns with ticket intent)
+          - [x] CodeRabbit review (no blocking feedback)
+          - [x] Sensitive path check (no auth/billing/migration/CI changes)
+
+          This PR was auto-approved because it meets all criteria for low-risk agent changes.
+          It will now enter the merge queue for final validation.
+
+          > If this approval is incorrect, dismiss it and add the \`needs-human\` label."
+
+          echo "PR #$PR_NUMBER approved"
+
+      - name: Enable auto-merge
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+
+          # Enable auto-merge (squash) which will enter the merge queue
+          gh pr merge $PR_NUMBER --auto --squash || echo "Auto-merge already enabled or not available"
+
+          # Add label for tracking
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=auto-approved" || true
+
+          echo "Auto-merge enabled for PR #$PR_NUMBER"
+
+      - name: Skip reason (log only)
+        if: >-
+          steps.check-statuses.outputs.all_passed != 'true' || steps.sensitive-check.outputs.is_safe != 'true'
+        run: |
+          STATUSES_PASSED="${{ steps.check-statuses.outputs.all_passed }}"
+          SENSITIVE_SAFE="${{ steps.sensitive-check.outputs.is_safe }}"
+          BLOCKING="${{ steps.check-statuses.outputs.blocking_reason }}"
+          SENSITIVE_FILES="${{ steps.sensitive-check.outputs.sensitive_files }}"
+
+          echo "Auto-approve skipped:"
+          if [[ "$STATUSES_PASSED" != "true" ]]; then
+            echo "  - Status checks not all passing: $BLOCKING"
+          fi
+          if [[ "$SENSITIVE_SAFE" != "true" ]]; then
+            echo "  - Sensitive files changed: $SENSITIVE_FILES"
+          fi

@@ -82,6 +82,7 @@ export async function GET() {
 
   if (!isHealthy) {
     void captureWarning('Deploy health check unhealthy', undefined, {
+      service: 'deploy',
       route: '/api/health/deploy',
       issues,
     });

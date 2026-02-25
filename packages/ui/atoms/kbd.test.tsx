@@ -45,8 +45,8 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByTestId('kbd');
       expect(kbd.className).toContain('bg-surface-2');
-      expect(kbd.className).toContain('border-subtle');
-      expect(kbd.className).toContain('text-secondary-token');
+      expect(kbd.className).toContain('border-default');
+      expect(kbd.className).toContain('text-primary-token');
     });
 
     it('tooltip variant has dark mode styles', () => {
@@ -57,7 +57,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByTestId('kbd');
       expect(kbd.className).toContain('bg-surface-2');
-      expect(kbd.className).toContain('border-subtle');
+      expect(kbd.className).toContain('border-default');
     });
   });
 
@@ -141,7 +141,7 @@ describe('Kbd', () => {
         </div>
       );
       const kbd = screen.getByText('⌘K');
-      expect(kbd.className).toContain('text-secondary-token');
+      expect(kbd.className).toContain('text-primary-token');
     });
   });
 });

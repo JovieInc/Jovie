@@ -181,6 +181,8 @@ export async function GET() {
         `Billing health check ${hasCritical ? 'critical' : 'warning'}`,
         undefined,
         {
+          service: 'billing',
+          route: '/api/billing/health',
           checks: result.checks,
           metrics: result.metrics,
         }
@@ -199,6 +201,7 @@ export async function GET() {
   } catch (error) {
     logger.error('Billing health check failed:', error);
     void captureWarning('Billing health check failed', error, {
+      service: 'billing',
       route: '/api/billing/health',
     });
 

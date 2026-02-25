@@ -224,12 +224,25 @@ export function UserButton({
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
-  const handleFeedbackSubmit = useCallback((feedback: string) => {
+  const handleFeedbackSubmit = useCallback(async (feedback: string) => {
+    const trimmedFeedback = feedback.trim();
+
     track('feedback_submitted', {
-      feedback: feedback.trim(),
+      feedback: trimmedFeedback,
       source: 'dashboard_sidebar',
       method: 'custom_modal',
-      character_count: feedback.trim().length,
+      character_count: trimmedFeedback.length,
+    });
+
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: trimmedFeedback,
+        source: 'dashboard_sidebar',
+        pathname:
+          typeof window !== 'undefined' ? window.location.pathname : null,
+      }),
     });
   }, []);
   const {
@@ -258,6 +271,21 @@ export function UserButton({
 
   // Handle loading state or no user
   if (!isLoaded || !user) {
+    if (trigger) {
+      return (
+        <CommonDropdown
+          variant='dropdown'
+          items={[]}
+          trigger={trigger}
+          align='start'
+          open={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          disabled
+          contentClassName='w-[220px]'
+        />
+      );
+    }
+
     return showUserInfo ? (
       <div className='flex w-full items-center gap-2 rounded-md px-2 py-1'>
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />

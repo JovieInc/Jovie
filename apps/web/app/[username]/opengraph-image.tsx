@@ -78,6 +78,17 @@ function fallbackImage(username: string) {
   );
 }
 
+function getReleaseSubtitle(
+  profileIsPublic: boolean,
+  releaseCount: number,
+  topReleases: string[]
+): string {
+  if (!profileIsPublic) return 'Artist profile on Jovie';
+  if (releaseCount <= 0) return 'Build your release catalog on Jovie';
+  if (topReleases.length > 0) return topReleases.join(' • ');
+  return 'Latest releases on Spotify, Apple Music, and more';
+}
+
 export default async function Image({
   params,
 }: {
@@ -121,13 +132,11 @@ export default async function Image({
   const releaseCount =
     profileIsPublic && releaseStats ? releaseStats.releaseCount : 0;
 
-  const releaseSubtitle = !profileIsPublic
-    ? 'Artist profile on Jovie'
-    : releaseCount > 0
-      ? topReleases.length > 0
-        ? topReleases.join(' • ')
-        : 'Latest releases on Spotify, Apple Music, and more'
-      : 'Build your release catalog on Jovie';
+  const releaseSubtitle = getReleaseSubtitle(
+    profileIsPublic,
+    releaseCount,
+    topReleases
+  );
 
   return new ImageResponse(
     <div

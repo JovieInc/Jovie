@@ -25,7 +25,7 @@ export function ImagePreviewStrip({
         {images.map(image => (
           <motion.div
             key={image.id}
-            className='group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-white/[0.08] bg-surface-2'
+            className='group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-subtle bg-surface-2'
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
@@ -43,8 +43,8 @@ export function ImagePreviewStrip({
               onClick={() => onRemove(image.id)}
               className={cn(
                 'absolute right-1 top-1 flex h-5 w-5 items-center justify-center',
-                'rounded-full bg-black/60 opacity-0 group-hover:opacity-100',
-                'text-white transition-opacity',
+                'rounded-full bg-surface-3/90 opacity-0 group-hover:opacity-100',
+                'text-primary-token transition-opacity',
                 'focus-visible:opacity-100'
               )}
               aria-label={`Remove ${image.name}`}

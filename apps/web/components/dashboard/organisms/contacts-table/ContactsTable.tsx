@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
@@ -13,6 +14,7 @@ import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
+import { getContactRowContextMenuItems } from './row-actions';
 
 interface ContactsTableProps {
   readonly contacts: EditableContact[];
@@ -48,8 +50,6 @@ export const ContactsTable = memo(function ContactsTable({
       setSelectedContactId(newContact.id);
     }
   }, [contacts]);
-
-  const columns = useMemo(() => createContactColumns({ onDelete }), [onDelete]);
 
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -113,9 +113,32 @@ export const ContactsTable = memo(function ContactsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
   }, [headerActions]);
 
+  const handleCopyToClipboard = useCallback((text: string, label: string) => {
+    void navigator.clipboard.writeText(text);
+    toast.success(`${label} copied`);
+  }, []);
+
+  const columns = useMemo(
+    () =>
+      createContactColumns({
+        onDelete,
+        onCopyToClipboard: handleCopyToClipboard,
+      }),
+    [onDelete, handleCopyToClipboard]
+  );
+
   const handleRowClick = useCallback((contact: EditableContact) => {
     setSelectedContactId(contact.id);
   }, []);
+
+  const getContextMenuItems = useCallback(
+    (contact: EditableContact) =>
+      getContactRowContextMenuItems(contact, {
+        onDelete,
+        onCopyToClipboard: handleCopyToClipboard,
+      }),
+    [onDelete, handleCopyToClipboard]
+  );
 
   const handleClose = useCallback(() => {
     setSelectedContactId(null);
@@ -190,6 +213,7 @@ export const ContactsTable = memo(function ContactsTable({
               className='text-[13px]'
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
+              getContextMenuItems={getContextMenuItems}
             />
           )}
         </div>

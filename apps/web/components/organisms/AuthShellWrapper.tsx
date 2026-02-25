@@ -55,15 +55,13 @@ export function useTableMeta(): TableMetaContextValue {
  * Use this when you need to render components that call useTableMeta()
  * without the full AuthShellWrapper (e.g., in Storybook stories).
  */
-export function TableMetaProvider({ children }: { children: ReactNode }) {
-  const [tableMeta, setTableMetaState] = useState<TableMeta>({
+export function TableMetaProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  const [tableMeta, setTableMeta] = useState<TableMeta>({
     rowCount: null,
     toggle: null,
   });
-  const setTableMeta = useCallback(
-    (meta: TableMeta) => setTableMetaState(meta),
-    []
-  );
   const value = useMemo(
     () => ({ tableMeta, setTableMeta }),
     [tableMeta, setTableMeta]

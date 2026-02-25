@@ -143,13 +143,13 @@ function getIssueData(
 }
 
 function parseAutomationContract(body: string): AutomationContract {
-  const verifyMatch = body.match(/verify_required=(true|false)/i)?.[1];
-  const simplifyMatch = body.match(/simplify_bounded=(true|false)/i)?.[1];
-  const modelMatch = body.match(/model_tier=(premium|economy)/i)?.[1];
+  const verifyMatch = /verify_required=(true|false)/i.exec(body)?.[1];
+  const simplifyMatch = /simplify_bounded=(true|false)/i.exec(body)?.[1];
+  const modelMatch = /model_tier=(premium|economy)/i.exec(body)?.[1];
 
   return {
-    verifyRequired: verifyMatch?.toLowerCase() === 'false' ? false : true,
-    simplifyBounded: simplifyMatch?.toLowerCase() === 'false' ? false : true,
+    verifyRequired: verifyMatch?.toLowerCase() !== 'false',
+    simplifyBounded: simplifyMatch?.toLowerCase() !== 'false',
     modelTier: modelMatch?.toLowerCase() === 'economy' ? 'economy' : 'premium',
   };
 }

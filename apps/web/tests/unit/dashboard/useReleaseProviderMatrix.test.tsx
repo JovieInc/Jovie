@@ -394,7 +394,11 @@ describe('useReleaseProviderMatrix', () => {
       const options = stableRefresh.mock.calls[0]?.[1];
 
       act(() => {
-        options?.onSuccess?.(makeRelease({ id: 'release-1' }));
+        options?.onSuccess?.({
+          release: makeRelease({ id: 'release-1' }),
+          rateLimited: false,
+          retryAfter: '',
+        });
       });
 
       expect(result.current.flashedReleaseId).toBe('release-1');

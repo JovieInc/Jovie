@@ -25,9 +25,25 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.describe('Golden Path - Complete User Journey', () => {
-  // Run serially: listen/tip mode tests share a Turbopack route that compiles slowly
-  // when two parallel requests hit it simultaneously
+  // Run serially: parallel mode overloads the Turbopack dev server causing all tests
+  // to timeout. Serial ensures each test gets full server capacity.
   test.describe.configure({ mode: 'serial' });
+
+  // Intercept fire-and-forget tracking API calls that trigger slow Turbopack
+  // compilation cascades (60-75s per route) and block the dev server.
+  // These are analytics-only calls that don't affect page functionality.
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+  });
+
   test.beforeEach(async ({ page }, testInfo) => {
     // Check if we have test user credentials
     const username = process.env.E2E_CLERK_USER_USERNAME;
@@ -75,7 +91,7 @@ test.describe('Golden Path - Complete User Journey', () => {
   test('Authenticated user can access dashboard and view profile', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(120_000); // 2 minutes — signInUser includes Turbopack cold compile + Clerk CDN + React 19 stabilization
+    test.setTimeout(180_000); // 3 minutes — includes sign-in + Turbopack compilation
 
     // STEP 1: Sign in with test user
     try {
@@ -92,12 +108,11 @@ test.describe('Golden Path - Complete User Journey', () => {
         return;
       }
 
-      // Handle webkit navigation race and timeout issues
+      // Handle navigation race and timeout issues
       const msg = error instanceof Error ? error.message : String(error);
       if (
         msg.includes('Navigation interrupted') ||
         msg.includes('net::ERR_') ||
-        msg.includes('Timeout') ||
         msg.includes('page.goto') ||
         msg.includes('Target closed') ||
         msg.includes('browser has disconnected')
@@ -147,20 +162,58 @@ test.describe('Golden Path - Complete User Journey', () => {
     await expect(appShellContent).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
+
+    // STEP 5: Verify real data loaded (not silent error → empty state)
+    // When fetchDashboardCoreWithSession() fails silently it returns
+    // needsOnboarding: true, which redirects to /onboarding. Catch that.
+    const currentUrl = page.url();
+    expect(
+      currentUrl,
+      'Dashboard silently failed — redirected to onboarding'
+    ).not.toContain('/onboarding');
+    expect(
+      currentUrl,
+      'Dashboard silently failed — redirected to sign-in'
+    ).not.toContain('/sign-in');
+
+    // Verify no error banner rendered (shell-level catch renders data-testid="dashboard-error")
+    const errorBanner = page.locator('[data-testid="dashboard-error"]');
+    await expect(errorBanner).not.toBeVisible({ timeout: 2000 });
+
+    // Verify sidebar navigation rendered with real links (proves DashboardDataProvider has data)
+    const sidebarNav = page.locator('nav').first();
+    await expect(sidebarNav).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    // At least one dashboard nav link should be present (Profile, Releases, etc.)
+    const dashboardNavLink = page.locator('nav a[href*="/app/"]').first();
+    await expect(dashboardNavLink).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    // Verify the Clerk user button rendered (proves auth context is intact)
+    const userButton = page
+      .locator('[data-clerk-element="userButton"], [data-testid="user-button"]')
+      .first();
+    const hasUserButton = await userButton.isVisible().catch(() => false);
+    if (!hasUserButton) {
+      console.warn('User button not visible — auth context may be degraded');
+    }
   });
 
   test('Golden path with listen mode', async ({ page }, testInfo) => {
-    test.setTimeout(120_000); // Turbopack cold compile can be slow
+    test.setTimeout(300_000); // 5min — serial mode means previous tests consume compilation time
 
     // Navigate to existing profile in listen mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
 
-    // Use domcontentloaded + hydration instead of networkidle for stability
-    // Turbopack cold compile for [username]/[...slug] route can take 60s+
+    // Use commit (first response byte) instead of domcontentloaded for stability
+    // Turbopack streams SSR while compiling client chunks — domcontentloaded fires late
     try {
       await page.goto(`/${testProfile}?mode=listen`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
+        waitUntil: 'commit',
+        timeout: 120_000,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -179,8 +232,9 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Listen mode shows artist name in h1 and subtitle "Choose a Service"
     // Use .first() to avoid strict mode violation when multiple h1 elements exist
+    // 120s timeout: Turbopack client chunk compilation can take 60-120s in dev
     await expect(page.locator('h1').first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 120_000,
     });
 
     // Should show DSP options (e.g., "Open in Spotify") or "not available" message
@@ -189,22 +243,22 @@ test.describe('Golden Path - Complete User Journey', () => {
     );
     const noLinksMsg = page.getByText(/streaming links aren.t available/i);
     await expect(spotifyButton.first().or(noLinksMsg)).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 120_000,
     });
   });
 
   test('Golden path with tip mode', async ({ page }, testInfo) => {
-    test.setTimeout(120_000); // Turbopack cold compile can be slow
+    test.setTimeout(300_000); // 5min — serial mode means previous tests consume compilation time
 
     // Navigate to existing profile in tip mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
 
-    // Use domcontentloaded + hydration instead of networkidle for stability
-    // Turbopack cold compile for [username]/[...slug] route can take 60s+
+    // Use commit (first response byte) instead of domcontentloaded for stability
+    // Turbopack streams SSR while compiling client chunks — domcontentloaded fires late
     try {
       await page.goto(`/${testProfile}?mode=tip`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 90_000,
+        waitUntil: 'commit',
+        timeout: 120_000,
       });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -223,8 +277,9 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Tip mode shows artist name in h1 and subtitle "Tip with Venmo"
     // Use .first() to avoid strict mode violation when multiple h1 elements exist
+    // 120s timeout: Turbopack client chunk compilation can take 60-120s in dev
     await expect(page.locator('h1').first()).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 120_000,
     });
 
     // Should show either tip selector or "not available" message
@@ -235,7 +290,7 @@ test.describe('Golden Path - Complete User Journey', () => {
     await expect(
       tipSelector.or(tipHeading).or(noTipMsg).or(venmoNotAvail)
     ).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      timeout: 120_000,
     });
   });
 });
