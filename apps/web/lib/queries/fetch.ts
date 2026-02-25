@@ -79,6 +79,11 @@ export async function fetchWithTimeout<T>(
   }
 }
 
+/**
+ * Return a user-safe error message for a failed fetch response.
+ * 5xx errors receive a generic message to avoid leaking server internals;
+ * 4xx errors retain the standard status text for debugging.
+ */
 function getFetchErrorMessage(response: Response): string {
   // Avoid surfacing raw server failure copy to end users.
   // 5xx responses are still identified by status for retry and monitoring.

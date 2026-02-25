@@ -108,17 +108,24 @@ describe('fetch utilities', () => {
     });
 
     it('uses a safe generic message for server errors', async () => {
-      mockFetch.mockResolvedValueOnce({
+      const mockResponse = {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
-      });
+      };
+      mockFetch.mockResolvedValueOnce(mockResponse);
 
-      await expect(fetchWithTimeout('/api/test')).rejects.toMatchObject({
-        status: 500,
-        message:
-          'Request failed due to a temporary server issue. Please try again.',
-      });
+      try {
+        await fetchWithTimeout('/api/test');
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(FetchError);
+        expect((error as FetchError).status).toBe(500);
+        expect((error as FetchError).message).toBe(
+          'Request failed due to a temporary server issue. Please try again.'
+        );
+        expect((error as FetchError).response).toBe(mockResponse);
+      }
     });
 
     it('throws FetchError with status 502 on invalid JSON response', async () => {
