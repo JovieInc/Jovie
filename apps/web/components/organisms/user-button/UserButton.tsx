@@ -224,12 +224,25 @@ export function UserButton({
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
-  const handleFeedbackSubmit = useCallback((feedback: string) => {
+  const handleFeedbackSubmit = useCallback(async (feedback: string) => {
+    const trimmedFeedback = feedback.trim();
+
     track('feedback_submitted', {
-      feedback: feedback.trim(),
+      feedback: trimmedFeedback,
       source: 'dashboard_sidebar',
       method: 'custom_modal',
-      character_count: feedback.trim().length,
+      character_count: trimmedFeedback.length,
+    });
+
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: trimmedFeedback,
+        source: 'dashboard_sidebar',
+        pathname:
+          typeof window !== 'undefined' ? window.location.pathname : null,
+      }),
     });
   }, []);
   const {

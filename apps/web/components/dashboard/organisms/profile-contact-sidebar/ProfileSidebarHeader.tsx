@@ -20,6 +20,7 @@ interface ProfileSidebarHeaderProps {
   readonly username: string;
   readonly displayName: string;
   readonly profilePath: string;
+  readonly onClose: () => void;
 }
 
 function generateVCard(
@@ -41,6 +42,7 @@ export function ProfileSidebarHeader({
   username,
   displayName,
   profilePath,
+  onClose,
 }: ProfileSidebarHeaderProps) {
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,6 +134,7 @@ export function ProfileSidebarHeader({
         <DrawerHeaderActions
           primaryActions={primaryActions}
           overflowActions={overflowActions}
+          onClose={onClose}
         />
       }
     />

@@ -166,7 +166,7 @@ export function EngagementEngineLanding() {
                   <ArrowRight className='h-4 w-4' />
                 </Link>
                 <Link
-                  href='/link-in-bio'
+                  href='/'
                   className='inline-flex items-center justify-center gap-2 h-12 px-6 rounded-md border border-subtle bg-surface-0 text-primary-token text-sm font-medium transition-colors hover:bg-surface-1 focus-ring-themed'
                 >
                   Learn more

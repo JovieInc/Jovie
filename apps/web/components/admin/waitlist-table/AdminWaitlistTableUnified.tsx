@@ -44,9 +44,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 export function AdminWaitlistTableUnified({
   entries,
-  page,
   pageSize,
   total,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
   groupingEnabled = false,
   externalSelection,
 }: WaitlistTableProps) {
@@ -146,12 +148,7 @@ export function AdminWaitlistTableUnified({
           headerCheckboxStateRef,
           toggleSelectAll
         ),
-        cell: createSelectCellRenderer(
-          selectedIdsRef,
-          page,
-          pageSize,
-          toggleSelect
-        ),
+        cell: createSelectCellRenderer(selectedIdsRef, toggleSelect),
         /* eslint-enable react-hooks/refs */
         size: 56, // 14 * 4 = 56px (w-14)
       }),
@@ -234,8 +231,6 @@ export function AdminWaitlistTableUnified({
       // - they use refs to prevent column recreation on selection change
       toggleSelectAll,
       toggleSelect,
-      page,
-      pageSize,
     ]
   );
 
@@ -271,6 +266,9 @@ export function AdminWaitlistTableUnified({
       className='text-[13px]'
       rowSelection={rowSelection}
       onRowSelectionChange={handleRowSelectionChange}
+      hasNextPage={hasNextPage}
+      isFetchingNextPage={isFetchingNextPage}
+      onLoadMore={onLoadMore}
       groupingConfig={
         groupingEnabled
           ? {

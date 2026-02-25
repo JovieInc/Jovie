@@ -62,6 +62,8 @@ describe('useBillingStatusQuery', () => {
         plan: 'pro_monthly',
         hasStripeCustomer: true,
         stripeSubscriptionId: 'sub_456',
+        stale: false,
+        staleReason: null,
       });
     });
 
@@ -87,6 +89,8 @@ describe('useBillingStatusQuery', () => {
         plan: null,
         hasStripeCustomer: false,
         stripeSubscriptionId: null,
+        stale: false,
+        staleReason: null,
       });
     });
 
@@ -107,6 +111,8 @@ describe('useBillingStatusQuery', () => {
         plan: null,
         hasStripeCustomer: false,
         stripeSubscriptionId: null,
+        stale: false,
+        staleReason: null,
       });
     });
 

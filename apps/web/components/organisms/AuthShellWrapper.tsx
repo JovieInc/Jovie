@@ -58,14 +58,10 @@ export function useTableMeta(): TableMetaContextValue {
 export function TableMetaProvider({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const [tableMeta, setTableMetaState] = useState<TableMeta>({
+  const [tableMeta, setTableMeta] = useState<TableMeta>({
     rowCount: null,
     toggle: null,
   });
-  const setTableMeta = useCallback(
-    (meta: TableMeta) => setTableMetaState(meta),
-    []
-  );
   const value = useMemo(
     () => ({ tableMeta, setTableMeta }),
     [tableMeta, setTableMeta]

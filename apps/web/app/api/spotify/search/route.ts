@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { cacheQuery } from '@/lib/db/cache';
@@ -86,6 +87,7 @@ function validateSearchQuery(q: string | undefined): NextResponse | null {
  * - Data sanitization
  */
 export async function GET(request: NextRequest) {
+  const { userId } = await auth();
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
@@ -105,8 +107,8 @@ export async function GET(request: NextRequest) {
   const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
 
   // Rate limiting with headers for client visibility
-  const clientIp = getClientIP(request);
-  const rateLimitResult = await spotifySearchApiLimiter.limit(clientIp);
+  const identifier = userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
+  const rateLimitResult = await spotifySearchApiLimiter.limit(identifier);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,
     ...createRateLimitHeaders(rateLimitResult),

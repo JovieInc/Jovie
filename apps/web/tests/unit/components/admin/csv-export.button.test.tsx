@@ -145,7 +145,7 @@ describe('ExportCSVButton', () => {
   });
 
   describe('Export Behavior', () => {
-    it('should call getData and trigger download on click', async () => {
+    it('should open confirmation dialog before triggering download', async () => {
       const getData = vi.fn().mockReturnValue(mockUsers);
 
       render(
@@ -160,8 +160,10 @@ describe('ExportCSVButton', () => {
 
       await waitFor(() => {
         expect(getData).toHaveBeenCalledTimes(1);
-        expect(downloadCSVBlob).toHaveBeenCalled();
+        expect(screen.getByText('Confirm CSV export')).toBeInTheDocument();
       });
+
+      expect(downloadCSVBlob).not.toHaveBeenCalled();
     });
 
     it('should show loading state during export', async () => {
@@ -219,6 +221,11 @@ describe('ExportCSVButton', () => {
 
       await waitFor(() => {
         expect(asyncGetData).toHaveBeenCalled();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /download csv/i }));
+
+      await waitFor(() => {
         expect(downloadCSVBlob).toHaveBeenCalled();
       });
     });
@@ -235,10 +242,59 @@ describe('ExportCSVButton', () => {
       fireEvent.click(screen.getByRole('button'));
 
       await waitFor(() => {
+        expect(screen.getByText('Confirm CSV export')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /download csv/i }));
+
+      await waitFor(() => {
         expect(generateTimestampedFilename).toHaveBeenCalledWith(
           'test-export',
           'csv'
         );
+      });
+    });
+
+    it('should show export details in confirmation dialog', async () => {
+      render(
+        <ExportCSVButton
+          getData={() => mockUsers}
+          columns={mockUserColumns}
+          filename='users'
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Confirm CSV export')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Rows')).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByText('Columns')).toBeInTheDocument();
+      expect(screen.getByText('4')).toBeInTheDocument();
+    });
+
+    it('should not download when confirmation is cancelled', async () => {
+      render(
+        <ExportCSVButton
+          getData={() => mockUsers}
+          columns={mockUserColumns}
+          filename='users'
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Confirm CSV export')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+      await waitFor(() => {
+        expect(downloadCSVBlob).not.toHaveBeenCalled();
       });
     });
 
@@ -252,6 +308,12 @@ describe('ExportCSVButton', () => {
       );
 
       fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Confirm CSV export')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /download csv/i }));
 
       await waitFor(() => {
         expect(downloadCSVBlob).toHaveBeenCalled();

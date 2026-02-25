@@ -138,6 +138,8 @@ async function globalSetup() {
     '/signin',
     APP_ROUTES.DASHBOARD_PROFILE,
     `/${testProfile}`,
+    `/${testProfile}?mode=listen`,
+    `/${testProfile}?mode=tip`,
   ];
   await Promise.all(
     warmupRoutes.map(async route => {

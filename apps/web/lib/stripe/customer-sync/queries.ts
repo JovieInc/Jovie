@@ -7,7 +7,6 @@
 import 'server-only';
 import { eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureWarning } from '@/lib/error-tracking';
@@ -226,9 +225,33 @@ export async function fetchUserBillingDataWithAuth<
       return { success: false, error: 'User not authenticated' };
     }
 
-    return await withDbSession(async clerkUserId => {
-      return await fetchUserBillingData({ clerkUserId, fields });
+    const sessionAwareResult = await fetchUserBillingData({
+      clerkUserId: userId,
+      fields,
     });
+
+    // If billing query fails unexpectedly, retry once as a best-effort guard
+    // against transient auth/session setup issues before surfacing an error.
+    if (sessionAwareResult.success) {
+      return sessionAwareResult;
+    }
+
+    const retryResult = await fetchUserBillingData({
+      clerkUserId: userId,
+      fields,
+    });
+
+    if (!retryResult.success) {
+      await captureWarning('Billing data auth query failed after retry', null, {
+        clerkUserId: userId,
+        fields: fields.join(','),
+        function: 'fetchUserBillingDataWithAuth',
+        initialError: sessionAwareResult.error,
+        retryError: retryResult.error,
+      });
+    }
+
+    return retryResult;
   } catch (error) {
     await captureWarning(
       'Billing data fetch with auth failed (transient)',

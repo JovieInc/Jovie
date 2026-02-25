@@ -56,6 +56,7 @@ export default async function ClaimPage({ params, searchParams }: Props) {
       displayName={profile.displayName ?? profile.username}
       avatarUrl={profile.avatarUrl}
       claimToken={token}
+      profileId={profile.id}
     />
   );
 }

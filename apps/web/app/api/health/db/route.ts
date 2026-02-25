@@ -141,6 +141,7 @@ export async function GET(request: Request) {
       'health/db'
     );
     void captureWarning('DB health check unhealthy', undefined, {
+      service: 'db',
       route: '/api/health/db',
       error: healthResult.error,
       latency: healthResult.latency,

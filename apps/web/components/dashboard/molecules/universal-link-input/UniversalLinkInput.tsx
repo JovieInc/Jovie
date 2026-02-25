@@ -236,7 +236,7 @@ export const UniversalLinkInput = forwardRef<
 
     const handleVoiceInput = useCallback(async () => {
       if (!voiceInputEnabled) return;
-      if (typeof globalThis.window === 'undefined') return;
+      if (globalThis.window === undefined) return;
       if (!navigator.mediaDevices?.getUserMedia) return;
 
       try {

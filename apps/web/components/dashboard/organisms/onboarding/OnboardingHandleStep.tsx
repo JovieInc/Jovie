@@ -28,6 +28,7 @@ interface OnboardingHandleStepProps {
   readonly onSubmit: (e?: React.FormEvent) => void;
   readonly onSuggestionClick?: (value: string) => void;
   readonly isPendingSubmit?: boolean;
+  readonly autoSubmitClaimed?: boolean;
 }
 
 function ValidationIcon({
@@ -105,11 +106,36 @@ function ButtonContent({
   isSubmitting,
   isPendingSubmit,
   isChecking,
+  autoSubmitClaimed,
 }: {
   readonly isSubmitting: boolean;
   readonly isPendingSubmit: boolean;
   readonly isChecking: boolean;
+  readonly autoSubmitClaimed: boolean;
 }) {
+  if (autoSubmitClaimed) {
+    return (
+      <div className='flex items-center justify-center space-x-2'>
+        <svg
+          viewBox='0 0 20 20'
+          fill='none'
+          aria-hidden='true'
+          className='h-4 w-4 animate-in zoom-in duration-300'
+        >
+          <circle cx='10' cy='10' r='9' stroke='currentColor' strokeWidth='2' />
+          <path
+            d='M6 10.2l2.6 2.6L14 7.4'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+          />
+        </svg>
+        <span>Claimed!</span>
+      </div>
+    );
+  }
+
   if (isSubmitting) {
     return (
       <div className='flex items-center justify-center space-x-2'>
@@ -146,8 +172,17 @@ export function OnboardingHandleStep({
   onSubmit,
   onSuggestionClick,
   isPendingSubmit = false,
+  autoSubmitClaimed = false,
 }: OnboardingHandleStepProps) {
   function renderValidationStatus(): React.ReactNode {
+    if (autoSubmitClaimed && handleInput) {
+      return (
+        <div className='text-success text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+          @{handleInput} claimed.
+        </div>
+      );
+    }
+
     if (!handleInput || stateError) return null;
     // Checking state is shown via spinner icon in the input — no text needed
     if (handleValidation.checking) return null;
@@ -259,6 +294,7 @@ export function OnboardingHandleStep({
               isSubmitting={isSubmitting}
               isPendingSubmit={isPendingSubmit}
               isChecking={handleValidation.checking}
+              autoSubmitClaimed={autoSubmitClaimed}
             />
           </AuthButton>
         </form>

@@ -51,14 +51,14 @@ export function AutomaticReleaseSmartlinksSection() {
                   border: '1px solid rgba(255,255,255,0.05)',
                 }}
               >
-                Smartlinks · Auto-generated
+                Smartlinks · Auto-generated{' '}
                 <span style={{ color: 'var(--linear-text-tertiary)' }}>→</span>
               </span>
             </div>
           </div>
 
           {/* Two-panel product mockup */}
-          <div className='relative mt-12'>
+          <div className='relative mt-10'>
             <div
               className='relative overflow-hidden rounded-2xl'
               style={{

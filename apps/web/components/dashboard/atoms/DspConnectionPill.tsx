@@ -127,7 +127,7 @@ export function DspConnectionPill({
           {onSyncNow && (
             <DropdownMenuItem onClick={onSyncNow}>
               <RefreshCw className='h-3.5 w-3.5' />
-              Sync Now
+              Sync
             </DropdownMenuItem>
           )}
           {onSyncNow && onDisconnect && <DropdownMenuSeparator />}

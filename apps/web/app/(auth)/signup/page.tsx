@@ -3,6 +3,13 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 import { AuthLayout, SignUpForm } from '@/components/auth';
+import {
+  clearSignupClaimValue,
+  persistSignupClaimValue,
+  SIGNUP_ARTIST_NAME_KEY,
+  SIGNUP_SPOTIFY_EXPECTED_KEY,
+  SIGNUP_SPOTIFY_URL_KEY,
+} from '@/lib/auth/signup-claim-storage';
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage.
@@ -18,21 +25,25 @@ function SignUpClaimDataPersistence() {
     const handle = searchParams.get('handle');
 
     try {
+      const now = Date.now();
+
       // Clear stale values before persisting new ones
-      sessionStorage.removeItem('jovie_signup_spotify_url');
-      sessionStorage.removeItem('jovie_signup_artist_name');
+      clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
+      clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
+      clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
 
       if (spotifyUrl) {
-        sessionStorage.setItem('jovie_signup_spotify_url', spotifyUrl);
+        persistSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY, spotifyUrl, now);
+        persistSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY, 'true', now);
       }
       if (artistName) {
-        sessionStorage.setItem('jovie_signup_artist_name', artistName);
+        persistSignupClaimValue(SIGNUP_ARTIST_NAME_KEY, artistName, now);
       }
 
       if (handle) {
         sessionStorage.setItem(
           'pendingClaim',
-          JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
+          JSON.stringify({ handle: handle.toLowerCase(), ts: now })
         );
       }
     } catch {
