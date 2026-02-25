@@ -258,6 +258,41 @@ For deeper implementation guidance, use `.claude/skills/entitlements.md`.
 
 ---
 
+## PR Discipline (Required)
+
+### Size Limits
+- Max 10 files changed per PR (excluding lockfiles and generated files)
+- Max 400 lines of diff (additions + deletions)
+- If a task requires more, split into sequential PRs with clear dependencies
+
+### Pre-Push Gate
+Before pushing to a branch, agents MUST pass locally:
+1. `pnpm --filter web exec tsc --noEmit` (typecheck)
+2. `pnpm biome check apps/web` (lint)
+3. `pnpm vitest --run --changed` (affected tests)
+4. `pnpm --filter web lint:server-boundaries` (boundaries)
+
+Do NOT push code that fails any of these. Fix first, push once.
+
+### One PR = One Concern
+- Each PR addresses exactly one Linear issue or one bug fix
+- No drive-by refactors, no "while I'm here" changes
+- If you find a related issue, create a separate Linear ticket
+
+### Branch Hygiene
+- Always rebase on main before pushing (not merge)
+- If a PR has been open >24h without progress, close it and re-create from fresh main
+
+### Incremental Shipping (Ship Fast, Fail Fast)
+- When a command produces multiple independent fixes, ship each as its own PR
+- Push and enable auto-merge immediately — don't wait for CI before starting the next fix
+- CI runs in parallel on all PRs while the agent continues working
+- This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
+- If a PR fails CI, the agent can fix it while other PRs continue merging
+- Each PR must still pass /verify locally before pushing
+
+---
+
 ## Pre-PR Checklist (required before opening any PR)
 
 1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks

@@ -5,11 +5,11 @@ tags: [e2e, testing, automation, cleanup]
 
 # /clean - E2E Console Error Cleanup
 
-Autonomous workflow to run Playwright E2E smoke tests on all dashboard, admin, and public pages, detect and fix console errors, and open a PR when clean.
+Autonomous workflow to run Playwright E2E smoke tests on all dashboard, admin, and public pages, detect and fix console errors, and ship PRs incrementally as fixes accumulate.
 
 ## Goal
 
-Run comprehensive E2E smoke tests, capture all browser console errors, fix them iteratively, and open a clean PR with auto-merge enabled.
+Run comprehensive E2E smoke tests, capture all browser console errors, fix them iteratively, and ship focused PRs as soon as fixes are cohesive — don't wait until everything is clean.
 
 ## Pre-flight Checklist
 
@@ -68,7 +68,7 @@ SMOKE_ONLY=1 doppler run -- pnpm exec playwright test \
   --project=chromium --reporter=line
 ```
 
-### Step 2: Fix Loop
+### Step 2: Fix Loop with Checkpoints
 
 For each failure or console error detected:
 
@@ -77,13 +77,65 @@ For each failure or console error detected:
 3. **Prefer correct behavior** over silencing logs
 4. **Re-run the tests** after each fix
 
-Repeat until:
-- All tests pass
-- No console errors or uncaught exceptions remain on any page
+#### Checkpoint: Ship When Ready
 
-### Step 3: Post-Fix Verification
+After fixing a cohesive group of errors (e.g., all errors in one component, one page, or one category), evaluate:
 
-Once tests are clean, run verification:
+1. **Are the fixes self-contained?** (Would they make sense as a standalone PR?)
+2. **Do they pass /verify?** (typecheck, lint, affected tests)
+3. **Are they within PR Discipline limits?** (max 10 files, max 400 lines)
+
+If yes to all three — **ship immediately:**
+
+```bash
+# Return to main
+git checkout main && git pull origin main
+
+# Create focused branch
+git checkout -b fix/clean-{category}-$(date +%Y%m%d-%H%M%S)
+
+# Stage specific files, commit, push, PR, auto-merge
+git add <specific-files>
+git commit -m "fix: resolve {category} console errors from E2E smoke tests
+
+- {Fix description 1}
+- {Fix description 2}
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+
+git push -u origin fix/clean-{category}-$(date +%Y%m%d-%H%M%S)
+
+gh pr create \
+  --title "fix: clean {category} console errors from E2E smoke tests" \
+  --body "$(cat <<'EOF'
+## Summary
+- Fixed {category} console errors detected during E2E smoke testing
+
+## Pages Affected
+- {list of affected pages}
+
+## Test plan
+- [x] Smoke tests pass for affected pages
+- [x] TypeScript compiles
+- [x] Biome lint passes
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
+
+gh pr merge --auto --squash
+
+# Return to main for next batch
+git checkout main
+```
+
+**Don't wait for CI** — move to the next group of errors immediately. CI runs in parallel.
+
+Then continue the fix loop from Step 1, re-running tests on fresh main to find remaining errors.
+
+### Step 3: Final Verification
+
+Once all tests pass and no console errors remain:
 
 ```bash
 # Run /verify for build, typecheck, lint, and other checks
@@ -93,39 +145,22 @@ Once tests are clean, run verification:
 /simplify
 ```
 
-### Step 4: Create PR
+If there are any remaining uncommitted fixes, ship them as a final PR.
 
-```bash
-# Create a new branch
-git checkout -b fix/clean-console-errors-$(date +%Y%m%d-%H%M%S)
+### Step 4: Summary
 
-# Stage and commit changes
-git add -A
-git commit -m "fix: resolve console errors detected in E2E smoke tests
+```
+E2E Clean Run Complete
 
-- Fixed console errors detected during E2E smoke testing
-- All dashboard, admin, and public pages now load cleanly
+PRs Created:
+  1. {PR URL} - {category} - CI: pending/passed
+  2. {PR URL} - {category} - CI: pending/passed
+  ...
 
-Co-Authored-By: Claude <noreply@anthropic.com>"
+Pages Verified Clean:
+  - {list all pages that now pass}
 
-# Create PR with auto-merge
-gh pr create \
-  --title "fix: clean console errors from E2E smoke tests" \
-  --body "## Summary
-- Fixed console errors detected during E2E smoke testing
-- All dashboard, admin, and public pages now load cleanly
-
-## Pages Verified
-- Home page and public profiles
-- All dashboard pages (analytics, audience, chat, contacts, earnings, profile, releases, tour-dates)
-- All admin pages (dashboard, activity, campaigns, creators, users, waitlist)
-
-## Test Results
-- [x] All smoke tests passing
-- [x] No console errors on any page
-- [x] Build passes
-- [x] Type check passes
-- [x] Lint passes"
+Remaining Issues: {count, if any}
 ```
 
 ## Constraints
@@ -133,7 +168,8 @@ gh pr create \
 - **Do not ignore or suppress** console errors unless explicitly justified
 - **Do not weaken** test coverage
 - **Make minimal, correct changes** - fix the root cause, not symptoms
-- **Stop only when** the system is fully clean
+- **Ship incrementally** - don't accumulate a massive PR
+- **Size gates are hard limits** - max 10 files, max 400 lines per PR
 - **Proceed autonomously** without asking for confirmation
 
 ## Debugging Tips
