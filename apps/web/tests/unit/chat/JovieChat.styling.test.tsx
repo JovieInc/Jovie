@@ -104,6 +104,11 @@ describe('JovieChat styling regressions', () => {
     expect(loadingAvatar!.classList.contains('border')).toBe(false);
     expect(loadingAvatar!.classList.contains('border-subtle')).toBe(false);
 
+    // Verify the loading avatar retains its non-border classes (including flex)
+    expect(loadingAvatar!.classList.contains('flex')).toBe(true);
+    expect(loadingAvatar!.classList.contains('items-center')).toBe(true);
+    expect(loadingAvatar!.classList.contains('justify-center')).toBe(true);
+
     // Verify border classes were removed from loading bubble
     expect(loadingBubble!.classList.contains('border')).toBe(false);
     expect(loadingBubble!.classList.contains('border-subtle')).toBe(false);
@@ -112,5 +117,9 @@ describe('JovieChat styling regressions', () => {
     expect(loadingBubble!.classList.contains('rounded-2xl')).toBe(true);
     expect(loadingBubble!.classList.contains('bg-surface-1')).toBe(true);
     expect(loadingBubble!.classList.contains('px-5')).toBe(true);
+
+    // Verify no separator (border-t border-subtle) exists in the compact chat input area
+    const separator = container.querySelector('.border-t.border-subtle');
+    expect(separator).toBeNull();
   });
 });
