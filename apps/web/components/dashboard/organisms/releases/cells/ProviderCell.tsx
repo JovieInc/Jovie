@@ -344,14 +344,18 @@ export const ProviderCell = memo(function ProviderCell({
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
-      await onCopy(path, label, testId);
-      setCopiedTestId(testId);
+      try {
+        await onCopy(path, label, testId);
+        setCopiedTestId(testId);
 
-      // Clear existing timeout before setting a new one
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
+        // Clear existing timeout before setting a new one
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
+      } catch (error) {
+        console.error('Failed to copy link:', error);
       }
-      copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
     },
     [onCopy]
   );
