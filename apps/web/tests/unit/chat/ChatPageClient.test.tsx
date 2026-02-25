@@ -11,12 +11,14 @@ const mockSetHeaderBadge = vi.fn();
 const mockSetHeaderActions = vi.fn();
 const mockSuccessNotification = vi.fn();
 const mockErrorNotification = vi.fn();
+const mockPush = vi.fn();
+const mockDeleteMutateAsync = vi.fn();
 
 let mockSearchParams = new URLSearchParams();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockPush,
     replace: mockReplace,
     back: vi.fn(),
   }),
@@ -56,6 +58,13 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({
     success: mockSuccessNotification,
     error: mockErrorNotification,
+  }),
+}));
+
+vi.mock('@/lib/queries/useChatMutations', () => ({
+  useDeleteConversationMutation: () => ({
+    mutateAsync: mockDeleteMutateAsync,
+    isPending: false,
   }),
 }));
 
@@ -139,6 +148,8 @@ describe('ChatPageClient', () => {
     capturedOnTitleChange = undefined;
     mockSuccessNotification.mockReset();
     mockErrorNotification.mockReset();
+    mockPush.mockReset();
+    mockDeleteMutateAsync.mockReset();
   });
 
   it('renders JovieChat with profileId from selected profile', () => {
@@ -227,5 +238,21 @@ describe('ChatPageClient', () => {
 
     // Should show spinner, not JovieChat
     expect(container.querySelector('[data-testid="jovie-chat"]')).toBeNull();
+  });
+
+  it('registers a chat options dropdown in header actions', () => {
+    renderChatPage('conv-123');
+
+    const headerActionsElement = mockSetHeaderActions.mock.calls.at(-1)?.[0];
+
+    expect(React.isValidElement(headerActionsElement)).toBe(true);
+
+    const children = React.isValidElement<{ children: React.ReactNode[] }>(
+      headerActionsElement
+    )
+      ? headerActionsElement.props.children
+      : [];
+
+    expect(children).toHaveLength(2);
   });
 });

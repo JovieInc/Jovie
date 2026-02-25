@@ -1,7 +1,27 @@
 'use client';
 
-import { SimpleTooltip } from '@jovie/ui';
-import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  SimpleTooltip,
+} from '@jovie/ui';
+import {
+  AlertCircle,
+  Copy,
+  MoreHorizontal,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -18,6 +38,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useDeleteConversationMutation } from '@/lib/queries/useChatMutations';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
 
 interface ChatPageClientProps {
@@ -43,7 +64,9 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
+  const deleteConversation = useDeleteConversationMutation();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
 
   // Register ProfileContactSidebar in the unified right panel system
@@ -101,23 +124,62 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   const headerActions = useMemo(
     () => (
       <>
-        {conversationId && (
-          <SimpleTooltip content='Copy session ID'>
-            <CircleIconButton
-              size='sm'
-              variant='outline'
-              ariaLabel='Copy session ID'
+        <DropdownMenu>
+          <SimpleTooltip content='Chat options'>
+            <DropdownMenuTrigger asChild>
+              <CircleIconButton
+                size='sm'
+                variant='outline'
+                ariaLabel='Chat options'
+              >
+                <MoreHorizontal aria-hidden='true' className='size-4' />
+              </CircleIconButton>
+            </DropdownMenuTrigger>
+          </SimpleTooltip>
+          <DropdownMenuContent align='end'>
+            <DropdownMenuItem
+              disabled={!conversationId}
               onClick={handleCopyConversationId}
             >
               <Copy aria-hidden='true' className='size-4' />
-            </CircleIconButton>
-          </SimpleTooltip>
-        )}
+              Copy session ID
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={!conversationId}
+              className='text-destructive focus:text-destructive'
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 aria-hidden='true' className='size-4' />
+              Delete chat
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <PreviewToggleButton />
       </>
     ),
     [conversationId, handleCopyConversationId]
   );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!conversationId) return;
+
+    try {
+      await deleteConversation.mutateAsync({ conversationId });
+      router.push(APP_ROUTES.CHAT);
+      notifications.success('Thread deleted');
+      setHeaderBadge(null);
+      setShowDeleteDialog(false);
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+      notifications.error('Failed to delete thread');
+    }
+  }, [
+    conversationId,
+    deleteConversation,
+    notifications,
+    router,
+    setHeaderBadge,
+  ]);
 
   const handleConversationCreate = useCallback(
     (newConversationId: string) => {
@@ -188,15 +250,48 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   }
 
   return (
-    <JovieChat
-      profileId={selectedProfile.id}
-      conversationId={conversationId}
-      onConversationCreate={handleConversationCreate}
-      onTitleChange={handleTitleChange}
-      initialQuery={initialQuery ?? undefined}
-      displayName={selectedProfile.displayName ?? undefined}
-      avatarUrl={selectedProfile.avatarUrl}
-      username={selectedProfile.username ?? undefined}
-    />
+    <>
+      <JovieChat
+        profileId={selectedProfile.id}
+        conversationId={conversationId}
+        onConversationCreate={handleConversationCreate}
+        onTitleChange={handleTitleChange}
+        initialQuery={initialQuery ?? undefined}
+        displayName={selectedProfile.displayName ?? undefined}
+        avatarUrl={selectedProfile.avatarUrl}
+        username={selectedProfile.username ?? undefined}
+      />
+
+      <AlertDialog
+        open={showDeleteDialog}
+        onOpenChange={open => {
+          if (!deleteConversation.isPending) {
+            setShowDeleteDialog(open);
+          }
+        }}
+      >
+        <AlertDialogContent className='max-w-sm'>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete chat</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this chat. This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteConversation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant='destructive'
+              onClick={handleDeleteConfirm}
+              disabled={deleteConversation.isPending}
+            >
+              {deleteConversation.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
