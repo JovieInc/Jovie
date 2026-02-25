@@ -551,8 +551,8 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # On PRs: gates on ci-fast + unit tests + a11y (layout guard remains informational).
-    # On merge queue: ci-fast + a11y run; unit tests/layout-guard are skipped
-    # (already passed on PR) and their "skipped" result passes the checks below.
+    # On merge queue: all jobs run; path-gated jobs that find no relevant changes
+    # skip internally and report "success" or "skipped", both of which pass below.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
@@ -590,7 +590,7 @@ jobs:
             echo "⚠️ ci-layout-guard failed — layout overlap/touching regressions detected (non-blocking)"
           fi
 
-          echo "✅ All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y"
+          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y"
 
   ci-build-public:
     name: Build (public routes)
@@ -1081,7 +1081,15 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
+        run: |
+          # Align with ci-build-public: run when build OR test paths changed.
+          RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1108,14 +1116,13 @@ jobs:
       - name: Download build artifact
         id: download
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        continue-on-error: true
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
           path: apps/web/.next
 
       - name: Run axe a11y audit (public routes)
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download.outcome == 'success'
+        if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           cd apps/web
           # Create empty auth state so Playwright's auth-setup project doesn't crash.
