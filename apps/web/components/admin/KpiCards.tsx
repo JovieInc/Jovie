@@ -27,7 +27,7 @@ interface KpiCardsProps {
 function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 line-clamp-1'
+      className='inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-2xs font-medium text-warning line-clamp-1'
       title={message ?? 'Data source unavailable'}
     >
       <AlertTriangle className='size-3' aria-hidden='true' />
@@ -40,7 +40,7 @@ function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
 function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-slate-500/10 px-2 py-0.5 text-xs font-medium text-slate-500 dark:text-slate-400 line-clamp-1'
+      className='inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token line-clamp-1'
       title={message ?? 'Data source not configured'}
     >
       <span className='hidden sm:inline'>Not configured</span>
@@ -101,13 +101,13 @@ export function KpiCards({
   };
 
   return (
-    <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+    <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
       <KpiItem
         title='MRR'
         value={mrrLabel}
         metadata={renderStripeMetadata('Monthly recurring revenue')}
         icon={CircleDollarSign}
-        iconClassName='text-sky-600 dark:text-sky-400'
+        iconClassName='text-info'
       />
 
       <KpiItem
@@ -115,7 +115,7 @@ export function KpiCards({
         value={balanceLabel}
         metadata={renderMercuryMetadata('Mercury checking')}
         icon={Banknote}
-        iconClassName='text-emerald-600 dark:text-emerald-400'
+        iconClassName='text-success'
       />
 
       <KpiItem
@@ -123,7 +123,7 @@ export function KpiCards({
         value={burnRateLabel}
         metadata={renderMercuryMetadata('Spend in the last 30 days')}
         icon={TrendingDown}
-        iconClassName='text-rose-500 dark:text-rose-300'
+        iconClassName='text-error'
       />
 
       <KpiItem
@@ -131,7 +131,7 @@ export function KpiCards({
         value={claimedCreatorsLabel}
         metadata='Artists who claimed their profile'
         icon={Users}
-        iconClassName='text-violet-500 dark:text-violet-300'
+        iconClassName='text-[var(--color-chart-4)]'
       />
     </div>
   );

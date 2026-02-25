@@ -1,3 +1,4 @@
+import { Skeleton } from '@jovie/ui';
 import { MetricsChartClient } from '@/components/admin/MetricsChartClient';
 import { ReliabilityCard } from '@/components/admin/ReliabilityCard';
 import {
@@ -30,8 +31,8 @@ export async function AdminUsageSection() {
 export function AdminUsageSectionSkeleton() {
   return (
     <section id='usage' className='grid gap-6 lg:grid-cols-3'>
-      <div className='lg:col-span-2 h-64 rounded-xl skeleton' />
-      <div id='errors' className='h-64 rounded-xl skeleton' />
+      <Skeleton className='lg:col-span-2 h-64 rounded-xl' />
+      <Skeleton className='h-64 rounded-xl' />
     </section>
   );
 }

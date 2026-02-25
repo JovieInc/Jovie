@@ -103,7 +103,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
           <h3 className='text-sm font-medium text-primary-token'>
             Daily active users
           </h3>
-          <p className='text-xs text-tertiary-token'>Last 14 days</p>
+          <p className='text-2xs text-tertiary-token'>Last 14 days</p>
         </div>
         <p className='text-sm text-secondary-token'>
           No usage data available yet.
@@ -119,9 +119,9 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
           <h3 className='text-sm font-medium text-primary-token'>
             Daily active users
           </h3>
-          <p className='text-xs text-tertiary-token'>Last 14 days</p>
+          <p className='text-2xs text-tertiary-token'>Last 14 days</p>
         </div>
-        <div className='flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 tabular-nums'>
+        <div className='flex items-center gap-1.5 text-app font-medium text-success tabular-nums'>
           <TrendingUp className='h-3.5 w-3.5' />
           {stats.deltaPct >= 0 ? '+' : ''}
           {stats.deltaPct.toFixed(1)}%
@@ -134,19 +134,19 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
 
       <div className='grid gap-4 sm:grid-cols-3'>
         <div>
-          <p className='text-xs text-tertiary-token'>Current DAU</p>
+          <p className='text-2xs text-tertiary-token'>Current DAU</p>
           <p className='text-2xl font-semibold tabular-nums text-primary-token'>
             {stats.latest.users.toLocaleString()}
           </p>
         </div>
         <div>
-          <p className='text-xs text-tertiary-token'>14d Average</p>
+          <p className='text-2xs text-tertiary-token'>14d Average</p>
           <p className='text-2xl font-semibold tabular-nums text-primary-token'>
             {stats.avgUsers.toLocaleString()}
           </p>
         </div>
         <div>
-          <p className='text-xs text-tertiary-token'>Peak day</p>
+          <p className='text-2xs text-tertiary-token'>Peak day</p>
           <p className='text-2xl font-semibold tabular-nums text-primary-token'>
             {stats.maxUsers.toLocaleString()}
           </p>

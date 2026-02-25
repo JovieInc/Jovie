@@ -1,3 +1,4 @@
+import { Skeleton } from '@jovie/ui';
 import { DefaultStatusBanner } from '@/components/admin/DefaultStatusBanner';
 import { KpiCards } from '@/components/admin/KpiCards';
 import { getAdminOverviewMetrics } from '@/lib/admin/overview';
@@ -35,11 +36,11 @@ export async function AdminKpiSection() {
 export function AdminKpiSectionSkeleton() {
   return (
     <>
-      <div className='h-16 rounded-xl skeleton' />
+      <Skeleton className='h-16 rounded-xl' />
       <section id='users' className='space-y-6'>
         <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
           {KPI_SKELETON_KEYS.map(key => (
-            <div key={key} className='h-24 rounded-xl skeleton' />
+            <Skeleton key={key} className='h-28 rounded-xl' />
           ))}
         </div>
       </section>

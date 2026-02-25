@@ -1,3 +1,4 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { AlertOctagon, Bug, Flame, Users } from 'lucide-react';
 import type { AdminSentryMetrics } from '@/lib/admin/sentry-metrics';
 
@@ -14,13 +15,17 @@ export function SentryMetricsCard({
 }: Readonly<SentryMetricsCardProps>) {
   if (!metrics.isConfigured || !metrics.isAvailable) {
     return (
-      <div className='rounded-xl border border-border/60 bg-card/50 p-5'>
-        <h3 className='text-sm font-medium text-primary-token'>Sentry</h3>
-        <p className='mt-2 text-sm text-secondary-token'>
-          {metrics.errorMessage ??
-            'Sentry metrics are temporarily unavailable. Please try again shortly.'}
-        </p>
-      </div>
+      <Card className='border-subtle bg-surface-1/80'>
+        <CardHeader className='p-5 pb-2'>
+          <CardTitle className='text-lg tracking-tight'>Sentry</CardTitle>
+        </CardHeader>
+        <CardContent className='p-5 pt-0'>
+          <p className='text-app text-secondary-token'>
+            {metrics.errorMessage ??
+              'Sentry metrics are temporarily unavailable. Please try again shortly.'}
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -30,57 +35,58 @@ export function SentryMetricsCard({
       : 'No unresolved issues in the last 24 hours.';
 
   return (
-    <div className='rounded-xl border border-border/60 bg-card/50 p-5'>
-      <div className='mb-4'>
-        <h3 className='text-sm font-medium text-primary-token'>Sentry</h3>
-        <p className='text-xs text-tertiary-token'>
+    <Card className='border-subtle bg-surface-1/80'>
+      <CardHeader className='space-y-1 p-5 pb-3'>
+        <CardTitle className='text-lg tracking-tight'>Sentry</CardTitle>
+        <p className='text-2xs text-tertiary-token'>
           Production errors from the last 24 hours
         </p>
-      </div>
+      </CardHeader>
+      <CardContent className='space-y-4 p-5 pt-0'>
+        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+          <div className='rounded-lg bg-surface-2 p-3'>
+            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
+              <Bug className='size-4 text-info' />
+              Unresolved issues
+            </p>
+            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
+              {formatMetric(metrics.unresolvedIssues24h)}
+            </p>
+          </div>
 
-      <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
-        <div className='rounded-lg bg-background/60 p-3'>
-          <p className='flex items-center gap-2 text-xs text-secondary-token'>
-            <Bug className='size-4 text-blue-500' />
-            Unresolved issues
-          </p>
-          <p className='mt-2 text-xl font-semibold text-primary-token tabular-nums'>
-            {formatMetric(metrics.unresolvedIssues24h)}
-          </p>
+          <div className='rounded-lg bg-surface-2 p-3'>
+            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
+              <Flame className='size-4 text-warning' />
+              Error events
+            </p>
+            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
+              {formatMetric(metrics.totalEvents24h)}
+            </p>
+          </div>
+
+          <div className='rounded-lg bg-surface-2 p-3'>
+            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
+              <Users className='size-4 text-[var(--color-chart-4)]' />
+              Impacted users
+            </p>
+            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
+              {formatMetric(metrics.impactedUsers24h)}
+            </p>
+          </div>
+
+          <div className='rounded-lg bg-surface-2 p-3'>
+            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
+              <AlertOctagon className='size-4 text-error' />
+              Critical issues
+            </p>
+            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
+              {formatMetric(metrics.criticalIssues24h)}
+            </p>
+          </div>
         </div>
 
-        <div className='rounded-lg bg-background/60 p-3'>
-          <p className='flex items-center gap-2 text-xs text-secondary-token'>
-            <Flame className='size-4 text-amber-500' />
-            Error events
-          </p>
-          <p className='mt-2 text-xl font-semibold text-primary-token tabular-nums'>
-            {formatMetric(metrics.totalEvents24h)}
-          </p>
-        </div>
-
-        <div className='rounded-lg bg-background/60 p-3'>
-          <p className='flex items-center gap-2 text-xs text-secondary-token'>
-            <Users className='size-4 text-violet-500' />
-            Impacted users
-          </p>
-          <p className='mt-2 text-xl font-semibold text-primary-token tabular-nums'>
-            {formatMetric(metrics.impactedUsers24h)}
-          </p>
-        </div>
-
-        <div className='rounded-lg bg-background/60 p-3'>
-          <p className='flex items-center gap-2 text-xs text-secondary-token'>
-            <AlertOctagon className='size-4 text-red-500' />
-            Critical issues
-          </p>
-          <p className='mt-2 text-xl font-semibold text-primary-token tabular-nums'>
-            {formatMetric(metrics.criticalIssues24h)}
-          </p>
-        </div>
-      </div>
-
-      <p className='mt-4 text-xs text-tertiary-token'>{topIssueLabel}</p>
-    </div>
+        <p className='text-2xs text-tertiary-token'>{topIssueLabel}</p>
+      </CardContent>
+    </Card>
   );
 }

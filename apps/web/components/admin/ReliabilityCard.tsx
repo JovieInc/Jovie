@@ -1,3 +1,4 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
@@ -15,23 +16,23 @@ function getHealthTone(summary: AdminReliabilitySummary): HealthTone {
   if (summary.incidents24h >= 5 || summary.errorRatePercent >= 5) {
     return {
       label: 'Critical',
-      labelClassName: 'text-red-600 dark:text-red-400',
-      iconClassName: 'text-red-500',
+      labelClassName: 'text-error',
+      iconClassName: 'text-error',
     };
   }
 
   if (summary.incidents24h >= 1 || summary.errorRatePercent >= 1) {
     return {
       label: 'Needs attention',
-      labelClassName: 'text-amber-600 dark:text-amber-400',
-      iconClassName: 'text-amber-500',
+      labelClassName: 'text-warning',
+      iconClassName: 'text-warning',
     };
   }
 
   return {
     label: 'Healthy',
-    labelClassName: 'text-emerald-600 dark:text-emerald-400',
-    iconClassName: 'text-emerald-500',
+    labelClassName: 'text-success',
+    iconClassName: 'text-success',
   };
 }
 
@@ -48,20 +49,24 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
     : '—';
 
   return (
-    <div className='h-full space-y-4'>
-      <div className='flex items-start justify-between'>
-        <div>
-          <h3 className='text-sm font-medium text-primary-token'>
-            Reliability
-          </h3>
-          <p className='text-xs text-tertiary-token'>System health metrics</p>
+    <Card className='h-full border-subtle bg-surface-1/80'>
+      <CardHeader className='space-y-1 p-5 pb-3'>
+        <div className='flex items-start justify-between gap-2'>
+          <div>
+            <CardTitle className='text-lg tracking-tight'>
+              Reliability
+            </CardTitle>
+            <p className='text-2xs text-tertiary-token'>
+              System health metrics
+            </p>
+          </div>
+          <span className={`text-app font-medium ${tone.labelClassName}`}>
+            {tone.label}
+          </span>
         </div>
-        <span className={`text-xs font-medium ${tone.labelClassName}`}>
-          {tone.label}
-        </span>
-      </div>
-      <div className='space-y-3 text-sm text-secondary-token'>
-        <div className='flex items-center justify-between py-2'>
+      </CardHeader>
+      <CardContent className='space-y-3 p-5 pt-0 text-app text-secondary-token'>
+        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
             <CheckCircle2 className={`size-4 ${tone.iconClassName}`} />
             Error rate
@@ -70,29 +75,30 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
             {errorRateLabel}
           </span>
         </div>
-        <div className='flex items-center justify-between py-2'>
+        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <Clock3 className='size-4 text-blue-500' />
+            <Clock3 className='size-4 text-info' />
             p95 latency
           </div>
           <span className='text-primary-token tabular-nums'>
             {latencyLabel}
           </span>
         </div>
-        <div className='flex items-center justify-between py-2'>
+        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <AlertTriangle className='size-4 text-amber-500' />
+            <AlertTriangle className='size-4 text-warning' />
             Incidents (24h)
           </div>
           <span className='text-primary-token tabular-nums'>
             {incidentsLabel}
           </span>
         </div>
-      </div>
-      <p className='text-xs text-tertiary-token'>
-        Last incident resolved on {lastIncidentLabel}. Review logs and alerts
-        before shipping new changes.
-      </p>
-    </div>
+
+        <p className='pt-1 text-2xs text-tertiary-token'>
+          Last incident resolved on {lastIncidentLabel}. Review logs and alerts
+          before shipping new changes.
+        </p>
+      </CardContent>
+    </Card>
   );
 }

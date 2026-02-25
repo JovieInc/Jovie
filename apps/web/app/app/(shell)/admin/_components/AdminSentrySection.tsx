@@ -1,3 +1,4 @@
+import { Skeleton } from '@jovie/ui';
 import { SentryMetricsCard } from '@/components/admin/SentryMetricsCard';
 import { getAdminSentryMetrics } from '@/lib/admin/sentry-metrics';
 
@@ -14,7 +15,7 @@ export async function AdminSentrySection() {
 export function AdminSentrySectionSkeleton() {
   return (
     <section id='sentry'>
-      <div className='h-44 rounded-xl skeleton' />
+      <Skeleton className='h-44 rounded-xl' />
     </section>
   );
 }
