@@ -167,7 +167,6 @@ export function PreviewPanel() {
         {/* Header with action buttons */}
         <DrawerHeader
           title='Live Preview'
-          onClose={close}
           actions={
             <DrawerHeaderActions
               primaryActions={primaryActions}

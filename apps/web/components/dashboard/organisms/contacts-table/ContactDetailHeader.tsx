@@ -73,7 +73,7 @@ export function ContactDetailHeader({
   return (
     <DrawerHeader
       title={roleLabel}
-      onClose={onClose}
+      onClose={hasActions ? undefined : onClose}
       actions={
         hasActions ? (
           <DrawerHeaderActions

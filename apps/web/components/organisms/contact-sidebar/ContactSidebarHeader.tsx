@@ -166,7 +166,7 @@ export function ContactSidebarHeader({
   return (
     <DrawerHeader
       title={titleContent}
-      onClose={onClose}
+      onClose={hasActions ? undefined : onClose}
       actions={
         hasActions ? (
           <DrawerHeaderActions

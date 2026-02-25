@@ -120,6 +120,7 @@ export function ReleaseSidebarHeader({
   return (
     <DrawerHeader
       title={hasRelease ? 'Release details' : 'No release selected'}
+      onClose={hasActions ? undefined : onClose}
       actions={
         <div className='flex items-center gap-2'>
           {hasRelease && (
