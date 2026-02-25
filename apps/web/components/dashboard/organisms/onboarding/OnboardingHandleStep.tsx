@@ -203,7 +203,7 @@ export function OnboardingHandleStep({
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
-          {isReservedHandle && handleInput ? (
+          {isReservedHandle ? (
             <div className='flex flex-col items-center gap-3 rounded-2xl border border-subtle bg-surface-1 px-5 py-6 text-center'>
               <p className='text-sm font-medium uppercase tracking-[0.08em] text-tertiary-token'>
                 Reserved handle
@@ -221,7 +221,7 @@ export function OnboardingHandleStep({
 
         <form className={FORM_LAYOUT.formInner} onSubmit={onSubmit}>
           <div>
-            {isReservedHandle && handleInput ? (
+            {isReservedHandle ? (
               <p className='mb-2 text-xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
                 Edit handle (optional)
               </p>
