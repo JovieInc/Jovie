@@ -1,12 +1,12 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
+import { PacerProvider } from '@tanstack/react-pacer';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
-import { PacerProvider } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';

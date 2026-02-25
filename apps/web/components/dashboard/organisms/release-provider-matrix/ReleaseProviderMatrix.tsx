@@ -45,7 +45,6 @@ import {
   type ReleaseView,
 } from './ReleaseTableSubheader';
 import { SmartLinkGateBanner } from './SmartLinkGateBanner';
-import { SpotifyConnectDialog } from './SpotifyConnectDialog';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 
@@ -53,6 +52,13 @@ import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 const ReleaseSidebar = lazy(() =>
   import('@/components/organisms/release-sidebar').then(m => ({
     default: m.ReleaseSidebar,
+  }))
+);
+
+// Lazy load SpotifyConnectDialog - only shown on user interaction
+const SpotifyConnectDialog = lazy(() =>
+  import('./SpotifyConnectDialog').then(m => ({
+    default: m.SpotifyConnectDialog,
   }))
 );
 
@@ -819,12 +825,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onArtistSelect={handleAppleMusicConnect}
       />
 
-      <SpotifyConnectDialog
-        open={spotifySearchOpen}
-        onOpenChange={setSpotifySearchOpen}
-        onConnected={handleArtistConnected}
-        onImportStart={handleImportStart}
-      />
+      <Suspense fallback={null}>
+        <SpotifyConnectDialog
+          open={spotifySearchOpen}
+          onOpenChange={setSpotifySearchOpen}
+          onConnected={handleArtistConnected}
+          onImportStart={handleImportStart}
+        />
+      </Suspense>
     </>
   );
 });
