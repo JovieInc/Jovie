@@ -1,6 +1,6 @@
 'use client';
 
-import { TrendingUp } from 'lucide-react';
+import { TrendingDown, TrendingUp } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 import type { AdminUsagePoint } from '@/lib/admin/overview';
@@ -121,8 +121,16 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
           </h3>
           <p className='text-2xs text-tertiary-token'>Last 14 days</p>
         </div>
-        <div className='flex items-center gap-1.5 text-app font-medium text-success tabular-nums'>
-          <TrendingUp className='h-3.5 w-3.5' />
+        <div
+          className={`flex items-center gap-1.5 text-app font-medium tabular-nums ${
+            stats.deltaPct >= 0 ? 'text-success' : 'text-error'
+          }`}
+        >
+          {stats.deltaPct >= 0 ? (
+            <TrendingUp className='h-4 w-4' />
+          ) : (
+            <TrendingDown className='h-4 w-4' />
+          )}
           {stats.deltaPct >= 0 ? '+' : ''}
           {stats.deltaPct.toFixed(1)}%
         </div>

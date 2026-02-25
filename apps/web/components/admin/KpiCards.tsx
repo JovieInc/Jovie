@@ -27,11 +27,11 @@ interface KpiCardsProps {
 function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-2xs font-medium text-warning line-clamp-1'
+      className='inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-2xs font-medium text-warning'
       title={message ?? 'Data source unavailable'}
     >
       <AlertTriangle className='size-3' aria-hidden='true' />
-      <span className='hidden sm:inline'>Unavailable</span>
+      <span className='hidden truncate max-w-[10rem] sm:inline'>Unavailable</span>
       <span className='sm:hidden'>N/A</span>
     </span>
   );
@@ -40,10 +40,10 @@ function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
 function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token line-clamp-1'
+      className='inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token'
       title={message ?? 'Data source not configured'}
     >
-      <span className='hidden sm:inline'>Not configured</span>
+      <span className='hidden truncate max-w-[10rem] sm:inline'>Not configured</span>
       <span className='sm:hidden'>N/A</span>
     </span>
   );
@@ -131,7 +131,7 @@ export function KpiCards({
         value={claimedCreatorsLabel}
         metadata='Artists who claimed their profile'
         icon={Users}
-        iconClassName='text-[var(--color-chart-4)]'
+        iconClassName='text-accent'
       />
     </div>
   );

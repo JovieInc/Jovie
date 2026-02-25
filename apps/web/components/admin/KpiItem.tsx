@@ -22,7 +22,7 @@ export function KpiItem({
       <CardContent className='space-y-2 p-4'>
         <div className='flex items-center gap-1.5'>
           <Icon
-            className={`h-3.5 w-3.5 ${iconClassName || 'text-tertiary-token'}`}
+            className={`h-4 w-4 ${iconClassName || 'text-tertiary-token'}`}
           />
           <dt className='text-2xs tracking-wide text-tertiary-token'>
             {title}

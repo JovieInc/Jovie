@@ -6,6 +6,32 @@ interface SentryMetricsCardProps {
   readonly metrics: AdminSentryMetrics;
 }
 
+interface MetricBlockProps {
+  readonly icon: React.ComponentType<{ className?: string }>;
+  readonly iconClassName: string;
+  readonly label: string;
+  readonly value: string;
+}
+
+function MetricBlock({
+  icon: Icon,
+  iconClassName,
+  label,
+  value,
+}: Readonly<MetricBlockProps>) {
+  return (
+    <div className='rounded-lg bg-surface-2 p-3'>
+      <p className='flex items-center gap-2 text-2xs text-secondary-token'>
+        <Icon className={`h-4 w-4 ${iconClassName}`} />
+        {label}
+      </p>
+      <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function formatMetric(value: number): string {
   return value.toLocaleString('en-US');
 }
@@ -44,48 +70,38 @@ export function SentryMetricsCard({
       </CardHeader>
       <CardContent className='space-y-4 p-5 pt-0'>
         <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
-          <div className='rounded-lg bg-surface-2 p-3'>
-            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
-              <Bug className='size-4 text-info' />
-              Unresolved issues
-            </p>
-            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
-              {formatMetric(metrics.unresolvedIssues24h)}
-            </p>
-          </div>
-
-          <div className='rounded-lg bg-surface-2 p-3'>
-            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
-              <Flame className='size-4 text-warning' />
-              Error events
-            </p>
-            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
-              {formatMetric(metrics.totalEvents24h)}
-            </p>
-          </div>
-
-          <div className='rounded-lg bg-surface-2 p-3'>
-            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
-              <Users className='size-4 text-[var(--color-chart-4)]' />
-              Impacted users
-            </p>
-            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
-              {formatMetric(metrics.impactedUsers24h)}
-            </p>
-          </div>
-
-          <div className='rounded-lg bg-surface-2 p-3'>
-            <p className='flex items-center gap-2 text-2xs text-secondary-token'>
-              <AlertOctagon className='size-4 text-error' />
-              Critical issues
-            </p>
-            <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
-              {formatMetric(metrics.criticalIssues24h)}
-            </p>
-          </div>
+          <MetricBlock
+            icon={Bug}
+            iconClassName='text-info'
+            label='Unresolved issues'
+            value={formatMetric(metrics.unresolvedIssues24h)}
+          />
+          <MetricBlock
+            icon={Flame}
+            iconClassName='text-warning'
+            label='Error events'
+            value={formatMetric(metrics.totalEvents24h)}
+          />
+          <MetricBlock
+            icon={Users}
+            iconClassName='text-accent'
+            label='Impacted users'
+            value={formatMetric(metrics.impactedUsers24h)}
+          />
+          <MetricBlock
+            icon={AlertOctagon}
+            iconClassName='text-error'
+            label='Critical issues'
+            value={formatMetric(metrics.criticalIssues24h)}
+          />
         </div>
 
-        <p className='text-2xs text-tertiary-token'>{topIssueLabel}</p>
+        <p
+          className='truncate text-2xs text-tertiary-token'
+          title={topIssueLabel}
+        >
+          {topIssueLabel}
+        </p>
       </CardContent>
     </Card>
   );

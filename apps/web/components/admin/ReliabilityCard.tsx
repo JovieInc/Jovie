@@ -68,7 +68,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
       <CardContent className='space-y-3 p-5 pt-0 text-app text-secondary-token'>
         <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <CheckCircle2 className={`size-4 ${tone.iconClassName}`} />
+            <CheckCircle2 className={`h-4 w-4 ${tone.iconClassName}`} />
             Error rate
           </div>
           <span className='text-primary-token tabular-nums'>
@@ -77,7 +77,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         </div>
         <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <Clock3 className='size-4 text-info' />
+            <Clock3 className='h-4 w-4 text-info' />
             p95 latency
           </div>
           <span className='text-primary-token tabular-nums'>
@@ -86,7 +86,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         </div>
         <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <AlertTriangle className='size-4 text-warning' />
+            <AlertTriangle className={`h-4 w-4 ${tone.iconClassName}`} />
             Incidents (24h)
           </div>
           <span className='text-primary-token tabular-nums'>
@@ -95,7 +95,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         </div>
 
         <p className='pt-1 text-2xs text-tertiary-token'>
-          Last incident resolved on {lastIncidentLabel}. Review logs and alerts
+          Last incident on {lastIncidentLabel}. Review logs and alerts
           before shipping new changes.
         </p>
       </CardContent>

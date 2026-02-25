@@ -27,7 +27,7 @@ export default function AdminPage() {
           data-testid='admin-dashboard-content'
         >
           <header className='space-y-1'>
-            <p className='text-2xs font-medium uppercase tracking-[0.14em] text-tertiary-token'>
+            <p className='text-2xs font-medium uppercase tracking-widest text-tertiary-token'>
               Operations
             </p>
             <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
