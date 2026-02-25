@@ -13,6 +13,18 @@ interface ReadSignupClaimValueOptions {
   ttlMs?: number;
 }
 
+type StorageType = 'session' | 'local';
+
+function getStorage(type: StorageType): Storage | null {
+  try {
+    const storage =
+      type === 'session' ? globalThis.sessionStorage : globalThis.localStorage;
+    return storage ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function parseStoredValue(raw: string): StoredSignupClaimValue | null {
   try {
     const parsed = JSON.parse(raw) as Partial<StoredSignupClaimValue>;
@@ -40,8 +52,8 @@ export function persistSignupClaimValue(
     ts,
   } satisfies StoredSignupClaimValue);
 
-  sessionStorage.setItem(key, payload);
-  localStorage.setItem(key, payload);
+  getStorage('session')?.setItem(key, payload);
+  getStorage('local')?.setItem(key, payload);
 }
 
 export function readSignupClaimValue(
@@ -51,12 +63,15 @@ export function readSignupClaimValue(
     ttlMs = DEFAULT_SIGNUP_CLAIM_TTL_MS,
   }: ReadSignupClaimValueOptions = {}
 ): string | null {
+  const sessionStorage = getStorage('session');
+  const localStorage = getStorage('local');
+
   const sessionValue = readFromStorage(sessionStorage, key, now, ttlMs);
   if (sessionValue) return sessionValue;
 
   const localValue = readFromStorage(localStorage, key, now, ttlMs);
   if (localValue) {
-    sessionStorage.setItem(
+    sessionStorage?.setItem(
       key,
       JSON.stringify({
         value: localValue,
@@ -69,16 +84,18 @@ export function readSignupClaimValue(
 }
 
 export function clearSignupClaimValue(key: string): void {
-  sessionStorage.removeItem(key);
-  localStorage.removeItem(key);
+  getStorage('session')?.removeItem(key);
+  getStorage('local')?.removeItem(key);
 }
 
 function readFromStorage(
-  storage: Storage,
+  storage: Storage | null,
   key: string,
   now: number,
   ttlMs: number
 ): string | null {
+  if (!storage) return null;
+
   const raw = storage.getItem(key);
   if (!raw) return null;
 
