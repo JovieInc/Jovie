@@ -197,7 +197,7 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent align='end' className='w-[260px] p-0'>
+      <PopoverContent align='end' className='w-[260px]'>
         {/* Header */}
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
           <span className='text-[13px] font-semibold text-primary-token'>
