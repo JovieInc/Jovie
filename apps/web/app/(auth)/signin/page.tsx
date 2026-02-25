@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthLayout, SignInForm } from '@/components/auth';
+import { APP_ROUTES } from '@/constants/routes';
 
 /**
  * Sign-in page using new Clerk Core API implementation.
@@ -13,7 +14,7 @@ export default function SignInPage() {
       showFormTitle={false}
       footerPrompt="Don't have an account?"
       footerLinkText='Sign up'
-      footerLinkHref='/signup'
+      footerLinkHref={APP_ROUTES.SIGNUP}
     >
       <SignInForm />
     </AuthLayout>

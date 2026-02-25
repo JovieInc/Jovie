@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 import { AuthLayout, SignUpForm } from '@/components/auth';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   clearSignupClaimValue,
   persistSignupClaimValue,
@@ -69,7 +70,7 @@ export default function SignUpPage() {
       showFormTitle={false}
       footerPrompt='Already have an account?'
       footerLinkText='Sign in'
-      footerLinkHref='/signin'
+      footerLinkHref={APP_ROUTES.SIGNIN}
     >
       <Suspense>
         <SignUpClaimDataPersistence />
