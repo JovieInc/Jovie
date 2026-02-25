@@ -645,6 +645,7 @@ jobs:
           path: apps/web/.next
           retention-days: 1
           if-no-files-found: error
+          include-hidden-files: true
 
   ci-layout-guard:
     name: Layout Guard (blocking)

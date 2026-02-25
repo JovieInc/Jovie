@@ -26,8 +26,12 @@ function getRuntime(): 'nodejs' | 'edge' | 'unknown' {
     return 'edge';
   }
 
-  // Check for Node.js
-  if (typeof process !== 'undefined' && process.versions?.node) {
+  // Check for Node.js — avoid process.versions (Node-only API flagged by Edge Runtime)
+  if (
+    typeof process !== 'undefined' &&
+    typeof process.env === 'object' &&
+    !('EdgeRuntime' in globalThis)
+  ) {
     return 'nodejs';
   }
 

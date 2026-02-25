@@ -23,7 +23,12 @@ import { REQUEST_ID_HEADER } from '@/lib/monitoring/middleware';
 
 type RouteHandler = (
   request: NextRequest,
-  context?: { params?: Record<string, string> }
+  context?: {
+    params?:
+      | Record<string, string>
+      | Promise<Record<string, string>>
+      | Promise<Record<string, never>>;
+  }
 ) => Promise<Response>;
 
 interface WrapperOptions {
