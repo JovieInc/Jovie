@@ -16,5 +16,18 @@
   },
   "include": [],
   "exclude": ["node_modules"],
-  "references": [{ "path": "./apps/web" }, { "path": "./packages/ui" }]
+  "references": [
+    {
+      "path": "./apps/web"
+    },
+    {
+      "path": "./packages/ui"
+    },
+    {
+      "path": "./apps/docs"
+    },
+    {
+      "path": "./apps/should-i-make"
+    }
+  ]
 }
