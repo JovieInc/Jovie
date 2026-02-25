@@ -37,4 +37,14 @@ describe('playwright sentry reporter wiring', () => {
       expect.arrayContaining([['./tests/e2e/reporters/sentry-ci-reporter.ts']])
     );
   });
+
+  it('uses html reporter when not in CI', async () => {
+    delete process.env.CI;
+    delete process.env.SENTRY_E2E_REPORTING;
+    delete process.env.SENTRY_DSN;
+
+    const config = await loadConfig();
+
+    expect(config.reporter).toBe('html');
+  });
 });

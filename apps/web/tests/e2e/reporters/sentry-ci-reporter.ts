@@ -10,6 +10,16 @@ import * as Sentry from '@sentry/node';
 
 const FLUSH_TIMEOUT_MS = 4000;
 
+const SECRET_PATTERN =
+  /(?:token|key|secret|password|authorization|cookie|dsn|credential)[=: ].{4,}/gi;
+
+function redactSecrets(text: string): string {
+  return text.replace(SECRET_PATTERN, (match) => {
+    const prefix = match.slice(0, match.indexOf('=') + 1 || match.indexOf(':') + 1 || match.indexOf(' ') + 1);
+    return `${prefix}[REDACTED]`;
+  });
+}
+
 function toError(value: unknown): Error {
   if (value instanceof Error) {
     return value;
@@ -17,6 +27,22 @@ function toError(value: unknown): Error {
 
   if (typeof value === 'string') {
     return new Error(value);
+  }
+
+  // Playwright's TestError is a plain object with message/stack/value properties
+  if (value !== null && typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const msg =
+      typeof obj.message === 'string' && obj.message
+        ? obj.message
+        : typeof obj.value === 'string' && obj.value
+          ? obj.value
+          : 'Playwright test failed';
+    const err = new Error(msg);
+    if (typeof obj.stack === 'string') {
+      err.stack = obj.stack;
+    }
+    return err;
   }
 
   return new Error('Playwright test failed with an unknown error payload.');
@@ -48,14 +74,14 @@ function parseStackLocation(stack?: string): { file: string; line?: number } {
   };
 }
 
-function isSentryEnabled(): boolean {
+function isE2eSentryReportingEnabled(): boolean {
   return (
     process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN)
   );
 }
 
 class SentryCiReporter implements Reporter {
-  private enabled = isSentryEnabled();
+  private enabled = isE2eSentryReportingEnabled();
 
   onBegin(config: FullConfig, suite: Suite): void {
     if (!this.enabled) {
@@ -82,12 +108,18 @@ class SentryCiReporter implements Reporter {
   }
 
   onTestEnd(test: TestCase, result: TestResult): void {
-    if (!this.enabled || result.status !== 'failed') {
+    // Only report on the final retry attempt to avoid noise from transient failures
+    if (
+      !this.enabled ||
+      result.status !== 'failed' ||
+      result.retry < test.retries
+    ) {
       return;
     }
 
+    // Parse stack from the original TestError before toError conversion
+    const location = parseStackLocation(result.error?.stack);
     const error = toError(result.error);
-    const location = parseStackLocation(error.stack);
 
     Sentry.withScope(scope => {
       scope.setLevel('error');
@@ -111,31 +143,47 @@ class SentryCiReporter implements Reporter {
       scope.setContext('playwright.failure', {
         workerIndex: result.workerIndex,
         parallelIndex: result.parallelIndex,
-        stdout: result.stdout.map(chunk => chunk.toString('utf8')).slice(-5),
-        stderr: result.stderr.map(chunk => chunk.toString('utf8')).slice(-5),
+        stdout: result.stdout
+          .map(chunk => redactSecrets(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk))
+          .slice(-5),
+        stderr: result.stderr
+          .map(chunk => redactSecrets(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk))
+          .slice(-5),
       });
 
       if (location.file !== 'unknown') {
-        scope.addEventProcessor(event => ({
-          ...event,
-          exception: {
-            values: [
-              {
-                type: error.name,
-                value: error.message,
-                stacktrace: {
-                  frames: [
-                    {
-                      filename: location.file,
-                      lineno: location.line,
-                      function: test.title,
-                    },
-                  ],
+        scope.addEventProcessor(event => {
+          const exception = event.exception;
+
+          if (!exception || !Array.isArray(exception.values) || exception.values.length === 0) {
+            return event;
+          }
+
+          const [firstException, ...restExceptions] = exception.values;
+          const existingFrames = firstException.stacktrace?.frames ?? [];
+          const augmentedFirstException = {
+            ...firstException,
+            stacktrace: {
+              ...firstException.stacktrace,
+              frames: [
+                ...existingFrames,
+                {
+                  filename: location.file,
+                  lineno: location.line,
+                  function: test.title,
                 },
-              },
-            ],
-          },
-        }));
+              ],
+            },
+          };
+
+          return {
+            ...event,
+            exception: {
+              ...exception,
+              values: [augmentedFirstException, ...restExceptions],
+            },
+          };
+        });
       }
 
       Sentry.captureException(error);
@@ -148,7 +196,6 @@ class SentryCiReporter implements Reporter {
     }
 
     Sentry.setTag('run.status', result.status);
-    await Sentry.flush(FLUSH_TIMEOUT_MS);
     await Sentry.close(FLUSH_TIMEOUT_MS);
   }
 }
