@@ -10,6 +10,10 @@ export interface ApproveWaitlistInput {
   entryId: string;
 }
 
+export interface DisapproveWaitlistInput {
+  entryId: string;
+}
+
 export interface UpdateWaitlistStatusInput {
   entryId: string;
   status: 'new' | 'invited' | 'claimed';
@@ -72,6 +76,39 @@ async function approveWaitlistEntry(
   }
 }
 
+async function disapproveWaitlistEntry(
+  input: DisapproveWaitlistInput
+): Promise<WaitlistMutationResponse> {
+  try {
+    const payload = await fetchWithTimeout<{
+      success?: boolean;
+      status?: string;
+      error?: string;
+    }>(`${APP_ROUTES.ADMIN_WAITLIST}/disapprove`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'Failed to disapprove waitlist entry');
+    }
+
+    return {
+      success: true,
+      status: payload.status ?? 'new',
+    };
+  } catch (error) {
+    if (error instanceof FetchError) {
+      throw new Error('Failed to disapprove waitlist entry');
+    }
+    throw error;
+  }
+}
+
 /**
  * Mutation function for updating waitlist entry status.
  */
@@ -127,6 +164,17 @@ export function useApproveWaitlistMutation() {
 
   return useMutation({
     mutationFn: approveWaitlistEntry,
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.waitlist.all });
+    },
+  });
+}
+
+export function useDisapproveWaitlistMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: disapproveWaitlistEntry,
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.waitlist.all });
     },

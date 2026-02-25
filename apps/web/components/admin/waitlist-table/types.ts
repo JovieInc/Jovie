@@ -27,4 +27,9 @@ export interface WaitlistTableProps {
   };
 }
 
-export type ApproveStatus = 'idle' | 'loading' | 'success' | 'error';
+export type ApproveStatus =
+  | 'idle'
+  | 'approving'
+  | 'disapproving'
+  | 'success'
+  | 'error';
