@@ -33,7 +33,7 @@ vi.mock('@/components/atoms/SwipeToReveal', () => ({
     React.createElement('div', { 'data-testid': 'swipe-reveal' }, children),
 }));
 
-vi.mock('@/components/molecules/drawer/DrawerLinkSection', () => ({
+vi.mock('@/components/molecules/drawer', () => ({
   DrawerLinkSection: ({
     title,
     children,
@@ -45,6 +45,24 @@ vi.mock('@/components/molecules/drawer/DrawerLinkSection', () => ({
       'div',
       { 'data-testid': `link-section-${title}` },
       children
+    ),
+  SidebarLinkRow: ({
+    icon,
+    label,
+    isVisible,
+  }: {
+    icon: React.ReactNode;
+    label: string;
+    isVisible?: boolean;
+  }) =>
+    React.createElement(
+      'div',
+      {
+        'data-testid': `sidebar-link-row-${label}`,
+        'data-visible': isVisible === false ? 'false' : 'true',
+      },
+      icon,
+      React.createElement('span', null, label)
     ),
 }));
 

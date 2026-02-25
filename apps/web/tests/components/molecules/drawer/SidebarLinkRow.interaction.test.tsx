@@ -172,4 +172,38 @@ describe('SidebarLinkRow interactions', () => {
       screen.queryByRole('button', { name: 'Copied!' })
     ).not.toBeInTheDocument();
   });
+
+  it('fires copy callbacks on success and failure', async () => {
+    const user = userEvent.setup();
+    const onCopySuccess = vi.fn();
+    const onCopyError = vi.fn();
+    const writeText = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('clipboard unavailable'));
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <SidebarLinkRow
+        icon={<span aria-hidden='true'>📎</span>}
+        label='Website'
+        url='https://example.com'
+        onCopySuccess={onCopySuccess}
+        onCopyError={onCopyError}
+      />
+    );
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Copy Website link' })[0]
+    );
+    await user.click(screen.getAllByRole('button', { name: 'Copied!' })[0]);
+
+    expect(onCopySuccess).toHaveBeenCalledTimes(1);
+    expect(onCopyError).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,17 +1,17 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
-import { DrawerLinkSection } from '@/components/molecules/drawer/DrawerLinkSection';
-import { cn } from '@/lib/utils';
+import {
+  DrawerLinkSection,
+  SidebarLinkRow,
+} from '@/components/molecules/drawer';
 import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
@@ -40,18 +40,6 @@ function formatDisplayHost(url: string): string {
   }
 }
 
-const ACTION_BUTTON_CLASS = [
-  'p-1.5 rounded-md text-secondary-token',
-  'hover:text-primary-token hover:bg-surface-1/60',
-  'transition-colors ease-out focus-visible:outline-none',
-  'focus-visible:ring-2 focus-visible:ring-primary-token',
-].join(' ');
-
-const SWIPE_ACTION_CLASS = [
-  'flex h-full items-center justify-center px-4',
-  'text-white transition-colors active:opacity-80',
-].join(' ');
-
 const SECTION_ORDER: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
 
 const SECTION_LABELS: Record<LinkSection, string> = {
@@ -67,138 +55,32 @@ interface LinkItemProps {
 }
 
 function LinkItem({ link, onRemove }: LinkItemProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(link.url);
-      setCopied(true);
-      toast.success('Link copied');
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast.error('Failed to copy');
-    }
-  }, [link.url]);
-
-  const handleOpen = useCallback(() => {
-    globalThis.open(link.url, '_blank', 'noopener,noreferrer');
-  }, [link.url]);
-
-  const handleRemove = useCallback(() => {
-    onRemove?.(link.id);
-  }, [link.id, onRemove]);
-
   const handle = extractHandleFromUrl(link.url);
 
-  const swipeActionsWidth = onRemove ? 132 : 88;
-
-  const swipeActions = (
-    <>
-      <button
-        type='button'
-        onClick={handleCopy}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-blue-500')}
-        aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
-      >
-        {copied ? (
-          <Check className='h-4 w-4' aria-hidden='true' />
-        ) : (
-          <Copy className='h-4 w-4' aria-hidden='true' />
-        )}
-      </button>
-      <button
-        type='button'
-        onClick={handleOpen}
-        className={cn(SWIPE_ACTION_CLASS, 'bg-gray-500')}
-        aria-label={`Open ${link.title}`}
-      >
-        <ExternalLink className='h-4 w-4' aria-hidden='true' />
-      </button>
-      {onRemove && (
-        <button
-          type='button'
-          onClick={handleRemove}
-          className={cn(SWIPE_ACTION_CLASS, 'bg-red-500')}
-          aria-label={`Remove ${link.title}`}
-        >
-          <Trash2 className='h-4 w-4' aria-hidden='true' />
-        </button>
-      )}
-    </>
-  );
+  const trailingContent =
+    link.platform === 'website' && link.verificationStatus === 'verified' ? (
+      <span className='ml-0.5 inline-flex align-middle'>
+        <SimpleTooltip content='Official website'>
+          <span>
+            <VerifiedBadge size='sm' className='text-accent' />
+          </span>
+        </SimpleTooltip>
+      </span>
+    ) : undefined;
 
   return (
-    <SwipeToReveal
-      itemId={`profile-link-${link.id}`}
-      actions={swipeActions}
-      actionsWidth={swipeActionsWidth}
-      className='rounded-2xl'
-    >
-      <div
-        className={cn(
-          'flex items-center justify-between rounded-2xl',
-          'bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
-          'transition-colors ease-out',
-          !link.isVisible && 'opacity-60'
-        )}
-      >
-        {/* Left: Icon box + Platform Name */}
-        <div className='flex items-center gap-3 min-w-0'>
-          <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token'>
-            <SocialIcon platform={link.platform} className='h-4 w-4' />
-          </div>
-          <div className='min-w-0 flex-1'>
-            <div className='truncate text-sm text-primary-token'>
-              {handle ? `@${handle}` : formatDisplayHost(link.url)}
-              {link.platform === 'website' &&
-                link.verificationStatus === 'verified' && (
-                  <span className='ml-1.5 inline-flex align-middle'>
-                    <SimpleTooltip content='Official website'>
-                      <span>
-                        <VerifiedBadge size='sm' className='text-accent' />
-                      </span>
-                    </SimpleTooltip>
-                  </span>
-                )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Actions (visible on hover/focus - desktop only) */}
-        <div className='hidden sm:flex items-center gap-1 shrink-0'>
-          <button
-            type='button'
-            onClick={handleOpen}
-            className={ACTION_BUTTON_CLASS}
-            aria-label={`Open ${link.title}`}
-          >
-            <ExternalLink className='h-4 w-4' aria-hidden='true' />
-          </button>
-          <button
-            type='button'
-            onClick={handleCopy}
-            className={ACTION_BUTTON_CLASS}
-            aria-label={copied ? 'Copied!' : `Copy ${link.title} link`}
-          >
-            {copied ? (
-              <Check className='h-4 w-4 text-success' aria-hidden='true' />
-            ) : (
-              <Copy className='h-4 w-4' aria-hidden='true' />
-            )}
-          </button>
-          {onRemove && (
-            <button
-              type='button'
-              onClick={handleRemove}
-              className={ACTION_BUTTON_CLASS}
-              aria-label={`Remove ${link.title}`}
-            >
-              <Trash2 className='h-4 w-4' aria-hidden='true' />
-            </button>
-          )}
-        </div>
-      </div>
-    </SwipeToReveal>
+    <SidebarLinkRow
+      icon={<SocialIcon platform={link.platform} className='h-4 w-4' />}
+      label={handle ? `@${handle}` : formatDisplayHost(link.url)}
+      url={link.url}
+      deepLinkPlatform={link.platform}
+      isVisible={link.isVisible}
+      trailingContent={trailingContent}
+      isEditable={Boolean(onRemove)}
+      onRemove={onRemove ? () => onRemove(link.id) : undefined}
+      onCopySuccess={() => toast.success('Link copied')}
+      onCopyError={() => toast.error('Failed to copy')}
+    />
   );
 }
 
