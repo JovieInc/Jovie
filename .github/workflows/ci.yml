@@ -551,7 +551,7 @@ jobs:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
     # On PRs: gates on ci-fast + unit tests + a11y (layout guard remains informational).
-    # On merge queue: only ci-fast runs; unit tests/a11y/layout-guard are skipped
+    # On merge queue: ci-fast + a11y run; unit tests/layout-guard are skipped
     # (already passed on PR) and their "skipped" result passes the checks below.
     needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
@@ -577,8 +577,10 @@ jobs:
             exit 1
           fi
 
-          # ci-a11y: blocking — accessibility violations must fail PR
-          if [[ "${{ needs.ci-a11y.result }}" == "failure" || "${{ needs.ci-a11y.result }}" == "cancelled" || "${{ needs.ci-a11y.result }}" == "skipped" ]]; then
+          # ci-a11y: blocking — accessibility violations must fail PR.
+          # "skipped" is allowed: fork PRs skip ci-build-public (no secrets),
+          # and path-gated PRs with no UI changes skip the build/a11y pipeline.
+          if [[ "${{ needs.ci-a11y.result }}" == "failure" || "${{ needs.ci-a11y.result }}" == "cancelled" ]]; then
             echo "❌ ci-a11y did not pass"
             exit 1
           fi
@@ -588,16 +590,16 @@ jobs:
             echo "⚠️ ci-layout-guard failed — layout overlap/touching regressions detected (non-blocking)"
           fi
 
-          echo "✅ All required PR checks passed: lint, typecheck, guardrails, unit tests"
+          echo "✅ All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y"
 
   ci-build-public:
     name: Build (public routes)
     needs: [ci-path-changes]
     # Shared Next.js build for a11y + layout-guard — build once, test twice.
-    # On PRs: always runs for first-class accessibility/layout verification.
-    # Fork PRs never get labels, so this is skipped for forks (fork PRs use fork-pr-gate).
+    # On PRs: always runs for first-class accessibility/layout verification (non-fork only).
+    # On merge_group: runs to validate a11y/layout haven't regressed before merge.
     # On main push: always runs for full coverage.
-    # Skipped in merge queue: a11y + layout-guard already ran on the PR.
+    # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -611,7 +613,15 @@ jobs:
       - name: Check for relevant changes
         id: check_changes
         shell: bash
-        run: echo "run_full_ci=true" >> $GITHUB_OUTPUT
+        run: |
+          # Run when UI/component paths changed (build or test patterns cover a11y-relevant changes).
+          RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'

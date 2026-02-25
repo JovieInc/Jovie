@@ -71,6 +71,19 @@ describe('HeaderProfileProgress', () => {
     );
   });
 
+  it('returns null when completionPercentage >= 100', () => {
+    const { container } = renderProgress({
+      profileCompletion: {
+        ...baseDashboardData.profileCompletion,
+        percentage: 100,
+      },
+    });
+
+    const stops = container.querySelectorAll('linearGradient stop');
+    expect(stops).toHaveLength(0);
+    expect(container.querySelector('button')).toBeNull();
+  });
+
   it('does not crash when profileCompletion is missing', () => {
     const { queryByRole } = renderProgress({
       profileCompletion:
