@@ -61,8 +61,8 @@ export const ReleaseCell = memo(function ReleaseCell({
           </TruncatedText>
           {showType && typeStyle && (
             <Badge
-              variant='secondary'
-              className={`shrink-0 border bg-transparent text-[10px] font-medium ${typeStyle.border} ${typeStyle.text}`}
+              size='sm'
+              className={`shrink-0 rounded-full ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
             >
               {typeStyle.label}
             </Badge>
