@@ -33,6 +33,10 @@ export interface SidebarLinkRowProps {
   readonly onRemove?: () => void;
   readonly className?: string;
   readonly testId?: string;
+  readonly trailingContent?: ReactNode;
+  readonly isVisible?: boolean;
+  readonly onCopySuccess?: () => void;
+  readonly onCopyError?: () => void;
 }
 
 export function SidebarLinkRow({
@@ -46,6 +50,10 @@ export function SidebarLinkRow({
   onRemove,
   className,
   testId,
+  trailingContent,
+  isVisible = true,
+  onCopySuccess,
+  onCopyError,
 }: SidebarLinkRowProps) {
   const [copied, setCopied] = useState(false);
   const hasUrl = url.trim().length > 0;
@@ -57,12 +65,14 @@ export function SidebarLinkRow({
       .writeText(url)
       .then(() => {
         setCopied(true);
+        onCopySuccess?.();
         setTimeout(() => setCopied(false), 1500);
       })
       .catch(() => {
+        onCopyError?.();
         // Silently fail - clipboard may not be available
       });
-  }, [hasUrl, url]);
+  }, [hasUrl, onCopyError, onCopySuccess, url]);
 
   const handleOpen = useCallback(async () => {
     if (!hasUrl) return;
@@ -139,6 +149,7 @@ export function SidebarLinkRow({
           'group flex items-center justify-between lg:rounded-md',
           'px-3 py-1.5 bg-surface-2 hover:bg-interactive-hover',
           'transition-colors',
+          !isVisible && 'opacity-60',
           className
         )}
         data-testid={testId}
@@ -154,6 +165,7 @@ export function SidebarLinkRow({
               {badge}
             </span>
           )}
+          {trailingContent}
         </div>
 
         {/* Right: Actions (desktop only — mobile uses swipe-to-reveal) */}
