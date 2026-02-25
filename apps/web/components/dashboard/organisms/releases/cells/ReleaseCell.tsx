@@ -67,7 +67,9 @@ export const ReleaseCell = memo(function ReleaseCell({
               {typeStyle.label}
             </Badge>
           )}
-          <PopularityIcon popularity={release.spotifyPopularity} />
+          <span className='ml-auto shrink-0'>
+            <PopularityIcon popularity={release.spotifyPopularity} />
+          </span>
           {/* Year - mobile only (meta column is hidden on mobile) */}
           {release.releaseDate && (
             <span className='shrink-0 text-[10px] tabular-nums text-tertiary-token sm:hidden'>

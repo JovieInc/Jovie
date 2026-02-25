@@ -28,11 +28,11 @@ function ContactTitle({
   readonly onCopyClerkId: () => Promise<void>;
 }) {
   if (!hasContact) return <>No contact selected</>;
-  if (!clerkId) return <>Contact</>;
+  if (!clerkId) return <>Details</>;
 
   return (
     <span className='flex items-center gap-1'>
-      <span>Contact</span>
+      <span>Details</span>
       <button
         type='button'
         onClick={onCopyClerkId}
