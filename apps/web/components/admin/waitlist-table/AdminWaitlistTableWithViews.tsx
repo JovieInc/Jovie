@@ -238,6 +238,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                     disabled={entries.length === 0}
                     ariaLabel='Export waitlist to CSV file'
                     variant='ghost'
+                    size='sm'
                     className={ACTION_BAR_BUTTON_CLASS}
                     label='Export'
                   />

@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import {
+  ACTION_BAR_BUTTON_CLASS,
   ActionBar,
   ActionBarItem,
   ExportCSVButton,
@@ -63,7 +64,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
             <AudienceFilterDropdown
               filters={filters}
               onFiltersChange={onFiltersChange}
-              buttonClassName='focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1'
+              buttonClassName={ACTION_BAR_BUTTON_CLASS}
             />
           </ActionBarItem>
           <ActionBarItem
@@ -81,7 +82,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
               disabled={!hasData && subscriberCount === 0}
               variant='ghost'
               size='sm'
-              className='focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1'
+              className={ACTION_BAR_BUTTON_CLASS}
             />
           </ActionBarItem>
         </ActionBar>

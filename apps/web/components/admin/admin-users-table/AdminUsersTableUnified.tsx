@@ -1,21 +1,21 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
-import Link from 'next/link';
 import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarItem,
   type ContextMenuItemType,
   ExportCSVButton,
   TableBulkActionsToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
-import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   USERS_CSV_FILENAME_PREFIX,
@@ -288,43 +288,26 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             />
 
             {/* Main toolbar (always visible) */}
-            <div className='flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3'>
-              <div className='text-xs text-secondary-token tabular-nums'>
-                <span className='hidden sm:inline'>Showing </span>
-                {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()}
-                <span className='hidden sm:inline'> users</span>
+            <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
+              <div className='hidden text-xs text-secondary-token tabular-nums md:block'>
+                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()} users
               </div>
-              <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
-                <form
-                  action={APP_ROUTES.ADMIN_USERS}
-                  method='get'
-                  className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
-                >
-                  <input type='hidden' name='sort' value={sort} />
-                  <Input
-                    name='q'
-                    defaultValue={search}
-                    placeholder='Search by email or name'
-                    className='w-full sm:w-[240px]'
+              <ActionBar className='hidden md:flex ml-auto'>
+                <ActionBarItem tooltipLabel='Export'>
+                  <ExportCSVButton<AdminUserRow>
+                    getData={() => users}
+                    columns={usersCSVColumns}
+                    filename={USERS_CSV_FILENAME_PREFIX}
+                    disabled={users.length === 0}
+                    ariaLabel='Export users to CSV file'
+                    variant='ghost'
+                    size='sm'
+                    label='Export'
+                    className={ACTION_BAR_BUTTON_CLASS}
                   />
-                  <Button type='submit' size='sm' variant='secondary'>
-                    Search
-                  </Button>
-                  {search ? (
-                    <Button asChild size='sm' variant='ghost'>
-                      <Link href='?'>Clear</Link>
-                    </Button>
-                  ) : null}
-                </form>
-                <ExportCSVButton<AdminUserRow>
-                  getData={() => users}
-                  columns={usersCSVColumns}
-                  filename={USERS_CSV_FILENAME_PREFIX}
-                  disabled={users.length === 0}
-                  ariaLabel='Export users to CSV file'
-                />
-              </div>
+                </ActionBarItem>
+              </ActionBar>
             </div>
           </>
         }
