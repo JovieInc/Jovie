@@ -2,13 +2,15 @@ import type Stripe from 'stripe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoisted mocks
-const { mockDb, mockCaptureWarning, mockRevalidatePath } = vi.hoisted(() => ({
-  mockDb: {
-    select: vi.fn(),
-  },
-  mockCaptureWarning: vi.fn(),
-  mockRevalidatePath: vi.fn(),
-}));
+const { mockDb, mockCaptureWarning, mockRevalidatePath, mockGetRedis } =
+  vi.hoisted(() => ({
+    mockDb: {
+      select: vi.fn(),
+    },
+    mockCaptureWarning: vi.fn(),
+    mockRevalidatePath: vi.fn(),
+    mockGetRedis: vi.fn(),
+  }));
 
 vi.mock('@/lib/db', () => ({
   db: mockDb,
@@ -23,6 +25,10 @@ vi.mock('@/lib/db/schema', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
+}));
+
+vi.mock('@/lib/redis', () => ({
+  getRedis: mockGetRedis,
 }));
 
 vi.mock('next/cache', () => ({
@@ -41,6 +47,7 @@ import {
 describe('Stripe webhook utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetRedis.mockReturnValue(null);
   });
 
   describe('getStripeObjectId', () => {
@@ -305,6 +312,15 @@ describe('Stripe webhook utils', () => {
       await invalidateBillingCache();
 
       expect(mockRevalidatePath).toHaveBeenCalledTimes(6);
+    });
+
+    it('deletes user billing status cache entry when userId is provided', async () => {
+      const mockRedis = { del: vi.fn().mockResolvedValue(1) };
+      mockGetRedis.mockReturnValue(mockRedis);
+
+      await invalidateBillingCache('user_123');
+
+      expect(mockRedis.del).toHaveBeenCalledWith('billing:status:v1:user_123');
     });
   });
 });

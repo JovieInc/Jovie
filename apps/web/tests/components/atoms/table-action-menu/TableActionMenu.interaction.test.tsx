@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -60,5 +61,50 @@ describe('TableActionMenu interactions', () => {
     expect(
       await screen.findByRole('menuitem', { name: 'Edit' })
     ).toBeInTheDocument();
+  });
+
+  it('does not crash and renders no action items when items array is empty', async () => {
+    const user = userEvent.setup({ delay: null });
+
+    render(<TableActionMenu items={[]} />);
+
+    await user.click(screen.getByRole('button', { name: 'More actions' }));
+
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+
+  it('supports in-flight disabling to prevent duplicate action calls on rapid clicks', async () => {
+    const user = userEvent.setup({ delay: null });
+    const onClick = vi.fn();
+
+    function RapidActionMenu() {
+      const [isBusy, setIsBusy] = useState(false);
+
+      return (
+        <TableActionMenu
+          open={true}
+          items={[
+            {
+              id: 'delete',
+              label: 'Delete',
+              disabled: isBusy,
+              onClick: () => {
+                if (isBusy) return;
+                setIsBusy(true);
+                onClick();
+              },
+            },
+          ]}
+        />
+      );
+    }
+
+    render(<RapidActionMenu />);
+
+    const deleteItem = screen.getByRole('menuitem', { name: 'Delete' });
+    await user.click(deleteItem);
+    await user.click(deleteItem);
+
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 });

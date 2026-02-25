@@ -45,6 +45,7 @@ export function ProfileShell({
   children,
   showSocialBar = true,
   showTipButton = false,
+  isTipModeActive = false,
   showBackButton = false,
   showFooter = true,
   showNotificationButton = false,
@@ -213,7 +214,11 @@ export function ProfileShell({
                               variant='ghost'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className='border border-transparent hover:border-subtle hover:bg-surface-2'
+                              className={`border transition-colors ${
+                                isTipModeActive
+                                  ? 'border-subtle bg-surface-2 text-primary-token'
+                                  : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                              }`}
                               onClick={() => setTipDrawerOpen(true)}
                             >
                               <DollarSign
@@ -236,7 +241,11 @@ export function ProfileShell({
                             variant='ghost'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className='border border-transparent hover:border-subtle hover:bg-surface-2'
+                            className={`border transition-colors ${
+                              isTipModeActive
+                                ? 'border-subtle bg-surface-2 text-primary-token'
+                                : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                            }`}
                             asChild
                           >
                             <Link href={`/${artist.handle}?mode=tip`}>

@@ -38,7 +38,7 @@ const PROFILE_TAB_OPTIONS = [
 ];
 
 export function ProfileContactSidebar() {
-  const { isOpen } = usePreviewPanelState();
+  const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
   const [selectedCategory, setSelectedCategory] =
@@ -331,7 +331,14 @@ export function ProfileContactSidebar() {
     );
   }
 
-  const { username, displayName, avatarUrl, links, profilePath } = previewData;
+  const {
+    username,
+    displayName,
+    avatarUrl,
+    links,
+    profilePath,
+    dspConnections,
+  } = previewData;
 
   return (
     <RightDrawer
@@ -345,6 +352,7 @@ export function ProfileContactSidebar() {
           username={username}
           displayName={displayName}
           profilePath={profilePath}
+          onClose={close}
         />
 
         {/* Contact Header with Avatar, Name — all editable */}
@@ -380,6 +388,7 @@ export function ProfileContactSidebar() {
             selectedCategory={resolvedCategory}
             onAddLink={handleAddLink}
             onRemoveLink={handleRemoveLink}
+            dspConnections={dspConnections}
           />
 
           {/* Inline add link form */}

@@ -72,21 +72,21 @@ export function createExternalLinkMenuItems(
  */
 export function createStatusActionMenuItems(
   entry: WaitlistEntryRow,
-  approveEntry: (id: string) => Promise<void>
+  approveEntry: (
+    entry: Pick<WaitlistEntryRow, 'id' | 'status'>
+  ) => Promise<void>
 ): ContextMenuItemType[] {
   const isApproved = entry.status === 'invited' || entry.status === 'claimed';
 
   return [
     {
       id: 'approve',
-      label: isApproved ? 'Approved' : 'Approve',
+      label: isApproved ? 'Disapprove' : 'Approve',
       icon: <ClipboardList className='h-3.5 w-3.5' />,
       onClick: () => {
-        if (!isApproved) {
-          void approveEntry(entry.id);
-        }
+        void approveEntry({ id: entry.id, status: entry.status });
       },
-      disabled: isApproved,
+      disabled: false,
     },
   ];
 }
@@ -97,7 +97,9 @@ export function createStatusActionMenuItems(
 export function buildContextMenuItems(
   entry: WaitlistEntryRow,
   copyToClipboard: (text: string, label: string) => void,
-  approveEntry: (id: string) => Promise<void>
+  approveEntry: (
+    entry: Pick<WaitlistEntryRow, 'id' | 'status'>
+  ) => Promise<void>
 ): ContextMenuItemType[] {
   return [
     ...createCopyMenuItems(entry, copyToClipboard),

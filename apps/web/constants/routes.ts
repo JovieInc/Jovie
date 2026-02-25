@@ -45,6 +45,7 @@ export const APP_ROUTES = {
   ADMIN: '/app/admin',
   ADMIN_WAITLIST: '/app/admin/waitlist',
   ADMIN_WAITLIST_SETTINGS: '/app/admin/waitlist/settings',
+  ADMIN_FEEDBACK: '/app/admin/feedback',
   ADMIN_CREATORS: '/app/admin/creators',
   ADMIN_CREATORS_BULK_REFRESH: '/app/admin/creators/bulk-refresh',
   ADMIN_CREATORS_DELETE: '/app/admin/creators/delete',
@@ -56,6 +57,7 @@ export const APP_ROUTES = {
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing
+  DEMO: '/demo',
   PRICING: '/pricing',
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',

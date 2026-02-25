@@ -12,6 +12,8 @@ import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 
+type SmartLinkLockReason = 'scheduled' | 'cap' | null;
+
 interface MobileReleaseListProps {
   readonly releases: ReleaseViewModel[];
   readonly artistName?: string | null;
@@ -22,9 +24,7 @@ interface MobileReleaseListProps {
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
   readonly groupByYear?: boolean;
 }
 
@@ -59,7 +59,7 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
 
 function getLockIconName(
   isLocked: boolean,
-  lockReason?: 'scheduled' | 'cap' | null
+  lockReason?: SmartLinkLockReason
 ): string {
   if (!isLocked) return 'Link2';
   return lockReason === 'scheduled' ? 'Clock' : 'Lock';
@@ -81,7 +81,7 @@ const SwipeActions = memo(function SwipeActions({
     testId: string
   ) => Promise<string>;
   readonly isLocked: boolean;
-  readonly lockReason?: 'scheduled' | 'cap' | null;
+  readonly lockReason?: SmartLinkLockReason;
 }) {
   const handleCopy = useCallback(() => {
     if (onCopy && !isLocked) {
@@ -164,9 +164,7 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
   const year = getReleaseYear(release);
 

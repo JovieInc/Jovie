@@ -18,11 +18,33 @@ vi.mock('@/components/atoms/SwipeToReveal', () => ({
   ),
 }));
 
+vi.mock('@/lib/deep-links', () => ({
+  getDSPDeepLinkConfig: vi.fn(),
+  getSocialDeepLinkConfig: vi.fn(),
+  openDeepLink: vi.fn(),
+}));
+
 const { SidebarLinkRow } = await import(
   '@/components/molecules/drawer/SidebarLinkRow'
 );
+const deepLinks = await import('@/lib/deep-links');
 
 describe('SidebarLinkRow interactions', () => {
+  it('renders label, optional badge, and supplied icon content', () => {
+    render(
+      <SidebarLinkRow
+        icon={<span data-testid='custom-icon'>icon</span>}
+        label='Portfolio'
+        badge='Pinned'
+        url='https://example.com/portfolio'
+      />
+    );
+
+    expect(screen.getByText('Portfolio')).toBeInTheDocument();
+    expect(screen.getByText('Pinned')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
+  });
+
   it('supports copy and open actions for a valid URL', async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -41,7 +63,7 @@ describe('SidebarLinkRow interactions', () => {
 
     render(
       <SidebarLinkRow
-        icon={<span aria-hidden='true'>🔗</span>}
+        icon={<span aria-hidden='true'>icon</span>}
         label='Portfolio'
         url='https://example.com/portfolio'
       />
@@ -66,13 +88,59 @@ describe('SidebarLinkRow interactions', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('uses deep links when configuration exists and falls back to window.open when deep links fail', async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.fn();
+    const deepLinkConfig = { appStoreUrl: 'https://example.com/app' };
+
+    vi.mocked(deepLinks.getDSPDeepLinkConfig).mockReturnValue(
+      deepLinkConfig as never
+    );
+    vi.mocked(deepLinks.openDeepLink)
+      .mockRejectedValueOnce(new Error('cannot open app'))
+      .mockResolvedValueOnce(true);
+
+    Object.defineProperty(globalThis, 'open', {
+      value: openSpy,
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <SidebarLinkRow
+        icon={<span aria-hidden='true'>icon</span>}
+        label='Spotify'
+        url='https://example.com/music'
+        deepLinkPlatform='spotify'
+      />
+    );
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Open Spotify' })[0]
+    );
+    expect(deepLinks.openDeepLink).toHaveBeenCalledWith(
+      'https://example.com/music',
+      deepLinkConfig
+    );
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://example.com/music',
+      '_blank',
+      'noopener,noreferrer'
+    );
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Open Spotify' })[0]
+    );
+    expect(openSpy).toHaveBeenCalledTimes(1);
+  });
+
   it('supports remove action and disabled remove state', async () => {
     const user = userEvent.setup();
     const onRemove = vi.fn();
 
     const { rerender } = render(
       <SidebarLinkRow
-        icon={<span aria-hidden='true'>🗑️</span>}
+        icon={<span aria-hidden='true'>icon</span>}
         label='Social'
         url='https://example.com/social'
         isEditable
@@ -87,7 +155,7 @@ describe('SidebarLinkRow interactions', () => {
 
     rerender(
       <SidebarLinkRow
-        icon={<span aria-hidden='true'>🗑️</span>}
+        icon={<span aria-hidden='true'>icon</span>}
         label='Social'
         url='https://example.com/social'
         isEditable
@@ -101,6 +169,21 @@ describe('SidebarLinkRow interactions', () => {
     })) {
       expect(removeButton).toBeDisabled();
     }
+  });
+
+  it('does not render remove controls when row is not editable', () => {
+    render(
+      <SidebarLinkRow
+        icon={<span aria-hidden='true'>icon</span>}
+        label='Social'
+        url='https://example.com/social'
+        onRemove={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Remove Social' })
+    ).not.toBeInTheDocument();
   });
 
   it('disables open and copy actions when URL is empty', async () => {
@@ -121,7 +204,7 @@ describe('SidebarLinkRow interactions', () => {
 
     render(
       <SidebarLinkRow
-        icon={<span aria-hidden='true'>🚫</span>}
+        icon={<span aria-hidden='true'>icon</span>}
         label='Website'
         url=''
       />
@@ -157,7 +240,7 @@ describe('SidebarLinkRow interactions', () => {
 
     render(
       <SidebarLinkRow
-        icon={<span aria-hidden='true'>📋</span>}
+        icon={<span aria-hidden='true'>icon</span>}
         label='Resume'
         url='https://example.com/resume'
       />
@@ -171,5 +254,39 @@ describe('SidebarLinkRow interactions', () => {
     expect(
       screen.queryByRole('button', { name: 'Copied!' })
     ).not.toBeInTheDocument();
+  });
+
+  it('fires copy callbacks on success and failure', async () => {
+    const user = userEvent.setup();
+    const onCopySuccess = vi.fn();
+    const onCopyError = vi.fn();
+    const writeText = vi
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('clipboard unavailable'));
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+
+    render(
+      <SidebarLinkRow
+        icon={<span aria-hidden='true'>📎</span>}
+        label='Website'
+        url='https://example.com'
+        onCopySuccess={onCopySuccess}
+        onCopyError={onCopyError}
+      />
+    );
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Copy Website link' })[0]
+    );
+    await user.click(screen.getAllByRole('button', { name: 'Copied!' })[0]);
+
+    expect(onCopySuccess).toHaveBeenCalledTimes(1);
+    expect(onCopyError).toHaveBeenCalledTimes(1);
   });
 });

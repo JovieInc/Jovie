@@ -78,6 +78,7 @@ interface StaticArtistPageProps {
   readonly contacts: PublicContact[];
   readonly subtitle: string;
   readonly showTipButton: boolean;
+  readonly isTipModeActive?: boolean;
   readonly showBackButton: boolean;
   readonly showFooter?: boolean;
   readonly autoOpenCapture?: boolean;
@@ -238,6 +239,7 @@ export function StaticArtistPage({
   contacts,
   subtitle,
   showTipButton,
+  isTipModeActive = false,
   showBackButton,
   showFooter = true,
   autoOpenCapture,
@@ -261,6 +263,7 @@ export function StaticArtistPage({
         subtitle={subtitle}
         showSocialBar={mode !== 'listen'}
         showTipButton={showTipButton}
+        isTipModeActive={isTipModeActive}
         showBackButton={showBackButton}
         showFooter={showFooter}
         showNotificationButton={true}

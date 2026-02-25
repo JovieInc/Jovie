@@ -43,7 +43,6 @@ export const RESERVED_USERNAMES = [
   'mail',
   'changelog',
   'engagement-engine',
-  'link-in-bio',
 
   // Legal/company pages
   'about',

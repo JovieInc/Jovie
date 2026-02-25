@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy } from 'lucide-react';
+import { Copy, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -10,6 +10,10 @@ import {
 } from '@/components/admin/table/organisms/KanbanBoard';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarButton,
+  ActionBarItem,
   DisplayMenuDropdown,
   ExportCSVButton,
   TableBulkActionsToolbar,
@@ -22,9 +26,9 @@ import {
   waitlistCSVColumns,
 } from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { useAdminWaitlistInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { useUpdateWaitlistStatusMutation } from '@/lib/queries/useWaitlistMutations';
-import { AdminTablePagination } from '../table/AdminTablePagination';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import {
   persistGroupingPreference,
@@ -34,7 +38,6 @@ import {
 } from './storage';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
-import { usePagination } from './usePagination';
 import { WaitlistKanbanCard } from './WaitlistKanbanCard';
 
 /**
@@ -48,7 +51,7 @@ import { WaitlistKanbanCard } from './WaitlistKanbanCard';
  * - LocalStorage persistence for view and grouping preferences
  */
 export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
-  const { entries, page, pageSize, total } = props;
+  const { entries: initialEntries, pageSize, total } = props;
 
   // View mode state with localStorage persistence
   const [viewMode, setViewMode] = useState<ViewMode>(readViewModePreference);
@@ -68,12 +71,19 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     persistGroupingPreference(groupingEnabled);
   }, [groupingEnabled]);
 
-  const { totalPages, canPrev, canNext, from, to, prevHref, nextHref } =
-    usePagination({
-      page,
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAdminWaitlistInfiniteQuery({
       pageSize,
-      total,
+      initialData: { rows: initialEntries, total },
     });
+
+  const entries = useMemo(
+    () => data?.pages.flatMap(page => page.rows) ?? initialEntries,
+    [data, initialEntries]
+  );
+
+  const from = entries.length > 0 ? 1 : 0;
+  const to = entries.length;
 
   const { approveStatuses, approveEntry } = useApproveEntry({
     onRowUpdate: () => {
@@ -169,7 +179,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
       <WaitlistKanbanCard
         entry={entry}
         approveStatus={approveStatuses[entry.id]}
-        onApprove={() => void approveEntry(entry.id)}
+        onApprove={() => approveEntry({ id: entry.id, status: entry.status })}
       />
     ),
     [approveStatuses, approveEntry]
@@ -219,53 +229,60 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                 {total.toLocaleString()}
                 <span className='hidden sm:inline'> entries</span>
               </div>
-              <div className='flex items-center gap-2'>
-                <ExportCSVButton<WaitlistEntryRow>
-                  getData={() => entries}
-                  columns={waitlistCSVColumns}
-                  filename={WAITLIST_CSV_FILENAME_PREFIX}
-                  disabled={entries.length === 0}
-                  ariaLabel='Export waitlist to CSV file'
-                />
-                <DisplayMenuDropdown
-                  viewMode={viewMode}
-                  availableViewModes={['list', 'board']}
-                  onViewModeChange={setViewMode}
-                  groupingEnabled={groupingEnabled}
-                  onGroupingToggle={setGroupingEnabled}
-                  groupingLabel='Group by status'
-                />
-              </div>
+              <ActionBar>
+                <ActionBarItem tooltipLabel='Export'>
+                  <ExportCSVButton<WaitlistEntryRow>
+                    getData={() => entries}
+                    columns={waitlistCSVColumns}
+                    filename={WAITLIST_CSV_FILENAME_PREFIX}
+                    disabled={entries.length === 0}
+                    ariaLabel='Export waitlist to CSV file'
+                    variant='ghost'
+                    className={ACTION_BAR_BUTTON_CLASS}
+                    label='Export'
+                  />
+                </ActionBarItem>
+                <ActionBarItem tooltipLabel='Display' shortcut='⇧V'>
+                  <DisplayMenuDropdown
+                    trigger={
+                      <ActionBarButton
+                        label='Display'
+                        icon={<Settings2 className='h-3.5 w-3.5' />}
+                        mobileIconOnly={true}
+                        className={ACTION_BAR_BUTTON_CLASS}
+                      />
+                    }
+                    viewMode={viewMode}
+                    availableViewModes={['list', 'board']}
+                    onViewModeChange={setViewMode}
+                    groupingEnabled={groupingEnabled}
+                    onGroupingToggle={setGroupingEnabled}
+                    groupingLabel='Group by status'
+                  />
+                </ActionBarItem>
+              </ActionBar>
             </div>
           </>
-        }
-        footer={
-          viewMode === 'list' ? (
-            <AdminTablePagination
-              page={page}
-              totalPages={totalPages}
-              from={from}
-              to={to}
-              total={total}
-              canPrev={canPrev}
-              canNext={canNext}
-              prevHref={prevHref}
-              nextHref={nextHref}
-              entityLabel='entries'
-            />
-          ) : null
         }
       >
         {() =>
           viewMode === 'list' ? (
             <AdminWaitlistTableUnified
-              {...props}
+              entries={entries}
+              page={1}
+              pageSize={pageSize}
+              total={total}
               groupingEnabled={groupingEnabled}
               externalSelection={{
                 selectedIds,
                 headerCheckboxState,
                 toggleSelect,
                 toggleSelectAll,
+              }}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => {
+                fetchNextPage().catch(() => {});
               }}
             />
           ) : (
