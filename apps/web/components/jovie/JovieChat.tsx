@@ -290,10 +290,10 @@ export function JovieChat({
               ))}
               {isLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className='flex gap-3'>
-                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
+                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'>
                     <BrandLogo size={16} tone='auto' />
                   </div>
-                  <div className='rounded-2xl border border-subtle bg-surface-1 px-5 py-3.5'>
+                  <div className='rounded-2xl bg-surface-1 px-5 py-3.5'>
                     <div className='flex items-center gap-1.5'>
                       <span
                         className='flex items-center gap-1'
@@ -346,7 +346,7 @@ export function JovieChat({
           )}
 
           {/* Input at bottom */}
-          <div className='border-t border-subtle px-4 py-4'>
+          <div className='px-4 py-4'>
             <div className='mx-auto max-w-2xl space-y-2'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
