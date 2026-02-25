@@ -3,17 +3,19 @@
 import { Badge } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Copy, Mail, Phone, Trash2 } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   TableActionMenu,
   type TableActionMenuItem,
 } from '@/components/atoms/table-action-menu';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
+import { convertContextMenuItems } from '@/components/organisms/table';
 import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
+import { getContactRowContextMenuItems } from './row-actions';
 
 const contactColumnHelper = createColumnHelper<EditableContact>();
 
@@ -44,6 +46,7 @@ function handleCopyClick(e: React.MouseEvent<HTMLButtonElement>) {
 
 export interface ContactColumnCallbacks {
   readonly onDelete: (contact: EditableContact) => void;
+  readonly onCopyToClipboard: (text: string, label: string) => void;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table column defs require any for mixed accessor types
@@ -139,37 +142,12 @@ export function createContactColumns(
       header: '',
       cell: ({ row }) => {
         const contact = row.original;
-        const items: TableActionMenuItem[] = [];
-
-        if (contact.email) {
-          items.push({
-            id: 'copy-email',
-            label: 'Copy email',
-            icon: Copy,
-            onClick: () => copyToClipboard(contact.email!, 'Email'), // NOSONAR - narrowed by `if` guard above
-          });
-        }
-
-        if (contact.phone) {
-          items.push({
-            id: 'copy-phone',
-            label: 'Copy phone',
-            icon: Copy,
-            onClick: () => copyToClipboard(contact.phone!, 'Phone'), // NOSONAR - narrowed by `if` guard above
-          });
-        }
-
-        if (items.length > 0) {
-          items.push({ id: 'separator', label: '', onClick: () => {} });
-        }
-
-        items.push({
-          id: 'delete',
-          label: 'Delete contact',
-          icon: Trash2,
-          variant: 'destructive',
-          onClick: () => callbacks.onDelete(contact),
-        });
+        const items: TableActionMenuItem[] = convertContextMenuItems(
+          getContactRowContextMenuItems(contact, {
+            onDelete: callbacks.onDelete,
+            onCopyToClipboard: callbacks.onCopyToClipboard,
+          })
+        );
 
         return (
           <div className='flex items-center justify-end'>

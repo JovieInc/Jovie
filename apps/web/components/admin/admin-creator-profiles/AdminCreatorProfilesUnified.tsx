@@ -12,7 +12,11 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import {
+  convertToCommonDropdownItems,
+  UnifiedTable,
+  useRowSelection,
+} from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -350,6 +354,18 @@ export function AdminCreatorProfilesUnified({
 
   // Register right panel with AuthShell instead of rendering inline.
   // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
+  const sidebarContextMenuItems = useMemo(() => {
+    const selectedProfile = selectedId
+      ? filteredProfiles.find(profile => profile.id === selectedId)
+      : null;
+
+    if (!selectedProfile) {
+      return [];
+    }
+
+    return convertToCommonDropdownItems(getContextMenuItems(selectedProfile));
+  }, [selectedId, filteredProfiles, getContextMenuItems]);
+
   const sidebarPanel = useMemo(
     () => (
       <ContactSidebar
@@ -361,6 +377,7 @@ export function AdminCreatorProfilesUnified({
         onContactChange={handleContactChange}
         onSave={saveContact}
         isSaving={isSaving}
+        contextMenuItems={sidebarContextMenuItems}
         onAvatarUpload={handleAvatarUpload}
       />
     ),
@@ -373,6 +390,7 @@ export function AdminCreatorProfilesUnified({
       handleContactChange,
       saveContact,
       isSaving,
+      sidebarContextMenuItems,
       handleAvatarUpload,
     ]
   );
