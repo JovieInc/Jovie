@@ -47,7 +47,7 @@ export async function fetchWithTimeout<T>(
 
     if (!response.ok) {
       throw new FetchError(
-        `Fetch failed: ${response.status} ${response.statusText}`,
+        getFetchErrorMessage(response),
         response.status,
         response
       );
@@ -77,6 +77,16 @@ export async function fetchWithTimeout<T>(
     // Clean up external signal listener if we added one without { once: true }
     // (not needed here since we use { once: true }, but good practice)
   }
+}
+
+function getFetchErrorMessage(response: Response): string {
+  // Avoid surfacing raw server failure copy to end users.
+  // 5xx responses are still identified by status for retry and monitoring.
+  if (response.status >= 500) {
+    return 'Request failed due to a temporary server issue. Please try again.';
+  }
+
+  return `Fetch failed: ${response.status} ${response.statusText}`;
 }
 
 /**

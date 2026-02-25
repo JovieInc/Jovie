@@ -101,7 +101,24 @@ describe('fetch utilities', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(FetchError);
         expect((error as FetchError).status).toBe(404);
+        expect((error as FetchError).message).toBe(
+          'Fetch failed: 404 Not Found'
+        );
       }
+    });
+
+    it('uses a safe generic message for server errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+
+      await expect(fetchWithTimeout('/api/test')).rejects.toMatchObject({
+        status: 500,
+        message:
+          'Request failed due to a temporary server issue. Please try again.',
+      });
     });
 
     it('throws FetchError with status 502 on invalid JSON response', async () => {
