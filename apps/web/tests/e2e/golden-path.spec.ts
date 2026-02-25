@@ -203,16 +203,16 @@ test.describe('Golden Path - Complete User Journey', () => {
   });
 
   test('Golden path with listen mode', async ({ page }, testInfo) => {
-    test.setTimeout(180_000); // Turbopack cold compile + API calls can be slow
+    test.setTimeout(300_000); // 5min — serial mode means previous tests consume compilation time
 
     // Navigate to existing profile in listen mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
 
-    // Use domcontentloaded + hydration instead of networkidle for stability
-    // Turbopack cold compile for [username] route + background API calls can take 120s+
+    // Use commit (first response byte) instead of domcontentloaded for stability
+    // Turbopack streams SSR while compiling client chunks — domcontentloaded fires late
     try {
       await page.goto(`/${testProfile}?mode=listen`, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'commit',
         timeout: 120_000,
       });
     } catch (error) {
@@ -232,9 +232,9 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Listen mode shows artist name in h1 and subtitle "Choose a Service"
     // Use .first() to avoid strict mode violation when multiple h1 elements exist
-    // 60s timeout: after domcontentloaded, Turbopack still compiles client chunks
+    // 120s timeout: Turbopack client chunk compilation can take 60-120s in dev
     await expect(page.locator('h1').first()).toBeVisible({
-      timeout: 60_000,
+      timeout: 120_000,
     });
 
     // Should show DSP options (e.g., "Open in Spotify") or "not available" message
@@ -243,21 +243,21 @@ test.describe('Golden Path - Complete User Journey', () => {
     );
     const noLinksMsg = page.getByText(/streaming links aren.t available/i);
     await expect(spotifyButton.first().or(noLinksMsg)).toBeVisible({
-      timeout: 60_000,
+      timeout: 120_000,
     });
   });
 
   test('Golden path with tip mode', async ({ page }, testInfo) => {
-    test.setTimeout(180_000); // Turbopack cold compile + API calls can be slow
+    test.setTimeout(300_000); // 5min — serial mode means previous tests consume compilation time
 
     // Navigate to existing profile in tip mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
 
-    // Use domcontentloaded + hydration instead of networkidle for stability
-    // Even with warmed routes, background API calls (audience/visit) can block the server
+    // Use commit (first response byte) instead of domcontentloaded for stability
+    // Turbopack streams SSR while compiling client chunks — domcontentloaded fires late
     try {
       await page.goto(`/${testProfile}?mode=tip`, {
-        waitUntil: 'domcontentloaded',
+        waitUntil: 'commit',
         timeout: 120_000,
       });
     } catch (error) {
@@ -277,9 +277,9 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Tip mode shows artist name in h1 and subtitle "Tip with Venmo"
     // Use .first() to avoid strict mode violation when multiple h1 elements exist
-    // 60s timeout: after domcontentloaded, Turbopack still compiles client chunks
+    // 120s timeout: Turbopack client chunk compilation can take 60-120s in dev
     await expect(page.locator('h1').first()).toBeVisible({
-      timeout: 60_000,
+      timeout: 120_000,
     });
 
     // Should show either tip selector or "not available" message
@@ -290,7 +290,7 @@ test.describe('Golden Path - Complete User Journey', () => {
     await expect(
       tipSelector.or(tipHeading).or(noTipMsg).or(venmoNotAvail)
     ).toBeVisible({
-      timeout: 60_000,
+      timeout: 120_000,
     });
   });
 });
