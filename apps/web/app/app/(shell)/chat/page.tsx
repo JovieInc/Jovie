@@ -1,12 +1,25 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { getSessionContext } from '@/lib/auth/session';
 import { getDashboardData } from '../dashboard/actions';
 import { ChatPageClient } from './ChatPageClient';
 
-export const metadata = {
-  title: 'New Thread',
-  description: 'Start a new thread with Jovie AI',
+const CHAT_DESCRIPTION = 'Start a new thread with Jovie AI';
+
+const getDashboardTitle = async () => {
+  const { profile } = await getSessionContext({ requireProfile: false });
+  const displayName = profile?.displayName?.trim();
+
+  return displayName ? `${displayName} | Jovie` : 'Jovie Dashboard';
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: await getDashboardTitle(),
+    description: CHAT_DESCRIPTION,
+  };
+}
 
 export default async function ChatPage() {
   const dashboardData = await getDashboardData();
