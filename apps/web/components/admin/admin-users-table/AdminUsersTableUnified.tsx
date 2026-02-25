@@ -6,7 +6,6 @@ import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
@@ -24,9 +23,9 @@ import {
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { useAdminUsersInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminUsersTableProps } from './types';
-import { useAdminUsersTable } from './useAdminUsersTable';
 import {
   createActionsCellRenderer,
   createSelectCellRenderer,
@@ -40,21 +39,23 @@ import {
 const columnHelper = createColumnHelper<AdminUserRow>();
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
-  const { users, page, pageSize, total, search, sort } = props;
+  const { users: initialUsers, pageSize, total, search, sort } = props;
 
-  const { router, pagination } = useAdminUsersTable(props);
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAdminUsersInfiniteQuery({
+      sort,
+      search,
+      pageSize,
+      initialData: { rows: initialUsers, total },
+    });
 
-  const {
-    totalPages,
-    canPrev,
-    canNext,
-    from,
-    to,
-    prevHref,
-    nextHref,
-    clearHref,
-    buildHref,
-  } = pagination;
+  const users = useMemo(
+    () => data?.pages.flatMap(page => page.rows) ?? initialUsers,
+    [data, initialUsers]
+  );
+
+  const from = users.length > 0 ? 1 : 0;
+  const to = users.length;
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -204,9 +205,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
   const SelectCell = useMemo(
-    () =>
-      createSelectCellRenderer(selectedIdsRef, page, pageSize, toggleSelect),
-    [page, pageSize, toggleSelect]
+    () => createSelectCellRenderer(selectedIdsRef, toggleSelect),
+    [toggleSelect]
   );
   /* eslint-enable react-hooks/refs */
 
@@ -302,24 +302,18 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
                 >
                   <input type='hidden' name='sort' value={sort} />
-                  <input
-                    type='hidden'
-                    name='pageSize'
-                    value={String(pageSize)}
-                  />
                   <Input
                     name='q'
                     defaultValue={search}
                     placeholder='Search by email or name'
                     className='w-full sm:w-[240px]'
                   />
-                  <input type='hidden' name='page' value='1' />
                   <Button type='submit' size='sm' variant='secondary'>
                     Search
                   </Button>
                   {search ? (
                     <Button asChild size='sm' variant='ghost'>
-                      <Link href={clearHref}>Clear</Link>
+                      <Link href='?'>Clear</Link>
                     </Button>
                   ) : null}
                 </form>
@@ -333,24 +327,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
               </div>
             </div>
           </>
-        }
-        footer={
-          <AdminTablePagination
-            page={page}
-            totalPages={totalPages}
-            from={from}
-            to={to}
-            total={total}
-            canPrev={canPrev}
-            canNext={canNext}
-            prevHref={prevHref}
-            nextHref={nextHref}
-            pageSize={pageSize}
-            onPageSizeChange={nextPageSize => {
-              router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-            }}
-            entityLabel='users'
-          />
         }
       >
         {() => (
@@ -378,6 +354,11 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
             enableVirtualization={true}
             minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
             className='text-[13px]'
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={() => {
+              void fetchNextPage();
+            }}
           />
         )}
       </AdminTableShell>

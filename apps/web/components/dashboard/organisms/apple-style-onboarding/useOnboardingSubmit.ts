@@ -13,6 +13,13 @@ import {
 import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { identify, track } from '@/lib/analytics';
+import {
+  clearSignupClaimValue,
+  readSignupClaimValue,
+  SIGNUP_ARTIST_NAME_KEY,
+  SIGNUP_SPOTIFY_EXPECTED_KEY,
+  SIGNUP_SPOTIFY_URL_KEY,
+} from '@/lib/auth/signup-claim-storage';
 import { captureError } from '@/lib/error-tracking';
 import {
   extractErrorCode,
@@ -38,10 +45,22 @@ async function tryAutoConnectSpotify(
   };
 
   try {
-    const spotifyUrl = sessionStorage.getItem('jovie_signup_spotify_url');
-    if (!spotifyUrl) return;
+    const spotifyExpected =
+      readSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY) === 'true';
+    const spotifyUrl = readSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
 
-    const artistName = sessionStorage.getItem('jovie_signup_artist_name') ?? '';
+    if (!spotifyUrl) {
+      if (spotifyExpected) {
+        track('onboarding_oauth_claim_missing', {
+          missing_field: 'spotify_url',
+          source: 'oauth_redirect',
+        });
+      }
+      clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
+      return;
+    }
+
+    const artistName = readSignupClaimValue(SIGNUP_ARTIST_NAME_KEY) ?? '';
     const artistMatch =
       /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
 
@@ -113,8 +132,9 @@ async function tryAutoConnectSpotify(
         clearInterval(stageTimer);
       }
     }
-    sessionStorage.removeItem('jovie_signup_spotify_url');
-    sessionStorage.removeItem('jovie_signup_artist_name');
+    clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
+    clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
+    clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
   } catch {
     // sessionStorage access may fail — non-critical
   }
@@ -138,7 +158,10 @@ interface UseOnboardingSubmitReturn {
   handleSubmit: (e?: FormEvent) => Promise<void>;
   isPendingSubmit: boolean;
   spotifyImportState: SpotifyImportState;
+  autoSubmitClaimed: boolean;
 }
+
+const AUTO_SUBMIT_CONFIRMATION_DELAY_MS = 1400;
 
 /**
  * Hook to manage onboarding form submission.
@@ -169,6 +192,7 @@ export function useOnboardingSubmit({
       stage: 0,
       message: '',
     });
+  const [autoSubmitClaimed, setAutoSubmitClaimed] = useState(false);
 
   // Abort controller to clean up Spotify import interval on unmount
   const spotifyAbortRef = useRef<AbortController | null>(null);
@@ -227,6 +251,7 @@ export function useOnboardingSubmit({
       track('onboarding_error', errorTrackingPayload);
 
       if (isDatabaseError(error)) {
+        setAutoSubmitClaimed(false);
         setState(prev => ({
           ...prev,
           error:
@@ -255,6 +280,7 @@ export function useOnboardingSubmit({
         progress: 0,
         isSubmitting: false,
       }));
+      setAutoSubmitClaimed(false);
     },
     [router, userId]
   );
@@ -305,6 +331,7 @@ export function useOnboardingSubmit({
         step: 'validating',
         isSubmitting: true,
       }));
+      setAutoSubmitClaimed(false);
 
       try {
         // Use fullName if provided (from Clerk identity), otherwise fall back to handle
@@ -325,6 +352,14 @@ export function useOnboardingSubmit({
           handle: resolvedHandle,
           completion_time: new Date().toISOString(),
         });
+
+        if (shouldAutoSubmitHandle) {
+          setAutoSubmitClaimed(true);
+          await new Promise(resolve => {
+            globalThis.setTimeout(resolve, AUTO_SUBMIT_CONFIRMATION_DELAY_MS);
+          });
+          setAutoSubmitClaimed(false);
+        }
 
         goToNextStep();
 
@@ -347,6 +382,7 @@ export function useOnboardingSubmit({
       setProfileReadyHandle,
       userEmail,
       userId,
+      shouldAutoSubmitHandle,
     ]
   );
 
@@ -407,5 +443,6 @@ export function useOnboardingSubmit({
     handleSubmit,
     isPendingSubmit,
     spotifyImportState,
+    autoSubmitClaimed,
   };
 }

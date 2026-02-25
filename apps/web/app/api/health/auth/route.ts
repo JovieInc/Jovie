@@ -78,6 +78,7 @@ export async function GET() {
     // Log full error details server-side for debugging
     logger.error('[health/auth] Error:', error);
     void captureWarning('Auth health check failed', e, {
+      service: 'auth',
       route: '/api/health/auth',
     });
     return NextResponse.json(

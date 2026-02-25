@@ -1,6 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -22,6 +23,7 @@ import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLi
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
+  readonly isFirstSession?: boolean;
 }
 
 /**
@@ -37,14 +39,30 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
   );
 }
 
-export function ChatPageClient({ conversationId }: ChatPageClientProps) {
-  const { selectedProfile } = useDashboardData();
+export function ChatPageClient({
+  conversationId,
+  isFirstSession = false,
+}: ChatPageClientProps) {
+  const {
+    selectedProfile,
+    creatorProfiles,
+    needsOnboarding,
+    dashboardLoadError,
+  } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+  const [autoRetryCount, setAutoRetryCount] = useState(0);
+
+  const hasProfilesButNoSelection =
+    creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
+  const hasDashboardLoadFailure = Boolean(dashboardLoadError);
+  const isProfileSetupRace =
+    hasProfilesButNoSelection && !hasDashboardLoadFailure;
+  const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
@@ -163,14 +181,96 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   // Profile unavailable — show actionable error instead of infinite spinner.
   // This happens when billing/entitlements fail or the DB query times out,
   // causing getDashboardData to return selectedProfile: null.
+  useEffect(() => {
+    if (selectedProfile) {
+      setAutoRetryCount(0);
+      return;
+    }
+
+    const wasLikelyJustOnboarded =
+      searchParams.get('from') === 'onboarding' ||
+      searchParams.get('onboarding') === 'complete';
+
+    Sentry.addBreadcrumb({
+      category: 'dashboard.chat',
+      level: hasDashboardLoadFailure ? 'error' : 'warning',
+      message: 'ChatPageClient rendered with null selectedProfile',
+      data: {
+        hasDashboardLoadFailure,
+        dashboardLoadError,
+        needsOnboarding,
+        creatorProfilesCount: creatorProfiles.length,
+        hasProfilesButNoSelection,
+        isProfileSetupRace,
+        wasLikelyJustOnboarded,
+        hasSpotifyConnectedProfile: creatorProfiles.some(profile =>
+          Boolean(profile.spotifyId)
+        ),
+        conversationId: conversationId ?? null,
+      },
+    });
+
+    if (hasDashboardLoadFailure) {
+      Sentry.captureMessage(
+        'Chat selectedProfile missing due to dashboard load failure',
+        {
+          level: 'error',
+          tags: {
+            category: 'dashboard.chat',
+            state: 'profile_load_failed',
+          },
+          extra: {
+            dashboardLoadError,
+            needsOnboarding,
+            creatorProfilesCount: creatorProfiles.length,
+            hasProfilesButNoSelection,
+            conversationId: conversationId ?? null,
+          },
+        }
+      );
+      return;
+    }
+
+    if (!canAutoRetry) {
+      return;
+    }
+
+    const retryTimeout = globalThis.setTimeout(() => {
+      setAutoRetryCount(previous => previous + 1);
+      globalThis.location.reload();
+    }, 3000);
+
+    return () => {
+      globalThis.clearTimeout(retryTimeout);
+    };
+  }, [
+    canAutoRetry,
+    conversationId,
+    creatorProfiles,
+    dashboardLoadError,
+    hasDashboardLoadFailure,
+    hasProfilesButNoSelection,
+    isProfileSetupRace,
+    needsOnboarding,
+    searchParams,
+    selectedProfile,
+  ]);
+
   if (!selectedProfile) {
+    const profileMessage = isProfileSetupRace
+      ? 'Looks like your profile is still being set up. This usually takes a few seconds.'
+      : 'We hit a problem loading your profile. Please retry in a moment.';
+
     return (
       <div className='flex h-full items-center justify-center'>
         <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
           <AlertCircle className='h-8 w-8 text-tertiary-token' />
-          <p className='text-sm text-secondary-token'>
-            Could not load your profile. This is usually temporary.
-          </p>
+          <p className='text-sm text-secondary-token'>{profileMessage}</p>
+          {isProfileSetupRace && canAutoRetry && (
+            <p className='text-xs text-tertiary-token'>
+              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
+            </p>
+          )}
           <button
             type='button'
             onClick={() => globalThis.location.reload()}
@@ -194,6 +294,7 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       displayName={selectedProfile.displayName ?? undefined}
       avatarUrl={selectedProfile.avatarUrl}
       username={selectedProfile.username ?? undefined}
+      isFirstSession={isFirstSession}
     />
   );
 }

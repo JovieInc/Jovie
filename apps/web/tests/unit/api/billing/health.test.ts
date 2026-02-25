@@ -28,8 +28,10 @@ vi.mock('@/lib/stripe/config', () => ({
   getActivePriceIds: vi.fn(() => ['price_test_monthly', 'price_test_yearly']),
 }));
 
+const mockCaptureWarning = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/error-tracking', () => ({
-  captureWarning: vi.fn(),
+  captureWarning: mockCaptureWarning,
 }));
 
 describe('GET /api/billing/health', () => {
@@ -79,5 +81,13 @@ describe('GET /api/billing/health', () => {
     expect(response.status).toBe(503);
     expect(data.healthy).toBe(false);
     expect(data.error).toBeDefined();
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Billing health check failed',
+      expect.any(Error),
+      expect.objectContaining({
+        service: 'billing',
+        route: '/api/billing/health',
+      })
+    );
   });
 });

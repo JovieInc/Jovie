@@ -13,7 +13,12 @@ import {
 
 export interface WaitlistKanbanCardProps {
   readonly entry: WaitlistEntryRow;
-  readonly approveStatus?: 'idle' | 'loading' | 'success' | 'error';
+  readonly approveStatus?:
+    | 'idle'
+    | 'approving'
+    | 'disapproving'
+    | 'success'
+    | 'error';
   readonly onApprove?: () => void;
 }
 
@@ -123,16 +128,24 @@ export function WaitlistKanbanCard({
       </div>
 
       {/* Actions */}
-      {onApprove && !isApproved && (
+      {onApprove && (
         <div className='mt-3 pt-3 border-t border-subtle'>
           <Button
             size='sm'
             variant='primary'
             className='w-full'
-            disabled={approveStatus === 'loading'}
+            disabled={
+              approveStatus === 'approving' || approveStatus === 'disapproving'
+            }
             onClick={onApprove}
           >
-            {approveStatus === 'loading' ? 'Approving…' : 'Approve'}
+            {approveStatus === 'approving'
+              ? 'Approving…'
+              : approveStatus === 'disapproving'
+                ? 'Disapproving…'
+                : isApproved
+                  ? 'Disapprove'
+                  : 'Approve'}
           </Button>
         </div>
       )}

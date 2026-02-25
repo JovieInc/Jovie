@@ -171,7 +171,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       });
     }
 
-    await invalidateBillingCache();
+    await invalidateBillingCache(userId);
 
     return result;
   }
@@ -231,7 +231,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_updated',
     });
 
-    await invalidateBillingCache();
+    await invalidateBillingCache(userId);
 
     return result;
   }
@@ -299,7 +299,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       });
     }
 
-    await invalidateBillingCache();
+    await invalidateBillingCache(userId);
 
     return {
       success: true,

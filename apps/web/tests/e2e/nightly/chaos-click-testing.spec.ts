@@ -31,6 +31,7 @@ interface ChaosError {
   page: string;
   element: string;
   error: string;
+  source: 'console' | 'pageerror';
 }
 
 function isReactError(text: string): boolean {
@@ -97,7 +98,9 @@ async function chaosTestPage(
     console.log(`  Found ${elements.length} elements on ${url}`);
 
     for (const selector of elements) {
-      const errorsBefore = [...getContext().consoleErrors];
+      const contextBefore = getContext();
+      const errorsBefore = [...contextBefore.consoleErrors];
+      const pageErrorsBefore = [...contextBefore.uncaughtExceptions];
 
       try {
         const locator = page.locator(selector).first();
@@ -111,9 +114,28 @@ async function chaosTestPage(
           e => !errorsBefore.includes(e) && isReactError(e)
         );
 
+        const newPageErrors = getContext().uncaughtExceptions.filter(
+          e => !pageErrorsBefore.includes(e) && isReactError(e)
+        );
+
         if (newErrors.length > 0) {
-          errors.push({ page: url, element: selector, error: newErrors[0] });
+          errors.push({
+            page: url,
+            element: selector,
+            error: newErrors[0],
+            source: 'console',
+          });
           console.log(`  ❌ ${selector}: ${newErrors[0].slice(0, 80)}`);
+        }
+
+        if (newPageErrors.length > 0) {
+          errors.push({
+            page: url,
+            element: selector,
+            error: newPageErrors[0],
+            source: 'pageerror',
+          });
+          console.log(`  ❌ ${selector}: ${newPageErrors[0].slice(0, 80)}`);
         }
 
         // Navigate back if we left the page
@@ -172,7 +194,16 @@ test.describe('Chaos Click Testing @nightly @chaos', () => {
   test('public pages', async ({ page }, testInfo) => {
     await runChaosTest(
       page,
-      ['/', '/pricing', '/signin', '/signup', '/legal/terms', '/legal/privacy'],
+      [
+        '/',
+        '/pricing',
+        '/signin',
+        '/signup',
+        '/waitlist',
+        '/onboarding',
+        '/legal/terms',
+        '/legal/privacy',
+      ],
       testInfo
     );
   });

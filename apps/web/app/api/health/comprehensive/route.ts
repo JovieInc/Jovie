@@ -362,6 +362,7 @@ export async function GET(request: Request) {
       'health/comprehensive'
     );
     void captureWarning('Comprehensive health check failed', error, {
+      service: 'comprehensive',
       route: '/api/health/comprehensive',
     });
 

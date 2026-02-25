@@ -63,7 +63,7 @@ export function ComparisonSection() {
             duration: reducedMotion ? 0 : 0.5,
             ease: [0.25, 0.46, 0.45, 0.94],
           }}
-          className='text-center heading-gap-linear'
+          className='text-center mb-10 md:mb-12'
         >
           <p
             className='mb-4 uppercase'

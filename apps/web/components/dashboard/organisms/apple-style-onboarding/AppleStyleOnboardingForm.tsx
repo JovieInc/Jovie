@@ -11,6 +11,8 @@ import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
+import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
+
 import type { AppleStyleOnboardingFormProps } from './types';
 import { ONBOARDING_STEPS } from './types';
 import { useHandleValidation } from './useHandleValidation';
@@ -49,18 +51,23 @@ export function AppleStyleOnboardingForm({
       fullName,
     });
 
-  const { state, handleSubmit, isPendingSubmit, spotifyImportState } =
-    useOnboardingSubmit({
-      userId,
-      userEmail,
-      fullName,
-      handle,
-      handleInput,
-      handleValidation,
-      goToNextStep,
-      setProfileReadyHandle,
-      shouldAutoSubmitHandle,
-    });
+  const {
+    state,
+    handleSubmit,
+    isPendingSubmit,
+    spotifyImportState,
+    autoSubmitClaimed,
+  } = useOnboardingSubmit({
+    userId,
+    userEmail,
+    fullName,
+    handle,
+    handleInput,
+    handleValidation,
+    goToNextStep,
+    setProfileReadyHandle,
+    shouldAutoSubmitHandle,
+  });
 
   useEffect(() => {
     if (userId) {
@@ -122,8 +129,15 @@ export function AppleStyleOnboardingForm({
   ]);
 
   const goToDashboard = useCallback(() => {
-    globalThis.location.href = APP_ROUTES.DASHBOARD;
-  }, []);
+    if (typeof window === 'undefined') return;
+
+    const initialQuery = getOnboardingDashboardInitialQuery(
+      spotifyImportState.status
+    );
+    const dashboardUrl = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
+
+    globalThis.location.href = dashboardUrl;
+  }, [spotifyImportState.status]);
 
   const renderStepContent = () => {
     switch (currentStepIndex) {
@@ -143,6 +157,7 @@ export function AppleStyleOnboardingForm({
             onHandleChange={setHandleInput}
             onSubmit={handleSubmit}
             isPendingSubmit={isPendingSubmit}
+            autoSubmitClaimed={autoSubmitClaimed}
           />
         );
 

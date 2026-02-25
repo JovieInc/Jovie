@@ -58,7 +58,7 @@ export function AutomaticReleaseSmartlinksSection() {
           </div>
 
           {/* Two-panel product mockup */}
-          <div className='relative mt-12'>
+          <div className='relative mt-10'>
             <div
               className='relative overflow-hidden rounded-2xl'
               style={{
