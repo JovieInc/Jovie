@@ -27,6 +27,21 @@ export type SortDirection = z.infer<typeof sortDirectionSchema>;
 // =============================================================================
 
 /**
+ * Audience segment filter values.
+ */
+export const audienceSegmentValues = [
+  'highIntent',
+  'returning',
+  'frequent',
+  'recent24h',
+] as const;
+
+/**
+ * Audience segment filter validation schema.
+ */
+export const audienceSegmentSchema = z.enum(audienceSegmentValues);
+
+/**
  * Audience member sort column values.
  */
 export const memberSortValues = [
@@ -68,6 +83,8 @@ export const membersQuerySchema = z.object({
     val => Number(val ?? 10),
     z.number().int().min(1).max(100)
   ),
+  /** Segment filters */
+  segments: z.array(audienceSegmentSchema).default([]),
 });
 
 /**

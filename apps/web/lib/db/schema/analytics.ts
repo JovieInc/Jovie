@@ -76,6 +76,9 @@ export const audienceMembers = pgTable(
     creatorProfileLastSeenIdx: index(
       'audience_members_creator_profile_id_last_seen_at_idx'
     ).on(table.creatorProfileId, table.lastSeenAt),
+    creatorProfileTypeLastSeenIdx: index(
+      'audience_members_creator_profile_id_type_last_seen_at_idx'
+    ).on(table.creatorProfileId, table.type, table.lastSeenAt),
     creatorProfileUpdatedIdx: index(
       'audience_members_creator_profile_id_updated_at_idx'
     ).on(table.creatorProfileId, table.updatedAt),

@@ -1,6 +1,6 @@
 'use client';
 
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import type { AudienceFilters } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import type { AudienceMember } from '@/types';
 import { PAGINATED_CACHE } from './cache-strategies';
@@ -74,6 +74,7 @@ export function useAudienceInfiniteQuery({
           pageParams: [1],
         }
       : undefined,
+    placeholderData: keepPreviousData,
     ...PAGINATED_CACHE,
   });
 }
