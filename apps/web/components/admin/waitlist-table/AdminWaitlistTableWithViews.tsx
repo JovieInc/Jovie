@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy } from 'lucide-react';
+import { Copy, Settings2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -10,6 +10,10 @@ import {
 } from '@/components/admin/table/organisms/KanbanBoard';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarButton,
+  ActionBarItem,
   DisplayMenuDropdown,
   ExportCSVButton,
   TableBulkActionsToolbar,
@@ -225,23 +229,38 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                 {total.toLocaleString()}
                 <span className='hidden sm:inline'> entries</span>
               </div>
-              <div className='flex items-center gap-2'>
-                <ExportCSVButton<WaitlistEntryRow>
-                  getData={() => entries}
-                  columns={waitlistCSVColumns}
-                  filename={WAITLIST_CSV_FILENAME_PREFIX}
-                  disabled={entries.length === 0}
-                  ariaLabel='Export waitlist to CSV file'
-                />
-                <DisplayMenuDropdown
-                  viewMode={viewMode}
-                  availableViewModes={['list', 'board']}
-                  onViewModeChange={setViewMode}
-                  groupingEnabled={groupingEnabled}
-                  onGroupingToggle={setGroupingEnabled}
-                  groupingLabel='Group by status'
-                />
-              </div>
+              <ActionBar>
+                <ActionBarItem tooltipLabel='Export'>
+                  <ExportCSVButton<WaitlistEntryRow>
+                    getData={() => entries}
+                    columns={waitlistCSVColumns}
+                    filename={WAITLIST_CSV_FILENAME_PREFIX}
+                    disabled={entries.length === 0}
+                    ariaLabel='Export waitlist to CSV file'
+                    variant='ghost'
+                    className={ACTION_BAR_BUTTON_CLASS}
+                    label='Export'
+                  />
+                </ActionBarItem>
+                <ActionBarItem tooltipLabel='Display' shortcut='⇧V'>
+                  <DisplayMenuDropdown
+                    trigger={
+                      <ActionBarButton
+                        label='Display'
+                        icon={<Settings2 className='h-3.5 w-3.5' />}
+                        mobileIconOnly={true}
+                        className={ACTION_BAR_BUTTON_CLASS}
+                      />
+                    }
+                    viewMode={viewMode}
+                    availableViewModes={['list', 'board']}
+                    onViewModeChange={setViewMode}
+                    groupingEnabled={groupingEnabled}
+                    onGroupingToggle={setGroupingEnabled}
+                    groupingLabel='Group by status'
+                  />
+                </ActionBarItem>
+              </ActionBar>
             </div>
           </>
         }
