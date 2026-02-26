@@ -4,7 +4,7 @@
 # code to an agent branch without an existing PR. This closes the gap where
 # agents complete work and push, but leave no PR for the CI pipeline to process.
 #
-# TRIGGER: Push to any agent branch pattern (codex/*, claude/*, codegen-bot/*, linear/*)
+# TRIGGER: Push to agent branch pattern (codex/*, codegen-bot/*, linear/*, claude/*)
 #
 # SAFETY:
 # - Idempotent: skips if PR already exists for the branch
@@ -19,9 +19,9 @@ on:
   push:
     branches:
       - 'codex/**'
-      - 'claude/**'
       - 'codegen-bot/**'
       - 'linear/**'
+      - 'claude/**'
 
 permissions:
   contents: write
@@ -118,7 +118,7 @@ jobs:
 
           while true; do
             OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-              | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/"))] | length')
+              | jq '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/"))] | length')
 
             echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
 

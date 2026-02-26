@@ -82,6 +82,7 @@ export default async function AppShellLayout({
             <AuthShellWrapper
               persistSidebarCollapsed={setSidebarCollapsed}
               sidebarDefaultOpen={sidebarDefaultOpen}
+              previewPanelDefaultOpen={dashboardData.isFirstSession}
             >
               {children}
             </AuthShellWrapper>

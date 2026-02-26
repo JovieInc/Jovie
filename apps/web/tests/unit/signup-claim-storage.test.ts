@@ -59,4 +59,29 @@ describe('signup claim storage', () => {
     expect(window.sessionStorage.getItem(key)).toBeNull();
     expect(window.localStorage.getItem(key)).toBeNull();
   });
+
+  it('handles unavailable sessionStorage while reading from localStorage', () => {
+    const originalSessionStorage = globalThis.sessionStorage;
+
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      configurable: true,
+      value: null,
+    });
+
+    try {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ value: 'artist-name', ts: 2500 })
+      );
+
+      expect(readSignupClaimValue(key, { now: 3000, ttlMs: 10_000 })).toBe(
+        'artist-name'
+      );
+    } finally {
+      Object.defineProperty(globalThis, 'sessionStorage', {
+        configurable: true,
+        value: originalSessionStorage,
+      });
+    }
+  });
 });

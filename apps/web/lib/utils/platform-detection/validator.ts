@@ -77,6 +77,8 @@ export const PLATFORM_ERROR_EXAMPLES: Record<string, string> = {
   tiktok: 'Add your username. Example: https://tiktok.com/@username',
   youtube: 'Add your handle. Example: https://youtube.com/@handle',
   twitter: 'Add your username. Example: https://x.com/username',
+  stripe:
+    'Use your Stripe dashboard URL. Example: https://dashboard.stripe.com/',
   venmo: 'Add your username. Example: https://venmo.com/username',
   facebook: 'Add your page name. Example: https://facebook.com/pagename',
   linkedin: 'Add your profile. Example: https://linkedin.com/in/username',
@@ -175,6 +177,8 @@ export function validateUrl(url: string, platform: PlatformInfo): boolean {
         return /tiktok\.com\/@[a-zA-Z0-9._]+\/?$/.test(url);
       case 'youtube':
         return validateYouTubeUrl(url);
+      case 'stripe':
+        return /dashboard\.stripe\.com(?:\/.*)?$/.test(url);
       case 'venmo':
         return /venmo\.com\/[a-zA-Z0-9_-]+\/?$/.test(url);
       case 'facebook':

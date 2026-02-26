@@ -14,7 +14,6 @@ import {
   getSpotifyAlbums,
   getSpotifyArtistAlbums,
   getSpotifyTracks,
-  mapSpotifyAlbumType,
   parseSpotifyReleaseDate,
   type SpotifyAlbum,
   type SpotifyAlbumFull,
@@ -44,6 +43,7 @@ import {
   upsertRelease,
   upsertTrack,
 } from './queries';
+import { classifySpotifyReleaseType } from './release-type';
 import { generateUniqueSlug } from './slug';
 
 // ============================================================================
@@ -330,26 +330,6 @@ export async function importReleasesFromSpotify(
 }
 
 /**
- * Determine release type, inferring EP from track count
- *
- * Spotify's API only returns 'album', 'single', or 'compilation' — there is
- * no 'ep' value. EPs (4-6 tracks) are reported as 'single' by Spotify, so we
- * detect them by checking the track count. When Spotify says 'album', we trust
- * that classification regardless of track count.
- */
-function determineReleaseType(
-  albumType: SpotifyAlbum['album_type'],
-  totalTracks: number
-): 'album' | 'single' | 'ep' | 'compilation' {
-  const releaseType = mapSpotifyAlbumType(albumType);
-  // Spotify reports EPs as 'single' — detect them by track count (4-6 tracks)
-  if (releaseType === 'single' && totalTracks >= 4 && totalTracks <= 6) {
-    return 'ep';
-  }
-  return releaseType;
-}
-
-/**
  * Sanitize album metadata fields
  */
 function sanitizeAlbumMetadata(
@@ -589,7 +569,7 @@ async function importSingleRelease(
   const effectiveAlbumType = fullAlbum?.album_type ?? album.album_type;
   const effectiveTotalTracks = fullAlbum?.total_tracks ?? album.total_tracks;
 
-  const releaseType = determineReleaseType(
+  const releaseType = classifySpotifyReleaseType(
     effectiveAlbumType,
     effectiveTotalTracks
   );

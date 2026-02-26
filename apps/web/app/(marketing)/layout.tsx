@@ -3,17 +3,16 @@ import { FlagValues } from 'flags/react';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
-import { homepageFlags } from '@/lib/flags';
+import { homepageFlagDefaults } from '@/lib/flags';
 
 export default async function MarketingLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const values = Object.fromEntries(
-    await Promise.all(homepageFlags.map(async f => [f.key, await f()] as const))
-  );
-  const encrypted = await encryptFlagValues(values);
+  // Use static defaults instead of evaluating flag() functions which call
+  // cookies()/headers() and force the entire marketing layout into dynamic rendering.
+  const encrypted = await encryptFlagValues(homepageFlagDefaults);
 
   return (
     <div className='linear-marketing flex min-h-screen flex-col overflow-x-hidden bg-surface-page text-primary-token'>

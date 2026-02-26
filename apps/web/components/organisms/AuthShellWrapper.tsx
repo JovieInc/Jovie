@@ -76,6 +76,7 @@ export function TableMetaProvider({
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
+  readonly previewPanelDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
@@ -94,10 +95,12 @@ function KeyboardShortcutsHandler() {
 function AuthShellWrapperInner({
   persistSidebarCollapsed,
   sidebarDefaultOpen,
+  previewPanelDefaultOpen,
   children,
 }: Readonly<{
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
+  previewPanelDefaultOpen?: boolean;
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
@@ -113,6 +116,8 @@ function AuthShellWrapperInner({
   // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
+  const shouldDefaultOpenPreviewPanel =
+    config.section === 'dashboard' && previewPanelDefaultOpen;
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
@@ -165,7 +170,11 @@ function AuthShellWrapperInner({
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
       <RightPanelProvider>
-        <PreviewPanelProvider enabled={previewEnabled}>
+        <PreviewPanelProvider
+          key={config.section}
+          defaultOpen={shouldDefaultOpenPreviewPanel}
+          enabled={previewEnabled}
+        >
           <AuthShell
             section={config.section}
             breadcrumbs={config.breadcrumbs}
@@ -201,6 +210,7 @@ function AuthShellWrapperInner({
 export function AuthShellWrapper({
   persistSidebarCollapsed,
   sidebarDefaultOpen,
+  previewPanelDefaultOpen,
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
@@ -209,6 +219,7 @@ export function AuthShellWrapper({
         <AuthShellWrapperInner
           persistSidebarCollapsed={persistSidebarCollapsed}
           sidebarDefaultOpen={sidebarDefaultOpen}
+          previewPanelDefaultOpen={previewPanelDefaultOpen}
         >
           {children}
         </AuthShellWrapperInner>

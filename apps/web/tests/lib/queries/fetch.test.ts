@@ -101,6 +101,30 @@ describe('fetch utilities', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(FetchError);
         expect((error as FetchError).status).toBe(404);
+        expect((error as FetchError).message).toBe(
+          'Fetch failed: 404 Not Found'
+        );
+      }
+    });
+
+    it('uses a safe generic message for server errors', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      };
+      mockFetch.mockResolvedValueOnce(mockResponse);
+
+      try {
+        await fetchWithTimeout('/api/test');
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect(error).toBeInstanceOf(FetchError);
+        expect((error as FetchError).status).toBe(500);
+        expect((error as FetchError).message).toBe(
+          'Request failed due to a temporary server issue. Please try again.'
+        );
+        expect((error as FetchError).response).toBe(mockResponse);
       }
     });
 
