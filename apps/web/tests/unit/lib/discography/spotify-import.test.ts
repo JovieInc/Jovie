@@ -36,7 +36,6 @@ vi.mock('@/lib/db', () => ({
 const mockGetSpotifyArtistAlbums = vi.fn().mockResolvedValue([]);
 const mockGetSpotifyAlbums = vi.fn().mockResolvedValue([]);
 const mockGetSpotifyTracks = vi.fn().mockResolvedValue([]);
-const mockMapSpotifyAlbumType = vi.fn().mockReturnValue('album');
 const mockSafeParse = vi.fn((id: unknown) => ({
   success: typeof id === 'string' && id.length > 0,
 }));
@@ -57,7 +56,6 @@ vi.mock('@/lib/spotify', () => ({
     (id: string) => `https://open.spotify.com/track/${id}`
   ),
   getBestSpotifyImage: mockGetBestSpotifyImage,
-  mapSpotifyAlbumType: mockMapSpotifyAlbumType,
   parseSpotifyReleaseDate: vi.fn().mockReturnValue(new Date('2024-01-01')),
 }));
 
@@ -105,7 +103,6 @@ describe('spotify-import', () => {
     mockGetSpotifyArtistAlbums.mockResolvedValue([]);
     mockGetSpotifyAlbums.mockResolvedValue([]);
     mockGetSpotifyTracks.mockResolvedValue([]);
-    mockMapSpotifyAlbumType.mockReturnValue('album');
     mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
     mockUpsertRelease.mockResolvedValue({ id: 'release-1' });
     mockUpsertTrack.mockResolvedValue({ id: 'track-1' });
@@ -601,8 +598,6 @@ describe('spotify-import', () => {
     });
 
     it('classifies EPs based on full album track count when summary album says single', async () => {
-      mockMapSpotifyAlbumType.mockReturnValue('single');
-
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
         {
           id: 'album-ep',
