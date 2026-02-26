@@ -113,6 +113,25 @@ describe('@critical session.ts', () => {
       expect(queryText).not.toContain('app.user_id');
     });
 
+    it('falls back to SET when set_config fails', async () => {
+      const { setupDbSession } = await import('@/lib/auth/session');
+
+      mockDbExecute
+        .mockRejectedValueOnce(new Error('set_config unavailable'))
+        .mockResolvedValueOnce(undefined);
+
+      const result = await setupDbSession('user_fallback_123');
+
+      expect(result.userId).toBe('user_fallback_123');
+      expect(mockDbExecute).toHaveBeenCalledTimes(2);
+
+      const firstQueryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+      const secondQueryText = JSON.stringify(mockDbExecute.mock.calls[1]?.[0]);
+
+      expect(firstQueryText).toContain("set_config('app.clerk_user_id'");
+      expect(secondQueryText).toContain('SET app.clerk_user_id');
+    });
+
     it('uses getCachedAuth when no clerkUserId provided', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'user_from_auth' });
 

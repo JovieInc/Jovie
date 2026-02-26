@@ -130,7 +130,7 @@ export function SignInForm() {
             No account found.{' '}
             <Link
               href='/signup'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
+              className='text-primary-token underline focus-ring-themed rounded-md'
             >
               Sign up instead
             </Link>
