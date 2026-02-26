@@ -117,6 +117,27 @@ export const homepageAutomaticReleaseSmartlinks = flag({
   },
 });
 
+/**
+ * Static default values for homepage flags.
+ * Use this instead of evaluating flag() functions to avoid triggering
+ * cookies()/headers() which forces dynamic rendering.
+ */
+export const homepageFlagDefaults: Record<string, boolean> = {
+  homepage_hero: true,
+  homepage_label_logos: true,
+  homepage_how_it_works: true,
+  homepage_product_preview: false,
+  homepage_example_profiles: false,
+  homepage_deeplinks_grid: true,
+  homepage_problem: false,
+  homepage_comparison: false,
+  homepage_what_you_get: false,
+  homepage_see_it_in_action: false,
+  homepage_final_cta: true,
+  homepage_dashboard_showcase: true,
+  homepage_automatic_release_smartlinks: true,
+};
+
 /** All homepage flags for bulk operations (discovery endpoint, layout encryption) */
 export const homepageFlags = [
   homepageHero,

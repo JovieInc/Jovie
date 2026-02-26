@@ -4,6 +4,7 @@ export {
   homepageDeeplinksGrid,
   homepageExampleProfiles,
   homepageFinalCta,
+  homepageFlagDefaults,
   homepageFlags,
   homepageHero,
   homepageHowItWorks,
