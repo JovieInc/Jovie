@@ -23,7 +23,20 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
       className='shrink-0'
     >
       <title id={`status-${status}`}>{label}</title>
-      {status === 'live' && <circle cx='7' cy='7' r='5' fill={color} />}
+      {status === 'live' && (
+        <svg viewBox='0 0 14 14' className='overflow-visible'>
+          <title>{label}</title>
+          <circle cx='7' cy='7' r='5' fill={color} />
+          <path
+            d='M4.5 7L6.5 9L9.5 5'
+            stroke='white'
+            strokeWidth='1.5'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+            fill='none'
+          />
+        </svg>
+      )}
       {status === 'syncing' && (
         <>
           <circle
@@ -31,10 +44,18 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             cy='7'
             r='4.5'
             stroke={color}
-            strokeWidth='1'
+            strokeWidth='1.5'
             fill='none'
           />
-          <path d='M7 2.5A4.5 4.5 0 0 1 11.5 7H7V2.5Z' fill={color} />
+          <line
+            x1='3.5'
+            y1='10.5'
+            x2='10.5'
+            y2='3.5'
+            stroke={color}
+            strokeWidth='1.5'
+            strokeLinecap='round'
+          />
         </>
       )}
       {status === 'scheduled' && (
@@ -44,7 +65,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             cy='7'
             r='4.5'
             stroke={color}
-            strokeWidth='1'
+            strokeWidth='1.5'
             fill='none'
           />
           <line
@@ -53,7 +74,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             x2='7'
             y2='7'
             stroke={color}
-            strokeWidth='1'
+            strokeWidth='1.5'
             strokeLinecap='round'
           />
           <line
@@ -62,7 +83,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             x2='9.5'
             y2='7'
             stroke={color}
-            strokeWidth='1'
+            strokeWidth='1.5'
             strokeLinecap='round'
           />
         </>
@@ -73,7 +94,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
           cy='7'
           r='4.5'
           stroke={color}
-          strokeWidth='1'
+          strokeWidth='1.5'
           strokeDasharray='2 2'
           fill='none'
         />
@@ -85,7 +106,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             cy='7'
             r='4.5'
             stroke={color}
-            strokeWidth='1'
+            strokeWidth='1.5'
             fill='none'
           />
           <line
@@ -94,7 +115,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             x2='11'
             y2='3'
             stroke={color}
-            strokeWidth='1'
+            strokeWidth='1.5'
             strokeLinecap='round'
           />
         </>

@@ -35,17 +35,14 @@ export function DemoReleaseDetail({
   return (
     <div className='flex h-full flex-col'>
       {/* Header */}
-      <div className='flex items-start justify-between border-b border-subtle px-4 py-3'>
-        <div className='min-w-0 flex-1'>
-          <h2 className='truncate text-sm font-semibold text-primary-token'>
-            {release.title}
-          </h2>
-          <p className='text-2xs text-tertiary-token'>{release.artist}</p>
+      <div className='flex items-center justify-between border-b border-subtle px-4 py-2 min-h-12'>
+        <div className='min-w-0 flex-1 text-[13px] text-tertiary-token font-medium'>
+          REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
         <button
           type='button'
           onClick={onClose}
-          className='shrink-0 rounded-md p-1 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+          className='shrink-0 rounded flex items-center justify-center size-6 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
           aria-label='Close detail panel'
         >
           <X className='size-4' />
@@ -53,89 +50,65 @@ export function DemoReleaseDetail({
       </div>
 
       {/* Scrollable content */}
-      <div className='flex-1 overflow-y-auto p-4'>
-        {/* Properties grid */}
-        <div className='space-y-3'>
-          <h3 className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
-            Properties
-          </h3>
-          <div className='space-y-2'>
-            <PropertyRow label='Status'>
-              <div className='flex items-center gap-1.5'>
-                <DemoStatusIcon status={release.status} />
-                <span className='capitalize'>{release.status}</span>
-              </div>
-            </PropertyRow>
-            <PropertyRow label='Priority'>
-              <div className='flex items-center gap-1.5'>
-                <DemoPriorityIcon priority={release.priority} />
-                <span className='capitalize'>{release.priority}</span>
-              </div>
-            </PropertyRow>
-            <PropertyRow label='Type'>
-              <span>{release.type}</span>
-            </PropertyRow>
-            <PropertyRow label='Tracks'>
-              <span>{release.trackCount}</span>
-            </PropertyRow>
-            <PropertyRow label='Release date'>
-              <span>{release.releaseDate}</span>
-            </PropertyRow>
-            <PropertyRow label='Assignee'>
-              <div className='flex items-center gap-1.5'>
-                <DemoAvatar assignee={release.assignee} size={16} />
-                <span>{release.assignee.name}</span>
-              </div>
-            </PropertyRow>
-            {release.streams > 0 && (
-              <PropertyRow label='Streams'>
-                <span>{release.streams.toLocaleString()}</span>
-              </PropertyRow>
-            )}
-          </div>
+      <div className='flex-1 overflow-y-auto p-5'>
+        {/* Title Area */}
+        <div className='mb-6'>
+          <h2 className='text-lg font-semibold text-primary-token mb-1'>
+            {release.title}
+          </h2>
+          <p className='text-[13px] text-secondary-token'>{release.artist}</p>
         </div>
 
-        {/* Labels */}
-        {release.labels.length > 0 && (
-          <div className='mt-4 space-y-2'>
-            <h3 className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
-              Labels
-            </h3>
-            <div className='flex flex-wrap gap-1'>
-              {release.labels.map(label => (
-                <span
-                  key={label.id}
-                  className='rounded-xs px-1.5 py-0.5 text-[10px] font-medium'
-                  style={{
-                    backgroundColor: `${label.color}20`,
-                    color: label.color,
-                  }}
-                >
-                  {label.name}
-                </span>
-              ))}
+        {/* Properties grid */}
+        <div className='space-y-1 mb-8'>
+          <PropertyRow label='Status'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+              <DemoStatusIcon status={release.status} />
+              <span className='capitalize'>{release.status}</span>
             </div>
-          </div>
-        )}
+          </PropertyRow>
+          <PropertyRow label='Priority'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+              <DemoPriorityIcon priority={release.priority} />
+              <span className='capitalize'>{release.priority}</span>
+            </div>
+          </PropertyRow>
+          <PropertyRow label='Assignee'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+              <DemoAvatar assignee={release.assignee} size={16} />
+              <span>{release.assignee.name}</span>
+            </div>
+          </PropertyRow>
+          <PropertyRow label='Type'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+              <span>{release.type}</span>
+            </div>
+          </PropertyRow>
+          <PropertyRow label='Release date'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+              <span>{release.releaseDate}</span>
+            </div>
+          </PropertyRow>
+        </div>
 
         {/* Provider connections */}
         {release.links.length > 0 && (
-          <div className='mt-4 space-y-2'>
-            <h3 className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+          <div className='mt-4 mb-8'>
+            <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-2'>
               Providers
             </h3>
-            <div className='space-y-1.5'>
+            <div className='space-y-1'>
               {release.links.map(link => (
                 <div
                   key={link.id}
-                  className='flex items-center gap-2 rounded-md border border-subtle px-3 py-2'
+                  className='flex items-center gap-2 rounded-md border border-subtle px-3 py-2 text-[13px]'
                 >
                   <span
-                    className='size-2 shrink-0 rounded-full'
+                    className='size-1.5 shrink-0 rounded-full'
                     style={{ backgroundColor: STATUS_DOT[link.status] }}
                   />
                   <span
-                    className='flex-1 text-app font-medium'
+                    className='flex-1 font-medium'
                     style={{
                       color:
                         PROVIDER_COLORS[link.provider] ??
@@ -144,7 +117,7 @@ export function DemoReleaseDetail({
                   >
                     {link.provider}
                   </span>
-                  <span className='text-2xs capitalize text-tertiary-token'>
+                  <span className='capitalize text-tertiary-token'>
                     {link.status}
                   </span>
                 </div>
@@ -153,22 +126,44 @@ export function DemoReleaseDetail({
           </div>
         )}
 
+        {/* Labels */}
+        {release.labels.length > 0 && (
+          <div className='mt-4 mb-8'>
+            <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-2'>
+              Labels
+            </h3>
+            <div className='flex flex-wrap gap-1'>
+              {release.labels.map(label => (
+                <span
+                  key={label.id}
+                  className='flex items-center gap-1.5 rounded-full border border-subtle px-2 py-0.5 text-[11px] font-medium text-secondary-token bg-transparent'
+                >
+                  <span
+                    className='size-1.5 rounded-full'
+                    style={{ backgroundColor: label.color }}
+                  />
+                  {label.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Activity */}
         <div className='mt-4 space-y-2'>
-          <h3 className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+          <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-3'>
             Activity
           </h3>
-          <div className='space-y-2'>
+          <div className='space-y-3'>
             {DEMO_ACTIVITY_TEMPLATE.map(activity => (
-              <div key={activity.id} className='flex gap-2'>
-                <div className='mt-1.5 size-1.5 shrink-0 rounded-full bg-tertiary-token' />
-                <div>
-                  <p className='text-app text-primary-token'>
-                    {activity.action}
-                  </p>
-                  <p className='text-2xs text-tertiary-token'>
-                    {activity.detail} · {activity.time}
-                  </p>
+              <div key={activity.id} className='flex gap-2.5 text-[13px]'>
+                <DemoAvatar assignee={release.assignee} size={16} />
+                <div className='text-secondary-token leading-snug'>
+                  <span className='font-medium text-primary-token'>
+                    {release.assignee.name}
+                  </span>{' '}
+                  {activity.action.toLowerCase()}{' '}
+                  <span className='text-tertiary-token'>· {activity.time}</span>
                 </div>
               </div>
             ))}
@@ -176,7 +171,7 @@ export function DemoReleaseDetail({
         </div>
 
         {/* Actions */}
-        <div className='mt-5 grid grid-cols-2 gap-2'>
+        <div className='mt-8 grid grid-cols-2 gap-2'>
           <Button
             size='sm'
             variant='secondary'
@@ -203,13 +198,6 @@ export function DemoReleaseDetail({
           </Button>
         </div>
       </div>
-
-      {/* Note */}
-      {release.note && (
-        <div className='border-t border-subtle px-4 py-3'>
-          <p className='text-2xs text-tertiary-token'>{release.note}</p>
-        </div>
-      )}
     </div>
   );
 }
@@ -224,9 +212,11 @@ function PropertyRow({
   readonly children: React.ReactNode;
 }) {
   return (
-    <div className='flex items-center justify-between text-app'>
-      <span className='text-tertiary-token'>{label}</span>
-      <div className='text-primary-token'>{children}</div>
+    <div className='flex items-center text-[13px] min-h-[28px]'>
+      <span className='w-[100px] shrink-0 text-tertiary-token'>{label}</span>
+      <div className='flex-1 text-primary-token flex items-center'>
+        {children}
+      </div>
     </div>
   );
 }
