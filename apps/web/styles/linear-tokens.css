@@ -101,8 +101,8 @@
      ============================================ */
 
   --linear-hero-glow: radial-gradient(
-    ellipse 70% 55% at 25% 35%,
-    oklch(92% 0.02 270 / 0.3),
+    ellipse 60% 50% at 50% 40%,
+    oklch(92% 0.02 270 / 0.25),
     transparent 70%
   );
   --linear-hero-gradient-from: oklch(40% 0.06 270);
@@ -328,8 +328,8 @@
 
   /* Hero-specific */
   --linear-hero-glow: radial-gradient(
-    ellipse 70% 55% at 25% 35%,
-    oklch(22% 0.025 260 / 0.5),
+    ellipse 60% 50% at 50% 40%,
+    oklch(22% 0.025 260 / 0.35),
     transparent 70%
   );
   --linear-hero-gradient-from: oklch(72% 0.015 260);

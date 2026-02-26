@@ -125,11 +125,7 @@ export function RecentChats() {
 
   return (
     <>
-      <SidebarCollapsibleGroup
-        label='Threads'
-        defaultOpen={false}
-        icon={MessageSquare}
-      >
+      <SidebarCollapsibleGroup label='Threads' defaultOpen icon={MessageSquare}>
         <SidebarMenu>
           {conversations.map(convo => {
             const href = `${APP_ROUTES.CHAT}/${convo.id}`;

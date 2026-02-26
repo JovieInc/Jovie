@@ -1,6 +1,7 @@
 'use client';
 
 import type * as React from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface TableRowProps {
@@ -30,15 +31,18 @@ export function TableRow({
 }: Readonly<TableRowProps>) {
   const isVirtual = virtualRow !== undefined;
 
-  const combinedStyle: React.CSSProperties = {
-    ...customStyle,
-    ...(isVirtual
-      ? {
-          transform: `translateY(${virtualRow.start}px)`,
-          height: '60px',
-        }
-      : {}),
-  };
+  const combinedStyle = useMemo<React.CSSProperties>(
+    () => ({
+      ...customStyle,
+      ...(isVirtual
+        ? {
+            transform: `translateY(${virtualRow?.start}px)`,
+            height: '60px',
+          }
+        : {}),
+    }),
+    [customStyle, isVirtual, virtualRow?.start]
+  );
 
   return (
     <tr

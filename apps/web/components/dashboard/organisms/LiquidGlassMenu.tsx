@@ -242,7 +242,7 @@ export function LiquidGlassMenu({
       {/* Expanded menu overlay */}
       <div
         className={cn(
-          'absolute inset-x-0 bottom-0 transition-all duration-300 ease-out',
+          'absolute inset-x-0 bottom-full transition-all duration-300 ease-out',
           isExpanded
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none'
@@ -274,7 +274,7 @@ export function LiquidGlassMenu({
           <GlassBlur intense />
 
           <nav
-            className='relative z-10 py-2'
+            className='relative z-10 py-2 max-h-[70svh] overflow-y-auto overscroll-contain'
             aria-label='Expanded navigation menu'
           >
             {/* Menu items */}
