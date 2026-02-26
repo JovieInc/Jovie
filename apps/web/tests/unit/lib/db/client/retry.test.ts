@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  DbCircuitOpenError,
+  dbCircuitBreaker,
+} from '@/lib/db/client/circuit-breaker';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 
 describe('isRetryableError', () => {
@@ -21,6 +25,9 @@ describe('isRetryableError', () => {
 });
 
 describe('withRetry', () => {
+  beforeEach(() => {
+    dbCircuitBreaker.reset();
+  });
   it('returns result on first success', async () => {
     const result = await withRetry(() => Promise.resolve('ok'), 'test', 3);
     expect(result).toBe('ok');
@@ -48,6 +55,22 @@ describe('withRetry', () => {
       'syntax error in SQL'
     );
     expect(operation).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails fast with 503 once circuit is open', async () => {
+    const operation = vi.fn(async () => {
+      throw new Error('connection reset by peer');
+    });
+
+    for (let i = 0; i < 5; i++) {
+      await expect(withRetry(operation, 'trip-circuit', 1)).rejects.toThrow(
+        'connection reset by peer'
+      );
+    }
+
+    await expect(
+      withRetry(operation, 'trip-circuit', 1)
+    ).rejects.toBeInstanceOf(DbCircuitOpenError);
   });
 
   it('throws after exhausting all retries', async () => {
