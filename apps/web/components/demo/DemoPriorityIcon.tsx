@@ -31,11 +31,10 @@ export function DemoPriorityIcon({
         height={SIZE}
         viewBox='0 0 14 14'
         fill='none'
-        role='img'
-        aria-label={label}
+        aria-labelledby={`priority-${priority}`}
         className='shrink-0'
       >
-        <title>{label}</title>
+        <title id={`priority-${priority}`}>{label}</title>
         <line
           x1='3'
           y1='7'
@@ -60,11 +59,10 @@ export function DemoPriorityIcon({
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      role='img'
-      aria-label={label}
+      aria-labelledby={`priority-${priority}-bars`}
       className='shrink-0'
     >
-      <title>{label}</title>
+      <title id={`priority-${priority}-bars`}>{label}</title>
       {Array.from({ length: bars }, (_, i) => {
         const height = 3 + i * 2;
         const x = startX + i * (barWidth + gap);

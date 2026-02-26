@@ -57,7 +57,7 @@ export function DemoReleasesPanel({
     (e: React.KeyboardEvent) => {
       if (flatIds.length === 0) return;
 
-      let nextIndex = focusIndex;
+      let nextIndex: number;
 
       if (e.key === 'ArrowDown' || e.key === 'j') {
         e.preventDefault();
@@ -121,10 +121,8 @@ export function DemoReleasesPanel({
                 )}
                 viewBox='0 0 12 12'
                 fill='none'
-                role='img'
                 aria-hidden='true'
               >
-                <title>Toggle group</title>
                 <path
                   d='M3 4.5L6 7.5L9 4.5'
                   stroke='currentColor'
