@@ -26,6 +26,7 @@ const DeeplinksGrid = dynamic(
 );
 
 import { DashboardShowcase } from '@/components/home/DashboardShowcase';
+import { FeatureBlocks } from '@/components/home/FeatureBlocks';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksRich } from '@/components/home/HowItWorksRich';
@@ -257,6 +258,7 @@ export default function HomePage() {
   const showFinalCta = d.homepage_final_cta;
   const showAutomaticReleaseSmartlinks =
     d.homepage_automatic_release_smartlinks;
+  const showFeatureBlocks = d.homepage_feature_blocks;
 
   return (
     <div
@@ -309,6 +311,12 @@ export default function HomePage() {
       )}
 
       {showLabelLogos && <LabelLogosBar />}
+
+      {showFeatureBlocks && (
+        <DeferredSection placeholderHeight={1200}>
+          <FeatureBlocks />
+        </DeferredSection>
+      )}
 
       {showProductPreview && (
         <DeferredSection placeholderHeight={640}>
