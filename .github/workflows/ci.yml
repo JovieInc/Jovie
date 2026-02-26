@@ -303,7 +303,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
+        with:
+          # Full history needed for turbo --affected merge-base detection
+          fetch-depth: 0
       - name: Short-circuit for docs-only / empty-diff PR updates
         if: ${{ github.event_name == 'pull_request' }}
         run: |
@@ -864,7 +866,8 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 1
+          # Full history needed for turbo --affected merge-base detection
+          fetch-depth: 0
 
       - name: Check for relevant changes
         id: check_changes
@@ -1954,7 +1957,7 @@ jobs:
     needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
-    environment: Preview - jovie
+    environment: Preview – jovie
     timeout-minutes: 20
     steps:
       - name: Gate required smoke on PRs
@@ -2087,13 +2090,15 @@ jobs:
             apps/web/test-results/
           retention-days: 3
 
-  # Homepage smoke test runs BEFORE production deploy
-  # Uses curl-based check for reliability (Playwright had issues with Vercel bypass)
+  # Homepage smoke test checks CURRENT production state (informational only).
+  # NOT a deploy blocker — if prod is degraded we still need to be able to ship fixes.
+  # Post-deploy verification is handled by canary-health-gate.
   ci-homepage-smoke:
-    name: Homepage Smoke (Pre-Deploy)
+    name: Homepage Smoke (Informational)
     needs: [ci-fast, ci-build]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 5
     steps:
       - name: Verify homepage renders correctly
@@ -2151,7 +2156,7 @@ jobs:
           echo "✅ Homepage smoke passed"
 
   deploy:
-    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required, ci-homepage-smoke] # Required smoke + homepage smoke must pass before deploy
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required] # Required smoke must pass before deploy; homepage smoke is informational
     # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
