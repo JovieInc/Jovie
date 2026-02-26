@@ -11,6 +11,7 @@ interface WaitlistSettingsResponse {
   autoAcceptEnabled: boolean;
   autoAcceptDailyLimit: number;
   autoAcceptedToday: number;
+  autoAcceptResetsAt: string;
 }
 
 export function WaitlistSettingsPanel() {

@@ -20,6 +20,8 @@ describe('LabelLogosBar', () => {
 
   it('renders heading text', () => {
     render(<LabelLogosBar />);
-    expect(screen.getByText(/trusted by artists on/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/built by an artist who's released on/i)
+    ).toBeInTheDocument();
   });
 });

@@ -29,9 +29,15 @@ export interface UseSuggestedProfilesReturn {
   starterContext: SuggestionsStarterContext | null;
 }
 
+interface UseSuggestedProfilesOptions {
+  enabled?: boolean;
+}
+
 export function useSuggestedProfiles(
-  profileId: string | undefined
+  profileId: string | undefined,
+  options: UseSuggestedProfilesOptions = {}
 ): UseSuggestedProfilesReturn {
+  const { enabled = true } = options;
   const [suggestions, setSuggestions] = useState<ProfileSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -42,6 +48,11 @@ export function useSuggestedProfiles(
 
   // Fetch suggestions on mount
   useEffect(() => {
+    if (!enabled) {
+      setIsLoading(false);
+      return;
+    }
+
     if (!profileId || fetchedRef.current) return;
     fetchedRef.current = true;
 
@@ -80,7 +91,7 @@ export function useSuggestedProfiles(
     }
 
     fetchSuggestions();
-  }, [profileId]);
+  }, [enabled, profileId]);
 
   const next = useCallback(() => {
     setCurrentIndex(i => Math.min(i + 1, suggestions.length - 1));
