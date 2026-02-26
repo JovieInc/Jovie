@@ -1,14 +1,27 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Short-circuit heavy import chains that this test doesn't exercise.
+
+const { previewPanelProviderMock, useAuthRouteConfigMock } = vi.hoisted(() => ({
+  previewPanelProviderMock: vi.fn(
+    ({ children }: { children: ReactNode }) => children
+  ),
+  useAuthRouteConfigMock: vi.fn(() => ({
+    section: 'dashboard',
+    isArtistProfileSettings: false,
+    breadcrumbs: [],
+    showMobileTabs: false,
+    isTableRoute: false,
+  })),
+}));
 // AuthShellWrapper pulls in context providers, @jovie/ui Sheet components,
 // ErrorBoundary (which loads Sentry init chain), and keyboard shortcut hooks.
 // Mocking them avoids ~3s of transitive module resolution.
 
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
-  PreviewPanelProvider: ({ children }: { children: ReactNode }) => children,
+  PreviewPanelProvider: previewPanelProviderMock,
 }));
 
 vi.mock('@/contexts/KeyboardShortcutsContext', () => ({
@@ -55,13 +68,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/hooks/useAuthRouteConfig', () => ({
-  useAuthRouteConfig: () => ({
-    section: 'dashboard',
-    isArtistProfileSettings: false,
-    breadcrumbs: [],
-    showMobileTabs: false,
-    isTableRoute: false,
-  }),
+  useAuthRouteConfig: useAuthRouteConfigMock,
 }));
 
 vi.mock('@/components/organisms/AuthShell', () => ({
@@ -87,6 +94,18 @@ vi.mock('@/components/dashboard/atoms/DrawerToggleButton', () => ({
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 
 describe('AuthShellWrapper', () => {
+  beforeEach(() => {
+    previewPanelProviderMock.mockClear();
+    useAuthRouteConfigMock.mockClear();
+    useAuthRouteConfigMock.mockReturnValue({
+      section: 'dashboard',
+      isArtistProfileSettings: false,
+      breadcrumbs: [],
+      showMobileTabs: false,
+      isTableRoute: false,
+    });
+  });
+
   it('renders children without throwing runtime ReferenceError', () => {
     render(
       <AuthShellWrapper>
@@ -95,5 +114,40 @@ describe('AuthShellWrapper', () => {
     );
 
     expect(screen.getByText('child content')).toBeInTheDocument();
+  });
+
+  it('passes preview panel default-open state through to provider on dashboard routes', () => {
+    render(
+      <AuthShellWrapper previewPanelDefaultOpen>
+        <div>child content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(previewPanelProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultOpen: true, enabled: true }),
+      undefined
+    );
+  });
+
+  it('does not default-open preview panel on non-dashboard routes', () => {
+    // Override the route config mock for this test to simulate a non-dashboard route
+    useAuthRouteConfigMock.mockReturnValue({
+      section: 'settings',
+      isArtistProfileSettings: false,
+      breadcrumbs: [],
+      showMobileTabs: false,
+      isTableRoute: false,
+    });
+
+    render(
+      <AuthShellWrapper previewPanelDefaultOpen>
+        <div>child content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(previewPanelProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultOpen: false, enabled: false }),
+      undefined
+    );
   });
 });

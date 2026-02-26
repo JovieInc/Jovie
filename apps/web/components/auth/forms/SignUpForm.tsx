@@ -16,6 +16,11 @@ import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
 
+const OAUTH_PROVIDER_COPY: Record<'google' | 'spotify', string> = {
+  google: 'Google',
+  spotify: 'Spotify',
+};
+
 /**
  * Sign-up form using Clerk Core API.
  * Replaces the old Clerk Elements-based OtpSignUpForm.
@@ -33,6 +38,7 @@ export function SignUpForm() {
     error,
     clearError,
     shouldSuggestSignIn,
+    oauthFailureProvider,
     startEmailFlow,
     verifyCode,
     resendCode,
@@ -101,15 +107,59 @@ export function SignUpForm() {
       <CardContent className='space-y-3 p-0'>
         {/* Method selection step */}
         {step === 'method' && (
-          <MethodSelector
-            onEmailClick={handleEmailClick}
-            onGoogleClick={() => startOAuth('google')}
-            onSpotifyClick={() => startOAuth('spotify')}
-            loadingState={loadingState}
-            lastMethod={lastAuthMethod}
-            mode='signup'
-            error={step === 'method' ? error : null}
-          />
+          <>
+            <MethodSelector
+              onEmailClick={handleEmailClick}
+              onGoogleClick={() => startOAuth('google')}
+              onSpotifyClick={() => startOAuth('spotify')}
+              loadingState={loadingState}
+              lastMethod={lastAuthMethod}
+              mode='signup'
+              error={step === 'method' && oauthFailureProvider ? null : error}
+            />
+
+            {error && oauthFailureProvider && (
+              <div
+                className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3'
+                role='alert'
+              >
+                <p className='text-sm font-medium text-destructive'>
+                  {OAUTH_PROVIDER_COPY[oauthFailureProvider]} connection failed.
+                </p>
+                <p className='text-sm text-[#4c515a] dark:text-[#a8aaad]'>
+                  Try another sign-up method to keep going right away.
+                </p>
+                <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
+                  <button
+                    type='button'
+                    onClick={() => startOAuth(oauthFailureProvider)}
+                    className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
+                  >
+                    Try {OAUTH_PROVIDER_COPY[oauthFailureProvider]} again
+                  </button>
+                  {oauthFailureProvider !== 'google' && (
+                    <button
+                      type='button'
+                      onClick={() => startOAuth('google')}
+                      className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
+                    >
+                      Continue with Google
+                    </button>
+                  )}
+                  <button
+                    type='button'
+                    onClick={handleEmailClick}
+                    className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
+                  >
+                    Continue with email
+                  </button>
+                </div>
+                <p className='text-xs text-[#6b6f76] dark:text-[#969799]'>
+                  Details: {error}
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {/* Email input step */}
