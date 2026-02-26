@@ -209,6 +209,14 @@ export async function signInUser(
         );
       }
 
+      // Handle Clerk rejecting non-test emails for email_code strategy
+      if (msg.includes('test email') || msg.includes('clerk_test')) {
+        throw new ClerkTestError(
+          `Clerk requires +clerk_test email format for email_code strategy. Current email rejected: ${msg.slice(0, 100)}`,
+          'CLERK_SETUP_FAILED'
+        );
+      }
+
       // Re-throw the original error if Clerk was loaded but signIn failed
       throw error;
     }

@@ -19,11 +19,10 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      role='img'
-      aria-label={label}
+      aria-labelledby={`status-${status}`}
       className='shrink-0'
     >
-      <title>{label}</title>
+      <title id={`status-${status}`}>{label}</title>
       {status === 'live' && <circle cx='7' cy='7' r='5' fill={color} />}
       {status === 'syncing' && (
         <>

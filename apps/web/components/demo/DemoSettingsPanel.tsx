@@ -128,7 +128,10 @@ function ToggleRow({
   readonly defaultChecked: boolean;
 }) {
   return (
-    <label className='flex cursor-pointer items-start justify-between gap-3 rounded-md border border-subtle px-3 py-2.5'>
+    <label
+      aria-label={label}
+      className='flex cursor-pointer items-start justify-between gap-3 rounded-md border border-subtle px-3 py-2.5'
+    >
       <div>
         <p className='text-app font-medium text-primary-token'>{label}</p>
         <p className='text-2xs text-tertiary-token'>{description}</p>
