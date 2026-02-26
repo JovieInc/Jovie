@@ -50,7 +50,7 @@ export function FinalCTASection() {
             <span
               aria-hidden='true'
               className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
-            />
+            />{' '}
             Free forever. No credit card.
           </p>
         </div>

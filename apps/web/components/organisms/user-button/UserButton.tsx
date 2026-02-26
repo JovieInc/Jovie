@@ -241,7 +241,9 @@ export function UserButton({
         message: trimmedFeedback,
         source: 'dashboard_sidebar',
         pathname:
-          typeof window !== 'undefined' ? window.location.pathname : null,
+          typeof globalThis.window !== 'undefined'
+            ? globalThis.location.pathname
+            : null,
       }),
     });
   }, []);
