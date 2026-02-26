@@ -27,12 +27,14 @@ describe('Admin waitlist settings API', () => {
       autoAcceptEnabled: false,
       autoAcceptDailyLimit: 0,
       autoAcceptedToday: 0,
+      autoAcceptResetsAt: new Date('2026-02-26T00:00:00Z'),
     });
     mockUpdateWaitlistSettings.mockResolvedValue({
       gateEnabled: true,
       autoAcceptEnabled: true,
       autoAcceptDailyLimit: 5,
       autoAcceptedToday: 1,
+      autoAcceptResetsAt: new Date('2026-02-26T00:00:00Z'),
     });
   });
 
