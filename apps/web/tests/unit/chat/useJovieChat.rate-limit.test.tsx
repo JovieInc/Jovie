@@ -53,7 +53,7 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
-vi.mock('@/lib/pacer', () => ({
+vi.mock('@tanstack/react-pacer', () => ({
   useAsyncRateLimiter: (_fn: unknown, options: { onReject?: () => void }) => {
     onRejectHandler = options.onReject;
     return {

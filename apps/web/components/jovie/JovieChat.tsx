@@ -74,10 +74,18 @@ export function JovieChat({
 
   // Suggested profiles carousel data — lifted here so we can hide
   // the help text and suggested prompts while the carousel has items.
-  const suggestedProfiles = useSuggestedProfiles(profileId);
-  const detectedFirstSession =
-    (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0;
-  const isFirstSession = isFirstSessionProp || detectedFirstSession;
+  const shouldLoadSuggestedProfiles = Boolean(profileId) && !isFirstSessionProp;
+  const suggestedProfiles = useSuggestedProfiles(profileId, {
+    enabled: shouldLoadSuggestedProfiles,
+  });
+  const suggestionsReady = !suggestedProfiles.isLoading;
+  const detectedFirstSession = suggestionsReady
+    ? (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0
+    : null;
+  const isFirstSession =
+    detectedFirstSession === null
+      ? isFirstSessionProp
+      : isFirstSessionProp || detectedFirstSession;
   const latestReleaseTitle =
     latestReleaseTitleProp ??
     suggestedProfiles.starterContext?.latestReleaseTitle ??

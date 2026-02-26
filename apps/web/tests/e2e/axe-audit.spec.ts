@@ -36,10 +36,8 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
       await page.goto(route.path, { timeout: 120_000 });
       await waitForLoad(page);
 
-      // Exclude color-contrast — tracked separately as design token issue
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .disableRules(['color-contrast'])
         .analyze();
 
       if (results.violations.length > 0) {
@@ -77,10 +75,8 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
       await page.goto(route.path, { timeout: 120_000 });
       await waitForLoad(page);
 
-      // Exclude color-contrast — tracked separately as design token issue
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-        .disableRules(['color-contrast'])
         .analyze();
 
       if (results.violations.length > 0) {

@@ -1,35 +1,30 @@
 import { render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-// Mock next/link
-type NextLinkProps = ComponentProps<'a'> & { href: string };
-vi.mock('next/link', () => ({
-  default: ({ children, href, ...props }: NextLinkProps) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
+// Mock ClaimHandleForm (client component with hooks)
+vi.mock('@/components/home/claim-handle', () => ({
+  ClaimHandleForm: () => <div data-testid='claim-handle-form' />,
 }));
 
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 
 describe('FinalCTASection', () => {
-  it('renders heading text', () => {
+  it('renders urgency headline', () => {
     render(<FinalCTASection />);
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
-      'Your fans are waiting.'
+      "Your name won't be available forever."
     );
   });
 
-  it('renders subtitle text', () => {
+  it('renders claim handle form', () => {
     render(<FinalCTASection />);
-    expect(screen.getByText(/connect spotify/i)).toBeInTheDocument();
+    expect(screen.getByTestId('claim-handle-form')).toBeInTheDocument();
   });
 
-  it('renders CTA button linking to signup', () => {
+  it('renders micro-text', () => {
     render(<FinalCTASection />);
-    const link = screen.getByRole('link', { name: /get started free/i });
-    expect(link).toHaveAttribute('href', '/signup');
+    expect(
+      screen.getByText(/free forever\. no credit card\./i)
+    ).toBeInTheDocument();
   });
 });

@@ -126,6 +126,28 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.analyticsRetentionDays).toBe(30);
   });
 
+  it('returns free entitlements when billing lookup reports user not found', async () => {
+    mockCachedAuth.mockResolvedValue({ userId: 'user_new_missing_row' });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'newmissing@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: false,
+      error: 'User not found',
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.userId).toBe('user_new_missing_row');
+    expect(entitlements.isAuthenticated).toBe(true);
+    expect(entitlements.email).toBe('newmissing@example.com');
+    expect(entitlements.plan).toBe('free');
+    expect(entitlements.isPro).toBe(false);
+    expect(entitlements.contactsLimit).toBe(100);
+    expect(entitlements.analyticsRetentionDays).toBe(30);
+  });
+
   it('maps billing data for a free user', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_free' });
     mockCachedCurrentUser.mockResolvedValue({

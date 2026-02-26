@@ -12,6 +12,10 @@ import {
 } from 'react';
 import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
+import {
+  getOnboardingCompletionMethod,
+  toDurationMs,
+} from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
 import { identify, track } from '@/lib/analytics';
 import {
   clearSignupClaimValue,
@@ -38,8 +42,10 @@ interface SpotifyImportState {
 
 async function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  userId: string
 ): Promise<void> {
+  const importStartedAt = Date.now();
   const safeSetter: typeof setSpotifyImportState = value => {
     if (!signal.aborted) setSpotifyImportState(value);
   };
@@ -65,6 +71,9 @@ async function tryAutoConnectSpotify(
       /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
 
     if (artistMatch?.[1]) {
+      track('onboarding_spotify_import_started', {
+        user_id: userId,
+      });
       safeSetter({
         status: 'importing',
         stage: 0,
@@ -107,12 +116,22 @@ async function tryAutoConnectSpotify(
         });
 
         if (importResult.success) {
+          track('onboarding_spotify_import_completed', {
+            user_id: userId,
+            releasesImported: importResult.imported,
+            duration: toDurationMs(importStartedAt),
+          });
           safeSetter({
             status: 'success',
             stage: 2,
             message: `Spotify connected — imported ${importResult.imported} release${importResult.imported === 1 ? '' : 's'}.`,
           });
         } else {
+          track('onboarding_spotify_import_failed', {
+            user_id: userId,
+            error: importResult.message || 'Spotify import failed',
+            stage: 'connect',
+          });
           safeSetter({
             status: 'error',
             stage: 2,
@@ -121,7 +140,12 @@ async function tryAutoConnectSpotify(
               'Unable to connect Spotify. You can retry from your Dashboard.',
           });
         }
-      } catch {
+      } catch (error) {
+        track('onboarding_spotify_import_failed', {
+          user_id: userId,
+          error: getErrorMessage(error),
+          stage: 'connect',
+        });
         safeSetter({
           status: 'error',
           stage: 2,
@@ -150,6 +174,8 @@ interface UseOnboardingSubmitOptions {
   goToNextStep: () => void;
   setProfileReadyHandle: (handle: string) => void;
   shouldAutoSubmitHandle: boolean;
+  isReservedHandle: boolean;
+  onboardingStartedAtMs: number;
 }
 
 interface UseOnboardingSubmitReturn {
@@ -176,6 +202,8 @@ export function useOnboardingSubmit({
   goToNextStep,
   setProfileReadyHandle,
   shouldAutoSubmitHandle,
+  isReservedHandle,
+  onboardingStartedAtMs,
 }: UseOnboardingSubmitOptions): UseOnboardingSubmitReturn {
   const router = useRouter();
   const [state, setState] = useState<OnboardingState>({
@@ -313,6 +341,13 @@ export function useOnboardingSubmit({
       if (!handleValidation.clientValid) return;
       if (!handleValidation.available) return;
 
+      track('onboarding_handle_submitted', {
+        user_id: userId,
+        handle: resolvedHandle,
+        wasReserved: isReservedHandle,
+        wasAutoSubmitted: shouldAutoSubmitHandle,
+      });
+
       // Track submission start
       track('onboarding_submission_started', {
         user_id: userId,
@@ -351,6 +386,8 @@ export function useOnboardingSubmit({
           user_id: userId,
           handle: resolvedHandle,
           completion_time: new Date().toISOString(),
+          totalDuration: toDurationMs(onboardingStartedAtMs),
+          method: getOnboardingCompletionMethod(shouldAutoSubmitHandle),
         });
 
         if (shouldAutoSubmitHandle) {
@@ -367,7 +404,11 @@ export function useOnboardingSubmit({
         spotifyAbortRef.current?.abort();
         const controller = new AbortController();
         spotifyAbortRef.current = controller;
-        void tryAutoConnectSpotify(setSpotifyImportState, controller.signal);
+        void tryAutoConnectSpotify(
+          setSpotifyImportState,
+          controller.signal,
+          userId
+        );
       } catch (error) {
         handleSubmitError(error, resolvedHandle, redirectUrl);
       }
@@ -383,6 +424,8 @@ export function useOnboardingSubmit({
       userEmail,
       userId,
       shouldAutoSubmitHandle,
+      isReservedHandle,
+      onboardingStartedAtMs,
     ]
   );
 

@@ -94,7 +94,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
 function ConnectedDspPills({
   dspConnections,
 }: {
-  dspConnections: PreviewDspConnections;
+  readonly dspConnections: PreviewDspConnections;
 }) {
   const connectedProviders = [
     {

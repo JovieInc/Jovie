@@ -27,6 +27,11 @@ export interface AuthShellProps {
   readonly children: ReactNode;
 }
 
+function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
+  if (!showMobileTabs) return undefined;
+  return isTableRoute ? 'pb-20 lg:pb-0' : 'pb-20 lg:pb-6';
+}
+
 function AuthShellInner({
   section,
   breadcrumbs,
@@ -49,7 +54,7 @@ function AuthShellInner({
     <AppShellFrame
       sidebar={<UnifiedSidebar section={section} />}
       header={
-        !isInSettings ? (
+        isInSettings ? null : (
           <DashboardHeader
             breadcrumbs={breadcrumbs}
             sidebarTrigger={sidebarTrigger}
@@ -60,18 +65,12 @@ function AuthShellInner({
             }
             showDivider={isTableRoute}
           />
-        ) : null
+        )
       }
       main={children}
       rightPanel={rightPanel}
       mobileBottomNav={showMobileTabs ? <DashboardMobileTabs /> : null}
-      contentClassName={
-        showMobileTabs
-          ? isTableRoute
-            ? 'pb-20 lg:pb-0'
-            : 'pb-20 lg:pb-6'
-          : undefined
-      }
+      contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
       isTableRoute={isTableRoute}
     />
   );
