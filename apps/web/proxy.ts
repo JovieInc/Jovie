@@ -533,7 +533,7 @@ function buildFinalResponse(
 
   if (currentCookieRequirement !== nextCookieRequirement) {
     res.cookies.set(COOKIE_BANNER_REQUIRED_COOKIE, nextCookieRequirement, {
-      httpOnly: true,
+      httpOnly: false, // Readable by client JS so CookieBannerSection can check without headers()
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 30,

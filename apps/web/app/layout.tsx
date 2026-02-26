@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import { headers } from 'next/headers';
 import Script from 'next/script';
 import React from 'react';
 import { CoreProviders } from '@/components/providers/CoreProviders';
@@ -10,10 +9,6 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
-import {
-  COOKIE_BANNER_REQUIRED_COOKIE,
-  isCookieBannerRequired,
-} from '@/lib/cookies/consent-regions';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
@@ -155,25 +150,14 @@ export default async function RootLayout({
     : (await import('@vercel/toolbar/next')).VercelToolbar;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  // Read CSP nonce from request headers (set by middleware) to prevent
-  // hydration mismatch: server renders nonce="" but client expects undefined
-  const headersList = await headers();
-  const nonce = headersList.get('x-nonce') || undefined;
-  const cookieHeader = headersList.get('cookie');
-  const cookieRequirement = cookieHeader
-    ?.split(';')
-    .find(cookie =>
-      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
-    )
-    ?.split('=')[1];
-  const cookieBannerRequired =
-    cookieRequirement == null
-      ? isCookieBannerRequired(headersList.get('x-vercel-ip-country'))
-      : cookieRequirement !== '0';
+  // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
+  // response header set by the middleware (proxy.ts). No need to read headers() here,
+  // which would force all routes into dynamic rendering.
+  // Cookie banner visibility is determined client-side by reading document.cookie.
 
   const headContent = (
     <head>
-      <Script src='/theme-init.js' strategy='beforeInteractive' nonce={nonce} />
+      <Script src='/theme-init.js' strategy='beforeInteractive' />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}
@@ -234,7 +218,6 @@ export default async function RootLayout({
         id='organization-schema'
         type='application/ld+json'
         strategy='afterInteractive'
-        nonce={nonce}
         suppressHydrationWarning
         // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
@@ -316,7 +299,7 @@ export default async function RootLayout({
         </a>
         <CoreProviders>{children}</CoreProviders>
 
-        <CookieBannerSection showBanner={cookieBannerRequired} />
+        <CookieBannerSection />
         {VercelToolbar && <VercelToolbar />}
       </body>
     </html>
