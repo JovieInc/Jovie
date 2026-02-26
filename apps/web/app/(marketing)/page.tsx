@@ -315,7 +315,6 @@ export default async function HomePage() {
         style={{ minHeight: 'calc(100svh - var(--linear-header-height))' }}
       >
         {showHero && <RedesignedHero />}
-        {showLabelLogos && <LabelLogosBar />}
       </div>
 
       {showHowItWorks && <HowItWorksRich />}
@@ -331,6 +330,8 @@ export default async function HomePage() {
           <DashboardShowcase />
         </DeferredSection>
       )}
+
+      {showLabelLogos && <LabelLogosBar />}
 
       {showProductPreview && (
         <DeferredSection placeholderHeight={640}>
