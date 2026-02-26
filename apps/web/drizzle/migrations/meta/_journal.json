@@ -337,6 +337,13 @@
       "when": 1772006400000,
       "tag": "0043_creator_profiles_user_created_index",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1772092800000,
+      "tag": "0044_optimize_audience_type_filtering",
+      "breakpoints": true
     }
   ]
 }

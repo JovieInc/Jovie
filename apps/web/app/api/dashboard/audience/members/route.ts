@@ -1,4 +1,13 @@
-import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gt,
+  gte,
+  or,
+} from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -7,11 +16,50 @@ import { audienceMembers } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
-import { membersQuerySchema } from '@/lib/validation/schemas';
+import {
+  type MembersQueryParams,
+  membersQuerySchema,
+} from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+type AudienceSegment = MembersQueryParams['segments'][number];
+
+/**
+ * Maps a validated segment value to its corresponding SQL condition.
+ */
+const segmentToCondition = (segment: AudienceSegment) => {
+  switch (segment) {
+    case 'highIntent':
+      return eq(audienceMembers.intentLevel, 'high');
+    case 'returning':
+      return gt(audienceMembers.visits, 1);
+    case 'frequent':
+      return gte(audienceMembers.visits, 3);
+    case 'recent24h':
+      return gt(
+        audienceMembers.lastSeenAt,
+        drizzleSql`NOW() - INTERVAL '24 hours'`
+      );
+  }
+};
+
+/**
+ * Builds a combined SQL condition from multiple segment filters using OR
+ * semantics: selecting multiple segments shows members matching ANY of the
+ * selected segments (union), not all of them (intersection).
+ */
+const buildSegmentCondition = (segments: AudienceSegment[]) => {
+  if (segments.length === 0) {
+    return drizzleSql<boolean>`true`;
+  }
+
+  const conditions = segments.map(segmentToCondition);
+
+  return conditions.length === 1 ? conditions[0] : or(...conditions)!;
+};
 
 const MEMBER_SORT_COLUMNS = {
   lastSeen: audienceMembers.lastSeenAt,
@@ -32,6 +80,7 @@ export async function GET(request: NextRequest) {
         direction: searchParams.get('direction') ?? undefined,
         page: searchParams.get('page') ?? undefined,
         pageSize: searchParams.get('pageSize') ?? undefined,
+        segments: searchParams.getAll('segments'),
       });
 
       if (!parsed.success) {
@@ -41,7 +90,8 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const { profileId, sort, direction, page, pageSize } = parsed.data;
+      const { profileId, sort, direction, page, pageSize, segments } =
+        parsed.data;
 
       // Verify user owns the profile
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
@@ -55,6 +105,8 @@ export async function GET(request: NextRequest) {
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const offset = (page - 1) * pageSize;
+
+      const segmentCondition = buildSegmentCondition(segments);
 
       const baseQuery = tx
         .select({
@@ -79,7 +131,9 @@ export async function GET(request: NextRequest) {
           createdAt: audienceMembers.firstSeenAt,
         })
         .from(audienceMembers)
-        .where(eq(audienceMembers.creatorProfileId, profileId));
+        .where(
+          and(eq(audienceMembers.creatorProfileId, profileId), segmentCondition)
+        );
 
       const [rows, [{ total }]] = await Promise.all([
         baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
@@ -88,7 +142,12 @@ export async function GET(request: NextRequest) {
             total: drizzleSql`COALESCE(COUNT(${audienceMembers.id}), 0)`,
           })
           .from(audienceMembers)
-          .where(eq(audienceMembers.creatorProfileId, profileId)),
+          .where(
+            and(
+              eq(audienceMembers.creatorProfileId, profileId),
+              segmentCondition
+            )
+          ),
       ]);
 
       const serializeDate = (value?: Date | string | null) => {
