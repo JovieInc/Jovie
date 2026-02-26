@@ -1,7 +1,3 @@
-'use client';
-
-import { motion, useReducedMotion } from 'motion/react';
-
 import { Container } from '@/components/site/Container';
 
 import {
@@ -11,17 +7,10 @@ import {
   UniversalMusicGroupLogo,
 } from './label-logos';
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0 },
-};
-
 export function LabelLogosBar() {
-  const prefersReducedMotion = useReducedMotion();
-
   return (
     <section
-      aria-label='Record labels using Jovie'
+      aria-label='Record labels the founder has released on'
       className='bg-[var(--linear-bg-page)] pb-10 pt-0 sm:pb-14'
     >
       <Container size='homepage'>
@@ -44,41 +33,35 @@ export function LabelLogosBar() {
             color: 'var(--linear-text-tertiary)',
           }}
         >
-          Trusted by artists on
+          Built by an artist who&apos;s released on
         </p>
 
-        <motion.div
-          className='flex flex-wrap items-center justify-center gap-x-10 gap-y-5'
-          initial={prefersReducedMotion ? 'visible' : 'hidden'}
-          whileInView='visible'
-          viewport={{ once: true, margin: '-40px' }}
-          transition={{ staggerChildren: 0.08 }}
-        >
-          <motion.div variants={fadeUp} transition={{ duration: 0.4 }}>
+        <div className='flex flex-wrap items-center justify-center gap-x-10 gap-y-5'>
+          <div>
             <SonyMusicLogo
               className='h-4 w-auto select-none transition-opacity duration-[160ms] hover:opacity-70'
               style={{ color: 'var(--linear-text-tertiary)' }}
             />
-          </motion.div>
-          <motion.div variants={fadeUp} transition={{ duration: 0.4 }}>
+          </div>
+          <div>
             <UniversalMusicGroupLogo
               className='h-3 w-auto select-none transition-opacity duration-[160ms] hover:opacity-70'
               style={{ color: 'var(--linear-text-tertiary)' }}
             />
-          </motion.div>
-          <motion.div variants={fadeUp} transition={{ duration: 0.4 }}>
+          </div>
+          <div>
             <AwalLogo
               className='h-[18px] w-auto select-none transition-opacity duration-[160ms] hover:opacity-70'
               style={{ color: 'var(--linear-text-tertiary)' }}
             />
-          </motion.div>
-          <motion.div variants={fadeUp} transition={{ duration: 0.4 }}>
+          </div>
+          <div>
             <ArmadaMusicLogo
               className='h-5 w-auto select-none transition-opacity duration-[160ms] hover:opacity-70'
               style={{ color: 'var(--linear-text-tertiary)' }}
             />
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       </Container>
     </section>
   );
