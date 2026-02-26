@@ -16,7 +16,7 @@ import {
 import { ButtonSpinner } from '../ButtonSpinner';
 
 const FOOTER_LINK_CLASSES =
-  'text-[#1f2023] dark:text-[#e3e4e6] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md touch-manipulation';
+  'text-[#1f2023] dark:text-[#e3e4e6] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md touch-manipulation';
 
 const METHOD_DISPLAY_NAMES: Record<AuthMethod, string> = {
   google: 'Google',
