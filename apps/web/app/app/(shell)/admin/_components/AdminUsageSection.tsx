@@ -32,7 +32,7 @@ export function AdminUsageSectionSkeleton() {
   return (
     <section id='usage' className='grid gap-6 lg:grid-cols-3'>
       <Skeleton className='lg:col-span-2 h-64 rounded-xl' />
-      <Skeleton className='h-64 rounded-xl' />
+      <Skeleton id='errors' className='h-64 rounded-xl' />
     </section>
   );
 }

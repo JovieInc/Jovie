@@ -45,7 +45,9 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
       : `${summary.p95LatencyMs.toFixed(0)}ms`;
   const incidentsLabel = summary.incidents24h.toLocaleString();
   const lastIncidentLabel = summary.lastIncidentAt
-    ? summary.lastIncidentAt.toISOString().slice(0, 10)
+    ? typeof summary.lastIncidentAt === 'string'
+      ? summary.lastIncidentAt.slice(0, 10)
+      : summary.lastIncidentAt.toISOString().slice(0, 10)
     : '—';
 
   return (
@@ -77,7 +79,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         </div>
         <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <Clock3 className='h-4 w-4 text-info' />
+            <Clock3 className={`h-4 w-4 ${tone.iconClassName}`} />
             p95 latency
           </div>
           <span className='text-primary-token tabular-nums'>
@@ -94,10 +96,14 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
           </span>
         </div>
 
-        <p className='pt-1 text-2xs text-tertiary-token'>
-          Last incident on {lastIncidentLabel}. Review logs and alerts
-          before shipping new changes.
-        </p>
+        {summary.lastIncidentAt && (
+          <p className='pt-1 text-2xs text-tertiary-token'>
+            Last incident on {lastIncidentLabel}.
+            {tone.label !== 'Healthy' && (
+              <> Review logs and alerts before shipping new changes.</>
+            )}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

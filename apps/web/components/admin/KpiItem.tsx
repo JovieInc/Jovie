@@ -24,13 +24,13 @@ export function KpiItem({
           <Icon
             className={`h-4 w-4 ${iconClassName || 'text-tertiary-token'}`}
           />
-          <dt className='text-2xs tracking-wide text-tertiary-token'>
+          <p className='text-2xs tracking-wide text-tertiary-token'>
             {title}
-          </dt>
+          </p>
         </div>
-        <dd className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
+        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
           {value}
-        </dd>
+        </p>
         <div className='text-app text-secondary-token'>{metadata}</div>
       </CardContent>
     </Card>
