@@ -332,7 +332,7 @@ export function renderReleaseTypeCell({
 
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style.border} ${style.text}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0 text-[10px] leading-[20px] font-medium ${style.border} ${style.bg} ${style.text}`}
     >
       {style.label}
     </span>

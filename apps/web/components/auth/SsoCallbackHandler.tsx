@@ -39,7 +39,7 @@ function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
           This is taking longer than expected. You can{' '}
           <Link
             href='/signin'
-            className='text-primary-token hover:underline focus-ring-themed rounded-md'
+            className='text-primary-token underline focus-ring-themed rounded-md'
           >
             try signing in again
           </Link>

@@ -1,12 +1,15 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getEntitlements } from '@/lib/entitlements/registry';
+import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import {
   aiChatDailyFreeLimiter,
   aiChatDailyGrowthLimiter,
   aiChatDailyProLimiter,
 } from '@/lib/rate-limit';
+import { getRedis } from '@/lib/redis';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
+import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +22,13 @@ type ChatUsageSnapshot = {
   warningThreshold: number;
   isNearLimit: boolean;
 };
+
+type StaleChatUsageSnapshot = ChatUsageSnapshot & {
+  _stale: true;
+};
+
+const CHAT_USAGE_CACHE_KEY_PREFIX = 'chat:usage:v1:';
+const CHAT_USAGE_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
 
 function resolvePlan(
   plan: string | null | undefined
@@ -35,6 +45,41 @@ function getDailyLimiter(plan: 'free' | 'pro' | 'growth') {
   return aiChatDailyFreeLimiter;
 }
 
+async function readCachedChatUsage(
+  userId: string
+): Promise<ChatUsageSnapshot | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    const cached = await redis.get<ChatUsageSnapshot>(
+      `${CHAT_USAGE_CACHE_KEY_PREFIX}${userId}`
+    );
+    if (!cached) return null;
+    return typeof cached === 'string' ? JSON.parse(cached) : cached;
+  } catch {
+    return null;
+  }
+}
+
+function writeChatUsageCache(
+  userId: string,
+  snapshot: ChatUsageSnapshot
+): void {
+  const redis = getRedis();
+  if (!redis) return;
+
+  redis
+    .set(`${CHAT_USAGE_CACHE_KEY_PREFIX}${userId}`, JSON.stringify(snapshot), {
+      ex: CHAT_USAGE_CACHE_TTL_SECONDS,
+    })
+    .catch(() => {});
+}
+
+const CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=30, stale-while-revalidate=120',
+} as const;
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) {
@@ -43,9 +88,25 @@ export async function GET() {
 
   const billing = await getUserBillingInfo();
   if (!billing.success) {
+    // Billing unavailable — serve stale cached data if we have it
+    const cached = await readCachedChatUsage(userId);
+    if (cached) {
+      const stale: StaleChatUsageSnapshot = { ...cached, _stale: true };
+      return NextResponse.json(stale, { headers: CACHE_HEADERS });
+    }
+
+    logger.warn('Chat usage billing lookup failed with no cache fallback', {
+      userId,
+    });
     return NextResponse.json(
       { error: 'Billing service temporarily unavailable' },
-      { status: 503, headers: { 'Retry-After': '60' } }
+      {
+        status: 503,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Retry-After': RETRY_AFTER_SERVICE,
+        },
+      }
     );
   }
 
@@ -68,9 +129,7 @@ export async function GET() {
     isNearLimit: remaining > 0 && remaining <= warningThreshold,
   };
 
-  return NextResponse.json(response, {
-    headers: {
-      'Cache-Control': 'private, max-age=30, stale-while-revalidate=120',
-    },
-  });
+  writeChatUsageCache(userId, response);
+
+  return NextResponse.json(response, { headers: CACHE_HEADERS });
 }

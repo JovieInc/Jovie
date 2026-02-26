@@ -642,6 +642,12 @@ async function resolveDashboardData(): Promise<DashboardData> {
         userId: error.userId,
         isAdmin: error.isAdmin,
       });
+      Sentry.addBreadcrumb({
+        category: 'dashboard.entitlements',
+        level: 'warning',
+        message: 'Billing unavailable — degraded to free tier',
+        data: { userId: error.userId, isAdmin: error.isAdmin },
+      });
       const freeDefaults = getEntitlements('free');
       entitlements = {
         userId: error.userId,
