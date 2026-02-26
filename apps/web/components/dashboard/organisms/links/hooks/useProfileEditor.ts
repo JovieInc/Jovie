@@ -12,7 +12,8 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { PACER_TIMING, useAutoSave } from '@/lib/pacer';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import { useAutoSave } from '@/lib/pacer/hooks/useAutoSave';
 import {
   useAvatarMutation,
   useProfileSaveMutation,

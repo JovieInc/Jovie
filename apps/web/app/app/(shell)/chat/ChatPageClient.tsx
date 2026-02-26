@@ -97,6 +97,10 @@ export function ChatPageClient({
       avatarUrl: selectedProfile.avatarUrl ?? null,
       links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
+      dspConnections: {
+        spotify: { connected: false, artistName: null },
+        appleMusic: { connected: false, artistName: null },
+      },
     });
   }, [selectedProfile, previewLinks, setPreviewData]);
 
