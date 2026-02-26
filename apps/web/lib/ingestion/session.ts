@@ -18,9 +18,15 @@ export async function withSystemIngestionSession<T>(
 
   // is_local=false (session-scoped) because the Neon HTTP driver has no
   // transaction context — is_local=true would be silently discarded.
-  await db.execute(
-    drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, false)`
-  );
+  try {
+    await db.execute(
+      drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, false)`
+    );
+  } catch {
+    await db.execute(
+      drizzleSql`SET app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
+    );
+  }
 
   return operation(db);
 }
