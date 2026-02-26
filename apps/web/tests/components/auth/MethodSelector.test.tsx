@@ -23,15 +23,20 @@ describe('MethodSelector', () => {
     );
   };
 
-  it('prioritizes Spotify then Google then email for signup when flag is enabled', () => {
+  it('renders a single Spotify CTA and demoted secondary links for signup when flag is enabled', () => {
     renderWithFlags(<MethodSelector {...commonProps} mode='signup' />, {
       [FEATURE_FLAG_KEYS.SPOTIFY_OAUTH]: true,
     });
 
-    const buttons = screen.getAllByRole('button');
-    expect(buttons[0]).toHaveTextContent('Continue with Spotify');
-    expect(buttons[1]).toHaveTextContent('Continue with Google');
-    expect(buttons[2]).toHaveTextContent('Continue with email');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Spotify' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'or continue with Google' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'or use email' })
+    ).toBeInTheDocument();
   });
 
   it('keeps Google first for signin', () => {
@@ -52,7 +57,7 @@ describe('MethodSelector', () => {
     expect(buttons[2]).toHaveTextContent('Continue with Spotify');
   });
 
-  it('keeps last method override for returning users', () => {
+  it('keeps Spotify as the primary signup CTA even when last method is email', () => {
     renderWithFlags(
       <MethodSelector {...commonProps} mode='signup' lastMethod='email' />,
       {
@@ -60,10 +65,18 @@ describe('MethodSelector', () => {
       }
     );
 
-    const buttons = screen.getAllByRole('button');
-    expect(buttons[0]).toHaveTextContent('Continue with email');
-    expect(buttons[1]).toHaveTextContent('Continue with Spotify');
-    expect(buttons[2]).toHaveTextContent('Continue with Google');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Spotify' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('You used email last time')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'or continue with Google' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'or use email' })
+    ).toBeInTheDocument();
   });
 
   it('keeps Google first for signup when Spotify flag is disabled', () => {

@@ -95,6 +95,7 @@ export function MethodSelector({
   const isSpotifyLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'spotify';
   const isAnyLoading = loadingState.type !== 'idle';
+  const useSignupSpotifyLayout = mode === 'signup' && spotifyOauthEnabled;
 
   const renderMethodButton = (
     method: AuthMethod,
@@ -201,25 +202,68 @@ export function MethodSelector({
       </div>
 
       <div className={FORM_LAYOUT.formInner}>
-        {/* Primary method */}
-        <div>{renderMethodButton(orderedMethods[0], true)}</div>
+        {useSignupSpotifyLayout ? (
+          <>
+            <button
+              type='button'
+              onClick={onSpotifyClick}
+              disabled={isAnyLoading}
+              aria-busy={isSpotifyLoading}
+              className={`${authButtonVariants({ variant: 'primaryLight' })} ${AUTH_CLASSES.oauthButtonMobile} bg-[#1db954] border-[#1ed760] text-[#041008] hover:bg-[#1aa34a] active:bg-[#179243]`}
+            >
+              {isSpotifyLoading ? (
+                <>
+                  <ButtonSpinner />
+                  <span>Opening Spotify...</span>
+                </>
+              ) : (
+                <>
+                  <AuthSpotifyIcon />
+                  <span>Continue with Spotify</span>
+                </>
+              )}
+            </button>
 
-        {/* Last used indicator - fixed height to prevent layout shift */}
-        <div className='min-h-[20px] flex items-center justify-center'>
-          {lastMethod && orderedMethods.includes(lastMethod) && (
-            <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
-              You used {METHOD_DISPLAY_NAMES[lastMethod]} last time
-            </p>
-          )}
-        </div>
+            <div className='space-y-2 pt-1'>
+              <AuthButton
+                variant='link'
+                onClick={onGoogleClick}
+                disabled={isAnyLoading}
+              >
+                or continue with Google
+              </AuthButton>
+              <AuthButton
+                variant='link'
+                onClick={onEmailClick}
+                disabled={isAnyLoading}
+              >
+                or use email
+              </AuthButton>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Primary method */}
+            <div>{renderMethodButton(orderedMethods[0], true)}</div>
 
-        {/* Secondary methods */}
-        {orderedMethods.length > 1 && (
-          <div className='space-y-3'>
-            {orderedMethods.slice(1).map(method => (
-              <div key={method}>{renderMethodButton(method, false)}</div>
-            ))}
-          </div>
+            {/* Last used indicator - fixed height to prevent layout shift */}
+            <div className='min-h-[20px] flex items-center justify-center'>
+              {lastMethod && orderedMethods.includes(lastMethod) && (
+                <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
+                  You used {METHOD_DISPLAY_NAMES[lastMethod]} last time
+                </p>
+              )}
+            </div>
+
+            {/* Secondary methods */}
+            {orderedMethods.length > 1 && (
+              <div className='space-y-3'>
+                {orderedMethods.slice(1).map(method => (
+                  <div key={method}>{renderMethodButton(method, false)}</div>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
