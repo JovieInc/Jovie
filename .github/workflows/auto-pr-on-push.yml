@@ -1,6 +1,6 @@
 # Auto-PR on Agent Push
 #
-# PURPOSE: Automatically creates a PR when an agent (Codex, Claude, etc.) pushes
+# PURPOSE: Automatically creates a PR when an agent (Codex, Codegen-bot, Linear) pushes
 # code to an agent branch without an existing PR. This closes the gap where
 # agents complete work and push, but leave no PR for the CI pipeline to process.
 #
@@ -146,7 +146,7 @@ jobs:
         run: |
 
           # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
-          # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
+          # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, codegen-bot/jov-100-fix
           TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
           echo "ticket=$TICKET" >> $GITHUB_OUTPUT
 

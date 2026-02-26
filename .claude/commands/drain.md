@@ -22,6 +22,7 @@ gh pr list --state open --json number,title,headRefName,statusCheckRollup,labels
 ```
 
 For each open PR, collect failing checks:
+
 ```bash
 gh pr checks <NUMBER> --json name,state,conclusion 2>/dev/null || echo "[]"
 ```
@@ -48,7 +49,8 @@ git checkout main
 git pull origin main
 ```
 
-### Run the full CI suite locally:
+### Run the full CI suite locally
+
 ```bash
 pnpm --filter web exec tsc --noEmit          # typecheck
 pnpm biome check apps/web                     # lint
@@ -56,34 +58,42 @@ pnpm vitest --run --changed                   # tests
 pnpm --filter web lint:server-boundaries       # boundaries
 ```
 
-### Fix failures:
+### Fix failures
+
 - TypeScript errors: fix the types
 - Lint errors: `pnpm biome check apps/web --write` then fix remaining
 - Test failures: fix the code (not the test, unless the test is wrong)
 - A11y regressions: add aria labels, fix contrast, add roles as needed
 
-### Validate the fix:
+### Validate the fix
+
 ```bash
 pnpm --filter web exec tsc --noEmit && pnpm biome check apps/web && pnpm vitest --run
 ```
 
-### Commit and push to main:
+### Create a fix branch and open a PR
+
 ```bash
+git checkout -b fix/systemic-ci-blockers main
 git add -A
 git commit -m "fix: resolve systemic CI blockers
 
 Fixes: <list the check names that were failing>
 
 Co-authored-by: Claude <claude@anthropic.com>"
-git push origin main
+git push origin fix/systemic-ci-blockers
+gh pr create --base main --head fix/systemic-ci-blockers --title "fix: resolve systemic CI blockers"
 ```
 
-### Wait for CI on main:
+### Wait for CI on the fix PR
+
 ```bash
 # Watch the latest CI run
-gh run list --branch main --limit 1 --json databaseId,status,conclusion
+gh run list --branch fix/systemic-ci-blockers --limit 1 --json databaseId,status,conclusion
 # If still running, wait:
 gh run watch <RUN_ID>
+# Once green, merge the PR:
+gh pr merge --auto --squash
 ```
 
 **Do NOT proceed to Phase 2 until main CI is green.**
@@ -103,6 +113,7 @@ done
 ```
 
 Wait for CI to re-run on all PRs (give it a few minutes for checks to start):
+
 ```bash
 sleep 120  # Let GitHub trigger CI runs
 
@@ -133,8 +144,9 @@ After orchestrate completes, produce a final summary:
 
 ```bash
 # Final state
-MERGED=$(gh pr list --state merged --json number --jq 'length' --search "merged:>=$(date -v-1H +%Y-%m-%dT%H:%M:%S)" 2>/dev/null || echo "check manually")
-CLOSED=$(gh pr list --state closed --json number --jq 'length' --search "closed:>=$(date -v-1H +%Y-%m-%dT%H:%M:%S)" 2>/dev/null || echo "check manually")
+ONE_HOUR_AGO=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)
+MERGED=$(gh pr list --state merged --json number --jq 'length' --search "merged:>=$ONE_HOUR_AGO" 2>/dev/null || echo "check manually")
+CLOSED=$(gh pr list --state closed --json number --jq 'length' --search "closed:>=$ONE_HOUR_AGO" 2>/dev/null || echo "check manually")
 OPEN=$(gh pr list --state open --json number,title,labels --limit 100)
 ```
 

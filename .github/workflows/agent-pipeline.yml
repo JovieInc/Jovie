@@ -60,6 +60,8 @@ jobs:
       pr_head_sha: ${{ steps.evaluate.outputs.pr_head_sha }}
       attempt_number: ${{ steps.retry-guard.outputs.attempt_number }}
       error_context: ${{ steps.error-context.outputs.error_context }}
+      is_systemic: ${{ steps.systemic-check.outputs.is_systemic }}
+      systemic_checks: ${{ steps.systemic-check.outputs.systemic_checks }}
     steps:
       - name: Determine trigger type and PR context
         id: trigger
@@ -187,9 +189,9 @@ jobs:
             exit 0
           fi
 
-          # Get this PR's failing check names
-          THIS_PR_FAILS=$(gh pr checks "$PR_NUMBER" 2>/dev/null \
-            | grep -i "fail" | awk '{print $1}' | sort -u || echo "")
+          # Get this PR's failing check names (structured JSON output)
+          THIS_PR_FAILS=$(gh pr checks "$PR_NUMBER" --json name,conclusion 2>/dev/null \
+            | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "failure") | .name' | sort -u || echo "")
 
           if [[ -z "$THIS_PR_FAILS" ]]; then
             echo "No failing checks found for PR #$PR_NUMBER"
@@ -206,8 +208,8 @@ jobs:
           for CHECK_NAME in $THIS_PR_FAILS; do
             FAIL_COUNT=1  # count this PR
             for OTHER_PR in $OTHER_PRS; do
-              OTHER_STATUS=$(gh pr checks "$OTHER_PR" 2>/dev/null \
-                | grep -i "fail" | awk '{print $1}' | grep -Fx "$CHECK_NAME" || true)
+              OTHER_STATUS=$(gh pr checks "$OTHER_PR" --json name,conclusion 2>/dev/null \
+                | jq -r '.[] | select(.conclusion == "FAILURE" or .conclusion == "failure") | .name' | grep -Fx "$CHECK_NAME" || true)
               if [[ -n "$OTHER_STATUS" ]]; then
                 FAIL_COUNT=$((FAIL_COUNT + 1))
               fi
@@ -226,30 +228,6 @@ jobs:
             echo "No systemic failures detected"
             echo "is_systemic=false" >> $GITHUB_OUTPUT
           fi
-
-      - name: Label systemic blocker and skip fix
-        if: steps.systemic-check.outputs.is_systemic == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          PR_NUMBER="${{ steps.trigger.outputs.pr_number }}"
-          SYSTEMIC="${{ steps.systemic-check.outputs.systemic_checks }}"
-
-          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
-            --method POST \
-            --field "labels[]=systemic-blocker" || true
-
-          gh pr comment "$PR_NUMBER" --body "## Systemic CI Blocker Detected
-
-          This PR's CI failures appear to be systemic (same checks failing on 3+ PRs):
-
-          \`\`\`
-          $SYSTEMIC
-          \`\`\`
-
-          **Skipping individual fix attempts.** These failures likely originate on \`main\` and should be fixed there first.
-
-          Run \`/drain\` to fix systemic issues on main and then rebase all PRs."
 
       - name: Retry guard (fix path only, max 5 attempts per SHA)
         id: retry-guard
@@ -417,6 +395,50 @@ jobs:
           echo "pr_head_sha=$PR_HEAD_SHA" >> $GITHUB_OUTPUT
 
   # ==========================================================================
+  # SYSTEMIC REPORT: Label and comment on PRs blocked by systemic failures
+  # Separate job with write permissions (guard job is read-only)
+  # ==========================================================================
+  systemic-report:
+    name: Label Systemic Blocker
+    needs: guard
+    if: needs.guard.outputs.is_systemic == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Label and comment systemic blocker
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ needs.guard.outputs.pr_number }}
+          SYSTEMIC: ${{ needs.guard.outputs.systemic_checks }}
+        run: |
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=systemic-blocker" || true
+
+          gh pr comment "$PR_NUMBER" --body "## Systemic CI Blocker Detected
+
+          This PR's CI failures appear to be systemic (same checks failing on 3+ PRs):
+
+          \`\`\`
+          $SYSTEMIC
+          \`\`\`
+
+          **Skipping individual fix attempts.** These failures likely originate on \`main\` and should be fixed there first.
+
+          Run \`/drain\` to fix systemic issues on main and then rebase all PRs."
+
+  # ==========================================================================
   # FIX: Apply fixes using Claude agent (CI failure or CodeRabbit review)
   # ==========================================================================
   fix:
@@ -497,7 +519,7 @@ jobs:
           3. **Preserve formatting**: Do not reformat code not related to the fix
           4. **No dead code**: Do not introduce unused imports, variables, or functions
           5. **No lint silencing**: Never add // biome-ignore or @ts-ignore unless absolutely necessary
-          6. **Node 24 + pnpm only**: Use pnpm commands, run from repo root
+          6. **Node 22 + pnpm only**: Use pnpm commands, run from repo root
 
           HEADER
 
@@ -916,7 +938,8 @@ jobs:
     if: >-
       needs.guard.outputs.should_fix == 'false' &&
       needs.guard.outputs.should_approve == 'false' &&
-      github.event_name == 'workflow_run'
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -937,7 +960,7 @@ jobs:
         run: |
           # Find open agent PRs with needs-human label
           STALE_PRS=$(gh pr list --state open --label needs-human --json number,headRefName,updatedAt,title --limit 50 \
-            | jq -r --arg cutoff "$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)" \
+            | jq -c --arg cutoff "$(date -u -d '48 hours ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-48H +%Y-%m-%dT%H:%M:%SZ)" \
             '[.[] | select(.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)")) | select(.updatedAt < $cutoff)] | .[]')
 
           if [[ -z "$STALE_PRS" ]]; then
@@ -945,9 +968,10 @@ jobs:
             exit 0
           fi
 
-          echo "$STALE_PRS" | jq -r '.number' | while read -r PR_NUMBER; do
-            TITLE=$(echo "$STALE_PRS" | jq -r --arg num "$PR_NUMBER" 'select(.number == ($num | tonumber)) | .title')
-            BRANCH=$(echo "$STALE_PRS" | jq -r --arg num "$PR_NUMBER" 'select(.number == ($num | tonumber)) | .headRefName')
+          echo "$STALE_PRS" | while read -r PR_OBJ; do
+            PR_NUMBER=$(echo "$PR_OBJ" | jq -r '.number')
+            TITLE=$(echo "$PR_OBJ" | jq -r '.title')
+            BRANCH=$(echo "$PR_OBJ" | jq -r '.headRefName')
             echo "Closing stale PR #$PR_NUMBER: $TITLE (branch: $BRANCH)"
 
             # Extract Linear issue ID from branch name if present
