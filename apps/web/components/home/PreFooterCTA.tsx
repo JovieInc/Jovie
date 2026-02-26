@@ -66,15 +66,6 @@ export function PreFooterCTA() {
               <Link href='/onboarding'>Create Your Profile</Link>
             </Button>
 
-            <Button
-              asChild
-              size='lg'
-              variant='secondary'
-              className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105'
-            >
-              <Link href='/pricing'>View Pricing</Link>
-            </Button>
-
             {/* Secondary info with better visual hierarchy */}
             <div className='flex items-center gap-2 text-tertiary-token transition-colors duration-300'>
               <svg

@@ -46,16 +46,13 @@ const GRABBER_STYLE: React.CSSProperties = {
 
 function buildNavLinks(
   customNavLinks: ReadonlyArray<NavLink> | undefined,
-  hidePricingLink: boolean,
   showAuthenticatedAction: boolean
 ): NavLink[] {
   let baseLinks: NavLink[];
   if (customNavLinks) {
     baseLinks = [...customNavLinks];
-  } else if (hidePricingLink) {
-    baseLinks = [];
   } else {
-    baseLinks = [{ href: '/pricing', label: 'Pricing' }];
+    baseLinks = [];
   }
 
   if (!showAuthenticatedAction) {
@@ -99,10 +96,8 @@ function MobileNavCta({
 }
 
 export function MobileNav({
-  hidePricingLink = false,
   navLinks: customNavLinks,
 }: {
-  readonly hidePricingLink?: boolean;
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -140,11 +135,7 @@ export function MobileNav({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [isOpen, close]);
 
-  const navLinks = buildNavLinks(
-    customNavLinks,
-    hidePricingLink,
-    showAuthenticatedAction
-  );
+  const navLinks = buildNavLinks(customNavLinks, showAuthenticatedAction);
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
   const portalTarget = typeof document === 'undefined' ? null : document.body;

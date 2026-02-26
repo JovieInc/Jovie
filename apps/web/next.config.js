@@ -229,6 +229,12 @@ const nextConfig = {
     ];
 
     return [
+      // Pricing page hidden for founding member launch (JOV-1050)
+      {
+        source: '/pricing',
+        destination: '/',
+        permanent: false,
+      },
       // Legal page redirects
       {
         source: '/privacy',

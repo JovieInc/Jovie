@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { publicEnv } from '@/lib/env-public';
 
@@ -82,16 +81,6 @@ export function PricingPreview() {
               </p>
             </div>
           )}
-        </div>
-
-        <div className='text-center mt-10'>
-          <Link
-            href='/pricing'
-            className='inline-block px-6 py-3 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors'
-            style={FONT_SYNTHESIS_STYLE}
-          >
-            View pricing →
-          </Link>
         </div>
       </Container>
     </section>
