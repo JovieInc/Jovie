@@ -86,6 +86,7 @@ export interface UseSignUpFlowReturn {
 
   // Suggestions based on errors
   shouldSuggestSignIn: boolean;
+  oauthFailureProvider: 'google' | 'spotify' | null;
 
   // Actions
   startEmailFlow: (email: string) => Promise<boolean>;
@@ -112,10 +113,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
 
   // Sign-up specific state
   const [shouldSuggestSignIn, setShouldSuggestSignIn] = useState(false);
+  const [oauthFailureProvider, setOauthFailureProvider] = useState<
+    'google' | 'spotify' | null
+  >(null);
 
   const clearError = useCallback(() => {
     base.clearError();
     setShouldSuggestSignIn(false);
+    setOauthFailureProvider(null);
   }, [base]);
 
   /**
@@ -302,6 +307,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
 
         const message = parseClerkError(err);
         base.setError(message);
+        setOauthFailureProvider(provider);
         base.setLoadingState({ type: 'idle' });
       }
     },
@@ -328,6 +334,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
     error: base.error,
     clearError,
     shouldSuggestSignIn,
+    oauthFailureProvider,
     startEmailFlow,
     verifyCode,
     resendCode,
