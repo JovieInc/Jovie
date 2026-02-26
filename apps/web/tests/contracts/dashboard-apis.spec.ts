@@ -343,7 +343,7 @@ describe('Dashboard API contracts', () => {
       expectStatusOk(response, body);
       expect(body).toMatchObject({
         total: 1,
-        members: [
+        rows: [
           expect.objectContaining({
             id: 'member_1',
             latestActions: ['visit'],
@@ -388,7 +388,7 @@ describe('Dashboard API contracts', () => {
       expectStatusOk(response, body);
       expect(body).toEqual({
         total: 1,
-        subscribers: [
+        rows: [
           {
             id: 'sub_1',
             email: 'fan@example.com',

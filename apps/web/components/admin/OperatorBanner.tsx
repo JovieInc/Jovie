@@ -46,9 +46,13 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
 
   // Check dismissal state from session storage
   useEffect(() => {
-    const dismissed = sessionStorage.getItem('operator-banner-dismissed');
-    if (dismissed === 'true') {
-      setIsDismissed(true);
+    try {
+      const dismissed = sessionStorage.getItem('operator-banner-dismissed');
+      if (dismissed === 'true') {
+        setIsDismissed(true);
+      }
+    } catch {
+      // Ignore storage access errors (private browsing / restricted context)
     }
   }, []);
 
@@ -79,7 +83,11 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
 
   const handleDismiss = () => {
     setIsDismissed(true);
-    sessionStorage.setItem('operator-banner-dismissed', 'true');
+    try {
+      sessionStorage.setItem('operator-banner-dismissed', 'true');
+    } catch {
+      // Ignore storage access errors (private browsing / restricted context)
+    }
   };
 
   if (!showBanner || isDismissed || !isVisible) {

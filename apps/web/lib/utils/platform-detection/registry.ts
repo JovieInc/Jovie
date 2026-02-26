@@ -135,6 +135,7 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   featurefm: createPlatformInfo('featurefm', 'https://ffm.to/...'),
 
   // Payment/Tip Platforms
+  stripe: createPlatformInfo('stripe', 'https://dashboard.stripe.com/login'),
   venmo: createPlatformInfo('venmo', 'https://venmo.com/username'),
   paypal: createPlatformInfo('paypal', 'https://paypal.me/username'),
   cashapp: createPlatformInfo('cashapp', 'https://cash.app/$username'),
@@ -269,6 +270,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
 
   // Payment platforms
+  { pattern: /(?:www\.)?dashboard\.stripe\.com/i, platformId: 'stripe' },
   { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
   { pattern: /(?:www\.)?paypal\.me|paypal\.com/i, platformId: 'paypal' },
   { pattern: /(?:www\.)?cash\.app/i, platformId: 'cashapp' },
