@@ -78,8 +78,8 @@ export const HeaderProfileProgress = memo(function HeaderProfileProgress() {
         />
         <defs>
           <linearGradient id={gradientId} x1='0%' y1='0%' x2='100%' y2='100%'>
-            <stop offset='0%' stopColor='var(--color-brand-400)' />
-            <stop offset='100%' stopColor='var(--color-brand-500)' />
+            <stop offset='0%' stopColor='var(--color-accent)' />
+            <stop offset='100%' stopColor='var(--color-accent-hover)' />
           </linearGradient>
         </defs>
       </svg>

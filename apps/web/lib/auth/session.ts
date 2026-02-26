@@ -63,6 +63,20 @@ export function getSessionSetupSql(userId: string) {
   return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`;
 }
 
+function getSessionSetupFallbackSql(userId: string) {
+  validateClerkUserId(userId);
+  return drizzleSql`SET app.clerk_user_id = ${userId}`;
+}
+
+async function applySessionUserId(userId: string): Promise<void> {
+  try {
+    await db.execute(getSessionSetupSql(userId));
+  } catch (error) {
+    logDbError('setupDbSession_set_config_failed', error, { userId });
+    await db.execute(getSessionSetupFallbackSql(userId));
+  }
+}
+
 /**
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
@@ -77,7 +91,7 @@ export async function setupDbSession(clerkUserId?: string) {
   try {
     // Execute the session setup SQL with retry logic for transient failures
     await withRetry(async () => {
-      await db.execute(getSessionSetupSql(userId));
+      await applySessionUserId(userId);
     }, 'setupDbSession');
 
     logDbInfo('setupDbSession', 'Session setup completed successfully', {
