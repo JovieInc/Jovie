@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
+import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { logger } from '@/lib/utils/logger';
@@ -31,43 +32,6 @@ function clampRange(requested: TimeRange, retentionDays: number): TimeRange {
   return best;
 }
 
-type CacheEntry = {
-  payload: unknown;
-  expiresAt: number;
-};
-
-// Cache TTL matches client-side staleTime (60s) to avoid unnecessary recomputation
-const TTL_MS = 60_000;
-const MAX_CACHE_ENTRIES = 1000;
-const cache = new Map<string, CacheEntry>();
-const inflight = new Map<string, Promise<unknown>>();
-
-/**
- * Prune expired entries and enforce max cache size using LRU eviction.
- * Called before adding new entries to prevent unbounded memory growth.
- */
-function pruneCache(): void {
-  const now = Date.now();
-
-  // First pass: remove expired entries
-  for (const [key, entry] of cache) {
-    if (entry.expiresAt <= now) {
-      cache.delete(key);
-    }
-  }
-
-  // Second pass: if still over limit, remove oldest entries (LRU approximation)
-  if (cache.size > MAX_CACHE_ENTRIES) {
-    const entriesToRemove = cache.size - MAX_CACHE_ENTRIES;
-    const keys = cache.keys();
-    for (let i = 0; i < entriesToRemove; i++) {
-      const { value: key, done } = keys.next();
-      if (done) break;
-      cache.delete(key);
-    }
-  }
-}
-
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function isRange(value: string): value is TimeRange {
@@ -82,14 +46,6 @@ function isRange(value: string): value is TimeRange {
 
 function isView(value: string): value is DashboardAnalyticsView {
   return value === 'traffic' || value === 'full';
-}
-
-function getCacheKey(
-  userId: string,
-  view: DashboardAnalyticsView,
-  range: TimeRange
-): string {
-  return `dashboard-analytics:${userId}:${view}:${range}`;
 }
 
 export async function GET(request: Request) {
@@ -118,54 +74,35 @@ export async function GET(request: Request) {
       }
       const range = clampRange(rawRange, retentionDays);
 
-      const key = getCacheKey(userId, view, range);
-      const now = Date.now();
-      const cached = cache.get(key);
+      const key = `dashboard-analytics:${userId}:${view}:${range}`;
 
-      if (!forceRefresh && cached && cached.expiresAt > now) {
-        return NextResponse.json(cached.payload, {
-          status: 200,
-          headers: NO_STORE_HEADERS,
-        });
+      if (forceRefresh) {
+        await invalidateCache(key);
       }
 
-      const existing = inflight.get(key);
-      const promise =
-        !forceRefresh && existing
-          ? existing
-          : (async () => {
-              const analytics = await getUserDashboardAnalytics(
-                userId,
-                range,
-                view
-              );
-              const payload = {
-                ...analytics,
-                top_cities: analytics.top_cities ?? [],
-                top_countries: analytics.top_countries ?? [],
-                top_referrers: analytics.top_referrers ?? [],
-                top_links: analytics.top_links ?? [],
-              } as const;
-              return payload;
-            })();
+      const payload = await cacheQuery(
+        key,
+        async () => {
+          const analytics = await getUserDashboardAnalytics(
+            userId,
+            range,
+            view
+          );
+          return {
+            ...analytics,
+            top_cities: analytics.top_cities ?? [],
+            top_countries: analytics.top_countries ?? [],
+            top_referrers: analytics.top_referrers ?? [],
+            top_links: analytics.top_links ?? [],
+          };
+        },
+        { ttlSeconds: 60 }
+      );
 
-      if (!forceRefresh && !existing) {
-        inflight.set(key, promise);
-      }
-
-      try {
-        const payload = await promise;
-        pruneCache();
-        cache.set(key, { payload, expiresAt: Date.now() + TTL_MS });
-        return NextResponse.json(payload, {
-          status: 200,
-          headers: NO_STORE_HEADERS,
-        });
-      } finally {
-        if (inflight.get(key) === promise) {
-          inflight.delete(key);
-        }
-      }
+      return NextResponse.json(payload, {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
     });
   } catch (error) {
     logger.error('Error in analytics API:', error);

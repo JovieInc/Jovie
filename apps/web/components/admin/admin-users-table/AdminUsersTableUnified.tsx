@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Badge, Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
@@ -8,14 +8,17 @@ import { useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   type ContextMenuItemType,
+  convertContextMenuItems,
   ExportCSVButton,
   TableBulkActionsToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
   USERS_CSV_FILENAME_PREFIX,
@@ -38,6 +41,75 @@ import {
 
 const columnHelper = createColumnHelper<AdminUserRow>();
 
+interface AdminUserMobileCardProps {
+  readonly user: AdminUserRow;
+  readonly isSelected: boolean;
+  readonly onToggleSelect: (id: string) => void;
+  readonly contextMenuItems: ContextMenuItemType[];
+}
+
+function AdminUserMobileCard({
+  user,
+  isSelected,
+  onToggleSelect,
+  contextMenuItems,
+}: Readonly<AdminUserMobileCardProps>) {
+  const actionItems = convertContextMenuItems(contextMenuItems);
+
+  return (
+    <article className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+      <div className='mb-3 flex items-start justify-between gap-3'>
+        <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
+          <input
+            type='checkbox'
+            checked={isSelected}
+            onChange={() => onToggleSelect(user.id)}
+            className='mt-0.5 h-4 w-4 rounded border-subtle text-accent focus:ring-accent'
+            aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
+          />
+          <div className='min-w-0'>
+            <p className='truncate text-sm font-semibold text-primary-token'>
+              {user.name ?? 'User'}
+            </p>
+            <p className='truncate text-xs text-secondary-token'>
+              {user.email ?? 'No email'}
+            </p>
+          </div>
+        </label>
+        <TableActionMenu items={actionItems} align='end' />
+      </div>
+
+      <div className='flex flex-wrap items-center gap-2 text-xs'>
+        <Badge
+          size='sm'
+          variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+        >
+          {user.plan}
+        </Badge>
+        {user.deletedAt ? (
+          <Badge size='sm' variant='warning'>
+            Deleted
+          </Badge>
+        ) : (
+          <Badge size='sm' variant='success'>
+            Active
+          </Badge>
+        )}
+        <span className='text-secondary-token'>
+          Joined{' '}
+          {user.createdAt
+            ? new Intl.DateTimeFormat('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              }).format(user.createdAt)
+            : '—'}
+        </span>
+      </div>
+    </article>
+  );
+}
+
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const { users: initialUsers, pageSize, total, search, sort } = props;
 
@@ -56,6 +128,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   const from = users.length > 0 ? 1 : 0;
   const to = users.length;
+  const isMobile = useBreakpointDown('md');
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -329,38 +402,81 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           </>
         }
       >
-        {() => (
-          <UnifiedTable
-            data={users}
-            columns={columns}
-            rowSelection={rowSelection}
-            isLoading={false}
-            emptyState={
-              <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                <Users className='h-6 w-6' />
-                <div>
-                  <div className='font-medium'>No users found</div>
-                  <div className='text-xs'>
-                    {search
-                      ? 'Try adjusting your search terms or clearing the filter.'
-                      : 'Users will appear here once they sign up.'}
+        {() =>
+          isMobile ? (
+            <div className='space-y-3 p-3'>
+              {users.length === 0 ? (
+                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                  <Users className='h-6 w-6' />
+                  <div>
+                    <div className='font-medium'>No users found</div>
+                    <div className='text-xs'>
+                      {search
+                        ? 'Try adjusting your search terms or clearing the filter.'
+                        : 'Users will appear here once they sign up.'}
+                    </div>
                   </div>
                 </div>
-              </div>
-            }
-            getRowId={row => row.id}
-            getRowClassName={getRowClassName}
-            getContextMenuItems={getContextMenuItems}
-            enableVirtualization={true}
-            minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-            className='text-[13px]'
-            hasNextPage={hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
-            onLoadMore={() => {
-              fetchNextPage().catch(() => {});
-            }}
-          />
-        )}
+              ) : (
+                users.map(user => (
+                  <AdminUserMobileCard
+                    key={user.id}
+                    user={user}
+                    isSelected={selectedIds.has(user.id)}
+                    onToggleSelect={toggleSelect}
+                    contextMenuItems={getContextMenuItems(user)}
+                  />
+                ))
+              )}
+
+              {hasNextPage ? (
+                <Button
+                  type='button'
+                  variant='secondary'
+                  size='sm'
+                  className='w-full'
+                  loading={isFetchingNextPage}
+                  onClick={() => {
+                    fetchNextPage().catch(() => {});
+                  }}
+                >
+                  Load more users
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <UnifiedTable
+              data={users}
+              columns={columns}
+              rowSelection={rowSelection}
+              isLoading={false}
+              emptyState={
+                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                  <Users className='h-6 w-6' />
+                  <div>
+                    <div className='font-medium'>No users found</div>
+                    <div className='text-xs'>
+                      {search
+                        ? 'Try adjusting your search terms or clearing the filter.'
+                        : 'Users will appear here once they sign up.'}
+                    </div>
+                  </div>
+                </div>
+              }
+              getRowId={row => row.id}
+              getRowClassName={getRowClassName}
+              getContextMenuItems={getContextMenuItems}
+              enableVirtualization={true}
+              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+              className='text-[13px]'
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => {
+                fetchNextPage().catch(() => {});
+              }}
+            />
+          )
+        }
       </AdminTableShell>
     </QueryErrorBoundary>
   );
