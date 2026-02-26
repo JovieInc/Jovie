@@ -29,7 +29,7 @@ export const SidebarTrigger = React.forwardRef<
       variant='ghost'
       size='icon'
       className={cn(
-        'h-7 w-7 outline-none ring-sidebar-ring focus-visible:ring-2',
+        'h-7 w-7 outline-none focus-visible:bg-sidebar-accent',
         className
       )}
       onClick={handleClick}
@@ -72,13 +72,13 @@ export const SidebarRail = React.forwardRef<
       title='Toggle Sidebar'
       className={cn(
         'absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-out after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+        'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
         'in-data-[side=left][data-state=closed]:cursor-e-resize in-data-[side=right][data-state=closed]:cursor-w-resize',
         'group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full group-data-[collapsible=offcanvas]:hover:bg-sidebar',
         'in-data-[side=left][data-collapsible=offcanvas]:-right-2',
         'in-data-[side=right][data-collapsible=offcanvas]:-left-2',
-        'outline-none ring-sidebar-ring focus-visible:ring-2 focus-visible:ring-offset-0',
+        'outline-none',
         className
       )}
       {...props}
