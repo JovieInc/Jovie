@@ -14,6 +14,36 @@ import { cn } from '@/lib/utils';
 
 type NavLink = { href: string; label: string };
 
+// ── Hoisted style objects (avoid re-creating on every render → less GC pressure) ──
+
+const CTA_BUTTON_STYLE: React.CSSProperties = {
+  color: 'var(--linear-btn-primary-fg)',
+  backgroundColor: 'var(--linear-btn-primary-bg)',
+  border: '1px solid var(--linear-btn-primary-border)',
+  boxShadow: 'var(--linear-shadow-button)',
+};
+
+const OVERLAY_STYLE: React.CSSProperties = {
+  background: 'oklch(0% 0 0 / 0.6)',
+  backdropFilter: 'blur(8px)',
+  WebkitBackdropFilter: 'blur(8px)',
+};
+
+const NAV_PANEL_STYLE: React.CSSProperties = {
+  backgroundColor:
+    'color-mix(in oklab, var(--linear-bg-surface-0) 95%, white 5%)',
+  borderTop:
+    '1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%)',
+  boxShadow:
+    '0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)',
+  paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
+};
+
+const GRABBER_STYLE: React.CSSProperties = {
+  background:
+    'color-mix(in oklab, var(--linear-text-tertiary) 40%, transparent)',
+};
+
 function buildNavLinks(
   customNavLinks: ReadonlyArray<NavLink> | undefined,
   hidePricingLink: boolean,
@@ -56,12 +86,7 @@ function MobileNavCta({
         'transition-all duration-200 ease-out',
         'active:scale-[0.98]'
       )}
-      style={{
-        color: 'var(--linear-btn-primary-fg)',
-        backgroundColor: 'var(--linear-btn-primary-bg)',
-        border: '1px solid var(--linear-btn-primary-border)',
-        boxShadow: 'var(--linear-shadow-button)',
-      }}
+      style={CTA_BUTTON_STYLE}
       onClick={close}
     >
       {label}
@@ -182,11 +207,7 @@ export function MobileNav({
               )}
               onClick={close}
               aria-hidden='true'
-              style={{
-                background: 'oklch(0% 0 0 / 0.6)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-              }}
+              style={OVERLAY_STYLE}
             />
 
             {/* Navigation panel */}
@@ -198,25 +219,14 @@ export function MobileNav({
                 'transition-all duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)]',
                 'translate-y-0 opacity-100 pointer-events-auto'
               )}
-              style={{
-                backgroundColor:
-                  'color-mix(in oklab, var(--linear-bg-surface-0) 95%, white 5%)',
-                borderTop:
-                  '1px solid color-mix(in oklab, var(--linear-border-subtle) 85%, white 15%)',
-                boxShadow:
-                  '0 -8px 40px oklch(0% 0 0 / 0.25), 0 -2px 12px oklch(0% 0 0 / 0.15)',
-                paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
-              }}
+              style={NAV_PANEL_STYLE}
               aria-label='Mobile navigation'
             >
               {/* Grabber handle */}
               <div className='flex justify-center pt-3 pb-2' aria-hidden='true'>
                 <div
                   className='w-9 h-[5px] rounded-full'
-                  style={{
-                    background:
-                      'color-mix(in oklab, var(--linear-text-tertiary) 40%, transparent)',
-                  }}
+                  style={GRABBER_STYLE}
                 />
               </div>
 

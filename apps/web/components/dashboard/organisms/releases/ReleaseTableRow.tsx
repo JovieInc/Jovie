@@ -74,10 +74,14 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
-      await onCopy(path, label, testId);
-      setCopiedId(testId);
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+      try {
+        await onCopy(path, label, testId);
+        setCopiedId(testId);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+      } catch (error) {
+        console.error('Failed to copy link:', error);
+      }
     },
     [onCopy]
   );
