@@ -69,7 +69,22 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
+  it('founding has same booleans and limits as pro', () => {
+    const foundingBooleans = ENTITLEMENT_REGISTRY.founding.booleans;
+    const proBooleans = ENTITLEMENT_REGISTRY.pro.booleans;
+
+    for (const [key, proValue] of Object.entries(proBooleans)) {
+      expect(foundingBooleans[key as BooleanEntitlement]).toBe(proValue);
+    }
+
+    const foundingLimits = ENTITLEMENT_REGISTRY.founding.limits;
+    const proLimits = ENTITLEMENT_REGISTRY.pro.limits;
+
+    expect(foundingLimits).toEqual(proLimits);
+  });
+
   it('numeric escalation: growth >= pro >= free (where not null)', () => {
+    // Founding is excluded — it has the same limits as pro but sits at a different price point
     const plans: PlanId[] = ['free', 'pro', 'growth'];
 
     const numericKeys: NumericEntitlement[] = [
@@ -136,23 +151,34 @@ describe('Entitlement Registry Consistency', () => {
 
   it('free plan has null price, paid plans have prices', () => {
     expect(ENTITLEMENT_REGISTRY.free.marketing.price).toBeNull();
+    expect(ENTITLEMENT_REGISTRY.founding.marketing.price).not.toBeNull();
     expect(ENTITLEMENT_REGISTRY.pro.marketing.price).not.toBeNull();
     expect(ENTITLEMENT_REGISTRY.growth.marketing.price).not.toBeNull();
   });
 
-  it('paid plan prices: monthly and yearly are positive', () => {
-    for (const planId of ['pro', 'growth'] as const) {
+  it('paid plan prices: monthly is positive', () => {
+    for (const planId of ['founding', 'pro', 'growth'] as const) {
       const price = ENTITLEMENT_REGISTRY[planId].marketing.price!;
       expect(price.monthly).toBeGreaterThan(0);
+    }
+  });
+
+  it('plans with yearly pricing offer a discount', () => {
+    for (const planId of ['pro', 'growth'] as const) {
+      const price = ENTITLEMENT_REGISTRY[planId].marketing.price!;
       expect(price.yearly).toBeGreaterThan(0);
       // Yearly should be less than 12x monthly (a discount)
       expect(price.yearly).toBeLessThan(price.monthly * 12);
     }
   });
 
+  it('founding has no yearly pricing', () => {
+    expect(ENTITLEMENT_REGISTRY.founding.marketing.price!.yearly).toBeNull();
+  });
+
   it('registry plan IDs match UserPlan type values', () => {
-    // UserPlan = 'free' | 'pro' | 'growth' in types/index.ts
-    const expectedPlans: PlanId[] = ['free', 'pro', 'growth'];
+    // UserPlan = 'free' | 'founding' | 'pro' | 'growth' in types/index.ts
+    const expectedPlans: PlanId[] = ['free', 'founding', 'pro', 'growth'];
     expect([...planIds]).toEqual(expectedPlans);
   });
 });

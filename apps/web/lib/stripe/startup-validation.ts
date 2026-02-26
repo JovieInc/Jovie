@@ -25,7 +25,7 @@ export function validateStripeBillingConfig(): {
   const activePriceIds = getActivePriceIds();
   if (activePriceIds.length === 0) {
     issues.push(
-      'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_PRO_MONTHLY and/or STRIPE_PRICE_PRO_YEARLY.'
+      'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_YEARLY, and/or STRIPE_PRICE_FOUNDING_MONTHLY.'
     );
   }
 

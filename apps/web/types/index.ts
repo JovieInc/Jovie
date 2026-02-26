@@ -284,7 +284,7 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
   );
 }
 
-export type UserPlan = 'free' | 'pro' | 'growth';
+export type UserPlan = 'free' | 'founding' | 'pro' | 'growth';
 
 export interface UserEntitlements {
   userId: string | null;
@@ -293,7 +293,7 @@ export interface UserEntitlements {
   isAdmin: boolean;
   // Plan info
   plan: UserPlan;
-  isPro: boolean; // true for pro or growth
+  isPro: boolean; // true for founding, pro, or growth
   hasAdvancedFeatures: boolean; // true for growth only
   // Feature gates
   canRemoveBranding: boolean;
