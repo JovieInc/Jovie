@@ -202,7 +202,7 @@ export function validateUrl(url: string, platform: PlatformInfo): boolean {
       case 'linktree':
         return /linktr\.ee\/[a-zA-Z0-9._]+\/?$/.test(url);
       case 'bandcamp':
-        return /[a-zA-Z0-9_-]+\.bandcamp\.com\/?/.test(url);
+        return /[a-zA-Z0-9_-]+\.bandcamp\.com\/?$/.test(url);
       default:
         return true; // Basic URL validation passed for unknown platforms
     }

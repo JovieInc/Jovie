@@ -16,7 +16,8 @@ import { logger } from '@/lib/utils/logger';
  * Note: Hyphen placed at end of character class (no escape needed)
  */
 // NOSONAR - S5869 false positive: all chars in class are unique, hyphen at end is intentional
-const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const EMAIL_REGEX =
+  /\b[A-Z0-9._%+-]+@[A-Z0-9-]+(?:\.[A-Z0-9-]+)*\.[A-Z]{2,}\b/gi;
 
 /**
  * Obfuscation patterns used by creators to prevent scraping
@@ -28,7 +29,7 @@ const EMAIL_REGEX = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 // NOSONAR - S5869 false positive: all chars in class are unique, hyphen at end is intentional
 const OBFUSCATION_PATTERNS = [
   // "email at domain dot com" variants
-  /\b([A-Z0-9._%+-]+)\s*(?:\(at\)|\[at\]|@|at)\s*([A-Z0-9.-]+)\s*(?:\(dot\)|\[dot\]|\.|\s+dot\s+)\s*([A-Z]{2,})\b/gi,
+  /\b([A-Z0-9._%+-]+)\s{0,3}(?:\(at\)|\[at\]|@|at)\s{0,3}([A-Z0-9-]+(?:\.[A-Z0-9-]+)*)\s{0,3}(?:\(dot\)|\[dot\]|\.|\s{1,3}dot\s{1,3})\s{0,3}([A-Z]{2,})\b/gi,
 ] as const;
 
 /**
@@ -79,7 +80,7 @@ export function isValidEmail(email: string): boolean {
   if (email.length > 254) return false;
 
   // Simple pattern check
-  const basicPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const basicPattern = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
   if (!basicPattern.test(email)) return false;
 
   // Domain check - reject non-email domains

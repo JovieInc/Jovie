@@ -142,6 +142,12 @@ const INTERNAL_DOMAIN_SUFFIXES = [
 
 /**
  * Cloud metadata endpoints to block (SSRF protection).
+ *
+ * Security: These hardcoded IPs/hostnames are intentional SSRF protection measures.
+ * - 169.254.169.254 is the AWS/GCP Instance Metadata Service (IMDS) endpoint.
+ *   Blocking it prevents server-side request forgery attacks that could leak
+ *   cloud credentials or instance metadata.
+ * - metadata.google.internal is the GCP-specific metadata endpoint.
  */
 const METADATA_PATTERNS = new Set([
   '169.254.169.254',

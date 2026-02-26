@@ -28,7 +28,11 @@ import {
 } from './helpers';
 import { detectLinktreePaidTier } from './paid-tier';
 
-/** Schemes that should be blocked for security and relevance */
+/**
+ * Schemes that should be blocked for security and relevance.
+ * Security: javascript: and vbscript: are explicitly blocked to prevent XSS.
+ * The remaining schemes are blocked because they are not extractable web URLs.
+ */
 const BLOCKED_SCHEMES = [
   'javascript:',
   'mailto:',

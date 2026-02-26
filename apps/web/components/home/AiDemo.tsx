@@ -80,7 +80,9 @@ const PAUSE_BETWEEN_DEMOS = 6000;
 
 function randomDelay() {
   return (
-    SEGMENT_DELAY_MIN + Math.random() * (SEGMENT_DELAY_MAX - SEGMENT_DELAY_MIN)
+    SEGMENT_DELAY_MIN +
+    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) *
+      (SEGMENT_DELAY_MAX - SEGMENT_DELAY_MIN)
   );
 }
 

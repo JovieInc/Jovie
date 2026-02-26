@@ -80,7 +80,8 @@ function isRetryableSearchError(error: unknown): boolean {
 }
 
 function calculateRetryDelay(attempt: number): number {
-  const jitter = Math.random() * 0.3 + 0.85;
+  const jitter =
+    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 0.3 + 0.85;
   return SEARCH_BASE_DELAY_MS * Math.pow(2, attempt) * jitter;
 }
 
@@ -236,7 +237,10 @@ export async function GET(request: NextRequest) {
     // Probabilistic cleanup (10% of requests) to amortize cost.
     // Full cleanup on every request is O(n log n) due to sorting;
     // force cleanup when maps exceed size limits.
-    if (Math.random() < 0.1 || searchCache.size > MAX_CACHE_SIZE) {
+    if (
+      crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 < 0.1 ||
+      searchCache.size > MAX_CACHE_SIZE
+    ) {
       cleanupSearchCache();
     }
   }

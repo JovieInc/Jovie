@@ -35,7 +35,8 @@ function isNonRetryableError(error: unknown): boolean {
 }
 
 function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
-  const jitter = Math.random() * 0.3 + 0.85;
+  const jitter =
+    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 0.3 + 0.85;
   return baseDelayMs * Math.pow(2, attempt) * jitter;
 }
 

@@ -64,8 +64,8 @@ export function formatLyricsForAppleMusic(raw: string): {
   }
 
   // 8. Trim trailing whitespace per line
-  const hadTrailingWhitespace = / +$/m.test(text);
-  text = text.replaceAll(/ +$/gm, '');
+  const hadTrailingWhitespace = /[ \t]+$/m.test(text);
+  text = text.replaceAll(/[ \t]+$/gm, '');
   if (hadTrailingWhitespace) {
     changes.push('Trimmed trailing whitespace');
   }
@@ -78,7 +78,7 @@ export function formatLyricsForAppleMusic(raw: string): {
   }
 
   // 10. Remove leading/trailing blank lines
-  const trimmed = text.replace(/^\n+/, '').replace(/\n+$/, '');
+  const trimmed = text.replace(/^\n{1,}/, '').replace(/\n{1,}$/, '');
   if (trimmed.length !== text.length) {
     changes.push('Removed leading/trailing blank lines');
   }
