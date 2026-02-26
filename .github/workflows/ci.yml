@@ -650,15 +650,18 @@ jobs:
           fi
           echo "Build output verified: $(du -sh apps/web/.next | cut -f1)"
 
+      - name: Package build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: tar -cf /tmp/nextjs-build.tar -C apps/web .next
+
       - name: Upload build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: apps/web/.next
+          path: /tmp/nextjs-build.tar
           retention-days: 1
           if-no-files-found: error
-          include-hidden-files: true
 
   ci-layout-guard:
     name: Layout Guard (blocking)
@@ -690,7 +693,11 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: apps/web/.next
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.download.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run layout overlap/touching guard
         if: steps.download.outcome == 'success'
@@ -1017,6 +1024,7 @@ jobs:
             COVERAGE_FLAG="--coverage"
           fi
           # Use forked pool with limited workers to reduce CI flakiness from memory pressure
+          export NODE_OPTIONS="--max-old-space-size=4096"
           VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
           # Mitigate low-frequency flakes by retrying failed tests once in CI
           RETRY_FLAG="--retry=1"
@@ -1123,7 +1131,11 @@ jobs:
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
-          path: apps/web/.next
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
