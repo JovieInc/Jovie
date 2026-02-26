@@ -21,30 +21,18 @@ test.describe('Homepage', () => {
   test('displays the main hero section', async ({ page }) => {
     // Check main headline
     await expect(page.locator('h1')).toContainText(
-      'Jovie is a purpose-built link in bio for artists and musicians'
+      'AI to power your music career'
     );
 
     // Check lead text
-    await expect(
-      page.getByText(/Capture every fan with AI-powered profiles/i)
-    ).toBeVisible();
+    await expect(page.getByText(/Built to amplify your work/i)).toBeVisible();
   });
 
-  test('displays the hero CTA buttons', async ({ page }) => {
-    // Check "Get started" button in hero
+  test('displays the hero claim handle form', async ({ page }) => {
+    // Check claim handle input in hero
     const heroSection = page.locator('main section').first();
-    const getStartedButton = heroSection.getByRole('link', {
-      name: /Get started/i,
-    });
-    await expect(getStartedButton).toBeVisible();
-    await expect(getStartedButton).toHaveAttribute('href', '/signup');
-
-    // Check "See how it works" button
-    const howItWorksButton = heroSection.getByRole('link', {
-      name: /See how it works/i,
-    });
-    await expect(howItWorksButton).toBeVisible();
-    await expect(howItWorksButton).toHaveAttribute('href', '#how-it-works');
+    const input = heroSection.locator('input').first();
+    await expect(input).toBeVisible();
   });
 
   test('displays the content sections', async ({ page }) => {
@@ -109,17 +97,16 @@ test.describe('Homepage', () => {
 
     // Check that main content is visible
     await expect(page.locator('h1')).toContainText(
-      'Jovie is a purpose-built link in bio',
+      'AI to power your music career',
       {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       }
     );
 
-    // Check that CTAs are visible
-    const getStartedButton = page.getByRole('link', {
-      name: /Get started/i,
-    });
-    await expect(getStartedButton).toBeVisible({
+    // Check that claim handle form is visible
+    const heroSection = page.locator('main section').first();
+    const input = heroSection.locator('input').first();
+    await expect(input).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
@@ -128,15 +115,13 @@ test.describe('Homepage', () => {
     // Check for proper heading structure
     const headings = page.locator('h1, h2, h3');
     await expect(headings.first()).toContainText(
-      'Jovie is a purpose-built link in bio'
+      'AI to power your music career'
     );
 
-    // Check for proper link labels in hero
+    // Check for claim handle input in hero
     const heroSection = page.locator('main section').first();
-    const getStartedLink = heroSection.getByRole('link', {
-      name: /Get started/i,
-    });
-    await expect(getStartedLink).toBeVisible();
+    const input = heroSection.locator('input').first();
+    await expect(input).toBeVisible();
 
     // Check for proper image alt texts (logo in header should exist)
     const headerLogo = page.locator('header img, header svg').first();

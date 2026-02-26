@@ -84,6 +84,50 @@ async function validatePriceId(priceId: string): Promise<NextResponse | null> {
   return null;
 }
 
+function jsonServiceUnavailable() {
+  return NextResponse.json(
+    {
+      error:
+        'Payment service is temporarily unavailable. Please try again in a moment.',
+    },
+    { status: 503, headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' } }
+  );
+}
+
+async function handleCheckoutError(error: unknown): Promise<NextResponse> {
+  const retryContext =
+    error instanceof StripeRetryExhaustedError
+      ? {
+          retryAttempts: error.attempts,
+          retryOperation: error.operation,
+          retryExhausted: true,
+        }
+      : {};
+
+  await captureCriticalError('Stripe checkout session creation failed', error, {
+    route: '/api/stripe/checkout',
+    method: 'POST',
+    ...retryContext,
+  });
+
+  if (error instanceof StripeRetryExhaustedError) {
+    return jsonServiceUnavailable();
+  }
+
+  if (error instanceof Error) {
+    const knownError = getCheckoutErrorResponse(error);
+    if (knownError) {
+      return jsonError(knownError.message, knownError.status);
+    }
+  }
+
+  if (isTransientStripeError(error)) {
+    return jsonServiceUnavailable();
+  }
+
+  return jsonError('Failed to create checkout session', 500);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -174,55 +218,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error creating checkout session:', error);
-    const retryContext =
-      error instanceof StripeRetryExhaustedError
-        ? {
-            retryAttempts: error.attempts,
-            retryOperation: error.operation,
-            retryExhausted: true,
-          }
-        : {};
-
-    await captureCriticalError(
-      'Stripe checkout session creation failed',
-      error,
-      { route: '/api/stripe/checkout', method: 'POST', ...retryContext }
-    );
-
-    if (error instanceof StripeRetryExhaustedError) {
-      return NextResponse.json(
-        {
-          error:
-            'Payment service is temporarily unavailable. Please try again in a moment.',
-        },
-        {
-          status: 503,
-          headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
-        }
-      );
-    }
-
-    if (error instanceof Error) {
-      const knownError = getCheckoutErrorResponse(error);
-      if (knownError) {
-        return jsonError(knownError.message, knownError.status);
-      }
-    }
-
-    if (isTransientStripeError(error)) {
-      return NextResponse.json(
-        {
-          error:
-            'Payment service is temporarily unavailable. Please try again in a moment.',
-        },
-        {
-          status: 503,
-          headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
-        }
-      );
-    }
-
-    return jsonError('Failed to create checkout session', 500);
+    return handleCheckoutError(error);
   }
 }
 

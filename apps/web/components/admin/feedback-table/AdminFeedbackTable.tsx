@@ -180,9 +180,14 @@ export function AdminFeedbackTable({
                 Dismiss
               </Button>
               <span className='text-xs text-secondary-token'>
-                {selected.status === 'dismissed'
-                  ? `Dismissed ${selected.dismissedAtIso ? new Date(selected.dismissedAtIso).toLocaleString() : ''}`
-                  : 'Marked as pending'}
+                {(() => {
+                  if (selected.status !== 'dismissed')
+                    return 'Marked as pending';
+                  const date = selected.dismissedAtIso
+                    ? new Date(selected.dismissedAtIso).toLocaleString()
+                    : '';
+                  return `Dismissed ${date}`;
+                })()}
               </span>
             </div>
           </div>

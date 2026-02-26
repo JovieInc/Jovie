@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AuthBackButton } from '@/components/auth';
+import { getValidationFailureKey } from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
 import {
   OnboardingCompleteStep,
   OnboardingHandleStep,
@@ -27,6 +28,10 @@ export function AppleStyleOnboardingForm({
   userId,
   shouldAutoSubmitHandle = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
+  const onboardingStartedAtRef = useRef(Date.now());
+  const previousStepIndexRef = useRef<number | null>(null);
+  const lastValidationFailureKeyRef = useRef<string | null>(null);
+
   const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
   const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
 
@@ -67,6 +72,8 @@ export function AppleStyleOnboardingForm({
     goToNextStep,
     setProfileReadyHandle,
     shouldAutoSubmitHandle,
+    isReservedHandle,
+    onboardingStartedAtMs: onboardingStartedAtRef.current,
   });
 
   useEffect(() => {
@@ -79,10 +86,62 @@ export function AppleStyleOnboardingForm({
   }, [userId]);
 
   useEffect(() => {
+    const currentStep = ONBOARDING_STEPS[currentStepIndex];
+    const previousStepIndex = previousStepIndexRef.current;
+    const previousStep =
+      previousStepIndex === null ? null : ONBOARDING_STEPS[previousStepIndex];
+
+    if (currentStep) {
+      track('onboarding_step_transitioned', {
+        user_id: userId,
+        fromStep: previousStep?.id ?? null,
+        toStep: currentStep.id,
+        stepIndex: currentStepIndex,
+      });
+    }
+
+    previousStepIndexRef.current = currentStepIndex;
+  }, [currentStepIndex, userId]);
+
+  const handleSuggestionClick = useCallback(
+    (selectedSuggestion: string) => {
+      track('onboarding_handle_suggestion_selected', {
+        user_id: userId,
+        originalHandle: handleInput,
+        selectedSuggestion,
+      });
+      setHandleInput(selectedSuggestion);
+    },
+    [handleInput, userId]
+  );
+
+  useEffect(() => {
     if (currentStepIndex === 0 && handleInputRef.current) {
       handleInputRef.current.focus();
     }
   }, [currentStepIndex]);
+
+  useEffect(() => {
+    if (!handleInput || handleValidation.checking || !handleValidation.error) {
+      lastValidationFailureKeyRef.current = null;
+      return;
+    }
+
+    const failureKey = getValidationFailureKey(
+      handleInput,
+      handleValidation.error
+    );
+    if (lastValidationFailureKeyRef.current === failureKey) {
+      return;
+    }
+
+    track('onboarding_handle_validation_failed', {
+      user_id: userId,
+      handle: handleInput,
+      reason: handleValidation.error,
+    });
+    lastValidationFailureKeyRef.current = failureKey;
+  }, [handleInput, handleValidation.checking, handleValidation.error, userId]);
 
   const handleStepCtaDisabledReason = useMemo(() => {
     if (state.isSubmitting) return 'Saving…';
@@ -156,6 +215,7 @@ export function AppleStyleOnboardingForm({
             inputRef={handleInputRef}
             onHandleChange={setHandleInput}
             onSubmit={handleSubmit}
+            onSuggestionClick={handleSuggestionClick}
             isPendingSubmit={isPendingSubmit}
             autoSubmitClaimed={autoSubmitClaimed}
           />
