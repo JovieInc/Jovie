@@ -36,22 +36,11 @@ import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
-import {
-  homepageAutomaticReleaseSmartlinks,
-  homepageComparison,
-  homepageDashboardShowcase,
-  homepageDeeplinksGrid,
-  homepageExampleProfiles,
-  homepageFinalCta,
-  homepageHero,
-  homepageHowItWorks,
-  homepageLabelLogos,
-  homepageProductPreview,
-  homepageSeeItInAction,
-} from '@/lib/flags/homepage';
+import { homepageFlagDefaults } from '@/lib/flags/homepage';
 
-// Flags read cookies for toolbar overrides, making this page dynamic.
-// Revert to `revalidate = false` once homepage design is finalized.
+// Static rendering: use hardcoded flag defaults instead of evaluating flag()
+// functions which call cookies()/headers() and force dynamic rendering.
+export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The Link-in-Bio Built for Artists`;
@@ -254,32 +243,20 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
 });
 
-export default async function HomePage() {
-  const [
-    showHero,
-    showLabelLogos,
-    showHowItWorks,
-    showDashboardShowcase,
-    showProductPreview,
-    showExampleProfiles,
-    showDeeplinksGrid,
-    showComparison,
-    showSeeItInAction,
-    showFinalCta,
-    showAutomaticReleaseSmartlinks,
-  ] = await Promise.all([
-    homepageHero(),
-    homepageLabelLogos(),
-    homepageHowItWorks(),
-    homepageDashboardShowcase(),
-    homepageProductPreview(),
-    homepageExampleProfiles(),
-    homepageDeeplinksGrid(),
-    homepageComparison(),
-    homepageSeeItInAction(),
-    homepageFinalCta(),
-    homepageAutomaticReleaseSmartlinks(),
-  ]);
+export default function HomePage() {
+  const d = homepageFlagDefaults;
+  const showHero = d.homepage_hero;
+  const showLabelLogos = d.homepage_label_logos;
+  const showHowItWorks = d.homepage_how_it_works;
+  const showDashboardShowcase = d.homepage_dashboard_showcase;
+  const showProductPreview = d.homepage_product_preview;
+  const showExampleProfiles = d.homepage_example_profiles;
+  const showDeeplinksGrid = d.homepage_deeplinks_grid;
+  const showComparison = d.homepage_comparison;
+  const showSeeItInAction = d.homepage_see_it_in_action;
+  const showFinalCta = d.homepage_final_cta;
+  const showAutomaticReleaseSmartlinks =
+    d.homepage_automatic_release_smartlinks;
 
   return (
     <div
