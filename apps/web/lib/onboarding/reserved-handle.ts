@@ -28,7 +28,9 @@ export function buildHandleCandidates(name: string): string[] {
   const candidates = [combined, hyphenated, firstWord]
     .map(value => normalizeUsername(value))
     .map(value => (value && /^[a-z]/.test(value) ? value : `artist-${value}`))
-    .map(value => value.replaceAll(/-+/g, '-').replaceAll(/(^-+)|(-+$)/g, ''))
+    .map(value =>
+      value.replaceAll(/-{2,}/g, '-').replace(/^-+/, '').replace(/-+$/, '')
+    )
     .filter(Boolean)
     .filter((value, index, arr) => arr.indexOf(value) === index)
     .filter(value => validateUsername(value).isValid);

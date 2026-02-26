@@ -125,8 +125,9 @@ export function slugify(text: string): string {
     .trim()
     .replaceAll(/[^\w\s-]/g, '') // Remove non-word chars except spaces and hyphens
     .replaceAll(/\s+/g, '-') // Replace spaces with hyphens
-    .replaceAll(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .replaceAll(/(?:^-+)|(?:-+$)/g, ''); // Trim hyphens from start and end
+    .replaceAll(/-{2,}/g, '-') // Replace multiple hyphens with single hyphen
+    .replace(/^-+/, '') // Trim hyphens from start
+    .replace(/-+$/, ''); // Trim hyphens from end
 }
 
 /**

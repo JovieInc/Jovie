@@ -133,7 +133,7 @@ export function transformImageUrl(
 
   // Handle Cloudinary URLs
   try {
-    const urlObj = new URL(url, 'http://dummy-base/');
+    const urlObj = new URL(url, 'https://dummy-base/');
     if (urlObj.hostname === 'res.cloudinary.com') {
       return transformCloudinaryUrl(url, options);
     }

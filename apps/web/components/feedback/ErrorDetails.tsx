@@ -10,7 +10,7 @@ import { toast } from 'sonner';
  */
 function generateErrorRef(): string {
   const ts = Date.now().toString(36).slice(-4);
-  const rand = Math.random().toString(36).slice(2, 6);
+  const rand = crypto.randomUUID().slice(0, 4);
   return `ref-${ts}-${rand}`;
 }
 

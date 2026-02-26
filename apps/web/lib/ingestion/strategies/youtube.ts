@@ -60,7 +60,7 @@ export function validateYouTubeChannelUrl(url: string): string | null {
     }
     const aboutUrl = candidate.endsWith('/about')
       ? candidate
-      : `${candidate.replace(/\/+$/, '')}/about`;
+      : `${candidate.replace(/\/{1,}$/, '')}/about`;
     const result = validatePlatformUrl(aboutUrl, YOUTUBE_CONFIG);
     return result.valid && result.normalized ? result.normalized : null;
   } catch {

@@ -69,7 +69,8 @@ export function slugify(text: string): string {
     .trim()
     .replaceAll(/[^\w\s-]/g, '')
     .replaceAll(/[\s_-]+/g, '-')
-    .replaceAll(/(^-+)|(-+$)/g, '');
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 }
 
 export function generateHandle(name: string): string {

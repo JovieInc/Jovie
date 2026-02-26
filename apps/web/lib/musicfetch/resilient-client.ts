@@ -223,7 +223,7 @@ export async function musicfetchRequest<T>(
   options: MusicfetchRequestOptions
 ): Promise<T> {
   const dedupKey = crypto
-    .createHash('sha1')
+    .createHash('sha256')
     .update(`${endpoint}?${params.toString()}`)
     .digest('hex');
 

@@ -274,7 +274,10 @@ async function retryUpdateWithFreshData(
     // Add jittered exponential backoff before retry
     if (retryCount > 0) {
       const backoffMs = BASE_DELAY_MS * Math.pow(2, retryCount - 1);
-      const jitter = Math.random() * backoffMs * 0.5;
+      const jitter =
+        (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) *
+        backoffMs *
+        0.5;
       await delay(backoffMs + jitter);
     }
 

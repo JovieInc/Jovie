@@ -515,9 +515,10 @@ export async function getInternalUserId(
 
 function generateRandomCode(): string {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789'; // No ambiguous chars
+  const randomBytes = crypto.getRandomValues(new Uint32Array(8));
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[randomBytes[i] % chars.length];
   }
   return code;
 }

@@ -40,7 +40,7 @@ function createExcerpt(content: string): string {
 
   return paragraph
     .replaceAll(/^#+\s*/g, '')
-    .replaceAll(/\[(.*?)\]\(.*?\)/g, '$1')
+    .replaceAll(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replaceAll(/[*_`>]/g, '')
     .replaceAll(/\s+/g, ' ')
     .trim()
