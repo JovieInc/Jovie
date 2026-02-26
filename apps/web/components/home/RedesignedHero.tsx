@@ -1,168 +1,63 @@
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
-import type { FeaturedCreator } from '@/lib/featured-creators';
-import { getFeaturedCreators } from '@/lib/featured-creators';
 import { ClaimHandleForm } from './claim-handle';
-import { HeroSpotifySearch } from './HeroSpotifySearch';
-import { MobileProfilePreview } from './MobileProfilePreview';
-import { PhoneFrame } from './PhoneFrame';
 
-const FALLBACK_CREATOR: FeaturedCreator = {
-  id: 'fallback',
-  handle: 'tim',
-  name: 'Tim White',
-  src: '/images/hero/tim-profile.avif',
-  tagline: null,
-  genres: ['Artist'],
-  latestReleaseTitle: 'Afterglow (Deluxe)',
-  latestReleaseType: 'Album',
-};
-
-/**
- * RedesignedHero — F-layout hero: copy left, profile mockup right.
- * Linear.app-inspired: floating card with browser chrome, deep shadows, slight 3D tilt.
- */
-export async function RedesignedHero() {
-  const [creators, showSpotifySearch, showClaimHandle] = await Promise.all([
-    getFeaturedCreators().catch(() => [] as FeaturedCreator[]),
-    checkGate(null, FEATURE_FLAG_KEYS.HERO_SPOTIFY_CLAIM_FLOW, false),
-    checkGate(null, FEATURE_FLAG_KEYS.CLAIM_HANDLE, true),
-  ]);
-  const featuredCreator = creators[0] ?? FALLBACK_CREATOR;
-
+export function RedesignedHero() {
   return (
-    <section className='relative flex flex-1 flex-col justify-center overflow-hidden px-5 sm:px-6 lg:px-[77px]'>
-      {/* Ambient glow */}
+    <section className='relative flex flex-1 flex-col items-center justify-center overflow-hidden px-5 sm:px-6'>
+      {/* Ambient glow — centered */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{ background: 'var(--linear-hero-glow)' }}
       />
 
-      <div className='relative grid w-full grid-cols-1 items-center gap-8 py-10 md:grid-cols-[1fr_auto] md:gap-10 lg:gap-14 lg:py-14'>
-        <div>
-          <h1
-            style={{
-              fontSize: 'clamp(36px, calc(16px + 4vw), 64px)',
-              fontWeight: 510,
-              lineHeight: 1,
-              letterSpacing: '-0.022em',
-              color: 'var(--linear-text-primary)',
-              fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
-              fontVariationSettings: '"opsz" 64',
-            }}
-          >
-            One-click artist profiles
-            <br />
-            that actually convert.
-          </h1>
-
-          <p
-            className='mt-3 max-w-[400px]'
-            style={{
-              fontSize: '15px',
-              fontWeight: 400,
-              lineHeight: '24px',
-              letterSpacing: '-0.011em',
-              color: 'var(--linear-text-secondary)',
-            }}
-          >
-            Your entire music career. One link. Ready in seconds.
-          </p>
-
-          <div className='mt-6 max-w-[400px]'>
-            {(() => {
-              if (showSpotifySearch) return <HeroSpotifySearch />;
-              if (showClaimHandle) return <ClaimHandleForm />;
-              return <HeroSpotifySearch />;
-            })()}
-          </div>
-
-          <p
-            className='mt-3 flex items-center gap-2'
-            style={{
-              fontSize: '13px',
-              letterSpacing: '0.01em',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            <span
-              aria-hidden='true'
-              className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
-            />{' '}
-            Free forever. No credit card.
-          </p>
-        </div>
-
-        <div className='relative hidden md:flex md:flex-col md:items-center'>
-          <HeroProfileMockup creator={featuredCreator} />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function HeroProfileMockup({ creator }: { readonly creator: FeaturedCreator }) {
-  return (
-    <div className='flex flex-col items-center'>
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute -inset-20'
-        style={{
-          background:
-            'radial-gradient(50% 50% at 50% 40%, rgba(255,255,255,0.03) 0%, transparent 70%)',
-        }}
-      />
-
-      <div
-        className='relative overflow-hidden'
-        style={{
-          height: 440,
-          width: 300,
-          perspective: '1200px',
-          perspectiveOrigin: '50% 40%',
-        }}
-      >
-        <div
+      <div className='relative flex w-full max-w-[900px] flex-col items-center py-10 text-center lg:py-14'>
+        <h1
           style={{
-            transform: 'rotateY(-3deg) rotateX(1deg)',
-            transformStyle: 'preserve-3d',
+            fontSize: 'clamp(36px, calc(16px + 4vw), 64px)',
+            fontWeight: 510,
+            lineHeight: 1,
+            letterSpacing: '-0.022em',
+            color: 'var(--linear-text-primary)',
+            fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
+            fontVariationSettings: '"opsz" 64',
           }}
         >
-          <PhoneFrame>
-            <MobileProfilePreview creator={creator} />
-          </PhoneFrame>
-        </div>
+          AI to power your music career.
+        </h1>
 
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 bottom-0'
-          style={{
-            height: 100,
-            background:
-              'linear-gradient(to bottom, transparent, var(--linear-bg-page))',
-          }}
-        />
-      </div>
-
-      <div
-        className='mt-3 rounded-full border px-3 py-1.5'
-        style={{
-          borderColor: 'var(--linear-border-subtle)',
-          background: 'rgba(255, 255, 255, 0.02)',
-          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)',
-        }}
-      >
         <p
+          className='mx-auto mt-4 max-w-[500px]'
           style={{
-            fontSize: '12px',
-            fontWeight: 500,
-            letterSpacing: '-0.005em',
+            fontSize: '17px',
+            fontWeight: 400,
+            lineHeight: 1.6,
+            letterSpacing: '-0.011em',
             color: 'var(--linear-text-secondary)',
           }}
         >
-          jov.ie/{creator.handle}
+          Built to amplify your work — not replace it.
+        </p>
+
+        <div className='mt-8 w-full max-w-[480px] text-left'>
+          <ClaimHandleForm />
+        </div>
+
+        <p
+          className='mt-3 flex items-center justify-center gap-2'
+          style={{
+            fontSize: '13px',
+            fontWeight: 510,
+            letterSpacing: '0.01em',
+            color: 'var(--linear-text-tertiary)',
+          }}
+        >
+          <span
+            aria-hidden='true'
+            className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
+          />
+          Free forever. No credit card.
         </p>
       </div>
-    </div>
+    </section>
   );
 }
