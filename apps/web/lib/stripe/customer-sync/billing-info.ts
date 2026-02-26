@@ -42,6 +42,13 @@ export async function getUserBillingInfo(): Promise<{
     fields: BILLING_FIELDS_FULL,
   });
 
+  if (!result.success && result.error === 'User not found') {
+    return {
+      success: true,
+      data: undefined,
+    };
+  }
+
   // If the query failed, pass through the error
   if (!result.success || !result.data) {
     return {
