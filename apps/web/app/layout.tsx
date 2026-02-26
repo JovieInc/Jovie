@@ -26,6 +26,18 @@ const inter = localFont({
   weight: '100 900',
 });
 
+const getRequestHeaders = async () => {
+  if (typeof headers !== 'function') {
+    return new Headers();
+  }
+
+  try {
+    return await headers();
+  } catch {
+    return new Headers();
+  }
+};
+
 export const metadata: Metadata = {
   title: {
     default: APP_NAME,
@@ -157,7 +169,7 @@ export default async function RootLayout({
 
   // Read CSP nonce from request headers (set by middleware) to prevent
   // hydration mismatch: server renders nonce="" but client expects undefined
-  const headersList = await headers();
+  const headersList = await getRequestHeaders();
   const nonce = headersList.get('x-nonce') || undefined;
   const cookieHeader = headersList.get('cookie');
   const cookieRequirement = cookieHeader
