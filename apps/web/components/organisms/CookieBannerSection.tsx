@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { saveConsent } from '@/lib/cookies/consent';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 
 declare global {
   var JVConsent:
@@ -17,12 +18,25 @@ declare global {
 }
 
 export interface CookieBannerSectionProps {
+  /** @deprecated No longer used -- cookie requirement is read client-side from document.cookie */
   readonly showBanner?: boolean;
 }
 
-export function CookieBannerSection({
-  showBanner = true,
-}: CookieBannerSectionProps) {
+/**
+ * Read the cookie-banner-required flag from document.cookie.
+ * The middleware sets `jv_cc_required=1` for EU/EEA visitors and `0` otherwise.
+ * If the cookie is absent (e.g. first visit before middleware runs) we default to showing the banner.
+ */
+function isBannerRequiredFromCookie(): boolean {
+  if (typeof document === 'undefined') return true;
+  const match = document.cookie
+    .split(';')
+    .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
+  if (!match) return true; // cookie not set yet -- show banner as a safe default
+  return match.split('=')[1]?.trim() !== '0';
+}
+
+export function CookieBannerSection(_props: CookieBannerSectionProps) {
   const pathname = usePathname();
   const isDashboard = Boolean(pathname?.startsWith('/app'));
 
@@ -31,7 +45,13 @@ export function CookieBannerSection({
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
 
   useEffect(() => {
-    if (!showBanner || isDashboard) {
+    if (isDashboard) {
+      setVisible(false);
+      return;
+    }
+
+    const bannerRequired = isBannerRequiredFromCookie();
+    if (!bannerRequired) {
       setVisible(false);
       return;
     }
@@ -42,7 +62,7 @@ export function CookieBannerSection({
     } catch {
       setVisible(true);
     }
-  }, [showBanner, isDashboard]);
+  }, [isDashboard]);
 
   useEffect(() => {
     if (globalThis.window && !globalThis.JVConsent) {
@@ -102,7 +122,7 @@ export function CookieBannerSection({
 
   return (
     <>
-      {showBanner && visible && !isDashboard ? (
+      {visible && !isDashboard ? (
         <aside
           aria-label='Cookie consent'
           data-testid='cookie-banner'
