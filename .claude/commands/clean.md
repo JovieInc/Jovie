@@ -88,11 +88,12 @@ After fixing a cohesive group of errors (e.g., all errors in one component, one 
 If yes to all three — **ship immediately:**
 
 ```bash
-# Return to main
-git checkout main && git pull origin main
+# Return to develop
+git checkout develop && git pull origin develop
 
 # Create focused branch
-git checkout -b fix/clean-{category}-$(date +%Y%m%d-%H%M%S)
+BRANCH="fix/clean-{category}-$(date +%Y%m%d-%H%M%S)"
+git checkout -b "$BRANCH"
 
 # Stage specific files, commit, push, PR, auto-merge
 git add <specific-files>
@@ -103,9 +104,10 @@ git commit -m "fix: resolve {category} console errors from E2E smoke tests
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
-git push -u origin fix/clean-{category}-$(date +%Y%m%d-%H%M%S)
+git push -u origin "$BRANCH"
 
 gh pr create \
+  --base develop \
   --title "fix: clean {category} console errors from E2E smoke tests" \
   --body "$(cat <<'EOF'
 ## Summary
@@ -125,13 +127,13 @@ EOF
 
 gh pr merge --auto --squash
 
-# Return to main for next batch
-git checkout main
+# Return to develop for next batch
+git checkout develop
 ```
 
 **Don't wait for CI** — move to the next group of errors immediately. CI runs in parallel.
 
-Then continue the fix loop from Step 1, re-running tests on fresh main to find remaining errors.
+Then continue the fix loop from Step 1, re-running tests on fresh develop to find remaining errors.
 
 ### Step 3: Final Verification
 
@@ -149,7 +151,7 @@ If there are any remaining uncommitted fixes, ship them as a final PR.
 
 ### Step 4: Summary
 
-```
+```text
 E2E Clean Run Complete
 
 PRs Created:

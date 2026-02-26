@@ -85,8 +85,8 @@ If verification fails, fix before proceeding.
 #### 3d. Ship Immediately
 
 ```bash
-# Ensure on latest main
-git checkout main && git pull origin main
+# Ensure on latest develop
+git checkout develop && git pull origin develop
 
 # Create feature branch
 git checkout -b fix/sonarcloud-{rule-or-category}-{batch-number}
@@ -126,10 +126,10 @@ EOF
 gh pr merge --auto --squash
 ```
 
-**Do NOT wait for CI.** Immediately return to main and start the next batch.
+**Do NOT wait for CI.** Immediately return to develop and start the next batch.
 
 ```bash
-git checkout main
+git checkout develop
 ```
 
 #### 3e. Next Batch
@@ -140,7 +140,7 @@ Repeat from step 3a with the next group of issues. Each PR ships independently â
 
 After all batches are shipped:
 
-```
+```text
 SonarCloud Fix Run Complete
 
 PRs Created:
