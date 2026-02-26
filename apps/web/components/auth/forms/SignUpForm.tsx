@@ -167,7 +167,7 @@ export function SignUpForm() {
                 Account already exists.{' '}
                 <Link
                   href={buildSignInUrl(email)}
-                  className='text-primary-token hover:underline focus-ring-themed rounded-md'
+                  className='text-primary-token underline focus-ring-themed rounded-md'
                 >
                   Sign in instead
                 </Link>
