@@ -26,6 +26,7 @@ const DeeplinksGrid = dynamic(
 );
 
 import { DashboardShowcase } from '@/components/home/DashboardShowcase';
+import { FeatureBlocks } from '@/components/home/FeatureBlocks';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { HowItWorksRich } from '@/components/home/HowItWorksRich';
@@ -42,6 +43,7 @@ import {
   homepageDashboardShowcase,
   homepageDeeplinksGrid,
   homepageExampleProfiles,
+  homepageFeatureBlocks,
   homepageFinalCta,
   homepageHero,
   homepageHowItWorks,
@@ -267,6 +269,7 @@ export default async function HomePage() {
     showSeeItInAction,
     showFinalCta,
     showAutomaticReleaseSmartlinks,
+    showFeatureBlocks,
   ] = await Promise.all([
     homepageHero(),
     homepageLabelLogos(),
@@ -279,6 +282,7 @@ export default async function HomePage() {
     homepageSeeItInAction(),
     homepageFinalCta(),
     homepageAutomaticReleaseSmartlinks(),
+    homepageFeatureBlocks(),
   ]);
 
   return (
@@ -332,6 +336,12 @@ export default async function HomePage() {
       )}
 
       {showLabelLogos && <LabelLogosBar />}
+
+      {showFeatureBlocks && (
+        <DeferredSection placeholderHeight={1200}>
+          <FeatureBlocks />
+        </DeferredSection>
+      )}
 
       {showProductPreview && (
         <DeferredSection placeholderHeight={640}>

@@ -117,6 +117,15 @@ export const homepageAutomaticReleaseSmartlinks = flag({
   },
 });
 
+export const homepageFeatureBlocks = flag({
+  key: 'homepage_feature_blocks',
+  description: 'Show the feature blocks section on the homepage',
+  defaultValue: false,
+  decide() {
+    return this.defaultValue as boolean;
+  },
+});
+
 /** All homepage flags for bulk operations (discovery endpoint, layout encryption) */
 export const homepageFlags = [
   homepageHero,
@@ -132,4 +141,5 @@ export const homepageFlags = [
   homepageFinalCta,
   homepageDashboardShowcase,
   homepageAutomaticReleaseSmartlinks,
+  homepageFeatureBlocks,
 ] as const;
