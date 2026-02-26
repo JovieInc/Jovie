@@ -202,6 +202,11 @@ export const creatorProfiles = pgTable(
       table.userId,
       table.isClaimed
     ),
+    // Performance index: dashboard profile lookups by user ordered by creation time.
+    userIdCreatedAtIndex: index('idx_creator_profiles_user_id_created_at').on(
+      table.userId,
+      table.createdAt
+    ),
     // Enforce one-to-one Spotify artist ownership across creator profiles.
     spotifyIdUnique: uniqueIndex('creator_profiles_spotify_id_unique')
       .on(table.spotifyId)

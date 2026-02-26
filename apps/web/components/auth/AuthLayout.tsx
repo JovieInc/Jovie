@@ -220,7 +220,7 @@ export function AuthLayout({
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-primary-token hover:underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-primary-token underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>

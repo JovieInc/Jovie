@@ -28,7 +28,6 @@ export const chatUsageQueryOptions = {
     return failureCount < 1;
   },
   retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-  refetchOnWindowFocus: true,
 } as const;
 
 export function useChatUsageQuery() {

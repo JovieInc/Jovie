@@ -15,6 +15,7 @@ import {
   getEligibleProfileCount,
   maskEmail,
   NO_STORE_HEADERS,
+  PREVIEW_LIMIT,
   parsePreviewParams,
 } from './lib';
 
@@ -117,18 +118,20 @@ export async function POST(request: Request) {
             maxPerHour,
             effectiveRate: Math.round(3600000 / avgDelayMs),
           },
-          profiles: profilesWithEmails.map(p => ({
+          profiles: profilesWithEmails.slice(0, PREVIEW_LIMIT).map(p => ({
             id: p.id,
             username: p.username,
             displayName: p.displayName,
             fitScore: p.fitScore,
-            email: p.contactEmail,
+            email: maskEmail(p.contactEmail),
           })),
-          skipped: profilesWithoutEmails.map(p => ({
+          profilesTruncated: profilesWithEmails.length > PREVIEW_LIMIT,
+          skipped: profilesWithoutEmails.slice(0, PREVIEW_LIMIT).map(p => ({
             id: p.id,
             username: p.username,
             reason: 'no_contact_email',
           })),
+          skippedTruncated: profilesWithoutEmails.length > PREVIEW_LIMIT,
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );
