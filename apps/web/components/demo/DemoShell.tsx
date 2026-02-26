@@ -50,9 +50,6 @@ const NAV_ITEMS: { key: DemoTab; label: string; icon: typeof Music2 }[] = [
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
-const toolbarBtnClass =
-  'flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-0 rounded hover:bg-interactive-hover gap-1.5 text-xs font-medium';
-
 export function DemoShell({
   activeTab,
   onTabChange,
@@ -95,7 +92,7 @@ export function DemoShell({
                           isActive={activeTab === item.key}
                           tooltip={item.label}
                           onClick={() => onTabChange(item.key)}
-                          className='h-7'
+                          className='h-7 text-[13px]'
                         >
                           <item.icon className='size-3.5' />
                           <span>{item.label}</span>
@@ -130,11 +127,17 @@ export function DemoShell({
             {activeTab === 'releases' && (
               <div className='flex items-center gap-2'>
                 <div className='flex items-center mr-2 gap-1'>
-                  <button type='button' className={toolbarBtnClass}>
+                  <button
+                    type='button'
+                    className='flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-0 rounded hover:bg-interactive-hover gap-1.5 text-xs font-medium'
+                  >
                     <ListFilter className='size-3.5' />
                     <span>Filter</span>
                   </button>
-                  <button type='button' className={toolbarBtnClass}>
+                  <button
+                    type='button'
+                    className='flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-0 rounded hover:bg-interactive-hover gap-1.5 text-xs font-medium'
+                  >
                     <SlidersHorizontal className='size-3.5' />
                     <span>Display</span>
                   </button>

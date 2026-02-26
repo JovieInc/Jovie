@@ -24,11 +24,8 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
     >
       <title id={`status-${status}`}>{label}</title>
       {status === 'live' && (
-        <svg
-          viewBox='0 0 14 14'
-          className='overflow-visible'
-          aria-hidden='true'
-        >
+        <svg viewBox='0 0 14 14' className='overflow-visible'>
+          <title>{label}</title>
           <circle cx='7' cy='7' r='5' fill={color} />
           <path
             d='M4.5 7L6.5 9L9.5 5'
