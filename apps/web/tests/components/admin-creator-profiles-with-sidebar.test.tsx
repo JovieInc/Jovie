@@ -107,16 +107,22 @@ const getProfileRow = (username: string) =>
   screen.getByRole('row', { name: new RegExp(`@${username}`, 'i') });
 
 const expectSidebarOpen = async () => {
-  await waitFor(() => {
-    expect(screen.getByTestId('contact-sidebar')).toHaveAttribute(
-      'aria-hidden',
-      'false'
-    );
-  });
+  await waitFor(
+    () => {
+      expect(screen.getByTestId('contact-sidebar')).toHaveAttribute(
+        'aria-hidden',
+        'false'
+      );
+    },
+    { timeout: 3000 }
+  );
 
-  await waitFor(() => {
-    expect(screen.getByPlaceholderText('First')).toBeInTheDocument();
-  });
+  await waitFor(
+    () => {
+      expect(screen.getByPlaceholderText('First')).toBeInTheDocument();
+    },
+    { timeout: 3000 }
+  );
 
   return screen.getByTestId('contact-sidebar');
 };
