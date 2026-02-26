@@ -2,11 +2,10 @@
 
 import { useChat } from '@ai-sdk/react';
 import * as Sentry from '@sentry/nextjs';
+import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { useAsyncRateLimiter } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys } from '@/lib/queries/keys';
 import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';

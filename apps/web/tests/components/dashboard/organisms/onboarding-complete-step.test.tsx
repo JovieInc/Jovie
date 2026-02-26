@@ -31,4 +31,34 @@ describe('OnboardingCompleteStep', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('2/3')).toBeInTheDocument();
   });
+
+  it('disables dashboard action while spotify import is in progress', () => {
+    render(
+      <OnboardingCompleteStep
+        {...baseProps}
+        spotifyImportStatus='importing'
+        spotifyImportStage={0}
+        spotifyImportMessage='Importing your artists…'
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Finishing setup...' })
+    ).toBeDisabled();
+  });
+
+  it('enables dashboard action when spotify import succeeds', () => {
+    render(
+      <OnboardingCompleteStep
+        {...baseProps}
+        spotifyImportStatus='success'
+        spotifyImportStage={2}
+        spotifyImportMessage='All set!'
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Go to Dashboard' })
+    ).toBeEnabled();
+  });
 });

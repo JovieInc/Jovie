@@ -28,6 +28,8 @@ export function OnboardingCompleteStep({
   spotifyImportMessage,
   spotifyImportStage,
 }: OnboardingCompleteStepProps) {
+  const isSpotifyImportInProgress = spotifyImportStatus === 'importing';
+
   return (
     <div className='flex flex-col items-center justify-center h-full'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
@@ -61,7 +63,15 @@ export function OnboardingCompleteStep({
         ) : null}
 
         <div className={FORM_LAYOUT.formInner}>
-          <AuthButton onClick={onGoToDashboard}>Go to Dashboard</AuthButton>
+          <AuthButton
+            onClick={onGoToDashboard}
+            disabled={isSpotifyImportInProgress}
+            aria-busy={isSpotifyImportInProgress}
+          >
+            {isSpotifyImportInProgress
+              ? 'Finishing setup...'
+              : 'Go to Dashboard'}
+          </AuthButton>
 
           <AuthButton onClick={onCopyLink} variant='secondary'>
             Copy Link
