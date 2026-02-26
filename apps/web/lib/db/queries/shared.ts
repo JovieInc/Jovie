@@ -90,7 +90,6 @@ export interface SocialLink {
   confidence: string;
   sourcePlatform: string | null;
   sourceType: string | null;
-  evidence: unknown;
   version: number;
 }
 
@@ -144,7 +143,6 @@ export async function getProfileSocialLinks(
       confidence: socialLinks.confidence,
       sourcePlatform: socialLinks.sourcePlatform,
       sourceType: socialLinks.sourceType,
-      evidence: socialLinks.evidence,
       version: socialLinks.version,
     })
     .from(socialLinks)

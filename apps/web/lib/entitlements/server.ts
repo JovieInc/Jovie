@@ -41,6 +41,10 @@ export class BillingUnavailableError extends Error {
   }
 }
 
+function isMissingBillingRecord(error?: string): boolean {
+  return error === 'User not found';
+}
+
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   const { userId } = await getCachedAuth();
   if (!userId) {
@@ -64,6 +68,16 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   ]);
 
   if (!billing.success) {
+    if (isMissingBillingRecord(billing.error)) {
+      return {
+        ...UNAUTHENTICATED_ENTITLEMENTS,
+        userId,
+        email: clerkEmail,
+        isAuthenticated: true,
+        isAdmin: adminStatus,
+      };
+    }
+
     // Billing lookup failed — throw so callers surface an error state
     // instead of silently revoking pro features for paying users.
     logger.warn('Billing lookup failed in entitlements (transient)', {

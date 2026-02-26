@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { logger } from '@/lib/utils/logger';
 import { waitlistSettingsUpdateSchema } from '@/lib/validation/schemas';
 import {
   getWaitlistSettings,
@@ -26,11 +27,25 @@ export async function GET() {
   if (!entitlements.isAuthenticated) return forbiddenResponse(401);
   if (!entitlements.isAdmin) return forbiddenResponse(403);
 
-  const settings = await getWaitlistSettings();
-  return NextResponse.json(
-    { success: true, settings },
-    { headers: NO_STORE_HEADERS }
-  );
+  try {
+    const settings = await getWaitlistSettings();
+    return NextResponse.json(
+      {
+        success: true,
+        settings: {
+          ...settings,
+          autoAcceptResetsAt: settings.autoAcceptResetsAt.toISOString(),
+        },
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    logger.error('Failed to load waitlist settings', { error });
+    return NextResponse.json(
+      { success: false, error: 'Failed to load waitlist settings' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -52,9 +67,23 @@ export async function PATCH(request: Request) {
     );
   }
 
-  const settings = await updateWaitlistSettings(parsed.data);
-  return NextResponse.json(
-    { success: true, settings },
-    { headers: NO_STORE_HEADERS }
-  );
+  try {
+    const settings = await updateWaitlistSettings(parsed.data);
+    return NextResponse.json(
+      {
+        success: true,
+        settings: {
+          ...settings,
+          autoAcceptResetsAt: settings.autoAcceptResetsAt.toISOString(),
+        },
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    logger.error('Failed to update waitlist settings', { error });
+    return NextResponse.json(
+      { success: false, error: 'Failed to update waitlist settings' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }

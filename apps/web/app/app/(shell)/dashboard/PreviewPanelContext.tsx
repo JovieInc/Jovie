@@ -24,6 +24,16 @@ export interface PreviewPanelData {
   avatarUrl: string | null;
   links: PreviewPanelLink[];
   profilePath: string;
+  dspConnections: {
+    spotify: {
+      connected: boolean;
+      artistName: string | null;
+    };
+    appleMusic: {
+      connected: boolean;
+      artistName: string | null;
+    };
+  };
 }
 
 // Split contexts to prevent cascading re-renders:
