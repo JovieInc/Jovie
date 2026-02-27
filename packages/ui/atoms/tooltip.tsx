@@ -89,7 +89,7 @@ const TooltipContent = React.forwardRef<
           'min-h-[28px]',
           // Tokenized surface styling to ensure Tailwind emits the tooltip background
           'max-w-xs border border-transparent',
-          'bg-surface-3 text-primary-token shadow-[0_4px_12px_rgba(0,0,0,0.4)]',
+          'bg-surface-tooltip text-tooltip-foreground shadow-lg',
           // Calm animation: slight fade + drift
           'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
           'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
@@ -115,7 +115,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-surface-3'
+            className='fill-surface-tooltip'
             data-testid='tooltip-arrow'
           />
         )}

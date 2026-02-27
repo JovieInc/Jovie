@@ -36,15 +36,15 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout — 13px / weight 500 / 6px radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-left text-app leading-tight tracking-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-2 text-left text-app leading-tight tracking-tight outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
-    // Transitions — Linear: 0.16s var(--ease-interactive)
-    'transition-[background-color,color] duration-normal ease-interactive',
+    // Transitions — Linear: instant for background, colors
+    'transition-[background-color,color] duration-0 ease-interactive',
     // Default text color - muted sidebar tokens matching Linear
     'text-sidebar-item-foreground',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:bg-sidebar-accent',
+    'hover:bg-sidebar-accent hover:text-sidebar-foreground',
     // Active state — Linear: rgba(255,255,255,0.06) bg, brighter text
     'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-foreground',
     // Focus state - subtle bg like Linear (no rings)
@@ -59,9 +59,9 @@ const sidebarMenuButtonVariants = cva(
     '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-normal [&>span:last-child]:ease-interactive',
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
     // Icon styling — 14px icons matching Linear
-    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-4 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-normal [&>svg]:ease-interactive',
-    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-normal [&_[data-sidebar-icon]_svg]:ease-interactive',
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
+    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
     'hover:[&>svg]:text-sidebar-item-icon',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
     'data-[active=true]:[&>svg]:text-sidebar-item-icon',
@@ -75,9 +75,9 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background shadow-[0_0_0_1px_rgb(var(--sidebar-border))] hover:shadow-[0_0_0_1px_rgb(var(--sidebar-accent))]',
       },
       size: {
-        default: 'min-h-7',
-        sm: 'min-h-6 text-xs',
-        lg: 'min-h-9 group-data-[collapsible=icon]:!size-9',
+        default: 'h-7',
+        sm: 'h-6 text-xs',
+        lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },
     },
     defaultVariants: {
