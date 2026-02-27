@@ -24,9 +24,9 @@ export function AutomaticReleaseSmartlinksSection() {
                 lineHeight: 1,
               }}
             >
-              Automatic smartlinks
+              Smart links for
               <br />
-              for every release.
+              every release.
             </h2>
             <div className='max-w-lg'>
               <p

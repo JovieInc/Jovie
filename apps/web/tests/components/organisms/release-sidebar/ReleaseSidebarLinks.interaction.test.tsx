@@ -157,8 +157,20 @@ vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
   ReleaseSidebarHeader: () => <div>Header</div>,
 }));
-vi.mock('@/components/organisms/release-sidebar/ReleaseArtwork', () => ({
-  ReleaseArtwork: () => <div>Artwork</div>,
+vi.mock('next/image', () => ({
+  default: (props: { alt: string }) => <img alt={props.alt} />,
+}));
+vi.mock('@/components/atoms/Icon', () => ({
+  Icon: () => <span />,
+}));
+vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+  AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  buildArtworkSizes: () => ({}),
+}));
+vi.mock('@/components/organisms/AvatarUploadable', () => ({
+  AvatarUploadable: () => <div>Artwork</div>,
 }));
 vi.mock('@/components/organisms/release-sidebar/ReleaseFields', () => ({
   ReleaseFields: () => <div>Fields</div>,

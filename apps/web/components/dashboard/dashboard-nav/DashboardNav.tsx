@@ -109,7 +109,7 @@ export function DashboardNav(_: DashboardNavProps) {
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: NavItem[]) => (
-      <SidebarMenu>
+      <SidebarMenu className='gap-0.5'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
