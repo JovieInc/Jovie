@@ -96,7 +96,7 @@ export function DemoReleasesPanel({
       className='h-full overflow-y-auto overflow-x-hidden outline-none scrollbar-hide'
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      role='listbox'
+      role='listbox' // NOSONAR - custom listbox pattern with keyboard navigation, native <select> not suitable for this UI
       aria-label='Releases'
     >
       {groups.map(group => {
@@ -136,7 +136,7 @@ export function DemoReleasesPanel({
                   <div
                     key={release.id}
                     data-release-id={release.id}
-                    role='option'
+                    role='option' // NOSONAR - custom listbox option with keyboard support
                     tabIndex={0}
                     aria-selected={isSelected}
                     onClick={() => {

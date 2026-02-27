@@ -141,7 +141,7 @@ export async function generateUniqueSlug(
   }
 
   // Fallback: append random suffix (extremely rare edge case)
-  const randomSuffix = Math.random().toString(36).slice(2, 8);
+  const randomSuffix = crypto.randomUUID().slice(0, 6);
   return `${baseSlug}-${randomSuffix}`;
 }
 

@@ -3,7 +3,7 @@ export interface MarkdownFrontmatterResult {
   data: Record<string, string>;
 }
 
-const FRONTMATTER_REGEX = /^---\s*\n([\s\S]*?)\n---\s*(?:\n|$)/;
+const FRONTMATTER_REGEX = /^--- *\n([\s\S]*?)\n--- *(?:\n|$)/;
 
 export function parseMarkdownFrontmatter(
   raw: string

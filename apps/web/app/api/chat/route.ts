@@ -1090,7 +1090,7 @@ const SIMPLE_INTENT_PATTERNS = [
   /^(?:upload|change|update|set)\s+(?:my\s+)?(?:photo|avatar|picture|profile\s*pic|pfp)/i,
   /^(?:format|clean\s*up|fix)\s+(?:my\s+)?lyrics/i,
   /^check\s+(?:my\s+)?canvas/i,
-  /^mark\s+.+\s+as\s+(?:uploaded|done|set)/i,
+  /^mark\s+\S+(?:\s+\S+)*\s+as\s+(?:uploaded|done|set)/i,
 ] as const;
 
 /**

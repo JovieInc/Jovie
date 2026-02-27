@@ -83,7 +83,7 @@ export function EmailStep({
     }
 
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(trimmed)) {
       setLocalError('Please enter a valid email address.');
       return false;

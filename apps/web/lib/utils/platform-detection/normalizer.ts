@@ -191,13 +191,13 @@ export function normalizeUrl(url: string): string {
     }
 
     // Normalize stray spaces around dots
-    url = trimmed.replaceAll(/\s*\.\s*/g, '.');
+    url = trimmed.replaceAll(/ *\. */g, '.');
 
     // Fix common domain misspellings
     url = fixDomainMisspellings(url);
 
     // Comma instead of dot before common TLDs (e.g., youtube,com)
-    url = url.replaceAll(/,(?=\s*(com|net|tv|be|gg|me)\b)/gi, '.');
+    url = url.replaceAll(/,(?= *(com|net|tv|be|gg|me)\b)/gi, '.');
 
     // Fix missing dots before TLDs
     url = fixMissingDots(url);

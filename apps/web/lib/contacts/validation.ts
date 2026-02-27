@@ -1,6 +1,6 @@
 import type { ContactChannel, DashboardContactInput } from '@/types/contacts';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
 
 export function normalizeTerritories(raw: string[]): string[] {
   const cleaned = raw.map(value => value.trim()).filter(Boolean);
