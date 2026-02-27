@@ -1,9 +1,17 @@
 'use client';
 
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryClientContext, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { QueryProvider } from '@/components/providers/QueryProvider';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
@@ -20,7 +28,7 @@ import { BillingLoadingSkeleton } from './billing/BillingLoadingSkeleton';
 import { CurrentPlanCard } from './billing/CurrentPlanCard';
 import { PlanComparisonSection } from './billing/PlanComparisonSection';
 
-export const BillingDashboard = memo(function BillingDashboard() {
+const BillingDashboardContent = memo(function BillingDashboardContent() {
   const { error: notifyError, success: notifySuccess } = useNotifications();
   const queryClient = useQueryClient();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -130,4 +138,18 @@ export const BillingDashboard = memo(function BillingDashboard() {
       <BillingHistorySection historyQuery={historyQuery} />
     </div>
   );
+});
+
+export const BillingDashboard = memo(function BillingDashboard() {
+  const queryClient = useContext(QueryClientContext);
+
+  if (!queryClient) {
+    return (
+      <QueryProvider>
+        <BillingDashboardContent />
+      </QueryProvider>
+    );
+  }
+
+  return <BillingDashboardContent />;
 });
