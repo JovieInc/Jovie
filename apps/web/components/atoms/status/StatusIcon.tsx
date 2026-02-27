@@ -1,4 +1,6 @@
-import { memo } from 'react';
+'use client';
+
+import { memo, useId } from 'react';
 
 export type ReleaseStatus =
   | 'live'
@@ -25,6 +27,7 @@ export const StatusIcon = memo(function StatusIcon({
   readonly className?: string;
 }) {
   const { color, label } = STATUS_CONFIG[status];
+  const titleId = useId();
 
   return (
     <svg
@@ -32,16 +35,12 @@ export const StatusIcon = memo(function StatusIcon({
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      aria-labelledby={`status-${status}`}
+      aria-labelledby={titleId}
       className={`shrink-0 ${className ?? ''}`}
     >
-      <title id={`status-${status}`}>{label}</title>
+      <title id={titleId}>{label}</title>
       {status === 'live' && (
-        <svg
-          viewBox='0 0 14 14'
-          className='overflow-visible'
-          aria-hidden='true'
-        >
+        <g>
           <circle cx='7' cy='7' r='5' fill={color} />
           <path
             d='M4.5 7L6.5 9L9.5 5'
@@ -51,7 +50,7 @@ export const StatusIcon = memo(function StatusIcon({
             strokeLinejoin='round'
             fill='none'
           />
-        </svg>
+        </g>
       )}
       {status === 'syncing' && (
         <>

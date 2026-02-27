@@ -1,3 +1,6 @@
+'use client';
+
+import { useId } from 'react';
 import type { ReleaseStatus } from './demo-types';
 
 const SIZE = 14;
@@ -12,6 +15,7 @@ const STATUS_CONFIG: Record<ReleaseStatus, { color: string; label: string }> = {
 
 export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
   const { color, label } = STATUS_CONFIG[status];
+  const titleId = useId();
 
   return (
     <svg
@@ -19,16 +23,12 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      aria-labelledby={`status-${status}`}
+      aria-labelledby={titleId}
       className='shrink-0'
     >
-      <title id={`status-${status}`}>{label}</title>
+      <title id={titleId}>{label}</title>
       {status === 'live' && (
-        <svg
-          viewBox='0 0 14 14'
-          className='overflow-visible'
-          aria-hidden='true'
-        >
+        <g>
           <circle cx='7' cy='7' r='5' fill={color} />
           <path
             d='M4.5 7L6.5 9L9.5 5'
@@ -38,7 +38,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
             strokeLinejoin='round'
             fill='none'
           />
-        </svg>
+        </g>
       )}
       {status === 'syncing' && (
         <>

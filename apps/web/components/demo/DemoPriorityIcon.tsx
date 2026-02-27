@@ -1,3 +1,6 @@
+'use client';
+
+import { useId } from 'react';
 import type { ReleasePriority } from './demo-types';
 
 const SIZE = 14;
@@ -23,6 +26,7 @@ export function DemoPriorityIcon({
   readonly priority: ReleasePriority;
 }) {
   const { color, bars, label } = PRIORITY_CONFIG[priority];
+  const titleId = useId();
 
   if (bars === 0) {
     return (
@@ -31,10 +35,10 @@ export function DemoPriorityIcon({
         height={SIZE}
         viewBox='0 0 14 14'
         fill='none'
-        aria-labelledby={`priority-${priority}`}
+        aria-labelledby={titleId}
         className='shrink-0'
       >
-        <title id={`priority-${priority}`}>{label}</title>
+        <title id={titleId}>{label}</title>
         <line
           x1='3'
           y1='7'
@@ -59,10 +63,10 @@ export function DemoPriorityIcon({
       height={SIZE}
       viewBox='0 0 14 14'
       fill='none'
-      aria-labelledby={`priority-${priority}-bars`}
+      aria-labelledby={titleId}
       className='shrink-0'
     >
-      <title id={`priority-${priority}-bars`}>{label}</title>
+      <title id={titleId}>{label}</title>
       {Array.from({ length: bars }, (_, i) => {
         const height = 3 + i * 2;
         const x = startX + i * (barWidth + gap);

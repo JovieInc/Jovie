@@ -22,8 +22,10 @@ export const AssigneeAvatar = memo(function AssigneeAvatar({
         backgroundColor: assignee.color,
       }}
       title={assignee.name}
+      role='img'
+      aria-label={assignee.name}
     >
-      {assignee.initials}
+      <span aria-hidden='true'>{assignee.initials}</span>
     </div>
   );
 });
