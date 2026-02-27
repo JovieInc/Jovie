@@ -1,7 +1,8 @@
 'use client';
 
-import { useId } from 'react';
-import type { ReleasePriority } from './demo-types';
+import { memo, useId } from 'react';
+
+export type ReleasePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
 
 const SIZE = 14;
 
@@ -20,10 +21,12 @@ const PRIORITY_CONFIG: Record<
   },
 };
 
-export function DemoPriorityIcon({
+export const PriorityIcon = memo(function PriorityIcon({
   priority,
+  className,
 }: {
   readonly priority: ReleasePriority;
+  readonly className?: string;
 }) {
   const { color, bars, label } = PRIORITY_CONFIG[priority];
   const titleId = useId();
@@ -36,7 +39,7 @@ export function DemoPriorityIcon({
         viewBox='0 0 14 14'
         fill='none'
         aria-labelledby={titleId}
-        className='shrink-0'
+        className={`shrink-0 ${className ?? ''}`}
       >
         <title id={titleId}>{label}</title>
         <line
@@ -64,7 +67,7 @@ export function DemoPriorityIcon({
       viewBox='0 0 14 14'
       fill='none'
       aria-labelledby={titleId}
-      className='shrink-0'
+      className={`shrink-0 ${className ?? ''}`}
     >
       <title id={titleId}>{label}</title>
       {Array.from({ length: bars }, (_, i) => {
@@ -73,7 +76,7 @@ export function DemoPriorityIcon({
         const y = 11 - height;
         return (
           <rect
-            key={`bar-${x}-${y}`}
+            key={`bar-${priority}-${i.toString()}`}
             x={x}
             y={y}
             width={barWidth}
@@ -85,4 +88,4 @@ export function DemoPriorityIcon({
       })}
     </svg>
   );
-}
+});

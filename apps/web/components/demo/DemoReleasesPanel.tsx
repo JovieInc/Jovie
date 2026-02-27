@@ -1,5 +1,6 @@
 'use client';
 
+import { ChevronRight } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DemoAvatar } from './DemoAvatar';
@@ -92,7 +93,7 @@ export function DemoReleasesPanel({
   return (
     <div
       ref={listRef}
-      className='h-full overflow-y-auto outline-none scrollbar-none'
+      className='h-full overflow-y-auto overflow-x-hidden outline-none scrollbar-hide'
       tabIndex={0}
       onKeyDown={handleKeyDown}
       role='listbox' // NOSONAR - custom listbox pattern with keyboard navigation, native <select> not suitable for this UI
@@ -108,24 +109,15 @@ export function DemoReleasesPanel({
               type='button'
               onClick={() => toggleGroup(group.status)}
               className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-8 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token hover:text-secondary-token'
+              aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
             >
-              <svg
+              <ChevronRight
                 className={cn(
                   'size-3.5 shrink-0 transition-transform duration-fast text-tertiary-token',
                   !isCollapsed && 'rotate-90'
                 )}
-                viewBox='0 0 12 12'
-                fill='none'
                 aria-hidden='true'
-              >
-                <path
-                  d='M4.5 3L7.5 6L4.5 9'
-                  stroke='currentColor'
-                  strokeWidth='1.5'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                />
-              </svg>
+              />
               <DemoStatusIcon status={group.status} />
               <span>{STATUS_LABEL[group.status]}</span>
               <span className='text-quaternary-token'>

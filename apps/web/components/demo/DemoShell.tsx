@@ -70,7 +70,11 @@ export function DemoShell({
             <SidebarHeader className='px-2 pt-2 pb-0 h-9 justify-center'>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton size='sm' className='h-7 font-medium'>
+                  <SidebarMenuButton
+                    size='sm'
+                    className='h-7 font-medium'
+                    aria-label='Open workspace selector'
+                  >
                     <div className='flex items-center gap-1.5 w-full'>
                       <BrandLogo
                         size={16}
@@ -130,11 +134,19 @@ export function DemoShell({
             {activeTab === 'releases' && (
               <div className='flex items-center gap-2'>
                 <div className='flex items-center mr-2 gap-1'>
-                  <button type='button' className={toolbarBtnClass}>
+                  <button
+                    type='button'
+                    className={toolbarBtnClass}
+                    aria-label='Open filter menu'
+                  >
                     <ListFilter className='size-3.5' />
                     <span>Filter</span>
                   </button>
-                  <button type='button' className={toolbarBtnClass}>
+                  <button
+                    type='button'
+                    className={toolbarBtnClass}
+                    aria-label='Open display options'
+                  >
                     <SlidersHorizontal className='size-3.5' />
                     <span>Display</span>
                   </button>
