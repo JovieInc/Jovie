@@ -1,5 +1,4 @@
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
@@ -25,8 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.text();
-    const headersList = await headers();
-    const signature = headersList.get('stripe-signature');
+    const signature = req.headers.get('stripe-signature');
 
     if (!signature) {
       return NextResponse.json(

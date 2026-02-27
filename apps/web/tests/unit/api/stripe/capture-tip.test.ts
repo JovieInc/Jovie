@@ -2,16 +2,10 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/capture-tip/route';
 
-const { mockHeaders, mockInsert, mockSelect, mockStripeConstructEvent } =
-  vi.hoisted(() => ({
-    mockHeaders: vi.fn(),
-    mockInsert: vi.fn(),
-    mockSelect: vi.fn(),
-    mockStripeConstructEvent: vi.fn(),
-  }));
-
-vi.mock('next/headers', () => ({
-  headers: () => mockHeaders(),
+const { mockInsert, mockSelect, mockStripeConstructEvent } = vi.hoisted(() => ({
+  mockInsert: vi.fn(),
+  mockSelect: vi.fn(),
+  mockStripeConstructEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -43,8 +37,6 @@ describe('/api/capture-tip', () => {
   });
 
   it('returns 400 when signature is missing', async () => {
-    mockHeaders.mockResolvedValue(new Map() as any);
-
     const request = new NextRequest('http://localhost:3000/api/capture-tip', {
       method: 'POST',
       body: 'test-body',
@@ -57,10 +49,6 @@ describe('/api/capture-tip', () => {
   });
 
   it('persists a new tip for payment_intent.succeeded', async () => {
-    mockHeaders.mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -104,6 +92,7 @@ describe('/api/capture-tip', () => {
     const request = new NextRequest('http://localhost:3000/api/capture-tip', {
       method: 'POST',
       body: 'test-body',
+      headers: { 'stripe-signature': 'sig_test' },
     });
 
     const response = await POST(request);
@@ -116,10 +105,6 @@ describe('/api/capture-tip', () => {
   });
 
   it('returns 500 when creator profile not found (CRITICAL bug prevention)', async () => {
-    mockHeaders.mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -146,6 +131,7 @@ describe('/api/capture-tip', () => {
     const request = new NextRequest('http://localhost:3000/api/capture-tip', {
       method: 'POST',
       body: 'test-body',
+      headers: { 'stripe-signature': 'sig_test' },
     });
 
     const response = await POST(request);
@@ -161,10 +147,6 @@ describe('/api/capture-tip', () => {
   });
 
   it('handles duplicate tip events via onConflictDoNothing', async () => {
-    mockHeaders.mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -199,6 +181,7 @@ describe('/api/capture-tip', () => {
     const request = new NextRequest('http://localhost:3000/api/capture-tip', {
       method: 'POST',
       body: 'test-body',
+      headers: { 'stripe-signature': 'sig_test' },
     });
 
     const response = await POST(request);
@@ -208,10 +191,6 @@ describe('/api/capture-tip', () => {
   });
 
   it('ignores non-payment_intent.succeeded events', async () => {
-    mockHeaders.mockResolvedValue(
-      new Map([['stripe-signature', 'sig_test']]) as any
-    );
-
     const event = {
       type: 'payment_intent.created', // Different event type
       data: {
@@ -226,6 +205,7 @@ describe('/api/capture-tip', () => {
     const request = new NextRequest('http://localhost:3000/api/capture-tip', {
       method: 'POST',
       body: 'test-body',
+      headers: { 'stripe-signature': 'sig_test' },
     });
 
     const response = await POST(request);
