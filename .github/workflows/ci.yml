@@ -1243,6 +1243,10 @@ jobs:
           NODE_ENV: test
           CI: true
           SMOKE_ONLY: '1'
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-pr-e2e
+          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
@@ -1571,6 +1575,10 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           SMOKE_ONLY: '1'
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-pr-e2e
+          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
@@ -1591,6 +1599,10 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           SMOKE_ONLY: '1'
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-pr-e2e-auth
+          SENTRY_RELEASE: ${{ github.sha }}
           # Auth smoke requires real Clerk keys in CI
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -1608,6 +1620,10 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-main-e2e
+          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -1620,7 +1636,7 @@ jobs:
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test --reporter=line --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
         if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
@@ -1635,7 +1651,11 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
-        run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
+          SENTRY_RELEASE: ${{ github.sha }}
+        run: cd apps/web && pnpm playwright test --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
