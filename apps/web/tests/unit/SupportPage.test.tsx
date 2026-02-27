@@ -8,10 +8,15 @@ vi.mock('@/lib/analytics', () => ({
   page: vi.fn(),
 }));
 
-// Mock the constants module
-vi.mock('@/constants/app', () => ({
-  APP_NAME: 'Jovie',
-}));
+// Mock the constants module (use importOriginal to include re-exports like APP_URL)
+vi.mock('@/constants/app', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/constants/app')>();
+  return {
+    ...actual,
+    APP_NAME: 'Jovie',
+    APP_URL: 'https://meetjovie.com',
+  };
+});
 
 describe('SupportPage', () => {
   it('renders the support page correctly', () => {
