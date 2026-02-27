@@ -92,7 +92,7 @@ export function DemoReleasesPanel({
   return (
     <div
       ref={listRef}
-      className='h-full overflow-y-auto outline-none scrollbar-none [&::-webkit-scrollbar]:hidden'
+      className='h-full overflow-y-auto outline-none scrollbar-none'
       tabIndex={0}
       onKeyDown={handleKeyDown}
       role='listbox'
