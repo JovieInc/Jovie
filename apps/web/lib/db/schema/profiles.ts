@@ -300,46 +300,54 @@ export const creatorProfileAttributes = pgTable(
 );
 
 // Profile photos table for avatar uploads with Vercel Blob
-export const profilePhotos = pgTable('profile_photos', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  creatorProfileId: uuid('creator_profile_id').references(
-    () => creatorProfiles.id,
-    { onDelete: 'cascade' }
-  ),
-  ingestionOwnerUserId: uuid('ingestion_owner_user_id').references(
-    () => users.id,
-    { onDelete: 'set null' }
-  ),
-  status: photoStatusEnum('status').notNull().default('uploading'),
-  sourcePlatform: text('source_platform'),
-  sourceType: ingestionSourceTypeEnum('source_type')
-    .default('manual')
-    .notNull(),
-  confidence: numeric('confidence', { precision: 3, scale: 2 })
-    .default('1.00')
-    .notNull(),
-  lockedByUser: boolean('locked_by_user').default(false).notNull(),
-  blobUrl: text('blob_url'),
-  smallUrl: text('small_url'),
-  mediumUrl: text('medium_url'),
-  largeUrl: text('large_url'),
-  originalFilename: text('original_filename'),
-  mimeType: text('mime_type'),
-  fileSize: integer('file_size'),
-  width: integer('width'),
-  height: integer('height'),
-  processedAt: timestamp('processed_at'),
-  errorMessage: text('error_message'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-}, table => ({
-  userIdx: index('idx_profile_photos_user_id').on(table.userId),
-  creatorProfileIdx: index('idx_profile_photos_creator_profile_id').on(table.creatorProfileId),
-  ingestionOwnerIdx: index('idx_profile_photos_ingestion_owner').on(table.ingestionOwnerUserId),
-}));
+export const profilePhotos = pgTable(
+  'profile_photos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id').references(
+      () => creatorProfiles.id,
+      { onDelete: 'cascade' }
+    ),
+    ingestionOwnerUserId: uuid('ingestion_owner_user_id').references(
+      () => users.id,
+      { onDelete: 'set null' }
+    ),
+    status: photoStatusEnum('status').notNull().default('uploading'),
+    sourcePlatform: text('source_platform'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    confidence: numeric('confidence', { precision: 3, scale: 2 })
+      .default('1.00')
+      .notNull(),
+    lockedByUser: boolean('locked_by_user').default(false).notNull(),
+    blobUrl: text('blob_url'),
+    smallUrl: text('small_url'),
+    mediumUrl: text('medium_url'),
+    largeUrl: text('large_url'),
+    originalFilename: text('original_filename'),
+    mimeType: text('mime_type'),
+    fileSize: integer('file_size'),
+    width: integer('width'),
+    height: integer('height'),
+    processedAt: timestamp('processed_at'),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    userIdx: index('idx_profile_photos_user_id').on(table.userId),
+    creatorProfileIdx: index('idx_profile_photos_creator_profile_id').on(
+      table.creatorProfileId
+    ),
+    ingestionOwnerIdx: index('idx_profile_photos_ingestion_owner').on(
+      table.ingestionOwnerUserId
+    ),
+  })
+);
 
 // Creator claim invites table for tracking email invitations to claim profiles
 export const creatorClaimInvites = pgTable(
@@ -374,7 +382,9 @@ export const creatorClaimInvites = pgTable(
     creatorProfileIdIdx: index(
       'idx_creator_claim_invites_creator_profile_id'
     ).on(table.creatorProfileId),
-    creatorContactIdIdx: index('idx_creator_claim_invites_contact_id').on(table.creatorContactId),
+    creatorContactIdIdx: index('idx_creator_claim_invites_contact_id').on(
+      table.creatorContactId
+    ),
 
     statusIdx: index('idx_creator_claim_invites_status').on(table.status),
     sendAtIdx: index('idx_creator_claim_invites_send_at').on(table.sendAt),

@@ -137,7 +137,9 @@ export const clickEvents = pgTable(
     createdAtIdx: index('click_events_created_at_idx').on(table.createdAt),
     // Performance index: analytics aggregation by link type
     linkIdIdx: index('idx_click_events_link_id').on(table.linkId),
-    audienceMemberIdIdx: index('idx_click_events_audience_member_id').on(table.audienceMemberId),
+    audienceMemberIdIdx: index('idx_click_events_audience_member_id').on(
+      table.audienceMemberId
+    ),
 
     linkTypeAnalyticsIndex: index('idx_click_events_link_type').on(
       table.creatorProfileId,
