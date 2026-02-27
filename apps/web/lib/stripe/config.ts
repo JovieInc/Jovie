@@ -11,6 +11,7 @@
  * - Growth: $99/mo or $948/yr (save 2 months) - Coming soon
  */
 
+import { PRICING } from '@/lib/config/pricing';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
@@ -30,48 +31,46 @@ interface PriceMapping {
 // Current active price mappings
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
-    // Founding tier pricing (early supporter, locked in for life)
+    // All tiers from centralized PRICING config
     {
-      priceId: env.STRIPE_PRICE_FOUNDING_MONTHLY || '',
-      plan: 'founding',
-      amount: 900, // $9/mo
+      priceId: PRICING.founding.monthly.priceId || '',
+      plan: PRICING.founding.monthly.entitlementPlan,
+      amount: PRICING.founding.monthly.amount,
       currency: 'usd',
-      interval: 'month',
-      description: 'Founding Member Monthly',
-    },
-    // Pro tier pricing
-    {
-      priceId: env.STRIPE_PRICE_PRO_MONTHLY || '',
-      plan: 'pro',
-      amount: 3900, // $39/mo
-      currency: 'usd',
-      interval: 'month',
-      description: 'Pro Monthly',
+      interval: PRICING.founding.monthly.interval,
+      description: PRICING.founding.monthly.label,
     },
     {
-      priceId: env.STRIPE_PRICE_PRO_YEARLY || '',
-      plan: 'pro',
-      amount: 34800, // $348/yr (save 2 months)
+      priceId: PRICING.pro.monthly.priceId || '',
+      plan: PRICING.pro.monthly.entitlementPlan,
+      amount: PRICING.pro.monthly.amount,
       currency: 'usd',
-      interval: 'year',
-      description: 'Pro Yearly',
-    },
-    // Growth tier pricing (coming soon)
-    {
-      priceId: env.STRIPE_PRICE_GROWTH_MONTHLY || '',
-      plan: 'growth',
-      amount: 9900, // $99/mo
-      currency: 'usd',
-      interval: 'month',
-      description: 'Growth Monthly',
+      interval: PRICING.pro.monthly.interval,
+      description: PRICING.pro.monthly.label,
     },
     {
-      priceId: env.STRIPE_PRICE_GROWTH_YEARLY || '',
-      plan: 'growth',
-      amount: 94800, // $948/yr (save 2 months)
+      priceId: PRICING.pro.annual.priceId || '',
+      plan: PRICING.pro.annual.entitlementPlan,
+      amount: PRICING.pro.annual.amount,
       currency: 'usd',
-      interval: 'year',
-      description: 'Growth Yearly',
+      interval: PRICING.pro.annual.interval,
+      description: PRICING.pro.annual.label,
+    },
+    {
+      priceId: PRICING.growth.monthly.priceId || '',
+      plan: PRICING.growth.monthly.entitlementPlan,
+      amount: PRICING.growth.monthly.amount,
+      currency: 'usd',
+      interval: PRICING.growth.monthly.interval,
+      description: PRICING.growth.monthly.label,
+    },
+    {
+      priceId: PRICING.growth.annual.priceId || '',
+      plan: PRICING.growth.annual.entitlementPlan,
+      amount: PRICING.growth.annual.amount,
+      currency: 'usd',
+      interval: PRICING.growth.annual.interval,
+      description: PRICING.growth.annual.label,
     },
   ];
 
@@ -140,6 +139,18 @@ export function validateStripeConfig(): {
 
   if (!publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
     missingVars.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
+  }
+
+  if (!env.STRIPE_PRICE_FOUNDING_MONTHLY) {
+    missingVars.push('STRIPE_PRICE_FOUNDING_MONTHLY');
+  }
+
+  if (!env.STRIPE_PRICE_PRO_MONTHLY) {
+    missingVars.push('STRIPE_PRICE_PRO_MONTHLY');
+  }
+
+  if (!env.STRIPE_PRICE_PRO_ANNUAL && !env.STRIPE_PRICE_PRO_YEARLY) {
+    missingVars.push('STRIPE_PRICE_PRO_ANNUAL');
   }
 
   return {

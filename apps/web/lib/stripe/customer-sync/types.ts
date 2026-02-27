@@ -26,6 +26,8 @@ export interface UserBillingFields {
   stripeCustomerId: string | null;
   /** Active Stripe subscription ID */
   stripeSubscriptionId: string | null;
+  /** Stripe price ID associated with the active subscription */
+  stripePriceId: string | null;
   /** Optimistic locking version for concurrent update protection */
   billingVersion: number;
   /** Timestamp of the last processed billing event for event ordering */
@@ -74,6 +76,7 @@ export const BILLING_FIELDS_FULL = [
   'plan',
   'stripeCustomerId',
   'stripeSubscriptionId',
+  'stripePriceId',
   'billingVersion',
   'lastBillingEventAt',
 ] as const satisfies readonly UserBillingFieldKey[];
@@ -89,6 +92,7 @@ export const BILLING_FIELDS_STATUS = [
   'plan',
   'stripeCustomerId',
   'stripeSubscriptionId',
+  'stripePriceId',
   'billingVersion',
   'lastBillingEventAt',
 ] as const satisfies readonly UserBillingFieldKey[];
@@ -113,6 +117,7 @@ export const LEGACY_FIELDS: readonly UserBillingFieldKey[] = [
   'isPro',
   'stripeCustomerId',
   'stripeSubscriptionId',
+  'stripePriceId',
 ] as const;
 
 /**
@@ -191,6 +196,7 @@ export interface UpdateBillingStatusOptions {
   plan?: string; // 'free' | 'pro' | 'growth'
   stripeCustomerId?: string;
   stripeSubscriptionId?: string | null;
+  stripePriceId?: string | null;
   stripeEventId?: string;
   stripeEventTimestamp?: Date;
   eventType?: BillingAuditEventType;
@@ -230,6 +236,7 @@ export function buildSelectObject<T extends readonly UserBillingFieldKey[]>(
     plan: users.plan,
     stripeCustomerId: users.stripeCustomerId,
     stripeSubscriptionId: users.stripeSubscriptionId,
+    stripePriceId: users.stripePriceId,
     billingVersion: users.billingVersion,
     lastBillingEventAt: users.lastBillingEventAt,
   } as const;
