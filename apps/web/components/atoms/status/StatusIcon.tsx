@@ -1,7 +1,13 @@
 'use client';
 
-import { useId } from 'react';
-import type { ReleaseStatus } from './demo-types';
+import { memo, useId } from 'react';
+
+export type ReleaseStatus =
+  | 'live'
+  | 'syncing'
+  | 'scheduled'
+  | 'draft'
+  | 'archived';
 
 const SIZE = 14;
 
@@ -13,7 +19,13 @@ const STATUS_CONFIG: Record<ReleaseStatus, { color: string; label: string }> = {
   archived: { color: 'var(--color-text-tertiary-token)', label: 'Archived' },
 };
 
-export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
+export const StatusIcon = memo(function StatusIcon({
+  status,
+  className,
+}: {
+  readonly status: ReleaseStatus;
+  readonly className?: string;
+}) {
   const { color, label } = STATUS_CONFIG[status];
   const titleId = useId();
 
@@ -24,7 +36,7 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
       viewBox='0 0 14 14'
       fill='none'
       aria-labelledby={titleId}
-      className='shrink-0'
+      className={`shrink-0 ${className ?? ''}`}
     >
       <title id={titleId}>{label}</title>
       {status === 'live' && (
@@ -125,4 +137,4 @@ export function DemoStatusIcon({ status }: { readonly status: ReleaseStatus }) {
       )}
     </svg>
   );
-}
+});

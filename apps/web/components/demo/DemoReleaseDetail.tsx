@@ -62,30 +62,35 @@ export function DemoReleaseDetail({
         {/* Properties grid */}
         <div className='space-y-1 mb-8'>
           <PropertyRow label='Status'>
-            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
               <DemoStatusIcon status={release.status} />
               <span className='capitalize'>{release.status}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Priority'>
-            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
               <DemoPriorityIcon priority={release.priority} />
               <span className='capitalize'>{release.priority}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Assignee'>
-            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
               <DemoAvatar assignee={release.assignee} size={16} />
               <span>{release.assignee.name}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Type'>
-            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
               <span>{release.type}</span>
             </div>
           </PropertyRow>
+          <PropertyRow label='Tracks'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+              <span>{release.trackCount}</span>
+            </div>
+          </PropertyRow>
           <PropertyRow label='Release date'>
-            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover cursor-pointer transition-colors duration-0'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
               <span>{release.releaseDate}</span>
             </div>
           </PropertyRow>
@@ -157,18 +162,36 @@ export function DemoReleaseDetail({
           <div className='space-y-3'>
             {DEMO_ACTIVITY_TEMPLATE.map(activity => (
               <div key={activity.id} className='flex gap-2.5 text-[13px]'>
-                <DemoAvatar assignee={release.assignee} size={16} />
+                <div className='mt-1 size-2 shrink-0 rounded-full bg-tertiary-token' />
                 <div className='text-secondary-token leading-snug'>
                   <span className='font-medium text-primary-token'>
-                    {release.assignee.name}
-                  </span>{' '}
-                  {activity.action.toLowerCase()}{' '}
-                  <span className='text-tertiary-token'>· {activity.time}</span>
+                    {activity.action}
+                  </span>
+                  {activity.detail && (
+                    <span className='text-tertiary-token'>
+                      {' '}
+                      &mdash; {activity.detail}
+                    </span>
+                  )}
+                  <span className='text-tertiary-token'>
+                    {' '}
+                    · {activity.time}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </div>
+
+        {/* Note */}
+        {release.note && (
+          <div className='mt-4 mb-4'>
+            <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-2'>
+              Note
+            </h3>
+            <p className='text-[13px] text-secondary-token'>{release.note}</p>
+          </div>
+        )}
 
         {/* Actions */}
         <div className='mt-8 grid grid-cols-2 gap-2'>

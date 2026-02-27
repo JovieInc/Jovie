@@ -3,6 +3,7 @@
 
 export * from './AmountSelector';
 export * from './ArtistName';
+export * from './AssigneeAvatar';
 export * from './AvatarUploadAnnouncer';
 export * from './AvatarUploadOverlay';
 export * from './BackgroundPattern';
