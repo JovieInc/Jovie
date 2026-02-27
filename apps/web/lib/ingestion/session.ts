@@ -21,16 +21,18 @@ export async function withSystemIngestionSession<T>(
       // Set the session variable within the transaction
       try {
         await tx.execute(
-          drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, false)`
+          drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
         );
       } catch {
         await tx.execute(
-          drizzleSql`SET app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
+          drizzleSql`SET LOCAL app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
         );
       }
 
       return operation(tx);
     },
-    options?.isolationLevel ? { isolationLevel: options.isolationLevel } : undefined
+    options?.isolationLevel
+      ? { isolationLevel: options.isolationLevel }
+      : undefined
   );
 }

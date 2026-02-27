@@ -57,15 +57,15 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 export function getSessionSetupSql(userId: string) {
   validateClerkUserId(userId);
 
-  // Set the Clerk session variable for RLS in a single query.
-  // We use the neon-serverless (WebSocket) driver, which supports transactions
-  // and stateful sessions across multiple queries in a transaction.
-  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`;
+  // Set the Clerk session variable for RLS using transaction-local scope.
+  // is_local=true ensures the variable is scoped to the current transaction,
+  // preventing cross-request RLS session bleed in pooled connections.
+  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`;
 }
 
 function getSessionSetupFallbackSql(userId: string) {
   validateClerkUserId(userId);
-  return drizzleSql`SET app.clerk_user_id = ${userId}`;
+  return drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`;
 }
 
 async function applySessionUserId(userId: string): Promise<void> {
@@ -120,8 +120,9 @@ export async function withDbSession<T>(
  * Transaction isolation levels supported by PostgreSQL
  */
 export type IsolationLevel =
-  | 'read_committed'
-  | 'repeatable_read'
+  | 'read committed'
+  | 'read uncommitted'
+  | 'repeatable read'
   | 'serializable';
 
 /**
@@ -138,7 +139,7 @@ export async function withDbSessionTx<T>(
   options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
   const userId = await resolveClerkUserId(options?.clerkUserId);
-  
+
   // Since we use the Neon WebSocket driver, we can use db.transaction()
   // to ensure session setup and queries execute on the same stateful connection.
   return db.transaction(
@@ -147,7 +148,9 @@ export async function withDbSessionTx<T>(
       await tx.execute(getSessionSetupSql(userId));
       return operation(tx, userId);
     },
-    options?.isolationLevel ? { isolationLevel: options.isolationLevel } : undefined
+    options?.isolationLevel
+      ? { isolationLevel: options.isolationLevel }
+      : undefined
   );
 }
 

@@ -29,7 +29,6 @@ import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
-import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -253,16 +252,16 @@ async function reconcileProUsersWithoutSubscription(
           // They have an active subscription - link it
           stats.mismatches++;
 
-          await db.batch([
-            db
+          await db.transaction(async tx => {
+            await tx
               .update(users)
               .set({
                 stripeSubscriptionId: activeSubscription.id,
                 billingUpdatedAt: new Date(),
                 billingVersion: drizzleSql`${users.billingVersion} + 1`,
               })
-              .where(eq(users.id, user.id)),
-            db.insert(billingAuditLog).values({
+              .where(eq(users.id, user.id));
+            await tx.insert(billingAuditLog).values({
               userId: user.id,
               eventType: 'reconciliation_fix',
               previousState: { stripeSubscriptionId: null },
@@ -271,8 +270,8 @@ async function reconcileProUsersWithoutSubscription(
               metadata: {
                 reason: 'linked_active_subscription',
               },
-            })
-          ]);
+            });
+          });
 
           stats.fixed++;
           continue;
@@ -282,8 +281,8 @@ async function reconcileProUsersWithoutSubscription(
       // No active subscription found - they shouldn't be Pro
       stats.mismatches++;
 
-      await db.batch([
-        db
+      await db.transaction(async tx => {
+        await tx
           .update(users)
           .set({
             isPro: false,
@@ -291,8 +290,8 @@ async function reconcileProUsersWithoutSubscription(
             billingUpdatedAt: new Date(),
             billingVersion: drizzleSql`${users.billingVersion} + 1`,
           })
-          .where(eq(users.id, user.id)),
-        db.insert(billingAuditLog).values({
+          .where(eq(users.id, user.id));
+        await tx.insert(billingAuditLog).values({
           userId: user.id,
           eventType: 'reconciliation_fix',
           previousState: { stripeSubscriptionId: null },
@@ -301,8 +300,8 @@ async function reconcileProUsersWithoutSubscription(
           metadata: {
             reason: 'no_active_subscription',
           },
-        })
-      ]);
+        });
+      });
 
       stats.fixed++;
     } catch (error) {

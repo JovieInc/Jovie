@@ -33,6 +33,20 @@ describe('@critical session.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDbExecute.mockResolvedValue(undefined);
+    // Mock transaction to invoke the callback with a mock tx object
+    mockDbTransaction.mockImplementation(
+      async (callback: (tx: unknown) => Promise<unknown>) => {
+        const mockTx = {
+          execute: mockDbExecute,
+          select: mockDbSelect,
+          transaction: mockDbTransaction,
+          update: vi.fn(),
+          insert: vi.fn(),
+          delete: vi.fn(),
+        };
+        return callback(mockTx);
+      }
+    );
   });
 
   describe('validateClerkUserId', () => {
@@ -129,7 +143,7 @@ describe('@critical session.ts', () => {
       const secondQueryText = JSON.stringify(mockDbExecute.mock.calls[1]?.[0]);
 
       expect(firstQueryText).toContain("set_config('app.clerk_user_id'");
-      expect(secondQueryText).toContain('SET app.clerk_user_id');
+      expect(secondQueryText).toContain('SET LOCAL app.clerk_user_id');
     });
 
     it('uses getCachedAuth when no clerkUserId provided', async () => {
@@ -197,13 +211,12 @@ describe('@critical session.ts', () => {
         clerkUserId: 'user_123',
       });
 
-      // The implementation passes the db object directly (neon-http driver doesn't support transactions)
-      // Verify the db object was passed (has execute, select, transaction methods)
+      // The WebSocket driver supports real transactions.
+      // Verify the transaction callback received a tx object and the userId.
+      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
       expect(operation).toHaveBeenCalledWith(
         expect.objectContaining({
           execute: expect.any(Function),
-          select: expect.any(Function),
-          transaction: expect.any(Function),
         }),
         'user_123'
       );
