@@ -1,3 +1,4 @@
+import { Card, CardContent } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -17,15 +18,19 @@ export function KpiItem({
   iconClassName,
 }: Readonly<KpiItemProps>) {
   return (
-    <div className='space-y-1.5'>
-      <div className='flex items-center gap-1.5'>
-        <Icon className={`h-3 w-3 ${iconClassName || 'text-tertiary-token'}`} />
-        <dt className='text-xs text-tertiary-token'>{title}</dt>
-      </div>
-      <dd className='text-2xl font-semibold tabular-nums text-primary-token'>
-        {value}
-      </dd>
-      <div className='text-xs text-secondary-token'>{metadata}</div>
-    </div>
+    <Card className='border-subtle bg-surface-1/90'>
+      <CardContent className='space-y-2 p-4'>
+        <div className='flex items-center gap-1.5'>
+          <Icon
+            className={`h-4 w-4 ${iconClassName || 'text-tertiary-token'}`}
+          />
+          <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
+        </div>
+        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
+          {value}
+        </p>
+        <div className='text-app text-secondary-token'>{metadata}</div>
+      </CardContent>
+    </Card>
   );
 }

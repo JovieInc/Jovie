@@ -1,3 +1,4 @@
+import { Skeleton } from '@jovie/ui';
 import { ActivityTableUnified } from '@/components/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 
@@ -15,8 +16,8 @@ export function AdminActivitySectionSkeleton() {
   return (
     <section id='activity'>
       <div className='space-y-2'>
-        <div className='h-8 w-32 rounded skeleton' />
-        <div className='h-64 rounded-xl skeleton' />
+        <Skeleton className='h-8 w-32 rounded' />
+        <Skeleton className='h-64 rounded-xl' />
       </div>
     </section>
   );

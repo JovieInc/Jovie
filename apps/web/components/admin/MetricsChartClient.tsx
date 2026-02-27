@@ -1,5 +1,6 @@
 'use client';
 
+import { Skeleton } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import type { AdminUsagePoint } from '@/lib/admin/overview';
 
@@ -28,17 +29,17 @@ const MetricsChartImpl = dynamic(
       <div className='space-y-4'>
         <div className='flex items-start justify-between'>
           <div className='space-y-2'>
-            <div className='h-4 w-40 animate-pulse rounded bg-surface-1' />
-            <div className='h-3 w-24 animate-pulse rounded bg-surface-1' />
+            <Skeleton className='h-4 w-40 rounded' />
+            <Skeleton className='h-3 w-24 rounded' />
           </div>
-          <div className='h-4 w-16 animate-pulse rounded bg-surface-1' />
+          <Skeleton className='h-4 w-16 rounded' />
         </div>
-        <div className='h-64 animate-pulse rounded-lg bg-surface-1' />
+        <Skeleton className='h-64 rounded-lg' />
         <div className='grid gap-4 sm:grid-cols-3'>
           {METRICS_CHART_LOADING_CARD_KEYS.map(key => (
             <div key={key} className='space-y-2'>
-              <div className='h-3 w-20 animate-pulse rounded bg-surface-1' />
-              <div className='h-8 w-16 animate-pulse rounded bg-surface-1' />
+              <Skeleton className='h-3 w-20 rounded' />
+              <Skeleton className='h-8 w-16 rounded' />
             </div>
           ))}
         </div>
