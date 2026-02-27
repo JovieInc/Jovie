@@ -79,13 +79,13 @@ async function tryAutoConnectSpotify(
       readSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY) === 'true';
     const spotifyUrl = readSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
 
+    if (!spotifyUrl && spotifyExpected) {
+      track('onboarding_oauth_claim_missing', {
+        missing_field: 'spotify_url',
+        source: 'oauth_redirect',
+      });
+    }
     if (!spotifyUrl) {
-      if (spotifyExpected) {
-        track('onboarding_oauth_claim_missing', {
-          missing_field: 'spotify_url',
-          source: 'oauth_redirect',
-        });
-      }
       clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
       return;
     }
