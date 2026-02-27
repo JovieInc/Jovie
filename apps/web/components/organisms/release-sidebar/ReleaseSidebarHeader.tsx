@@ -3,14 +3,12 @@
 /**
  * ReleaseSidebarHeader Component
  *
- * Header section of the release sidebar with action buttons.
- * Uses the shared DrawerHeader shell for consistent styling.
+ * Demo-style header: release ID label on left, actions + close on right.
+ * Matches the DemoReleaseDetail header pattern.
  */
 
-import { SegmentControl } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -19,23 +17,21 @@ import type { Release } from './types';
 interface ReleaseSidebarHeaderProps {
   readonly release: Release | null;
   readonly hasRelease: boolean;
+  readonly artistName?: string;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
-  readonly panelMode: 'edit' | 'live';
-  readonly onPanelModeChange: (mode: 'edit' | 'live') => void;
 }
 
 export function ReleaseSidebarHeader({
   release,
   hasRelease,
+  artistName,
   onClose,
   onRefresh,
   isRefreshing = false,
   onCopySmartLink,
-  panelMode,
-  onPanelModeChange,
 }: ReleaseSidebarHeaderProps) {
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
@@ -54,13 +50,11 @@ export function ReleaseSidebarHeader({
     copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [onCopySmartLink]);
 
-  const primaryActions: DrawerHeaderAction[] = [];
   const overflowActions: DrawerHeaderAction[] = [];
 
   if (showActions) {
-    // Copy smart link + Open smart link - primary actions
     /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
-    primaryActions.push(
+    overflowActions.push(
       {
         id: 'copy',
         label: isCopied ? 'Copied!' : 'Copy smart link',
@@ -85,7 +79,6 @@ export function ReleaseSidebarHeader({
     );
     /* eslint-enable react-hooks/refs */
 
-    // Refresh - overflow action
     overflowActions.push({
       id: 'refresh',
       label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
@@ -101,7 +94,6 @@ export function ReleaseSidebarHeader({
     });
   }
 
-  // Copy release ID - available for all releases with an ID
   if (hasRelease && release?.id) {
     overflowActions.push({
       id: 'copy-id',
@@ -115,34 +107,30 @@ export function ReleaseSidebarHeader({
     });
   }
 
-  const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
+  const titleText =
+    hasRelease && release?.title ? release.title : 'No release selected';
 
   return (
-    <DrawerHeader
-      title={hasRelease ? 'Release details' : 'No release selected'}
-      actions={
-        <div className='flex items-center gap-2'>
-          {hasRelease && (
-            <SegmentControl
-              value={panelMode}
-              onValueChange={onPanelModeChange}
-              options={[
-                { value: 'edit', label: 'Edit' },
-                { value: 'live', label: 'Live' },
-              ]}
-              size='sm'
-              aria-label='Sidebar mode'
-            />
-          )}
-          {hasActions ? (
-            <DrawerHeaderActions
-              primaryActions={primaryActions}
-              overflowActions={overflowActions}
-              onClose={onClose}
-            />
-          ) : undefined}
+    <div className='flex items-center justify-between border-b border-subtle px-4 py-2 min-h-12 shrink-0'>
+      <div className='min-w-0 flex-1'>
+        <div className='text-[13px] font-medium text-primary-token truncate'>
+          {titleText}
         </div>
-      }
-    />
+        {artistName && (
+          <div className='text-[13px] text-secondary-token truncate'>
+            {artistName}
+          </div>
+        )}
+      </div>
+      <div className='flex items-center gap-1'>
+        {(overflowActions.length > 0 || onClose) && (
+          <DrawerHeaderActions
+            primaryActions={[]}
+            overflowActions={overflowActions}
+            onClose={onClose}
+          />
+        )}
+      </div>
+    </div>
   );
 }
