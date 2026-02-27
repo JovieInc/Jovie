@@ -78,7 +78,7 @@ export function formatLyricsForAppleMusic(raw: string): {
   }
 
   // 10. Remove leading/trailing blank lines
-  const trimmed = text.replace(/^\n{1,}/, '').replace(/\n{1,}$/, '');
+  const trimmed = text.replace(/^\n+/, '').replace(/\n+$/, '');
   if (trimmed.length !== text.length) {
     changes.push('Removed leading/trailing blank lines');
   }

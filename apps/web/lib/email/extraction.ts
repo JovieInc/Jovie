@@ -28,8 +28,12 @@ const EMAIL_REGEX =
  */
 // NOSONAR - S5869 false positive: all chars in class are unique, hyphen at end is intentional
 const OBFUSCATION_PATTERNS = [
-  // "email at domain dot com" variants
-  /\b([A-Z0-9._%+-]+)\s{0,3}(?:\(at\)|\[at\]|@|at)\s{0,3}([A-Z0-9-]+(?:\.[A-Z0-9-]+)*)\s{0,3}(?:\(dot\)|\[dot\]|\.|\s{1,3}dot\s{1,3})\s{0,3}([A-Z]{2,})\b/gi,
+  // "email (at) domain (dot) com"
+  /\b([A-Z0-9._%+-]+)\s{0,3}\(at\)\s{0,3}([A-Z0-9-]+(?:\.[A-Z0-9-]+)*)\s{0,3}\(dot\)\s{0,3}([A-Z]{2,})\b/gi,
+  // "email [at] domain [dot] com"
+  /\b([A-Z0-9._%+-]+)\s{0,3}\[at\]\s{0,3}([A-Z0-9-]+(?:\.[A-Z0-9-]+)*)\s{0,3}\[dot\]\s{0,3}([A-Z]{2,})\b/gi,
+  // "email at domain dot com" (plain text)
+  /\b([A-Z0-9._%+-]+)\s{1,3}at\s{1,3}([A-Z0-9-]+(?:\.[A-Z0-9-]+)*)\s{1,3}dot\s{1,3}([A-Z]{2,})\b/gi,
 ] as const;
 
 /**
