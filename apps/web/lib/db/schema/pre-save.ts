@@ -33,6 +33,9 @@ export const preSaveTokens = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    userIdIdx: index('pre_save_tokens_user_id_idx').on(table.userId),
+    trackIdIdx: index('pre_save_tokens_track_id_idx').on(table.trackId),
+
     releaseIdx: index('pre_save_tokens_release_id_idx').on(table.releaseId),
     providerIdx: index('pre_save_tokens_provider_idx').on(table.provider),
     executedIdx: index('pre_save_tokens_executed_at_idx').on(table.executedAt),

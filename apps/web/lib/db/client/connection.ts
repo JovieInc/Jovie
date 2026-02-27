@@ -1,16 +1,16 @@
 /**
  * Database Connection Management
  *
- * Uses Neon HTTP driver with managed connection pooling.
+ * Uses Neon WebSocket driver for stateful connection pooling.
  * This is the serverless-native pattern:
- * - Stateless HTTP requests (no WebSocket/TCP pool management)
- * - Neon handles connection pooling server-side via ?pooler=true
- * - One client per request is fine - no local pool needed
- * - Eliminates "pool under pressure" issues in serverless
+ * - Stateful WebSocket requests required for Row Level Security (RLS)
+ * - db.transaction() is supported and maintains connection state
+ * - set_config applies properly within the transaction
  */
 
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import { env } from '@/lib/env-server';
 import * as schema from '../schema';
 import { logDbInfo } from './logging';

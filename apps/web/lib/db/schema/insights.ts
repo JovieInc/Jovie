@@ -119,6 +119,8 @@ export const aiInsights = pgTable(
   },
   table => [
     // Primary lookup: active insights for a creator, newest first
+    generationRunIdx: index('idx_ai_insights_generation_run_id').on(table.generationRunId),
+
     index('idx_ai_insights_creator_active').on(
       table.creatorProfileId,
       table.status,
