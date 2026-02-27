@@ -14,8 +14,11 @@ const SECRET_PATTERN =
   /(?:token|key|secret|password|authorization|cookie|dsn|credential)[=: ].{4,}/gi;
 
 function redactSecrets(text: string): string {
-  return text.replace(SECRET_PATTERN, (match) => {
-    const prefix = match.slice(0, match.indexOf('=') + 1 || match.indexOf(':') + 1 || match.indexOf(' ') + 1);
+  return text.replace(SECRET_PATTERN, match => {
+    const prefix = match.slice(
+      0,
+      match.indexOf('=') + 1 || match.indexOf(':') + 1 || match.indexOf(' ') + 1
+    );
     return `${prefix}[REDACTED]`;
   });
 }
@@ -144,10 +147,18 @@ class SentryCiReporter implements Reporter {
         workerIndex: result.workerIndex,
         parallelIndex: result.parallelIndex,
         stdout: result.stdout
-          .map(chunk => redactSecrets(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk))
+          .map(chunk =>
+            redactSecrets(
+              Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk
+            )
+          )
           .slice(-5),
         stderr: result.stderr
-          .map(chunk => redactSecrets(Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk))
+          .map(chunk =>
+            redactSecrets(
+              Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk
+            )
+          )
           .slice(-5),
       });
 
@@ -155,7 +166,11 @@ class SentryCiReporter implements Reporter {
         scope.addEventProcessor(event => {
           const exception = event.exception;
 
-          if (!exception || !Array.isArray(exception.values) || exception.values.length === 0) {
+          if (
+            !exception ||
+            !Array.isArray(exception.values) ||
+            exception.values.length === 0
+          ) {
             return event;
           }
 
