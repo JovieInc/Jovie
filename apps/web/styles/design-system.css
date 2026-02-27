@@ -70,6 +70,7 @@
   --color-bg-input: #ebecef; /* Same as surface-3 */
   --color-bg-active: #ebecef; /* Same as surface-3 */
   --color-bg-button: #e3e5e8;
+  --color-bg-tooltip: #101012; /* Linear dark background for light mode tooltips */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -85,6 +86,7 @@
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
+  --color-text-tooltip: #ffffff;
 
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: rgba(0, 0, 0, 0.4);
@@ -187,12 +189,13 @@
   --color-bg-input: #191b1f; /* Same as surface-1 */
   --color-bg-active: #23252a; /* Same as surface-2 */
   --color-bg-button: #2a2c32; /* Same as surface-3 */
+  --color-bg-tooltip: #2a2c32; /* Matches surface-3 in dark mode */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):
-       Primary:   lch(100% 0 272)     → oklch ~100% — pure white headings
+       Primary:   lch(100% 0 272)       → oklch ~100% — pure white headings
        Secondary: lch(90.65% 1.35 272) → oklch ~91% — body text, labels (bright!)
-       Tertiary:  lch(62.6% 1.35 272)  → oklch ~63% — descriptions, meta
+       Tertiary:  lch(62.6% 1.35 272)   → oklch ~63% — descriptions, meta
        Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
      Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
   /* Text hierarchy — extracted from Linear CSS vars (2026-02-17)
@@ -210,6 +213,7 @@
     51% 1.35 272
   ); /* ~#7a7b7d — bumped from 38.29% for WCAG AA 4.5:1 contrast on dark bg */
   --color-text-disabled-token: oklch(28% 0.006 272);
+  --color-text-tooltip: lch(100% 0 272); /* White text on dark tooltips */
 
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: rgba(255, 255, 255, 0.55);
