@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
@@ -68,8 +67,8 @@ export function SignInForm() {
   };
 
   return (
-    <Card className='shadow-none border-0 bg-transparent p-0'>
-      <CardContent className='space-y-3 p-0'>
+    <div className='w-full'>
+      <div className='space-y-3'>
         {/* Method selection step */}
         {step === 'method' && (
           <MethodSelector
@@ -136,7 +135,7 @@ export function SignInForm() {
             </Link>
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

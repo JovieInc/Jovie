@@ -14,277 +14,226 @@
  */
 
 :root {
-  /* ============================================
+    /* ============================================
      LINEAR COLOR PRIMITIVES (OKLCH)
      Extracted from Linear.app, converted to OKLCH
      ============================================ */
-
-  /* Lightness scale (Linear's gray ramp — dark mode reference) */
-  --linear-l-0: 5%; /* rgb(8,9,10) → near black */
-  --linear-l-1: 7%; /* rgb(11,11,11) → page bg */
-  --linear-l-2: 9%; /* rgb(15,16,17) → surface-0 */
-  --linear-l-3: 11%; /* rgb(20,21,22) → surface-1 */
-  --linear-l-4: 16%; /* rgb(32,33,34) → surface-2/borders */
-  --linear-l-5: 20%; /* rgb(40,40,44) → button bg */
-  --linear-l-6: 58%; /* rgb(138,143,152) → secondary text */
-  --linear-l-7: 97%; /* rgb(247,248,248) → primary text */
-
-  /* Base chroma for Linear's neutral grays */
-  --linear-chroma: 0.008;
-  --linear-hue: 260; /* Slight blue-ish tint */
-
-  /* ============================================
+    /* Lightness scale (Linear's gray ramp — dark mode reference) */
+    --linear-l-0: 5%;
+    /* rgb(8,9,10) → near black */
+    --linear-l-1: 7%;
+    /* rgb(11,11,11) → page bg */
+    --linear-l-2: 9%;
+    /* rgb(15,16,17) → surface-0 */
+    --linear-l-3: 11%;
+    /* rgb(20,21,22) → surface-1 */
+    --linear-l-4: 16%;
+    /* rgb(32,33,34) → surface-2/borders */
+    --linear-l-5: 20%;
+    /* rgb(40,40,44) → button bg */
+    --linear-l-6: 58%;
+    /* rgb(138,143,152) → secondary text */
+    --linear-l-7: 97%;
+    /* rgb(247,248,248) → primary text */
+    /* Base chroma for Linear's neutral grays */
+    --linear-chroma: 0.008;
+    --linear-hue: 260;
+    /* Slight blue-ish tint */
+    /* ============================================
      TEXT COLORS — LIGHT MODE
      ============================================ */
-
-  --linear-text-primary: oklch(12% 0.005 260);
-  --linear-text-secondary: oklch(45% 0.012 260);
-  --linear-text-tertiary: oklch(55% 0.01 260);
-  --linear-text-inverse: oklch(97% 0.005 260);
-
-  /* ============================================
+    --linear-text-primary: oklch(12% 0.005 260);
+    --linear-text-secondary: oklch(45% 0.012 260);
+    --linear-text-tertiary: oklch(55% 0.01 260);
+    --linear-text-inverse: oklch(97% 0.005 260);
+    /* ============================================
      BACKGROUNDS — LIGHT MODE
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
-
-  --linear-bg-page: oklch(98.5% 0.002 260);
-  --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
-  --linear-bg-surface-0: oklch(99.2% 0.002 260);
-  --linear-bg-surface-1: oklch(97% 0.002 260);
-  --linear-bg-surface-2: oklch(95% 0.003 260);
-  --linear-bg-button: oklch(92% 0.005 260);
-  --linear-bg-footer: oklch(98.5% 0.002 260);
-  --linear-border-footer: oklch(90% 0.005 260);
-  --linear-bg-hover: rgba(0, 0, 0, 0.04);
-
-  /* ============================================
+    --linear-bg-page: oklch(98.5% 0.002 260);
+    --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
+    --linear-bg-surface-0: oklch(99.2% 0.002 260);
+    --linear-bg-surface-1: oklch(97% 0.002 260);
+    --linear-bg-surface-2: oklch(95% 0.003 260);
+    --linear-bg-button: oklch(92% 0.005 260);
+    --linear-bg-footer: oklch(98.5% 0.002 260);
+    --linear-border-footer: oklch(90% 0.005 260);
+    --linear-bg-hover: rgba(0, 0, 0, 0.04);
+    /* ============================================
      BORDERS — LIGHT MODE
      ============================================ */
-
-  --linear-border-subtle: rgba(0, 0, 0, 0.06);
-  --linear-border-default: rgba(0, 0, 0, 0.1);
-  --linear-border-strong: rgba(0, 0, 0, 0.15);
-  --linear-border-focus: oklch(55% 0.15 270);
-
-  /* ============================================
+    --linear-border-subtle: rgba(0, 0, 0, 0.06);
+    --linear-border-default: rgba(0, 0, 0, 0.1);
+    --linear-border-strong: rgba(0, 0, 0, 0.15);
+    --linear-border-focus: oklch(55% 0.15 270);
+    /* ============================================
      BUTTON COLORS — LIGHT MODE
      ============================================ */
-
-  /* Primary button — dark on light */
-  --linear-btn-primary-bg: oklch(15% 0.005 260);
-  --linear-btn-primary-fg: oklch(98% 0 0);
-  --linear-btn-primary-hover: oklch(22% 0.005 260);
-  --linear-btn-primary-border: oklch(15% 0.005 260);
-
-  /* Secondary button — subtle gray */
-  --linear-btn-secondary-bg: oklch(94% 0.005 260);
-  --linear-btn-secondary-fg: oklch(20% 0.005 260);
-  --linear-btn-secondary-hover: oklch(90% 0.005 260);
-
-  /* Accent button — indigo (same in both modes) */
-  --linear-btn-accent-bg: oklch(55% 0.25 270);
-  --linear-btn-accent-fg: oklch(100% 0 0);
-  --linear-btn-accent-hover: oklch(60% 0.25 270);
-
-  /* ============================================
+    /* Primary button — dark on light */
+    --linear-btn-primary-bg: oklch(15% 0.005 260);
+    --linear-btn-primary-fg: oklch(98% 0 0);
+    --linear-btn-primary-hover: oklch(22% 0.005 260);
+    --linear-btn-primary-border: oklch(15% 0.005 260);
+    /* Secondary button — subtle gray */
+    --linear-btn-secondary-bg: oklch(94% 0.005 260);
+    --linear-btn-secondary-fg: oklch(20% 0.005 260);
+    --linear-btn-secondary-hover: oklch(90% 0.005 260);
+    /* Accent button — indigo (same in both modes) */
+    --linear-btn-accent-bg: oklch(55% 0.25 270);
+    --linear-btn-accent-fg: oklch(100% 0 0);
+    --linear-btn-accent-hover: oklch(60% 0.25 270);
+    /* ============================================
      ACCENT COLORS (mode-independent)
      ============================================ */
-
-  --linear-success: oklch(72% 0.2 145);
-  --linear-warning: oklch(82% 0.17 85);
-  --linear-warning-subtle: oklch(82% 0.17 85 / 0.15);
-  --linear-accent: oklch(55% 0.25 270);
-
-  /* ============================================
+    --linear-success: oklch(72% 0.2 145);
+    --linear-warning: oklch(82% 0.17 85);
+    --linear-warning-subtle: oklch(82% 0.17 85 / 0.15);
+    --linear-accent: oklch(55% 0.25 270);
+    /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
      ============================================ */
-
-  --linear-hero-glow: radial-gradient(
-    ellipse 60% 50% at 50% 40%,
-    oklch(92% 0.02 270 / 0.25),
-    transparent 70%
-  );
-  --linear-hero-gradient-from: oklch(40% 0.06 270);
-  --linear-hero-gradient-to: oklch(55% 0.04 270);
-  --linear-separator-from: rgba(0, 0, 0, 0.08);
-  --linear-separator-via: rgba(0, 0, 0, 0.04);
-
-  /* ============================================
+    --linear-hero-glow: radial-gradient( ellipse 60% 50% at 50% 40%, oklch(92% 0.02 270 / 0.25), transparent 70%);
+    --linear-hero-gradient-from: oklch(40% 0.06 270);
+    --linear-hero-gradient-to: oklch(55% 0.04 270);
+    --linear-separator-from: rgba(0, 0, 0, 0.08);
+    --linear-separator-via: rgba(0, 0, 0, 0.04);
+    /* ============================================
      SHADOWS — LIGHT MODE
      ============================================ */
-
-  --linear-shadow-button:
-    rgba(0, 0, 0, 0) 0px 8px 2px 0px,
-    rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
-    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px,
-    rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
-    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
-
-  /* ============================================
+    --linear-shadow-button: rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+    --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
+    --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
+    /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
-
-  /* Font weights - Linear uses Inter variable font with precise weights */
-  --linear-font-weight-normal: 400;
-  --linear-font-weight-medium: 510;
-  --linear-font-weight-semibold: 538;
-  --linear-font-weight-bold: 590;
-
-  /* Letter spacing */
-  --linear-tracking-headline: -0.022em;
-  --linear-tracking-subheadline: -0.0175em;
-  --linear-tracking-body: -0.011em;
-  --linear-tracking-normal: normal;
-
-  /* Line heights */
-  --linear-leading-none: 1;
-  --linear-leading-tight: 1.06;
-  --linear-leading-snug: 1.08;
-  --linear-leading-normal: 1.6;
-  --linear-leading-relaxed: 1.33;
-
-  /* Font features - Linear's OpenType features */
-  --linear-font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
-  --linear-font-optical-sizing: 28;
-
-  /* ============================================
+    /* Font weights - Linear uses Inter variable font with precise weights */
+    --linear-font-weight-normal: 400;
+    --linear-font-weight-medium: 510;
+    --linear-font-weight-semibold: 538;
+    --linear-font-weight-bold: 590;
+    /* Letter spacing */
+    --linear-tracking-headline: -0.022em;
+    --linear-tracking-subheadline: -0.0175em;
+    --linear-tracking-body: -0.011em;
+    --linear-tracking-normal: normal;
+    /* Line heights */
+    --linear-leading-none: 1;
+    --linear-leading-tight: 1.06;
+    --linear-leading-snug: 1.08;
+    --linear-leading-normal: 1.6;
+    --linear-leading-relaxed: 1.33;
+    /* Font features - Linear's OpenType features */
+    --linear-font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
+    --linear-font-optical-sizing: 28;
+    /* ============================================
      TYPE SCALE (Desktop) — mode-independent
      ============================================ */
-
-  --linear-h1-size: 64px;
-  --linear-h1-weight: 510;
-  --linear-h1-leading: 64px;
-  --linear-h1-tracking: -1.408px;
-
-  --linear-h2-size: 48px;
-  --linear-h2-weight: 510;
-  --linear-h2-leading: 48px;
-  --linear-h2-tracking: -1.056px;
-
-  --linear-h3-size: 20px;
-  --linear-h3-weight: 590;
-  --linear-h3-leading: 26.6px;
-  --linear-h3-tracking: -0.24px;
-
-  --linear-h4-size: 18px;
-  --linear-h4-weight: 538;
-  --linear-h4-leading: 24px;
-
-  --linear-body-lg-size: 24px;
-  --linear-body-lg-weight: 400;
-  --linear-body-lg-leading: 31.92px;
-  --linear-body-lg-tracking: -0.288px;
-
-  --linear-body-size: 15px;
-  --linear-body-weight: 400;
-  --linear-body-leading: 24px;
-  --linear-body-tracking: -0.165px;
-
-  --linear-body-sm-size: 14px;
-  --linear-body-sm-weight: 400;
-  --linear-body-sm-leading: 21px;
-  --linear-body-sm-tracking: -0.182px;
-
-  --linear-caption-size: 13px;
-  --linear-caption-weight: 510;
-  --linear-caption-leading: 19.5px;
-  --linear-caption-tracking: -0.13px;
-
-  --linear-label-size: 12px;
-  --linear-label-weight: 400;
-  --linear-label-leading: 19.2px;
-
-  /* ============================================
+    --linear-h1-size: 64px;
+    --linear-h1-weight: 510;
+    --linear-h1-leading: 64px;
+    --linear-h1-tracking: -1.408px;
+    --linear-h2-size: 48px;
+    --linear-h2-weight: 510;
+    --linear-h2-leading: 48px;
+    --linear-h2-tracking: -1.056px;
+    --linear-h3-size: 20px;
+    --linear-h3-weight: 590;
+    --linear-h3-leading: 26.6px;
+    --linear-h3-tracking: -0.24px;
+    --linear-h4-size: 18px;
+    --linear-h4-weight: 538;
+    --linear-h4-leading: 24px;
+    --linear-body-lg-size: 24px;
+    --linear-body-lg-weight: 400;
+    --linear-body-lg-leading: 31.92px;
+    --linear-body-lg-tracking: -0.288px;
+    --linear-body-size: 15px;
+    --linear-body-weight: 400;
+    --linear-body-leading: 24px;
+    --linear-body-tracking: -0.165px;
+    --linear-body-sm-size: 14px;
+    --linear-body-sm-weight: 400;
+    --linear-body-sm-leading: 21px;
+    --linear-body-sm-tracking: -0.182px;
+    --linear-caption-size: 13px;
+    --linear-caption-weight: 510;
+    --linear-caption-leading: 19.5px;
+    --linear-caption-tracking: -0.13px;
+    --linear-label-size: 12px;
+    --linear-label-weight: 400;
+    --linear-label-leading: 19.2px;
+    /* ============================================
      LAYOUT — mode-independent
      ============================================ */
-
-  --linear-container-max: 1032px;
-  --linear-container-padding: 24px;
-  --linear-content-max: 984px;
-
-  --linear-hero-section-max: 1024px;
-  --linear-hero-h1-width: 900px;
-  --linear-hero-lead-width: 821.469px;
-  --linear-pricing-grid-max: 1024px;
-
-  --linear-header-height: 72px;
-  --linear-hero-height: 392px;
-  --linear-button-height-sm: 32px;
-  --linear-button-height-md: 40px;
-
-  --linear-radius-sm: 8px;
-  --linear-radius-md: 10px;
-  --linear-radius-lg: 12px;
-  --linear-radius-full: 9999px;
-
-  /* ============================================
+    --linear-container-max: 1032px;
+    --linear-container-padding: 24px;
+    --linear-content-max: 984px;
+    --linear-hero-section-max: 1024px;
+    --linear-hero-h1-width: 900px;
+    --linear-hero-lead-width: 821.469px;
+    --linear-pricing-grid-max: 1024px;
+    --linear-header-height: 56px;
+    --linear-hero-height: 392px;
+    --linear-button-height-sm: 32px;
+    --linear-button-height-md: 40px;
+    --linear-radius-sm: 8px;
+    --linear-radius-md: 10px;
+    --linear-radius-lg: 12px;
+    --linear-radius-full: 9999px;
+    /* ============================================
      SPACING — mode-independent
      ============================================ */
-
-  --linear-space-1: 4px;
-  --linear-space-2: 8px;
-  --linear-space-3: 12px;
-  --linear-space-4: 16px;
-  --linear-space-5: 20px;
-  --linear-space-6: 24px;
-  --linear-space-8: 32px;
-  --linear-space-10: 40px;
-  --linear-space-12: 48px;
-  --linear-space-16: 64px;
-  --linear-space-20: 80px;
-  --linear-space-24: 96px;
-  --linear-space-28: 112px;
-  --linear-space-32: 128px;
-  --linear-space-40: 160px;
-
-  --linear-gap-nav: 4px;
-  --linear-gap-buttons: 8px;
-  --linear-gap-cards: 24px;
-
-  --linear-section-pt-sm: 48px;
-  --linear-section-pb-sm: 64px;
-  --linear-section-pt-md: 64px;
-  --linear-section-pb-md: 80px;
-  --linear-section-pt-lg: 80px;
-  --linear-section-pb-lg: 96px;
-
-  --linear-content-gap-sm: 40px;
-  --linear-content-gap-md: 48px;
-  --linear-content-gap-lg: 64px;
-
-  --linear-footer-py: 48px;
-  --linear-footer-py-lg: 64px;
-
-  /* ============================================
+    --linear-space-1: 4px;
+    --linear-space-2: 8px;
+    --linear-space-3: 12px;
+    --linear-space-4: 16px;
+    --linear-space-5: 20px;
+    --linear-space-6: 24px;
+    --linear-space-8: 32px;
+    --linear-space-10: 40px;
+    --linear-space-12: 48px;
+    --linear-space-16: 64px;
+    --linear-space-20: 80px;
+    --linear-space-24: 96px;
+    --linear-space-28: 112px;
+    --linear-space-32: 128px;
+    --linear-space-40: 160px;
+    --linear-gap-nav: 4px;
+    --linear-gap-buttons: 8px;
+    --linear-gap-cards: 24px;
+    --linear-section-pt-sm: 48px;
+    --linear-section-pb-sm: 64px;
+    --linear-section-pt-md: 64px;
+    --linear-section-pb-md: 80px;
+    --linear-section-pt-lg: 80px;
+    --linear-section-pb-lg: 96px;
+    --linear-content-gap-sm: 40px;
+    --linear-content-gap-md: 48px;
+    --linear-content-gap-lg: 64px;
+    --linear-footer-py: 48px;
+    --linear-footer-py-lg: 64px;
+    /* ============================================
      EFFECTS — mode-independent
      ============================================ */
-
-  --linear-blur-header: 20px;
-
-  --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --linear-duration-fast: 100ms;
-  --linear-duration-normal: 160ms;
-  --linear-duration-slow: 300ms;
-
-  /* ============================================
+    --linear-blur-header: 20px;
+    --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --linear-duration-fast: 100ms;
+    --linear-duration-normal: 160ms;
+    --linear-duration-slow: 300ms;
+    /* ============================================
      RESPONSIVE TYPOGRAPHY — mode-independent
      ============================================ */
-
-  --linear-h1-size-sm: 40px;
-  --linear-h1-size-md: 52px;
-  --linear-h1-size-lg: 64px;
-
-  --linear-h2-size-sm: 28px;
-  --linear-h2-size-md: 36px;
-  --linear-h2-size-lg: 48px;
-
-  --linear-body-lg-size-sm: 16px;
-  --linear-body-lg-size-lg: 17px;
+    --linear-h1-size-sm: 40px;
+    --linear-h1-size-md: 52px;
+    --linear-h1-size-lg: 64px;
+    --linear-h2-size-sm: 28px;
+    --linear-h2-size-md: 36px;
+    --linear-h2-size-lg: 48px;
+    --linear-body-lg-size-sm: 16px;
+    --linear-body-lg-size-lg: 17px;
 }
+
 
 /* ============================================
    DARK MODE OVERRIDES
@@ -293,54 +242,45 @@
    ============================================ */
 
 :root.dark {
-  /* Text */
-  --linear-text-primary: oklch(97% 0.005 260);
-  --linear-text-secondary: oklch(62% 0.015 255);
-  --linear-text-tertiary: oklch(60% 0.01 260);
-  --linear-text-inverse: oklch(5% 0.005 260);
-
-  /* Backgrounds — extracted from linear.app via Playwright (2026-02-16) */
-  --linear-bg-page: oklch(14% 0.003 260);
-  --linear-bg-header: oklch(14% 0.003 260 / 0.8);
-  --linear-bg-surface-0: oklch(17.2% 0.003 260);
-  --linear-bg-surface-1: oklch(18.6% 0.003 260);
-  --linear-bg-surface-2: oklch(20.4% 0.003 260);
-  --linear-bg-button: oklch(26.5% 0.01 265);
-  --linear-bg-footer: oklch(14% 0.003 260);
-  --linear-border-footer: oklch(26.5% 0.01 265);
-  --linear-bg-hover: rgba(255, 255, 255, 0.08);
-
-  /* Borders */
-  --linear-border-subtle: rgba(255, 255, 255, 0.05);
-  --linear-border-default: rgba(255, 255, 255, 0.08);
-  --linear-border-strong: rgba(255, 255, 255, 0.1);
-  --linear-border-focus: oklch(60% 0.12 260);
-
-  /* Buttons */
-  --linear-btn-primary-bg: oklch(92% 0 0);
-  --linear-btn-primary-fg: oklch(5% 0.005 260);
-  --linear-btn-primary-hover: oklch(100% 0 0);
-  --linear-btn-primary-border: oklch(92% 0 0);
-
-  --linear-btn-secondary-bg: oklch(20% 0.01 260);
-  --linear-btn-secondary-fg: oklch(97% 0.005 260);
-  --linear-btn-secondary-hover: oklch(25% 0.01 260);
-
-  /* Hero-specific */
-  --linear-hero-glow: radial-gradient(
-    ellipse 60% 50% at 50% 40%,
-    oklch(22% 0.025 260 / 0.35),
-    transparent 70%
-  );
-  --linear-hero-gradient-from: oklch(72% 0.015 260);
-  --linear-hero-gradient-to: oklch(58% 0.01 260);
-  --linear-separator-from: rgba(255, 255, 255, 0.06);
-  --linear-separator-via: rgba(255, 255, 255, 0.03);
-
-  /* Shadows */
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.2);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.35);
+    /* Text */
+    --linear-text-primary: oklch(97% 0.005 260);
+    --linear-text-secondary: oklch(62% 0.015 255);
+    --linear-text-tertiary: oklch(60% 0.01 260);
+    --linear-text-inverse: oklch(5% 0.005 260);
+    /* Backgrounds — extracted from linear.app via Playwright (2026-02-16) */
+    --linear-bg-page: oklch(14% 0.003 260);
+    --linear-bg-header: oklch(14% 0.003 260 / 0.8);
+    --linear-bg-surface-0: oklch(17.2% 0.003 260);
+    --linear-bg-surface-1: oklch(18.6% 0.003 260);
+    --linear-bg-surface-2: oklch(20.4% 0.003 260);
+    --linear-bg-button: oklch(26.5% 0.01 265);
+    --linear-bg-footer: oklch(14% 0.003 260);
+    --linear-border-footer: oklch(26.5% 0.01 265);
+    --linear-bg-hover: rgba(255, 255, 255, 0.08);
+    /* Borders */
+    --linear-border-subtle: rgba(255, 255, 255, 0.05);
+    --linear-border-default: rgba(255, 255, 255, 0.08);
+    --linear-border-strong: rgba(255, 255, 255, 0.1);
+    --linear-border-focus: oklch(60% 0.12 260);
+    /* Buttons */
+    --linear-btn-primary-bg: oklch(92% 0 0);
+    --linear-btn-primary-fg: oklch(5% 0.005 260);
+    --linear-btn-primary-hover: oklch(100% 0 0);
+    --linear-btn-primary-border: oklch(92% 0 0);
+    --linear-btn-secondary-bg: oklch(20% 0.01 260);
+    --linear-btn-secondary-fg: oklch(97% 0.005 260);
+    --linear-btn-secondary-hover: oklch(25% 0.01 260);
+    /* Hero-specific */
+    --linear-hero-glow: radial-gradient( ellipse 60% 50% at 50% 40%, oklch(22% 0.025 260 / 0.35), transparent 70%);
+    --linear-hero-gradient-from: oklch(72% 0.015 260);
+    --linear-hero-gradient-to: oklch(58% 0.01 260);
+    --linear-separator-from: rgba(255, 255, 255, 0.06);
+    --linear-separator-via: rgba(255, 255, 255, 0.03);
+    /* Shadows */
+    --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.2);
+    --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.35);
 }
+
 
 /* ============================================
    SEMANTIC ALIASES
@@ -348,17 +288,15 @@
    ============================================ */
 
 :root {
-  /* Semantic text */
-  --linear-color-text: var(--linear-text-primary);
-  --linear-color-text-muted: var(--linear-text-secondary);
-  --linear-color-text-subtle: var(--linear-text-tertiary);
-
-  /* Semantic backgrounds */
-  --linear-color-bg: var(--linear-bg-page);
-  --linear-color-bg-elevated: var(--linear-bg-surface-0);
-  --linear-color-bg-card: var(--linear-bg-surface-1);
-
-  /* Semantic borders */
-  --linear-color-border: var(--linear-border-default);
-  --linear-color-divider: var(--linear-border-subtle);
+    /* Semantic text */
+    --linear-color-text: var(--linear-text-primary);
+    --linear-color-text-muted: var(--linear-text-secondary);
+    --linear-color-text-subtle: var(--linear-text-tertiary);
+    /* Semantic backgrounds */
+    --linear-color-bg: var(--linear-bg-page);
+    --linear-color-bg-elevated: var(--linear-bg-surface-0);
+    --linear-color-bg-card: var(--linear-bg-surface-1);
+    /* Semantic borders */
+    --linear-color-border: var(--linear-border-default);
+    --linear-color-divider: var(--linear-border-subtle);
 }
