@@ -274,8 +274,13 @@ export async function POST(request: Request) {
     }
 
     const results: BatchIngestResult[] = [];
-    for (const entry of parsed.data.spotifyUrls) {
-      results.push(await processSpotifyEntry(entry));
+    // Process in smaller concurrent chunks to avoid N+1 sequential overhead
+    // but prevent thundering herd database exhaustion
+    const CONCURRENCY = 5;
+    for (let i = 0; i < parsed.data.spotifyUrls.length; i += CONCURRENCY) {
+      const batch = parsed.data.spotifyUrls.slice(i, i + CONCURRENCY);
+      const batchResults = await Promise.all(batch.map(processSpotifyEntry));
+      results.push(...batchResults);
     }
 
     return NextResponse.json(
