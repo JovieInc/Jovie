@@ -69,16 +69,24 @@ export interface CoreProvidersProps {
 function CoreProvidersInner({
   children,
   enableAnalytics,
+  enableMonitoring,
+  usePacer,
   initialThemeMode,
 }: {
   children: React.ReactNode;
   enableAnalytics: boolean;
+  enableMonitoring: boolean;
+  usePacer: boolean;
   initialThemeMode: ThemeMode;
 }) {
   // Handle chunk load errors gracefully (common with version mismatches)
   useChunkErrorHandler();
 
   useEffect(() => {
+    if (!enableMonitoring) {
+      return;
+    }
+
     // Log startup info
     logger.group('Jovie App');
     logger.info('Booting client providers', {
@@ -127,7 +135,28 @@ function CoreProvidersInner({
       isUnmounted = true;
       cleanupWebVitals?.();
     };
-  }, []);
+  }, [enableMonitoring]);
+
+  const content = (
+    <ThemeProvider
+      attribute='class'
+      defaultTheme={initialThemeMode}
+      enableSystem
+      disableTransitionOnChange
+      storageKey='jovie-theme'
+    >
+      <ThemeKeyboardShortcut />
+      <TooltipProvider delayDuration={1200}>
+        <LazyProviders enableAnalytics={enableAnalytics}>
+          {children}
+        </LazyProviders>
+      </TooltipProvider>
+    </ThemeProvider>
+  );
+
+  if (!usePacer) {
+    return content;
+  }
 
   return (
     <PacerProvider
@@ -151,20 +180,7 @@ function CoreProvidersInner({
         },
       }}
     >
-      <ThemeProvider
-        attribute='class'
-        defaultTheme={initialThemeMode}
-        enableSystem
-        disableTransitionOnChange
-        storageKey='jovie-theme'
-      >
-        <ThemeKeyboardShortcut />
-        <TooltipProvider delayDuration={1200}>
-          <LazyProviders enableAnalytics={enableAnalytics}>
-            {children}
-          </LazyProviders>
-        </TooltipProvider>
-      </ThemeProvider>
+      {content}
     </PacerProvider>
   );
 }
@@ -180,11 +196,30 @@ const MARKETING_PREFIXES = [
   '/waitlist',
 ] as const;
 
+const FULL_PROVIDER_PREFIXES = [
+  '/app',
+  '/account',
+  '/artist-selection',
+  '/billing',
+  '/sso-callback',
+  '/onboarding',
+] as const;
+
+type CoreProviderVariant = 'full' | 'public';
+
+export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
+  return FULL_PROVIDER_PREFIXES.some(prefix => pathname.startsWith(prefix))
+    ? 'full'
+    : 'public';
+}
+
 export function CoreProviders({
   children,
   initialThemeMode = 'dark',
 }: CoreProvidersProps) {
   const pathname = usePathname() ?? '';
+  const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
+  const isPublicVariant = variant === 'public';
   const enableAnalytics = useMemo(
     () =>
       pathname !== '/' &&
@@ -192,18 +227,24 @@ export function CoreProviders({
     [pathname]
   );
 
-  return (
-    <React.StrictMode>
-      <NuqsProvider>
-        <QueryProvider>
-          <CoreProvidersInner
-            enableAnalytics={enableAnalytics}
-            initialThemeMode={initialThemeMode}
-          >
-            {children}
-          </CoreProvidersInner>
-        </QueryProvider>
-      </NuqsProvider>
-    </React.StrictMode>
+  const providers = (
+    <NuqsProvider>
+      <QueryProvider>
+        <CoreProvidersInner
+          enableAnalytics={enableAnalytics}
+          enableMonitoring={!isPublicVariant}
+          initialThemeMode={initialThemeMode}
+          usePacer={!isPublicVariant}
+        >
+          {children}
+        </CoreProvidersInner>
+      </QueryProvider>
+    </NuqsProvider>
   );
+
+  if (isPublicVariant) {
+    return providers;
+  }
+
+  return <React.StrictMode>{providers}</React.StrictMode>;
 }
