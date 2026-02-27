@@ -1,12 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
-import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -21,7 +19,6 @@ export interface HeaderNavProps {
   readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   readonly logoVariant?: LogoVariant;
   readonly hideNav?: boolean;
-  readonly hidePricingLink?: boolean;
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
 }
@@ -33,14 +30,10 @@ export function HeaderNav({
   logoSize = 'sm',
   logoVariant = 'word',
   hideNav = false,
-  hidePricingLink = false,
   containerSize: _containerSize = 'lg',
   navLinks,
 }: HeaderNavProps = {}) {
-  const pathname = usePathname();
   const navLinkClass = 'nav-link-linear focus-ring-themed';
-  const isPricingActive = pathname === APP_ROUTES.PRICING;
-
   return (
     <header
       data-testid='header-nav'
@@ -90,15 +83,6 @@ export function HeaderNav({
                 </a>
               )
             )}
-            {!navLinks && !hidePricingLink && (
-              <Link
-                href={APP_ROUTES.PRICING}
-                className={cn(navLinkClass, isPricingActive && 'is-active')}
-                aria-current={isPricingActive ? 'page' : undefined}
-              >
-                Pricing
-              </Link>
-            )}
           </div>
         )}
 
@@ -116,7 +100,7 @@ export function HeaderNav({
         {/* Mobile hamburger menu - shown on small screens only */}
         {!hideNav && (
           <div className='flex md:hidden items-center'>
-            <MobileNav hidePricingLink={hidePricingLink} navLinks={navLinks} />
+            <MobileNav navLinks={navLinks} />
           </div>
         )}
       </nav>

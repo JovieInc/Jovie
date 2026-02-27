@@ -39,8 +39,6 @@ export function MarketingHeader({
     wait: PACER_TIMING.SCROLL_THROTTLE_MS,
   });
   const resolvedHideNav = hideNav ?? pathname === '/investors';
-  // Show pricing link on all pages including homepage (was hidden as pseudo feature flag)
-  const hidePricingLink = false;
 
   // Anchor nav links for the /launch landing page
   const launchNavLinks =
@@ -58,7 +56,6 @@ export function MarketingHeader({
       logoSize={logoSize}
       logoVariant='word'
       hideNav={resolvedHideNav}
-      hidePricingLink={hidePricingLink}
       containerSize='homepage'
       className='border-b'
       navLinks={launchNavLinks}

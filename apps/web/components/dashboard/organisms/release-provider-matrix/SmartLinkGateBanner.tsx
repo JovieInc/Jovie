@@ -73,7 +73,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
             </p>
             <p className='mt-0.5 text-xs text-secondary-token'>
               <Link
-                href='/pricing'
+                href='/launch/pricing'
                 className='font-medium text-primary underline-offset-2 hover:underline'
               >
                 Upgrade to Pro
