@@ -62,6 +62,46 @@ export interface PlanEntitlements {
 }
 
 // ---------------------------------------------------------------------------
+// Shared entitlement blocks (founding and pro share identical capabilities)
+// ---------------------------------------------------------------------------
+
+const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
+  canRemoveBranding: true,
+  canExportContacts: true,
+  canAccessAdvancedAnalytics: true,
+  canFilterSelfFromAnalytics: true,
+  canAccessAdPixels: true,
+  canBeVerified: true,
+  aiCanUseTools: true,
+  canCreateManualReleases: true,
+  canAccessFutureReleases: true,
+  canSendNotifications: true,
+  canEditSmartLinks: true,
+};
+
+const PRO_LIMITS: PlanEntitlements['limits'] = {
+  analyticsRetentionDays: 90,
+  contactsLimit: null,
+  smartLinksLimit: null,
+  aiDailyMessageLimit: 100,
+};
+
+const PRO_FEATURES: readonly string[] = [
+  'All Free features +',
+  'Unlimited smart links',
+  'Pre-release & countdown pages',
+  'Remove Jovie branding',
+  'Extended analytics (90 days)',
+  'Advanced analytics & geographic insights',
+  'Filter your own visits',
+  'Unlimited contacts',
+  'Contact export',
+  'Verified badge',
+  'AI assistant (100 messages/day)',
+  'Priority support',
+];
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -104,82 +144,22 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
     },
   },
   founding: {
-    booleans: {
-      canRemoveBranding: true,
-      canExportContacts: true,
-      canAccessAdvancedAnalytics: true,
-      canFilterSelfFromAnalytics: true,
-      canAccessAdPixels: true,
-      canBeVerified: true,
-      aiCanUseTools: true,
-      canCreateManualReleases: true,
-      canAccessFutureReleases: true,
-      canSendNotifications: true,
-      canEditSmartLinks: true,
-    },
-    limits: {
-      analyticsRetentionDays: 90,
-      contactsLimit: null,
-      smartLinksLimit: null,
-      aiDailyMessageLimit: 100,
-    },
+    booleans: { ...PRO_BOOLEANS },
+    limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Founding Member',
       tagline: 'Early supporter pricing, locked in for life',
-      features: [
-        'All Free features +',
-        'Unlimited smart links',
-        'Pre-release & countdown pages',
-        'Remove Jovie branding',
-        'Extended analytics (90 days)',
-        'Advanced analytics & geographic insights',
-        'Filter your own visits',
-        'Unlimited contacts',
-        'Contact export',
-        'Verified badge',
-        'AI assistant (100 messages/day)',
-        'Priority support',
-      ],
+      features: PRO_FEATURES,
       price: { monthly: 9, yearly: null },
     },
   },
   pro: {
-    booleans: {
-      canRemoveBranding: true,
-      canExportContacts: true,
-      canAccessAdvancedAnalytics: true,
-      canFilterSelfFromAnalytics: true,
-      canAccessAdPixels: true,
-      canBeVerified: true,
-      aiCanUseTools: true,
-      canCreateManualReleases: true,
-      canAccessFutureReleases: true,
-      canSendNotifications: true,
-      canEditSmartLinks: true,
-    },
-    limits: {
-      analyticsRetentionDays: 90,
-      contactsLimit: null,
-      smartLinksLimit: null,
-      aiDailyMessageLimit: 100,
-    },
+    booleans: { ...PRO_BOOLEANS },
+    limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Pro',
       tagline: 'For growing artists',
-      features: [
-        'All Free features +',
-        'Unlimited smart links',
-        'Pre-release & countdown pages',
-        'Remove Jovie branding',
-        'Extended analytics (90 days)',
-        'Advanced analytics & geographic insights',
-        'Filter your own visits',
-        'Unlimited contacts',
-        'Contact export',
-        'Verified badge',
-        'AI assistant (100 messages/day)',
-        'Priority support',
-      ],
+      features: PRO_FEATURES,
       price: { monthly: 39, yearly: 348 },
     },
   },
