@@ -57,15 +57,15 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
 export function getSessionSetupSql(userId: string) {
   validateClerkUserId(userId);
 
-  // Set the Clerk session variable for RLS in a single query.
-  // is_local=false (session-scoped) because the Neon HTTP driver has no
-  // transaction context — is_local=true would be silently discarded.
-  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`;
+  // Set the Clerk session variable for RLS using transaction-local scope.
+  // is_local=true ensures the variable is scoped to the current transaction,
+  // preventing cross-request RLS session bleed in pooled connections.
+  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`;
 }
 
 function getSessionSetupFallbackSql(userId: string) {
   validateClerkUserId(userId);
-  return drizzleSql`SET app.clerk_user_id = ${userId}`;
+  return drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`;
 }
 
 async function applySessionUserId(userId: string): Promise<void> {
@@ -81,9 +81,9 @@ async function applySessionUserId(userId: string): Promise<void> {
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
  *
- * Note: For better performance with the Neon HTTP driver, consider using
- * getSessionSetupSql() with db.batch() to ensure session setup and queries
- * execute on the same connection.
+ * Note: Since we use the Neon WebSocket driver, db.transaction() is fully
+ * supported and is the recommended way to ensure session setup and queries
+ * execute on the same stateful connection.
  */
 export async function setupDbSession(clerkUserId?: string) {
   const userId = await resolveClerkUserId(clerkUserId);
@@ -120,8 +120,9 @@ export async function withDbSession<T>(
  * Transaction isolation levels supported by PostgreSQL
  */
 export type IsolationLevel =
-  | 'read_committed'
-  | 'repeatable_read'
+  | 'read committed'
+  | 'read uncommitted'
+  | 'repeatable read'
   | 'serializable';
 
 /**
@@ -129,23 +130,28 @@ export type IsolationLevel =
  * Sets app.clerk_user_id via session-scoped set_config
  * before executing the operation.
  *
- * Note: The Neon HTTP driver does not support transactions. The operation
- * runs directly against db without transaction isolation. Callers should
- * also filter by userId in WHERE clauses for defense-in-depth.
- *
- * @param operation - The database operation to execute
- * @param options.clerkUserId - Optional explicit Clerk user ID (uses auth() if not provided)
- * @param options.isolationLevel - Unused with Neon HTTP driver (retained for API compatibility)
+ * @param operation The callback to execute with the transaction
+ * @param options Optional Clerk user ID and isolation level override
+ * @returns The result of the operation
  */
 export async function withDbSessionTx<T>(
   operation: (tx: DbOrTransaction, userId: string) => Promise<T>,
   options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
-  // Set RLS session variables via setupDbSession (session-scoped).
-  // The neon-http driver does not support transactions, so the operation
-  // runs directly against db. Callers must also filter by userId.
-  const { userId } = await setupDbSession(options?.clerkUserId);
-  return operation(db, userId);
+  const userId = await resolveClerkUserId(options?.clerkUserId);
+
+  // Since we use the Neon WebSocket driver, we can use db.transaction()
+  // to ensure session setup and queries execute on the same stateful connection.
+  return db.transaction(
+    async tx => {
+      // Set the session variable within the transaction
+      await tx.execute(getSessionSetupSql(userId));
+      return operation(tx, userId);
+    },
+    options?.isolationLevel
+      ? { isolationLevel: options.isolationLevel }
+      : undefined
+  );
 }
 
 /**

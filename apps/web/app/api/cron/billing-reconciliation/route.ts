@@ -29,7 +29,6 @@ import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
-import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -253,25 +252,25 @@ async function reconcileProUsersWithoutSubscription(
           // They have an active subscription - link it
           stats.mismatches++;
 
-          await db
-            .update(users)
-            .set({
-              stripeSubscriptionId: activeSubscription.id,
-              billingUpdatedAt: new Date(),
-              billingVersion: drizzleSql`${users.billingVersion} + 1`,
-            })
-            .where(eq(users.id, user.id));
-
-          // Log to audit
-          await db.insert(billingAuditLog).values({
-            userId: user.id,
-            eventType: 'reconciliation_fix',
-            previousState: { stripeSubscriptionId: null },
-            newState: { stripeSubscriptionId: activeSubscription.id },
-            source: 'reconciliation',
-            metadata: {
-              reason: 'linked_active_subscription',
-            },
+          await db.transaction(async tx => {
+            await tx
+              .update(users)
+              .set({
+                stripeSubscriptionId: activeSubscription.id,
+                billingUpdatedAt: new Date(),
+                billingVersion: drizzleSql`${users.billingVersion} + 1`,
+              })
+              .where(eq(users.id, user.id));
+            await tx.insert(billingAuditLog).values({
+              userId: user.id,
+              eventType: 'reconciliation_fix',
+              previousState: { stripeSubscriptionId: null },
+              newState: { stripeSubscriptionId: activeSubscription.id },
+              source: 'reconciliation',
+              metadata: {
+                reason: 'linked_active_subscription',
+              },
+            });
           });
 
           stats.fixed++;
@@ -282,26 +281,29 @@ async function reconcileProUsersWithoutSubscription(
       // No active subscription found - they shouldn't be Pro
       stats.mismatches++;
 
-      const result = await updateUserBillingStatus({
-        clerkUserId: user.clerkId,
-        isPro: false,
-        eventType: 'reconciliation_fix',
-        source: 'reconciliation',
-        metadata: {
-          reason: 'pro_without_subscription',
-          hadCustomerId: !!user.stripeCustomerId,
-        },
+      await db.transaction(async tx => {
+        await tx
+          .update(users)
+          .set({
+            isPro: false,
+            stripeSubscriptionId: null,
+            billingUpdatedAt: new Date(),
+            billingVersion: drizzleSql`${users.billingVersion} + 1`,
+          })
+          .where(eq(users.id, user.id));
+        await tx.insert(billingAuditLog).values({
+          userId: user.id,
+          eventType: 'reconciliation_fix',
+          previousState: { stripeSubscriptionId: null },
+          newState: { isPro: false },
+          source: 'reconciliation',
+          metadata: {
+            reason: 'no_active_subscription',
+          },
+        });
       });
 
-      if (result.success) {
-        stats.fixed++;
-        logger.info(
-          `[billing-reconciliation] Downgraded user ${user.id}: Pro without subscription`
-        );
-      } else {
-        stats.errors++;
-        errors.push(`Failed to fix Pro user ${user.id}: ${result.error}`);
-      }
+      stats.fixed++;
     } catch (error) {
       stats.errors++;
       const message = error instanceof Error ? error.message : String(error);

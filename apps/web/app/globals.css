@@ -1246,6 +1246,7 @@ body {
   --color-surface-input: var(--color-bg-input);
   --color-surface-active: var(--color-bg-active);
   --color-surface-button: var(--color-bg-button);
+  --color-surface-tooltip: var(--color-bg-tooltip);
 
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);
@@ -1257,6 +1258,7 @@ body {
   --color-tertiary-token: var(--color-text-tertiary-token);
   --color-quaternary-token: var(--color-text-quaternary-token);
   --color-disabled-token: var(--color-text-disabled-token);
+  --color-tooltip-foreground: var(--color-text-tooltip);
 
   /* Interactive states — self-referential aliases expose existing CSS vars to Tailwind v4 color system */
   --color-interactive-hover: var(--color-interactive-hover);

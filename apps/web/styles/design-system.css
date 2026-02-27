@@ -53,31 +53,24 @@
 */
 
 :root {
-  /* Light mode surfaces — extracted from Linear CSS vars (2026-02-17)
-     --bg-base-color-light: #fcfcfc
-     --bg-sidebar-light: #f5f5f5
-     --color-bg-primary:    lch(99% 0 282.863)     — main content
-     --color-bg-secondary:  lch(93.75% 0 282.863)  — cards, panels
-     --color-bg-tertiary:   lch(91.417% 0 282.863) — nested surfaces
-     --color-bg-quaternary: lch(97.542% 0 282.863) — hover state */
-  /* prettier-ignore */ --color-bg-base: #f5f5f5; /* Sidebar bg — Linear: --bg-sidebar-light */
-  /* prettier-ignore */ --color-bg-surface-0: #fcfcfc; /* Page bg — Linear: --bg-base-color-light */
-  /* prettier-ignore */ --color-bg-surface-1: lch(
-    99% 0 282.863
-  ); /* Main content — Linear: bg-primary */
-  /* prettier-ignore */ --color-bg-surface-2: lch(
-    93.75% 0 282.863
-  ); /* Cards — Linear: bg-secondary */
-  /* prettier-ignore */ --color-bg-surface-3: lch(
-    91.417% 0 282.863
-  ); /* Nested — Linear: bg-tertiary */
+  /* Light mode surfaces — matching Linear's exact structural hues
+     --bg-base: Sidebar & page background
+     --bg-surface-1: Main app content area
+     --bg-surface-2: Cards and panels
+     --bg-surface-3: Interactive / elevated */
+  /* prettier-ignore */ --color-bg-base: #f7f8f9; /* Sidebar bg */
+  /* prettier-ignore */ --color-bg-surface-0: #f7f8f9; /* Page bg */
+  /* prettier-ignore */ --color-bg-surface-1: #ffffff; /* Main content */
+  /* prettier-ignore */ --color-bg-surface-2: #f2f3f5; /* Cards */
+  /* prettier-ignore */ --color-bg-surface-3: #ebecef; /* Nested / hover */
 
-  --color-bg-page: #fcfcfc; /* Same as surface-0 */
-  --color-bg-hover: lch(97.542% 0 282.863); /* Linear: bg-quaternary (hover) */
-  --color-bg-elevated: lch(93.75% 0 282.863); /* Same as surface-2 */
-  --color-bg-input: lch(99% 0 282.863); /* Same as surface-1 */
-  --color-bg-active: lch(93.75% 0 282.863); /* Same as surface-2 */
-  --color-bg-button: lch(91.417% 0 282.863); /* Same as surface-3 */
+  --color-bg-page: #f7f8f9; /* Same as base */
+  --color-bg-hover: rgba(0, 0, 0, 0.04); /* Hover overlay */
+  --color-bg-elevated: #f2f3f5; /* Same as surface-2 */
+  --color-bg-input: #ebecef; /* Same as surface-3 */
+  --color-bg-active: #ebecef; /* Same as surface-3 */
+  --color-bg-button: #e3e5e8;
+  --color-bg-tooltip: #101012; /* Linear dark background for light mode tooltips */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
@@ -93,6 +86,7 @@
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
+  --color-text-tooltip: #ffffff;
 
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: rgba(0, 0, 0, 0.4);
@@ -181,48 +175,27 @@
 
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
-  /* Dark mode surfaces — extracted from Linear CSS vars (2026-02-17)
-     Using Linear's exact LCH values from :root CSS custom properties:
-       --bg-color:          lch(2.467% 0 272)      = #090909  (sidebar/page bg)
-       --color-bg-primary:  lch(4.8% 0.7 272)      = #101012  (primary surface)
-       --color-bg-quaternary: lch(7.133% 1.867 272) = #141518  (hover surface)
-       --color-bg-secondary: lch(10.633% 3.033 272) = #191B1F  (secondary surface)
-       --color-bg-tertiary: lch(14.133% 4.2 272)    = #212329  (tertiary surface)
-       --bg-border-color:   lch(14.74% 3.54 272)    = #23252A  (border color) */
-  /* prettier-ignore */ --color-bg-base: lch(
-    2.467% 0 272
-  ); /* #090909 — sidebar/page bg */
-  /* prettier-ignore */ --color-bg-surface-0: lch(
-    4.8% 0.7 272
-  ); /* #101012 — primary surface */
-  /* prettier-ignore */ --color-bg-surface-1: lch(
-    7.133% 1.867 272
-  ); /* #141518 — cards */
-  /* prettier-ignore */ --color-bg-surface-2: lch(
-    10.633% 3.033 272
-  ); /* #191B1F — inputs, elevated */
-  /* prettier-ignore */ --color-bg-surface-3: lch(
-    14.133% 4.2 272
-  ); /* #212329 — modals, tooltips */
+  /* Dark mode surfaces — matched to Linear's exact Hex values */
+  --color-bg-base: #090909; /* sidebar/page bg */
+  --color-bg-surface-0: #101012; /* primary app surface */
+  --color-bg-surface-1: #191b1f; /* cards */
+  --color-bg-surface-2: #23252a; /* inputs, elevated */
+  --color-bg-surface-3: #2a2c32; /* modals, tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: lch(2.467% 0 272); /* Same as base */
-  --color-bg-hover: rgba(
-    255,
-    255,
-    255,
-    0.02
-  ); /* Row/item hover (semi-transparent overlay) */
-  --color-bg-elevated: lch(4.8% 0.7 272); /* Same as surface-0 */
-  --color-bg-input: lch(10.633% 3.033 272); /* Same as surface-2 */
-  --color-bg-active: lch(10.633% 3.033 272); /* Same as surface-2 */
-  --color-bg-button: lch(14.133% 4.2 272); /* Same as surface-3 */
+  --color-bg-page: #090909; /* Same as base */
+  --color-bg-hover: rgba(255, 255, 255, 0.04); /* Row/item hover */
+  --color-bg-elevated: #101012; /* Same as surface-0 */
+  --color-bg-input: #191b1f; /* Same as surface-1 */
+  --color-bg-active: #23252a; /* Same as surface-2 */
+  --color-bg-button: #2a2c32; /* Same as surface-3 */
+  --color-bg-tooltip: #2a2c32; /* Matches surface-3 in dark mode */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):
-       Primary:   lch(100% 0 272)     → oklch ~100% — pure white headings
+       Primary:   lch(100% 0 272)       → oklch ~100% — pure white headings
        Secondary: lch(90.65% 1.35 272) → oklch ~91% — body text, labels (bright!)
-       Tertiary:  lch(62.6% 1.35 272)  → oklch ~63% — descriptions, meta
+       Tertiary:  lch(62.6% 1.35 272)   → oklch ~63% — descriptions, meta
        Quaternary: lch(38.29% 1.35 272) → oklch ~38% — placeholders, disabled
      Key insight: Linear's secondary is MUCH brighter than typical (90% not 65%) */
   /* Text hierarchy — extracted from Linear CSS vars (2026-02-17)
@@ -240,6 +213,7 @@
     51% 1.35 272
   ); /* ~#7a7b7d — bumped from 38.29% for WCAG AA 4.5:1 contrast on dark bg */
   --color-text-disabled-token: oklch(28% 0.006 272);
+  --color-text-tooltip: lch(100% 0 272); /* White text on dark tooltips */
 
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: rgba(255, 255, 255, 0.55);

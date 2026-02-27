@@ -9,6 +9,8 @@ const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
 
+const mockDbTransaction = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
@@ -18,6 +20,7 @@ vi.mock('@/lib/db', () => ({
     insert: vi.fn(() => ({
       values: mockDbInsertValues,
     })),
+    transaction: mockDbTransaction,
   },
 }));
 
@@ -68,6 +71,20 @@ describe('GET /api/cron/billing-reconciliation', () => {
     mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
     mockDbInsertValues.mockResolvedValue(undefined);
     mockStripeList.mockResolvedValue({ data: [], has_more: false });
+    // Mock transaction to invoke callback with a tx that has update/insert
+    mockDbTransaction.mockImplementation(
+      async (callback: (tx: unknown) => Promise<unknown>) => {
+        const mockTx = {
+          update: vi.fn(() => ({
+            set: mockDbUpdateSet,
+          })),
+          insert: vi.fn(() => ({
+            values: mockDbInsertValues,
+          })),
+        };
+        return callback(mockTx);
+      }
+    );
   });
 
   afterEach(() => {

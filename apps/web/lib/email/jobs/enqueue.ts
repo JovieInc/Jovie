@@ -122,15 +122,13 @@ export async function enqueueBulkClaimInviteJobs(
   let skipped = 0;
   let cumulativeDelayMs = 0;
 
-  for (let i = 0; i < invites.length; i++) {
-    const invite = invites[i];
-
+  const valuesToInsert = invites.map((invite, i) => {
     // Calculate delay for this invite
     let delayMs: number;
     if (useRandomDelay) {
       // Add random delay to cumulative total
       delayMs = cumulativeDelayMs;
-      cumulativeDelayMs += randomDelay(minDelayMs, maxDelayMs);
+      cumulativeDelayMs += randomDelay(minDelayMs!, maxDelayMs!);
     } else {
       // Use fixed delay
       delayMs = i * fixedDelay;
@@ -141,27 +139,28 @@ export async function enqueueBulkClaimInviteJobs(
 
     const dedupKey = `send_claim_invite:${invite.inviteId}`;
 
-    const [job] = await tx
+    return {
+      jobType: 'send_claim_invite' as const,
+      payload: invite,
+      status: 'pending' as const,
+      runAt,
+      priority,
+      maxAttempts,
+      dedupKey,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  });
+
+  if (valuesToInsert.length > 0) {
+    const jobs = await tx
       .insert(ingestionJobs)
-      .values({
-        jobType: 'send_claim_invite',
-        payload: invite,
-        status: 'pending',
-        runAt,
-        priority,
-        maxAttempts,
-        dedupKey,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      })
+      .values(valuesToInsert)
       .onConflictDoNothing({ target: [ingestionJobs.dedupKey] })
       .returning({ id: ingestionJobs.id });
 
-    if (job) {
-      enqueued++;
-    } else {
-      skipped++;
-    }
+    enqueued = jobs.length;
+    skipped = invites.length - enqueued;
   }
 
   logger.info('Enqueued bulk claim invite jobs', {

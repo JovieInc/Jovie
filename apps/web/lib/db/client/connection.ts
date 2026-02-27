@@ -1,20 +1,23 @@
 /**
  * Database Connection Management
  *
- * Uses Neon HTTP driver with managed connection pooling.
+ * Uses Neon WebSocket driver for stateful connection pooling.
  * This is the serverless-native pattern:
- * - Stateless HTTP requests (no WebSocket/TCP pool management)
- * - Neon handles connection pooling server-side via ?pooler=true
- * - One client per request is fine - no local pool needed
- * - Eliminates "pool under pressure" issues in serverless
+ * - Stateful WebSocket requests required for Row Level Security (RLS)
+ * - db.transaction() is supported and maintains connection state
+ * - set_config applies properly within the transaction
  */
 
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import { env } from '@/lib/env-server';
 import * as schema from '../schema';
 import { logDbInfo } from './logging';
 import type { DbType, PoolMetrics } from './types';
+
+// Configure Neon to use the ws library for WebSocket connections in Node.js
+neonConfig.webSocketConstructor = ws;
 
 declare global {
   var db: DbType | undefined;
@@ -22,10 +25,11 @@ declare global {
 
 // Lazy initialization of database connection
 let _db: DbType | undefined;
+let _pool: Pool | undefined;
 
 /**
- * Initialize the database connection using Neon HTTP driver.
- * Uses the pooled connection URL from Neon console (?pooler=true).
+ * Initialize the database connection using Neon WebSocket driver.
+ * Uses a Pool for stateful connections that support transactions and RLS.
  */
 export function initializeDb(): DbType {
   const databaseUrl = env.DATABASE_URL;
@@ -45,17 +49,22 @@ export function initializeDb(): DbType {
     return globalThis.db;
   }
 
-  logDbInfo('db_init', 'Initializing database connection with HTTP driver', {
-    environment: env.NODE_ENV,
-    hasUrl: !!databaseUrl,
-    driver: 'neon-http',
-  });
+  logDbInfo(
+    'db_init',
+    'Initializing database connection with WebSocket driver',
+    {
+      environment: env.NODE_ENV,
+      hasUrl: !!databaseUrl,
+      driver: 'neon-serverless',
+    }
+  );
 
-  // Create Neon HTTP client - stateless, Neon manages pooling server-side
-  const sql = neon(databaseUrl);
+  // Create Neon WebSocket pool - stateful, supports transactions for RLS
+  const pool = new Pool({ connectionString: databaseUrl });
+  _pool = pool;
 
-  // Create drizzle instance with HTTP driver
-  const dbInstance = drizzle(sql, {
+  // Create drizzle instance with WebSocket driver
+  const dbInstance = drizzle(pool, {
     schema,
     logger: isProduction
       ? false
@@ -102,21 +111,12 @@ export function setInternalDb(db: DbType): void {
   _db = db;
 }
 
-// Export a getter function that initializes the connection on first access.
-// The Proxy also guards against .transaction() which is unsupported by neon-http.
+// Export a lazy-initializing proxy that forwards all access to the real db instance.
+// The WebSocket driver supports db.transaction() for RLS session isolation.
 export const db = new Proxy({} as DbType, {
-  get(target, prop) {
+  get(_target, prop) {
     if (!_db) {
       _db = initializeDb();
-    }
-    if (prop === 'transaction') {
-      return () => {
-        throw new Error(
-          'db.transaction() is not supported with the Neon HTTP driver. ' +
-            'Use individual queries or batch operations instead. ' +
-            'See lib/auth/session.ts for the recommended pattern.'
-        );
-      };
     }
 
     const value = Reflect.get(_db, prop, _db);
@@ -126,24 +126,41 @@ export const db = new Proxy({} as DbType, {
 
 /**
  * Get connection pool metrics for monitoring.
- * Returns null - HTTP driver doesn't use local pooling.
- * Neon manages pooling server-side with ?pooler=true.
+ * Returns real metrics from the WebSocket Pool instance.
  */
 export function getPoolMetrics(): PoolMetrics | null {
-  // HTTP driver doesn't have local pool metrics
-  // Pooling is managed by Neon server-side
-  return null;
+  if (!_pool) {
+    return null;
+  }
+
+  const total = _pool.totalCount;
+  const idle = _pool.idleCount;
+  const waiting = _pool.waitingCount;
+
+  return {
+    total,
+    idle,
+    waiting,
+    utilization: total > 0 ? (total - idle) / total : 0,
+  };
 }
 
 /**
  * Get pool state for health checks (internal use).
- * Returns null - HTTP driver doesn't use local pooling.
+ * Returns real pool state from the WebSocket Pool instance.
  */
 export function getPoolState(): {
   totalCount: number;
   idleCount: number;
   waitingCount: number;
 } | null {
-  // HTTP driver doesn't have local pool state
-  return null;
+  if (!_pool) {
+    return null;
+  }
+
+  return {
+    totalCount: _pool.totalCount,
+    idleCount: _pool.idleCount,
+    waitingCount: _pool.waitingCount,
+  };
 }

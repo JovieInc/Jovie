@@ -92,7 +92,7 @@ export function DemoReleasesPanel({
   return (
     <div
       ref={listRef}
-      className='h-full overflow-y-auto overflow-x-hidden outline-none'
+      className='h-full overflow-y-auto outline-none scrollbar-none'
       tabIndex={0}
       onKeyDown={handleKeyDown}
       role='listbox'
@@ -107,30 +107,30 @@ export function DemoReleasesPanel({
             <button
               type='button'
               onClick={() => toggleGroup(group.status)}
-              className='sticky top-0 z-10 flex w-full items-center gap-2 border-b border-subtle bg-surface-1 px-4 py-1.5 text-2xs font-medium text-tertiary-token hover:text-secondary-token'
+              className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-8 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token hover:text-secondary-token'
             >
-              <DemoStatusIcon status={group.status} />
-              <span>{STATUS_LABEL[group.status]}</span>
-              <span className='text-quaternary-token'>
-                {group.releases.length}
-              </span>
               <svg
                 className={cn(
-                  'ml-auto size-3 transition-transform duration-fast',
-                  isCollapsed && '-rotate-90'
+                  'size-3.5 shrink-0 transition-transform duration-fast text-tertiary-token',
+                  !isCollapsed && 'rotate-90'
                 )}
                 viewBox='0 0 12 12'
                 fill='none'
                 aria-hidden='true'
               >
                 <path
-                  d='M3 4.5L6 7.5L9 4.5'
+                  d='M4.5 3L7.5 6L4.5 9'
                   stroke='currentColor'
                   strokeWidth='1.5'
                   strokeLinecap='round'
                   strokeLinejoin='round'
                 />
               </svg>
+              <DemoStatusIcon status={group.status} />
+              <span>{STATUS_LABEL[group.status]}</span>
+              <span className='text-quaternary-token'>
+                {group.releases.length}
+              </span>
             </button>
 
             {/* Rows */}
@@ -159,28 +159,24 @@ export function DemoReleasesPanel({
                       }
                     }}
                     className={cn(
-                      'flex cursor-pointer items-center gap-3 border-b border-subtle px-4 py-2 text-app transition-colors duration-fast',
-                      isSelected && 'bg-interactive-active',
+                      'flex h-[34px] cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--color-border-subtle)]',
+                      isSelected &&
+                        'bg-accent/10 shadow-[inset_2px_0_0_var(--color-accent),inset_0_-1px_0_var(--color-border-subtle)]',
                       isFocused && !isSelected && 'bg-interactive-hover',
                       !isSelected && !isFocused && 'hover:bg-interactive-hover'
                     )}
-                    style={{
-                      opacity: 1,
-                      transform: 'translateY(0)',
-                      transition: `opacity 0.3s ease ${i * 30}ms, transform 0.3s ease ${i * 30}ms, background-color var(--duration-fast) var(--ease-interactive)`,
-                    }}
                   >
                     {/* Status icon */}
                     <DemoStatusIcon status={release.status} />
 
-                    {/* Title + artist */}
-                    <div className='min-w-0 flex-1'>
-                      <p className='truncate font-medium text-primary-token'>
+                    {/* Title + artist inline */}
+                    <div className='min-w-0 flex-1 flex items-baseline gap-2'>
+                      <span className='truncate text-[13px] font-medium text-primary-token'>
                         {release.title}
-                      </p>
-                      <p className='truncate text-2xs text-tertiary-token'>
+                      </span>
+                      <span className='truncate text-[12px] text-tertiary-token'>
                         {release.artist}
-                      </p>
+                      </span>
                     </div>
 
                     {/* Labels */}
@@ -188,12 +184,12 @@ export function DemoReleasesPanel({
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
-                          className='rounded-xs px-1.5 py-0.5 text-[10px] font-medium'
-                          style={{
-                            backgroundColor: `${label.color}20`,
-                            color: label.color,
-                          }}
+                          className='flex items-center gap-1.5 rounded-full border border-subtle px-1.5 py-0.5 text-[11px] font-medium text-secondary-token bg-transparent'
                         >
+                          <span
+                            className='size-1.5 rounded-full'
+                            style={{ backgroundColor: label.color }}
+                          />
                           {label.name}
                         </span>
                       ))}
@@ -210,10 +206,10 @@ export function DemoReleasesPanel({
                     )}
 
                     {/* Assignee */}
-                    <DemoAvatar assignee={release.assignee} />
+                    <DemoAvatar assignee={release.assignee} size={16} />
 
                     {/* Date */}
-                    <span className='hidden shrink-0 text-2xs text-quaternary-token xl:block'>
+                    <span className='hidden shrink-0 text-[12px] text-quaternary-token xl:block w-16 text-right'>
                       {release.releaseDate}
                     </span>
                   </div>

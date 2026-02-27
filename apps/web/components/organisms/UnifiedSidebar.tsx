@@ -179,13 +179,17 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 items-center gap-1.5 rounded-md px-1.5 transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
-              <BrandLogo size={16} tone='auto' className='size-4 shrink-0' />
-              <span className='text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                {isAdmin ? 'Admin' : 'Jovie'}
+              <BrandLogo
+                size={16}
+                tone='auto'
+                className='rounded-[4px] shrink-0'
+              />
+              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                {isAdmin ? 'Admin' : 'Sora Vale'}
               </span>
               <ChevronDown
                 className='size-3 shrink-0 text-sidebar-item-icon opacity-60 group-data-[collapsible=icon]:hidden'

@@ -8,25 +8,31 @@ export const SYSTEM_INGESTION_USER = 'system_ingestion';
 
 /**
  * Execute an operation with system ingestion session context.
- * The neon-http driver does not support transactions, so isolationLevel is ignored.
+ * Uses a transaction to ensure session state is maintained across queries.
  */
 export async function withSystemIngestionSession<T>(
   operation: (tx: DbOrTransaction) => Promise<T>,
-  _options?: { isolationLevel?: IsolationLevel }
+  options?: { isolationLevel?: IsolationLevel }
 ): Promise<T> {
   validateClerkUserId(SYSTEM_INGESTION_USER);
 
-  // is_local=false (session-scoped) because the Neon HTTP driver has no
-  // transaction context — is_local=true would be silently discarded.
-  try {
-    await db.execute(
-      drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, false)`
-    );
-  } catch {
-    await db.execute(
-      drizzleSql`SET app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
-    );
-  }
+  return db.transaction(
+    async tx => {
+      // Set the session variable within the transaction
+      try {
+        await tx.execute(
+          drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
+        );
+      } catch {
+        await tx.execute(
+          drizzleSql`SET LOCAL app.clerk_user_id = ${SYSTEM_INGESTION_USER}`
+        );
+      }
 
-  return operation(db);
+      return operation(tx);
+    },
+    options?.isolationLevel
+      ? { isolationLevel: options.isolationLevel }
+      : undefined
+  );
 }

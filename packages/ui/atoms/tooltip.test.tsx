@@ -187,8 +187,8 @@ describe('Tooltip', () => {
     it('applies theme-aware surface classes', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('bg-surface-3');
-      expect(content.className).toContain('text-primary-token');
+      expect(content.className).toContain('bg-surface-tooltip');
+      expect(content.className).toContain('text-tooltip-foreground');
     });
 
     it('applies animation classes', () => {

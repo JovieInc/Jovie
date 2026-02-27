@@ -47,7 +47,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[52px] w-full items-center gap-2 px-4 sm:flex border-b border-subtle'>
+      <div className='relative hidden h-12 w-full items-center gap-2 px-5 md:px-6 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -60,9 +60,9 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex-1 items-center gap-3 flex'>
+        <div className='flex-1 items-center flex text-[13px]'>
           {!breadcrumbSuffix && (
-            <span className='text-[13px] font-medium text-secondary-token'>
+            <span className='font-medium text-primary-token'>
               {currentLabel}
             </span>
           )}

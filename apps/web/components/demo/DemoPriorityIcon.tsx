@@ -69,7 +69,7 @@ export function DemoPriorityIcon({
         const y = 11 - height;
         return (
           <rect
-            key={i}
+            key={`bar-${priority}-${i.toString()}`}
             x={x}
             y={y}
             width={barWidth}

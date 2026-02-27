@@ -195,23 +195,19 @@ export const creatorProfiles = pgTable(
       .where(drizzleSql`is_claimed = true`),
     // Index for GTM prioritization - sort unclaimed profiles by fit score
     fitScoreUnclaimedIndex: index('idx_creator_profiles_fit_score_unclaimed')
-      .on(table.fitScore, table.isClaimed, table.createdAt)
-      .where(drizzleSql`is_claimed = false AND fit_score IS NOT NULL`),
-    // Performance index: session context lookups (user + claimed profile)
+      .on(table.fitScore, table.id)
+      .where(drizzleSql`is_claimed = false`),
     userIdClaimedIndex: index('idx_creator_profiles_user_id_claimed').on(
       table.userId,
       table.isClaimed
     ),
-    // Performance index: dashboard profile lookups by user ordered by creation time.
     userIdCreatedAtIndex: index('idx_creator_profiles_user_id_created_at').on(
       table.userId,
       table.createdAt
     ),
-    // Enforce one-to-one Spotify artist ownership across creator profiles.
-    spotifyIdUnique: uniqueIndex('creator_profiles_spotify_id_unique')
-      .on(table.spotifyId)
-      .where(drizzleSql`spotify_id IS NOT NULL`),
+    // Performance index: Outreach dashboard filtering
     outreachStatusIndex: index('idx_creator_profiles_outreach_status').on(
+      table.isClaimed,
       table.outreachStatus,
       table.createdAt
     ),
@@ -304,42 +300,54 @@ export const creatorProfileAttributes = pgTable(
 );
 
 // Profile photos table for avatar uploads with Vercel Blob
-export const profilePhotos = pgTable('profile_photos', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  creatorProfileId: uuid('creator_profile_id').references(
-    () => creatorProfiles.id,
-    { onDelete: 'cascade' }
-  ),
-  ingestionOwnerUserId: uuid('ingestion_owner_user_id').references(
-    () => users.id,
-    { onDelete: 'set null' }
-  ),
-  status: photoStatusEnum('status').notNull().default('uploading'),
-  sourcePlatform: text('source_platform'),
-  sourceType: ingestionSourceTypeEnum('source_type')
-    .default('manual')
-    .notNull(),
-  confidence: numeric('confidence', { precision: 3, scale: 2 })
-    .default('1.00')
-    .notNull(),
-  lockedByUser: boolean('locked_by_user').default(false).notNull(),
-  blobUrl: text('blob_url'),
-  smallUrl: text('small_url'),
-  mediumUrl: text('medium_url'),
-  largeUrl: text('large_url'),
-  originalFilename: text('original_filename'),
-  mimeType: text('mime_type'),
-  fileSize: integer('file_size'),
-  width: integer('width'),
-  height: integer('height'),
-  processedAt: timestamp('processed_at'),
-  errorMessage: text('error_message'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const profilePhotos = pgTable(
+  'profile_photos',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id').references(
+      () => creatorProfiles.id,
+      { onDelete: 'cascade' }
+    ),
+    ingestionOwnerUserId: uuid('ingestion_owner_user_id').references(
+      () => users.id,
+      { onDelete: 'set null' }
+    ),
+    status: photoStatusEnum('status').notNull().default('uploading'),
+    sourcePlatform: text('source_platform'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    confidence: numeric('confidence', { precision: 3, scale: 2 })
+      .default('1.00')
+      .notNull(),
+    lockedByUser: boolean('locked_by_user').default(false).notNull(),
+    blobUrl: text('blob_url'),
+    smallUrl: text('small_url'),
+    mediumUrl: text('medium_url'),
+    largeUrl: text('large_url'),
+    originalFilename: text('original_filename'),
+    mimeType: text('mime_type'),
+    fileSize: integer('file_size'),
+    width: integer('width'),
+    height: integer('height'),
+    processedAt: timestamp('processed_at'),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    userIdx: index('idx_profile_photos_user_id').on(table.userId),
+    creatorProfileIdx: index('idx_profile_photos_creator_profile_id').on(
+      table.creatorProfileId
+    ),
+    ingestionOwnerIdx: index('idx_profile_photos_ingestion_owner').on(
+      table.ingestionOwnerUserId
+    ),
+  })
+);
 
 // Creator claim invites table for tracking email invitations to claim profiles
 export const creatorClaimInvites = pgTable(
@@ -374,6 +382,10 @@ export const creatorClaimInvites = pgTable(
     creatorProfileIdIdx: index(
       'idx_creator_claim_invites_creator_profile_id'
     ).on(table.creatorProfileId),
+    creatorContactIdIdx: index('idx_creator_claim_invites_contact_id').on(
+      table.creatorContactId
+    ),
+
     statusIdx: index('idx_creator_claim_invites_status').on(table.status),
     sendAtIdx: index('idx_creator_claim_invites_send_at').on(table.sendAt),
     // Unique constraint to prevent duplicate invites for same profile + email
