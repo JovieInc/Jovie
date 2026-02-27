@@ -17,11 +17,6 @@ declare global {
     | undefined;
 }
 
-export interface CookieBannerSectionProps {
-  /** @deprecated No longer used -- cookie requirement is read client-side from document.cookie */
-  readonly showBanner?: boolean;
-}
-
 /**
  * Read the cookie-banner-required flag from document.cookie.
  * The middleware sets `jv_cc_required=1` for EU/EEA visitors and `0` otherwise.
@@ -36,7 +31,7 @@ function isBannerRequiredFromCookie(): boolean {
   return match.split('=')[1]?.trim() !== '0';
 }
 
-export function CookieBannerSection(_props: CookieBannerSectionProps) {
+export function CookieBannerSection() {
   const pathname = usePathname();
   const isDashboard = Boolean(pathname?.startsWith('/app'));
 
