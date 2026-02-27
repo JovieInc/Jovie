@@ -88,6 +88,7 @@
     --linear-success: oklch(72% 0.2 145);
     --linear-warning: oklch(82% 0.17 85);
     --linear-warning-subtle: oklch(82% 0.17 85 / 0.15);
+    --linear-error: oklch(65% 0.2 25);
     --linear-accent: oklch(55% 0.25 270);
     /* ============================================
      HERO-SPECIFIC TOKENS
