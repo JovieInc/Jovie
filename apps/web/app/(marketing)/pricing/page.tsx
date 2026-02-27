@@ -314,7 +314,7 @@ export default function PricingPage() {
                 billingLabel='Billed monthly'
                 price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
                 priceSuffix='/month'
-                yearlyPrice={`or $${ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly})`}
+                yearlyPrice={`or $${ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly!}/year (save $${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly!})`}
                 buttonLabel='Get started'
                 buttonHref='/signup?plan=pro'
                 buttonVariant='primary'
@@ -330,7 +330,7 @@ export default function PricingPage() {
                     billingLabel='Billed monthly'
                     price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
                     priceSuffix='/month'
-                    yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly})`}
+                    yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly!}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly!})`}
                     buttonLabel='Request Early Access'
                     buttonHref='/signup?plan=growth'
                     buttonVariant='secondary'

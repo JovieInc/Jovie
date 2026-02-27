@@ -9,9 +9,14 @@
 // Plan IDs
 // ---------------------------------------------------------------------------
 
-export type PlanId = 'free' | 'pro' | 'growth';
+export type PlanId = 'free' | 'founding' | 'pro' | 'growth';
 
-const PLAN_IDS: readonly PlanId[] = ['free', 'pro', 'growth'] as const;
+const PLAN_IDS: readonly PlanId[] = [
+  'free',
+  'founding',
+  'pro',
+  'growth',
+] as const;
 
 // ---------------------------------------------------------------------------
 // Entitlement key unions
@@ -52,9 +57,49 @@ export interface PlanEntitlements {
     displayName: string;
     tagline: string;
     features: readonly string[];
-    price: { monthly: number; yearly: number } | null;
+    price: { monthly: number; yearly: number | null } | null;
   };
 }
+
+// ---------------------------------------------------------------------------
+// Shared entitlement blocks (founding and pro share identical capabilities)
+// ---------------------------------------------------------------------------
+
+const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
+  canRemoveBranding: true,
+  canExportContacts: true,
+  canAccessAdvancedAnalytics: true,
+  canFilterSelfFromAnalytics: true,
+  canAccessAdPixels: true,
+  canBeVerified: true,
+  aiCanUseTools: true,
+  canCreateManualReleases: true,
+  canAccessFutureReleases: true,
+  canSendNotifications: true,
+  canEditSmartLinks: true,
+};
+
+const PRO_LIMITS: PlanEntitlements['limits'] = {
+  analyticsRetentionDays: 90,
+  contactsLimit: null,
+  smartLinksLimit: null,
+  aiDailyMessageLimit: 100,
+};
+
+const PRO_FEATURES: readonly string[] = [
+  'All Free features +',
+  'Unlimited smart links',
+  'Pre-release & countdown pages',
+  'Remove Jovie branding',
+  'Extended analytics (90 days)',
+  'Advanced analytics & geographic insights',
+  'Filter your own visits',
+  'Unlimited contacts',
+  'Contact export',
+  'Verified badge',
+  'AI assistant (100 messages/day)',
+  'Priority support',
+];
 
 // ---------------------------------------------------------------------------
 // Registry
@@ -98,43 +143,23 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       price: null,
     },
   },
+  founding: {
+    booleans: { ...PRO_BOOLEANS },
+    limits: { ...PRO_LIMITS },
+    marketing: {
+      displayName: 'Founding Member',
+      tagline: 'Early supporter pricing, locked in for life',
+      features: PRO_FEATURES,
+      price: { monthly: 9, yearly: null },
+    },
+  },
   pro: {
-    booleans: {
-      canRemoveBranding: true,
-      canExportContacts: true,
-      canAccessAdvancedAnalytics: true,
-      canFilterSelfFromAnalytics: true,
-      canAccessAdPixels: true,
-      canBeVerified: true,
-      aiCanUseTools: true,
-      canCreateManualReleases: true,
-      canAccessFutureReleases: true,
-      canSendNotifications: true,
-      canEditSmartLinks: true,
-    },
-    limits: {
-      analyticsRetentionDays: 90,
-      contactsLimit: null,
-      smartLinksLimit: null,
-      aiDailyMessageLimit: 100,
-    },
+    booleans: { ...PRO_BOOLEANS },
+    limits: { ...PRO_LIMITS },
     marketing: {
       displayName: 'Pro',
       tagline: 'For growing artists',
-      features: [
-        'All Free features +',
-        'Unlimited smart links',
-        'Pre-release & countdown pages',
-        'Remove Jovie branding',
-        'Extended analytics (90 days)',
-        'Advanced analytics & geographic insights',
-        'Filter your own visits',
-        'Unlimited contacts',
-        'Contact export',
-        'Verified badge',
-        'AI assistant (100 messages/day)',
-        'Priority support',
-      ],
+      features: PRO_FEATURES,
       price: { monthly: 39, yearly: 348 },
     },
   },
@@ -187,6 +212,7 @@ export function getEntitlements(
 ): PlanEntitlements {
   if (plan === 'growth') return ENTITLEMENT_REGISTRY.growth;
   if (plan === 'pro') return ENTITLEMENT_REGISTRY.pro;
+  if (plan === 'founding') return ENTITLEMENT_REGISTRY.founding;
   return ENTITLEMENT_REGISTRY.free;
 }
 
@@ -208,7 +234,7 @@ export function getLimit(
 
 /** Whether the plan is pro or higher. */
 export function isProPlan(plan: string | null | undefined): boolean {
-  return plan === 'pro' || plan === 'growth';
+  return plan === 'founding' || plan === 'pro' || plan === 'growth';
 }
 
 /** Whether the plan has growth-only advanced features. */

@@ -6,6 +6,7 @@
  *
  * Pricing Tiers:
  * - Free: $0 (no Stripe subscription)
+ * - Founding: $9/mo (early supporter pricing, locked in for life)
  * - Pro: $39/mo or $348/yr (save 2 months)
  * - Growth: $99/mo or $948/yr (save 2 months) - Coming soon
  */
@@ -14,7 +15,7 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 // Plan types supported by the application
-export type PlanType = 'free' | 'pro' | 'growth';
+export type PlanType = 'free' | 'founding' | 'pro' | 'growth';
 
 // Price mapping interface
 interface PriceMapping {
@@ -29,6 +30,15 @@ interface PriceMapping {
 // Current active price mappings
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
+    // Founding tier pricing (early supporter, locked in for life)
+    {
+      priceId: env.STRIPE_PRICE_FOUNDING_MONTHLY || '',
+      plan: 'founding',
+      amount: 900, // $9/mo
+      currency: 'usd',
+      interval: 'month',
+      description: 'Founding Member Monthly',
+    },
     // Pro tier pricing
     {
       priceId: env.STRIPE_PRICE_PRO_MONTHLY || '',

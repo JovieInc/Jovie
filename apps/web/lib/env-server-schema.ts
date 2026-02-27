@@ -65,6 +65,9 @@ export const ServerEnvSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
 
+  // Stripe price IDs for Founding tier ($9/mo, locked-in early supporter pricing)
+  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().optional(),
+
   // Stripe price IDs for Pro tier ($39/mo, $348/yr)
   STRIPE_PRICE_PRO_MONTHLY: z.string().optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().optional(),
@@ -185,6 +188,7 @@ export const ENV_KEYS = [
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_TIP_WEBHOOK_SECRET',
+  'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_YEARLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
