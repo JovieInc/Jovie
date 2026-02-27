@@ -15,9 +15,7 @@ import type { SendClaimInvitePayload } from './send-claim-invite';
  */
 function randomDelay(minMs: number, maxMs: number): number {
   const range = maxMs - minMs;
-  return Math.floor(
-    minMs + (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * range
-  );
+  return Math.floor(minMs + Math.random() * range);
 }
 
 /**

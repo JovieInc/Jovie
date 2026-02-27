@@ -515,10 +515,15 @@ export async function getInternalUserId(
 
 function generateRandomCode(): string {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789'; // No ambiguous chars
+  const limit = Math.floor(2 ** 32 / chars.length) * chars.length;
   const randomBytes = crypto.getRandomValues(new Uint32Array(8));
   let code = '';
   for (let i = 0; i < 8; i++) {
-    code += chars[randomBytes[i] % chars.length];
+    let val = randomBytes[i];
+    while (val >= limit) {
+      val = crypto.getRandomValues(new Uint32Array(1))[0];
+    }
+    code += chars[val % chars.length];
   }
   return code;
 }
