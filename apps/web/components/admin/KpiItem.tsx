@@ -24,9 +24,7 @@ export function KpiItem({
           <Icon
             className={`h-4 w-4 ${iconClassName || 'text-tertiary-token'}`}
           />
-          <p className='text-2xs tracking-wide text-tertiary-token'>
-            {title}
-          </p>
+          <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
         </div>
         <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
           {value}

@@ -31,7 +31,9 @@ function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
       title={message ?? 'Data source unavailable'}
     >
       <AlertTriangle className='size-3' aria-hidden='true' />
-      <span className='hidden truncate max-w-[10rem] sm:inline'>Unavailable</span>
+      <span className='hidden truncate max-w-[10rem] sm:inline'>
+        Unavailable
+      </span>
       <span className='sm:hidden'>N/A</span>
     </span>
   );
@@ -43,7 +45,9 @@ function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
       className='inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token'
       title={message ?? 'Data source not configured'}
     >
-      <span className='hidden truncate max-w-[10rem] sm:inline'>Not configured</span>
+      <span className='hidden truncate max-w-[10rem] sm:inline'>
+        Not configured
+      </span>
       <span className='sm:hidden'>N/A</span>
     </span>
   );

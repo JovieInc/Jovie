@@ -45,9 +45,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
       : `${summary.p95LatencyMs.toFixed(0)}ms`;
   const incidentsLabel = summary.incidents24h.toLocaleString();
   const lastIncidentLabel = summary.lastIncidentAt
-    ? typeof summary.lastIncidentAt === 'string'
-      ? summary.lastIncidentAt.slice(0, 10)
-      : summary.lastIncidentAt.toISOString().slice(0, 10)
+    ? summary.lastIncidentAt.toISOString().slice(0, 10)
     : '—';
 
   return (
