@@ -25,11 +25,10 @@ const VIEWPORTS = [
 const THEMES = ['light', 'dark'] as const;
 
 type LayoutIssue = {
-  kind: 'overlap' | 'touching';
+  kind: 'overlap';
   a: string;
   b: string;
   overlapPx: number;
-  gapPx: number;
 };
 
 for (const viewport of VIEWPORTS) {
@@ -176,51 +175,12 @@ for (const viewport of VIEWPORTS) {
                     a: describe(a),
                     b: describe(b),
                     overlapPx: Math.round(overlapArea),
-                    gapPx: 0,
-                  });
-                  continue;
-                }
-
-                const verticalProjection = intersects1D(
-                  ar.top,
-                  ar.bottom,
-                  br.top,
-                  br.bottom
-                );
-                const horizontalProjection = intersects1D(
-                  ar.left,
-                  ar.right,
-                  br.left,
-                  br.right
-                );
-
-                const horizontalGap = Math.max(
-                  ar.left - br.right,
-                  br.left - ar.right,
-                  0
-                );
-                const verticalGap = Math.max(
-                  ar.top - br.bottom,
-                  br.top - ar.bottom,
-                  0
-                );
-
-                const touchesVertically =
-                  verticalProjection > 14 && horizontalGap <= 0.6;
-                const touchesHorizontally =
-                  horizontalProjection > 14 && verticalGap <= 0.6;
-
-                if (touchesVertically || touchesHorizontally) {
-                  issues.push({
-                    kind: 'touching',
-                    a: describe(a),
-                    b: describe(b),
-                    overlapPx: 0,
-                    gapPx:
-                      Math.round(Math.min(horizontalGap, verticalGap) * 100) /
-                      100,
                   });
                 }
+
+                // Note: "touching" detection (gapPx <= 0.6) was removed because
+                // adjacent block-level elements (sections, navs) naturally touch
+                // in normal document flow and flagging them produces false positives.
               }
             }
 
