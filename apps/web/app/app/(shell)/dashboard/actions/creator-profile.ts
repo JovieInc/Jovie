@@ -19,6 +19,20 @@ import { type CreatorProfile, creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { isContentClean } from '@/lib/validation/content-filter';
 
+const EXPECTED_PROFILE_ACTION_ERRORS = new Set([
+  'Unauthorized',
+  'User not found',
+  'Profile not found',
+  'Profile not found or unauthorized',
+]);
+
+function isExpectedProfileActionError(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    EXPECTED_PROFILE_ACTION_ERRORS.has(error.message)
+  );
+}
+
 /**
  * Updates a creator profile with the provided data.
  *
@@ -92,10 +106,12 @@ export async function updateCreatorProfile(
       return updatedProfile;
     });
   } catch (error) {
-    await captureError('updateCreatorProfile failed', error, {
-      route: 'dashboard/actions/creator-profile',
-      profileId,
-    });
+    if (!isExpectedProfileActionError(error)) {
+      await captureError('updateCreatorProfile failed', error, {
+        route: 'dashboard/actions/creator-profile',
+        profileId,
+      });
+    }
     throw error;
   }
 }
@@ -144,13 +160,9 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
       isPublic: true,
     });
   } catch (error) {
-    // updateCreatorProfile already captures all its errors to Sentry.
+    // updateCreatorProfile already captures unexpected runtime errors.
     // Only capture validation errors thrown before that call.
-    const isFromUpdate =
-      error instanceof TypeError &&
-      (error.message.includes('not found') ||
-        error.message.includes('Unauthorized'));
-    if (!isFromUpdate) {
+    if (!isExpectedProfileActionError(error)) {
       await captureError('publishProfileBasics failed', error, {
         route: 'dashboard/actions/creator-profile',
       });
@@ -235,9 +247,11 @@ export async function updateAllowProfilePhotoDownloads(
       await invalidateProfileCache(profile.usernameNormalized);
     }
   } catch (error) {
-    await captureError('updateAllowProfilePhotoDownloads failed', error, {
-      route: 'dashboard/actions/creator-profile',
-    });
+    if (!isExpectedProfileActionError(error)) {
+      await captureError('updateAllowProfilePhotoDownloads failed', error, {
+        route: 'dashboard/actions/creator-profile',
+      });
+    }
     throw error;
   }
 }
