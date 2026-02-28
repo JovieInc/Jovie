@@ -60,6 +60,23 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
   ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
 }));
 
+// Mock @jovie/ui ContextMenu components (needed in CI where importActual may not resolve)
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
+  const passthrough = ({ children }: { children?: React.ReactNode }) => (
+    <>{children}</>
+  );
+  return {
+    ...actual,
+    ContextMenu: passthrough,
+    ContextMenuContent: passthrough,
+    ContextMenuItem: passthrough,
+    ContextMenuLabel: passthrough,
+    ContextMenuSeparator: () => <hr />,
+    ContextMenuTrigger: passthrough,
+  };
+});
+
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
 }));
