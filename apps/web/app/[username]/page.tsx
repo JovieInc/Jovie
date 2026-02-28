@@ -393,6 +393,28 @@ const getProfileAndLinks = cache(async (username: string) => {
   return getCachedProfileAndLinks(username.toLowerCase());
 });
 
+const PROFILE_FLAG_CACHE_TTL_SECONDS = 5 * 60;
+
+const getCachedLatestReleaseGate = unstable_cache(
+  async () => {
+    return checkGate(null, FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD, false);
+  },
+  ['public-profile-latest-release-gate'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
+const getCachedSubscribeCTAVariant = unstable_cache(
+  async (profileId: string) => {
+    return getSubscribeCTAVariant(profileId);
+  },
+  ['public-profile-subscribe-cta-variant'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
 interface Props {
   readonly params: Promise<{
     readonly username: string;
@@ -436,14 +458,6 @@ export default async function ArtistPage({
     latestRelease: fetchedLatestRelease,
   } = profileResult;
 
-  // Feature-flagged: latest release card is disabled by default (gate defaults to false)
-  const showLatestRelease = await checkGate(
-    null,
-    FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD,
-    false
-  );
-  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
-
   if (status === 'error') {
     return (
       <div className='px-4 py-8'>
@@ -467,8 +481,13 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  // Evaluate subscribe CTA experiment per-artist (deterministic bucketing)
-  const subscribeCTAVariant = await getSubscribeCTAVariant(profile.id);
+  // Cache Statsig decisions for public profile traffic to avoid per-request latency.
+  const [showLatestRelease, subscribeCTAVariant] = await Promise.all([
+    getCachedLatestReleaseGate(),
+    getCachedSubscribeCTAVariant(profile.id),
+  ]);
+
+  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
   const subscribeTwoStep = subscribeCTAVariant === 'two_step';
 
   const publicContacts: PublicContact[] = toPublicContacts(
