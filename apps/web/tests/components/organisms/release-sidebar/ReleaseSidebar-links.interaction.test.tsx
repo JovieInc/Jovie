@@ -2,6 +2,23 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
+// Mock @jovie/ui ContextMenu components (needed in CI where importActual may not resolve)
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
+  const passthrough = ({ children }: { children?: React.ReactNode }) => (
+    <>{children}</>
+  );
+  return {
+    ...actual,
+    ContextMenu: passthrough,
+    ContextMenuContent: passthrough,
+    ContextMenuItem: passthrough,
+    ContextMenuLabel: passthrough,
+    ContextMenuSeparator: () => <hr />,
+    ContextMenuTrigger: passthrough,
+  };
+});
+
 // Mock RightDrawer
 vi.mock('@/components/organisms/RightDrawer', () => ({
   RightDrawer: ({
