@@ -66,15 +66,16 @@ export const ServerEnvSchema = z.object({
   STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
 
   // Stripe price IDs for Founding tier ($9/mo, locked-in early supporter pricing)
-  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().optional(),
+  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
 
   // Stripe price IDs for Pro tier ($39/mo, $348/yr)
-  STRIPE_PRICE_PRO_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_PRO_YEARLY: z.string().optional(),
+  STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
 
   // Stripe price IDs for Growth tier ($99/mo, $948/yr)
-  STRIPE_PRICE_GROWTH_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_GROWTH_YEARLY: z.string().optional(),
+  STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
@@ -190,6 +191,7 @@ export const ENV_KEYS = [
   'STRIPE_TIP_WEBHOOK_SECRET',
   'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
+  'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',

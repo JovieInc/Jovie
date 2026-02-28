@@ -172,6 +172,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       isPro: false,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
+      stripePriceId: null,
       stripeEventId,
       stripeEventTimestamp,
       eventType: downgradeEventType,
@@ -251,6 +252,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       plan, // Pass the plan type (pro/growth) from price ID
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: subscription.id,
+      stripePriceId: priceId,
       stripeEventId,
       stripeEventTimestamp,
       eventType,

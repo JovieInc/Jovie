@@ -56,6 +56,7 @@ function prepareUpdateData(
     isPro,
     stripeCustomerId,
     stripeSubscriptionId,
+    stripePriceId,
     stripeEventTimestamp,
   } = options;
 
@@ -71,6 +72,10 @@ function prepareUpdateData(
 
   if (stripeSubscriptionId !== undefined) {
     updateData.stripeSubscriptionId = stripeSubscriptionId;
+  }
+
+  if (stripePriceId !== undefined) {
+    updateData.stripePriceId = stripePriceId;
   }
 
   if (stripeEventTimestamp) {
@@ -129,6 +134,7 @@ export async function updateUserBillingStatus(
     plan,
     stripeCustomerId,
     stripeSubscriptionId,
+    stripePriceId,
     stripeEventId,
     stripeEventTimestamp,
     eventType = 'subscription_updated',
@@ -167,6 +173,7 @@ export async function updateUserBillingStatus(
       plan: currentUser.plan,
       stripeCustomerId: currentUser.stripeCustomerId,
       stripeSubscriptionId: currentUser.stripeSubscriptionId,
+      stripePriceId: currentUser.stripePriceId,
     };
 
     // Prepare new state for audit log
@@ -178,6 +185,8 @@ export async function updateUserBillingStatus(
         stripeSubscriptionId === undefined
           ? currentUser.stripeSubscriptionId
           : stripeSubscriptionId,
+      stripePriceId:
+        stripePriceId === undefined ? currentUser.stripePriceId : stripePriceId,
     };
 
     // Optimistic locking: Only update if billingVersion hasn't changed
@@ -261,6 +270,7 @@ async function retryUpdateWithFreshData(
     plan,
     stripeCustomerId,
     stripeSubscriptionId,
+    stripePriceId,
     stripeEventId,
     stripeEventTimestamp,
     eventType = 'subscription_updated',
@@ -346,6 +356,7 @@ async function retryUpdateWithFreshData(
           plan: freshUser.plan,
           stripeCustomerId: freshUser.stripeCustomerId,
           stripeSubscriptionId: freshUser.stripeSubscriptionId,
+          stripePriceId: freshUser.stripePriceId,
         },
         newState: {
           isPro,
@@ -355,6 +366,10 @@ async function retryUpdateWithFreshData(
             stripeSubscriptionId === undefined
               ? freshUser.stripeSubscriptionId
               : stripeSubscriptionId,
+          stripePriceId:
+            stripePriceId === undefined
+              ? freshUser.stripePriceId
+              : stripePriceId,
         },
         stripeEventId,
         source,

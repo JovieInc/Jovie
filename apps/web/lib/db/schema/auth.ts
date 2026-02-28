@@ -30,6 +30,7 @@ export const users = pgTable(
     plan: text('plan').default('free'), // 'free' | 'pro' | 'growth'
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
+    stripePriceId: text('stripe_price_id'),
     billingUpdatedAt: timestamp('billing_updated_at'),
     billingVersion: integer('billing_version').default(1).notNull(),
     lastBillingEventAt: timestamp('last_billing_event_at'),
