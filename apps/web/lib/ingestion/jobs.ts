@@ -40,6 +40,8 @@ async function insertJobWithDedup(
   values: typeof ingestionJobs.$inferInsert,
   dedupKey: string
 ): Promise<string | null> {
+  let caughtUniqueViolation: Error | undefined;
+
   try {
     const result = await db
       .insert(ingestionJobs)
@@ -59,6 +61,7 @@ async function insertJobWithDedup(
     if (!isUniqueViolation) {
       throw error;
     }
+    caughtUniqueViolation = error as Error;
   }
 
   // Race condition: another concurrent insert won — return the existing job's id
@@ -68,7 +71,17 @@ async function insertJobWithDedup(
     .where(eq(ingestionJobs.dedupKey, dedupKey))
     .limit(1);
 
-  return winner?.id ?? null;
+  if (winner?.id) {
+    return winner.id;
+  }
+
+  // If we caught a 23505 but the winner row has vanished, surface the original
+  // error instead of silently returning null — this indicates an anomaly.
+  if (caughtUniqueViolation) {
+    throw caughtUniqueViolation;
+  }
+
+  return null;
 }
 
 export async function enqueueLinktreeIngestionJob(params: {
