@@ -1,7 +1,9 @@
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
-export const dynamic = 'force-dynamic';
+// ISR: profiles are statically generated and revalidated every hour.
+// On-demand invalidation via revalidateTag('profile:{username}') handles mutations.
+export const revalidate = 3600;
 
 export default function ProfileLayout({
   children,
