@@ -85,6 +85,23 @@ vi.mock('@jovie/ui', async () => {
         ))}
       </div>
     ),
+    // ContextMenu components (imported transitively by AlbumArtworkContextMenu)
+    ContextMenu: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuContent: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuItem: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuLabel: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuSeparator: () => <hr />,
+    ContextMenuTrigger: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
   };
 });
 
