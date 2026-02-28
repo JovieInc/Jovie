@@ -37,9 +37,9 @@ import {
  * unique violation (23505) and falls back to returning the existing job.
  */
 async function insertJobWithDedup(
-  values: typeof ingestionJobs.$inferInsert,
-  dedupKey: string
+  values: typeof ingestionJobs.$inferInsert
 ): Promise<string | null> {
+  const dedupKey = values.dedupKey;
   let caughtUniqueViolation: Error | undefined;
 
   try {
@@ -68,7 +68,7 @@ async function insertJobWithDedup(
   const [winner] = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .where(eq(ingestionJobs.dedupKey, dedupKey!))
     .limit(1);
 
   if (winner?.id) {
@@ -134,18 +134,15 @@ export async function enqueueLinktreeIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_linktree',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_linktree',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueInstagramIngestionJob(params: {
@@ -194,18 +191,15 @@ export async function enqueueInstagramIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_instagram',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_instagram',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueTikTokIngestionJob(params: {
@@ -254,18 +248,15 @@ export async function enqueueTikTokIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_tiktok',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_tiktok',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueTwitterIngestionJob(params: {
@@ -314,18 +305,15 @@ export async function enqueueTwitterIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_twitter',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_twitter',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueBeaconsIngestionJob(params: {
@@ -374,18 +362,15 @@ export async function enqueueBeaconsIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_beacons',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_beacons',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueYouTubeIngestionJob(params: {
@@ -434,18 +419,15 @@ export async function enqueueYouTubeIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_youtube',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_youtube',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueLayloIngestionJob(params: {
@@ -493,18 +475,15 @@ export async function enqueueLayloIngestionJob(params: {
     return existing[0].id;
   }
 
-  return insertJobWithDedup(
-    {
-      jobType: 'import_laylo',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    },
-    payload.dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'import_laylo',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 /**
@@ -545,18 +524,15 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   }
 
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  return insertJobWithDedup(
-    {
-      jobType: 'dsp_artist_discovery',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered discovery
-      attempts: 0,
-    },
-    dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'dsp_artist_discovery',
+    payload,
+    dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 1, // Higher priority for user-triggered discovery
+    attempts: 0,
+  });
 }
 
 /**
@@ -595,18 +571,15 @@ export async function enqueueDspTrackEnrichmentJob(params: {
   }
 
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  return insertJobWithDedup(
-    {
-      jobType: 'dsp_track_enrichment',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 2, // Medium priority for enrichment
-      attempts: 0,
-    },
-    dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'dsp_track_enrichment',
+    payload,
+    dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 2, // Medium priority for enrichment
+    attempts: 0,
+  });
 }
 
 /**
@@ -645,16 +618,13 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
   }
 
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  return insertJobWithDedup(
-    {
-      jobType: 'musicfetch_enrichment',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered enrichment
-      attempts: 0,
-    },
-    dedupKey
-  );
+  return insertJobWithDedup({
+    jobType: 'musicfetch_enrichment',
+    payload,
+    dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 1, // Higher priority for user-triggered enrichment
+    attempts: 0,
+  });
 }
