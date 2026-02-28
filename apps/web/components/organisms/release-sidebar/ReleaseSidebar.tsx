@@ -8,17 +8,23 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button, SegmentControl } from '@jovie/ui';
+import { SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { Icon } from '@/components/atoms/Icon';
 import { DrawerEmptyState, DrawerSection } from '@/components/molecules/drawer';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import {
+  AlbumArtworkContextMenu,
+  buildArtworkSizes,
+} from '@/components/release/AlbumArtworkContextMenu';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
-import { ReleaseArtwork } from './ReleaseArtwork';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
@@ -53,8 +59,6 @@ export function ReleaseSidebar({
   onRefresh,
   isRefreshing = false,
   onReleaseChange,
-  onSave,
-  isSaving,
   onArtworkUpload,
   onArtworkRevert,
   onAddDspLink,
@@ -68,8 +72,6 @@ export function ReleaseSidebar({
   readOnly = false,
   onCanvasStatusUpdate,
 }: ReleaseSidebarProps) {
-  const [panelMode, setPanelMode] = useState<'edit' | 'live'>('edit');
-
   const {
     isAddingLink,
     setIsAddingLink,
@@ -230,36 +232,76 @@ export function ReleaseSidebar({
         <ReleaseSidebarHeader
           release={release}
           hasRelease={hasRelease}
+          artistName={artistName ?? undefined}
           onClose={onClose}
           onRefresh={onRefresh}
           isRefreshing={isRefreshing}
           onCopySmartLink={handleCopySmartLink}
-          panelMode={panelMode}
-          onPanelModeChange={setPanelMode}
         />
 
-        {/* Always-visible artwork + release name */}
+        {/* Artwork + analytics + tabs (always visible when release selected) */}
         {release && !selectedTrack && (
-          <div className='shrink-0 px-4 py-3'>
-            <ReleaseArtwork
-              artworkUrl={release.artworkUrl}
-              title={release.title}
-              artistName={artistName}
-              canUploadArtwork={canUploadArtwork}
-              onArtworkUpload={
-                canUploadArtwork ? handleArtworkUpload : undefined
-              }
-              allowDownloads={isEditable}
-              releaseId={release.id}
-              canRevert={canRevertArtwork}
-              onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
-            />
-          </div>
-        )}
+          <div className='shrink-0 px-5 pt-5 pb-4 space-y-4'>
+            {/* Artwork + analytics row */}
+            <div className='flex items-start gap-4'>
+              <AlbumArtworkContextMenu
+                title={release.title}
+                sizes={buildArtworkSizes(undefined, release.artworkUrl)}
+                allowDownloads={isEditable}
+                releaseId={release.id}
+                canRevert={canRevertArtwork}
+                onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
+              >
+                {canUploadArtwork && handleArtworkUpload ? (
+                  <AvatarUploadable
+                    src={release.artworkUrl}
+                    alt={
+                      release.title
+                        ? `${release.title} artwork`
+                        : 'Release artwork'
+                    }
+                    name={release.title}
+                    size='lg'
+                    rounded='md'
+                    uploadable={canUploadArtwork}
+                    onUpload={handleArtworkUpload}
+                    showHoverOverlay
+                  />
+                ) : (
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+                    {release.artworkUrl ? (
+                      <Image
+                        src={release.artworkUrl}
+                        alt={
+                          release.title
+                            ? `${release.title} artwork`
+                            : 'Release artwork'
+                        }
+                        fill
+                        className='object-cover'
+                        sizes='64px'
+                      />
+                    ) : (
+                      <div className='flex h-full w-full items-center justify-center'>
+                        <Icon
+                          name='Disc3'
+                          className='h-6 w-6 text-tertiary-token'
+                          aria-hidden='true'
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </AlbumArtworkContextMenu>
+              <div className='min-w-0 flex-1'>
+                <ReleaseSmartLinkAnalytics
+                  release={release}
+                  providerConfig={providerConfig}
+                />
+              </div>
+            </div>
 
-        {/* Tab navigation (edit mode only) */}
-        {release && !selectedTrack && panelMode === 'edit' && (
-          <div className='px-3 py-1.5 shrink-0'>
+            {/* Tab controls */}
             <SegmentControl
               value={activeTab}
               onValueChange={setActiveTab}
@@ -270,7 +312,7 @@ export function ReleaseSidebar({
           </div>
         )}
 
-        <div className='flex-1 space-y-5 overflow-auto px-4 py-4'>
+        <div className='flex-1 space-y-5 overflow-auto p-5'>
           {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}
@@ -280,23 +322,11 @@ export function ReleaseSidebar({
           )}
           {!(selectedTrack && release) && release && (
             <>
-              {panelMode === 'live' ? (
-                <div className='pb-1'>
-                  <ReleaseSmartLinkAnalytics
-                    release={release}
-                    providerConfig={providerConfig}
-                  />
-                </div>
-              ) : null}
-
               {/* Catalog tab: Fields, Track list */}
-              {panelMode === 'edit' && activeTab === 'catalog' && (
+              {activeTab === 'catalog' && (
                 <>
                   <div className='pb-5'>
-                    <ReleaseFields
-                      title={release.title}
-                      releaseDate={release.releaseDate}
-                    />
+                    <ReleaseFields releaseDate={release.releaseDate} />
                     <div className='mt-3'>
                       <ReleaseSmartLinkSection
                         smartLinkPath={release.smartLinkPath}
@@ -312,7 +342,7 @@ export function ReleaseSidebar({
               )}
 
               {/* Links tab: DSP links management */}
-              {panelMode === 'edit' && activeTab === 'links' && (
+              {activeTab === 'links' && (
                 <div className='space-y-5'>
                   <DrawerSection title='Distribution'>
                     <ReleaseDspLinks
@@ -338,36 +368,23 @@ export function ReleaseSidebar({
               )}
 
               {/* Details tab: Metadata + Settings */}
-              {panelMode === 'edit' && activeTab === 'details' && (
+              {activeTab === 'details' && (
                 <div className='space-y-5'>
-                  <DrawerSection title='Analytics'>
-                    <ReleaseSmartLinkAnalytics
-                      release={release}
-                      providerConfig={providerConfig}
-                    />
-                  </DrawerSection>
-
-                  <DrawerSection title='Metadata'>
-                    <ReleaseMetadata
-                      release={release}
-                      onCanvasStatusChange={
-                        canEditCanvasStatus
-                          ? handleCanvasStatusChange
-                          : undefined
-                      }
-                    />
-                  </DrawerSection>
+                  <ReleaseMetadata
+                    release={release}
+                    onCanvasStatusChange={
+                      canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                    }
+                  />
 
                   {isEditable && (
-                    <DrawerSection title='Settings'>
-                      <ReleaseSettings allowDownloads={allowDownloads} />
-                    </DrawerSection>
+                    <ReleaseSettings allowDownloads={allowDownloads} />
                   )}
                 </div>
               )}
 
               {/* Lyrics tab: Lyrics editor */}
-              {panelMode === 'edit' && activeTab === 'lyrics' && (
+              {activeTab === 'lyrics' && (
                 <ReleaseLyricsSection
                   releaseId={release.id}
                   lyrics={release.lyrics}
@@ -376,20 +393,6 @@ export function ReleaseSidebar({
                   onSaveLyrics={onSaveLyrics}
                   onFormatLyrics={onFormatLyrics}
                 />
-              )}
-
-              {panelMode === 'edit' && isEditable && onSave && (
-                <div className='pt-2 flex justify-end'>
-                  <Button
-                    type='button'
-                    size='sm'
-                    variant='primary'
-                    onClick={() => onSave(release)}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? 'Saving...' : 'Save changes'}
-                  </Button>
-                </div>
               )}
             </>
           )}

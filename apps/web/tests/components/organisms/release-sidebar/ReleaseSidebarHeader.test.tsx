@@ -6,11 +6,28 @@ const openSpy = vi.fn();
 
 vi.stubGlobal('open', openSpy);
 
-vi.mock('@/components/molecules/drawer', () => ({
-  DrawerHeader: ({ actions }: { actions?: React.ReactNode }) => (
+vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
+  DrawerHeaderActions: ({
+    overflowActions,
+    onClose,
+  }: {
+    primaryActions: { id: string; label: string; onClick: () => void }[];
+    overflowActions: { id: string; label: string; onClick: () => void }[];
+    onClose?: () => void;
+  }) => (
     <div>
-      <h2>Release details</h2>
-      {actions}
+      {overflowActions.map(
+        (a: { id: string; label: string; onClick: () => void }) => (
+          <button key={a.id} type='button' onClick={a.onClick}>
+            {a.label}
+          </button>
+        )
+      )}
+      {onClose && (
+        <button type='button' onClick={onClose}>
+          Close
+        </button>
+      )}
     </div>
   ),
 }));
@@ -40,7 +57,7 @@ const release = {
 };
 
 describe('ReleaseSidebarHeader', () => {
-  it('shows open smart link as always-visible action and opens in new tab', async () => {
+  it('shows open smart link action and opens in new tab', async () => {
     const user = userEvent.setup();
 
     render(
@@ -48,8 +65,6 @@ describe('ReleaseSidebarHeader', () => {
         release={release}
         hasRelease
         onCopySmartLink={vi.fn()}
-        panelMode='edit'
-        onPanelModeChange={vi.fn()}
       />
     );
 
@@ -63,22 +78,45 @@ describe('ReleaseSidebarHeader', () => {
     );
   });
 
-  it('renders edit/live mode toggle and switches to live mode', async () => {
-    const user = userEvent.setup();
-    const onPanelModeChange = vi.fn();
-
+  it('displays release title in header', () => {
     render(
       <ReleaseSidebarHeader
         release={release}
         hasRelease
         onCopySmartLink={vi.fn()}
-        panelMode='edit'
-        onPanelModeChange={onPanelModeChange}
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: /live/i }));
+    expect(screen.getByText('Test Release')).toBeInTheDocument();
+  });
 
-    expect(onPanelModeChange).toHaveBeenCalledWith('live');
+  it('displays artist name when provided', () => {
+    render(
+      <ReleaseSidebarHeader
+        release={release}
+        hasRelease
+        artistName='Test Artist'
+        onCopySmartLink={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Test Artist')).toBeInTheDocument();
+  });
+
+  it('close action is available in overflow menu', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+
+    render(
+      <ReleaseSidebarHeader
+        release={release}
+        hasRelease
+        onClose={onClose}
+        onCopySmartLink={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /close/i }));
+    expect(onClose).toHaveBeenCalled();
   });
 });
