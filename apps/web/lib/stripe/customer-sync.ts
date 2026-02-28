@@ -23,8 +23,8 @@
  * ```
  *
  * ### Field Selection Constants
- * - `BILLING_FIELDS_FULL` - All 8 fields for complete billing info
- * - `BILLING_FIELDS_STATUS` - 6 fields for update operations
+ * - `BILLING_FIELDS_FULL` - All 10 fields for complete billing info
+ * - `BILLING_FIELDS_STATUS` - 8 fields for update operations
  * - `BILLING_FIELDS_CUSTOMER` - 4 fields for Stripe customer operations
  *
  * ## Hardened Features

@@ -14,6 +14,9 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
 
 // Mock drawer components
 vi.mock('@/components/molecules/drawer', () => ({
+  EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid='entity-header-card'>{children}</div>
+  ),
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
