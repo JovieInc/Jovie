@@ -1,4 +1,11 @@
+import { DemoReleasesExperience } from '@/components/demo/DemoReleasesExperience';
 import { ClaimHandleForm } from './claim-handle';
+import {
+  ArmadaMusicLogo,
+  AwalLogo,
+  SonyMusicLogo,
+  UniversalMusicGroupLogo,
+} from './label-logos';
 
 export function RedesignedHero() {
   return (
@@ -26,8 +33,8 @@ export function RedesignedHero() {
             fontVariationSettings: '"opsz" 64',
           }}
         >
-          AI to power your <br className='hidden md:block' />
-          music career.
+          The smartest link in bio <br className='hidden md:block' />
+          for musicians.
         </h1>
 
         <p
@@ -40,7 +47,9 @@ export function RedesignedHero() {
             color: 'var(--linear-text-secondary)',
           }}
         >
-          Built to amplify your work — not replace it.
+          Capture contacts. Route listeners. Grow your audience.{' '}
+          <br className='hidden sm:block' />
+          Everything you need to turn streams into super-fans.
         </p>
 
         <div className='mt-10 w-full max-w-[480px] text-left'>
@@ -63,31 +72,40 @@ export function RedesignedHero() {
           Free forever. No credit card.
         </p>
 
-        {/* Product Shot using /demo */}
-        <div className='relative w-full max-w-[1100px] mt-20 lg:mt-24'>
-          {/* Outer glow/border effect matching Linear */}
-          <div className='rounded-2xl lg:rounded-[24px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-2 lg:p-4 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.2)] backdrop-blur-sm'>
-            <div className='relative w-full aspect-16/10 overflow-hidden rounded-xl lg:rounded-[18px] border border-(--linear-border-subtle) bg-(--linear-bg-page) shadow-inner'>
-              {/* Browser bar mockup */}
-              <div className='absolute top-0 left-0 right-0 h-10 lg:h-12 border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-1) flex items-center px-4 gap-2 z-20'>
-                <div className='flex gap-1.5'>
-                  <div className='w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full bg-(--linear-text-tertiary) opacity-30' />
-                  <div className='w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full bg-(--linear-text-tertiary) opacity-30' />
-                  <div className='w-2.5 h-2.5 lg:w-3 lg:h-3 rounded-full bg-(--linear-text-tertiary) opacity-30' />
-                </div>
-              </div>
+        {/* Small inline Label Logos */}
+        <div className='mt-12 flex flex-col items-center gap-4'>
+          <p className='text-[12px] font-medium text-[var(--linear-text-tertiary)] uppercase tracking-widest'>
+            Trusted by artists on
+          </p>
+          <div className='flex items-center gap-6 sm:gap-8'>
+            <SonyMusicLogo className='h-[14px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-300 hover:opacity-100 sm:h-[16px]' />
+            <UniversalMusicGroupLogo className='h-[10px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-300 hover:opacity-100 sm:h-[12px]' />
+            <AwalLogo className='h-[16px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-300 hover:opacity-100 sm:h-[18px]' />
+            <ArmadaMusicLogo className='h-[14px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-300 hover:opacity-100 sm:h-[16px]' />
+          </div>
+        </div>
 
-              {/* iframe content */}
-              <div className='absolute inset-0 pt-10 lg:pt-12'>
-                <iframe
-                  src='/demo'
-                  className='w-full h-full'
-                  title='Product Demo'
-                  loading='lazy'
-                  style={{ border: 'none', backgroundColor: 'transparent' }}
-                />
-              </div>
+        {/* Product Shot */}
+        <div className='relative w-full max-w-[1100px] mt-20 lg:mt-24 text-left pointer-events-none'>
+          <div
+            className='relative w-full overflow-hidden rounded-t-xl lg:rounded-t-2xl border-t border-l border-r border-[var(--linear-border-subtle)]'
+            style={{
+              backgroundColor: 'rgba(10, 14, 24, 0.95)',
+              boxShadow:
+                '0 0 0 1px rgba(0,0,0,0.5), 0 30px 60px -12px rgba(0,0,0,0.8), 0 50px 100px -20px rgba(0,0,0,0.8)',
+              maskImage:
+                'linear-gradient(to bottom, black 50%, transparent 100%)',
+              WebkitMaskImage:
+                'linear-gradient(to bottom, black 50%, transparent 100%)',
+            }}
+          >
+            {/* Interactive Demo (Edge-to-edge UI) */}
+            <div className='bg-surface-0'>
+              <DemoReleasesExperience containerClassName='h-[480px] lg:h-[580px] overflow-hidden border-none m-0 bg-transparent' />
             </div>
+
+            {/* Bottom gradient fade */}
+            <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[rgba(10,14,24,1)] to-transparent z-30' />
           </div>
         </div>
       </div>

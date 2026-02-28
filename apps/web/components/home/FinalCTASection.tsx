@@ -1,13 +1,13 @@
 import { Container } from '@/components/site/Container';
-import { ClaimHandleForm } from './claim-handle';
+import { Button } from '@jovie/ui';
 
 export function FinalCTASection() {
   return (
     <section
-      className='bg-[var(--linear-bg-page)]'
+      className='bg-[var(--linear-bg-page)] relative z-10'
       style={{
         paddingTop: 'var(--linear-section-pt-lg)',
-        paddingBottom: 'var(--linear-section-pb-lg)',
+        paddingBottom: '240px', // Extra padding to catch the floating claim bar
       }}
     >
       <Container size='homepage'>
@@ -31,28 +31,21 @@ export function FinalCTASection() {
               color: 'var(--linear-text-primary)',
             }}
           >
-            Your name won&apos;t be available forever.
+            Claim your piece of the internet.
           </h2>
-
-          <div className='mt-8 w-full max-w-[480px]'>
-            <ClaimHandleForm />
-          </div>
-
-          <p
-            className='mt-3 flex items-center gap-2'
-            style={{
-              fontSize: '13px',
-              fontWeight: 510,
-              letterSpacing: '0.01em',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            <span
-              aria-hidden='true'
-              className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
-            />{' '}
-            Free forever. No credit card.
+          <p className='mt-3 text-[var(--linear-text-tertiary)]'>
+            Get started for free. No credit card required.
           </p>
+
+          <div className='mt-8 flex flex-col items-center gap-4 w-full'>
+            <Button
+              size='lg'
+              className='h-12 rounded-full px-8 text-[15px] shadow-[0_0_0_1px_var(--linear-border-subtle),0_8px_16px_-4px_rgba(0,0,0,0.1)]'
+              asChild
+            >
+              <a href="/signup">Get Started Now</a>
+            </Button>
+          </div>
         </div>
       </Container>
     </section>
