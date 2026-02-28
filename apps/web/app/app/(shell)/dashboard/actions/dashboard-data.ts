@@ -464,7 +464,6 @@ async function fetchDashboardCoreWithSession(
     for (const [label, result] of [
       ['user_settings', settingsResult],
       ['social_links_existence', linkCountsResult],
-      ['tipping_stats', tippingStatsResult],
     ] as const) {
       if (result.status === 'rejected') {
         Sentry.captureException(result.reason, {
