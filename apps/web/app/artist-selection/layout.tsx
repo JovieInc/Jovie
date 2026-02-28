@@ -1,6 +1,8 @@
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
+export const dynamic = 'force-dynamic';
+
 export default function ArtistSelectionLayout({
   children,
 }: Readonly<{

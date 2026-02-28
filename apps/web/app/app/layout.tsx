@@ -1,8 +1,7 @@
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 
-// Note: Cannot use 'force-static' here because Clerk auth requires dynamic request context.
-// The nested (shell)/layout.tsx handles dynamic data fetching with 'force-dynamic'.
+export const dynamic = 'force-dynamic';
 
 export default function AppLayout({
   children,
