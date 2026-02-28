@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const replaceMock = vi.fn();
@@ -44,7 +44,7 @@ describe('AuthRedirectHandler', () => {
     });
 
     expect(
-      document.querySelector('[aria-hidden="true"].fixed')
+      screen.queryByTestId('auth-redirect-overlay')
     ).not.toBeInTheDocument();
   });
 
@@ -53,9 +53,7 @@ describe('AuthRedirectHandler', () => {
 
     render(<AuthRedirectHandler />);
 
-    expect(
-      document.querySelector('[aria-hidden="true"].fixed')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('auth-redirect-overlay')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
