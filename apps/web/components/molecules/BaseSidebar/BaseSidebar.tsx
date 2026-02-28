@@ -8,8 +8,9 @@
  */
 
 import { X } from 'lucide-react';
-import { forwardRef } from 'react';
+import { forwardRef, useEffect } from 'react';
 
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
 
 import type {
@@ -53,6 +54,17 @@ export const BaseSidebar = forwardRef<HTMLElement, BaseSidebarProps>(
     useSidebarEscapeKey({ isOpen, onClose, closeOnEscape });
 
     const isLeft = position === 'left';
+    const isMobile = useBreakpointDown('md');
+
+    // Prevent background scroll when mobile sidebar is open
+    useEffect(() => {
+      if (!isMobile || !isOpen) return;
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }, [isMobile, isOpen]);
 
     return (
       <>
@@ -77,8 +89,9 @@ export const BaseSidebar = forwardRef<HTMLElement, BaseSidebarProps>(
           data-testid={testId}
           className={cn(
             'fixed top-0 z-50 h-svh flex flex-col',
-            'bg-surface-0 border-subtle shadow-xl',
+            'bg-surface-0 border-subtle shadow-xl overflow-hidden',
             'transition-[transform,opacity] duration-200 ease-out',
+            'max-w-[100vw]',
             isLeft ? 'left-0 border-r' : 'right-0 border-l',
             getSidebarTransformClass(isOpen, isLeft),
             className
@@ -137,7 +150,14 @@ export function BaseSidebarContent({
   className,
 }: BaseSidebarContentProps) {
   return (
-    <div className={cn('flex-1 overflow-auto', className)}>{children}</div>
+    <div
+      className={cn(
+        'flex-1 min-h-0 overflow-auto overscroll-contain',
+        className
+      )}
+    >
+      {children}
+    </div>
   );
 }
 
