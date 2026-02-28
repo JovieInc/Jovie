@@ -74,24 +74,43 @@ vi.mock('@/components/molecules/drawer', () => ({
 
 // Mock sub-components that are not under test
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  ReleaseSidebarHeader: ({
-    onPanelModeChange,
-  }: {
-    onPanelModeChange: (mode: 'edit' | 'live') => void;
-  }) => (
-    <div data-testid='sidebar-header'>
-      <button type='button' onClick={() => onPanelModeChange('edit')}>
-        Edit mode
-      </button>
-      <button type='button' onClick={() => onPanelModeChange('live')}>
-        Live mode
-      </button>
-    </div>
-  ),
+  ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseArtwork', () => ({
-  ReleaseArtwork: () => <div data-testid='artwork'>Artwork</div>,
+// Mock @jovie/ui ContextMenu components (needed in CI where importActual may not resolve)
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
+  const passthrough = ({ children }: { children?: React.ReactNode }) => (
+    <>{children}</>
+  );
+  return {
+    ...actual,
+    ContextMenu: passthrough,
+    ContextMenuContent: passthrough,
+    ContextMenuItem: passthrough,
+    ContextMenuLabel: passthrough,
+    ContextMenuSeparator: () => <hr />,
+    ContextMenuTrigger: passthrough,
+  };
+});
+
+vi.mock('next/image', () => ({
+  default: (props: { alt: string }) => <img alt={props.alt} />,
+}));
+
+vi.mock('@/components/atoms/Icon', () => ({
+  Icon: () => <span data-testid='icon' />,
+}));
+
+vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+  AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid='artwork-menu'>{children}</div>
+  ),
+  buildArtworkSizes: () => ({}),
+}));
+
+vi.mock('@/components/organisms/AvatarUploadable', () => ({
+  AvatarUploadable: () => <div data-testid='artwork'>Artwork</div>,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseFields', () => ({
@@ -127,6 +146,15 @@ vi.mock(
   () => ({
     ReleaseSmartLinkSection: () => (
       <div data-testid='smart-link-section'>Smart Link Content</div>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics',
+  () => ({
+    ReleaseSmartLinkAnalytics: () => (
+      <div data-testid='analytics'>Analytics</div>
     ),
   })
 );
@@ -205,7 +233,6 @@ describe('ReleaseSidebar Links tab', () => {
 
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
     expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
@@ -238,21 +265,6 @@ describe('ReleaseSidebar Links tab', () => {
 
     // Should preserve the Links tab for workflow continuity
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
-  });
-
-  it('switches to Live mode and hides edit tab content', async () => {
-    const user = userEvent.setup();
-    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
-
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /live mode/i }));
-
-    expect(
-      screen.queryByRole('tab', { name: /catalog/i })
-    ).not.toBeInTheDocument();
-    expect(screen.queryByTestId('fields')).not.toBeInTheDocument();
-    expect(screen.queryByText('Save changes')).not.toBeInTheDocument();
   });
 
   it('Links tab renders DSP links section', async () => {
