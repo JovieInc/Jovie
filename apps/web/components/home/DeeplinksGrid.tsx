@@ -86,7 +86,7 @@ function TourMockup() {
                 color: 'var(--linear-text-primary)',
                 fontWeight: 500,
                 fontSize: '13px',
-                tracking: 'tight',
+                letterSpacing: '-0.01em',
               }}
             >
               {show.city}
