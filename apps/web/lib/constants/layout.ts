@@ -14,14 +14,14 @@ export const SIDEBAR_WIDTH = 320; // px
 /**
  * Standard table row heights
  *
- * All tables now use COMPACT (44px) as the standard for visual consistency.
- * - COMPACT/STANDARD: 44px - unified row height for all tables
- * - TALL: 60px - deprecated, kept for backwards compatibility
+ * All tables now use COMPACT (40px) as the standard for visual consistency, matching Linear design.
+ * - COMPACT/STANDARD: 40px - unified row height for all tables
+ * - TALL: 56px - deprecated, kept for backwards compatibility
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 44, // Unified standard row height
-  STANDARD: 44, // Same as COMPACT - all tables use 44px
-  TALL: 60, // Deprecated - remove after full migration
+  COMPACT: 40, // Unified standard row height
+  STANDARD: 40, // Same as COMPACT - all tables use 40px
+  TALL: 56, // Deprecated - remove after full migration
 } as const;
 
 /**

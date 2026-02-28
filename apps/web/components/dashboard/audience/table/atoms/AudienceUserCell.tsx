@@ -47,12 +47,12 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   const secondaryLabel = getSecondaryLabel();
 
   return (
-    <div className={cn('text-xs text-primary-token min-w-0', className)}>
+    <div className={cn('text-[13px] text-primary-token min-w-0', className)}>
       <TruncatedText lines={1} className='font-medium'>
         {displayName || getFallbackName(type)}
       </TruncatedText>
       {secondaryLabel && (
-        <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
+        <TruncatedText lines={1} className='text-xs text-secondary-token mt-0.5'>
           {secondaryLabel}
         </TruncatedText>
       )}

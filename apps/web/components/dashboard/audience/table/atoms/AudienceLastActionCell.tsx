@@ -28,7 +28,7 @@ export function AudienceLastActionCell({
 }: AudienceLastActionCellProps) {
   if (!actions.length) {
     return (
-      <div className={cn('text-xs text-tertiary-token', className)}>—</div>
+      <div className={cn('text-[13px] text-tertiary-token', className)}>—</div>
     );
   }
 
@@ -38,7 +38,7 @@ export function AudienceLastActionCell({
   return (
     <div
       className={cn(
-        'flex items-center gap-1.5 text-xs text-secondary-token',
+        'flex items-center gap-1.5 text-[13px] text-secondary-token',
         className
       )}
     >

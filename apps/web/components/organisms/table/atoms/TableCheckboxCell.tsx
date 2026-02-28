@@ -5,14 +5,18 @@ import type { Row, Table } from '@tanstack/react-table';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
+import { alignment } from '../table.styles';
+
 /**
  * Checkbox state types
  */
 export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
 
 // Shared checkbox styling for consistent appearance (uses design tokens)
-const CHECKBOX_STYLES =
-  'h-4 w-4 border-2 border-subtle rounded-[4px] data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white';
+const CHECKBOX_STYLES = cn(
+  alignment.checkboxSize,
+  'border border-subtle rounded-[3px] data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-white data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-white transition-all duration-100 ease-out shadow-sm'
+);
 
 // Legacy props (backwards compatibility)
 export interface TableCheckboxCellLegacyProps {
@@ -107,7 +111,7 @@ function TanStackRowCheckbox({
     >
       <span
         className={cn(
-          'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
+          'text-[13px] tabular-nums text-tertiary-token select-none transition-opacity',
           isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
         )}
         aria-hidden='true'
@@ -116,7 +120,7 @@ function TanStackRowCheckbox({
       </span>
       <div
         className={cn(
-          'absolute inset-0 transition-opacity',
+          'absolute inset-0 transition-opacity flex items-center justify-center',
           isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         )}
       >
@@ -158,7 +162,7 @@ function LegacyCheckboxCell({
         {!isHeader && rowNumber !== undefined && (
           <span
             className={cn(
-              'absolute inset-0 flex items-center justify-center text-[11px] tabular-nums text-tertiary-token transition-opacity',
+              'absolute inset-0 flex items-center justify-center text-[13px] tabular-nums text-tertiary-token transition-opacity',
               checked ? 'opacity-0' : 'group-hover:opacity-0'
             )}
           >

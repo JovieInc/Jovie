@@ -40,7 +40,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-xs font-medium text-tertiary-token'>
+      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-[13px] font-medium text-tertiary-token'>
         Past
       </span>
     );
@@ -49,19 +49,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning'>
+        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-[13px] font-medium text-warning'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-xs font-medium text-error'>
+        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-[13px] font-medium text-error'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-xs font-medium text-success'>
+        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-[13px] font-medium text-success'>
           On Sale
         </span>
       );
@@ -81,7 +81,7 @@ const DateCell = memo(function DateCell({
         {formatShortDate(startDate)}
       </span>
       {startTime && (
-        <span className='text-xs text-tertiary-token'>{startTime}</span>
+        <span className='text-[13px] text-tertiary-token'>{startTime}</span>
       )}
     </div>
   );
@@ -165,7 +165,7 @@ const SourceCell = memo(function SourceCell({
   const config = PROVIDER_CONFIG[provider];
 
   return (
-    <span className={cn('text-xs', config.className)}>{config.label}</span>
+    <span className={cn('text-[13px]', config.className)}>{config.label}</span>
   );
 });
 
@@ -186,7 +186,7 @@ const ActionsHeader = memo(function ActionsHeader({
             onSync();
           }}
           disabled={isSyncing}
-          className='inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-secondary-token hover:bg-surface-2 disabled:opacity-50'
+          className='inline-flex items-center gap-1 rounded px-2 py-1 text-[13px] text-secondary-token hover:bg-surface-2 disabled:opacity-50'
         >
           <Icon
             name='RefreshCw'
@@ -393,7 +393,7 @@ export function TourDatesTable({
           <Icon name='Calendar' className='h-6 w-6' />
           <div>
             <div className='font-medium'>No tour dates</div>
-            <div className='text-xs'>
+            <div className='text-[13px]'>
               Add your first tour date to get started.
             </div>
           </div>
