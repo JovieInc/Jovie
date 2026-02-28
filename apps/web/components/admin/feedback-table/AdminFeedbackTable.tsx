@@ -126,7 +126,7 @@ export function AdminFeedbackTable({
         ariaLabel='Feedback details'
       >
         {selected ? (
-          <div className='p-6 space-y-6'>
+          <div className='p-6 space-y-6 overflow-x-hidden'>
             <div>
               <h3 className='text-lg font-semibold text-primary-token'>
                 Feedback details
