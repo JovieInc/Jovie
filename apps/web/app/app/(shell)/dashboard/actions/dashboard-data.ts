@@ -386,9 +386,6 @@ async function fetchDashboardCoreWithSession(
                 | { sidebarCollapsed: boolean }
                 | undefined;
             }
-            Sentry.captureException(error, {
-              tags: { query: 'user_settings', context: 'dashboard_data' },
-            });
             throw error;
           }),
         // Optimized existence query for link booleans.
@@ -443,12 +440,6 @@ async function fetchDashboardCoreWithSession(
             if (!migrationResult.shouldRetry) {
               return { hasLinks: false, hasMusicLinks: false };
             }
-            Sentry.captureException(error, {
-              tags: {
-                query: 'social_links_existence',
-                context: 'dashboard_data',
-              },
-            });
             throw error;
           }),
         // Tipping stats now run in parallel with settings and link counts,
