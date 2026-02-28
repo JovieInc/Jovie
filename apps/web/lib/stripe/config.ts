@@ -141,10 +141,6 @@ export function validateStripeConfig(): {
     missingVars.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
   }
 
-  if (!env.STRIPE_PRICE_FOUNDING_MONTHLY) {
-    missingVars.push('STRIPE_PRICE_FOUNDING_MONTHLY');
-  }
-
   if (!env.STRIPE_PRICE_PRO_MONTHLY) {
     missingVars.push('STRIPE_PRICE_PRO_MONTHLY');
   }
