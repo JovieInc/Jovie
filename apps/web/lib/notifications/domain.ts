@@ -51,6 +51,7 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { fireSubscribeCAPIEvent } from '@/lib/tracking/fire-subscribe-event';
 import {
   statusSchema,
   subscribeSchema,
@@ -299,7 +300,7 @@ async function sendSubscriptionConfirmationEmail(
       id: dedupKey,
       dedupKey,
       category: 'transactional',
-      subject: `You're subscribed to ${artistName} on Jovie`,
+      subject: `Notifications on for ${artistName} on Jovie`,
       text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
       html: `
         <p>Thanks for turning on notifications for <strong>${artistName}</strong>.</p>
@@ -595,6 +596,20 @@ export const subscribeToNotificationsDomain = async (
       await upsertAudienceMember(artist_id, normalizedEmail, ipAddress, ua);
     }
 
+    // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
+    // email subscribers who are already verified from a previous subscription).
+    // Email OTP subscribers fire this event in verifyEmailOtpDomain() instead.
+    if (!shouldVerifyEmail) {
+      void fireSubscribeCAPIEvent({
+        creatorProfileId: artist_id,
+        email: normalizedEmail ?? undefined,
+        phone: normalizedPhone ?? undefined,
+        ipAddress: ipAddress ?? undefined,
+        userAgent: getHeader(context.headers, 'user-agent') ?? undefined,
+        sourceUrl: getHeader(context.headers, 'referer') ?? undefined,
+      });
+    }
+
     const dispatchResult = await dispatchSubscriptionEmail(
       channel,
       normalizedEmail,
@@ -683,6 +698,12 @@ export const verifyEmailOtpDomain = async (
       emailOtpAttempts: 0,
     })
     .where(eq(notificationSubscriptions.id, subscription.id));
+
+  // Fire CAPI Subscribe event now that the email subscriber is confirmed
+  void fireSubscribeCAPIEvent({
+    creatorProfileId: parsed.data.artist_id,
+    email: normalizedEmail ?? undefined,
+  });
 
   return {
     status: 200,
