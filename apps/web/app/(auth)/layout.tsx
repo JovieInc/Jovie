@@ -5,8 +5,7 @@ import { publicEnv } from '@/lib/env-public';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
 
-// Note: dynamic = 'force-dynamic' removed for cacheComponents compatibility
-// Auth pages will still be dynamic by default
+export const dynamic = 'force-dynamic';
 
 // Use local Inter font (no external network requests during build)
 const inter = localFont({
