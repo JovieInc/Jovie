@@ -382,7 +382,7 @@ export function ProfileContactSidebar() {
         )}
 
         {/* Links List — with add/remove */}
-        <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4'>
+        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
           <ProfileLinkList
             links={links}
             selectedCategory={resolvedCategory}
@@ -393,7 +393,7 @@ export function ProfileContactSidebar() {
 
           {/* Inline add link form */}
           {isAddingLink && (
-            <div className='mt-3 flex items-center gap-2'>
+            <div className='mt-3 flex flex-wrap items-center gap-2'>
               <Input
                 ref={addLinkInputRef}
                 type='url'
@@ -406,7 +406,7 @@ export function ProfileContactSidebar() {
                     setIsAddingLink(false);
                   }
                 }}
-                className='h-8 flex-1 text-sm'
+                className='h-8 flex-1 min-w-0 text-sm'
                 aria-label='New link URL'
               />
               <button

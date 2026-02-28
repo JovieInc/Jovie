@@ -1,7 +1,7 @@
 'use client';
 
 import { CommonDropdown } from '@jovie/ui';
-import { Copy, ExternalLink, Settings } from 'lucide-react';
+import { Copy, ExternalLink, ImageDown, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   SidebarMenuAction,
@@ -61,6 +61,13 @@ export function ProfileMenuActions({
               label: 'Open Profile',
               icon: ExternalLink,
               onClick: () => window.open(profileUrl, '_blank'),
+            },
+            {
+              type: 'action',
+              id: 'retargeting-ads',
+              label: 'Download Ads',
+              icon: ImageDown,
+              onClick: () => router.push(APP_ROUTES.SETTINGS_RETARGETING_ADS),
             },
             { type: 'separator', id: 'sep' },
             {

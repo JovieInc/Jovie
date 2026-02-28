@@ -54,7 +54,7 @@ export const NOTIFICATION_COPY = {
     unsubscribe:
       'We couldn’t update your notifications. Try again in a moment.',
     missingContact:
-      'We need your contact to manage this subscription. Add it again to continue.',
+      'We need your contact to manage notifications. Add it again to continue.',
     artistNotFound:
       'We couldn’t find that artist. Check the handle and try again.',
     artistUnavailable:
@@ -63,12 +63,12 @@ export const NOTIFICATION_COPY = {
   success: {
     subscribe: {
       email:
-        "You're in. You'll get notified when new music drops, tours are announced & more.",
-      sms: "You're in. You'll get a text when new music drops, tours are announced & more.",
+        "Notifications on. You'll get notified when new music drops, tours are announced & more.",
+      sms: "Notifications on. You'll get a text when new music drops, tours are announced & more.",
     },
     unsubscribe: {
-      email: 'You\u2019re unsubscribed from email notifications.',
-      sms: 'You\u2019re unsubscribed from text notifications.',
+      email: 'Email notifications turned off.',
+      sms: 'Text notifications turned off.',
     },
   },
 } as const;
