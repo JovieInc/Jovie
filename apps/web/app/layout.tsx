@@ -143,11 +143,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Vercel Toolbar: visible only to authenticated Vercel team members.
-  // Dynamically imported to keep it code-split. Disable with NEXT_DISABLE_TOOLBAR=1.
-  const VercelToolbar = process.env.NEXT_DISABLE_TOOLBAR
-    ? null
-    : (await import('@vercel/toolbar/next')).VercelToolbar;
+  // Vercel Toolbar: visible only to authenticated Vercel team members in non-production.
+  // Disabled in production to avoid showing floating button to team members visiting jov.ie.
+  const enableToolbar =
+    process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
+  const VercelToolbar = enableToolbar
+    ? (await import('@vercel/toolbar/next')).VercelToolbar
+    : null;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
