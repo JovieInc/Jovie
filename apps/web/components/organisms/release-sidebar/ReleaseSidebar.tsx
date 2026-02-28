@@ -328,7 +328,7 @@ export function ReleaseSidebar({
           </div>
         )}
 
-        <div className='flex-1 space-y-5 overflow-auto p-5'>
+        <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden p-5'>
           {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}

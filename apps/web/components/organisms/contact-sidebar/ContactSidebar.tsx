@@ -152,7 +152,7 @@ export const ContactSidebar = memo(function ContactSidebar({
             />
           </div>
 
-          <div className='flex-1 space-y-4 overflow-auto px-4 py-4'>
+          <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden px-4 py-4'>
             {activeTab === 'details' && (
               <ContactFields
                 firstName={contact.firstName}
