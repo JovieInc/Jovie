@@ -186,9 +186,10 @@ describe('field selection constants', () => {
     expect(BILLING_FIELDS_FULL).toContain('plan');
     expect(BILLING_FIELDS_FULL).toContain('stripeCustomerId');
     expect(BILLING_FIELDS_FULL).toContain('stripeSubscriptionId');
+    expect(BILLING_FIELDS_FULL).toContain('stripePriceId');
     expect(BILLING_FIELDS_FULL).toContain('billingVersion');
     expect(BILLING_FIELDS_FULL).toContain('lastBillingEventAt');
-    expect(BILLING_FIELDS_FULL).toHaveLength(9);
+    expect(BILLING_FIELDS_FULL).toHaveLength(10);
   });
 
   it('BILLING_FIELDS_STATUS contains fields without email/isAdmin', () => {
@@ -197,11 +198,12 @@ describe('field selection constants', () => {
     expect(BILLING_FIELDS_STATUS).toContain('plan');
     expect(BILLING_FIELDS_STATUS).toContain('stripeCustomerId');
     expect(BILLING_FIELDS_STATUS).toContain('stripeSubscriptionId');
+    expect(BILLING_FIELDS_STATUS).toContain('stripePriceId');
     expect(BILLING_FIELDS_STATUS).toContain('billingVersion');
     expect(BILLING_FIELDS_STATUS).toContain('lastBillingEventAt');
     expect(BILLING_FIELDS_STATUS).not.toContain('email');
     expect(BILLING_FIELDS_STATUS).not.toContain('isAdmin');
-    expect(BILLING_FIELDS_STATUS).toHaveLength(7);
+    expect(BILLING_FIELDS_STATUS).toHaveLength(8);
   });
 
   it('BILLING_FIELDS_CUSTOMER contains 4 fields for Stripe operations', () => {
