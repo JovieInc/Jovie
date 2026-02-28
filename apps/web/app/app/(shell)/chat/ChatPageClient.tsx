@@ -241,7 +241,7 @@ export function ChatPageClient({
 
     const retryTimeout = globalThis.setTimeout(() => {
       setAutoRetryCount(previous => previous + 1);
-      globalThis.location.reload();
+      router.refresh();
     }, 3000);
 
     return () => {
@@ -256,6 +256,7 @@ export function ChatPageClient({
     hasProfilesButNoSelection,
     isProfileSetupRace,
     needsOnboarding,
+    router,
     searchParams,
     selectedProfile,
   ]);
@@ -277,7 +278,7 @@ export function ChatPageClient({
           )}
           <button
             type='button'
-            onClick={() => globalThis.location.reload()}
+            onClick={() => router.refresh()}
             className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
           >
             <RefreshCw className='h-4 w-4' />
