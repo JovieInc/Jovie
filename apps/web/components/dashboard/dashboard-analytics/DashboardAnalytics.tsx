@@ -220,7 +220,7 @@ export function DashboardAnalytics() {
             loading={loading}
           />
           <StatCard
-            label='Subscribers'
+            label='Followers'
             value={fmt.format(data?.subscribers ?? 0)}
             meta={
               (data?.unique_users ?? 0) > 0
@@ -239,7 +239,7 @@ export function DashboardAnalytics() {
               <StatCard
                 label='Capture Rate'
                 value={`${data.capture_rate ?? 0}%`}
-                meta='Visitors to subscribers'
+                meta='Visitors to followers'
               />
               <StatCard
                 label='Listen Clicks'

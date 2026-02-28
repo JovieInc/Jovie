@@ -30,7 +30,7 @@ export function SubscriptionConfirmedBanner() {
       <span className='inline-flex items-center gap-2'>
         <Bell className='w-4 h-4' aria-hidden='true' />
         <span className='font-medium'>
-          Subscription confirmed! You&apos;ll receive updates from this artist.
+          Notifications on! You&apos;ll receive updates from this artist.
         </span>
       </span>
     </output>
