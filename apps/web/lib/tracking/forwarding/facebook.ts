@@ -27,6 +27,8 @@ function mapEventToFacebook(eventType: NormalizedEvent['eventType']): string {
       return 'ViewContent';
     case 'form_submit':
       return 'Lead';
+    case 'subscribe':
+      return 'Subscribe';
     case 'scroll_depth':
       return 'ViewContent';
     default:
@@ -68,6 +70,9 @@ export async function forwardToFacebook(
             // https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/customer-information-parameters
             ...(event.clientIp && { client_ip_address: event.clientIp }),
             client_user_agent: event.userAgent,
+            // Hashed PII improves match rate (SHA-256 hex, per Facebook spec)
+            ...(event.hashedEmail && { em: [event.hashedEmail] }),
+            ...(event.hashedPhone && { ph: [event.hashedPhone] }),
           },
           custom_data: {
             content_type: 'profile',
