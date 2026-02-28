@@ -3,7 +3,6 @@ import { cookies } from 'next/headers';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { PWAInstallToastActivator } from '@/components/feedback/PWAInstallToastActivator';
 import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
@@ -51,7 +50,6 @@ export default async function AppShellLayout({
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
         <VersionUpdateBannerWrapper />
-        <PWAInstallToastActivator />
         <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
           <DashboardDataProvider value={dashboardData}>
             <ProfileCompletionRedirect />

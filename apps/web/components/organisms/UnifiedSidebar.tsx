@@ -19,6 +19,7 @@ import {
   userSettingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
+import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
 import {
   Sidebar,
   SidebarContent,
@@ -161,7 +162,7 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-7 items-center gap-2 rounded-md px-2 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
@@ -179,7 +180,7 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-md px-1.5 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 w-full items-center gap-2 rounded-md px-2 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
@@ -189,7 +190,7 @@ function SidebarHeaderNav({
                 className='rounded-[4px] shrink-0'
               />
               <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                {isAdmin ? 'Admin' : 'Sora Vale'}
+                {isAdmin ? 'Admin' : 'Jovie'}
               </span>
               <ChevronDown
                 className='size-3 shrink-0 text-sidebar-item-icon opacity-60 group-data-[collapsible=icon]:hidden'
@@ -237,11 +238,11 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='icon'
       className={cn(
         'bg-base',
-        '[--sidebar-width:232px]',
+        '[--sidebar-width:244px]',
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 pt-2 pb-0'>
+      <SidebarHeader className='relative h-9 justify-center gap-0 pl-2 pr-3.5 pt-2 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -250,7 +251,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5'>
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 mt-2'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -261,6 +262,8 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <SidebarInstallBanner />
 
       <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
         <span className='text-2xs text-sidebar-muted select-none'>

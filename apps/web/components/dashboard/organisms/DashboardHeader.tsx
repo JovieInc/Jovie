@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -62,9 +63,13 @@ export function DashboardHeader({
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex-1 items-center flex text-[13px]'>
           {!breadcrumbSuffix && (
-            <span className='font-medium text-primary-token'>
-              {currentLabel}
-            </span>
+            <>
+              <span className='text-tertiary-token'>Jovie</span>
+              <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
+              <span className='font-medium text-primary-token'>
+                {currentLabel}
+              </span>
+            </>
           )}
           {breadcrumbSuffix}
         </div>
