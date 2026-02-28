@@ -358,100 +358,130 @@ async function fetchDashboardCoreWithSession(
     // Performance optimization: Fetch settings, link counts, AND tipping stats in parallel.
     // This eliminates the waterfall where tipping stats had to wait for chrome data to finish.
     // Each query in Promise.all uses batch API to ensure RLS session on same connection.
-    const [settings, linkCounts, tippingStats] = await Promise.all([
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select()
-            .from(userSettings)
-            .where(eq(userSettings.userId, userData.id))
-            .limit(1),
-        'User settings query'
-      )
-        .then(
-          result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+    // Use Promise.allSettled so a single query timeout doesn't crash the entire dashboard.
+    // Each settled result is unwrapped with a safe fallback default below.
+    const [settingsResult, linkCountsResult, tippingStatsResult] =
+      await Promise.allSettled([
+        executeWithSession(
+          clerkUserId,
+          () =>
+            db
+              .select()
+              .from(userSettings)
+              .where(eq(userSettings.userId, userData.id))
+              .limit(1),
+          'User settings query'
         )
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'user_settings',
-          });
+          .then(
+            result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+          )
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'user_settings',
+            });
 
-          if (!migrationResult.shouldRetry) {
-            return migrationResult.fallbackData as
-              | { sidebarCollapsed: boolean }
-              | undefined;
-          }
-          Sentry.captureException(error, {
-            tags: { query: 'user_settings', context: 'dashboard_data' },
-          });
-          throw error;
-        }),
-      // Optimized existence query for link booleans.
-      // Aggregate counts are scoped to the selected profile's active links.
-      // Both queries share the same RLS session context set by executeWithSession.
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select({
-              hasLinks: drizzleSql<boolean>`
-              exists (
-                select 1
-                from ${socialLinks}
-                where ${and(
-                  eq(socialLinks.creatorProfileId, selected.id),
-                  eq(socialLinks.state, 'active'),
-                  eq(socialLinks.isActive, true)
-                )}
-              )
-            `,
-              hasMusicLinks: drizzleSql<boolean>`
-              exists (
-                select 1
-                from ${socialLinks}
-                where ${and(
-                  eq(socialLinks.creatorProfileId, selected.id),
-                  eq(socialLinks.state, 'active'),
-                  eq(socialLinks.isActive, true),
-                  or(
-                    eq(socialLinks.platformType, 'dsp'),
-                    eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                  )
-                )}
-              )
-            `,
-            })
-            .from(users)
-            .where(eq(users.id, userData.id))
-            .limit(1),
-        'Social links existence query'
-      )
-        .then(result => {
-          return mapSocialLinkExistence(result?.[0]);
-        })
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'social_links_count',
-          });
+            if (!migrationResult.shouldRetry) {
+              return migrationResult.fallbackData as
+                | { sidebarCollapsed: boolean }
+                | undefined;
+            }
+            Sentry.captureException(error, {
+              tags: { query: 'user_settings', context: 'dashboard_data' },
+            });
+            throw error;
+          }),
+        // Optimized existence query for link booleans.
+        // Aggregate counts are scoped to the selected profile's active links.
+        // Both queries share the same RLS session context set by executeWithSession.
+        executeWithSession(
+          clerkUserId,
+          () =>
+            db
+              .select({
+                hasLinks: drizzleSql<boolean>`
+                exists (
+                  select 1
+                  from ${socialLinks}
+                  where ${and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true)
+                  )}
+                )
+              `,
+                hasMusicLinks: drizzleSql<boolean>`
+                exists (
+                  select 1
+                  from ${socialLinks}
+                  where ${and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true),
+                    or(
+                      eq(socialLinks.platformType, 'dsp'),
+                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
+                    )
+                  )}
+                )
+              `,
+              })
+              .from(users)
+              .where(eq(users.id, userData.id))
+              .limit(1),
+          'Social links existence query'
+        )
+          .then(result => {
+            return mapSocialLinkExistence(result?.[0]);
+          })
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'social_links_count',
+            });
 
-          if (!migrationResult.shouldRetry) {
-            return { hasLinks: false, hasMusicLinks: false };
-          }
-          Sentry.captureException(error, {
-            tags: {
-              query: 'social_links_existence',
-              context: 'dashboard_data',
-            },
-          });
-          throw error;
-        }),
-      // Tipping stats now run in parallel with settings and link counts,
-      // eliminating the previous waterfall where they waited for chrome data
-      fetchTippingStatsWithSession(selected.id, clerkUserId),
-    ]);
+            if (!migrationResult.shouldRetry) {
+              return { hasLinks: false, hasMusicLinks: false };
+            }
+            Sentry.captureException(error, {
+              tags: {
+                query: 'social_links_existence',
+                context: 'dashboard_data',
+              },
+            });
+            throw error;
+          }),
+        // Tipping stats now run in parallel with settings and link counts,
+        // eliminating the previous waterfall where they waited for chrome data
+        fetchTippingStatsWithSession(selected.id, clerkUserId),
+      ]);
+
+    // Unwrap settled results with safe fallback defaults for rejected queries.
+    // This ensures individual timeouts degrade gracefully instead of crashing the dashboard.
+    const settings =
+      settingsResult.status === 'fulfilled' ? settingsResult.value : undefined;
+    const linkCounts =
+      linkCountsResult.status === 'fulfilled'
+        ? linkCountsResult.value
+        : { hasLinks: false, hasMusicLinks: false };
+    const tippingStats =
+      tippingStatsResult.status === 'fulfilled'
+        ? tippingStatsResult.value
+        : createEmptyTippingStats();
+
+    // Report rejected queries to Sentry at warning level (timeouts are expected during cold starts)
+    for (const [label, result] of [
+      ['user_settings', settingsResult],
+      ['social_links_existence', linkCountsResult],
+      ['tipping_stats', tippingStatsResult],
+    ] as const) {
+      if (result.status === 'rejected') {
+        Sentry.captureException(result.reason, {
+          level: 'warning',
+          tags: { query: label, context: 'dashboard_data_settled' },
+        });
+      }
+    }
 
     const hasLinks = linkCounts.hasLinks;
     const hasMusicLinks = linkCounts.hasMusicLinks;
