@@ -32,7 +32,12 @@ export interface ForwardingResult {
  */
 export interface NormalizedEvent {
   eventId: string;
-  eventType: 'page_view' | 'link_click' | 'form_submit' | 'scroll_depth';
+  eventType:
+    | 'page_view'
+    | 'link_click'
+    | 'form_submit'
+    | 'scroll_depth'
+    | 'subscribe';
   eventTime: number; // Unix timestamp in seconds
   sourceUrl: string;
   referrer?: string;
@@ -52,6 +57,10 @@ export interface NormalizedEvent {
   linkId?: string;
   linkUrl?: string;
   formType?: string;
+
+  // Hashed PII for improved ad platform matching (SHA-256 hex)
+  hashedEmail?: string;
+  hashedPhone?: string;
 }
 
 /**

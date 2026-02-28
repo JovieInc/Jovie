@@ -40,7 +40,7 @@ export function AnalyticsFunnel({
       description: 'Distinct users identified',
     },
     {
-      label: 'Subscribers',
+      label: 'Followers',
       value: subscribers,
       description: 'Opted-in for notifications',
     },

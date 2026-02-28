@@ -34,7 +34,7 @@ export function SubscriptionSuccess({
     <div className='space-y-1'>
       <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
         <Bell className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>You&apos;re in</span>
+        <span className='font-semibold'>Notifications on</span>
       </div>
       <p className='text-xs text-center text-secondary-token'>
         You&apos;ll get a heads-up when {artistName} releases new music,
@@ -55,8 +55,8 @@ export function SubscriptionPendingConfirmation() {
         <span className='font-semibold'>Check your email</span>
       </div>
       <p className='text-xs text-center text-secondary-token'>
-        We sent a confirmation link to your email. Click it to start receiving
-        updates from this artist.
+        We sent a confirmation link to your email. Click it to turn on
+        notifications from this artist.
       </p>
     </div>
   );
