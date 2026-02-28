@@ -16,7 +16,7 @@ const VIEW_OPTIONS: {
   Icon: typeof Users;
 }[] = [
   { value: 'all', label: 'All audience', Icon: Users },
-  { value: 'subscribers', label: 'Subscribers', Icon: BellRing },
+  { value: 'subscribers', label: 'Followers', Icon: BellRing },
   { value: 'anonymous', label: 'Anonymous', Icon: Ghost },
 ];
 

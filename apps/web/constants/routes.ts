@@ -40,6 +40,7 @@ export const APP_ROUTES = {
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
   SETTINGS_AUDIENCE: '/app/settings/audience',
+  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
 
   // Admin
   ADMIN: '/app/admin',
