@@ -35,7 +35,7 @@ import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
-import type { ReleaseSidebarProps } from './types';
+import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
 /** Tab for organizing sidebar content into focused views */
@@ -48,6 +48,93 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
 ];
+
+function buildContextMenuItems(
+  release: Release | null,
+  artistName: string | null | undefined,
+  handleCopySmartLink: () => void,
+  onRefresh: (() => void) | undefined,
+  isRefreshing: boolean
+): CommonDropdownItem[] {
+  if (!release) return [];
+
+  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const items: CommonDropdownItem[] = [];
+
+  const utmContext = buildUTMContext({
+    smartLinkUrl,
+    releaseSlug: release.slug,
+    releaseTitle: release.title,
+    artistName,
+    releaseDate: release.releaseDate,
+  });
+
+  items.push(
+    {
+      type: 'action',
+      id: 'copy-url',
+      label: 'Copy smart link',
+      icon: <Copy className='h-4 w-4' />,
+      onClick: () => void handleCopySmartLink(),
+    },
+    {
+      type: 'action',
+      id: 'open-release',
+      label: 'Open release',
+      icon: <ExternalLink className='h-4 w-4' />,
+      onClick: () => globalThis.open(smartLinkUrl, '_blank'),
+    },
+    // UTM share presets
+    ...getUTMShareDropdownItems({
+      smartLinkUrl,
+      context: utmContext,
+    })
+  );
+
+  // "Copy Use Sound link" — only when release has video provider links
+  if (release.hasVideoLinks) {
+    const soundsUrl = `${getBaseUrl()}${release.smartLinkPath}/sounds`;
+    items.push(
+      { type: 'separator', id: 'sep-sounds' },
+      {
+        type: 'action',
+        id: 'copy-sounds-link',
+        label: 'Copy Use Sound link',
+        icon: <Sparkles className='h-4 w-4' />,
+        onClick: () => {
+          navigator.clipboard
+            ?.writeText(soundsUrl)
+            .then(() => {
+              toast.success('Use Sound link copied');
+            })
+            .catch(() => {
+              // Silently fail
+            });
+        },
+      }
+    );
+  }
+
+  items.push(
+    { type: 'separator', id: 'sep-actions' },
+    {
+      type: 'action',
+      id: 'refresh',
+      label: isRefreshing ? 'Refreshing…' : 'Refresh',
+      icon: <RefreshCw className='h-4 w-4' />,
+      onClick: () => {
+        if (isRefreshing) return;
+        if (onRefresh) {
+          onRefresh();
+        } else {
+          globalThis.location.reload();
+        }
+      },
+    }
+  );
+
+  return items;
+}
 
 export function ReleaseSidebar({
   release,
@@ -139,86 +226,17 @@ export function ReleaseSidebar({
 
   const canEditCanvasStatus = Boolean(release && onCanvasStatusUpdate);
 
-  const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
-    if (!release) return [];
-
-    const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
-    const items: CommonDropdownItem[] = [];
-
-    const utmContext = buildUTMContext({
-      smartLinkUrl,
-      releaseSlug: release.slug,
-      releaseTitle: release.title,
-      artistName,
-      releaseDate: release.releaseDate,
-    });
-
-    items.push(
-      {
-        type: 'action',
-        id: 'copy-url',
-        label: 'Copy smart link',
-        icon: <Copy className='h-4 w-4' />,
-        onClick: () => void handleCopySmartLink(),
-      },
-      {
-        type: 'action',
-        id: 'open-release',
-        label: 'Open release',
-        icon: <ExternalLink className='h-4 w-4' />,
-        onClick: () => globalThis.open(smartLinkUrl, '_blank'),
-      },
-      // UTM share presets
-      ...getUTMShareDropdownItems({
-        smartLinkUrl,
-        context: utmContext,
-      })
-    );
-
-    // "Copy Use Sound link" — only when release has video provider links
-    if (release.hasVideoLinks) {
-      const soundsUrl = `${getBaseUrl()}${release.smartLinkPath}/sounds`;
-      items.push(
-        { type: 'separator', id: 'sep-sounds' },
-        {
-          type: 'action',
-          id: 'copy-sounds-link',
-          label: 'Copy Use Sound link',
-          icon: <Sparkles className='h-4 w-4' />,
-          onClick: () => {
-            navigator.clipboard
-              ?.writeText(soundsUrl)
-              .then(() => {
-                toast.success('Use Sound link copied');
-              })
-              .catch(() => {
-                // Silently fail
-              });
-          },
-        }
-      );
-    }
-
-    items.push(
-      { type: 'separator', id: 'sep-actions' },
-      {
-        type: 'action',
-        id: 'refresh',
-        label: isRefreshing ? 'Refreshing…' : 'Refresh',
-        icon: <RefreshCw className='h-4 w-4' />,
-        onClick: () => {
-          if (isRefreshing) return;
-          if (onRefresh) {
-            onRefresh();
-          } else {
-            globalThis.location.reload();
-          }
-        },
-      }
-    );
-
-    return items;
-  }, [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]);
+  const contextMenuItems = useMemo<CommonDropdownItem[]>(
+    () =>
+      buildContextMenuItems(
+        release,
+        artistName,
+        handleCopySmartLink,
+        onRefresh,
+        isRefreshing
+      ),
+    [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]
+  );
 
   return (
     <RightDrawer

@@ -75,23 +75,22 @@ export function ReleaseSidebarHeader({
             'noopener,noreferrer'
           );
         },
+      },
+      {
+        id: 'refresh',
+        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
+        icon: RefreshCw,
+        onClick: () => {
+          if (isRefreshing) return;
+          if (onRefresh) {
+            onRefresh();
+            return;
+          }
+          globalThis.location.reload();
+        },
       }
     );
     /* eslint-enable react-hooks/refs */
-
-    overflowActions.push({
-      id: 'refresh',
-      label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
-      icon: RefreshCw,
-      onClick: () => {
-        if (isRefreshing) return;
-        if (onRefresh) {
-          onRefresh();
-          return;
-        }
-        globalThis.location.reload();
-      },
-    });
   }
 
   if (hasRelease && release?.id) {

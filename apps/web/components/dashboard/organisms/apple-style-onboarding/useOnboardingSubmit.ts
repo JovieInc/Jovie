@@ -64,6 +64,36 @@ async function waitForStageTransition(
   });
 }
 
+async function advanceSpotifyImportStages(
+  safeSetter: (value: SetStateAction<SpotifyImportState>) => void,
+  signal: AbortSignal,
+  imported: number
+): Promise<void> {
+  safeSetter({
+    status: 'importing',
+    stage: 1,
+    message: getSpotifyImportStageMessage(1, imported),
+  });
+
+  await waitForStageTransition(signal);
+  if (signal.aborted) return;
+
+  safeSetter({
+    status: 'importing',
+    stage: 2,
+    message: getSpotifyImportStageMessage(2),
+  });
+
+  await waitForStageTransition(signal);
+  if (signal.aborted) return;
+
+  safeSetter({
+    status: 'success',
+    stage: 2,
+    message: getSpotifyImportSuccessMessage(imported),
+  });
+}
+
 async function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
   signal: AbortSignal,
@@ -133,33 +163,11 @@ async function tryAutoConnectSpotify(
             releasesImported: importResult.imported,
             duration: toDurationMs(importStartedAt),
           });
-          safeSetter({
-            status: 'importing',
-            stage: 1,
-            message: getSpotifyImportStageMessage(1, importResult.imported),
-          });
-
-          await waitForStageTransition(signal);
-          if (signal.aborted) {
-            return;
-          }
-
-          safeSetter({
-            status: 'importing',
-            stage: 2,
-            message: getSpotifyImportStageMessage(2),
-          });
-
-          await waitForStageTransition(signal);
-          if (signal.aborted) {
-            return;
-          }
-
-          safeSetter({
-            status: 'success',
-            stage: 2,
-            message: getSpotifyImportSuccessMessage(importResult.imported),
-          });
+          await advanceSpotifyImportStages(
+            safeSetter,
+            signal,
+            importResult.imported
+          );
         } else {
           track('onboarding_spotify_import_failed', {
             user_id: userId,
