@@ -57,12 +57,7 @@ export function AuthRedirectHandler() {
   // Subtle full-screen fade — no spinner, no logo, no layout shift.
   // The redirect resolves within milliseconds; this just prevents a flash
   // of marketing content for authenticated users.
-  return (
-    <output
-      className='fixed inset-0 z-50 bg-base'
-      aria-label='Redirecting to your dashboard'
-    />
-  );
+  return <div className='fixed inset-0 z-50 bg-base' aria-hidden='true' />;
 }
 
 export { hasActiveClerkSession };

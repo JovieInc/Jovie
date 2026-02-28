@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const replaceMock = vi.fn();
@@ -44,7 +44,7 @@ describe('AuthRedirectHandler', () => {
     });
 
     expect(
-      screen.queryByLabelText(/redirecting to your dashboard/i)
+      document.querySelector('[aria-hidden="true"].fixed')
     ).not.toBeInTheDocument();
   });
 
@@ -54,7 +54,7 @@ describe('AuthRedirectHandler', () => {
     render(<AuthRedirectHandler />);
 
     expect(
-      screen.getByLabelText(/redirecting to your dashboard/i)
+      document.querySelector('[aria-hidden="true"].fixed')
     ).toBeInTheDocument();
 
     await waitFor(() => {
