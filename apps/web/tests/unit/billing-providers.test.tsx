@@ -1,12 +1,10 @@
 /**
- * Regression test: BillingDashboard requires QueryClientProvider.
+ * Regression test: BillingDashboard must never crash when QueryClientProvider
+ * is missing at the route boundary.
  *
- * This test guards against the production bug where billing/layout.tsx
- * mounted BillingDashboard without a QueryClientProvider at the route
- * boundary. BillingDashboard uses TanStack Query hooks that crash
- * without QueryClientProvider.
- *
- * This test protects against regressions in route/layout provider wiring.
+ * This guards against route/layout provider wiring regressions. BillingDashboard
+ * now self-heals by mounting a local QueryProvider when the upstream context is
+ * unavailable, while still working correctly when wrapped by the app provider tree.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -59,18 +57,13 @@ describe('BillingDashboard provider requirements', () => {
     ).not.toThrow();
   });
 
-  it('throws when rendered without QueryClientProvider', () => {
-    // Suppress React error boundary console noise
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
+  it('renders without crashing when QueryClientProvider is missing', () => {
     expect(() =>
       render(
         <NuqsTestingAdapter>
           <BillingDashboard />
         </NuqsTestingAdapter>
       )
-    ).toThrow();
-
-    consoleSpy.mockRestore();
+    ).not.toThrow();
   });
 });
