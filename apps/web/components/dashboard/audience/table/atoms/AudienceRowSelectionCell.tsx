@@ -1,8 +1,8 @@
 'use client';
 
 import { Checkbox } from '@jovie/ui';
-import { cn } from '@/lib/utils';
 import { alignment } from '@/components/organisms/table/table.styles';
+import { cn } from '@/lib/utils';
 
 export interface AudienceRowSelectionCellProps {
   readonly rowNumber: number;

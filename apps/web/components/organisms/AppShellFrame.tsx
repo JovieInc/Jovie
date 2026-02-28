@@ -27,7 +27,12 @@ export function AppShellFrame({
   isTableRoute = false,
 }: Readonly<AppShellFrameProps>) {
   return (
-    <div className={cn('flex h-svh w-full overflow-hidden bg-base', containerClassName)}>
+    <div
+      className={cn(
+        'flex h-svh w-full overflow-hidden bg-base',
+        containerClassName
+      )}
+    >
       {sidebar}
 
       <div

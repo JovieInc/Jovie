@@ -24,7 +24,7 @@ export function ClaimHandleForm({
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
-  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const _shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const displayDomain = BASE_URL.replace(/^https?:\/\//, '');
 
@@ -138,7 +138,8 @@ export function ClaimHandleForm({
           'transition-all duration-300',
           'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]',
           'focus-within:border-(--linear-text-primary) focus-within:shadow-[0_0_0_1px_var(--linear-text-primary)]',
-          available === true && 'border-(--linear-success) focus-within:border-(--linear-success) focus-within:shadow-[0_0_0_1px_var(--linear-success)]'
+          available === true &&
+            'border-(--linear-success) focus-within:border-(--linear-success) focus-within:shadow-[0_0_0_1px_var(--linear-success)]'
         )}
         style={{ minHeight: 64 }}
       >
@@ -184,7 +185,7 @@ export function ClaimHandleForm({
           />
         </div>
 
-          <button
+        <button
           type='submit'
           className={cn(
             'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[14px] px-6 text-[15px] font-medium transition-all duration-300 focus-ring-themed',

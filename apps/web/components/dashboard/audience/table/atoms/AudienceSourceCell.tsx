@@ -59,7 +59,9 @@ export function AudienceSourceCell({
   const utmLabel = utmParams ? formatUtmSourceLabel(utmParams) : null;
   if (utmLabel) {
     return (
-      <div className={cn('text-[13px] text-secondary-token truncate', className)}>
+      <div
+        className={cn('text-[13px] text-secondary-token truncate', className)}
+      >
         {utmLabel}
         {utmParams?.campaign && (
           <span className='text-tertiary-token ml-1'>
@@ -73,7 +75,9 @@ export function AudienceSourceCell({
   // Fall back to referrer-based source
   if (!referrerHistory.length) {
     return (
-      <div className={cn('text-[13px] text-tertiary-token', className)}>Direct</div>
+      <div className={cn('text-[13px] text-tertiary-token', className)}>
+        Direct
+      </div>
     );
   }
 

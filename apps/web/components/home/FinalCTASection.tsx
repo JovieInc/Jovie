@@ -1,5 +1,6 @@
-import { Container } from '@/components/site/Container';
 import { Button } from '@jovie/ui';
+import Link from 'next/link';
+import { Container } from '@/components/site/Container';
 
 export function FinalCTASection() {
   return (
@@ -43,7 +44,7 @@ export function FinalCTASection() {
               className='h-12 rounded-full px-8 text-[15px] shadow-[0_0_0_1px_var(--linear-border-subtle),0_8px_16px_-4px_rgba(0,0,0,0.1)]'
               asChild
             >
-              <a href="/signup">Get Started Now</a>
+              <Link href='/signup'>Get Started Now</Link>
             </Button>
           </div>
         </div>

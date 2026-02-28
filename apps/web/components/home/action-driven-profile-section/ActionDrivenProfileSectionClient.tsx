@@ -3,7 +3,6 @@
 import Image from 'next/image';
 import { Container } from '@/components/site/Container';
 import type { ActionDrivenProfileSectionClientProps } from './types';
-import { motion, useScroll, useTransform } from 'framer-motion';
 import { usePillarTabs } from './usePillarTabs';
 
 export function ActionDrivenProfileSectionClient({

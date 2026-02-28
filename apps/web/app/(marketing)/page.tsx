@@ -256,9 +256,7 @@ export default function HomePage() {
       />
 
       {/* Hero + logo bar fill the viewport together (minus fixed header) */}
-      <div
-        className='flex flex-col'
-      >
+      <div className='flex flex-col'>
         <RedesignedHero />
       </div>
 
