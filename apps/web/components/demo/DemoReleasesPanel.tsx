@@ -91,12 +91,12 @@ export function DemoReleasesPanel({
   );
 
   return (
-    <div
+    <div // NOSONAR - custom listbox pattern with keyboard navigation, native <select> not suitable for this UI
       ref={listRef}
       className='h-full overflow-y-auto overflow-x-hidden outline-none scrollbar-hide'
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      role='listbox' // NOSONAR - custom listbox pattern with keyboard navigation, native <select> not suitable for this UI
+      role='listbox'
       aria-label='Releases'
     >
       {groups.map(group => {
@@ -133,10 +133,10 @@ export function DemoReleasesPanel({
                 const isSelected = release.id === selectedId;
 
                 return (
-                  <div
+                  <div // NOSONAR - custom listbox option with keyboard support
                     key={release.id}
                     data-release-id={release.id}
-                    role='option' // NOSONAR - custom listbox option with keyboard support
+                    role='option'
                     tabIndex={0}
                     aria-selected={isSelected}
                     onClick={() => {
