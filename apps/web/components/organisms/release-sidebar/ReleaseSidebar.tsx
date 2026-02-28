@@ -75,7 +75,9 @@ function buildContextMenuItems(
       id: 'copy-url',
       label: 'Copy smart link',
       icon: <Copy className='h-4 w-4' />,
-      onClick: () => void handleCopySmartLink(),
+      onClick: () => {
+        handleCopySmartLink();
+      },
     },
     {
       type: 'action',
@@ -238,6 +240,10 @@ export function ReleaseSidebar({
     [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]
   );
 
+  const artworkAlt = release?.title
+    ? `${release.title} artwork`
+    : 'Release artwork';
+
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -273,11 +279,7 @@ export function ReleaseSidebar({
                 {canUploadArtwork && handleArtworkUpload ? (
                   <AvatarUploadable
                     src={release.artworkUrl}
-                    alt={
-                      release.title
-                        ? `${release.title} artwork`
-                        : 'Release artwork'
-                    }
+                    alt={artworkAlt}
                     name={release.title}
                     size='lg'
                     rounded='md'
@@ -290,11 +292,7 @@ export function ReleaseSidebar({
                     {release.artworkUrl ? (
                       <Image
                         src={release.artworkUrl}
-                        alt={
-                          release.title
-                            ? `${release.title} artwork`
-                            : 'Release artwork'
-                        }
+                        alt={artworkAlt}
                         fill
                         className='object-cover'
                         sizes='64px'
