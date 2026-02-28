@@ -28,8 +28,7 @@ const EXPECTED_PROFILE_ACTION_ERRORS = new Set([
 
 function isExpectedProfileActionError(error: unknown): boolean {
   return (
-    error instanceof TypeError &&
-    EXPECTED_PROFILE_ACTION_ERRORS.has(error.message)
+    error instanceof Error && EXPECTED_PROFILE_ACTION_ERRORS.has(error.message)
   );
 }
 
