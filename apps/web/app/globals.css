@@ -215,15 +215,15 @@ body {
 @layer components {
   /* Focus ring utilities */
   .focus-ring {
-    @apply focus-visible: outline-none focus-visible: ring-2 focus-visible: ring-offset-2 focus-visible: ring-gray-500/50 dark: focus-visible: ring-white/40 dark: focus-visible: ring-offset-gray-900;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
   }
   .focus-ring-transparent-offset {
-    @apply focus-visible: outline-none focus-visible: ring-2 focus-visible: ring-offset-transparent focus-visible: ring-gray-500/50 dark: focus-visible: ring-white/40;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
   }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg text-[13px] font-medium transition-colors duration-normal disabled: opacity-50 disabled: pointer-events-none;
-    @apply focus-visible: outline-none focus-visible: ring-2 focus-visible: ring-offset-2 focus-visible: ring-gray-500/50 dark: focus-visible: ring-white/40 dark: focus-visible: ring-offset-gray-900;
+    @apply inline-flex items-center justify-center rounded-lg text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
   }
   .btn-primary {
     background-color: var(--color-btn-primary-bg);
@@ -390,7 +390,7 @@ body {
     font-variation-settings: "opsz" 28;
     letter-spacing: -0.011em;
     line-height: 1.6;
-    @apply text-base sm: text-lg;
+    @apply text-base sm:text-lg;
   }
   .marketing-card {
     @apply relative p-6 rounded-2xl border transition-colors;
@@ -582,7 +582,7 @@ body {
     background-color: var(--color-interactive-active);
   }
   .focus-ring-themed {
-    @apply focus-visible: outline-none focus-visible: ring-2 focus-visible: ring-offset-2;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
     --tw-ring-color: var(--color-focus-ring);
   }
 }
@@ -625,22 +625,22 @@ body {
     @apply font-semibold tracking-tight;
   }
   h1 {
-    @apply text-4xl lg: text-5xl;
+    @apply text-4xl lg:text-5xl;
   }
   h2 {
-    @apply text-3xl lg: text-4xl;
+    @apply text-3xl lg:text-4xl;
   }
   h3 {
-    @apply text-2xl lg: text-3xl;
+    @apply text-2xl lg:text-3xl;
   }
   h4 {
-    @apply text-xl lg: text-2xl;
+    @apply text-xl lg:text-2xl;
   }
   h5 {
-    @apply text-lg lg: text-xl;
+    @apply text-lg lg:text-xl;
   }
   h6 {
-    @apply text-base lg: text-lg;
+    @apply text-base lg:text-lg;
   }
 }
 
@@ -752,14 +752,14 @@ body {
   }
   /* Micro-animations */
   .card-hover {
-    @apply transform transition-all duration-200 ease-out hover: -translate-y-1 hover: shadow-lg hover: shadow-gray-200/25 dark: hover: shadow-gray-900/25;
+    @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
   }
   .input-focus-glow {
-    @apply focus-visible: outline-none focus-visible: ring-2 focus-visible: ring-offset-1 focus-visible: shadow-lg transition-all duration-200;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
     --tw-ring-color: var(--color-accent);
   }
   .btn-press {
-    @apply transform transition-transform duration-100 ease-out active: scale-95;
+    @apply transform transition-transform duration-100 ease-out active:scale-95;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
