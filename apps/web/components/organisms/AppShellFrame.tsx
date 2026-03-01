@@ -48,7 +48,7 @@ export function AppShellFrame({
                 'flex-1 min-h-0 min-w-0',
                 isTableRoute
                   ? 'overflow-hidden overflow-x-auto'
-                  : 'overflow-y-auto overflow-x-hidden p-4 sm:p-6',
+                  : 'overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6',
                 contentClassName
               )}
             >

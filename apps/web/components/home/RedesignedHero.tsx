@@ -57,7 +57,7 @@ export function RedesignedHero() {
         </div>
 
         {/* Product Shot */}
-        <div className='relative w-full max-w-[1024px] mt-12 lg:mt-16 text-left pointer-events-none'>
+        <div className='relative w-full max-w-[1024px] mt-8 sm:mt-12 lg:mt-16 text-left pointer-events-none'>
           <div
             className='relative w-full overflow-hidden rounded-t-xl lg:rounded-t-2xl border-t border-l border-r border-[var(--linear-border-subtle)]'
             style={{
@@ -71,7 +71,7 @@ export function RedesignedHero() {
           >
             {/* Interactive Demo (Edge-to-edge UI) */}
             <div className='bg-[var(--linear-bg-surface-0)]'>
-              <DemoReleasesExperience containerClassName='h-[480px] lg:h-[580px] overflow-hidden border-none m-0 bg-transparent' />
+              <DemoReleasesExperience containerClassName='h-[320px] sm:h-[480px] lg:h-[580px] overflow-hidden border-none m-0 bg-transparent' />
             </div>
 
             {/* Bottom gradient fade */}

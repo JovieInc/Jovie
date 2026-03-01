@@ -33,8 +33,8 @@ export function DashboardHeader({
   return (
     <header data-testid='dashboard-header' className={cn('z-20', className)}>
       {/* Mobile: Large page title with action buttons + profile */}
-      <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
-        <h1 className='text-[22px] font-bold tracking-[-0.02em] text-primary-token leading-tight'>
+      <div className='flex items-center justify-between px-3 pt-3 pb-2 sm:hidden gap-2'>
+        <h1 className='text-xl font-bold tracking-[-0.02em] text-primary-token leading-tight min-w-0 truncate'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>

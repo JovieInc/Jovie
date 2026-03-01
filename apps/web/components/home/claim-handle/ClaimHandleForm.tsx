@@ -134,16 +134,15 @@ export function ClaimHandleForm({
       {/* Input row — matches HeroSpotifySearch layout */}
       <div
         className={cn(
-          'flex w-full items-center gap-3 rounded-[20px] border p-2',
+          'flex w-full flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-[20px] border p-2',
           'transition-all duration-300',
           'border-(--linear-border-default) bg-(--linear-bg-surface-0) shadow-[inset_0_1px_3px_rgba(0,0,0,0.15),0_0_0_1px_var(--linear-border-subtle)]',
           'focus-within:border-(--linear-text-primary) focus-within:shadow-[0_0_0_1px_var(--linear-text-primary)]',
           available === true &&
             'border-(--linear-success) focus-within:border-(--linear-success) focus-within:shadow-[0_0_0_1px_var(--linear-success)]'
         )}
-        style={{ minHeight: 64 }}
       >
-        <div className='flex items-center flex-1 min-w-0 px-4 gap-2'>
+        <div className='flex items-center flex-1 min-w-0 px-4 sm:px-4 gap-2'>
           <span
             className='shrink-0 select-none'
             style={{
@@ -188,7 +187,7 @@ export function ClaimHandleForm({
         <button
           type='submit'
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[14px] px-6 text-[15px] font-medium transition-all duration-300 focus-ring-themed',
+            'group w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[14px] px-6 text-[15px] font-medium transition-all duration-300 focus-ring-themed',
             navigating || checkingAvail
               ? 'bg-surface-2 text-tertiary-token cursor-not-allowed'
               : 'bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] shadow-[0_2px_10px_rgba(255,255,255,0.15)] hover:scale-[1.02] hover:shadow-[0_4px_20px_rgba(255,255,255,0.25)]'

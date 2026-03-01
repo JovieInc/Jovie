@@ -43,7 +43,7 @@ export function AutomaticReleaseSmartlinksSection() {
           </div>
 
           {/* Full Width Product Mockup */}
-          <div className='relative mt-16 md:mt-24 mx-auto w-full'>
+          <div className='relative mt-10 md:mt-24 mx-auto w-full'>
             <div className='relative w-full'>
               {/* Left panel — Dashboard Window */}
               <div
@@ -69,9 +69,11 @@ export function AutomaticReleaseSmartlinksSection() {
                   </div>
                 </div>
 
-                <div className='grid md:grid-cols-[1fr_1.1fr]'>
-                  {/* Left panel — Activity thread */}
-                  <ActivityThread />
+                <div className='grid grid-cols-1 md:grid-cols-[1fr_1.1fr]'>
+                  {/* Left panel — Activity thread (hidden on mobile to keep section compact) */}
+                  <div className='hidden md:block'>
+                    <ActivityThread />
+                  </div>
 
                   {/* Right panel — Release kanban */}
                   <ReleaseKanban />
@@ -301,7 +303,7 @@ function ReleaseKanban() {
       </div>
 
       {/* Columns */}
-      <div className='grid grid-cols-3 gap-px p-3'>
+      <div className='grid grid-cols-3 gap-px p-2 sm:p-3'>
         {SMARTLINK_KANBAN_COLUMNS.map(column => (
           <div key={column.title} className='flex flex-col gap-2 px-1.5'>
             {/* Column header */}
@@ -339,11 +341,11 @@ function ReleaseKanban() {
               >
                 {/* Artwork */}
                 <div
-                  className='h-16 w-full'
+                  className='h-10 sm:h-16 w-full'
                   style={{ background: card.gradient }}
                 />
 
-                <div className='space-y-1.5 px-2.5 py-2'>
+                <div className='space-y-1 sm:space-y-1.5 px-1.5 sm:px-2.5 py-1.5 sm:py-2'>
                   <p
                     className='truncate'
                     style={{

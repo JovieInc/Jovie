@@ -98,17 +98,17 @@ export function SeeItInActionCarousel({ creators }: Props) {
         </h2>
       </div>
 
-      <div className='relative mt-12'>
+      <div className='relative mt-8 sm:mt-12'>
         {/* Fade edges for premium feel */}
         <div
-          className='absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
+          className='absolute left-0 top-0 bottom-0 w-8 sm:w-24 z-10 pointer-events-none'
           style={{
             background:
               'linear-gradient(to right, var(--linear-bg-page), transparent)',
           }}
         />
         <div
-          className='absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
+          className='absolute right-0 top-0 bottom-0 w-8 sm:w-24 z-10 pointer-events-none'
           style={{
             background:
               'linear-gradient(to left, var(--linear-bg-page), transparent)',
@@ -130,12 +130,12 @@ export function SeeItInActionCarousel({ creators }: Props) {
               key={`${creator.id}-${index}`}
               className='relative flex flex-col gap-3 group'
             >
-              <div className='relative w-[180px] h-[240px] shrink-0 overflow-hidden rounded-[var(--linear-radius-lg)]'>
+              <div className='relative w-[140px] h-[187px] sm:w-[180px] sm:h-[240px] shrink-0 overflow-hidden rounded-[var(--linear-radius-lg)]'>
                 <Image
                   src={creator.src}
                   alt={`${creator.name}'s avatar`}
                   fill
-                  sizes='180px'
+                  sizes='(max-width: 640px) 140px, 180px'
                   placeholder='blur'
                   blurDataURL={BLUR_DATA_URL}
                   loading={index < 12 ? 'eager' : 'lazy'}
@@ -145,7 +145,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
                 <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80' />
 
                 {/* Profile info overlay */}
-                <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-1'>
+                <div className='absolute bottom-0 left-0 w-full p-3 sm:p-4 flex flex-col gap-1'>
                   <span className='text-[var(--linear-text-inverse)] font-[var(--linear-font-weight-medium)] text-[var(--linear-body-size)] truncate drop-shadow-md'>
                     {creator.name}
                   </span>
