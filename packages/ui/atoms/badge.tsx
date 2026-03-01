@@ -15,7 +15,8 @@ const badgeVariants = cva(
           'border-success/20 bg-success-subtle text-success dark:text-success-foreground',
         warning:
           'border-warning/20 bg-warning-subtle text-warning dark:text-warning-foreground',
-        error: 'border-error/20 bg-error-subtle text-error dark:text-error-foreground',
+        error:
+          'border-error/20 bg-error-subtle text-error dark:text-error-foreground',
       },
       size: {
         sm: 'px-1.5 py-0 text-[10px] leading-[18px]',

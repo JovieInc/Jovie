@@ -19,8 +19,10 @@ const inputVariants = cva(
     variants: {
       variant: {
         default: '',
-        error: 'border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
-        success: 'border-success focus-visible:ring-success focus-visible:border-success',
+        error:
+          'border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
+        success:
+          'border-success focus-visible:ring-success focus-visible:border-success',
       },
       inputSize: {
         sm: 'h-7 px-2 py-1 text-xs',
