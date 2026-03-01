@@ -27,10 +27,13 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description:
-    'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
+    'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
   keywords: [
+    'Jovie',
+    'link in bio for musicians',
     'artist profile',
     'music artist',
+    'smart links',
     'spotify',
     'social media',
     'music promotion',
@@ -60,7 +63,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     title: APP_NAME,
     description:
-      'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
+      'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
     siteName: APP_NAME,
     images: [
       {
@@ -75,9 +78,10 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: APP_NAME,
     description:
-      'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
+      'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
     images: [`${APP_URL}/og/default.png`],
-    creator: '@jovie',
+    creator: '@jovieapp',
+    site: '@jovieapp',
   },
   robots: {
     index: true,
@@ -215,7 +219,31 @@ export default async function RootLayout({
         crossOrigin='anonymous'
       />
 
-      {/* Structured Data for Organization */}
+      {/* Structured Data: WebSite + Organization (global, all pages) */}
+      <Script
+        id='website-schema'
+        type='application/ld+json'
+        strategy='afterInteractive'
+        suppressHydrationWarning
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: APP_NAME,
+            alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
+            url: APP_URL,
+            description:
+              'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+            inLanguage: 'en-US',
+            publisher: {
+              '@type': 'Organization',
+              name: APP_NAME,
+              url: APP_URL,
+            },
+          }),
+        }}
+      />
       <Script
         id='organization-schema'
         type='application/ld+json'
@@ -227,13 +255,14 @@ export default async function RootLayout({
             '@context': 'https://schema.org',
             '@type': 'Organization',
             name: APP_NAME,
+            legalName: 'Jovie Technology Inc.',
             url: APP_URL,
             logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
             description:
-              'Artist profiles for music artists. Connect your music, social media, and merch in one place.',
+              'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
             sameAs: [
-              'https://twitter.com/jovie',
-              'https://instagram.com/jovie',
+              'https://x.com/jovieapp',
+              'https://instagram.com/jovieapp',
             ],
           }),
         }}

@@ -610,7 +610,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     genres && genres.length > 0
       ? `. ${genres.slice(0, 3).join(', ')} artist`
       : '';
-  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more.`;
+  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more on Jovie.`;
 
   // Build dynamic keywords based on artist data
   const baseKeywords = [
