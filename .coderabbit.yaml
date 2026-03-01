@@ -6,7 +6,7 @@ early_access: true
 
 reviews:
   profile: assertive
-  request_changes_workflow: true
+  request_changes_workflow: false
   high_level_summary: true
   collapse_walkthrough: true
 
@@ -205,6 +205,7 @@ code_generation:
           Include edge cases and error scenarios.
           Never use db.transaction() — the Neon HTTP driver doesn't support it.
           For database code, mock with vi.mock('@/lib/db') — never hit a real database.
+          CRITICAL: All string assertions must be extracted from the actual source code. Never infer or guess user-facing text. Read the source file and copy the exact strings used in the code.
 
       - path: "apps/web/components/**/*.tsx"
         instructions: |
