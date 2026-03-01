@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import { clickEvents } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   buildProviderCandidates,
@@ -94,6 +95,11 @@ async function logClickEvent(options: {
     });
   } catch (error) {
     console.error('[ListenRoute] Failed to log click event', error);
+    captureError('ListenRoute click event insert failed', error, {
+      route: 'listen',
+      creatorProfileId: options.creatorProfileId,
+      providerKey: options.providerKey,
+    });
   }
 }
 
@@ -171,11 +177,20 @@ export async function GET(
       linkId: provider.linkId,
       request,
       isBot: botResult.isBot,
-    }).catch(console.error);
+    }).catch(err => {
+      captureError('ListenRoute click logging failed', err, {
+        route: 'listen',
+        username: normalizedUsername,
+        code: normalizedCode,
+      });
+    });
 
     return response;
   } catch (error) {
     console.error('[ListenRoute] Unexpected error', error);
+    captureError('ListenRoute unexpected error', error, {
+      route: 'listen',
+    });
     const response = new NextResponse('Internal Server Error', { status: 500 });
     applySecurityHeaders(response, false);
     return response;

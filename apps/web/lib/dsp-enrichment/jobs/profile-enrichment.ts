@@ -21,6 +21,7 @@ import {
   creatorAvatarCandidates,
   creatorProfiles,
 } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 import {
@@ -404,25 +405,49 @@ async function fetchDspDataInParallel(
 
   if (providers.includes('spotify') && profile.spotifyId) {
     fetchPromises.push(
-      fetchSpotifyData(profile.spotifyId).then(data => {
-        if (data) dspData.push(data);
-      })
+      fetchSpotifyData(profile.spotifyId)
+        .then(data => {
+          if (data) dspData.push(data);
+        })
+        .catch(err => {
+          captureError('DSP enrichment fetch failed', err, {
+            route: 'dsp-enrichment',
+            provider: 'spotify',
+            externalId: profile.spotifyId,
+          });
+        })
     );
   }
 
   if (providers.includes('apple_music') && profile.appleMusicId) {
     fetchPromises.push(
-      fetchAppleMusicData(profile.appleMusicId).then(data => {
-        if (data) dspData.push(data);
-      })
+      fetchAppleMusicData(profile.appleMusicId)
+        .then(data => {
+          if (data) dspData.push(data);
+        })
+        .catch(err => {
+          captureError('DSP enrichment fetch failed', err, {
+            route: 'dsp-enrichment',
+            provider: 'apple_music',
+            externalId: profile.appleMusicId,
+          });
+        })
     );
   }
 
   if (providers.includes('deezer') && profile.deezerId) {
     fetchPromises.push(
-      fetchDeezerData(profile.deezerId).then(data => {
-        if (data) dspData.push(data);
-      })
+      fetchDeezerData(profile.deezerId)
+        .then(data => {
+          if (data) dspData.push(data);
+        })
+        .catch(err => {
+          captureError('DSP enrichment fetch failed', err, {
+            route: 'dsp-enrichment',
+            provider: 'deezer',
+            externalId: profile.deezerId,
+          });
+        })
     );
   }
 
