@@ -164,12 +164,12 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-[13px] font-normal leading-[20px] outline-none ' +
-  'transition-colors duration-normal ease-interactive ' +
-  'text-secondary-token hover:bg-interactive-hover hover:text-primary-token ' +
-  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1.5 text-[13px] font-medium leading-[20px] outline-none ' +
+  'transition-colors duration-fast ease-interactive ' +
+  'text-secondary-token hover:bg-surface-0 hover:text-primary-token ' +
+  'data-highlighted:bg-surface-0 data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
-  'focus-visible:outline-none focus-visible:bg-interactive-hover ' +
+  'focus-visible:outline-none focus-visible:bg-surface-0 ' +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
   'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
 
@@ -186,22 +186,22 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
-  'transition-colors duration-normal ease-interactive ' +
-  'text-secondary-token hover:bg-interactive-hover hover:text-primary-token ' +
-  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
+  'relative flex cursor-default select-none items-center rounded-[var(--radius-sm)] py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
+  'transition-colors duration-fast ease-interactive ' +
+  'text-secondary-token hover:bg-surface-0 hover:text-primary-token ' +
+  'data-highlighted:bg-surface-0 data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
-  'focus-visible:outline-none focus-visible:bg-interactive-hover';
+  'focus-visible:outline-none focus-visible:bg-surface-0';
 
 /**
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
-  'transition-colors duration-normal ease-interactive ' +
+  'relative flex w-full cursor-default select-none items-center rounded-[var(--radius-sm)] py-1.5 pl-8 pr-2 text-[13px] font-medium leading-[20px] outline-none ' +
+  'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
-  'focus-visible:bg-interactive-hover focus-visible:text-primary-token ' +
-  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
+  'focus-visible:bg-surface-0 focus-visible:text-primary-token ' +
+  'data-highlighted:bg-surface-0 data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50';
 
 // ============================================================================
@@ -212,13 +212,13 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1 text-[12.5px] font-normal leading-[16px] outline-none ' +
-  'transition-colors duration-normal ease-interactive ' +
-  'text-secondary-token hover:bg-interactive-hover hover:text-primary-token ' +
-  'data-highlighted:bg-interactive-hover data-highlighted:text-primary-token ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-[var(--radius-sm)] px-2 py-1 text-[12px] font-medium leading-[16px] outline-none ' +
+  'transition-colors duration-fast ease-interactive ' +
+  'text-secondary-token hover:bg-surface-0 hover:text-primary-token ' +
+  'data-highlighted:bg-surface-0 data-highlighted:text-primary-token ' +
   'data-disabled:pointer-events-none data-disabled:opacity-50 ' +
-  'focus-visible:outline-none focus-visible:bg-interactive-hover ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
+  'focus-visible:outline-none focus-visible:bg-surface-0 ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
   'hover:[&_svg]:text-secondary-token data-highlighted:[&_svg]:text-secondary-token';
 
 /**
@@ -257,11 +257,12 @@ export const MENU_SHORTCUT_BASE =
  * Select trigger button styles
  */
 export const SELECT_TRIGGER_BASE =
-  'flex h-10 w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3 py-2 ' +
-  'text-sm text-primary-token ' +
+  'flex h-10 w-full items-center justify-between rounded-[var(--radius-md)] border border-default bg-surface-input px-3.5 py-2 ' +
+  'text-[13px] text-primary-token ' +
   'placeholder:text-tertiary-token ' +
-  'focus-visible:outline-none focus-visible:border-interactive ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:border-focus ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
+  'transition-all duration-normal ease-interactive ' +
   '[&>span]:line-clamp-1';
 
 // ============================================================================
@@ -286,7 +287,7 @@ export const subMenuContentClasses = [
  * Compact base — same surface/border/animation but tighter padding
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-lg border border-subtle bg-surface-0 dark:bg-surface-2 p-0.5 text-primary-token';
+  'z-50 min-w-[10.5rem] overflow-hidden rounded-[var(--radius-md)] border border-subtle bg-surface-1 p-1 text-primary-token';
 
 /**
  * Complete compact DropdownMenu content classes

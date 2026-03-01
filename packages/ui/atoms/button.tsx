@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-[var(--radius-default)] text-[13px] font-medium transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center rounded-[var(--radius-md)] text-[13px] font-medium transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-[transform,colors]',
   {
     variants: {
       variant: {
@@ -14,9 +14,9 @@ const buttonVariants = cva(
         primary:
           'bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:bg-btn-primary/90',
         accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
-        secondary: 'bg-surface-1 text-primary-token hover:bg-surface-2',
-        ghost: 'hover:bg-interactive-hover',
-        outline: 'border border-border bg-transparent hover:bg-surface-1',
+        secondary: 'bg-btn-secondary text-btn-secondary-foreground hover:bg-btn-secondary-hover',
+        ghost: 'hover:bg-interactive-hover active:bg-interactive-active text-secondary-token hover:text-primary-token',
+        outline: 'border border-default bg-transparent hover:bg-surface-hover active:bg-interactive-active',
         // Destructive variant
         destructive:
           'bg-destructive text-destructive-foreground hover:bg-destructive/90',

@@ -84,7 +84,7 @@ const AlertDialogHeader = ({
   ...props
 }: AlertDialogHeaderProps) => (
   <div
-    className={cn(headerStyles.base, 'space-y-2', className)}
+    className={cn(headerStyles.base, className)}
     data-testid={testId}
     {...props}
   />

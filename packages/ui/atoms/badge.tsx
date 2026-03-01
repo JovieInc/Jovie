@@ -12,15 +12,15 @@ const badgeVariants = cva(
         secondary:
           'bg-[var(--color-badge-bg)] text-[var(--color-badge-text)] border-[var(--color-badge-border)]',
         success:
-          'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-200',
+          'border-success/20 bg-success-subtle text-success dark:text-success-foreground',
         warning:
-          'border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-200',
-        error: 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-200',
+          'border-warning/20 bg-warning-subtle text-warning dark:text-warning-foreground',
+        error: 'border-error/20 bg-error-subtle text-error dark:text-error-foreground',
       },
       size: {
-        sm: 'px-2 py-0 text-[10px] leading-[20px]',
+        sm: 'px-1.5 py-0 text-[10px] leading-[18px]',
         md: 'px-2 py-0 text-[11px] leading-[20px]',
-        lg: 'px-3 py-0.5 text-xs',
+        lg: 'px-2.5 py-0.5 text-xs',
       },
     },
     defaultVariants: {
