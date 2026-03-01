@@ -308,9 +308,10 @@ export async function saveProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
 
-    // Invalidate cache and revalidate path
+    // Invalidate cache tag so next server fetch returns fresh data
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath(APP_ROUTES.RELEASES);
+    // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+    // Query, and a path revalidation resets client-side state (closing the sidebar).
 
     return mapReleaseToViewModel(
       release,
@@ -370,9 +371,10 @@ export async function resetProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
 
-    // Invalidate cache and revalidate path
+    // Invalidate cache tag so next server fetch returns fresh data
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath(APP_ROUTES.RELEASES);
+    // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+    // Query, and a path revalidation resets client-side state (closing the sidebar).
 
     return mapReleaseToViewModel(
       release,
@@ -431,7 +433,8 @@ export async function saveReleaseLyrics(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapReleaseToViewModel(
     updated,
@@ -492,7 +495,8 @@ export async function saveCanvasStatus(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapReleaseToViewModel(
     updated,
@@ -668,9 +672,10 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
 
   const providerLabels = buildProviderLabels();
 
-  // Invalidate cache
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   void trackServerEvent('release_isrc_rescan', {
     profileId: profile.id,
@@ -1402,9 +1407,10 @@ export async function uploadReleaseArtwork(
 
   const result = await response.json();
 
-  // Invalidate cache
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Skip revalidatePath — the client handles cache updates via onReleaseChange,
+  // and a path revalidation resets client-side state (closing the sidebar).
 
   return {
     artworkUrl: result.artworkUrl,
@@ -1504,7 +1510,8 @@ export async function revertReleaseArtwork(
     .where(eq(discogReleases.id, releaseId));
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Skip revalidatePath — the client handles cache updates via onReleaseChange,
+  // and a path revalidation resets client-side state (closing the sidebar).
 
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
