@@ -41,8 +41,8 @@ export function ArtistInfo({
   const avatarSizeMap = {
     sm: { mobile: 'display-sm', desktop: 'display-sm' },
     md: { mobile: 'display-md', desktop: 'display-lg' },
-    lg: { mobile: 'display-lg', desktop: 'display-xl' },
-    xl: { mobile: 'display-xl', desktop: 'display-2xl' },
+    lg: { mobile: 'display-md', desktop: 'display-xl' },
+    xl: { mobile: 'display-lg', desktop: 'display-2xl' },
   } as const;
 
   const { mobile: mobileSize, desktop: desktopSize } =
@@ -78,7 +78,7 @@ export function ArtistInfo({
 
   return (
     <div
-      className={`flex flex-col items-center space-y-3 sm:space-y-4 text-center ${className}`}
+      className={`flex flex-col items-center space-y-2.5 sm:space-y-3 text-center ${className}`}
     >
       <ProfilePhotoContextMenu
         name={artist.name}

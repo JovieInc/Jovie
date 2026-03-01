@@ -208,7 +208,7 @@ function renderContent({
     case 'subscribe':
       // Subscribe mode - show notification subscription form directly
       return (
-        <div className='space-y-4 py-4 sm:py-5'>
+        <div className='space-y-3 py-2 sm:py-3'>
           {subscribeTwoStep ? (
             <TwoStepNotificationsCTA artist={artist} />
           ) : (
@@ -275,7 +275,7 @@ export function StaticArtistPage({
             <SubscriptionConfirmedBanner />
           </Suspense>
           {mode === 'profile' ? (
-            <div className='space-y-4'>
+            <div className='space-y-3'>
               {latestRelease && (
                 <LatestReleaseCard
                   release={latestRelease}
