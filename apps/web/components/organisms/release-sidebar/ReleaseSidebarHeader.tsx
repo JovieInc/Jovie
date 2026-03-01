@@ -36,10 +36,13 @@ export function ReleaseSidebarHeader({
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isIdCopied, setIsIdCopied] = useState(false);
+  const idCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
     };
   }, []);
 
@@ -49,6 +52,25 @@ export function ReleaseSidebarHeader({
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [onCopySmartLink]);
+
+  const handleCopyReleaseId = useCallback(() => {
+    const releaseId = release?.id ?? '';
+    if (!releaseId) {
+      alert('No release ID available to copy.');
+      return;
+    }
+
+    navigator.clipboard
+      ?.writeText(releaseId)
+      .then(() => {
+        setIsIdCopied(true);
+        if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+        idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
+      })
+      .catch(() => {
+        alert('Failed to copy the release ID. Your browser may not allow clipboard access.');
+      });
+  }, [release]);
 
   const overflowActions: DrawerHeaderAction[] = [];
 
@@ -96,13 +118,11 @@ export function ReleaseSidebarHeader({
   if (hasRelease && release?.id) {
     overflowActions.push({
       id: 'copy-id',
-      label: 'Copy release ID',
+      label: isIdCopied ? 'Copied!' : 'Copy release ID',
       icon: Hash,
-      onClick: () => {
-        navigator.clipboard?.writeText(release?.id ?? '').catch(() => {
-          // Silently fail - clipboard may not be available
-        });
-      },
+      activeIcon: Check,
+      isActive: isIdCopied,
+      onClick: handleCopyReleaseId,
     });
   }
 

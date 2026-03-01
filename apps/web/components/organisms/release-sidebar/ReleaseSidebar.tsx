@@ -251,8 +251,9 @@ export function ReleaseSidebar({
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
+      data-testid='release-sidebar'
     >
-      <div data-testid='release-sidebar' className='flex h-full flex-col'>
+      <div className='flex h-full flex-col'>
         <ReleaseSidebarHeader
           release={release}
           hasRelease={hasRelease}
@@ -271,7 +272,7 @@ export function ReleaseSidebar({
               <AlbumArtworkContextMenu
                 title={release.title}
                 sizes={buildArtworkSizes(undefined, release.artworkUrl)}
-                allowDownloads={isEditable}
+                allowDownloads={allowDownloads}
                 releaseId={release.id}
                 canRevert={canRevertArtwork}
                 onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
