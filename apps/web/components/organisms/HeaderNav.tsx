@@ -37,11 +37,14 @@ export function HeaderNav({
   return (
     <header
       data-testid='header-nav'
-      className={cn('fixed top-0 left-0 right-0 w-full', className)}
+      className={cn(
+        'fixed top-0 left-0 right-0 w-full border-b transition-colors duration-200',
+        className
+      )}
       style={{
         fontSynthesisWeight: 'none',
-        borderStyle: 'none none solid',
-        borderColor: `var(--linear-text-primary) var(--linear-text-primary) var(--linear-border-subtle)`,
+        borderColor: 'var(--linear-border-subtle)',
+        backgroundColor: 'var(--linear-bg-header)',
         zIndex: 100,
         backdropFilter: `blur(var(--linear-blur-header))`,
         WebkitBackdropFilter: `blur(var(--linear-blur-header))`,
@@ -54,7 +57,7 @@ export function HeaderNav({
     >
       {/* Linear-style full-width content container */}
       <nav
-        className='flex items-center h-[72px] w-full px-5 sm:px-6 lg:px-[77px]'
+        className='flex items-center h-[56px] w-full px-5 sm:px-6 lg:px-[77px]'
         aria-label='Primary navigation'
       >
         {/* Logo section - left aligned with Linear padding */}

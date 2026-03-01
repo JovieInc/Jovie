@@ -29,11 +29,8 @@ export default function AdminCampaignsPage() {
   return (
     <PageShell>
       <PageContent className='mx-auto max-w-4xl'>
-        <div className='mb-8'>
-          <h1 className='text-2xl font-bold text-primary-token'>
-            Invite Campaigns
-          </h1>
-          <p className='mt-2 text-sm text-secondary-token'>
+        <div className='mb-6'>
+          <p className='text-sm text-secondary-token'>
             Send claim invites to unclaimed creator profiles. Emails are
             throttled and randomized to avoid spam filters.
           </p>

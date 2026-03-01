@@ -9,7 +9,11 @@ import { DemoSettingsPanel } from './DemoSettingsPanel';
 import { DemoShell } from './DemoShell';
 import { useDemoState } from './use-demo-state';
 
-export function DemoReleasesExperience() {
+export function DemoReleasesExperience({
+  containerClassName,
+}: {
+  readonly containerClassName?: string;
+} = {}) {
   const {
     activeTab,
     switchTab,
@@ -40,6 +44,7 @@ export function DemoReleasesExperience() {
       activeTab={activeTab}
       onTabChange={switchTab}
       rightPanel={rightPanel}
+      containerClassName={containerClassName}
     >
       {activeTab === 'releases' && (
         <DemoReleasesPanel

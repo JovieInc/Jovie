@@ -15,7 +15,6 @@ import { Icon } from '@/components/atoms/Icon';
 import {
   ACTION_BAR_BUTTON_CLASS,
   ActionBar,
-  ActionBarItem,
   ExportCSVButton,
 } from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
@@ -327,20 +326,21 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
       <ActionBar className='hidden md:flex'>
         {onSearchToggle && (
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={onSearchToggle}
-            className={cn(
-              ACTION_BAR_BUTTON_CLASS,
-              isSearchOpen && 'bg-interactive-active text-primary-token'
-            )}
-            aria-label={isSearchOpen ? 'Close search' : 'Search releases'}
-            aria-pressed={isSearchOpen}
-          >
-            <Icon name='Search' className='h-3.5 w-3.5' />
-            Search
-          </Button>
+          <TooltipShortcut label='Search' side='bottom'>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={onSearchToggle}
+              className={cn(
+                ACTION_BAR_BUTTON_CLASS,
+                isSearchOpen && 'bg-interactive-active text-primary-token'
+              )}
+              aria-pressed={isSearchOpen}
+            >
+              <Icon name='Search' className='h-3.5 w-3.5' />
+              Search
+            </Button>
+          </TooltipShortcut>
         )}
         <ReleaseFilterDropdown
           filters={filters}
@@ -359,17 +359,16 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onReleaseViewChange={onReleaseViewChange}
           triggerClassName={ACTION_BAR_BUTTON_CLASS}
         />
-        <ActionBarItem tooltipLabel='Export'>
-          <ExportCSVButton
-            getData={() => getReleasesForExport(releases, selectedIds)}
-            columns={RELEASES_CSV_COLUMNS}
-            filename='releases'
-            label='Export'
-            variant='ghost'
-            size='sm'
-            className={ACTION_BAR_BUTTON_CLASS}
-          />
-        </ActionBarItem>
+        <ExportCSVButton
+          getData={() => getReleasesForExport(releases, selectedIds)}
+          columns={RELEASES_CSV_COLUMNS}
+          filename='releases'
+          label='Export'
+          variant='ghost'
+          size='sm'
+          className={ACTION_BAR_BUTTON_CLASS}
+          tooltipLabel='Export'
+        />
       </ActionBar>
     </div>
   );

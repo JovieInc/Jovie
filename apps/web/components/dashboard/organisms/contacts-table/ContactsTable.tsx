@@ -221,7 +221,7 @@ export const ContactsTable = memo(function ContactsTable({
         {/* Footer - contact count */}
         {!isEmpty && (
           <div className='shrink-0 flex items-center border-t border-subtle px-4 py-1.5'>
-            <span className='text-xs text-tertiary-token tabular-nums'>
+            <span className='text-[13px] text-tertiary-token tabular-nums'>
               {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
             </span>
           </div>

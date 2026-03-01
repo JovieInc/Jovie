@@ -34,6 +34,7 @@ interface DemoShellProps {
   readonly onTabChange: (tab: DemoTab) => void;
   readonly children: ReactNode;
   readonly rightPanel?: ReactNode;
+  readonly containerClassName?: string;
 }
 
 const TAB_LABEL: Record<DemoTab, string> = {
@@ -58,6 +59,7 @@ export function DemoShell({
   onTabChange,
   children,
   rightPanel,
+  containerClassName,
 }: Readonly<DemoShellProps>) {
   return (
     <SidebarProvider
@@ -65,6 +67,7 @@ export function DemoShell({
       style={{ '--sidebar-width': '244px' } as React.CSSProperties}
     >
       <AppShellFrame
+        containerClassName={containerClassName}
         sidebar={
           <Sidebar collapsible='none'>
             <SidebarHeader className='px-2 pt-2 pb-0 h-9 justify-center'>

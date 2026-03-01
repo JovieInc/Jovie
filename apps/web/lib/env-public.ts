@@ -69,6 +69,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_SENTRY_DSN() {
     return process.env.NEXT_PUBLIC_SENTRY_DSN || undefined;
   },
+  get NEXT_PUBLIC_SENTRY_DSN_DEV() {
+    return process.env.NEXT_PUBLIC_SENTRY_DSN_DEV || undefined;
+  },
   get NEXT_PUBLIC_SENTRY_CSP_REPORT_URI() {
     return process.env.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI || undefined;
   },

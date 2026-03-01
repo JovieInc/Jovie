@@ -16,7 +16,6 @@ async function ActivityContent() {
   const items = await getAdminActivityFeed(50);
   return (
     <PageContent noPadding>
-      <h1 className='sr-only'>Activity</h1>
       <ActivityTableUnified items={items} />
     </PageContent>
   );

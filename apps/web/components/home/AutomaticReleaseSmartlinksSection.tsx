@@ -1,4 +1,5 @@
-import { Bolt, Check, Disc, Link } from 'lucide-react';
+import { Bolt, Check, Disc, Link, Music, Youtube } from 'lucide-react';
+import Image from 'next/image';
 
 import { Container } from '@/components/site/Container';
 import type { SmartlinkThreadItem } from './demo/mock-data';
@@ -7,7 +8,7 @@ import { SMARTLINK_KANBAN_COLUMNS, SMARTLINK_THREAD } from './demo/mock-data';
 export function AutomaticReleaseSmartlinksSection() {
   return (
     <section
-      className='section-spacing-linear'
+      className='section-spacing-linear overflow-hidden pb-32 md:pb-48'
       style={{ backgroundColor: 'var(--linear-bg-page)' }}
     >
       <Container size='homepage'>
@@ -57,25 +58,89 @@ export function AutomaticReleaseSmartlinksSection() {
             </div>
           </div>
 
-          {/* Two-panel product mockup */}
-          <div className='relative mt-10'>
-            <div
-              className='relative overflow-hidden rounded-2xl'
-              style={{
-                border: '1px solid var(--linear-border-subtle)',
-                backgroundColor: 'rgba(10, 14, 24, 0.9)',
-              }}
-            >
-              <div className='grid md:grid-cols-[1fr_1.1fr]'>
-                {/* Left panel — Activity thread */}
-                <ActivityThread />
+          {/* Full Width Product Mockup */}
+          <div className='relative mt-20 mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8'>
+            <div className='relative w-full'>
+              {/* Left panel — Dashboard Window */}
+              <div
+                className='relative overflow-hidden rounded-xl md:rounded-2xl md:w-[85%]'
+                style={{
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  backgroundColor: 'rgba(10, 14, 24, 0.95)',
+                  boxShadow:
+                    '0 0 0 1px rgba(0,0,0,0.5), 0 30px 60px -12px rgba(0,0,0,0.8), 0 50px 100px -20px rgba(0,0,0,0.8)',
+                }}
+              >
+                {/* Fake Mac Header */}
+                <div
+                  className='flex items-center px-5 h-12 border-b'
+                  style={{
+                    borderColor: 'rgba(255,255,255,0.06)',
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                  }}
+                >
+                  <div className='flex gap-2'>
+                    <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
+                    <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
+                    <div className='w-3 h-3 rounded-full bg-[#61C554] border border-black/10' />
+                  </div>
+                </div>
 
-                {/* Right panel — Release kanban */}
-                <ReleaseKanban />
+                <div className='grid md:grid-cols-[1fr_1.1fr]'>
+                  {/* Left panel — Activity thread */}
+                  <ActivityThread />
+
+                  {/* Right panel — Release kanban */}
+                  <ReleaseKanban />
+                </div>
+
+                {/* Bottom gradient fade */}
+                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[rgba(10,14,24,1)] to-transparent' />
               </div>
 
-              {/* Bottom gradient fade */}
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[rgba(4,7,13,0.95)] to-transparent' />
+              {/* Right panel — Floating Release Page */}
+              <div
+                className='absolute z-10 hidden md:flex flex-col right-0 bottom-[-20%]'
+                style={{
+                  width: '360px',
+                  borderRadius: '24px',
+                  backgroundColor: 'rgba(22, 23, 26, 0.75)',
+                  backdropFilter: 'blur(24px)',
+                  WebkitBackdropFilter: 'blur(24px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  boxShadow:
+                    '0 0 0 1px rgba(255,255,255,0.05), 0 40px 80px -10px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+                }}
+              >
+                <div className='p-6 flex flex-col items-center'>
+                  <div className='w-full aspect-square rounded-xl mb-6 shadow-lg relative overflow-hidden'>
+                    <div className='absolute inset-0 bg-linear-to-br from-[#1c1c1c] to-[#0a0a0a]' />
+                    <Image
+                      src='https://f4.bcbits.com/img/a0491039755_10.jpg'
+                      alt='The Deep End - Cosmic Gate & Tim White'
+                      className='absolute inset-0 w-full h-full object-cover opacity-90'
+                      fill
+                      unoptimized
+                    />
+                    <div className='absolute inset-0 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)] rounded-xl' />
+                  </div>
+
+                  <div className='w-full text-center mb-6'>
+                    <h3 className='text-white font-semibold text-2xl mb-1 tracking-tight'>
+                      The Deep End
+                    </h3>
+                    <p className='text-[var(--linear-text-tertiary)] text-[15px]'>
+                      Cosmic Gate & Tim White
+                    </p>
+                  </div>
+
+                  <div className='w-full space-y-3'>
+                    <PlatformButton platform='Spotify' icon={Disc} />
+                    <PlatformButton platform='Apple Music' icon={Music} />
+                    <PlatformButton platform='YouTube' icon={Youtube} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -90,7 +155,7 @@ function ActivityThread() {
       className='flex flex-col border-r'
       style={{
         borderColor: 'var(--linear-border-subtle)',
-        backgroundColor: 'rgba(13, 18, 28, 0.88)',
+        backgroundColor: 'transparent',
       }}
     >
       {/* Title bar */}
@@ -223,7 +288,7 @@ function getStatusBgColor(status: string): string {
 
 function ReleaseKanban() {
   return (
-    <div style={{ backgroundColor: 'rgba(13, 18, 28, 0.88)' }}>
+    <div style={{ backgroundColor: 'transparent' }}>
       {/* Title bar */}
       <div
         className='flex items-center gap-2 border-b px-5 py-3'
@@ -362,4 +427,37 @@ function ThreadIcon({
 
   const Icon = icons[type];
   return <Icon aria-hidden='true' className='h-3 w-3' style={{ color }} />;
+}
+
+function PlatformButton({
+  platform,
+  icon: IconComponent,
+}: {
+  platform: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div
+      className='w-full flex items-center justify-between p-3.5 rounded-xl transition-colors hover:bg-white/5 cursor-pointer group'
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      <div className='flex items-center gap-3.5'>
+        <div className='w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors'>
+          <IconComponent className='w-4 h-4 text-white/80' />
+        </div>
+        <span className='text-[15px] font-medium text-white tracking-tight'>
+          {platform}
+        </span>
+      </div>
+      <button
+        type='button'
+        className='px-4 py-1.5 rounded-full text-[13px] font-semibold bg-white text-black hover:bg-white/90 transition-colors'
+      >
+        Play
+      </button>
+    </div>
+  );
 }

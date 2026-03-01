@@ -27,10 +27,10 @@ export function AudienceIntentScoreCell({
   const label = intentLevel.charAt(0).toUpperCase() + intentLevel.slice(1);
 
   return (
-    <div className={cn('flex items-center gap-2 text-xs', className)}>
+    <div className={cn('flex items-center gap-2 text-[13px]', className)}>
       <span
         className={cn(
-          'inline-block size-2 shrink-0 rounded-full',
+          'inline-block size-1.5 shrink-0 rounded-full',
           INTENT_DOT_STYLES[intentLevel]
         )}
         aria-hidden='true'

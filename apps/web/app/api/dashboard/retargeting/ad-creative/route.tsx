@@ -16,32 +16,62 @@ const SIZES = {
   story: { width: 1080, height: 1920 },
 } as const;
 
-const BRAND = {
-  bg: 'radial-gradient(circle at 15% 10%, #363062 0%, #17122d 40%, #0a0715 100%)',
-  accent: '#b6a8ff',
-  secondary: '#d4cffb',
-  muted: '#9f95d9',
-  white: '#ffffff',
-  pillBg: 'rgba(182, 168, 255, 0.22)',
-  pillBorder: 'rgba(182, 168, 255, 0.4)',
+/** Color themes for ad creatives */
+const THEME = {
+  dark: {
+    bg: '#000000',
+    text: '#F5F5F7',
+    textMuted: '#86868B',
+    border: '#333336',
+    buttonBg: '#FFFFFF',
+    buttonText: '#000000',
+  },
+  light: {
+    bg: '#FFFFFF',
+    text: '#1D1D1F',
+    textMuted: '#86868B',
+    border: '#E5E5EA',
+    buttonBg: '#000000',
+    buttonText: '#FFFFFF',
+  },
 } as const;
 
+const FONT_STACK =
+  '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+/** Shared ad creative props */
+interface AdCreativeProps {
+  readonly artistName: string;
+  readonly username: string;
+  readonly avatarUrl: string | null;
+  readonly size: 'feed' | 'story';
+}
+
 /**
- * Fan retargeting ad: "Never miss a release from [Artist]"
+ * Shared layout shell for retargeting ad creatives.
+ * Renders branding, profile photo, text content, and CTA button
+ * with a consistent structure across dark/light themes.
  */
-function FanAdCreative({
-  artistName,
-  username,
-  avatarUrl,
+function AdCreativeLayout({
   size,
+  photoSize,
+  artistName,
+  avatarUrl,
+  theme,
+  textContent,
+  ctaLabel,
+  footer,
 }: {
-  artistName: string;
-  username: string;
-  avatarUrl: string | null;
   size: 'feed' | 'story';
+  photoSize: number;
+  artistName: string;
+  avatarUrl: string | null;
+  theme: (typeof THEME)['dark'] | (typeof THEME)['light'];
+  textContent: React.ReactNode;
+  ctaLabel: string;
+  footer?: React.ReactNode;
 }) {
   const isStory = size === 'story';
-  const photoSize = isStory ? 360 : 320;
 
   return (
     <div
@@ -52,137 +82,173 @@ function FanAdCreative({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: BRAND.bg,
-        color: BRAND.white,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-        padding: isStory ? '120px 80px' : '80px',
-        gap: isStory ? 56 : 40,
+        background: theme.bg,
+        color: theme.text,
+        fontFamily: FONT_STACK,
+        padding: isStory ? '120px' : '80px',
         position: 'relative',
       }}
     >
-      {/* Jovie wordmark - top right */}
+      {/* Subtle Jovie branding */}
       <div
         style={{
           position: 'absolute',
-          top: isStory ? 60 : 40,
-          right: isStory ? 60 : 40,
+          top: isStory ? 80 : 60,
           display: 'flex',
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: 600,
-          letterSpacing: -0.5,
-          color: BRAND.accent,
+          letterSpacing: '-0.02em',
+          color: theme.textMuted,
         }}
       >
         Jovie
       </div>
 
-      {/* Profile photo */}
-      <div
-        style={{
-          width: photoSize,
-          height: photoSize,
-          borderRadius: photoSize / 2,
-          border: '4px solid rgba(255,255,255,0.15)',
-          overflow: 'hidden',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(255,255,255,0.08)',
-          flexShrink: 0,
-        }}
-      >
-        {avatarUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
-          <img
-            src={avatarUrl}
-            alt=''
-            width={photoSize}
-            height={photoSize}
-            style={{ objectFit: 'cover' }}
-          />
-        ) : (
-          <div
-            style={{
-              fontSize: photoSize / 2.5,
-              fontWeight: 700,
-              color: BRAND.secondary,
-              display: 'flex',
-            }}
-          >
-            {artistName.charAt(0).toUpperCase()}
-          </div>
-        )}
-      </div>
-
-      {/* Text block */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: isStory ? 20 : 14,
-          textAlign: 'center',
+          gap: isStory ? 80 : 64,
+          marginTop: isStory ? -40 : 0,
         }}
       >
+        {/* Profile photo */}
+        <div
+          style={{
+            width: photoSize,
+            height: photoSize,
+            borderRadius: photoSize / 2,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: theme.border,
+            flexShrink: 0,
+          }}
+        >
+          {avatarUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
+            <img
+              src={avatarUrl}
+              alt=''
+              width={photoSize}
+              height={photoSize}
+              style={{ objectFit: 'cover' }}
+            />
+          ) : (
+            <div
+              style={{
+                fontSize: photoSize / 2.5,
+                fontWeight: 600,
+                color: theme.textMuted,
+                display: 'flex',
+              }}
+            >
+              {artistName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        {/* Text block */}
+        {textContent}
+
+        {/* CTA pill */}
         <div
           style={{
             display: 'flex',
-            fontSize: isStory ? 28 : 24,
-            fontWeight: 400,
-            color: BRAND.secondary,
-            letterSpacing: -0.3,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 56px',
+            borderRadius: 999,
+            fontSize: 28,
+            fontWeight: 600,
+            color: theme.buttonText,
+            background: theme.buttonBg,
+            letterSpacing: '-0.01em',
           }}
         >
-          Never miss a release from
-        </div>
-        <div
-          style={{
-            display: 'flex',
-            fontSize: isStory ? 56 : 48,
-            fontWeight: 700,
-            letterSpacing: -1.5,
-            lineHeight: 1.1,
-            maxWidth: 900,
-          }}
-        >
-          {artistName}
+          {ctaLabel}
         </div>
       </div>
 
-      {/* CTA pill */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px 40px',
-          borderRadius: 999,
-          fontSize: 22,
-          fontWeight: 600,
-          color: BRAND.white,
-          background: BRAND.pillBg,
-          border: `1.5px solid ${BRAND.pillBorder}`,
-          letterSpacing: -0.2,
-        }}
-      >
-        Turn on notifications
-      </div>
-
-      {/* URL footer */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: isStory ? 80 : 48,
-          display: 'flex',
-          fontSize: 22,
-          fontWeight: 500,
-          color: BRAND.muted,
-          letterSpacing: -0.2,
-        }}
-      >
-        jov.ie/{username}
-      </div>
+      {footer}
     </div>
+  );
+}
+
+/**
+ * Fan retargeting ad: "Never miss a release from [Artist]"
+ */
+function FanAdCreative({
+  artistName,
+  username,
+  avatarUrl,
+  size,
+}: AdCreativeProps) {
+  const isStory = size === 'story';
+  const theme = THEME.dark;
+
+  return (
+    <AdCreativeLayout
+      size={size}
+      photoSize={isStory ? 440 : 380}
+      artistName={artistName}
+      avatarUrl={avatarUrl}
+      theme={theme}
+      ctaLabel='Turn on notifications'
+      textContent={
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              fontSize: isStory ? 36 : 32,
+              fontWeight: 500,
+              color: theme.textMuted,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Never miss a release from
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: isStory ? 80 : 68,
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.05,
+              maxWidth: 900,
+              color: theme.text,
+            }}
+          >
+            {artistName}
+          </div>
+        </div>
+      }
+      footer={
+        <div
+          style={{
+            position: 'absolute',
+            bottom: isStory ? 80 : 60,
+            display: 'flex',
+            fontSize: 28,
+            fontWeight: 500,
+            color: theme.textMuted,
+            letterSpacing: '-0.02em',
+          }}
+        >
+          jov.ie/{username}
+        </div>
+      }
+    />
   );
 }
 
@@ -194,132 +260,55 @@ function ClaimAdCreative({
   username,
   avatarUrl,
   size,
-}: {
-  artistName: string;
-  username: string;
-  avatarUrl: string | null;
-  size: 'feed' | 'story';
-}) {
+}: AdCreativeProps) {
   const isStory = size === 'story';
-  const photoSize = isStory ? 320 : 280;
+  const theme = THEME.light;
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: BRAND.bg,
-        color: BRAND.white,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-        padding: isStory ? '120px 80px' : '80px',
-        gap: isStory ? 48 : 36,
-        position: 'relative',
-      }}
-    >
-      {/* Jovie wordmark - top right */}
-      <div
-        style={{
-          position: 'absolute',
-          top: isStory ? 60 : 40,
-          right: isStory ? 60 : 40,
-          display: 'flex',
-          fontSize: 28,
-          fontWeight: 600,
-          letterSpacing: -0.5,
-          color: BRAND.accent,
-        }}
-      >
-        Jovie
-      </div>
-
-      {/* Profile photo */}
-      <div
-        style={{
-          width: photoSize,
-          height: photoSize,
-          borderRadius: photoSize / 2,
-          border: '4px solid rgba(255,255,255,0.15)',
-          overflow: 'hidden',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(255,255,255,0.08)',
-          flexShrink: 0,
-        }}
-      >
-        {avatarUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
-          <img
-            src={avatarUrl}
-            alt=''
-            width={photoSize}
-            height={photoSize}
-            style={{ objectFit: 'cover' }}
-          />
-        ) : (
+    <AdCreativeLayout
+      size={size}
+      photoSize={isStory ? 360 : 320}
+      artistName={artistName}
+      avatarUrl={avatarUrl}
+      theme={theme}
+      ctaLabel='Claim your profile'
+      textContent={
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 24,
+            textAlign: 'center',
+          }}
+        >
           <div
             style={{
-              fontSize: photoSize / 2.5,
-              fontWeight: 700,
-              color: BRAND.secondary,
               display: 'flex',
+              fontSize: isStory ? 72 : 64,
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.05,
+              color: theme.text,
+              maxWidth: 800,
             }}
           >
-            {artistName.charAt(0).toUpperCase()}
+            Don&apos;t lose your handle.
           </div>
-        )}
-      </div>
-
-      {/* Headline */}
-      <div
-        style={{
-          display: 'flex',
-          fontSize: isStory ? 52 : 44,
-          fontWeight: 700,
-          letterSpacing: -1.5,
-          lineHeight: 1.1,
-          textAlign: 'center',
-        }}
-      >
-        Don&apos;t lose your handle
-      </div>
-
-      {/* Handle URL - prominent */}
-      <div
-        style={{
-          display: 'flex',
-          fontSize: isStory ? 36 : 32,
-          fontWeight: 600,
-          color: BRAND.accent,
-          letterSpacing: -0.5,
-        }}
-      >
-        jov.ie/{username}
-      </div>
-
-      {/* CTA pill */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px 40px',
-          borderRadius: 999,
-          fontSize: 22,
-          fontWeight: 600,
-          color: BRAND.white,
-          background: BRAND.pillBg,
-          border: `1.5px solid ${BRAND.pillBorder}`,
-          letterSpacing: -0.2,
-        }}
-      >
-        Claim your profile
-      </div>
-    </div>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: isStory ? 40 : 36,
+              fontWeight: 500,
+              color: theme.textMuted,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            jov.ie/{username}
+          </div>
+        </div>
+      }
+    />
   );
 }
 
@@ -346,6 +335,7 @@ export async function GET(req: NextRequest) {
           username: creatorProfiles.username,
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
+          isAdmin: users.isAdmin,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -357,6 +347,10 @@ export async function GET(req: NextRequest) {
           { error: 'Profile not found' },
           { status: 404 }
         );
+      }
+
+      if (!profile.isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
 
       const artistName = profile.displayName || profile.username || 'Artist';

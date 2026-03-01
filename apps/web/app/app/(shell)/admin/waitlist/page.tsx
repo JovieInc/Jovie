@@ -5,7 +5,6 @@ import type { SearchParams } from 'nuqs/server';
 import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
 import { WaitlistSettingsPanel } from '@/components/admin/WaitlistSettingsPanel';
 import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
@@ -60,17 +59,17 @@ export default async function AdminWaitlistPage({
     ]);
 
   return (
-    <PageShell>
-      <PageContent noPadding>
-        <WaitlistSettingsPanel />
-        <WaitlistMetrics metrics={metrics} />
+    <div className='flex flex-col h-full overflow-hidden p-4 sm:p-6 space-y-4'>
+      <WaitlistSettingsPanel />
+      <WaitlistMetrics metrics={metrics} />
+      <div className='flex-1 min-h-0'>
         <AdminWaitlistTableWithViews
           entries={entries}
           page={1}
           pageSize={resolvedPageSize}
           total={total}
         />
-      </PageContent>
-    </PageShell>
+      </div>
+    </div>
   );
 }

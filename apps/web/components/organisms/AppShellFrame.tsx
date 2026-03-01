@@ -8,6 +8,7 @@ interface AppShellFrameProps {
   readonly rightPanel?: ReactNode;
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
+  readonly containerClassName?: string;
   readonly isTableRoute?: boolean;
 }
 
@@ -22,10 +23,16 @@ export function AppShellFrame({
   rightPanel,
   mobileBottomNav,
   contentClassName,
+  containerClassName,
   isTableRoute = false,
 }: Readonly<AppShellFrameProps>) {
   return (
-    <div className='flex h-svh w-full overflow-hidden bg-base'>
+    <div
+      className={cn(
+        'flex h-svh w-full overflow-hidden bg-base',
+        containerClassName
+      )}
+    >
       {sidebar}
 
       <div

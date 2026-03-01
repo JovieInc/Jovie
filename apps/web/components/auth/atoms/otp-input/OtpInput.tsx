@@ -120,15 +120,15 @@ export function OtpInput({
             <div
               key={key}
               className={cn(
-                'relative flex items-center justify-center rounded-[6px] border text-xl sm:text-2xl font-sans transition-all duration-150',
-                'h-14 w-11 sm:h-12 sm:w-10',
-                'bg-surface-0 text-primary-token',
+                'relative flex items-center justify-center rounded-(--linear-radius-sm) border text-xl sm:text-2xl font-(--linear-caption-weight) transition-all duration-150',
+                'h-(--linear-button-height-md) w-11 sm:h-(--linear-button-height-md) sm:w-10 min-h-[40px]',
+                'bg-(--linear-bg-surface-0) text-(--linear-text-primary)',
                 isFocused
-                  ? 'border-subtle ring-2 ring-[rgb(var(--focus-ring))]/30 scale-105'
-                  : 'border-subtle',
-                error && 'border-destructive',
+                  ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/30 scale-[1.02]'
+                  : 'border-(--linear-border-subtle)',
+                error && 'border-(--linear-error)',
                 disabled && 'opacity-50 cursor-not-allowed',
-                'active:scale-95 active:bg-surface-1'
+                'active:scale-95 active:bg-(--linear-bg-surface-1)'
               )}
             >
               <input
