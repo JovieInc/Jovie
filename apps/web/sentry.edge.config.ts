@@ -4,25 +4,12 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
+import { getBaseServerConfig } from '@/lib/sentry/config';
 
-/**
- * PII Collection Notice:
- * When sendDefaultPii is enabled, Sentry may collect:
- * - User IP addresses (anonymized via beforeSend)
- * - User IDs (Clerk user IDs only, no emails)
- * - Request headers (sensitive headers scrubbed)
- *
- * This data is used for error debugging and is retained per Sentry's data retention policy.
- * Users can request data deletion via privacy@jov.ie.
- */
-
-const isProduction = process.env.NODE_ENV === 'production';
+const baseConfig = getBaseServerConfig();
 
 Sentry.init({
-  dsn:
-    process.env.NODE_ENV === 'development'
-      ? process.env.SENTRY_DSN_DEV
-      : process.env.SENTRY_DSN,
+  ...baseConfig,
 
   // Suppress known non-actionable errors
   ignoreErrors: [
@@ -34,15 +21,6 @@ Sentry.init({
     /transformAlgorithm is not a function/,
   ],
 
-  // Sample 10% of transactions in production, 100% in development
-  tracesSampleRate: isProduction ? 0.1 : 1.0,
-
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
-
-  // Enable sending user PII - scrubbed via beforeSend hook below
-  sendDefaultPii: true,
-
   // AI Agent Monitoring: Explicit for edge runtime (not auto-enabled like Node)
   integrations: [
     Sentry.vercelAIIntegration({
@@ -50,34 +28,4 @@ Sentry.init({
       recordOutputs: true,
     }),
   ],
-
-  // Scrub sensitive data before sending to Sentry
-  beforeSend(event) {
-    // Anonymize IP addresses
-    if (event.user?.ip_address) {
-      event.user.ip_address = '{{auto}}';
-    }
-
-    // Remove email addresses if present
-    if (event.user?.email) {
-      delete event.user.email;
-    }
-
-    // Scrub sensitive headers
-    if (event.request?.headers) {
-      const sensitiveHeaders = [
-        'authorization',
-        'cookie',
-        'x-api-key',
-        'x-auth-token',
-      ];
-      for (const header of sensitiveHeaders) {
-        if (event.request.headers[header]) {
-          event.request.headers[header] = '[Filtered]';
-        }
-      }
-    }
-
-    return event;
-  },
 });

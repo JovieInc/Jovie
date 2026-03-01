@@ -16,40 +16,62 @@ const SIZES = {
   story: { width: 1080, height: 1920 },
 } as const;
 
-const APPLE_DARK = {
-  bg: '#000000',
-  text: '#F5F5F7',
-  textMuted: '#86868B',
-  border: '#333336',
-  buttonBg: '#FFFFFF',
-  buttonText: '#000000',
+/** Color themes for ad creatives */
+const THEME = {
+  dark: {
+    bg: '#000000',
+    text: '#F5F5F7',
+    textMuted: '#86868B',
+    border: '#333336',
+    buttonBg: '#FFFFFF',
+    buttonText: '#000000',
+  },
+  light: {
+    bg: '#FFFFFF',
+    text: '#1D1D1F',
+    textMuted: '#86868B',
+    border: '#E5E5EA',
+    buttonBg: '#000000',
+    buttonText: '#FFFFFF',
+  },
 } as const;
 
-const APPLE_LIGHT = {
-  bg: '#FFFFFF',
-  text: '#1D1D1F',
-  textMuted: '#86868B',
-  border: '#E5E5EA',
-  buttonBg: '#000000',
-  buttonText: '#FFFFFF',
-} as const;
+const FONT_STACK =
+  '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+/** Shared ad creative props */
+interface AdCreativeProps {
+  readonly artistName: string;
+  readonly username: string;
+  readonly avatarUrl: string | null;
+  readonly size: 'feed' | 'story';
+}
 
 /**
- * Fan retargeting ad: "Never miss a release from [Artist]"
+ * Shared layout shell for retargeting ad creatives.
+ * Renders branding, profile photo, text content, and CTA button
+ * with a consistent structure across dark/light themes.
  */
-function FanAdCreative({
-  artistName,
-  username,
-  avatarUrl,
+function AdCreativeLayout({
   size,
+  photoSize,
+  artistName,
+  avatarUrl,
+  theme,
+  textContent,
+  ctaLabel,
+  footer,
 }: {
-  artistName: string;
-  username: string;
-  avatarUrl: string | null;
   size: 'feed' | 'story';
+  photoSize: number;
+  artistName: string;
+  avatarUrl: string | null;
+  theme: (typeof THEME)['dark'] | (typeof THEME)['light'];
+  textContent: React.ReactNode;
+  ctaLabel: string;
+  footer?: React.ReactNode;
 }) {
   const isStory = size === 'story';
-  const photoSize = isStory ? 440 : 380;
 
   return (
     <div
@@ -60,10 +82,9 @@ function FanAdCreative({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: APPLE_DARK.bg,
-        color: APPLE_DARK.text,
-        fontFamily:
-          '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        background: theme.bg,
+        color: theme.text,
+        fontFamily: FONT_STACK,
         padding: isStory ? '120px' : '80px',
         position: 'relative',
       }}
@@ -77,7 +98,7 @@ function FanAdCreative({
           fontSize: 24,
           fontWeight: 600,
           letterSpacing: '-0.02em',
-          color: APPLE_DARK.textMuted,
+          color: theme.textMuted,
         }}
       >
         Jovie
@@ -102,7 +123,7 @@ function FanAdCreative({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: APPLE_DARK.border,
+            background: theme.border,
             flexShrink: 0,
           }}
         >
@@ -120,7 +141,7 @@ function FanAdCreative({
               style={{
                 fontSize: photoSize / 2.5,
                 fontWeight: 600,
-                color: APPLE_DARK.textMuted,
+                color: theme.textMuted,
                 display: 'flex',
               }}
             >
@@ -130,6 +151,53 @@ function FanAdCreative({
         </div>
 
         {/* Text block */}
+        {textContent}
+
+        {/* CTA pill */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 56px',
+            borderRadius: 999,
+            fontSize: 28,
+            fontWeight: 600,
+            color: theme.buttonText,
+            background: theme.buttonBg,
+            letterSpacing: '-0.01em',
+          }}
+        >
+          {ctaLabel}
+        </div>
+      </div>
+
+      {footer}
+    </div>
+  );
+}
+
+/**
+ * Fan retargeting ad: "Never miss a release from [Artist]"
+ */
+function FanAdCreative({
+  artistName,
+  username,
+  avatarUrl,
+  size,
+}: AdCreativeProps) {
+  const isStory = size === 'story';
+  const theme = THEME.dark;
+
+  return (
+    <AdCreativeLayout
+      size={size}
+      photoSize={isStory ? 440 : 380}
+      artistName={artistName}
+      avatarUrl={avatarUrl}
+      theme={theme}
+      ctaLabel='Turn on notifications'
+      textContent={
         <div
           style={{
             display: 'flex',
@@ -144,7 +212,7 @@ function FanAdCreative({
               display: 'flex',
               fontSize: isStory ? 36 : 32,
               fontWeight: 500,
-              color: APPLE_DARK.textMuted,
+              color: theme.textMuted,
               letterSpacing: '-0.02em',
             }}
           >
@@ -158,47 +226,29 @@ function FanAdCreative({
               letterSpacing: '-0.04em',
               lineHeight: 1.05,
               maxWidth: 900,
-              color: APPLE_DARK.text,
+              color: theme.text,
             }}
           >
             {artistName}
           </div>
         </div>
-
-        {/* CTA pill */}
+      }
+      footer={
         <div
           style={{
+            position: 'absolute',
+            bottom: isStory ? 80 : 60,
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px 56px',
-            borderRadius: 999,
             fontSize: 28,
-            fontWeight: 600,
-            color: APPLE_DARK.buttonText,
-            background: APPLE_DARK.buttonBg,
-            letterSpacing: '-0.01em',
+            fontWeight: 500,
+            color: theme.textMuted,
+            letterSpacing: '-0.02em',
           }}
         >
-          Turn on notifications
+          jov.ie/{username}
         </div>
-      </div>
-
-      {/* URL footer */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: isStory ? 80 : 60,
-          display: 'flex',
-          fontSize: 28,
-          fontWeight: 500,
-          color: APPLE_DARK.textMuted,
-          letterSpacing: '-0.02em',
-        }}
-      >
-        jov.ie/{username}
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -210,94 +260,19 @@ function ClaimAdCreative({
   username,
   avatarUrl,
   size,
-}: {
-  artistName: string;
-  username: string;
-  avatarUrl: string | null;
-  size: 'feed' | 'story';
-}) {
+}: AdCreativeProps) {
   const isStory = size === 'story';
-  const photoSize = isStory ? 360 : 320;
+  const theme = THEME.light;
 
   return (
-    <div
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: APPLE_LIGHT.bg,
-        color: APPLE_LIGHT.text,
-        fontFamily:
-          '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        padding: isStory ? '120px' : '80px',
-        position: 'relative',
-      }}
-    >
-      {/* Subtle Jovie branding */}
-      <div
-        style={{
-          position: 'absolute',
-          top: isStory ? 80 : 60,
-          display: 'flex',
-          fontSize: 24,
-          fontWeight: 600,
-          letterSpacing: '-0.02em',
-          color: APPLE_LIGHT.textMuted,
-        }}
-      >
-        Jovie
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: isStory ? 80 : 64,
-          marginTop: isStory ? -40 : 0,
-        }}
-      >
-        {/* Profile photo */}
-        <div
-          style={{
-            width: photoSize,
-            height: photoSize,
-            borderRadius: photoSize / 2,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: APPLE_LIGHT.border,
-            flexShrink: 0,
-          }}
-        >
-          {avatarUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
-            <img
-              src={avatarUrl}
-              alt=''
-              width={photoSize}
-              height={photoSize}
-              style={{ objectFit: 'cover' }}
-            />
-          ) : (
-            <div
-              style={{
-                fontSize: photoSize / 2.5,
-                fontWeight: 600,
-                color: APPLE_LIGHT.textMuted,
-                display: 'flex',
-              }}
-            >
-              {artistName.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </div>
-
-        {/* Text block */}
+    <AdCreativeLayout
+      size={size}
+      photoSize={isStory ? 360 : 320}
+      artistName={artistName}
+      avatarUrl={avatarUrl}
+      theme={theme}
+      ctaLabel='Claim your profile'
+      textContent={
         <div
           style={{
             display: 'flex',
@@ -314,7 +289,7 @@ function ClaimAdCreative({
               fontWeight: 700,
               letterSpacing: '-0.04em',
               lineHeight: 1.05,
-              color: APPLE_LIGHT.text,
+              color: theme.text,
               maxWidth: 800,
             }}
           >
@@ -325,33 +300,15 @@ function ClaimAdCreative({
               display: 'flex',
               fontSize: isStory ? 40 : 36,
               fontWeight: 500,
-              color: APPLE_LIGHT.textMuted,
+              color: theme.textMuted,
               letterSpacing: '-0.02em',
             }}
           >
             jov.ie/{username}
           </div>
         </div>
-
-        {/* CTA pill */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '24px 56px',
-            borderRadius: 999,
-            fontSize: 28,
-            fontWeight: 600,
-            color: APPLE_LIGHT.buttonText,
-            background: APPLE_LIGHT.buttonBg,
-            letterSpacing: '-0.01em',
-          }}
-        >
-          Claim your profile
-        </div>
-      </div>
-    </div>
+      }
+    />
   );
 }
 
