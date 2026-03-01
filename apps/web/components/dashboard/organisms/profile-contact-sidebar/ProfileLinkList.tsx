@@ -163,26 +163,28 @@ export function ProfileLinkList({
     return groupedLinks[selectedCategory] ?? [];
   }, [selectedCategory, groupedLinks, links]);
 
-  if (
-    filteredLinks.length === 0 &&
-    !(selectedCategory === 'dsp' && dspConnections)
-  ) {
-    return (
-      <div className='py-8 text-center'>
-        <p className='text-sm text-secondary-token'>
-          No links in this category
-        </p>
-      </div>
-    );
-  }
-
   // When viewing a specific category, use shared DrawerLinkSection
   if (selectedCategory !== 'all') {
     if (selectedCategory === 'dsp' && dspConnections) {
       return (
-        <DrawerLinkSection title='Music connections' isEmpty={false}>
-          <ConnectedDspPills dspConnections={dspConnections} />
-        </DrawerLinkSection>
+        <div className='space-y-4'>
+          <DrawerLinkSection title='Music connections' isEmpty={false}>
+            <ConnectedDspPills dspConnections={dspConnections} />
+          </DrawerLinkSection>
+          <DrawerLinkSection
+            title='Music links'
+            onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
+            addLabel='Add Music link'
+            isEmpty={filteredLinks.length === 0}
+            emptyMessage='No music links yet. Click + to add one.'
+          >
+            <div className='space-y-2'>
+              {filteredLinks.map(link => (
+                <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+              ))}
+            </div>
+          </DrawerLinkSection>
+        </div>
       );
     }
 
@@ -191,7 +193,8 @@ export function ProfileLinkList({
         title={`${SECTION_LABELS[selectedCategory]} links`}
         onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
         addLabel={`Add ${SECTION_LABELS[selectedCategory]} link`}
-        isEmpty={false} // Early return above guarantees filteredLinks is non-empty
+        isEmpty={filteredLinks.length === 0}
+        emptyMessage={`No ${SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click + to add one.`}
       >
         <div className='space-y-2'>
           {filteredLinks.map(link => (

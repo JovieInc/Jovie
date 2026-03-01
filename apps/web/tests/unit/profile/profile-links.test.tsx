@@ -39,14 +39,20 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerLinkSection: ({
     title,
     children,
+    isEmpty,
+    emptyMessage,
   }: {
     title: string;
     children: React.ReactNode;
+    isEmpty?: boolean;
+    emptyMessage?: string;
   }) =>
     React.createElement(
       'div',
       { 'data-testid': `link-section-${title}` },
-      children
+      isEmpty
+        ? React.createElement('p', null, emptyMessage ?? 'No links yet.')
+        : children
     ),
   SidebarLinkRow: ({
     icon,
@@ -177,7 +183,9 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
       render(<ProfileLinkList links={links} selectedCategory='dsp' />);
 
       expect(screen.queryByTestId('social-icon-instagram')).toBeNull();
-      expect(screen.getByText('No links in this category')).toBeDefined();
+      expect(
+        screen.getByText('No music links yet. Click + to add one.')
+      ).toBeDefined();
     });
 
     it('shows empty state when no links exist in category', async () => {
@@ -187,7 +195,9 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
       render(<ProfileLinkList links={[]} selectedCategory='social' />);
 
-      expect(screen.getByText('No links in this category')).toBeDefined();
+      expect(
+        screen.getByText('No social links yet. Click + to add one.')
+      ).toBeDefined();
     });
   });
 

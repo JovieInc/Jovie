@@ -1,8 +1,7 @@
 'use client';
 
-import { Input, SegmentControl } from '@jovie/ui';
-import { Plus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SegmentControl } from '@jovie/ui';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -10,7 +9,7 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { isValidUrl } from '@/components/organisms/contact-sidebar/utils';
+import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import {
@@ -18,8 +17,7 @@ import {
   useProfileSaveMutation,
 } from '@/lib/queries/useProfileMutation';
 import { useRemoveSocialLinkMutation } from '@/lib/queries/useRemoveSocialLinkMutation';
-import { cn } from '@/lib/utils';
-import { detectPlatform } from '@/lib/utils/platform-detection/detector';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import {
   type CategoryOption,
@@ -28,6 +26,7 @@ import {
 } from './ProfileLinkList';
 import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { ProfileSidebarHeader } from './ProfileSidebarHeader';
+import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Tab options for the profile link categories */
 const PROFILE_TAB_OPTIONS = [
@@ -51,15 +50,6 @@ export function ProfileContactSidebar() {
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
-  const [newLinkUrl, setNewLinkUrl] = useState('');
-  const addLinkInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Focus add link input when it appears
-  useEffect(() => {
-    if (isAddingLink) {
-      addLinkInputRef.current?.focus();
-    }
-  }, [isAddingLink]);
 
   // Calculate category counts for the selector
   const categoryCounts = useMemo(() => {
@@ -166,86 +156,85 @@ export function ProfileContactSidebar() {
     [avatarMutation, previewData, setPreviewData]
   );
 
-  // Handle adding a new link
+  // Existing platform IDs for filtering suggestions
+  const existingPlatformIds = useMemo(
+    () =>
+      previewData?.links
+        .filter(l => l.platform !== 'youtube')
+        .map(l => l.platform) ?? [],
+    [previewData?.links]
+  );
+
+  // Handle adding a new link (opens smart input)
   const handleAddLink = useCallback((_category?: string) => {
     setIsAddingLink(true);
-    setNewLinkUrl('');
   }, []);
 
-  const handleConfirmAddLink = useCallback(async () => {
-    const url = newLinkUrl.trim();
-    if (!url || !selectedProfile || !previewData) return;
+  // Handle smart add — receives a detected link from SidebarLinkInput
+  const handleSmartAddLink = useCallback(
+    async (link: DetectedLink) => {
+      if (!selectedProfile || !previewData) return;
 
-    // Auto-prefix with https:// if missing
-    const fullUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+      // Optimistically add to sidebar
+      const optimisticLink: PreviewPanelLink = {
+        id: `temp-${Date.now()}`,
+        title: link.suggestedTitle ?? link.platform.name,
+        url: link.normalizedUrl,
+        platform: link.platform.id,
+        isVisible: true,
+      };
 
-    if (!isValidUrl(fullUrl)) {
-      toast.error('Please enter a valid URL');
-      return;
-    }
-
-    const detected = detectPlatform(fullUrl);
-    if (!detected.isValid) {
-      toast.error(detected.error ?? 'Invalid URL');
-      return;
-    }
-
-    // Optimistically add to sidebar
-    const optimisticLink: PreviewPanelLink = {
-      id: `temp-${Date.now()}`,
-      title: detected.platform.name,
-      url: detected.normalizedUrl,
-      platform: detected.platform.id,
-      isVisible: true,
-    };
-
-    setPreviewData({
-      ...previewData,
-      links: [...previewData.links, optimisticLink],
-    });
-
-    setIsAddingLink(false);
-    setNewLinkUrl('');
-
-    // Save to server via confirm-link endpoint
-    try {
-      const response = await fetch('/api/chat/confirm-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId: selectedProfile.id,
-          platform: detected.platform.id,
-          url: fullUrl,
-          normalizedUrl: detected.normalizedUrl,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to add link');
-      }
-
-      toast.success(`${detected.platform.name} link added`);
-    } catch {
-      // Revert on failure
       setPreviewData({
         ...previewData,
-        links: previewData.links.filter(l => l.id !== optimisticLink.id),
+        links: [...previewData.links, optimisticLink],
       });
-      toast.error('Failed to add link');
-    }
-  }, [newLinkUrl, selectedProfile, previewData, setPreviewData]);
 
-  const handleAddLinkKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        handleConfirmAddLink().catch(() => {});
+      setIsAddingLink(false);
+
+      // Auto-switch to the correct tab for the new link
+      const linkCategory = getPlatformCategory(link.platform.id);
+      const mappedCategory: CategoryOption =
+        linkCategory === 'websites'
+          ? 'custom'
+          : (linkCategory as CategoryOption);
+      if (
+        mappedCategory !== resolvedCategory &&
+        (mappedCategory === 'social' ||
+          mappedCategory === 'dsp' ||
+          mappedCategory === 'earnings' ||
+          mappedCategory === 'custom')
+      ) {
+        setSelectedCategory(mappedCategory);
       }
-      if (e.key === 'Escape') {
-        setIsAddingLink(false);
-        setNewLinkUrl('');
+
+      // Save to server via confirm-link endpoint
+      try {
+        const response = await fetch('/api/chat/confirm-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId: selectedProfile.id,
+            platform: link.platform.id,
+            url: link.originalUrl,
+            normalizedUrl: link.normalizedUrl,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to add link');
+        }
+
+        toast.success(`${link.platform.name} link added`);
+      } catch {
+        // Revert on failure
+        setPreviewData({
+          ...previewData,
+          links: previewData.links.filter(l => l.id !== optimisticLink.id),
+        });
+        toast.error('Failed to add link');
       }
     },
-    [handleConfirmAddLink]
+    [selectedProfile, previewData, setPreviewData, resolvedCategory]
   );
 
   // Handle removing a link
@@ -391,39 +380,18 @@ export function ProfileContactSidebar() {
             dspConnections={dspConnections}
           />
 
-          {/* Inline add link form */}
+          {/* Smart add link input with platform suggestions */}
           {isAddingLink && (
-            <div className='mt-3 flex flex-wrap items-center gap-2'>
-              <Input
-                ref={addLinkInputRef}
-                type='url'
-                placeholder='Paste link URL...'
-                value={newLinkUrl}
-                onChange={e => setNewLinkUrl(e.target.value)}
-                onKeyDown={handleAddLinkKeyDown}
-                onBlur={() => {
-                  if (!newLinkUrl.trim()) {
-                    setIsAddingLink(false);
-                  }
-                }}
-                className='h-8 flex-1 min-w-0 text-sm'
-                aria-label='New link URL'
+            <div className='mt-3'>
+              <SidebarLinkInput
+                categoryFilter={
+                  resolvedCategory === 'all' ? 'social' : resolvedCategory
+                }
+                existingPlatforms={existingPlatformIds}
+                onAdd={handleSmartAddLink}
+                onCancel={() => setIsAddingLink(false)}
+                creatorName={previewData?.displayName}
               />
-              <button
-                type='button'
-                onClick={() => {
-                  handleConfirmAddLink().catch(() => {});
-                }}
-                disabled={!newLinkUrl.trim()}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium',
-                  'bg-accent text-accent-foreground hover:bg-accent/90',
-                  'disabled:opacity-50 transition-colors'
-                )}
-              >
-                <Plus className='h-3 w-3' />
-                Add
-              </button>
             </div>
           )}
         </div>

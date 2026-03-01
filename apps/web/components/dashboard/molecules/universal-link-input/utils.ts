@@ -4,6 +4,10 @@
  * Shared utility functions for link input components.
  */
 
+import { CROSS_CATEGORY } from '@/components/dashboard/organisms/links/utils/link-categorization';
+import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-display-utils';
+import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
@@ -233,6 +237,25 @@ export function rankPlatformOptions(
     .map(entry => ({ ...entry.option, matchIndices: entry.matchIndices }));
 
   return scored;
+}
+
+/**
+ * Filter PLATFORM_OPTIONS to only those belonging to a given sidebar category.
+ * Uses getPlatformCategory() as single source of truth, with CROSS_CATEGORY
+ * support for platforms like YouTube that can appear in multiple sections.
+ */
+export function filterPlatformsBySection(
+  options: readonly PlatformOption[],
+  section: LinkSection
+): PlatformOption[] {
+  return options.filter(option => {
+    const cat = getPlatformCategory(option.id);
+    const mapped: LinkSection =
+      cat === 'websites' ? 'custom' : (cat as LinkSection);
+    if (mapped === section) return true;
+    const crossSections = CROSS_CATEGORY[option.id];
+    return crossSections?.includes(section) ?? false;
+  });
 }
 
 /**
