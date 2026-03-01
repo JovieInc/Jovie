@@ -87,10 +87,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
   return (
     <section
       ref={sectionRef}
-      className='section-spacing-linear overflow-hidden'
-      style={{
-        backgroundColor: 'var(--linear-bg-page)',
-      }}
+      className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'
     >
       <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-container-max)] mx-auto heading-gap-linear'>
         <h2 className='text-center marketing-h2-linear text-[var(--linear-text-primary)]'>
@@ -130,12 +127,15 @@ export function SeeItInActionCarousel({ creators }: Props) {
               key={`${creator.id}-${index}`}
               className='relative flex flex-col gap-3 group'
             >
-              <div className='relative w-[180px] h-[240px] shrink-0 overflow-hidden rounded-[var(--linear-radius-lg)]'>
+              <div
+                className='relative w-[200px] h-[280px] shrink-0 overflow-hidden rounded-[var(--linear-radius-lg)]'
+                style={{ boxShadow: 'var(--linear-shadow-card)' }}
+              >
                 <Image
                   src={creator.src}
                   alt={`${creator.name}'s avatar`}
                   fill
-                  sizes='180px'
+                  sizes='200px'
                   placeholder='blur'
                   blurDataURL={BLUR_DATA_URL}
                   loading={index < 12 ? 'eager' : 'lazy'}

@@ -7,10 +7,7 @@ import { SMARTLINK_KANBAN_COLUMNS, SMARTLINK_THREAD } from './demo/mock-data';
 
 export function AutomaticReleaseSmartlinksSection() {
   return (
-    <section
-      className='section-spacing-linear overflow-hidden'
-      style={{ backgroundColor: 'var(--linear-bg-page)' }}
-    >
+    <section className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'>
       <Container size='homepage'>
         <div className='mx-auto max-w-[var(--linear-content-max)]'>
           {/* Two-column header */}
@@ -26,18 +23,9 @@ export function AutomaticReleaseSmartlinksSection() {
                 release smartlink — populated with platform destinations,
                 artwork, and metadata your fans can trust.
               </p>
-              <span
-                className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors'
-                style={{
-                  fontSize: 'var(--linear-caption-size)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  color: 'var(--linear-text-secondary)',
-                  backgroundColor: 'var(--linear-bg-surface-0)',
-                  borderColor: 'var(--linear-border-subtle)',
-                }}
-              >
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-0)] border-[var(--linear-border-subtle)]'>
                 Smartlinks · Auto-generated{' '}
-                <span style={{ color: 'var(--linear-text-tertiary)' }}>→</span>
+                <span className='text-[var(--linear-text-tertiary)]'>→</span>
               </span>
             </div>
           </div>
@@ -55,13 +43,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 }}
               >
                 {/* Fake Mac Header */}
-                <div
-                  className='flex items-center px-5 h-12 border-b'
-                  style={{
-                    borderColor: 'var(--linear-border-subtle)',
-                    backgroundColor: 'var(--linear-bg-surface-1)',
-                  }}
-                >
+                <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                   <div className='flex gap-2'>
                     <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
                     <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
@@ -133,33 +115,13 @@ export function AutomaticReleaseSmartlinksSection() {
 
 function ActivityThread() {
   return (
-    <div
-      className='flex flex-col border-r'
-      style={{
-        borderColor: 'var(--linear-border-subtle)',
-        backgroundColor: 'var(--linear-bg-surface-0)',
-      }}
-    >
+    <div className='flex flex-col border-r border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)]'>
       {/* Title bar */}
-      <div
-        className='flex items-center gap-2 border-b px-5 py-3'
-        style={{ borderColor: 'var(--linear-border-subtle)' }}
-      >
-        <span
-          style={{
-            fontSize: 'var(--linear-caption-size)',
-            fontWeight: 'var(--linear-font-weight-medium)',
-            color: 'var(--linear-text-primary)',
-          }}
-        >
+      <div className='flex items-center gap-2 border-b border-[var(--linear-border-subtle)] px-5 py-3'>
+        <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
           Activity
         </span>
-        <span
-          style={{
-            fontSize: 'var(--linear-caption-size)',
-            color: 'var(--linear-text-tertiary)',
-          }}
-        >
+        <span className='text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
           · Release automation
         </span>
       </div>
@@ -170,47 +132,23 @@ function ActivityThread() {
           <div
             key={item.id}
             className='flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[var(--linear-bg-hover)]'
-            style={{ backgroundColor: 'transparent' }}
           >
             {/* Icon */}
-            <span
-              className='mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full'
-              style={{ backgroundColor: 'var(--linear-bg-surface-2)' }}
-            >
+            <span className='mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[var(--linear-bg-surface-2)]'>
               <ThreadIcon type={item.iconType} color={item.iconColor} />
             </span>
 
             <div className='min-w-0 flex-1'>
               <div className='flex items-baseline justify-between gap-2'>
-                <p
-                  className='truncate'
-                  style={{
-                    fontSize: 'var(--linear-caption-size)',
-                    fontWeight: 'var(--linear-font-weight-medium)',
-                    color: 'var(--linear-text-primary)',
-                  }}
-                >
+                <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
                   {item.label}
                 </p>
-                <span
-                  className='flex-shrink-0'
-                  style={{
-                    fontSize: 'var(--linear-label-size)',
-                    color: 'var(--linear-text-tertiary)',
-                  }}
-                >
+                <span className='flex-shrink-0 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
                   {item.time}
                 </span>
               </div>
               {item.detail && (
-                <p
-                  className='mt-0.5'
-                  style={{
-                    fontSize: 'var(--linear-label-size)',
-                    color: 'var(--linear-text-secondary)',
-                    lineHeight: 'var(--linear-leading-relaxed)',
-                  }}
-                >
+                <p className='mt-0.5 text-[var(--linear-label-size)] text-[var(--linear-text-secondary)] leading-[var(--linear-leading-relaxed)]'>
                   {item.detail}
                 </p>
               )}
@@ -220,10 +158,7 @@ function ActivityThread() {
       </div>
 
       {/* Command bar */}
-      <div
-        className='border-t px-4 py-3'
-        style={{ borderColor: 'var(--linear-border-subtle)' }}
-      >
+      <div className='border-t border-[var(--linear-border-subtle)] px-4 py-3'>
         <div
           className='flex items-center gap-2 rounded-lg px-3 py-2'
           style={{
@@ -232,22 +167,14 @@ function ActivityThread() {
           }}
         >
           <span
-            className='rounded px-1.5 py-0.5'
+            className='rounded px-1.5 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-accent)]'
             style={{
-              fontSize: 'var(--linear-label-size)',
-              fontWeight: 'var(--linear-font-weight-medium)',
-              color: 'var(--linear-accent)',
               backgroundColor: 'oklch(from var(--linear-accent) l c h / 0.1)',
             }}
           >
             @jovie
           </span>
-          <span
-            style={{
-              fontSize: 'var(--linear-caption-size)',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
+          <span className='text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
             create smartlink for upcoming release
           </span>
         </div>
@@ -272,30 +199,13 @@ function getStatusBgColor(status: string): string {
 
 function ReleaseKanban() {
   return (
-    <div style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}>
+    <div className='bg-[var(--linear-bg-surface-1)]'>
       {/* Title bar */}
-      <div
-        className='flex items-center gap-2 border-b px-5 py-3'
-        style={{ borderColor: 'var(--linear-border-subtle)' }}
-      >
-        <span
-          style={{
-            fontSize: 'var(--linear-caption-size)',
-            fontWeight: 'var(--linear-font-weight-medium)',
-            color: 'var(--linear-text-primary)',
-          }}
-        >
+      <div className='flex items-center gap-2 border-b border-[var(--linear-border-subtle)] px-5 py-3'>
+        <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
           Releases
         </span>
-        <span
-          className='rounded-full px-2 py-0.5'
-          style={{
-            fontSize: 'var(--linear-label-size)',
-            fontWeight: 'var(--linear-font-weight-medium)',
-            color: 'var(--linear-text-secondary)',
-            backgroundColor: 'var(--linear-bg-surface-2)',
-          }}
-        >
+        <span className='rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
           4
         </span>
       </div>
@@ -306,23 +216,10 @@ function ReleaseKanban() {
           <div key={column.title} className='flex flex-col gap-2 px-1.5'>
             {/* Column header */}
             <div className='flex items-center justify-between px-1 py-1.5'>
-              <span
-                style={{
-                  fontSize: 'var(--linear-label-size)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              >
+              <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] tracking-[0.05em] uppercase text-[var(--linear-text-tertiary)]'>
                 {column.title}
               </span>
-              <span
-                style={{
-                  fontSize: 'var(--linear-label-size)',
-                  color: 'var(--linear-text-tertiary)',
-                }}
-              >
+              <span className='text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
                 {column.cards.length}
               </span>
             </div>
@@ -344,33 +241,15 @@ function ReleaseKanban() {
                 />
 
                 <div className='space-y-1.5 px-2.5 py-2'>
-                  <p
-                    className='truncate'
-                    style={{
-                      fontSize: 'var(--linear-caption-size)',
-                      fontWeight: 'var(--linear-font-weight-medium)',
-                      color: 'var(--linear-text-primary)',
-                    }}
-                  >
+                  <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
                     {card.title}
                   </p>
-                  <p
-                    className='truncate'
-                    style={{
-                      fontSize: 'var(--linear-label-size)',
-                      color: 'var(--linear-text-tertiary)',
-                    }}
-                  >
+                  <p className='truncate text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
                     {card.artist}
                   </p>
 
                   <div className='flex items-center justify-between'>
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        color: 'var(--linear-text-tertiary)',
-                      }}
-                    >
+                    <span className='text-[10px] text-[var(--linear-text-tertiary)]'>
                       {card.platformCount} platforms
                     </span>
                     <span
@@ -421,21 +300,9 @@ function PlatformButton({
   icon: React.ElementType;
 }) {
   return (
-    <div
-      className='w-full flex items-center justify-between p-3.5 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
-      style={{
-        backgroundColor: 'var(--linear-bg-surface-2)',
-        border: '1px solid var(--linear-border-subtle)',
-      }}
-    >
+    <div className='w-full flex items-center justify-between p-3.5 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-2)] border border-[var(--linear-border-subtle)]'>
       <div className='flex items-center gap-3.5'>
-        <div
-          className='w-8 h-8 rounded-lg flex items-center justify-center transition-colors'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-0)',
-            border: '1px solid var(--linear-border-subtle)',
-          }}
-        >
+        <div className='w-8 h-8 rounded-lg flex items-center justify-center transition-colors bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'>
           <IconComponent className='w-4 h-4 text-[var(--linear-text-secondary)] group-hover:text-[var(--linear-text-primary)] transition-colors' />
         </div>
         <span className='text-[var(--linear-body-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] tracking-tight'>
@@ -444,11 +311,7 @@ function PlatformButton({
       </div>
       <button
         type='button'
-        className='px-4 py-1.5 rounded-full text-[var(--linear-caption-size)] font-[var(--linear-font-weight-semibold)] transition-colors'
-        style={{
-          backgroundColor: 'var(--linear-text-primary)',
-          color: 'var(--linear-bg-page)',
-        }}
+        className='px-4 py-1.5 rounded-full text-[var(--linear-caption-size)] font-[var(--linear-font-weight-semibold)] transition-colors bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)]'
       >
         Play
       </button>
