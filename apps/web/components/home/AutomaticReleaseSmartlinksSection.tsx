@@ -13,15 +13,15 @@ export function AutomaticReleaseSmartlinksSection() {
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Smart links for
+              Automatic links.
               <br />
-              every release.
+              Instant notifications.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Connect your Spotify and Jovie instantly creates a polished
-                release smartlink — populated with platform destinations,
-                artwork, and metadata your fans can trust.
+                Sync your Spotify once. When new music drops, Jovie instantly
+                builds a smart link and automatically notifies your fans via
+                email (SMS coming soon).
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-0)] border-[var(--linear-border-subtle)]'>
                 Smartlinks · Auto-generated{' '}

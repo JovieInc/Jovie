@@ -233,11 +233,13 @@ export function PhoneProfileDemo() {
               Link in bio
             </p>
             <h2 className='mt-4 marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Your profile. Every mode.
+              One profile. Adapts to every fan.
             </h2>
             <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
-              One link powers listening, tipping, touring, and industry contacts
-              — all in a single profile your fans can trust.
+              Opinionated by design. Your link instantly adapts to a fan&apos;s
+              location, preferred music app, and notification status. Jovie
+              handles the optimization and retargeting so you can focus on the
+              music.
             </p>
           </div>
 

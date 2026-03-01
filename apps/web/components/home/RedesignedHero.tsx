@@ -26,9 +26,9 @@ export function RedesignedHero() {
         </h1>
 
         <p className='marketing-lead-linear mx-auto mt-6 max-w-[var(--linear-hero-lead-width)] text-[var(--linear-text-secondary)]'>
-          Capture contacts. Route listeners. Grow your audience.{' '}
+          One link. Zero setup. Just sync your Spotify, and let Jovie’s AI{' '}
           <br className='hidden sm:block' />
-          Everything you need to turn streams into super-fans.
+          build a beautifully optimized profile designed to convert.
         </p>
 
         <div className='mt-8 w-full max-w-[480px] text-left'>
