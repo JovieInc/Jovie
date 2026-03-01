@@ -464,6 +464,7 @@ async function fetchDashboardCoreWithSession(
     for (const [label, result] of [
       ['user_settings', settingsResult],
       ['social_links_existence', linkCountsResult],
+      ['tipping_stats', tippingStatsResult],
     ] as const) {
       if (result.status === 'rejected') {
         Sentry.captureException(result.reason, {
@@ -594,7 +595,6 @@ async function fetchTippingStatsWithSession(
         () =>
           db
             .select({
-              total: drizzleSql<number>`coalesce(sum(case when (${clickEvents.metadata}->>'source') in ('qr', 'link') then 1 else 0 end), 0)`,
               qr: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'qr' then 1 else 0 end), 0)`,
               link: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'link' then 1 else 0 end), 0)`,
             })
@@ -613,7 +613,7 @@ async function fetchTippingStatsWithSession(
     const clickStats = clickStatsResult?.[0];
 
     return {
-      tipClicks: Number(clickStats?.total ?? 0),
+      tipClicks: Number((clickStats?.qr ?? 0) + (clickStats?.link ?? 0)),
       qrTipClicks: Number(clickStats?.qr ?? 0),
       linkTipClicks: Number(clickStats?.link ?? 0),
       tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
@@ -815,7 +815,7 @@ export async function getDashboardDataFresh(): Promise<DashboardData> {
  * Both functions now share the same deduped loader.
  *
  * @returns Complete DashboardData for the current user
- * @deprecated Use getDashboardData() instead
+ * @deprecated Use getDashboardData() instead. This alias is planned for removal in a future major release; migrate to getDashboardData() to avoid breakage.
  */
 export async function getDashboardDataCached(): Promise<DashboardData> {
   // Backwards-compatible alias; now shares the deduped loader.
