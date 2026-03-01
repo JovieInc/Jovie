@@ -1,4 +1,5 @@
 import { Bolt, Check, Disc, Link, Music, Youtube } from 'lucide-react';
+import Image from 'next/image';
 
 import { Container } from '@/components/site/Container';
 import type { SmartlinkThreadItem } from './demo/mock-data';
@@ -114,10 +115,12 @@ export function AutomaticReleaseSmartlinksSection() {
                 <div className='p-6 flex flex-col items-center'>
                   <div className='w-full aspect-square rounded-xl mb-6 shadow-lg relative overflow-hidden'>
                     <div className='absolute inset-0 bg-linear-to-br from-[#1c1c1c] to-[#0a0a0a]' />
-                    <img
+                    <Image
                       src='https://f4.bcbits.com/img/a0491039755_10.jpg'
                       alt='The Deep End - Cosmic Gate & Tim White'
                       className='absolute inset-0 w-full h-full object-cover opacity-90'
+                      fill
+                      unoptimized
                     />
                     <div className='absolute inset-0 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)] rounded-xl' />
                   </div>

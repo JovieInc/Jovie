@@ -7,11 +7,11 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const segmentControlVariants = cva(
-  'inline-flex items-center rounded-md border-0 bg-transparent p-0 shadow-none',
+  'inline-flex items-center rounded-md border-0 bg-surface-1 p-0.5 shadow-none',
   {
     variants: {
       variant: {
-        default: 'border-subtle',
+        default: 'border-subtle bg-surface-2',
         ghost: 'border-transparent bg-transparent shadow-none',
       },
       size: {
@@ -29,19 +29,19 @@ const segmentControlVariants = cva(
 
 const segmentTriggerVariants = cva(
   [
-    'relative rounded-md font-medium transition-all',
-    'focus-visible:outline-none focus-visible:bg-interactive-hover',
+    'relative rounded-md font-medium transition-all duration-fast ease-interactive',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background',
     // Inactive state
     'text-secondary-token hover:text-primary-token',
     // Active state - subtle bg, no shadow (Linear-style)
-    'data-[state=active]:bg-surface-2 data-[state=active]:text-primary-token',
+    'data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token data-[state=active]:shadow-sm',
   ],
   {
     variants: {
       size: {
-        sm: 'px-2.5 py-1 text-xs',
-        md: 'px-3 py-1.5 text-sm',
-        lg: 'px-4 py-2 text-base',
+        sm: 'px-2.5 py-1 text-[13px]',
+        md: 'px-3 py-1.5 text-[13px]',
+        lg: 'px-4 py-2 text-sm',
       },
     },
     defaultVariants: {

@@ -54,8 +54,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-emerald-500/10');
-      expect(badge.className).toContain('text-emerald-600');
+      expect(badge.className).toContain('bg-success-subtle');
+      expect(badge.className).toContain('text-success');
     });
 
     it('applies warning variant', () => {
@@ -65,8 +65,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-amber-500/10');
-      expect(badge.className).toContain('text-amber-600');
+      expect(badge.className).toContain('bg-warning-subtle');
+      expect(badge.className).toContain('text-warning');
     });
 
     it('applies error variant', () => {
@@ -76,8 +76,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-red-500/10');
-      expect(badge.className).toContain('text-red-600');
+      expect(badge.className).toContain('bg-error-subtle');
+      expect(badge.className).toContain('text-error');
     });
   });
 
@@ -97,7 +97,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('text-[10px]');
-      expect(badge.className).toContain('px-2');
+      expect(badge.className).toContain('px-1.5');
     });
 
     it('applies lg size', () => {
@@ -108,7 +108,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('text-xs');
-      expect(badge.className).toContain('px-3');
+      expect(badge.className).toContain('px-2.5');
     });
   });
 

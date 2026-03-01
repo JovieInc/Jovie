@@ -29,7 +29,7 @@ export const centeredContentStyles = {
   // fails to composite: https://github.com/shadcn-ui/ui/issues/7507
   position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
   layout: 'grid w-full max-w-lg gap-4',
-  surface: 'border border-subtle bg-surface-2 p-6 text-primary-token shadow-xl',
+  surface: 'border border-subtle bg-surface-3 p-6 text-primary-token shadow-xl',
   // fade + zoom only; slide animations conflict with the translate centering
   // because tw-animate-css slide uses transform: translate3d() in keyframes
   animation:
@@ -72,12 +72,12 @@ export const footerStyles = {
  * Title styles for modal components.
  */
 export const titleStyles = {
-  base: 'text-lg font-semibold leading-none tracking-tight',
+  base: 'text-base font-semibold leading-none tracking-tight',
 } as const;
 
 /**
  * Description styles for modal components.
  */
 export const descriptionStyles = {
-  base: 'text-sm text-secondary-token',
+  base: 'text-[13px] text-secondary-token',
 } as const;

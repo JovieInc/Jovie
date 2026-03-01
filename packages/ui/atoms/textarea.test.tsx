@@ -29,7 +29,7 @@ describe('Textarea', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
       expect(textarea.className).toContain('border-default');
-      expect(textarea.className).toContain('bg-surface-1');
+      expect(textarea.className).toContain('bg-surface-input');
     });
 
     it('applies error variant classes', () => {
@@ -41,7 +41,7 @@ describe('Textarea', () => {
     it('applies success variant classes', () => {
       render(<Textarea variant='success' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-green-500');
+      expect(textarea.className).toContain('border-success');
     });
 
     it('applies sm size classes', () => {
@@ -54,14 +54,14 @@ describe('Textarea', () => {
     it('applies md size classes by default', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('text-sm');
+      expect(textarea.className).toContain('text-[13px]');
       expect(textarea.className).toContain('min-h-[80px]');
     });
 
     it('applies lg size classes', () => {
       render(<Textarea textareaSize='lg' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('text-base');
+      expect(textarea.className).toContain('text-[13px]');
       expect(textarea.className).toContain('min-h-[120px]');
     });
 
@@ -163,7 +163,7 @@ describe('Textarea', () => {
     it('applies valid validation state', () => {
       render(<Textarea validationState='valid' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-green-500');
+      expect(textarea.className).toContain('border-success');
     });
   });
 
