@@ -88,6 +88,20 @@ describe('fetchUserBillingDataWithAuth', () => {
     expect(mockCaptureWarning).toHaveBeenCalledTimes(1);
   });
 
+  it('does not retry when billing lookup reports user not found', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_789' });
+    mockDbSelect.mockReturnValueOnce(createMockDbQuery([]));
+
+    const result = await fetchUserBillingDataWithAuth();
+
+    expect(result).toEqual({ success: false, error: 'User not found' });
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockCaptureWarning).not.toHaveBeenCalledWith(
+      'Billing data auth query failed after retry',
+      null,
+      expect.anything()
+    );
+  });
   it('captures warning when both attempts fail', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_456' });
     mockDbSelect
