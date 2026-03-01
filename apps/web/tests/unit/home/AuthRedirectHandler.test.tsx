@@ -44,7 +44,7 @@ describe('AuthRedirectHandler', () => {
     });
 
     expect(
-      screen.queryByLabelText(/redirecting to your dashboard/i)
+      screen.queryByTestId('auth-redirect-overlay')
     ).not.toBeInTheDocument();
   });
 
@@ -53,9 +53,7 @@ describe('AuthRedirectHandler', () => {
 
     render(<AuthRedirectHandler />);
 
-    expect(
-      screen.getByLabelText(/redirecting to your dashboard/i)
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('auth-redirect-overlay')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);

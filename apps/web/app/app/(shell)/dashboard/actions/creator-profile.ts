@@ -28,8 +28,7 @@ const EXPECTED_PROFILE_ACTION_ERRORS = new Set([
 
 function isExpectedProfileActionError(error: unknown): boolean {
   return (
-    error instanceof TypeError &&
-    EXPECTED_PROFILE_ACTION_ERRORS.has(error.message)
+    error instanceof Error && EXPECTED_PROFILE_ACTION_ERRORS.has(error.message)
   );
 }
 
@@ -66,7 +65,7 @@ export async function updateCreatorProfile(
     const { userId } = await getCachedAuth();
 
     if (!userId) {
-      throw new TypeError('Unauthorized');
+      throw new Error('Unauthorized');
     }
 
     return await withDbSession(async clerkUserId => {
@@ -178,7 +177,7 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
 async function requireOwnProfile() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const [user] = await db

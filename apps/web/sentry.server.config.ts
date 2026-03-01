@@ -29,6 +29,10 @@ Sentry.init({
     // Node.js TransformStream internal bug — not application code.
     // Occurs during streaming responses (chat API). Only 2 users affected.
     /transformAlgorithm is not a function/,
+    // Expected auth errors from server actions when session expires or user
+    // is not authenticated. These are handled by the client error boundary
+    // and are not bugs (JOV-1065).
+    /^Unauthorized$/,
   ],
 
   // Sample 10% of transactions in production, 100% in development
