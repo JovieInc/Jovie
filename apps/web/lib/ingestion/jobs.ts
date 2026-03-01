@@ -28,6 +28,62 @@ import {
 
 // Ingestion job payload schemas are now centralized in @/lib/validation/schemas/ingestion.ts
 
+/**
+ * Safely insert an ingestion job with dedup handling.
+ *
+ * The `dedup_key` unique index is partial (`WHERE dedup_key IS NOT NULL`),
+ * which means Drizzle's `onConflictDoNothing` may not fully match the
+ * constraint under concurrent inserts. This wrapper catches the PostgreSQL
+ * unique violation (23505) and falls back to returning the existing job.
+ */
+async function insertJobWithDedup(
+  values: typeof ingestionJobs.$inferInsert
+): Promise<string | null> {
+  const dedupKey = values.dedupKey;
+  let caughtUniqueViolation: Error | undefined;
+
+  try {
+    const result = await db
+      .insert(ingestionJobs)
+      .values(values)
+      .onConflictDoNothing({ target: ingestionJobs.dedupKey })
+      .returning({ id: ingestionJobs.id });
+
+    if (result.length > 0) {
+      return result[0].id;
+    }
+  } catch (error: unknown) {
+    // PostgreSQL unique_violation (23505) from the partial index race condition
+    const isUniqueViolation =
+      error instanceof Error &&
+      'code' in error &&
+      (error as { code: string }).code === '23505';
+    if (!isUniqueViolation) {
+      throw error;
+    }
+    caughtUniqueViolation = error as Error;
+  }
+
+  // Race condition: another concurrent insert won — return the existing job's id
+  const [winner] = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.dedupKey, dedupKey!))
+    .limit(1);
+
+  if (winner?.id) {
+    return winner.id;
+  }
+
+  // If we caught a 23505 but the winner row has vanished, surface the original
+  // error instead of silently returning null — this indicates an anomaly.
+  if (caughtUniqueViolation) {
+    throw caughtUniqueViolation;
+  }
+
+  return null;
+}
+
 export async function enqueueLinktreeIngestionJob(params: {
   creatorProfileId: string;
   sourceUrl: string;
@@ -78,32 +134,15 @@ export async function enqueueLinktreeIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_linktree',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_linktree',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueInstagramIngestionJob(params: {
@@ -152,31 +191,15 @@ export async function enqueueInstagramIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_instagram',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_instagram',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueTikTokIngestionJob(params: {
@@ -225,31 +248,15 @@ export async function enqueueTikTokIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_tiktok',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_tiktok',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueTwitterIngestionJob(params: {
@@ -298,31 +305,15 @@ export async function enqueueTwitterIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_twitter',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_twitter',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueBeaconsIngestionJob(params: {
@@ -371,31 +362,15 @@ export async function enqueueBeaconsIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_beacons',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_beacons',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueYouTubeIngestionJob(params: {
@@ -444,31 +419,15 @@ export async function enqueueYouTubeIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_youtube',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_youtube',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 export async function enqueueLayloIngestionJob(params: {
@@ -516,31 +475,15 @@ export async function enqueueLayloIngestionJob(params: {
     return existing[0].id;
   }
 
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'import_laylo',
-      payload,
-      dedupKey: payload.dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 0,
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, payload.dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'import_laylo',
+    payload,
+    dedupKey: payload.dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 0,
+    attempts: 0,
+  });
 }
 
 /**
@@ -581,32 +524,15 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   }
 
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'dsp_artist_discovery',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered discovery
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'dsp_artist_discovery',
+    payload,
+    dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 1, // Higher priority for user-triggered discovery
+    attempts: 0,
+  });
 }
 
 /**
@@ -645,32 +571,15 @@ export async function enqueueDspTrackEnrichmentJob(params: {
   }
 
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'dsp_track_enrichment',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 2, // Medium priority for enrichment
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won — return the existing job's id
-  const [winner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return winner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'dsp_track_enrichment',
+    payload,
+    dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 2, // Medium priority for enrichment
+    attempts: 0,
+  });
 }
 
 /**
@@ -709,30 +618,13 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
   }
 
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
-  const result = await db
-    .insert(ingestionJobs)
-    .values({
-      jobType: 'musicfetch_enrichment',
-      payload,
-      dedupKey,
-      status: 'pending',
-      runAt: new Date(),
-      priority: 1, // Higher priority for user-triggered enrichment
-      attempts: 0,
-    })
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey })
-    .returning({ id: ingestionJobs.id });
-
-  if (result.length > 0) {
-    return result[0].id;
-  }
-
-  // Race condition: another concurrent insert won
-  const [mfWinner] = await db
-    .select({ id: ingestionJobs.id })
-    .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
-    .limit(1);
-
-  return mfWinner?.id ?? null;
+  return insertJobWithDedup({
+    jobType: 'musicfetch_enrichment',
+    payload,
+    dedupKey,
+    status: 'pending',
+    runAt: new Date(),
+    priority: 1, // Higher priority for user-triggered enrichment
+    attempts: 0,
+  });
 }

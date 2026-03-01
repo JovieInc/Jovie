@@ -252,7 +252,7 @@ describe('@critical session.ts', () => {
 
       const { requireAuth } = await import('@/lib/auth/session');
 
-      await expect(requireAuth()).rejects.toThrow('Authentication required');
+      await expect(requireAuth()).rejects.toThrow('Unauthorized');
     });
   });
 

@@ -263,7 +263,7 @@ export async function saveProviderOverride(params: {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      throw new TypeError('Unauthorized');
+      throw new Error('Unauthorized');
     }
 
     const profile = await requireProfile();
@@ -336,7 +336,7 @@ export async function resetProviderOverride(params: {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      throw new TypeError('Unauthorized');
+      throw new Error('Unauthorized');
     }
 
     const profile = await requireProfile();
@@ -397,7 +397,7 @@ export async function saveReleaseLyrics(params: {
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -450,7 +450,7 @@ export async function saveCanvasStatus(params: {
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -533,7 +533,7 @@ export async function refreshRelease(params: { releaseId: string }): Promise<{
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -600,7 +600,7 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -706,7 +706,7 @@ export async function rescanAppleMusicLinks(): Promise<{
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -806,7 +806,7 @@ export async function syncFromSpotify(): Promise<{
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -912,7 +912,7 @@ export async function connectSpotifyArtist(params: {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1097,7 +1097,7 @@ export async function loadTracksForRelease(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1187,7 +1187,7 @@ export async function connectAppleMusicArtist(params: {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const externalArtistId = params.externalArtistId.trim();
@@ -1329,7 +1329,7 @@ export async function deleteRelease(
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1368,7 +1368,7 @@ export async function uploadReleaseArtwork(
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1422,7 +1422,7 @@ export async function updateAllowArtworkDownloads(
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1470,7 +1470,7 @@ export async function revertReleaseArtwork(
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
