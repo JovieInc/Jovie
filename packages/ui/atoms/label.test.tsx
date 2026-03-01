@@ -28,7 +28,7 @@ describe('Label', () => {
     it('applies default variant classes', () => {
       render(<Label data-testid='label'>Email</Label>);
       const label = screen.getByTestId('label');
-      expect(label.className).toContain('text-foreground');
+      expect(label.className).toContain('text-primary-token');
     });
 
     it('applies muted variant classes', () => {
@@ -38,7 +38,7 @@ describe('Label', () => {
         </Label>
       );
       const label = screen.getByTestId('label');
-      expect(label.className).toContain('text-muted-foreground');
+      expect(label.className).toContain('text-tertiary-token');
     });
 
     it('applies error variant classes', () => {
@@ -79,7 +79,7 @@ describe('Label', () => {
     it('applies base text styling', () => {
       render(<Label data-testid='label'>Email</Label>);
       const label = screen.getByTestId('label');
-      expect(label.className).toContain('text-sm');
+      expect(label.className).toContain('text-[13px]');
       expect(label.className).toContain('font-medium');
       expect(label.className).toContain('leading-none');
     });
@@ -99,7 +99,7 @@ describe('Label', () => {
       );
       const label = screen.getByTestId('label');
       expect(label.className).toContain('custom-class');
-      expect(label.className).toContain('text-sm');
+      expect(label.className).toContain('text-[13px]');
     });
   });
 

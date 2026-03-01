@@ -110,7 +110,7 @@ describe('Form', () => {
         </TestForm>
       );
       const formItem = screen.getByTestId('form-item');
-      expect(formItem.className).toContain('space-y-2');
+      expect(formItem.className).toContain('space-y-1.5');
     });
 
     it('merges custom className', () => {
@@ -236,8 +236,8 @@ describe('Form', () => {
     it('applies muted foreground styling', () => {
       render(<TestForm />);
       const description = screen.getByText('Your public display name.');
-      expect(description.className).toContain('text-sm');
-      expect(description.className).toContain('text-muted-foreground');
+      expect(description.className).toContain('text-[13px]');
+      expect(description.className).toContain('text-tertiary-token');
     });
 
     it('merges custom className', () => {
@@ -311,7 +311,7 @@ describe('Form', () => {
 
       const message = await screen.findByText('Email is required');
       expect(message.className).toContain('text-destructive');
-      expect(message.className).toContain('text-sm');
+      expect(message.className).toContain('text-[13px]');
       expect(message.className).toContain('font-medium');
     });
 

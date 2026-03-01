@@ -54,7 +54,7 @@ describe('overlay-styles', () => {
 
     it('surface includes border and background', () => {
       expect(centeredContentStyles.surface).toContain('border');
-      expect(centeredContentStyles.surface).toContain('bg-surface-2');
+      expect(centeredContentStyles.surface).toContain('bg-surface-3');
     });
 
     it('animation includes fade and zoom transitions', () => {
@@ -107,14 +107,14 @@ describe('overlay-styles', () => {
 
   describe('titleStyles', () => {
     it('base includes font sizing', () => {
-      expect(titleStyles.base).toContain('text-lg');
+      expect(titleStyles.base).toContain('text-base');
       expect(titleStyles.base).toContain('font-semibold');
     });
   });
 
   describe('descriptionStyles', () => {
     it('base includes muted text color', () => {
-      expect(descriptionStyles.base).toContain('text-sm');
+      expect(descriptionStyles.base).toContain('text-[13px]');
       expect(descriptionStyles.base).toContain('text-secondary-token');
     });
   });

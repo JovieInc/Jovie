@@ -58,7 +58,7 @@ describe('Input', () => {
     it('applies success variant classes', () => {
       render(<Input variant='success' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-green-500');
+      expect(input.className).toContain('border-success');
     });
 
     it('applies sm size classes', () => {
@@ -71,21 +71,21 @@ describe('Input', () => {
     it('applies md size classes by default', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-10');
+      expect(input.className).toContain('h-8');
       expect(input.className).toContain('text-[13px]');
     });
 
     it('applies lg size classes', () => {
       render(<Input inputSize='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-[68px]');
+      expect(input.className).toContain('h-10');
       expect(input.className).toContain('text-[13px]');
     });
 
     it('supports size prop as alias for inputSize', () => {
       render(<Input size='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-[68px]');
+      expect(input.className).toContain('h-10');
     });
 
     it('merges custom className', () => {
@@ -184,7 +184,7 @@ describe('Input', () => {
     it('applies valid validation state', () => {
       render(<Input validationState='valid' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-green-500');
+      expect(input.className).toContain('border-success');
     });
 
     it('applies pending validation state', () => {

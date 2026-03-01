@@ -83,7 +83,7 @@ describe('closeButtonStyles', () => {
   });
 
   it('has offset styles', () => {
-    expect(closeButtonStyles.offset).toContain('ring-offset-surface-1');
+    expect(closeButtonStyles.offset).toContain('ring-offset-background');
   });
 });
 
@@ -93,6 +93,6 @@ describe('closeButtonClassName', () => {
     expect(closeButtonClassName).toContain('hover:opacity-100');
     expect(closeButtonClassName).toContain('focus-visible:ring-2');
     expect(closeButtonClassName).toContain('disabled:pointer-events-none');
-    expect(closeButtonClassName).toContain('ring-offset-surface-1');
+    expect(closeButtonClassName).toContain('ring-offset-background');
   });
 });
