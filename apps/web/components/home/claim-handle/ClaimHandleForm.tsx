@@ -136,7 +136,7 @@ export function ClaimHandleForm({
         className={cn(
           'flex w-full items-center gap-3 rounded-[20px] border p-2',
           'transition-all duration-300',
-          'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)]',
+          'border-(--linear-border-default) bg-(--linear-bg-surface-0) shadow-[inset_0_1px_3px_rgba(0,0,0,0.15),0_0_0_1px_var(--linear-border-subtle)]',
           'focus-within:border-(--linear-text-primary) focus-within:shadow-[0_0_0_1px_var(--linear-text-primary)]',
           available === true &&
             'border-(--linear-success) focus-within:border-(--linear-success) focus-within:shadow-[0_0_0_1px_var(--linear-success)]'

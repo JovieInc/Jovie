@@ -8,7 +8,7 @@ export function FinalCTASection() {
       className='bg-[var(--linear-bg-page)] relative z-10'
       style={{
         paddingTop: 'var(--linear-section-pt-lg)',
-        paddingBottom: '240px', // Extra padding to catch the floating claim bar
+        paddingBottom: '180px', // Extra padding to catch the floating claim bar
       }}
     >
       <Container size='homepage'>

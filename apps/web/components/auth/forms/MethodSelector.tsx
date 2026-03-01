@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import * as React from 'react';
 import { useMemo } from 'react';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
@@ -14,9 +13,6 @@ import {
   authButtonVariants,
 } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
-
-const FOOTER_LINK_CLASSES =
-  'text-[#1f2023] dark:text-[#e3e4e6] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6c78e6]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#f5f5f5] dark:focus-visible:ring-offset-[#090909] rounded-md touch-manipulation';
 
 const METHOD_DISPLAY_NAMES: Record<AuthMethod, string> = {
   google: 'Google',
@@ -266,25 +262,6 @@ export function MethodSelector({
           </>
         )}
       </div>
-
-      {/* Footer link */}
-      <p className={FORM_LAYOUT.footerHint}>
-        {mode === 'signin' ? (
-          <>
-            Don&apos;t have an account?{' '}
-            <Link href='/signup' className={FOOTER_LINK_CLASSES}>
-              Create an account
-            </Link>
-          </>
-        ) : (
-          <>
-            Already have an account?{' '}
-            <Link href='/signin' className={FOOTER_LINK_CLASSES}>
-              Sign in
-            </Link>
-          </>
-        )}
-      </p>
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function RedesignedHero() {
           Everything you need to turn streams into super-fans.
         </p>
 
-        <div className='mt-10 w-full max-w-[480px] text-left'>
+        <div className='mt-8 w-full max-w-[480px] text-left'>
           <ClaimHandleForm />
         </div>
 
@@ -44,7 +44,7 @@ export function RedesignedHero() {
         </p>
 
         {/* Small inline Label Logos */}
-        <div className='mt-12 flex flex-col items-center gap-4'>
+        <div className='mt-8 flex flex-col items-center gap-4'>
           <p className='text-[var(--linear-label-size)] font-medium text-[var(--linear-text-tertiary)] uppercase tracking-[0.1em]'>
             Trusted by artists on
           </p>
@@ -57,7 +57,7 @@ export function RedesignedHero() {
         </div>
 
         {/* Product Shot */}
-        <div className='relative w-full max-w-[1024px] mt-16 lg:mt-24 text-left pointer-events-none'>
+        <div className='relative w-full max-w-[1024px] mt-12 lg:mt-16 text-left pointer-events-none'>
           <div
             className='relative w-full overflow-hidden rounded-t-xl lg:rounded-t-2xl border-t border-l border-r border-[var(--linear-border-subtle)]'
             style={{
