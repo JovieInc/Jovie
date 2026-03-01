@@ -1,6 +1,5 @@
 'use client';
 
-import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -103,8 +102,8 @@ export function SignUpForm() {
   };
 
   return (
-    <Card className='shadow-none border-0 bg-transparent p-0'>
-      <CardContent className='space-y-3 p-0'>
+    <div className='w-full'>
+      <div className='space-y-3'>
         {/* Method selection step */}
         {step === 'method' && (
           <>
@@ -245,7 +244,7 @@ export function SignUpForm() {
             .
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -187,7 +187,7 @@
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.1.1",
     "@playwright/test": "^1.58.2",
-    "@sentry/node": "^10",
+    "@sentry/node": "^10.39.0",
     "@storybook/addon-a11y": "^10.2.4",
     "@storybook/addon-docs": "^10.2.1",
     "@storybook/addon-vitest": "^10.2.8",

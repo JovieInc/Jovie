@@ -1,30 +1,24 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-
-// Mock ClaimHandleForm (client component with hooks)
-vi.mock('@/components/home/claim-handle', () => ({
-  ClaimHandleForm: () => <div data-testid='claim-handle-form' />,
-}));
-
+import { describe, expect, it } from 'vitest';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 
 describe('FinalCTASection', () => {
   it('renders urgency headline', () => {
     render(<FinalCTASection />);
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
-      "Your name won't be available forever."
+      'Claim your piece of the internet.'
     );
   });
 
-  it('renders claim handle form', () => {
-    render(<FinalCTASection />);
-    expect(screen.getByTestId('claim-handle-form')).toBeInTheDocument();
-  });
-
-  it('renders micro-text', () => {
+  it('renders CTA button', () => {
     render(<FinalCTASection />);
     expect(
-      screen.getByText(/free forever\. no credit card\./i)
+      screen.getByRole('link', { name: /get started/i })
     ).toBeInTheDocument();
+  });
+
+  it('renders subtext', () => {
+    render(<FinalCTASection />);
+    expect(screen.getByText(/no credit card required/i)).toBeInTheDocument();
   });
 });

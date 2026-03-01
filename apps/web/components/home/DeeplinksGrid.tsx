@@ -8,40 +8,56 @@ import { Container } from '@/components/site/Container';
 function TipMockup() {
   return (
     <div className='flex flex-col gap-3'>
-      <div className='flex gap-2'>
+      <p className='text-xs font-medium uppercase tracking-[0.15em] text-[var(--linear-text-tertiary)]'>
+        Choose amount
+      </p>
+      <div className='grid grid-cols-3 gap-3 border-0 p-0 m-0'>
         {['$3', '$5', '$10'].map(amt => (
           <div
             key={amt}
-            className='flex items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors duration-100'
+            className='group relative w-full aspect-square rounded-2xl border text-center transition-all duration-150 ease-out flex flex-col items-center justify-center gap-0.5'
             style={{
               backgroundColor:
-                amt === '$10'
-                  ? 'rgba(255,255,255,0.08)'
+                amt === '$5'
+                  ? 'var(--linear-text-primary)'
                   : 'rgba(255,255,255,0.03)',
-              color: 'var(--linear-text-primary)',
+              color:
+                amt === '$5'
+                  ? 'var(--linear-bg-page)'
+                  : 'var(--linear-text-primary)',
               border:
-                amt === '$10'
-                  ? '1px solid rgba(255,255,255,0.10)'
-                  : '1px solid rgba(255,255,255,0.05)',
+                amt === '$5'
+                  ? '1px solid transparent'
+                  : '1px solid rgba(255,255,255,0.10)',
+              boxShadow: amt === '$5' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
             }}
           >
-            {amt}
+            <span
+              className='text-[10px] font-medium uppercase tracking-wider'
+              style={{
+                color:
+                  amt === '$5'
+                    ? 'rgba(0,0,0,0.6)'
+                    : 'var(--linear-text-tertiary)',
+              }}
+            >
+              USD
+            </span>
+            <span className='text-2xl font-semibold tabular-nums tracking-tight'>
+              {amt}
+            </span>
           </div>
         ))}
       </div>
-      <div className='flex gap-2'>
-        <div
-          className='flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium flex-1'
-          style={{ backgroundColor: '#008CFF', color: '#fff' }}
-        >
-          Venmo
-        </div>
-        <div
-          className='flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium flex-1'
-          style={{ backgroundColor: '#fff', color: '#000' }}
-        >
-          Apple Pay
-        </div>
+      <div
+        className='flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold w-full mt-1'
+        style={{
+          backgroundColor: 'var(--linear-text-primary)',
+          color: 'var(--linear-bg-page)',
+          boxShadow: '0 2px 10px rgba(255,255,255,0.15)',
+        }}
+      >
+        Continue with Venmo
       </div>
     </div>
   );
@@ -54,109 +70,143 @@ function TourMockup() {
     { city: 'Brooklyn, NY', venue: "Baby's All Right", date: 'Apr 4' },
   ];
   return (
-    <div className='flex flex-col'>
-      {shows.map((show, i) => (
+    <div className='flex flex-col gap-2'>
+      {shows.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between py-2.5'
+          className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-surface-2 cursor-pointer group'
           style={{
-            borderBottom:
-              i < shows.length - 1
-                ? '1px solid rgba(255,255,255,0.05)'
-                : undefined,
+            backgroundColor: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
           }}
         >
-          <div style={{ fontSize: '12px', lineHeight: 1.4 }}>
+          <div className='flex flex-col gap-0.5'>
             <span
-              style={{ color: 'var(--linear-text-secondary)', fontWeight: 450 }}
+              style={{
+                color: 'var(--linear-text-primary)',
+                fontWeight: 500,
+                fontSize: '13px',
+                letterSpacing: '-0.01em',
+              }}
             >
               {show.city}
             </span>
-            <span style={{ color: 'var(--linear-text-tertiary)' }}>
-              {' '}
-              · {show.venue} · {show.date}
+            <span
+              style={{ color: 'var(--linear-text-tertiary)', fontSize: '12px' }}
+            >
+              {show.date} · {show.venue}
             </span>
           </div>
-          <span
-            style={{
-              color: 'var(--linear-text-tertiary)',
-              fontSize: '13px',
-            }}
+          <button
+            type='button'
+            className='px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] hover:scale-[1.02] transition-transform'
           >
-            →
-          </span>
+            Tickets
+          </button>
         </div>
       ))}
     </div>
   );
 }
 
+import { Calendar, Disc, FileText, Mail, Music, Youtube } from 'lucide-react';
+
 function ContactMockup() {
   const contacts = [
-    { role: 'Management', name: 'Sarah Kim' },
-    { role: 'Booking', name: 'Marcus Dean' },
-    { role: 'Publicist', name: 'Ava Chen' },
+    { role: 'Management', name: 'Sarah Kim', icon: Mail },
+    { role: 'Booking', name: 'Marcus Dean', icon: Calendar },
+    { role: 'Publicist', name: 'Ava Chen', icon: FileText },
   ];
   return (
-    <div className='flex flex-col'>
-      {contacts.map((c, i) => (
-        <div
-          key={c.role}
-          className='flex items-center justify-between py-2.5'
-          style={{
-            borderBottom:
-              i < contacts.length - 1
-                ? '1px solid rgba(255,255,255,0.05)'
-                : undefined,
-            fontSize: '12px',
-          }}
-        >
-          <span
-            style={{ color: 'var(--linear-text-tertiary)', fontWeight: 450 }}
+    <div className='flex flex-col gap-2'>
+      {contacts.map(c => {
+        const Icon = c.icon;
+        return (
+          <div
+            key={c.role}
+            className='flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-surface-2 cursor-pointer group'
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+            }}
           >
-            {c.role}
-          </span>
-          <span style={{ color: 'var(--linear-text-secondary)' }}>
-            {c.name}
-          </span>
-        </div>
-      ))}
+            <div
+              className='w-8 h-8 rounded-lg flex items-center justify-center'
+              style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+            >
+              <Icon className='w-4 h-4 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-primary)] transition-colors' />
+            </div>
+            <div className='flex flex-col flex-1'>
+              <span
+                style={{
+                  color: 'var(--linear-text-primary)',
+                  fontWeight: 500,
+                  fontSize: '13px',
+                }}
+              >
+                {c.role}
+              </span>
+              <span
+                style={{
+                  color: 'var(--linear-text-tertiary)',
+                  fontSize: '12px',
+                }}
+              >
+                {c.name}
+              </span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function ListenMockup() {
-  const dsps = ['Spotify', 'Apple Music', 'YouTube Music', 'Tidal'];
+  const dsps = [
+    { name: 'Spotify', icon: Disc, color: '#1DB954' },
+    { name: 'Apple Music', icon: Music, color: '#FA243C' },
+    { name: 'YouTube', icon: Youtube, color: '#FF0000' },
+  ];
   return (
-    <div className='flex flex-col'>
-      {dsps.map((name, i) => (
-        <div
-          key={name}
-          className='flex items-center justify-between py-2.5'
-          style={{
-            borderBottom:
-              i < dsps.length - 1
-                ? '1px solid rgba(255,255,255,0.05)'
-                : undefined,
-            fontSize: '12px',
-          }}
-        >
-          <span
-            style={{ color: 'var(--linear-text-secondary)', fontWeight: 450 }}
-          >
-            {name}
-          </span>
-          <span
+    <div className='flex flex-col gap-2'>
+      {dsps.map(dsp => {
+        const Icon = dsp.icon;
+        return (
+          <div
+            key={dsp.name}
+            className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-surface-2 cursor-pointer group'
             style={{
-              color: 'var(--linear-text-tertiary)',
-              fontSize: '11px',
-              fontWeight: 500,
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
             }}
           >
-            Open →
-          </span>
-        </div>
-      ))}
+            <div className='flex items-center gap-3'>
+              <div
+                className='w-8 h-8 rounded-lg flex items-center justify-center'
+                style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+              >
+                <Icon className='w-4 h-4' style={{ color: dsp.color }} />
+              </div>
+              <span
+                style={{
+                  color: 'var(--linear-text-primary)',
+                  fontWeight: 500,
+                  fontSize: '13px',
+                }}
+              >
+                {dsp.name}
+              </span>
+            </div>
+            <button
+              type='button'
+              className='px-4 py-1.5 rounded-full text-[12px] font-medium bg-[rgba(255,255,255,0.05)] text-[var(--linear-text-primary)] hover:bg-[rgba(255,255,255,0.1)] transition-colors'
+            >
+              Play
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
