@@ -68,7 +68,9 @@ export function ReleaseSidebarHeader({
         idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
       })
       .catch(() => {
-        alert('Failed to copy the release ID. Your browser may not allow clipboard access.');
+        alert(
+          'Failed to copy the release ID. Your browser may not allow clipboard access.'
+        );
       });
   }, [release]);
 
@@ -116,6 +118,7 @@ export function ReleaseSidebarHeader({
   }
 
   if (hasRelease && release?.id) {
+    /* eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
     overflowActions.push({
       id: 'copy-id',
       label: isIdCopied ? 'Copied!' : 'Copy release ID',
