@@ -315,7 +315,7 @@ export async function saveBandsintownApiKey(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -373,7 +373,7 @@ export async function removeBandsintownApiKey(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -423,7 +423,7 @@ export async function connectBandsintownArtist(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -492,7 +492,7 @@ export async function syncFromBandsintown(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -561,7 +561,7 @@ export async function createTourDate(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -626,7 +626,7 @@ export async function updateTourDate(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -692,7 +692,7 @@ export async function deleteTourDate(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -726,7 +726,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();

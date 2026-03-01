@@ -11,6 +11,8 @@
  * - Growth: $99/mo or $948/yr (save 2 months) - Coming soon
  */
 
+import 'server-only';
+
 import { PRICING } from '@/lib/config/pricing';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
@@ -139,6 +141,11 @@ export function validateStripeConfig(): {
 
   if (!publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
     missingVars.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
+  }
+
+  // Founding tier is the primary paid product — must be configured
+  if (!env.STRIPE_PRICE_FOUNDING_MONTHLY) {
+    missingVars.push('STRIPE_PRICE_FOUNDING_MONTHLY');
   }
 
   if (!env.STRIPE_PRICE_PRO_MONTHLY) {

@@ -14,17 +14,10 @@ const nextConfig = {
   // Transpile workspace packages for proper module resolution
   transpilePackages: ['@jovie/ui'],
   turbopack: {
-    // Resolve aliases matching tsconfig paths for consistent module resolution
-    resolveAlias: {
-      '@/*': './*',
-      '@/components/*': './components/*',
-      '@/atoms/*': './components/atoms/*',
-      '@/molecules/*': './components/molecules/*',
-      '@/organisms/*': './components/organisms/*',
-      '@/lib/*': './lib/*',
-      '@/types/*': './types/*',
-    },
-    // Prioritize common extensions for faster resolution
+    // Path aliases are automatically resolved from tsconfig.json paths.
+    // Do NOT add resolveAlias entries for @/* — that conflicts with
+    // tsconfig resolution and causes "Could not parse module" errors
+    // for server-only files (JOV-1062, JOV-1063).
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
   },
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback

@@ -39,7 +39,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   // Validate userId format to prevent SQL injection
@@ -160,7 +160,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Authentication required');
+    throw new Error('Unauthorized');
   }
   return userId;
 }
