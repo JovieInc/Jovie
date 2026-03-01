@@ -138,21 +138,40 @@ export function SeeItInActionCarousel({ creators }: Props) {
           {extendedCreators.map((creator, index) => (
             <div
               key={`${creator.id}-${index}`}
-              className='relative w-[120px] h-[120px] shrink-0'
+              className='relative flex flex-col gap-3 group'
             >
-              <Image
-                src={creator.src}
-                alt={`${creator.name}'s avatar`}
-                fill
-                sizes='120px'
-                placeholder='blur'
-                blurDataURL={BLUR_DATA_URL}
-                loading={index < 12 ? 'eager' : 'lazy'}
-                className='rounded-full object-cover transition-colors duration-150'
-                style={{
-                  border: '1px solid var(--linear-border-subtle)',
-                }}
-              />
+              <div className='relative w-[180px] h-[240px] shrink-0 overflow-hidden rounded-[20px]'>
+                <Image
+                  src={creator.src}
+                  alt={`${creator.name}'s avatar`}
+                  fill
+                  sizes='180px'
+                  placeholder='blur'
+                  blurDataURL={BLUR_DATA_URL}
+                  loading={index < 12 ? 'eager' : 'lazy'}
+                  className='object-cover transition-transform duration-500 group-hover:scale-105'
+                />
+                {/* Gradient overlay to make text readable */}
+                <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80' />
+
+                {/* Profile info overlay */}
+                <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-1'>
+                  <span className='text-white font-medium text-[15px] truncate drop-shadow-md'>
+                    {creator.name}
+                  </span>
+                  {creator.tagline && (
+                    <span className='text-white/80 text-[12px] truncate'>
+                      {creator.tagline}
+                    </span>
+                  )}
+                </div>
+
+                {/* Inner border for premium feel */}
+                <div
+                  className='absolute inset-0 rounded-[20px] pointer-events-none'
+                  style={{ border: '1px solid rgba(255,255,255,0.15)' }}
+                />
+              </div>
             </div>
           ))}
         </div>

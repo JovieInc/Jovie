@@ -344,6 +344,13 @@
       "when": 1772092800000,
       "tag": "0044_optimize_audience_type_filtering",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1772179200000,
+      "tag": "0045_add_users_stripe_price_id",
+      "breakpoints": true
     }
   ]
 }
