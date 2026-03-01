@@ -263,7 +263,7 @@ export function createRightMetaCellRenderer(
       : null;
 
     return (
-      <div className='flex min-w-[180px] md:min-w-[300px] items-center justify-end gap-3 text-xs text-secondary-token'>
+      <div className='flex min-w-[180px] md:min-w-[300px] items-center justify-end gap-3 text-[13px] text-secondary-token'>
         <div className='min-w-0 flex-1'>
           <SmartLinkCell
             release={release}
@@ -372,7 +372,7 @@ export function renderTotalTracksCell({
   getValue,
 }: CellContext<ReleaseViewModel, number>) {
   return (
-    <span className='text-xs text-secondary-token tabular-nums'>
+    <span className='text-[13px] text-secondary-token tabular-nums'>
       {getValue()}
     </span>
   );
@@ -386,7 +386,7 @@ export function renderDurationCell({
   if (!durationMs) return <EmptyCell />;
 
   return (
-    <span className='text-xs text-secondary-token tabular-nums'>
+    <span className='text-[13px] text-secondary-token tabular-nums'>
       {formatDuration(durationMs)}
     </span>
   );
@@ -406,12 +406,12 @@ export function renderGenresCell({
 
   return (
     <div className='flex items-center gap-1'>
-      <TruncatedText lines={1} className='text-xs text-secondary-token'>
+      <TruncatedText lines={1} className='text-[13px] text-secondary-token'>
         {firstGenre}
       </TruncatedText>
       {remainingCount > 0 && (
         <span
-          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
+          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] text-tertiary-token'
           title={genres.slice(1).join(', ')}
         >
           +{remainingCount}
@@ -438,7 +438,7 @@ export function renderMetricsCell({
     : null;
 
   return (
-    <div className='flex items-center gap-3 text-xs text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-3 text-[13px] text-secondary-token tabular-nums'>
       {/* Tracks count - fixed width */}
       <span className='w-8 text-right' title='Tracks'>
         {release.totalTracks}
@@ -481,7 +481,7 @@ export function renderStatsCell({
     : null;
 
   return (
-    <div className='flex items-center gap-2 text-xs text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-2 text-[13px] text-secondary-token tabular-nums'>
       {/* Popularity icon first */}
       <div className='w-4 flex justify-center'>
         <PopularityIcon popularity={release.spotifyPopularity} />

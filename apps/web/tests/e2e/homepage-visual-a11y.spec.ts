@@ -106,9 +106,9 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       for (const result of sectionResults) {
         const status = result.visible
           ? result.hasContent
-            ? '✅'
-            : '⚠️ BLANK'
-          : '❌ MISSING';
+            ? 'OK'
+            : 'BLANK'
+          : 'MISSING';
         console.log(`  ${status} ${result.name}`);
       }
 

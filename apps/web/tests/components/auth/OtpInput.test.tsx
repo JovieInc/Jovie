@@ -148,7 +148,7 @@ describe('OtpInput', () => {
   it('shows error styling when error prop is true', () => {
     const { container } = render(<OtpInput error />);
 
-    const digitBox = container.querySelector('[class*="border-destructive"]');
+    const digitBox = container.querySelector('[class*="linear-error"]');
     expect(digitBox).toBeInTheDocument();
   });
 
