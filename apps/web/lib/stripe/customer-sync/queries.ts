@@ -71,6 +71,10 @@ function mergeWithDefaults<T extends readonly UserBillingFieldKey[]>(
   return merged;
 }
 
+function isNonRetryableBillingError(error?: string): boolean {
+  return error === 'User not found' || error === 'User not authenticated';
+}
+
 /**
  * Attempts to fetch user data with legacy field fallback
  */
@@ -233,6 +237,13 @@ export async function fetchUserBillingDataWithAuth<
     // If billing query fails unexpectedly, retry once as a best-effort guard
     // against transient auth/session setup issues before surfacing an error.
     if (sessionAwareResult.success) {
+      return sessionAwareResult;
+    }
+
+    // Do not retry deterministic errors that are expected and non-transient.
+    // For example, newly authenticated users can exist in Clerk before their
+    // local billing row is created. Callers normalize this case to free plan.
+    if (isNonRetryableBillingError(sessionAwareResult.error)) {
       return sessionAwareResult;
     }
 
