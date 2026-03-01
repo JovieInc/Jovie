@@ -1,20 +1,11 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
-import { ActionDrivenProfileSection } from '@/components/home/ActionDrivenProfileSection';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
 import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticReleaseSmartlinksSection';
-
-const DeeplinksGrid = dynamic(
-  () =>
-    import('@/components/home/DeeplinksGrid').then(m => ({
-      default: m.DeeplinksGrid,
-    })),
-  { loading: () => <div style={{ height: 480 }} /> }
-);
 
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
+import { PhoneProfileDemo } from '@/components/home/PhoneProfileDemo';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
@@ -260,16 +251,12 @@ export default function HomePage() {
         <RedesignedHero />
       </div>
 
-      <DeferredSection placeholderHeight={800}>
-        <ActionDrivenProfileSection />
+      <DeferredSection placeholderHeight={600}>
+        <PhoneProfileDemo />
       </DeferredSection>
 
       <DeferredSection placeholderHeight={560}>
         <AutomaticReleaseSmartlinksSection />
-      </DeferredSection>
-
-      <DeferredSection placeholderHeight={480}>
-        <DeeplinksGrid />
       </DeferredSection>
 
       <DeferredSection placeholderHeight={520}>
