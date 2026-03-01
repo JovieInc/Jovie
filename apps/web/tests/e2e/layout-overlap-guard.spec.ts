@@ -83,6 +83,14 @@ for (const viewport of VIEWPORTS) {
                 return false;
               }
 
+              // Also skip descendants of fixed/sticky containers (e.g. floating bars)
+              let ancestor = el.parentElement;
+              while (ancestor) {
+                const pos = window.getComputedStyle(ancestor).position;
+                if (pos === 'fixed' || pos === 'sticky') return false;
+                ancestor = ancestor.parentElement;
+              }
+
               const interactive = el.matches(
                 'button, a[href], input, select, textarea, [role="button"], [role="link"]'
               );
