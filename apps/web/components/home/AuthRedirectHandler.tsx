@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LogoLoader } from '@/components/atoms/LogoLoader';
 import { APP_ROUTES } from '@/constants/routes';
 
 const CLERK_ACTIVITY_COOKIE = '__client_uat';
@@ -29,8 +28,8 @@ const hasActiveClerkSession = (cookieValue: string) => {
  * the user has an active session and we redirect to the dashboard.
  *
  * This runs in a useEffect after hydration so the static homepage renders
- * instantly for all visitors. Authenticated users get an immediate in-place
- * loading shell while the client-side redirect resolves.
+ * instantly for all visitors. Authenticated users see a subtle fade overlay
+ * while the client-side redirect resolves — no spinner, no layout shift.
  */
 export function AuthRedirectHandler() {
   const router = useRouter();
@@ -55,11 +54,15 @@ export function AuthRedirectHandler() {
     return null;
   }
 
+  // Subtle full-screen fade — no spinner, no logo, no layout shift.
+  // The redirect resolves within milliseconds; this just prevents a flash
+  // of marketing content for authenticated users.
   return (
-    <div className='fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm'>
-      <LogoLoader aria-label='Redirecting to your dashboard' variant='mono' />
-      <span className='sr-only'>Redirecting to your dashboard</span>
-    </div>
+    <div
+      className='fixed inset-0 z-50 bg-base'
+      aria-hidden='true'
+      data-testid='auth-redirect-overlay'
+    />
   );
 }
 
