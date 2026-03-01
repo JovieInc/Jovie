@@ -18,7 +18,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
 
 const ctaLoadingFallback = (
-  <div className='space-y-3 py-4 sm:py-5'>
+  <div className='space-y-3 py-2 sm:py-3'>
     <div className='h-3 w-40 rounded skeleton' aria-hidden='true' />
     <SubscriptionFormSkeleton />
   </div>
@@ -114,13 +114,13 @@ export function ProfilePrimaryCTA({
   ) {
     if (subscribeTwoStep) {
       return (
-        <div className='space-y-4 py-4 sm:py-5'>
+        <div className='space-y-3 py-2 sm:py-3'>
           <TwoStepNotificationsCTA artist={artist} />
         </div>
       );
     }
     return (
-      <div className='space-y-4 py-4 sm:py-5'>
+      <div className='space-y-3 py-2 sm:py-3'>
         <ArtistNotificationsCTA
           artist={artist}
           variant='button'
