@@ -15,7 +15,7 @@ export function FinalCTASection() {
         {/* Gradient separator */}
         <div
           aria-hidden='true'
-          className='mb-10 h-px'
+          className='mb-12 h-px max-w-[var(--linear-container-max)] mx-auto'
           style={{
             background:
               'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
@@ -23,25 +23,17 @@ export function FinalCTASection() {
         />
 
         <div className='mx-auto flex max-w-2xl flex-col items-center text-center'>
-          <h2
-            style={{
-              fontSize: 'clamp(28px, 4vw, 48px)',
-              fontWeight: 510,
-              lineHeight: 1,
-              letterSpacing: '-0.022em',
-              color: 'var(--linear-text-primary)',
-            }}
-          >
+          <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
             Claim your piece of the internet.
           </h2>
-          <p className='mt-3 text-[var(--linear-text-tertiary)]'>
+          <p className='mt-4 marketing-lead-linear text-[var(--linear-text-secondary)]'>
             Get started for free. No credit card required.
           </p>
 
           <div className='mt-8 flex flex-col items-center gap-4 w-full'>
             <Button
               size='lg'
-              className='h-12 rounded-full px-8 text-[15px] shadow-[0_0_0_1px_var(--linear-border-subtle),0_8px_16px_-4px_rgba(0,0,0,0.1)]'
+              className='h-[var(--linear-button-height-md)] rounded-[var(--linear-radius-md)] px-6 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] bg-[var(--linear-btn-primary-bg)] text-[var(--linear-btn-primary-fg)] shadow-[var(--linear-shadow-button)] hover:opacity-90 transition-opacity'
               asChild
             >
               <Link href='/signup'>Get Started Now</Link>

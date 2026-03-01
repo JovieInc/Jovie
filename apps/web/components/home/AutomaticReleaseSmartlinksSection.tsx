@@ -8,48 +8,32 @@ import { SMARTLINK_KANBAN_COLUMNS, SMARTLINK_THREAD } from './demo/mock-data';
 export function AutomaticReleaseSmartlinksSection() {
   return (
     <section
-      className='section-spacing-linear overflow-hidden pb-32 md:pb-48'
+      className='section-spacing-linear overflow-hidden'
       style={{ backgroundColor: 'var(--linear-bg-page)' }}
     >
       <Container size='homepage'>
-        <div className='mx-auto max-w-6xl'>
+        <div className='mx-auto max-w-[var(--linear-content-max)]'>
           {/* Two-column header */}
-          <div className='grid gap-6 md:grid-cols-2 md:items-start'>
-            <h2
-              className='max-w-md'
-              style={{
-                color: 'var(--linear-text-primary)',
-                fontSize: 'clamp(28px, 4vw, 48px)',
-                fontWeight: 510,
-                letterSpacing: '-0.022em',
-                lineHeight: 1,
-              }}
-            >
+          <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
+            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
               Smart links for
               <br />
               every release.
             </h2>
             <div className='max-w-lg'>
-              <p
-                style={{
-                  color: 'var(--linear-text-secondary)',
-                  fontSize: '15px',
-                  lineHeight: '24px',
-                  letterSpacing: '-0.011em',
-                }}
-              >
+              <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Connect your Spotify and Jovie instantly creates a polished
                 release smartlink — populated with platform destinations,
                 artwork, and metadata your fans can trust.
               </p>
               <span
-                className='mt-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1'
+                className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors'
                 style={{
-                  fontSize: '13px',
-                  fontWeight: 510,
+                  fontSize: 'var(--linear-caption-size)',
+                  fontWeight: 'var(--linear-font-weight-medium)',
                   color: 'var(--linear-text-secondary)',
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
+                  borderColor: 'var(--linear-border-subtle)',
                 }}
               >
                 Smartlinks · Auto-generated{' '}
@@ -59,24 +43,23 @@ export function AutomaticReleaseSmartlinksSection() {
           </div>
 
           {/* Full Width Product Mockup */}
-          <div className='relative mt-20 mx-auto w-full max-w-[1320px] px-4 sm:px-6 lg:px-8'>
+          <div className='relative mt-16 md:mt-24 mx-auto w-full'>
             <div className='relative w-full'>
               {/* Left panel — Dashboard Window */}
               <div
                 className='relative overflow-hidden rounded-xl md:rounded-2xl md:w-[85%]'
                 style={{
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  backgroundColor: 'rgba(10, 14, 24, 0.95)',
-                  boxShadow:
-                    '0 0 0 1px rgba(0,0,0,0.5), 0 30px 60px -12px rgba(0,0,0,0.8), 0 50px 100px -20px rgba(0,0,0,0.8)',
+                  border: '1px solid var(--linear-border-subtle)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
+                  boxShadow: 'var(--linear-shadow-card-elevated)',
                 }}
               >
                 {/* Fake Mac Header */}
                 <div
                   className='flex items-center px-5 h-12 border-b'
                   style={{
-                    borderColor: 'rgba(255,255,255,0.06)',
-                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    borderColor: 'var(--linear-border-subtle)',
+                    backgroundColor: 'var(--linear-bg-surface-1)',
                   }}
                 >
                   <div className='flex gap-2'>
@@ -95,21 +78,20 @@ export function AutomaticReleaseSmartlinksSection() {
                 </div>
 
                 {/* Bottom gradient fade */}
-                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[rgba(10,14,24,1)] to-transparent' />
+                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
               </div>
 
               {/* Right panel — Floating Release Page */}
               <div
-                className='absolute z-10 hidden md:flex flex-col right-0 bottom-[-20%]'
+                className='absolute z-10 hidden md:flex flex-col right-0 bottom-[-15%]'
                 style={{
                   width: '360px',
-                  borderRadius: '24px',
-                  backgroundColor: 'rgba(22, 23, 26, 0.75)',
+                  borderRadius: 'var(--linear-radius-lg)',
+                  backgroundColor: 'var(--linear-bg-surface-1)',
                   backdropFilter: 'blur(24px)',
                   WebkitBackdropFilter: 'blur(24px)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  boxShadow:
-                    '0 0 0 1px rgba(255,255,255,0.05), 0 40px 80px -10px rgba(0,0,0,0.9), 0 0 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.1)',
+                  border: '1px solid var(--linear-border-strong)',
+                  boxShadow: 'var(--linear-shadow-card-elevated)',
                 }}
               >
                 <div className='p-6 flex flex-col items-center'>
@@ -126,10 +108,10 @@ export function AutomaticReleaseSmartlinksSection() {
                   </div>
 
                   <div className='w-full text-center mb-6'>
-                    <h3 className='text-white font-semibold text-2xl mb-1 tracking-tight'>
+                    <h3 className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-semibold)] text-[var(--linear-h3-size)] mb-1 tracking-tight'>
                       The Deep End
                     </h3>
-                    <p className='text-[var(--linear-text-tertiary)] text-[15px]'>
+                    <p className='text-[var(--linear-text-tertiary)] text-[var(--linear-body-size)]'>
                       Cosmic Gate & Tim White
                     </p>
                   </div>
@@ -155,7 +137,7 @@ function ActivityThread() {
       className='flex flex-col border-r'
       style={{
         borderColor: 'var(--linear-border-subtle)',
-        backgroundColor: 'transparent',
+        backgroundColor: 'var(--linear-bg-surface-0)',
       }}
     >
       {/* Title bar */}
@@ -165,8 +147,8 @@ function ActivityThread() {
       >
         <span
           style={{
-            fontSize: '13px',
-            fontWeight: 510,
+            fontSize: 'var(--linear-caption-size)',
+            fontWeight: 'var(--linear-font-weight-medium)',
             color: 'var(--linear-text-primary)',
           }}
         >
@@ -174,7 +156,7 @@ function ActivityThread() {
         </span>
         <span
           style={{
-            fontSize: '13px',
+            fontSize: 'var(--linear-caption-size)',
             color: 'var(--linear-text-tertiary)',
           }}
         >
@@ -187,13 +169,13 @@ function ActivityThread() {
         {SMARTLINK_THREAD.map(item => (
           <div
             key={item.id}
-            className='flex items-start gap-3 rounded-lg px-3 py-2.5'
+            className='flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[var(--linear-bg-hover)]'
             style={{ backgroundColor: 'transparent' }}
           >
             {/* Icon */}
             <span
               className='mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full'
-              style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
+              style={{ backgroundColor: 'var(--linear-bg-surface-2)' }}
             >
               <ThreadIcon type={item.iconType} color={item.iconColor} />
             </span>
@@ -203,8 +185,8 @@ function ActivityThread() {
                 <p
                   className='truncate'
                   style={{
-                    fontSize: '13px',
-                    fontWeight: 450,
+                    fontSize: 'var(--linear-caption-size)',
+                    fontWeight: 'var(--linear-font-weight-medium)',
                     color: 'var(--linear-text-primary)',
                   }}
                 >
@@ -213,7 +195,7 @@ function ActivityThread() {
                 <span
                   className='flex-shrink-0'
                   style={{
-                    fontSize: '11px',
+                    fontSize: 'var(--linear-label-size)',
                     color: 'var(--linear-text-tertiary)',
                   }}
                 >
@@ -224,9 +206,9 @@ function ActivityThread() {
                 <p
                   className='mt-0.5'
                   style={{
-                    fontSize: '12px',
-                    color: 'var(--linear-text-tertiary)',
-                    lineHeight: '18px',
+                    fontSize: 'var(--linear-label-size)',
+                    color: 'var(--linear-text-secondary)',
+                    lineHeight: 'var(--linear-leading-relaxed)',
                   }}
                 >
                   {item.detail}
@@ -245,24 +227,24 @@ function ActivityThread() {
         <div
           className='flex items-center gap-2 rounded-lg px-3 py-2'
           style={{
-            backgroundColor: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.08)',
+            backgroundColor: 'var(--linear-bg-surface-1)',
+            border: '1px solid var(--linear-border-subtle)',
           }}
         >
           <span
             className='rounded px-1.5 py-0.5'
             style={{
-              fontSize: '11px',
-              fontWeight: 510,
-              color: 'var(--linear-accent, #6C7AFF)',
-              backgroundColor: 'rgba(108, 122, 255, 0.1)',
+              fontSize: 'var(--linear-label-size)',
+              fontWeight: 'var(--linear-font-weight-medium)',
+              color: 'var(--linear-accent)',
+              backgroundColor: 'oklch(from var(--linear-accent) l c h / 0.1)',
             }}
           >
             @jovie
           </span>
           <span
             style={{
-              fontSize: '13px',
+              fontSize: 'var(--linear-caption-size)',
               color: 'var(--linear-text-tertiary)',
             }}
           >
@@ -275,20 +257,22 @@ function ActivityThread() {
 }
 
 function getStatusColor(status: string): string {
-  if (status === 'Live') return '#4EC98C';
-  if (status === 'Syncing') return '#6C7AFF';
+  if (status === 'Live') return 'var(--linear-success)';
+  if (status === 'Syncing') return 'var(--linear-accent)';
   return 'var(--linear-text-tertiary)';
 }
 
 function getStatusBgColor(status: string): string {
-  if (status === 'Live') return 'rgba(78, 201, 140, 0.12)';
-  if (status === 'Syncing') return 'rgba(108, 122, 255, 0.12)';
-  return 'rgba(255,255,255,0.05)';
+  if (status === 'Live')
+    return 'oklch(from var(--linear-success) l c h / 0.12)';
+  if (status === 'Syncing')
+    return 'oklch(from var(--linear-accent) l c h / 0.12)';
+  return 'var(--linear-bg-surface-2)';
 }
 
 function ReleaseKanban() {
   return (
-    <div style={{ backgroundColor: 'transparent' }}>
+    <div style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}>
       {/* Title bar */}
       <div
         className='flex items-center gap-2 border-b px-5 py-3'
@@ -296,8 +280,8 @@ function ReleaseKanban() {
       >
         <span
           style={{
-            fontSize: '13px',
-            fontWeight: 510,
+            fontSize: 'var(--linear-caption-size)',
+            fontWeight: 'var(--linear-font-weight-medium)',
             color: 'var(--linear-text-primary)',
           }}
         >
@@ -306,10 +290,10 @@ function ReleaseKanban() {
         <span
           className='rounded-full px-2 py-0.5'
           style={{
-            fontSize: '10px',
-            fontWeight: 510,
+            fontSize: 'var(--linear-label-size)',
+            fontWeight: 'var(--linear-font-weight-medium)',
             color: 'var(--linear-text-secondary)',
-            backgroundColor: 'rgba(255,255,255,0.05)',
+            backgroundColor: 'var(--linear-bg-surface-2)',
           }}
         >
           4
@@ -324,8 +308,8 @@ function ReleaseKanban() {
             <div className='flex items-center justify-between px-1 py-1.5'>
               <span
                 style={{
-                  fontSize: '11px',
-                  fontWeight: 510,
+                  fontSize: 'var(--linear-label-size)',
+                  fontWeight: 'var(--linear-font-weight-medium)',
                   letterSpacing: '0.05em',
                   textTransform: 'uppercase',
                   color: 'var(--linear-text-tertiary)',
@@ -335,7 +319,7 @@ function ReleaseKanban() {
               </span>
               <span
                 style={{
-                  fontSize: '11px',
+                  fontSize: 'var(--linear-label-size)',
                   color: 'var(--linear-text-tertiary)',
                 }}
               >
@@ -347,10 +331,10 @@ function ReleaseKanban() {
             {column.cards.map(card => (
               <div
                 key={card.id}
-                className='overflow-hidden rounded-lg'
+                className='overflow-hidden rounded-lg shadow-sm transition-colors hover:bg-[var(--linear-bg-hover)] cursor-default'
                 style={{
-                  border: '1px solid rgba(255,255,255,0.05)',
-                  backgroundColor: 'rgba(255,255,255,0.02)',
+                  border: '1px solid var(--linear-border-subtle)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
                 }}
               >
                 {/* Artwork */}
@@ -363,8 +347,8 @@ function ReleaseKanban() {
                   <p
                     className='truncate'
                     style={{
-                      fontSize: '12px',
-                      fontWeight: 500,
+                      fontSize: 'var(--linear-caption-size)',
+                      fontWeight: 'var(--linear-font-weight-medium)',
                       color: 'var(--linear-text-primary)',
                     }}
                   >
@@ -373,7 +357,7 @@ function ReleaseKanban() {
                   <p
                     className='truncate'
                     style={{
-                      fontSize: '11px',
+                      fontSize: 'var(--linear-label-size)',
                       color: 'var(--linear-text-tertiary)',
                     }}
                   >
@@ -393,7 +377,7 @@ function ReleaseKanban() {
                       className='rounded-full px-1.5 py-0.5'
                       style={{
                         fontSize: '10px',
-                        fontWeight: 510,
+                        fontWeight: 'var(--linear-font-weight-medium)',
                         color: getStatusColor(card.status),
                         backgroundColor: getStatusBgColor(card.status),
                       }}
@@ -438,23 +422,33 @@ function PlatformButton({
 }) {
   return (
     <div
-      className='w-full flex items-center justify-between p-3.5 rounded-xl transition-colors hover:bg-white/5 cursor-pointer group'
+      className='w-full flex items-center justify-between p-3.5 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
       style={{
-        backgroundColor: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        backgroundColor: 'var(--linear-bg-surface-2)',
+        border: '1px solid var(--linear-border-subtle)',
       }}
     >
       <div className='flex items-center gap-3.5'>
-        <div className='w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors'>
-          <IconComponent className='w-4 h-4 text-white/80' />
+        <div
+          className='w-8 h-8 rounded-lg flex items-center justify-center transition-colors'
+          style={{
+            backgroundColor: 'var(--linear-bg-surface-0)',
+            border: '1px solid var(--linear-border-subtle)',
+          }}
+        >
+          <IconComponent className='w-4 h-4 text-[var(--linear-text-secondary)] group-hover:text-[var(--linear-text-primary)] transition-colors' />
         </div>
-        <span className='text-[15px] font-medium text-white tracking-tight'>
+        <span className='text-[var(--linear-body-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] tracking-tight'>
           {platform}
         </span>
       </div>
       <button
         type='button'
-        className='px-4 py-1.5 rounded-full text-[13px] font-semibold bg-white text-black hover:bg-white/90 transition-colors'
+        className='px-4 py-1.5 rounded-full text-[var(--linear-caption-size)] font-[var(--linear-font-weight-semibold)] transition-colors'
+        style={{
+          backgroundColor: 'var(--linear-text-primary)',
+          color: 'var(--linear-bg-page)',
+        }}
       >
         Play
       </button>
