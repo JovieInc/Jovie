@@ -559,6 +559,10 @@ jobs:
           prompt: |
             Read the file at /tmp/fix-instructions.md and apply the fixes described.
 
+            When writing or fixing test assertions, ALWAYS read the source file first and
+            extract exact strings from the code. Never infer or guess text content — copy
+            the literal strings used in the implementation.
+
             After making changes, run these validation commands:
             1. bash scripts/automation-verify.sh affected (verify typecheck/lint/tests)
             2. pnpm biome check . --write (auto-fix formatting)
