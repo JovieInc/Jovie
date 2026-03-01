@@ -50,10 +50,8 @@ function TipMockup() {
         ))}
       </div>
       <div
-        className='flex items-center justify-center rounded-xl px-4 py-3 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] w-full mt-1'
+        className='flex items-center justify-center rounded-xl px-4 py-3 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] w-full mt-1 bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)]'
         style={{
-          backgroundColor: 'var(--linear-text-primary)',
-          color: 'var(--linear-bg-page)',
           boxShadow: '0 2px 10px rgba(255,255,255,0.15)',
         }}
       >
@@ -74,29 +72,13 @@ function TourMockup() {
       {shows.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-0)',
-            border: '1px solid var(--linear-border-subtle)',
-          }}
+          className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'
         >
           <div className='flex flex-col gap-0.5'>
-            <span
-              style={{
-                color: 'var(--linear-text-primary)',
-                fontWeight: 'var(--linear-font-weight-medium)',
-                fontSize: 'var(--linear-caption-size)',
-                letterSpacing: '-0.01em',
-              }}
-            >
+            <span className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-medium)] text-[var(--linear-caption-size)] tracking-[-0.01em]'>
               {show.city}
             </span>
-            <span
-              style={{
-                color: 'var(--linear-text-tertiary)',
-                fontSize: 'var(--linear-label-size)',
-              }}
-            >
+            <span className='text-[var(--linear-text-tertiary)] text-[var(--linear-label-size)]'>
               {show.date} · {show.venue}
             </span>
           </div>
@@ -127,34 +109,16 @@ function ContactMockup() {
         return (
           <div
             key={c.role}
-            className='flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-0)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
+            className='flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'
           >
-            <div
-              className='w-8 h-8 rounded-lg flex items-center justify-center'
-              style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
-            >
+            <div className='w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--linear-bg-surface-1)]'>
               <Icon className='w-4 h-4 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-primary)] transition-colors' />
             </div>
             <div className='flex flex-col flex-1'>
-              <span
-                style={{
-                  color: 'var(--linear-text-primary)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  fontSize: 'var(--linear-caption-size)',
-                }}
-              >
+              <span className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-medium)] text-[var(--linear-caption-size)]'>
                 {c.role}
               </span>
-              <span
-                style={{
-                  color: 'var(--linear-text-tertiary)',
-                  fontSize: 'var(--linear-label-size)',
-                }}
-              >
+              <span className='text-[var(--linear-text-tertiary)] text-[var(--linear-label-size)]'>
                 {c.name}
               </span>
             </div>
@@ -178,23 +142,13 @@ function ListenMockup() {
         return (
           <div
             key={dsp.name}
-            className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
-            style={{
-              backgroundColor: 'var(--linear-bg-surface-0)',
-              border: '1px solid var(--linear-border-subtle)',
-            }}
+            className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'
           >
             <div className='flex items-center gap-3'>
               <div className='w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--linear-bg-surface-1)]'>
                 <Icon className='w-4 h-4' style={{ color: dsp.color }} />
               </div>
-              <span
-                style={{
-                  color: 'var(--linear-text-primary)',
-                  fontWeight: 'var(--linear-font-weight-medium)',
-                  fontSize: 'var(--linear-caption-size)',
-                }}
-              >
+              <span className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-medium)] text-[var(--linear-caption-size)]'>
                 {dsp.name}
               </span>
             </div>
@@ -250,12 +204,7 @@ const cards: CardData[] = [
 
 export function DeeplinksGrid() {
   return (
-    <section
-      className='section-spacing-linear relative overflow-hidden'
-      style={{
-        backgroundColor: 'var(--linear-bg-page)',
-      }}
-    >
+    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
       {/* Ambient glow behind grid — matches Linear's 400x400 radial glow pattern */}
       <div
         aria-hidden='true'
@@ -273,7 +222,7 @@ export function DeeplinksGrid() {
         <div className='text-center heading-gap-linear'>
           <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
             One link.{' '}
-            <span style={{ color: 'var(--linear-text-tertiary)' }}>
+            <span className='text-[var(--linear-text-tertiary)]'>
               Infinite outcomes.
             </span>
           </h2>
@@ -285,45 +234,27 @@ export function DeeplinksGrid() {
 
         {/* Card grid — 1px border-gap technique */}
         <div
-          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden'
+          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-[var(--linear-radius-lg)] border border-[var(--linear-border-subtle)]'
           style={{
-            backgroundColor: 'var(--linear-border-subtle)',
-            gap: '1px',
-            borderRadius: 'var(--linear-radius-lg)',
-            border: '1px solid var(--linear-border-subtle)',
             boxShadow: 'var(--linear-shadow-card)',
           }}
         >
           {cards.map(card => (
             <div
               key={card.slugPath}
-              className='group relative flex flex-col'
-              style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
+              className='group relative flex flex-col bg-[var(--linear-bg-surface-1)]'
             >
               <div className='flex flex-1 flex-col gap-4 p-6'>
                 {/* URL slug */}
-                <p
-                  className='font-mono'
-                  style={{
-                    fontSize: 'var(--linear-caption-size)',
-                    fontWeight: 450,
-                    color: 'var(--linear-text-tertiary)',
-                  }}
-                >
+                <p className='font-mono text-[var(--linear-caption-size)] font-[450] text-[var(--linear-text-tertiary)]'>
                   {'jov.ie/tim/'}
-                  <span style={{ color: 'var(--linear-text-primary)' }}>
+                  <span className='text-[var(--linear-text-primary)]'>
                     {card.slugPath}
                   </span>
                 </p>
 
                 {/* Description */}
-                <p
-                  style={{
-                    fontSize: 'var(--linear-body-sm-size)',
-                    lineHeight: 'var(--linear-leading-normal)',
-                    color: 'var(--linear-text-secondary)',
-                  }}
-                >
+                <p className='text-[var(--linear-body-sm-size)] leading-[var(--linear-leading-normal)] text-[var(--linear-text-secondary)]'>
                   {card.description}
                 </p>
 
