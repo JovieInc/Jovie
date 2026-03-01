@@ -38,8 +38,8 @@ function ContactTitle({
         onClick={onCopyClerkId}
         className={
           isClerkIdCopied
-            ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-success transition-colors'
-            : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors'
+            ? 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-success transition-colors duration-[0.1s]'
+            : 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-quaternary-token hover:bg-[rgba(255,255,255,0.05)] hover:text-secondary-token transition-colors duration-[0.1s]'
         }
         aria-label='Copy Clerk ID'
       >

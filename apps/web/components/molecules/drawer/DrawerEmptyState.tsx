@@ -12,6 +12,8 @@ export function DrawerEmptyState({
   className,
 }: DrawerEmptyStateProps) {
   return (
-    <p className={cn('text-xs text-secondary-token', className)}>{message}</p>
+    <p className={cn('text-[13px] text-quaternary-token', className)}>
+      {message}
+    </p>
   );
 }

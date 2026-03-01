@@ -27,11 +27,11 @@ export function DrawerHeader({
   return (
     <div
       className={cn(
-        'flex items-center justify-between h-[52px] px-3 shrink-0',
+        'flex items-center justify-between h-11 px-3 shrink-0 border-b border-[rgba(255,255,255,0.05)]',
         className
       )}
     >
-      <p className='text-xs font-medium text-secondary-token truncate'>
+      <p className='text-[13px] font-[510] leading-normal text-tertiary-token truncate'>
         {title}
       </p>
       <div className='flex items-center gap-1'>
@@ -41,13 +41,13 @@ export function DrawerHeader({
             size='icon'
             variant='ghost'
             onClick={onClose}
-            className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+            className='h-7 w-7 rounded-md text-quaternary-token transition-colors duration-[0.1s] hover:bg-[rgba(255,255,255,0.05)] hover:text-secondary-token'
             aria-label={isMobile ? 'Go back' : 'Close sidebar'}
           >
             {isMobile ? (
-              <ArrowLeft className='h-3.5 w-3.5' />
+              <ArrowLeft className='h-3 w-3' />
             ) : (
-              <X className='h-3.5 w-3.5' />
+              <X className='h-3 w-3' />
             )}
           </Button>
         )}

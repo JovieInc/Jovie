@@ -107,10 +107,12 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 
       <div className='flex items-center justify-between'>
         <div>
-          <p className='text-sm font-medium text-primary-token'>
+          <p className='text-[13px] font-[510] text-primary-token'>
             {variant.label}
           </p>
-          <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>
+          <p className='text-[12px] text-quaternary-token'>
+            {variant.dimensions}
+          </p>
         </div>
         <div className='flex items-center gap-2'>
           <Button
@@ -141,22 +143,22 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 
 export default function RetargetingAdsPage() {
   return (
-    <div className='mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6'>
+    <div className='mx-auto max-w-4xl space-y-10 px-4 py-8 sm:px-6'>
       <div>
-        <h1 className='text-xl font-semibold text-primary-token'>
+        <h1 className='text-[20px] font-[590] tracking-[-0.012em] text-primary-token'>
           Retargeting Ads
         </h1>
-        <p className='mt-1 text-sm text-secondary-token'>
+        <p className='mt-1.5 text-[15px] tracking-[-0.011em] text-tertiary-token'>
           Download ad images to use in your Instagram and Facebook campaigns.
           Upload them to Meta Ads Manager to retarget profile visitors.
         </p>
       </div>
 
       <div className='space-y-4'>
-        <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>
+        <h2 className='text-[11px] font-[510] uppercase tracking-[0.05em] text-quaternary-token'>
           Fan retargeting
         </h2>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] tracking-[-0.01em] text-tertiary-token'>
           Show these to fans who visited your profile but haven&apos;t turned on
           notifications yet.
         </p>
@@ -171,10 +173,10 @@ export default function RetargetingAdsPage() {
       </div>
 
       <div className='space-y-4'>
-        <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>
+        <h2 className='text-[11px] font-[510] uppercase tracking-[0.05em] text-quaternary-token'>
           Profile claim
         </h2>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] tracking-[-0.01em] text-tertiary-token'>
           Show these to artists who have an unclaimed profile to encourage them
           to claim it.
         </p>
@@ -188,11 +190,11 @@ export default function RetargetingAdsPage() {
         </div>
       </div>
 
-      <div className='rounded-xl border border-subtle bg-surface-0 p-4'>
-        <h3 className='text-sm font-medium text-primary-token'>
+      <div className='rounded-xl border border-[rgba(255,255,255,0.05)] bg-surface-0 p-5'>
+        <h3 className='text-[13px] font-[510] text-primary-token'>
           How to use these ads
         </h3>
-        <ol className='mt-2 list-inside list-decimal space-y-1 text-sm text-secondary-token'>
+        <ol className='mt-3 list-inside list-decimal space-y-1.5 text-[13px] leading-relaxed text-tertiary-token'>
           <li>Download the ad images above</li>
           <li>
             In Meta Ads Manager, create a new campaign with the Traffic

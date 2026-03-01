@@ -11,9 +11,9 @@ import {
 import { cn } from '@/lib/utils';
 
 const ACTION_BUTTON_CLASS = [
-  'p-1 rounded hover:bg-surface-2',
-  'text-tertiary-token hover:text-primary-token',
-  'transition-colors focus-visible:outline-none',
+  'p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]',
+  'text-quaternary-token hover:text-secondary-token',
+  'transition-colors duration-[0.1s] focus-visible:outline-none',
   'focus-visible:ring-2 focus-visible:ring-interactive',
 ].join(' ');
 
@@ -147,8 +147,8 @@ export function SidebarLinkRow({
       <div
         className={cn(
           'group flex items-center justify-between lg:rounded-md',
-          'px-3 py-1.5 bg-surface-2 hover:bg-interactive-hover',
-          'transition-colors',
+          'px-3 py-1.5 bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)]',
+          'transition-colors duration-[0.1s]',
           !isVisible && 'opacity-60',
           className
         )}
@@ -159,9 +159,11 @@ export function SidebarLinkRow({
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
-          <span className='text-xs text-secondary-token truncate'>{label}</span>
+          <span className='text-[13px] text-secondary-token truncate'>
+            {label}
+          </span>
           {badge && (
-            <span className='text-[10px] text-tertiary-token shrink-0'>
+            <span className='text-[11px] text-quaternary-token shrink-0'>
               {badge}
             </span>
           )}

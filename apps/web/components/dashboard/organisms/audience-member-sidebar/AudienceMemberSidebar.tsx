@@ -48,7 +48,7 @@ export function AudienceMemberSidebar({
     >
       <DrawerHeader title='Contact' onClose={onClose} />
 
-      <div className='flex-1 min-h-0 overflow-auto px-4 py-4 space-y-4'>
+      <div className='flex-1 min-h-0 overflow-auto px-4 py-4 space-y-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]'>
         <AudienceMemberHeader
           title={title}
           subtitle={subtitle}

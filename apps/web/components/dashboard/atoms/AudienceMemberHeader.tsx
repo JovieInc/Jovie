@@ -27,10 +27,12 @@ export function AudienceMemberHeader({
         size='lg'
       />
       <div className='min-w-0 flex-1'>
-        <div className='truncate text-sm font-semibold text-primary-token'>
+        <div className='truncate text-[15px] font-[510] leading-normal tracking-[-0.011em] text-primary-token'>
           {title}
         </div>
-        <div className='truncate text-xs text-secondary-token'>{subtitle}</div>
+        <div className='truncate text-[13px] leading-normal text-tertiary-token'>
+          {subtitle}
+        </div>
       </div>
     </div>
   );

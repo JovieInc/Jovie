@@ -75,7 +75,7 @@ export function RightDrawer({
     contextMenuItems != null && contextMenuItems.length > 0;
 
   const innerContent = (
-    <div className='h-full overflow-y-auto overflow-x-hidden overscroll-contain'>
+    <div className='h-full overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent] hover:[scrollbar-color:rgba(255,255,255,0.2)_transparent]'>
       {children}
     </div>
   );
@@ -121,8 +121,8 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-1 border-l border-subtle',
-        'transition-[width,opacity] duration-300 ease-out',
+        'bg-[var(--color-bg-level-1,var(--color-bg-surface-0))] border-l border-[rgba(255,255,255,0.05)]',
+        'transition-[width,opacity] duration-[0.25s] ease-[cubic-bezier(0.25,0.46,0.45,0.94)]',
         'overflow-hidden',
         isOpen
           ? 'opacity-100 visible'
