@@ -102,8 +102,8 @@ export async function generateMetadata(): Promise<Metadata> {
           height: 630,
         },
       ],
-      creator: '@jovie',
-      site: '@jovie',
+      creator: '@jovieapp',
+      site: '@jovieapp',
     },
     robots: {
       index: true,
@@ -139,9 +139,9 @@ const WEBSITE_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: APP_NAME,
-  alternateName: 'Jovie Link in Bio',
+  alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Capture fan contacts and direct every visitor to the right listening destination with one focused profile.',
+    'Jovie is the smartest link in bio for music artists. Capture fan contacts and direct every visitor to the right listening destination.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -198,7 +198,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: APP_NAME,
-  legalName: 'Jovie Inc',
+  legalName: 'Jovie Technology Inc.',
   url: APP_URL,
   logo: {
     '@type': 'ImageObject',
@@ -208,8 +208,8 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'A conversion-first link-in-bio platform for artists to capture fan contacts and drive clear next actions.',
-  sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
+    'Jovie is the smartest link in bio for music artists. Capture fan contacts and direct every visitor to the right listening destination.',
+  sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
     contactType: 'customer support',
