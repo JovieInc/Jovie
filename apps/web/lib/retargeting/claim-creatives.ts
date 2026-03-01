@@ -50,46 +50,60 @@ function hasAllCreativeSizes(
   return CLAIM_CREATIVE_LAYOUTS.every(layout => Boolean(creatives[layout.key]));
 }
 
-function getSolidBackgroundColor(username: string): string {
-  const palette = [
-    '#0B1020',
-    '#101828',
-    '#141A2A',
-    '#1A1F38',
-    '#111827',
-    '#0F172A',
-  ];
-  const hash = crypto.createHash('sha256').update(username).digest('hex');
-  const index = Number.parseInt(hash.slice(0, 2), 16) % palette.length;
-  return palette[index] ?? palette[0];
-}
-
 export function renderClaimCreativeSvg(params: {
   username: string;
   claimLink: string;
   width: number;
   height: number;
 }): string {
-  const { username, claimLink, width, height } = params;
-  const bg = getSolidBackgroundColor(username);
-  const primary = Math.round(Math.min(width, height) * 0.085);
-  const secondary = Math.round(primary * 0.5);
-  const ctaWidth = Math.round(width * 0.68);
-  const ctaHeight = Math.round(height * 0.11);
+  const { username, width, height } = params;
+
+  // Clean all-white Apple style
+  const bg = '#FFFFFF';
+  const text = '#1D1D1F';
+  const textMuted = '#86868B';
+  const buttonBg = '#000000';
+  const buttonText = '#FFFFFF';
+
+  const isLandscape = width > height;
+  const isStory = height >= 1920;
+
+  // Dynamic sizing based on dimensions
+  const baseScale = Math.min(width, height);
+  const headlineSize = Math.round(baseScale * 0.08);
+  const handleSize = Math.round(baseScale * 0.045);
+  const logoSize = Math.round(baseScale * 0.03);
+
+  const ctaWidth = Math.round(baseScale * 0.45);
+  const ctaHeight = Math.round(baseScale * 0.09);
+  const ctaTextSize = Math.round(ctaHeight * 0.35);
+
   const ctaX = Math.round((width - ctaWidth) / 2);
-  const ctaY = Math.round(height * 0.73);
+  const ctaY = Math.round(height * (isLandscape ? 0.75 : 0.65));
 
   const safeUsername = escapeXml(username);
-  const safeClaimLink = escapeXml(claimLink);
   const title = `jov.ie/${safeUsername}`;
+
+  // Font stack matching route.tsx
+  const fontStack =
+    '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="100%" height="100%" fill="${bg}" />
-  <text x="50%" y="42%" fill="#FFFFFF" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${primary}" font-weight="700" text-anchor="middle" letter-spacing="0.3">${title}</text>
-  <rect x="${ctaX}" y="${ctaY}" width="${ctaWidth}" height="${ctaHeight}" rx="999" fill="#FFFFFF"/>
-  <text x="50%" y="${ctaY + Math.round(ctaHeight * 0.62)}" fill="#111827" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${secondary}" font-weight="600" text-anchor="middle">Claim your Jovie profile</text>
-  <text x="50%" y="${Math.round(height * 0.92)}" fill="#9CA3AF" font-family="Inter, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif" font-size="${Math.max(24, Math.round(primary * 0.28))}" text-anchor="middle">${safeClaimLink}</text>
+  
+  <!-- Subtle Logo -->
+  <text x="50%" y="${isStory ? '10%' : '15%'}" fill="${textMuted}" font-family="${fontStack}" font-size="${logoSize}" font-weight="600" text-anchor="middle" letter-spacing="-0.02em">Jovie</text>
+  
+  <!-- Content Block -->
+  <g transform="translate(0, ${isLandscape ? -20 : 0})">
+    <text x="50%" y="42%" fill="${text}" font-family="${fontStack}" font-size="${headlineSize}" font-weight="700" text-anchor="middle" letter-spacing="-0.04em">Don't lose your handle.</text>
+    <text x="50%" y="${42 + (isLandscape ? 12 : 7)}%" fill="${textMuted}" font-family="${fontStack}" font-size="${handleSize}" font-weight="500" text-anchor="middle" letter-spacing="-0.02em">${title}</text>
+  </g>
+
+  <!-- CTA Button -->
+  <rect x="${ctaX}" y="${ctaY}" width="${ctaWidth}" height="${ctaHeight}" rx="999" fill="${buttonBg}"/>
+  <text x="50%" y="${ctaY + Math.round(ctaHeight * 0.6)}" fill="${buttonText}" font-family="${fontStack}" font-size="${ctaTextSize}" font-weight="600" text-anchor="middle" letter-spacing="-0.01em">Claim your profile</text>
 </svg>`;
 }
 

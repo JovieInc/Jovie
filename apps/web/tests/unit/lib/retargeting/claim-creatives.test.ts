@@ -13,8 +13,7 @@ describe('renderClaimCreativeSvg', () => {
     expect(svg).toContain('width="1080"');
     expect(svg).toContain('height="1920"');
     expect(svg).toContain('jov.ie/ladygaga');
-    expect(svg).toContain('Claim your Jovie profile');
-    expect(svg).toContain('/ladygaga/claim?token=abc123');
+    expect(svg).toContain('Claim your profile');
   });
 
   it('creates deterministic output for the same input', () => {

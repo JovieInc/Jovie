@@ -95,8 +95,12 @@ export const isDevelopment = process.env.NODE_ENV === 'development';
  * - This allows local development without Sentry configuration
  * - Errors are tagged with `sentryMode: 'lite' | 'full'` for filtering in Sentry dashboard
  */
-export const SENTRY_DSN_CLIENT = process.env.NEXT_PUBLIC_SENTRY_DSN;
-export const SENTRY_DSN_SERVER = process.env.SENTRY_DSN;
+export const SENTRY_DSN_CLIENT = isDevelopment
+  ? process.env.NEXT_PUBLIC_SENTRY_DSN_DEV
+  : process.env.NEXT_PUBLIC_SENTRY_DSN;
+export const SENTRY_DSN_SERVER = isDevelopment
+  ? process.env.SENTRY_DSN_DEV
+  : process.env.SENTRY_DSN;
 
 /**
  * Trace sample rate for performance monitoring.

@@ -26,18 +26,6 @@ export default function AdminPage() {
           className='space-y-6 md:space-y-8'
           data-testid='admin-dashboard-content'
         >
-          <header className='space-y-1'>
-            <p className='text-2xs font-medium uppercase tracking-widest text-tertiary-token'>
-              Operations
-            </p>
-            <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
-              Admin dashboard
-            </h1>
-            <p className='text-app text-secondary-token'>
-              Monitor revenue, reliability, and platform health from one place.
-            </p>
-          </header>
-
           <Suspense fallback={<AdminKpiSectionSkeleton />}>
             <AdminKpiSection />
           </Suspense>

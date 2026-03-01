@@ -70,6 +70,8 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     pathname.includes('/audience') ||
     pathname.includes('/users') ||
     pathname.includes('/waitlist') ||
+    pathname.includes('/feedback') ||
+    pathname.includes('/campaigns') ||
     pathname.includes('/releases');
 
   // Artist profile settings page gets the preview panel sidebar
