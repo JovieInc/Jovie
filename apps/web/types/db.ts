@@ -97,6 +97,12 @@ export interface CreatorProfile {
   apple_music_url: string | null;
   youtube_url: string | null;
   spotify_id: string | null;
+  // Additional DSP IDs for cross-platform matching
+  apple_music_id?: string | null;
+  youtube_music_id?: string | null;
+  deezer_id?: string | null;
+  tidal_id?: string | null;
+  soundcloud_id?: string | null;
   // Visibility and metadata
   is_public: boolean;
   is_verified: boolean;
@@ -144,6 +150,12 @@ export interface Artist {
   spotify_url?: string;
   apple_music_url?: string;
   youtube_url?: string;
+  // Additional DSP IDs for cross-platform matching
+  apple_music_id?: string;
+  youtube_music_id?: string;
+  deezer_id?: string;
+  tidal_id?: string;
+  soundcloud_id?: string;
   venmo_handle?: string;
   location?: string | null;
   active_since_year?: number | null;
@@ -381,6 +393,11 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     spotify_url: profile.spotify_url || undefined,
     apple_music_url: profile.apple_music_url || undefined,
     youtube_url: profile.youtube_url || undefined,
+    apple_music_id: profile.apple_music_id || undefined,
+    youtube_music_id: profile.youtube_music_id || undefined,
+    deezer_id: profile.deezer_id || undefined,
+    tidal_id: profile.tidal_id || undefined,
+    soundcloud_id: profile.soundcloud_id || undefined,
     location: profile.location ?? null,
     active_since_year: profile.active_since_year ?? null,
     published: profile.is_public,
@@ -433,6 +450,11 @@ export function convertDrizzleCreatorProfileToArtist(
     spotify_url: profile.spotifyUrl || undefined,
     apple_music_url: profile.appleMusicUrl || undefined,
     youtube_url: profile.youtubeUrl || undefined,
+    apple_music_id: profile.appleMusicId || undefined,
+    youtube_music_id: profile.youtubeMusicId || undefined,
+    deezer_id: profile.deezerId || undefined,
+    tidal_id: profile.tidalId || undefined,
+    soundcloud_id: profile.soundcloudId || undefined,
     venmo_handle: profile.venmoHandle || undefined,
     location: profile.location ?? null,
     active_since_year: profile.activeSinceYear ?? null,
