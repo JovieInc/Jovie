@@ -16,28 +16,30 @@ const SIZES = {
   story: { width: 1080, height: 1920 },
 } as const;
 
-/** Color themes for ad creatives */
+/** Color themes for ad creatives — Apple-inspired */
 const THEME = {
   dark: {
     bg: '#000000',
     text: '#F5F5F7',
-    textMuted: '#86868B',
-    border: '#333336',
+    textSecondary: '#A1A1A6',
+    textMuted: '#6E6E73',
+    border: '#1D1D1F',
     buttonBg: '#FFFFFF',
     buttonText: '#000000',
   },
   light: {
-    bg: '#FFFFFF',
+    bg: '#FBFBFD',
     text: '#1D1D1F',
+    textSecondary: '#6E6E73',
     textMuted: '#86868B',
-    border: '#E5E5EA',
-    buttonBg: '#000000',
+    border: '#D2D2D7',
+    buttonBg: '#1D1D1F',
     buttonText: '#FFFFFF',
   },
 } as const;
 
 const FONT_STACK =
-  '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  '"SF Pro Display", "Inter Variable", -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
 
 /** Shared ad creative props */
 interface AdCreativeProps {
@@ -49,14 +51,15 @@ interface AdCreativeProps {
 
 /**
  * Shared layout shell for retargeting ad creatives.
- * Renders branding, profile photo, text content, and CTA button
- * with a consistent structure across dark/light themes.
+ * Apple-inspired: generous whitespace, tight tracking, bold type hierarchy.
+ * Renders branding, optional profile photo, text content, and CTA button.
  */
 function AdCreativeLayout({
   size,
   photoSize,
   artistName,
   avatarUrl,
+  showPhoto = true,
   theme,
   textContent,
   ctaLabel,
@@ -66,6 +69,7 @@ function AdCreativeLayout({
   photoSize: number;
   artistName: string;
   avatarUrl: string | null;
+  showPhoto?: boolean;
   theme: (typeof THEME)['dark'] | (typeof THEME)['light'];
   textContent: React.ReactNode;
   ctaLabel: string;
@@ -85,19 +89,19 @@ function AdCreativeLayout({
         background: theme.bg,
         color: theme.text,
         fontFamily: FONT_STACK,
-        padding: isStory ? '120px' : '80px',
+        padding: isStory ? '120px 100px' : '80px',
         position: 'relative',
       }}
     >
-      {/* Subtle Jovie branding */}
+      {/* Subtle Jovie branding — top left */}
       <div
         style={{
           position: 'absolute',
           top: isStory ? 80 : 60,
           display: 'flex',
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: 600,
-          letterSpacing: '-0.02em',
+          letterSpacing: '-0.03em',
           color: theme.textMuted,
         }}
       >
@@ -109,63 +113,65 @@ function AdCreativeLayout({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: isStory ? 80 : 64,
+          gap: isStory ? 72 : 56,
           marginTop: isStory ? -40 : 0,
         }}
       >
-        {/* Profile photo */}
-        <div
-          style={{
-            width: photoSize,
-            height: photoSize,
-            borderRadius: photoSize / 2,
-            overflow: 'hidden',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: theme.border,
-            flexShrink: 0,
-          }}
-        >
-          {avatarUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
-            <img
-              src={avatarUrl}
-              alt=''
-              width={photoSize}
-              height={photoSize}
-              style={{ objectFit: 'cover' }}
-            />
-          ) : (
-            <div
-              style={{
-                fontSize: photoSize / 2.5,
-                fontWeight: 600,
-                color: theme.textMuted,
-                display: 'flex',
-              }}
-            >
-              {artistName.charAt(0).toUpperCase()}
-            </div>
-          )}
-        </div>
+        {/* Profile photo — only when showPhoto is true */}
+        {showPhoto && (
+          <div
+            style={{
+              width: photoSize,
+              height: photoSize,
+              borderRadius: photoSize / 2,
+              overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: theme.border,
+              flexShrink: 0,
+            }}
+          >
+            {avatarUrl ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
+              <img
+                src={avatarUrl}
+                alt=''
+                width={photoSize}
+                height={photoSize}
+                style={{ objectFit: 'cover' }}
+              />
+            ) : (
+              <div
+                style={{
+                  fontSize: photoSize / 2.5,
+                  fontWeight: 600,
+                  color: theme.textMuted,
+                  display: 'flex',
+                }}
+              >
+                {artistName.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Text block */}
         {textContent}
 
-        {/* CTA pill */}
+        {/* CTA pill — Apple-style rounded rect */}
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '24px 56px',
-            borderRadius: 999,
-            fontSize: 28,
+            padding: '22px 52px',
+            borderRadius: 980,
+            fontSize: 26,
             fontWeight: 600,
             color: theme.buttonText,
             background: theme.buttonBg,
-            letterSpacing: '-0.01em',
+            letterSpacing: '-0.02em',
           }}
         >
           {ctaLabel}
@@ -192,9 +198,10 @@ function FanAdCreative({
   return (
     <AdCreativeLayout
       size={size}
-      photoSize={isStory ? 440 : 380}
+      photoSize={isStory ? 400 : 340}
       artistName={artistName}
       avatarUrl={avatarUrl}
+      showPhoto
       theme={theme}
       ctaLabel='Turn on notifications'
       textContent={
@@ -203,16 +210,16 @@ function FanAdCreative({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 16,
+            gap: 12,
             textAlign: 'center',
           }}
         >
           <div
             style={{
               display: 'flex',
-              fontSize: isStory ? 36 : 32,
-              fontWeight: 500,
-              color: theme.textMuted,
+              fontSize: isStory ? 32 : 28,
+              fontWeight: 400,
+              color: theme.textSecondary,
               letterSpacing: '-0.02em',
             }}
           >
@@ -221,10 +228,10 @@ function FanAdCreative({
           <div
             style={{
               display: 'flex',
-              fontSize: isStory ? 80 : 68,
+              fontSize: isStory ? 76 : 64,
               fontWeight: 700,
-              letterSpacing: '-0.04em',
-              lineHeight: 1.05,
+              letterSpacing: '-0.045em',
+              lineHeight: 1,
               maxWidth: 900,
               color: theme.text,
             }}
@@ -239,7 +246,7 @@ function FanAdCreative({
             position: 'absolute',
             bottom: isStory ? 80 : 60,
             display: 'flex',
-            fontSize: 28,
+            fontSize: 24,
             fontWeight: 500,
             color: theme.textMuted,
             letterSpacing: '-0.02em',
@@ -255,21 +262,17 @@ function FanAdCreative({
 /**
  * Claim ad: "Don't lose your handle"
  */
-function ClaimAdCreative({
-  artistName,
-  username,
-  avatarUrl,
-  size,
-}: AdCreativeProps) {
+function ClaimAdCreative({ artistName, username, size }: AdCreativeProps) {
   const isStory = size === 'story';
   const theme = THEME.light;
 
   return (
     <AdCreativeLayout
       size={size}
-      photoSize={isStory ? 360 : 320}
+      photoSize={0}
       artistName={artistName}
-      avatarUrl={avatarUrl}
+      avatarUrl={null}
+      showPhoto={false}
       theme={theme}
       ctaLabel='Claim your profile'
       textContent={
@@ -278,19 +281,19 @@ function ClaimAdCreative({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 24,
+            gap: 28,
             textAlign: 'center',
           }}
         >
           <div
             style={{
               display: 'flex',
-              fontSize: isStory ? 72 : 64,
+              fontSize: isStory ? 80 : 68,
               fontWeight: 700,
-              letterSpacing: '-0.04em',
-              lineHeight: 1.05,
+              letterSpacing: '-0.045em',
+              lineHeight: 1,
               color: theme.text,
-              maxWidth: 800,
+              maxWidth: 880,
             }}
           >
             Don&apos;t lose your handle.
@@ -298,9 +301,9 @@ function ClaimAdCreative({
           <div
             style={{
               display: 'flex',
-              fontSize: isStory ? 40 : 36,
+              fontSize: isStory ? 38 : 34,
               fontWeight: 500,
-              color: theme.textMuted,
+              color: theme.textSecondary,
               letterSpacing: '-0.02em',
             }}
           >
@@ -355,7 +358,13 @@ export async function GET(req: NextRequest) {
 
       const artistName = profile.displayName || profile.username || 'Artist';
       const username = profile.username || '';
-      const avatarUrl = profile.avatarUrl || null;
+
+      // Ensure avatar URL is absolute — Satori (ImageResponse) requires absolute URLs for <img>
+      let avatarUrl: string | null = profile.avatarUrl || null;
+      if (avatarUrl && !avatarUrl.startsWith('http')) {
+        const origin = req.nextUrl.origin;
+        avatarUrl = `${origin}${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
+      }
 
       const element =
         type === 'fan' ? (

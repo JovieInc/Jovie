@@ -82,7 +82,7 @@ export function DrawerHeaderActions({
               size='icon'
               variant='ghost'
               asChild
-              className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+              className='h-7 w-7 rounded-md text-quaternary-token transition-colors duration-[0.1s] hover:bg-[rgba(255,255,255,0.05)] hover:text-secondary-token'
               aria-label={action.label}
             >
               <Link href={action.href}>
@@ -102,10 +102,10 @@ export function DrawerHeaderActions({
             variant='ghost'
             onClick={action.onClick}
             className={cn(
-              'h-8 w-8 rounded-md transition-colors hover:bg-surface-2',
+              'h-7 w-7 rounded-md transition-colors duration-[0.1s] hover:bg-[rgba(255,255,255,0.05)]',
               action.isActive
                 ? 'text-success hover:text-success'
-                : 'text-tertiary-token hover:text-primary-token'
+                : 'text-quaternary-token hover:text-secondary-token'
             )}
             aria-label={action.label}
           >
@@ -139,7 +139,7 @@ export function DrawerHeaderActions({
           <Button
             size='icon'
             variant='ghost'
-            className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+            className='h-7 w-7 rounded-md text-quaternary-token transition-colors duration-[0.1s] hover:bg-[rgba(255,255,255,0.05)] hover:text-secondary-token'
             aria-label='More actions'
           >
             <MoreVertical className='h-3.5 w-3.5' />
