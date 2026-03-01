@@ -531,9 +531,10 @@ export async function syncFromBandsintown(): Promise<{
     source: 'bandsintown',
   });
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return {
     success: true,
@@ -599,9 +600,10 @@ export async function createTourDate(params: {
     source: 'manual',
   });
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapTourDateToViewModel(created);
 }
@@ -675,9 +677,10 @@ export async function updateTourDate(params: {
     .where(eq(tourDates.id, params.id))
     .returning();
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapTourDateToViewModel(updated);
 }
@@ -711,9 +714,10 @@ export async function deleteTourDate(
     tourDateId: id,
   });
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return { success: true };
 }

@@ -599,7 +599,9 @@ describe('tour-dates/actions.ts', () => {
       expect(result.id).toBe('td_1');
       expect(mockDbInsert).toHaveBeenCalled();
       expect(mockRevalidateTag).toHaveBeenCalled();
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
+      // revalidatePath is intentionally skipped to avoid resetting client-side
+      // state (closing the sidebar). TanStack Query handles cache updates.
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
     it('rejects invalid start date', async () => {
@@ -847,10 +849,12 @@ describe('tour-dates/actions.ts', () => {
         'tour-dates:user_123:prof_123',
         'max'
       );
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
+      // revalidatePath is intentionally skipped to avoid resetting client-side
+      // state (closing the sidebar). TanStack Query handles cache updates.
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
-    it('revalidates tag and path after deleteTourDate', async () => {
+    it('revalidates tag after deleteTourDate (path skipped to preserve sidebar)', async () => {
       setupAuthenticatedUser();
       mockDbDelete.mockReturnValue(chainMock({ rowCount: 1 }));
 
@@ -863,7 +867,7 @@ describe('tour-dates/actions.ts', () => {
         'tour-dates:user_123:prof_123',
         'max'
       );
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/touring');
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
   });
 });

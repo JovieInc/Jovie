@@ -3,11 +3,10 @@
 import { and, asc, count, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
-  revalidatePath,
   revalidateTag,
   unstable_cache,
 } from 'next/cache';
-import { APP_ROUTES } from '@/constants/routes';
+
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -227,7 +226,8 @@ export async function saveContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_CONTACTS);
+  // Skip revalidatePath — the mutation hook handles cache updates via local
+  // state, and a path revalidation resets client-side state (closing the sidebar).
 
   return result;
 }
@@ -268,5 +268,6 @@ export async function deleteContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${profileId}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_CONTACTS);
+  // Skip revalidatePath — the mutation hook handles cache updates via local
+  // state, and a path revalidation resets client-side state (closing the sidebar).
 }

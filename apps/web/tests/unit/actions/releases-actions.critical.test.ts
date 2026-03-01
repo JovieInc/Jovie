@@ -433,7 +433,9 @@ describe('@critical releases/actions.ts', () => {
         })
       );
       expect(mockRevalidateTag).toHaveBeenCalled();
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      // revalidatePath is intentionally skipped to avoid resetting client-side
+      // state (closing the sidebar). TanStack Query handles cache updates.
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
     it('rejects unauthenticated calls', async () => {
@@ -1324,7 +1326,9 @@ describe('@critical releases/actions.ts', () => {
         `releases:${MOCK_USER_ID}:${MOCK_PROFILE.id}`,
         'max'
       );
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      // revalidatePath is intentionally skipped to avoid resetting client-side
+      // state (closing the sidebar). TanStack Query handles cache updates.
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
 
     it('deleteRelease invalidates tag and path', async () => {
