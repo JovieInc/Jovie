@@ -841,6 +841,18 @@ export async function syncFromSpotify(): Promise<{
       targetProviders: ['apple_music'],
     });
 
+    // Re-trigger MusicFetch enrichment to discover cross-platform DSP profiles
+    // This populates Deezer, Tidal, SoundCloud, YouTube Music IDs on the profile
+    void enqueueMusicFetchEnrichmentJob({
+      creatorProfileId: profile.id,
+      spotifyUrl: `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`,
+    }).catch(error => {
+      void captureError('MusicFetch enrichment enqueue failed on sync', error, {
+        action: 'syncFromSpotify',
+        creatorProfileId: profile.id,
+      });
+    });
+
     return {
       success: true,
       message: `Successfully synced ${result.imported} releases from Spotify.`,

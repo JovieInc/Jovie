@@ -666,6 +666,7 @@ describe('@critical releases/actions.ts', () => {
         errors: [],
       });
       mockEnqueueDspArtistDiscoveryJob.mockResolvedValue(undefined);
+      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue(undefined);
 
       const { syncFromSpotify } = await import(
         '@/app/app/(shell)/dashboard/releases/actions'
