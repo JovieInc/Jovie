@@ -5,8 +5,8 @@ import { renderStatusCell } from '@/components/admin/waitlist-table/utils/column
 describe('renderStatusCell', () => {
   it.each([
     ['new', 'New', 'bg-btn-primary'],
-    ['invited', 'Invited', 'border-amber-500/20'],
-    ['claimed', 'Claimed', 'border-emerald-500/20'],
+    ['invited', 'Invited', 'border-warning/20'],
+    ['claimed', 'Claimed', 'border-success/20'],
   ] as const)('renders %s as a small badge with consistent table sizing', (status, label, expectedClassToken) => {
     render(renderStatusCell(status));
 
