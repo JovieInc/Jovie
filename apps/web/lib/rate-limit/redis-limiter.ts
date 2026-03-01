@@ -43,10 +43,9 @@ export function createRedisRateLimiter(
   const redisClient = getRedis();
   if (!redisClient) {
     if (env.NODE_ENV === 'production') {
-      Sentry.captureMessage(
-        `Rate limiter "${config.name}" falling back to memory - Redis unavailable`,
-        'warning'
-      );
+      const message = `[CRITICAL] Rate limiter "${config.name}" falling back to in-memory store — rate limits will NOT persist across deploys or instances. Configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.`;
+      console.error(message);
+      Sentry.captureMessage(message, 'error');
     }
     return null;
   }
