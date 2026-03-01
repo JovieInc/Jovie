@@ -284,12 +284,12 @@ export function ProfileContactSidebar() {
       >
         <div className='flex h-full flex-col'>
           {/* Header skeleton */}
-          <div className='flex h-12 shrink-0 items-center justify-between border-b border-subtle px-4'>
+          <div className='flex h-12 shrink-0 items-center justify-between border-b border-[rgba(255,255,255,0.05)] px-4'>
             <div className='h-4 w-24 rounded skeleton' />
             <div className='h-6 w-6 rounded skeleton' />
           </div>
           {/* Avatar + name skeleton */}
-          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+          <div className='shrink-0 border-b border-[rgba(255,255,255,0.05)] px-4 py-3'>
             <div className='flex items-center gap-3'>
               <div className='h-12 w-12 rounded-full skeleton' />
               <div className='space-y-2'>
@@ -299,7 +299,7 @@ export function ProfileContactSidebar() {
             </div>
           </div>
           {/* Tab skeleton */}
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+          <div className='border-b border-[rgba(255,255,255,0.05)] px-3 py-1.5 shrink-0'>
             <div className='flex gap-2'>
               <div className='h-7 w-16 rounded-md skeleton' />
               <div className='h-7 w-16 rounded-md skeleton' />
@@ -345,7 +345,7 @@ export function ProfileContactSidebar() {
         />
 
         {/* Contact Header with Avatar, Name — all editable */}
-        <div className='shrink-0 border-b border-subtle px-4 py-3'>
+        <div className='shrink-0 border-b border-[rgba(255,255,255,0.05)] px-4 py-3'>
           <ProfileContactHeader
             displayName={displayName}
             username={username}
@@ -359,7 +359,7 @@ export function ProfileContactSidebar() {
 
         {/* Category tabs */}
         {visibleTabs.length > 1 && (
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+          <div className='border-b border-[rgba(255,255,255,0.05)] px-3 py-1.5 shrink-0'>
             <SegmentControl
               value={resolvedCategory}
               onValueChange={setSelectedCategory}
@@ -371,7 +371,7 @@ export function ProfileContactSidebar() {
         )}
 
         {/* Links List — with add/remove */}
-        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
+        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]'>
           <ProfileLinkList
             links={links}
             selectedCategory={resolvedCategory}
@@ -397,7 +397,7 @@ export function ProfileContactSidebar() {
         </div>
 
         {/* Profile Photo Download Settings */}
-        <div className='shrink-0 border-t border-subtle px-4 py-3'>
+        <div className='shrink-0 border-t border-[rgba(255,255,255,0.05)] px-4 py-3'>
           <ProfilePhotoSettings
             allowDownloads={
               (selectedProfile?.settings as Record<string, unknown> | null)

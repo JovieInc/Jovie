@@ -35,13 +35,17 @@ export function DrawerPropertyRow({
       className={cn(
         'grid items-start gap-2 w-full text-left',
         interactive &&
-          'rounded-md -mx-2 px-2 py-1.5 hover:bg-surface-2 transition-colors cursor-pointer',
+          'rounded-md -mx-2 px-2 py-1 hover:bg-[rgba(255,255,255,0.04)] transition-colors duration-[0.1s] cursor-pointer',
         className
       )}
       style={gridStyle}
     >
-      <div className='pt-0.5 text-xs text-tertiary-token'>{label}</div>
-      <div className='min-w-0 text-xs text-secondary-token'>{value}</div>
+      <div className='pt-px text-[13px] leading-normal text-quaternary-token'>
+        {label}
+      </div>
+      <div className='min-w-0 text-[13px] leading-normal text-secondary-token'>
+        {value}
+      </div>
     </Wrapper>
   );
 }

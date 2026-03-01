@@ -177,13 +177,6 @@ export function MethodSelector({
         <h1 className={FORM_LAYOUT.title}>
           {mode === 'signin' ? 'Log in to Jovie' : 'Create your Jovie account'}
         </h1>
-        {mode === 'signup' && (
-          <p className={FORM_LAYOUT.hint}>
-            {spotifyOauthEnabled
-              ? 'Sign up with Spotify, Google, or email in seconds, then make it unmistakably yours.'
-              : 'Sign up with Google or email in seconds, then make it unmistakably yours.'}
-          </p>
-        )}
       </div>
 
       <div className={FORM_LAYOUT.errorContainer}>

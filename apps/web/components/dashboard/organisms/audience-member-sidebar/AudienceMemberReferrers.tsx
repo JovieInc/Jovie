@@ -19,7 +19,9 @@ export function AudienceMemberReferrers({
 }: AudienceMemberReferrersProps) {
   if (member.referrerHistory.length === 0) {
     return (
-      <div className='text-sm text-secondary-token'>No referrer data yet.</div>
+      <div className='text-[13px] text-quaternary-token'>
+        No referrer data yet.
+      </div>
     );
   }
 
@@ -28,11 +30,11 @@ export function AudienceMemberReferrers({
       {member.referrerHistory.slice(0, 6).map(ref => (
         <li
           key={`${member.id}-${ref.url}-${ref.timestamp ?? ''}`}
-          className='text-sm text-primary-token'
+          className='text-[13px] text-secondary-token'
         >
           <div className='truncate'>{ref.url}</div>
           {ref.timestamp ? (
-            <div className='text-xs text-secondary-token'>
+            <div className='text-[12px] text-quaternary-token'>
               {formatTimeAgo(ref.timestamp)}
             </div>
           ) : null}

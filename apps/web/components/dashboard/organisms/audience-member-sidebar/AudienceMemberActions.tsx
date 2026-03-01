@@ -19,7 +19,9 @@ interface AudienceMemberActionsProps
 
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   if (member.latestActions.length === 0) {
-    return <div className='text-sm text-secondary-token'>No actions yet.</div>;
+    return (
+      <div className='text-[13px] text-quaternary-token'>No actions yet.</div>
+    );
   }
 
   return (
@@ -27,10 +29,12 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
       {member.latestActions.slice(0, 6).map(action => (
         <li
           key={`${member.id}-${action.label}-${action.timestamp ?? ''}`}
-          className={cn('flex items-start gap-2 text-sm text-primary-token')}
+          className={cn(
+            'flex items-start gap-2 text-[13px] text-secondary-token'
+          )}
         >
           <span
-            className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
+            className='mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.04)] text-quaternary-token'
             aria-hidden='true'
           >
             <Icon
@@ -42,7 +46,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
             {formatActionLabel(action.label)}
           </span>
           {action.timestamp ? (
-            <span className='ml-2 text-xs text-secondary-token'>
+            <span className='ml-2 text-[12px] text-quaternary-token'>
               {formatTimeAgo(action.timestamp)}
             </span>
           ) : null}

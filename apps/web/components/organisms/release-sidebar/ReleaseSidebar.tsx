@@ -266,7 +266,7 @@ export function ReleaseSidebar({
 
         {/* Artwork + analytics + tabs (always visible when release selected) */}
         {release && !selectedTrack && (
-          <div className='shrink-0 px-5 pt-5 pb-4 space-y-4'>
+          <div className='shrink-0 px-4 pt-4 pb-3 space-y-3'>
             {/* Artwork + analytics row */}
             <div className='flex items-start gap-4'>
               <AlbumArtworkContextMenu
@@ -329,7 +329,7 @@ export function ReleaseSidebar({
           </div>
         )}
 
-        <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden p-5'>
+        <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden p-4 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.1)_transparent]'>
           {selectedTrack && release && (
             <TrackDetailPanel
               track={selectedTrack}
@@ -360,7 +360,7 @@ export function ReleaseSidebar({
 
               {/* Links tab: DSP links management */}
               {activeTab === 'links' && (
-                <div className='space-y-5'>
+                <div className='space-y-4'>
                   <DrawerSection title='Distribution'>
                     <ReleaseDspLinks
                       release={release}
@@ -386,7 +386,7 @@ export function ReleaseSidebar({
 
               {/* Details tab: Metadata + Settings */}
               {activeTab === 'details' && (
-                <div className='space-y-5'>
+                <div className='space-y-4'>
                   <ReleaseMetadata
                     release={release}
                     onCanvasStatusChange={

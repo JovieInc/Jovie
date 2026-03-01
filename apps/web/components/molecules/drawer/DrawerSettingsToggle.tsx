@@ -41,7 +41,7 @@ export function DrawerSettingsToggle({
     >
       <label
         htmlFor={id}
-        className='text-xs text-secondary-token select-none cursor-pointer'
+        className='text-[13px] text-secondary-token select-none cursor-pointer'
       >
         {label}
       </label>

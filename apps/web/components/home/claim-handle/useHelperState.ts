@@ -44,7 +44,10 @@ export function useHelperState({
     }
 
     if (available === false) {
-      return { tone: 'error' as const, text: 'Handle already taken' };
+      return {
+        tone: 'idle' as const,
+        text: 'That handle is taken — you can pick another during setup.',
+      };
     }
 
     if (availError) {

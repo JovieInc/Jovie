@@ -15,9 +15,9 @@ export function DrawerSection({
   className,
 }: DrawerSectionProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1.5', className)}>
       {title && (
-        <div className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+        <div className='text-[11px] font-[510] uppercase tracking-[0.05em] text-quaternary-token'>
           {title}
         </div>
       )}

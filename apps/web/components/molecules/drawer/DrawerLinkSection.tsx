@@ -41,13 +41,13 @@ export function DrawerLinkSection({
   className,
 }: DrawerLinkSectionProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1.5', className)}>
       {/* Section header: title + action buttons */}
       <div className='flex items-center justify-between'>
         <h4
           className={[
-            'text-[11px] font-semibold uppercase',
-            'tracking-wide text-tertiary-token',
+            'text-[11px] font-[510] uppercase',
+            'tracking-[0.05em] text-quaternary-token',
           ].join(' ')}
         >
           {title}
@@ -59,13 +59,13 @@ export function DrawerLinkSection({
               type='button'
               onClick={onAdd}
               className={[
-                'p-1 rounded-md text-tertiary-token',
-                'hover:text-primary-token hover:bg-surface-2',
-                'transition-colors',
+                'p-1 rounded-md text-quaternary-token',
+                'hover:text-secondary-token hover:bg-[rgba(255,255,255,0.05)]',
+                'transition-colors duration-[0.1s]',
               ].join(' ')}
               aria-label={addLabel}
             >
-              <Plus className='h-4 w-4' />
+              <Plus className='h-3.5 w-3.5' />
             </button>
           )}
         </div>
@@ -73,7 +73,7 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <p className='text-xs text-tertiary-token py-2'>{emptyMessage}</p>
+        <p className='text-[13px] text-quaternary-token py-2'>{emptyMessage}</p>
       ) : (
         <div className='-mx-3 lg:mx-0'>{children}</div>
       )}

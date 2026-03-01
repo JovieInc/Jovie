@@ -7,7 +7,15 @@
  * Uses the shared DrawerHeader shell for consistent styling.
  */
 
-import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
+import {
+  Check,
+  Contact,
+  Copy,
+  ExternalLink,
+  QrCode,
+  Settings,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { DrawerHeader } from '@/components/molecules/drawer';
@@ -15,6 +23,7 @@ import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/Dr
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 
 interface ProfileSidebarHeaderProps {
   readonly username: string;
@@ -44,6 +53,7 @@ export function ProfileSidebarHeader({
   profilePath,
   onClose,
 }: ProfileSidebarHeaderProps) {
+  const router = useRouter();
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -124,6 +134,12 @@ export function ProfileSidebarHeader({
       label: 'Download QR code',
       icon: QrCode,
       onClick: handleDownloadQRCode,
+    },
+    {
+      id: 'settings',
+      label: 'Profile settings',
+      icon: Settings,
+      onClick: () => router.push(APP_ROUTES.SETTINGS_ARTIST_PROFILE),
     },
   ];
 

@@ -34,8 +34,8 @@ describe('SidebarLinkRow styling regression', () => {
 
     const row = screen.getByTestId('link-row');
 
-    // Must have a solid background (bg-surface-2), NOT bg-transparent
-    expect(row.className).toContain('bg-surface-2');
+    // Must have a background so swipe actions do not bleed through
+    expect(row.className).toContain('bg-[rgba(255,255,255,0.02)]');
     expect(row.className).not.toContain('bg-transparent');
   });
 
