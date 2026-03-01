@@ -250,6 +250,26 @@ export function sortDSPsForDevice(
   });
 }
 
+// ============================================================================
+// DSP URL Builders (construct artist page URLs from platform IDs)
+// ============================================================================
+
+function buildDeezerArtistUrl(artistId: string): string {
+  return `https://www.deezer.com/artist/${artistId}`;
+}
+
+function buildTidalArtistUrl(artistId: string): string {
+  return `https://tidal.com/browse/artist/${artistId}`;
+}
+
+function buildSoundcloudArtistUrl(slug: string): string {
+  return `https://soundcloud.com/${slug}`;
+}
+
+function buildYoutubeMusicChannelUrl(channelId: string): string {
+  return `https://music.youtube.com/channel/${channelId}`;
+}
+
 export function getAvailableDSPs(
   artist: Artist,
   releases?: Release[],
@@ -257,17 +277,39 @@ export function getAvailableDSPs(
 ): AvailableDSP[] {
   const dsps: AvailableDSP[] = [];
 
-  // Check artist URLs
+  // Check artist URLs (explicit URLs take priority)
   const spotifyUrl =
     artist.spotify_url ||
     (artist.spotify_id ? buildSpotifyArtistUrl(artist.spotify_id) : null);
   addDSP(dsps, 'spotify', spotifyUrl);
   addDSP(dsps, 'apple_music', artist.apple_music_url);
   addDSP(dsps, 'youtube', artist.youtube_url);
+
+  // Build URLs from DSP IDs when explicit URLs are not available
   addDSP(
     dsps,
     'soundcloud',
-    (artist as Artist & { soundcloud_url?: string }).soundcloud_url
+    (artist as Artist & { soundcloud_url?: string }).soundcloud_url ||
+      (artist.soundcloud_id
+        ? buildSoundcloudArtistUrl(artist.soundcloud_id)
+        : null)
+  );
+  addDSP(
+    dsps,
+    'deezer',
+    artist.deezer_id ? buildDeezerArtistUrl(artist.deezer_id) : null
+  );
+  addDSP(
+    dsps,
+    'tidal',
+    artist.tidal_id ? buildTidalArtistUrl(artist.tidal_id) : null
+  );
+  addDSP(
+    dsps,
+    'youtube_music',
+    artist.youtube_music_id
+      ? buildYoutubeMusicChannelUrl(artist.youtube_music_id)
+      : null
   );
 
   // Check for release-specific URLs if releases are provided

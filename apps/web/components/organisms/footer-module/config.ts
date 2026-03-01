@@ -34,7 +34,7 @@ export function getVariantConfigs(
       themeAppearance: 'icon',
     },
     profile: {
-      containerClass: 'relative mt-6 pt-4',
+      containerClass: 'relative pt-2',
       contentClass: '',
       colorVariant: 'light',
       showBranding: true,
