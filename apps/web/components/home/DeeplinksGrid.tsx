@@ -8,7 +8,7 @@ import { Container } from '@/components/site/Container';
 function TipMockup() {
   return (
     <div className='flex flex-col gap-3'>
-      <p className='text-xs font-medium uppercase tracking-[0.15em] text-[var(--linear-text-tertiary)]'>
+      <p className='text-[10px] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.15em] text-[var(--linear-text-tertiary)]'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-3 border-0 p-0 m-0'>
@@ -20,7 +20,7 @@ function TipMockup() {
               backgroundColor:
                 amt === '$5'
                   ? 'var(--linear-text-primary)'
-                  : 'rgba(255,255,255,0.03)',
+                  : 'var(--linear-bg-surface-0)',
               color:
                 amt === '$5'
                   ? 'var(--linear-bg-page)'
@@ -28,12 +28,12 @@ function TipMockup() {
               border:
                 amt === '$5'
                   ? '1px solid transparent'
-                  : '1px solid rgba(255,255,255,0.10)',
+                  : '1px solid var(--linear-border-subtle)',
               boxShadow: amt === '$5' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
             }}
           >
             <span
-              className='text-[10px] font-medium uppercase tracking-wider'
+              className='text-[10px] font-[var(--linear-font-weight-medium)] uppercase tracking-wider'
               style={{
                 color:
                   amt === '$5'
@@ -43,14 +43,14 @@ function TipMockup() {
             >
               USD
             </span>
-            <span className='text-2xl font-semibold tabular-nums tracking-tight'>
+            <span className='text-2xl font-[var(--linear-font-weight-semibold)] tabular-nums tracking-tight'>
               {amt}
             </span>
           </div>
         ))}
       </div>
       <div
-        className='flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold w-full mt-1'
+        className='flex items-center justify-center rounded-xl px-4 py-3 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] w-full mt-1'
         style={{
           backgroundColor: 'var(--linear-text-primary)',
           color: 'var(--linear-bg-page)',
@@ -74,25 +74,28 @@ function TourMockup() {
       {shows.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-surface-2 cursor-pointer group'
+          className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
           style={{
-            backgroundColor: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
+            backgroundColor: 'var(--linear-bg-surface-0)',
+            border: '1px solid var(--linear-border-subtle)',
           }}
         >
           <div className='flex flex-col gap-0.5'>
             <span
               style={{
                 color: 'var(--linear-text-primary)',
-                fontWeight: 500,
-                fontSize: '13px',
+                fontWeight: 'var(--linear-font-weight-medium)',
+                fontSize: 'var(--linear-caption-size)',
                 letterSpacing: '-0.01em',
               }}
             >
               {show.city}
             </span>
             <span
-              style={{ color: 'var(--linear-text-tertiary)', fontSize: '12px' }}
+              style={{
+                color: 'var(--linear-text-tertiary)',
+                fontSize: 'var(--linear-label-size)',
+              }}
             >
               {show.date} · {show.venue}
             </span>
@@ -124,15 +127,15 @@ function ContactMockup() {
         return (
           <div
             key={c.role}
-            className='flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-surface-2 cursor-pointer group'
+            className='flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
             style={{
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              backgroundColor: 'var(--linear-bg-surface-0)',
+              border: '1px solid var(--linear-border-subtle)',
             }}
           >
             <div
               className='w-8 h-8 rounded-lg flex items-center justify-center'
-              style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
+              style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
             >
               <Icon className='w-4 h-4 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-primary)] transition-colors' />
             </div>
@@ -140,8 +143,8 @@ function ContactMockup() {
               <span
                 style={{
                   color: 'var(--linear-text-primary)',
-                  fontWeight: 500,
-                  fontSize: '13px',
+                  fontWeight: 'var(--linear-font-weight-medium)',
+                  fontSize: 'var(--linear-caption-size)',
                 }}
               >
                 {c.role}
@@ -149,7 +152,7 @@ function ContactMockup() {
               <span
                 style={{
                   color: 'var(--linear-text-tertiary)',
-                  fontSize: '12px',
+                  fontSize: 'var(--linear-label-size)',
                 }}
               >
                 {c.name}
@@ -175,24 +178,21 @@ function ListenMockup() {
         return (
           <div
             key={dsp.name}
-            className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-surface-2 cursor-pointer group'
+            className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group'
             style={{
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              backgroundColor: 'var(--linear-bg-surface-0)',
+              border: '1px solid var(--linear-border-subtle)',
             }}
           >
             <div className='flex items-center gap-3'>
-              <div
-                className='w-8 h-8 rounded-lg flex items-center justify-center'
-                style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}
-              >
+              <div className='w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--linear-bg-surface-1)]'>
                 <Icon className='w-4 h-4' style={{ color: dsp.color }} />
               </div>
               <span
                 style={{
                   color: 'var(--linear-text-primary)',
-                  fontWeight: 500,
-                  fontSize: '13px',
+                  fontWeight: 'var(--linear-font-weight-medium)',
+                  fontSize: 'var(--linear-caption-size)',
                 }}
               >
                 {dsp.name}
@@ -200,7 +200,7 @@ function ListenMockup() {
             </div>
             <button
               type='button'
-              className='px-4 py-1.5 rounded-full text-[12px] font-medium bg-[rgba(255,255,255,0.05)] text-[var(--linear-text-primary)] hover:bg-[rgba(255,255,255,0.1)] transition-colors'
+              className='px-4 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)] hover:bg-[var(--linear-bg-hover)] transition-colors'
             >
               Play
             </button>
@@ -264,38 +264,20 @@ export function DeeplinksGrid() {
           width: '400px',
           height: '400px',
           borderRadius: '400px',
-          background:
-            'radial-gradient(50% 50%, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0) 50%)',
+          background: 'var(--linear-hero-glow)',
         }}
       />
 
       <Container size='homepage'>
         {/* Heading */}
         <div className='text-center heading-gap-linear'>
-          <h2
-            style={{
-              fontSize: 'clamp(28px, 4vw, 48px)',
-              fontWeight: 510,
-              lineHeight: 1,
-              letterSpacing: '-0.022em',
-              color: 'var(--linear-text-primary)',
-            }}
-          >
+          <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
             One link.{' '}
             <span style={{ color: 'var(--linear-text-tertiary)' }}>
               Infinite outcomes.
             </span>
           </h2>
-          <p
-            className='mx-auto mt-4'
-            style={{
-              fontSize: '15px',
-              lineHeight: '24px',
-              letterSpacing: '-0.011em',
-              color: 'var(--linear-text-secondary)',
-              maxWidth: '460px',
-            }}
-          >
+          <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
             Jovie automatically routes fans to the right action — or override
             with a direct link to tips, tours, contacts, and every release.
           </p>
@@ -305,25 +287,25 @@ export function DeeplinksGrid() {
         <div
           className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden'
           style={{
-            backgroundColor: 'rgba(255,255,255,0.08)',
+            backgroundColor: 'var(--linear-border-subtle)',
             gap: '1px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 4px 32px rgba(8,9,10,0.6)',
+            borderRadius: 'var(--linear-radius-lg)',
+            border: '1px solid var(--linear-border-subtle)',
+            boxShadow: 'var(--linear-shadow-card)',
           }}
         >
           {cards.map(card => (
             <div
               key={card.slugPath}
               className='group relative flex flex-col'
-              style={{ backgroundColor: 'var(--linear-bg-surface-0)' }}
+              style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
             >
               <div className='flex flex-1 flex-col gap-4 p-6'>
                 {/* URL slug */}
                 <p
                   className='font-mono'
                   style={{
-                    fontSize: '13px',
+                    fontSize: 'var(--linear-caption-size)',
                     fontWeight: 450,
                     color: 'var(--linear-text-tertiary)',
                   }}
@@ -337,8 +319,8 @@ export function DeeplinksGrid() {
                 {/* Description */}
                 <p
                   style={{
-                    fontSize: '14px',
-                    lineHeight: 1.55,
+                    fontSize: 'var(--linear-body-sm-size)',
+                    lineHeight: 'var(--linear-leading-normal)',
                     color: 'var(--linear-text-secondary)',
                   }}
                 >
@@ -354,7 +336,7 @@ export function DeeplinksGrid() {
                 className='absolute bottom-0 left-[15%] h-px w-[70%] opacity-0 transition-opacity duration-200 group-hover:opacity-30'
                 style={{
                   background:
-                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                    'linear-gradient(90deg, transparent, var(--linear-text-primary), transparent)',
                 }}
               />
             </div>

@@ -25,39 +25,42 @@ export function ActionDrivenProfileSectionClient({
   }
 
   return (
-    <section className='relative py-16 sm:py-20 bg-base overflow-hidden'>
+    <section
+      className='relative section-spacing-linear overflow-hidden'
+      style={{ backgroundColor: 'var(--linear-bg-page)' }}
+    >
       <div className='absolute inset-0 -z-10'>
         <div className='absolute inset-0 grid-bg opacity-60' />
         <div className={`absolute inset-0 ${active.accentClassName}`} />
-        <div className='pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-base to-transparent dark:from-base' />
-        <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
+        <div className='pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-[var(--linear-bg-page)] to-transparent' />
+        <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-[var(--linear-bg-page)] to-transparent' />
       </div>
 
-      <Container size='md'>
-        <div className='mx-auto max-w-5xl'>
-          <div className='grid gap-10 md:grid-cols-12 md:items-start'>
+      <Container size='homepage'>
+        <div className='mx-auto max-w-[var(--linear-content-max)]'>
+          <div className='grid md:grid-cols-12 md:items-start section-gap-linear'>
             <div className='md:col-span-8'>
-              <p className='inline-flex w-fit items-center rounded-full border border-subtle bg-surface-1/75 px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-secondary-token backdrop-blur supports-backdrop-filter:bg-surface-1/60'>
+              <p className='inline-flex w-fit items-center rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-[var(--linear-text-secondary)] backdrop-blur'>
                 {active.eyebrow}
               </p>
 
-              <h2 className='mt-3 text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
+              <h2 className='mt-4 marketing-h2-linear text-[var(--linear-text-primary)]'>
                 {active.title}
               </h2>
 
-              <p className='mt-4 max-w-prose text-sm sm:text-base leading-relaxed text-secondary-token'>
+              <p className='mt-4 max-w-prose marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 {active.description}
               </p>
 
-              <div className='mt-6'>
+              <div className='mt-8'>
                 <div
                   role='tablist'
                   aria-label='Adaptive fan routing'
-                  className='relative inline-grid grid-cols-3 rounded-xl border border-subtle bg-surface-0/40 p-1'
+                  className='relative inline-grid grid-cols-3 rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] p-1'
                 >
                   <span
                     aria-hidden='true'
-                    className='absolute inset-y-1 left-1 rounded-lg bg-surface-1 shadow transition-transform duration-500 ease-out motion-reduce:transition-none'
+                    className='absolute inset-y-1 left-1 rounded-lg bg-[var(--linear-bg-surface-2)] shadow-sm transition-transform duration-300 ease-out'
                     style={{
                       width: `calc((100% - 0.5rem) / ${pillars.length})`,
                       transform: `translateX(${activePillarIndex * 100}%)`,
@@ -77,10 +80,10 @@ export function ActionDrivenProfileSectionClient({
                         aria-selected={isActive}
                         aria-controls={panelId}
                         tabIndex={isActive ? 0 : -1}
-                        className={`relative z-10 inline-flex items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors duration-200 focus-ring-themed motion-reduce:transition-none ${
+                        className={`relative z-10 inline-flex items-center justify-center rounded-lg px-4 py-2 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] transition-colors duration-200 focus-ring ${
                           isActive
-                            ? 'text-primary-token'
-                            : 'text-secondary-token hover:text-primary-token'
+                            ? 'text-[var(--linear-text-primary)]'
+                            : 'text-[var(--linear-text-tertiary)] hover:text-[var(--linear-text-primary)] hover:bg-[var(--linear-bg-hover)]'
                         }`}
                         ref={node => {
                           tabRefs.current[index] = node;
@@ -94,33 +97,35 @@ export function ActionDrivenProfileSectionClient({
                   })}
                 </div>
 
-                <p className='mt-3 text-xs text-tertiary-token'>
+                <p className='mt-3 text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
                   Same artist profile. Ordered per fan.
                 </p>
 
-                <div className='mt-6 rounded-2xl border border-subtle bg-surface-1 p-4'>
-                  <div className='text-xs font-medium tracking-wide uppercase text-tertiary-token'>
+                <div className='mt-8 rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] p-5'>
+                  <div className='text-[var(--linear-label-size)] font-medium tracking-wide uppercase text-[var(--linear-text-tertiary)]'>
                     What changes for this fan
                   </div>
-                  <div className="relative mt-3 overflow-hidden rounded-xl border border-subtle bg-surface-0/30 before:absolute before:bottom-3 before:left-[22px] before:top-3 before:w-px before:bg-subtle/70 before:content-['']">
+                  <div className="relative mt-4 overflow-hidden rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] before:absolute before:bottom-4 before:left-[26px] before:top-4 before:w-px before:bg-[var(--linear-border-subtle)] before:content-['']">
                     {active.actions.map(action => (
                       <div
                         key={action}
-                        className='relative border-b border-subtle/70 py-2.5 pl-10 pr-3 last:border-b-0 hover:bg-surface-0/45'
+                        className='relative border-b border-[var(--linear-border-subtle)] py-3 pl-12 pr-4 last:border-b-0 hover:bg-[var(--linear-bg-hover)] transition-colors'
                       >
-                        <span className='absolute left-3 top-2.5 inline-flex h-5 w-5 items-center justify-center rounded-md border border-subtle bg-surface-0 text-[11px] font-semibold text-tertiary-token'>
+                        <span className='absolute left-4 top-3 inline-flex h-5 w-5 items-center justify-center rounded-md border border-[var(--linear-border-strong)] bg-[var(--linear-bg-surface-2)] text-[11px] font-semibold text-[var(--linear-text-tertiary)]'>
                           ✓
                         </span>
-                        <span className='text-sm leading-snug text-secondary-token'>
+                        <span className='text-[var(--linear-body-sm-size)] leading-snug text-[var(--linear-text-secondary)]'>
                           {action}
                         </span>
                       </div>
                     ))}
                   </div>
 
-                  <div className='mt-4 flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0/30 px-3 py-2'>
-                    <span className='text-xs text-tertiary-token'>Outcome</span>
-                    <span className='text-xs font-medium text-secondary-token'>
+                  <div className='mt-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-4 py-3'>
+                    <span className='text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
+                      Outcome
+                    </span>
+                    <span className='text-[var(--linear-caption-size)] font-medium text-[var(--linear-text-secondary)]'>
                       {active.metricChip}
                     </span>
                   </div>
@@ -129,7 +134,10 @@ export function ActionDrivenProfileSectionClient({
             </div>
 
             <div className='md:col-span-4'>
-              <div className='rounded-3xl border border-subtle bg-surface-0 p-5 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.55)] dark:shadow-[0_30px_90px_-55px_rgba(0,0,0,0.8)]'>
+              <div
+                className='rounded-[24px] border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] p-5'
+                style={{ boxShadow: 'var(--linear-shadow-card-elevated)' }}
+              >
                 {pillars.map(pillar => {
                   const isActive = pillar.id === activePillarId;
                   const tabId = getTabId(pillar.id);
@@ -150,9 +158,12 @@ export function ActionDrivenProfileSectionClient({
                       aria-labelledby={tabId}
                       hidden={!isActive}
                     >
-                      <div className='rounded-2xl border border-subtle bg-surface-1 p-4 shadow-[0_10px_35px_-25px_rgba(0,0,0,0.45)] dark:shadow-[0_10px_45px_-30px_rgba(0,0,0,0.75)]'>
+                      <div
+                        className='rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] p-4'
+                        style={{ boxShadow: 'var(--linear-shadow-card)' }}
+                      >
                         <div className='flex items-center gap-3'>
-                          <div className='h-14 w-14 overflow-hidden rounded-full border border-subtle bg-surface-0 shadow-[0_10px_25px_-20px_rgba(0,0,0,0.55)] dark:shadow-[0_12px_28px_-22px_rgba(0,0,0,0.9)]'>
+                          <div className='h-14 w-14 overflow-hidden rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)]'>
                             <Image
                               alt='Sample artist avatar'
                               src='/avatars/default-user.png'
@@ -164,10 +175,10 @@ export function ActionDrivenProfileSectionClient({
                             />
                           </div>
                           <div className='min-w-0'>
-                            <div className='truncate text-sm font-semibold text-primary-token'>
+                            <div className='truncate text-[var(--linear-body-sm-size)] font-[var(--linear-font-weight-semibold)] text-[var(--linear-text-primary)]'>
                               {profileArtist.name}
                             </div>
-                            <div className='truncate text-xs text-tertiary-token'>
+                            <div className='truncate text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
                               {profileArtist.handle}
                             </div>
                           </div>
@@ -175,15 +186,15 @@ export function ActionDrivenProfileSectionClient({
 
                         <button
                           type='button'
-                          className='mt-5 w-full rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white shadow-[0_10px_28px_-18px_rgba(0,0,0,0.65)] transition-transform duration-200 btn-press focus-ring-themed motion-reduce:transition-none'
+                          className='mt-5 w-full rounded-xl bg-[var(--linear-text-primary)] px-4 py-3 text-[var(--linear-body-sm-size)] font-semibold text-[var(--linear-bg-page)] transition-transform duration-200 focus-ring hover:scale-[1.02]'
                         >
                           {ctaLabel}
                         </button>
 
-                        <div className='mt-4 rounded-2xl border border-subtle bg-surface-0/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
-                          <div className='h-3 w-2/3 rounded bg-surface-3/35 dark:bg-surface-2/45' />
-                          <div className='mt-3 h-3 w-1/2 rounded bg-surface-3/25 dark:bg-surface-2/35' />
-                          <div className='mt-2 h-3 w-3/5 rounded bg-surface-3/25 dark:bg-surface-2/35' />
+                        <div className='mt-4 rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] p-4'>
+                          <div className='h-3 w-2/3 rounded bg-[var(--linear-bg-surface-2)]' />
+                          <div className='mt-3 h-3 w-1/2 rounded bg-[var(--linear-bg-surface-2)]' />
+                          <div className='mt-2 h-3 w-3/5 rounded bg-[var(--linear-bg-surface-2)]' />
                         </div>
                       </div>
                     </div>

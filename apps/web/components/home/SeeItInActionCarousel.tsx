@@ -92,23 +92,13 @@ export function SeeItInActionCarousel({ creators }: Props) {
         backgroundColor: 'var(--linear-bg-page)',
       }}
     >
-      <div className='w-full px-5 sm:px-6 lg:px-[77px]'>
-        <h2
-          className='text-center'
-          style={{
-            fontSize: 'var(--linear-h2-size)',
-            fontWeight: 'var(--linear-font-weight-medium)',
-            lineHeight: 'var(--linear-h2-leading)',
-            letterSpacing: 'var(--linear-h2-tracking)',
-            color: 'var(--linear-text-primary)',
-            marginBottom: 'var(--linear-space-12)',
-          }}
-        >
+      <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-container-max)] mx-auto heading-gap-linear'>
+        <h2 className='text-center marketing-h2-linear text-[var(--linear-text-primary)]'>
           See it in action
         </h2>
       </div>
 
-      <div className='relative'>
+      <div className='relative mt-12'>
         {/* Fade edges for premium feel */}
         <div
           className='absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
@@ -130,7 +120,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
           className='flex will-change-transform motion-reduce:transform-none'
           style={{
             width: 'max-content',
-            gap: 'var(--linear-space-6)',
+            gap: 'var(--linear-gap-cards)',
             transform: `translateX(-${scrollOffset}px)`,
             transition: isVisible ? 'transform 0.1s linear' : 'none',
           }}
@@ -140,7 +130,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
               key={`${creator.id}-${index}`}
               className='relative flex flex-col gap-3 group'
             >
-              <div className='relative w-[180px] h-[240px] shrink-0 overflow-hidden rounded-[20px]'>
+              <div className='relative w-[180px] h-[240px] shrink-0 overflow-hidden rounded-[var(--linear-radius-lg)]'>
                 <Image
                   src={creator.src}
                   alt={`${creator.name}'s avatar`}
@@ -156,11 +146,11 @@ export function SeeItInActionCarousel({ creators }: Props) {
 
                 {/* Profile info overlay */}
                 <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-1'>
-                  <span className='text-white font-medium text-[15px] truncate drop-shadow-md'>
+                  <span className='text-[var(--linear-text-inverse)] font-[var(--linear-font-weight-medium)] text-[var(--linear-body-size)] truncate drop-shadow-md'>
                     {creator.name}
                   </span>
                   {creator.tagline && (
-                    <span className='text-white/80 text-[12px] truncate'>
+                    <span className='text-[var(--linear-text-inverse)]/80 text-[var(--linear-label-size)] truncate'>
                       {creator.tagline}
                     </span>
                   )}
@@ -168,7 +158,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
 
                 {/* Inner border for premium feel */}
                 <div
-                  className='absolute inset-0 rounded-[20px] pointer-events-none'
+                  className='absolute inset-0 rounded-[var(--linear-radius-lg)] pointer-events-none'
                   style={{ border: '1px solid rgba(255,255,255,0.15)' }}
                 />
               </div>
