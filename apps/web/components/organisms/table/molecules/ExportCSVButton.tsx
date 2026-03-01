@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  TooltipShortcut,
 } from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -67,6 +68,10 @@ export interface ExportCSVButtonProps<T extends object> {
    * @default 'Export data to CSV file'
    */
   readonly ariaLabel?: string;
+  /**
+   * Tooltip label shown on hover. When provided, wraps the button in TooltipShortcut.
+   */
+  readonly tooltipLabel?: string;
 }
 
 export function ExportCSVButton<T extends object>({
@@ -79,6 +84,7 @@ export function ExportCSVButton<T extends object>({
   size = 'sm',
   label = 'Export CSV',
   ariaLabel = 'Export data to CSV file',
+  tooltipLabel,
 }: ExportCSVButtonProps<T>) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -153,27 +159,34 @@ export function ExportCSVButton<T extends object>({
     columns?.length ??
     (pendingData?.[0] ? Object.keys(pendingData[0]).length : 0);
 
+  const button = (
+    <Button
+      variant={variant}
+      size={size}
+      onClick={handleOpenConfirmation}
+      disabled={disabled || isExporting}
+      className={cn('gap-2 rounded-lg border-subtle hover:bg-base', className)}
+      aria-label={ariaLabel}
+      aria-busy={isExporting}
+    >
+      {isExporting ? (
+        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+      ) : (
+        <Download className='h-4 w-4' aria-hidden='true' />
+      )}
+      <span>{isExporting ? 'Exporting...' : label}</span>
+    </Button>
+  );
+
   return (
     <>
-      <Button
-        variant={variant}
-        size={size}
-        onClick={handleOpenConfirmation}
-        disabled={disabled || isExporting}
-        className={cn(
-          'gap-2 rounded-lg border-subtle hover:bg-base',
-          className
-        )}
-        aria-label={ariaLabel}
-        aria-busy={isExporting}
-      >
-        {isExporting ? (
-          <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
-        ) : (
-          <Download className='h-4 w-4' aria-hidden='true' />
-        )}
-        <span>{isExporting ? 'Exporting...' : label}</span>
-      </Button>
+      {tooltipLabel ? (
+        <TooltipShortcut label={tooltipLabel} side='bottom'>
+          {button}
+        </TooltipShortcut>
+      ) : (
+        button
+      )}
 
       <AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
         <AlertDialogContent>

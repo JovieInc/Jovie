@@ -55,6 +55,7 @@ export const APP_ROUTES = {
   ADMIN_CREATORS_TOGGLE_VERIFY: '/app/admin/creators/toggle-verify',
   ADMIN_USERS: '/app/admin/users',
   ADMIN_ACTIVITY: '/app/admin/activity',
+  ADMIN_CAMPAIGNS: '/app/admin/campaigns',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing

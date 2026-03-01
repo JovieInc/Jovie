@@ -132,9 +132,11 @@ export const ServerEnvSchema = z.object({
 
   // Sentry server-side
   SENTRY_DSN: z.string().optional(),
+  SENTRY_DSN_DEV: z.string().optional(),
   SENTRY_WEBHOOK_SECRET: z.string().optional(),
   SENTRY_AUTH_TOKEN: z.string().optional(),
   SENTRY_ORG_SLUG: z.string().optional(),
+  SENTRY_DEV_PROJECT: z.string().optional(),
 
   // Linear webhook automation
   LINEAR_WEBHOOK_SECRET: z.string().optional(),

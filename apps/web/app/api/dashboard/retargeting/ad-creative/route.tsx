@@ -16,14 +16,22 @@ const SIZES = {
   story: { width: 1080, height: 1920 },
 } as const;
 
-const BRAND = {
-  bg: 'radial-gradient(circle at 15% 10%, #363062 0%, #17122d 40%, #0a0715 100%)',
-  accent: '#b6a8ff',
-  secondary: '#d4cffb',
-  muted: '#9f95d9',
-  white: '#ffffff',
-  pillBg: 'rgba(182, 168, 255, 0.22)',
-  pillBorder: 'rgba(182, 168, 255, 0.4)',
+const APPLE_DARK = {
+  bg: '#000000',
+  text: '#F5F5F7',
+  textMuted: '#86868B',
+  border: '#333336',
+  buttonBg: '#FFFFFF',
+  buttonText: '#000000',
+} as const;
+
+const APPLE_LIGHT = {
+  bg: '#FFFFFF',
+  text: '#1D1D1F',
+  textMuted: '#86868B',
+  border: '#E5E5EA',
+  buttonBg: '#000000',
+  buttonText: '#FFFFFF',
 } as const;
 
 /**
@@ -41,7 +49,7 @@ function FanAdCreative({
   size: 'feed' | 'story';
 }) {
   const isStory = size === 'story';
-  const photoSize = isStory ? 360 : 320;
+  const photoSize = isStory ? 440 : 380;
 
   return (
     <div
@@ -52,132 +60,140 @@ function FanAdCreative({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: BRAND.bg,
-        color: BRAND.white,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-        padding: isStory ? '120px 80px' : '80px',
-        gap: isStory ? 56 : 40,
+        background: APPLE_DARK.bg,
+        color: APPLE_DARK.text,
+        fontFamily:
+          '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        padding: isStory ? '120px' : '80px',
         position: 'relative',
       }}
     >
-      {/* Jovie wordmark - top right */}
+      {/* Subtle Jovie branding */}
       <div
         style={{
           position: 'absolute',
-          top: isStory ? 60 : 40,
-          right: isStory ? 60 : 40,
+          top: isStory ? 80 : 60,
           display: 'flex',
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: 600,
-          letterSpacing: -0.5,
-          color: BRAND.accent,
+          letterSpacing: '-0.02em',
+          color: APPLE_DARK.textMuted,
         }}
       >
         Jovie
       </div>
 
-      {/* Profile photo */}
-      <div
-        style={{
-          width: photoSize,
-          height: photoSize,
-          borderRadius: photoSize / 2,
-          border: '4px solid rgba(255,255,255,0.15)',
-          overflow: 'hidden',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(255,255,255,0.08)',
-          flexShrink: 0,
-        }}
-      >
-        {avatarUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
-          <img
-            src={avatarUrl}
-            alt=''
-            width={photoSize}
-            height={photoSize}
-            style={{ objectFit: 'cover' }}
-          />
-        ) : (
-          <div
-            style={{
-              fontSize: photoSize / 2.5,
-              fontWeight: 700,
-              color: BRAND.secondary,
-              display: 'flex',
-            }}
-          >
-            {artistName.charAt(0).toUpperCase()}
-          </div>
-        )}
-      </div>
-
-      {/* Text block */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: isStory ? 20 : 14,
-          textAlign: 'center',
+          gap: isStory ? 80 : 64,
+          marginTop: isStory ? -40 : 0,
         }}
       >
+        {/* Profile photo */}
         <div
           style={{
+            width: photoSize,
+            height: photoSize,
+            borderRadius: photoSize / 2,
+            overflow: 'hidden',
             display: 'flex',
-            fontSize: isStory ? 28 : 24,
-            fontWeight: 400,
-            color: BRAND.secondary,
-            letterSpacing: -0.3,
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: APPLE_DARK.border,
+            flexShrink: 0,
           }}
         >
-          Never miss a release from
+          {avatarUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
+            <img
+              src={avatarUrl}
+              alt=''
+              width={photoSize}
+              height={photoSize}
+              style={{ objectFit: 'cover' }}
+            />
+          ) : (
+            <div
+              style={{
+                fontSize: photoSize / 2.5,
+                fontWeight: 600,
+                color: APPLE_DARK.textMuted,
+                display: 'flex',
+              }}
+            >
+              {artistName.charAt(0).toUpperCase()}
+            </div>
+          )}
         </div>
-        <div
-          style={{
-            display: 'flex',
-            fontSize: isStory ? 56 : 48,
-            fontWeight: 700,
-            letterSpacing: -1.5,
-            lineHeight: 1.1,
-            maxWidth: 900,
-          }}
-        >
-          {artistName}
-        </div>
-      </div>
 
-      {/* CTA pill */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px 40px',
-          borderRadius: 999,
-          fontSize: 22,
-          fontWeight: 600,
-          color: BRAND.white,
-          background: BRAND.pillBg,
-          border: `1.5px solid ${BRAND.pillBorder}`,
-          letterSpacing: -0.2,
-        }}
-      >
-        Turn on notifications
+        {/* Text block */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              fontSize: isStory ? 36 : 32,
+              fontWeight: 500,
+              color: APPLE_DARK.textMuted,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Never miss a release from
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: isStory ? 80 : 68,
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.05,
+              maxWidth: 900,
+              color: APPLE_DARK.text,
+            }}
+          >
+            {artistName}
+          </div>
+        </div>
+
+        {/* CTA pill */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 56px',
+            borderRadius: 999,
+            fontSize: 28,
+            fontWeight: 600,
+            color: APPLE_DARK.buttonText,
+            background: APPLE_DARK.buttonBg,
+            letterSpacing: '-0.01em',
+          }}
+        >
+          Turn on notifications
+        </div>
       </div>
 
       {/* URL footer */}
       <div
         style={{
           position: 'absolute',
-          bottom: isStory ? 80 : 48,
+          bottom: isStory ? 80 : 60,
           display: 'flex',
-          fontSize: 22,
+          fontSize: 28,
           fontWeight: 500,
-          color: BRAND.muted,
-          letterSpacing: -0.2,
+          color: APPLE_DARK.textMuted,
+          letterSpacing: '-0.02em',
         }}
       >
         jov.ie/{username}
@@ -201,7 +217,7 @@ function ClaimAdCreative({
   size: 'feed' | 'story';
 }) {
   const isStory = size === 'story';
-  const photoSize = isStory ? 320 : 280;
+  const photoSize = isStory ? 360 : 320;
 
   return (
     <div
@@ -212,112 +228,128 @@ function ClaimAdCreative({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: BRAND.bg,
-        color: BRAND.white,
-        fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-        padding: isStory ? '120px 80px' : '80px',
-        gap: isStory ? 48 : 36,
+        background: APPLE_LIGHT.bg,
+        color: APPLE_LIGHT.text,
+        fontFamily:
+          '"SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        padding: isStory ? '120px' : '80px',
         position: 'relative',
       }}
     >
-      {/* Jovie wordmark - top right */}
+      {/* Subtle Jovie branding */}
       <div
         style={{
           position: 'absolute',
-          top: isStory ? 60 : 40,
-          right: isStory ? 60 : 40,
+          top: isStory ? 80 : 60,
           display: 'flex',
-          fontSize: 28,
+          fontSize: 24,
           fontWeight: 600,
-          letterSpacing: -0.5,
-          color: BRAND.accent,
+          letterSpacing: '-0.02em',
+          color: APPLE_LIGHT.textMuted,
         }}
       >
         Jovie
       </div>
 
-      {/* Profile photo */}
       <div
         style={{
-          width: photoSize,
-          height: photoSize,
-          borderRadius: photoSize / 2,
-          border: '4px solid rgba(255,255,255,0.15)',
-          overflow: 'hidden',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          background: 'rgba(255,255,255,0.08)',
-          flexShrink: 0,
+          gap: isStory ? 80 : 64,
+          marginTop: isStory ? -40 : 0,
         }}
       >
-        {avatarUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
-          <img
-            src={avatarUrl}
-            alt=''
-            width={photoSize}
-            height={photoSize}
-            style={{ objectFit: 'cover' }}
-          />
-        ) : (
+        {/* Profile photo */}
+        <div
+          style={{
+            width: photoSize,
+            height: photoSize,
+            borderRadius: photoSize / 2,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: APPLE_LIGHT.border,
+            flexShrink: 0,
+          }}
+        >
+          {avatarUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- ImageResponse requires standard img */
+            <img
+              src={avatarUrl}
+              alt=''
+              width={photoSize}
+              height={photoSize}
+              style={{ objectFit: 'cover' }}
+            />
+          ) : (
+            <div
+              style={{
+                fontSize: photoSize / 2.5,
+                fontWeight: 600,
+                color: APPLE_LIGHT.textMuted,
+                display: 'flex',
+              }}
+            >
+              {artistName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        {/* Text block */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 24,
+            textAlign: 'center',
+          }}
+        >
           <div
             style={{
-              fontSize: photoSize / 2.5,
-              fontWeight: 700,
-              color: BRAND.secondary,
               display: 'flex',
+              fontSize: isStory ? 72 : 64,
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              lineHeight: 1.05,
+              color: APPLE_LIGHT.text,
+              maxWidth: 800,
             }}
           >
-            {artistName.charAt(0).toUpperCase()}
+            Don&apos;t lose your handle.
           </div>
-        )}
-      </div>
+          <div
+            style={{
+              display: 'flex',
+              fontSize: isStory ? 40 : 36,
+              fontWeight: 500,
+              color: APPLE_LIGHT.textMuted,
+              letterSpacing: '-0.02em',
+            }}
+          >
+            jov.ie/{username}
+          </div>
+        </div>
 
-      {/* Headline */}
-      <div
-        style={{
-          display: 'flex',
-          fontSize: isStory ? 52 : 44,
-          fontWeight: 700,
-          letterSpacing: -1.5,
-          lineHeight: 1.1,
-          textAlign: 'center',
-        }}
-      >
-        Don&apos;t lose your handle
-      </div>
-
-      {/* Handle URL - prominent */}
-      <div
-        style={{
-          display: 'flex',
-          fontSize: isStory ? 36 : 32,
-          fontWeight: 600,
-          color: BRAND.accent,
-          letterSpacing: -0.5,
-        }}
-      >
-        jov.ie/{username}
-      </div>
-
-      {/* CTA pill */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '16px 40px',
-          borderRadius: 999,
-          fontSize: 22,
-          fontWeight: 600,
-          color: BRAND.white,
-          background: BRAND.pillBg,
-          border: `1.5px solid ${BRAND.pillBorder}`,
-          letterSpacing: -0.2,
-        }}
-      >
-        Claim your profile
+        {/* CTA pill */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 56px',
+            borderRadius: 999,
+            fontSize: 28,
+            fontWeight: 600,
+            color: APPLE_LIGHT.buttonText,
+            background: APPLE_LIGHT.buttonBg,
+            letterSpacing: '-0.01em',
+          }}
+        >
+          Claim your profile
+        </div>
       </div>
     </div>
   );
@@ -346,6 +378,7 @@ export async function GET(req: NextRequest) {
           username: creatorProfiles.username,
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
+          isAdmin: users.isAdmin,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -357,6 +390,10 @@ export async function GET(req: NextRequest) {
           { error: 'Profile not found' },
           { status: 404 }
         );
+      }
+
+      if (!profile.isAdmin) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
 
       const artistName = profile.displayName || profile.username || 'Artist';

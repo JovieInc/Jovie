@@ -1,9 +1,14 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useMemo, useState } from 'react';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { useCallback, useMemo, useState } from 'react';
 
+import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { UnifiedTable } from '@/components/organisms/table';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
 interface FeedbackRow {
   id: string;
@@ -24,6 +29,8 @@ interface FeedbackRow {
 interface AdminFeedbackTableProps {
   readonly items: FeedbackRow[];
 }
+
+const columnHelper = createColumnHelper<FeedbackRow>();
 
 export function AdminFeedbackTable({
   items,
@@ -61,63 +68,82 @@ export function AdminFeedbackTable({
     setDismissingId(null);
   };
 
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
+  const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
+    () => [
+      columnHelper.accessor('createdAtIso', {
+        id: 'submitted',
+        header: 'Submitted',
+        cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
+        size: 180,
+      }),
+      columnHelper.accessor('user', {
+        id: 'user',
+        header: 'User',
+        cell: ({ getValue }) => {
+          const user = getValue();
+          return (
+            <span className='font-medium text-primary-token'>
+              {user.name ?? user.email ?? 'Unknown user'}
+            </span>
+          );
+        },
+        size: 200,
+      }),
+      columnHelper.accessor('message', {
+        id: 'message',
+        header: 'Feedback',
+        cell: ({ getValue }) => (
+          <TruncatedText lines={2} className='text-primary-token'>
+            {getValue()}
+          </TruncatedText>
+        ),
+        size: 400,
+      }),
+      columnHelper.accessor('status', {
+        id: 'status',
+        header: 'Status',
+        cell: ({ getValue }) => (
+          <span className='rounded-full border border-subtle px-2.5 py-1 text-xs text-secondary-token'>
+            {getValue()}
+          </span>
+        ),
+        size: 120,
+      }),
+    ],
+    []
+  );
+
+  const getRowClassName = useCallback(
+    (row: FeedbackRow) =>
+      row.id === selectedId
+        ? 'bg-brand-primary/5 cursor-pointer'
+        : 'hover:bg-surface-2/50 cursor-pointer group',
+    [selectedId]
+  );
+
   return (
-    <div className='flex min-h-[620px] border border-subtle rounded-xl overflow-hidden bg-surface-1'>
-      <div className='w-full lg:w-[58%] border-r border-subtle'>
-        <div className='px-5 py-4 border-b border-subtle'>
-          <h2 className='text-base font-semibold text-primary-token'>
-            Product feedback
-          </h2>
-          <p className='text-sm text-secondary-token'>
-            Review what customers shared and keep the queue tidy.
-          </p>
-        </div>
-        <div className='max-h-[560px] overflow-auto'>
-          <table className='w-full text-sm'>
-            <thead className='bg-surface-2 text-secondary-token'>
-              <tr>
-                <th className='px-4 py-3 text-left font-medium'>Submitted</th>
-                <th className='px-4 py-3 text-left font-medium'>User</th>
-                <th className='px-4 py-3 text-left font-medium'>Feedback</th>
-                <th className='px-4 py-3 text-left font-medium'>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(item => {
-                const isSelected = item.id === selectedId;
-                return (
-                  <tr
-                    key={item.id}
-                    className={
-                      isSelected ? 'bg-brand-primary/5' : 'hover:bg-surface-2'
-                    }
-                  >
-                    <td className='px-4 py-3 align-top'>
-                      <button
-                        type='button'
-                        onClick={() => setSelectedId(item.id)}
-                        className='text-left text-secondary-token hover:text-primary-token'
-                      >
-                        {new Date(item.createdAtIso).toLocaleString()}
-                      </button>
-                    </td>
-                    <td className='px-4 py-3 align-top text-primary-token'>
-                      {item.user.name ?? item.user.email ?? 'Unknown user'}
-                    </td>
-                    <td className='px-4 py-3 align-top text-primary-token max-w-[280px]'>
-                      <p className='line-clamp-2'>{item.message}</p>
-                    </td>
-                    <td className='px-4 py-3 align-top'>
-                      <span className='rounded-full border border-subtle px-2.5 py-1 text-xs text-secondary-token'>
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+    <div className='flex h-full min-h-[620px] rounded-xl overflow-hidden bg-surface-1'>
+      <div className='w-full lg:w-[58%] border-r border-subtle h-full'>
+        <AdminTableShell testId='admin-feedback-table'>
+          {() => (
+            <UnifiedTable
+              data={rows}
+              columns={columns}
+              getRowId={row => row.id}
+              getRowClassName={getRowClassName}
+              onRowClick={row => setSelectedId(row.id)}
+              enableVirtualization={true}
+              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+              className='text-[13px]'
+              emptyState={
+                <div className='px-4 py-10 text-center text-sm text-secondary-token'>
+                  <p className='font-medium'>No feedback found</p>
+                </div>
+              }
+            />
+          )}
+        </AdminTableShell>
       </div>
 
       <RightDrawer

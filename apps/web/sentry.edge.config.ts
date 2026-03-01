@@ -19,7 +19,10 @@ import * as Sentry from '@sentry/nextjs';
 const isProduction = process.env.NODE_ENV === 'production';
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
+  dsn:
+    process.env.NODE_ENV === 'development'
+      ? process.env.SENTRY_DSN_DEV
+      : process.env.SENTRY_DSN,
 
   // Suppress known non-actionable errors
   ignoreErrors: [

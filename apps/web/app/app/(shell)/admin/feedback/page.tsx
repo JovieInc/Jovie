@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminFeedbackPage() {
-  const [items, counts] = await Promise.all([
+  const [items, _counts] = await Promise.all([
     getAdminFeedbackItems(200),
     getFeedbackCounts(),
   ]);
@@ -19,16 +19,7 @@ export default async function AdminFeedbackPage() {
   return (
     <PageShell>
       <PageContent noPadding>
-        <div className='px-6 pt-6 pb-2'>
-          <h1 className='text-2xl font-semibold text-primary-token'>
-            Feedback inbox
-          </h1>
-          <p className='mt-1 text-sm text-secondary-token'>
-            {counts.pending} pending · {counts.dismissed} dismissed ·{' '}
-            {counts.total} total
-          </p>
-        </div>
-        <div className='p-6 pt-4'>
+        <div className='p-6 h-full'>
           <AdminFeedbackTable
             items={items.map(item => ({
               id: item.id,
