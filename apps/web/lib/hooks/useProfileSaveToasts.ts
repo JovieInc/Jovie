@@ -26,7 +26,8 @@ export function useProfileSaveToasts(
     }
 
     if (status.error) {
-      toast.error(status.error, { id: toastId });
+      console.error('[profile save error]', status.error);
+      toast.error('Failed to save changes. Please try again.', { id: toastId });
       return;
     }
 

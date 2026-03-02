@@ -127,6 +127,93 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.errorMessage).toBeUndefined();
   });
 
+  it('subtracts percentage coupon discount from MRR (JOV-1089)', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 2000, // $20/mo gross
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+
+    const thirtyDaysAgoSeconds = Math.floor(
+      (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+    );
+
+    const subscriptions = [
+      {
+        ...makeSubscription({
+          id: 'sub_discounted',
+          status: 'active',
+          created: thirtyDaysAgoSeconds - 10 * 24 * 60 * 60,
+          items,
+        }),
+        discounts: [
+          { source: { coupon: { percent_off: 50 }, type: 'coupon' } },
+        ],
+      } as unknown as Stripe.Subscription,
+    ];
+
+    listMock.mockResolvedValue({ data: subscriptions, has_more: false });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    // $20 gross - 50% = $10 net MRR
+    expect(metrics.mrrUsd).toBe(10);
+    expect(metrics.activeSubscribers).toBe(1);
+  });
+
+  it('subtracts fixed amount coupon discount from MRR (JOV-1089)', async () => {
+    const items = {
+      data: [
+        {
+          price: {
+            currency: 'usd',
+            unit_amount: 2000, // $20/mo gross
+            recurring: { interval: 'month', interval_count: 1 },
+          },
+          quantity: 1,
+        },
+      ],
+    } as Stripe.ApiList<Stripe.SubscriptionItem>;
+
+    const thirtyDaysAgoSeconds = Math.floor(
+      (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+    );
+
+    const subscriptions = [
+      {
+        ...makeSubscription({
+          id: 'sub_fixed_discount',
+          status: 'active',
+          created: thirtyDaysAgoSeconds - 10 * 24 * 60 * 60,
+          items,
+        }),
+        discounts: [
+          {
+            source: {
+              coupon: { amount_off: 500, currency: 'usd' },
+              type: 'coupon',
+            },
+          },
+        ],
+      } as unknown as Stripe.Subscription,
+    ];
+
+    listMock.mockResolvedValue({ data: subscriptions, has_more: false });
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    // $20 gross - $5 fixed = $15 net MRR
+    expect(metrics.mrrUsd).toBe(15);
+    expect(metrics.activeSubscribers).toBe(1);
+  });
+
   it('returns isAvailable false when Stripe API fails', async () => {
     listMock.mockRejectedValueOnce(new Error('Stripe API error'));
 
