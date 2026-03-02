@@ -217,19 +217,18 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('tab switching between Catalog, Links, Details, and Lyrics works', async () => {
+  it('tab switching between Track list, Links, Details, and Lyrics works', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Catalog tab active by default — Fields and Tracks visible
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
+    // Track list tab active by default — Tracks visible
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
     await user.click(screen.getByRole('tab', { name: /links/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
-    expect(screen.queryByTestId('fields')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
 
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
@@ -244,9 +243,9 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('lyrics')).toBeInTheDocument();
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
-    // Switch back to Catalog
-    await user.click(screen.getByRole('tab', { name: /catalog/i }));
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
+    // Switch back to Track list
+    await user.click(screen.getByRole('tab', { name: /track list/i }));
+    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
   });
 
   it('preserves active tab when release changes', async () => {
@@ -278,10 +277,10 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('Catalog tab renders smart link section', async () => {
+  it('smart link section renders in header area', async () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Catalog is the default tab, so smart link should be visible
+    // Smart link is always visible in the header when a release is selected
     expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
       'Smart Link Content'
     );

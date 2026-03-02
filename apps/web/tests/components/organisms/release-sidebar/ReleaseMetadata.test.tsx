@@ -44,7 +44,7 @@ describe('ReleaseMetadata canvas status', () => {
     expect(screen.getByText('Ready to upload')).toBeInTheDocument();
   });
 
-  it('falls back to empty state for unknown canvas status values', () => {
+  it('falls back to not-set badge for unknown canvas status values', () => {
     render(
       <ReleaseMetadata
         release={buildRelease({
@@ -53,14 +53,17 @@ describe('ReleaseMetadata canvas status', () => {
       />
     );
 
-    expect(screen.getByText('Set canvas status.')).toBeInTheDocument();
+    // Falls back to not_set config which renders "Set" badge
+    expect(screen.getByText('Canvas')).toBeInTheDocument();
+    expect(screen.getAllByText('Set').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('defaults to empty state when canvas status is missing', () => {
+  it('defaults to not-set badge when canvas status is missing', () => {
     render(
       <ReleaseMetadata release={buildRelease({ canvasStatus: undefined })} />
     );
 
-    expect(screen.getByText('Set canvas status.')).toBeInTheDocument();
+    expect(screen.getByText('Canvas')).toBeInTheDocument();
+    expect(screen.getAllByText('Set').length).toBeGreaterThanOrEqual(1);
   });
 });
