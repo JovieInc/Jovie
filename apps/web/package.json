@@ -102,7 +102,7 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.36",
-    "@ai-sdk/react": "^3.0.51",
+    "@ai-sdk/react": "^3.0.107",
     "@clerk/nextjs": "6.36.7",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
