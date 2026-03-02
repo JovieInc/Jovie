@@ -62,7 +62,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {showType && typeStyle && (
             <Badge
               size='sm'
-              className={`shrink-0 rounded-full ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+              className={`shrink-0 ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
             >
               {typeStyle.label}
             </Badge>
