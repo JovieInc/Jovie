@@ -1,10 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,20 +10,9 @@ export default async function RetargetingAdsLayout({
 }: {
   children: ReactNode;
 }) {
-  let entitlements;
-  try {
-    entitlements = await getCurrentUserEntitlements();
-  } catch (error) {
-    if (error instanceof BillingUnavailableError) {
-      entitlements = {
-        isAuthenticated: true,
-        userId: error.userId,
-        isAdmin: error.isAdmin,
-      };
-    } else {
-      throw error;
-    }
-  }
+  // getCurrentUserEntitlements degrades gracefully on billing failure --
+  // admin status is fetched independently and preserved even when billing is down.
+  const entitlements = await getCurrentUserEntitlements();
 
   if (!entitlements.isAuthenticated || !entitlements.userId) {
     redirect('/sign-in');
