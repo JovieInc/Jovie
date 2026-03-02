@@ -51,6 +51,14 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
       return actions[0].label;
     },
   },
+  {
+    header: 'LTV',
+    accessor: 'ltvCents',
+    formatter: v => {
+      const cents = Number(v ?? 0);
+      return cents > 0 ? `$${(cents / 100).toFixed(2)}` : '';
+    },
+  },
   { header: 'Location', accessor: 'locationLabel' },
   { header: 'Type', accessor: 'type', formatter: v => capitalize(v) },
   { header: 'Engagement Score', accessor: 'engagementScore' },

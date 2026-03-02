@@ -163,6 +163,7 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
     phone: i % 3 === 1 ? `+1555000${String(i).padStart(4, '0')}` : null,
     spotifyConnected: i % 5 === 0,
     purchaseCount: Math.floor(Math.random() * 10),
+    ltvCents: i % 3 === 0 ? (i + 1) * 100 : 0,
     tags: ['fan'],
     deviceType: i % 2 === 0 ? 'mobile' : 'desktop',
     lastSeenAt: new Date().toISOString(),

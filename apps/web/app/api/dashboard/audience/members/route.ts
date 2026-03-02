@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceMembers } from '@/lib/db/schema/analytics';
+import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
@@ -108,6 +109,14 @@ export async function GET(request: NextRequest) {
 
       const segmentCondition = buildSegmentCondition(segments);
 
+      const ltvSubquery = drizzleSql<number>`COALESCE((
+        SELECT ${tipAudience.tipAmountTotalCents}
+        FROM ${tipAudience}
+        WHERE ${tipAudience.profileId} = ${audienceMembers.creatorProfileId}
+          AND ${tipAudience.email} = ${audienceMembers.email}
+        LIMIT 1
+      ), 0)`;
+
       const baseQuery = tx
         .select({
           id: audienceMembers.id,
@@ -126,6 +135,7 @@ export async function GET(request: NextRequest) {
           phone: audienceMembers.phone,
           spotifyConnected: audienceMembers.spotifyConnected,
           purchaseCount: audienceMembers.purchaseCount,
+          ltvCents: ltvSubquery,
           tags: audienceMembers.tags,
           lastSeenAt: audienceMembers.lastSeenAt,
           createdAt: audienceMembers.firstSeenAt,
@@ -176,6 +186,7 @@ export async function GET(request: NextRequest) {
         phone: member.phone,
         spotifyConnected: Boolean(member.spotifyConnected),
         purchaseCount: member.purchaseCount,
+        ltvCents: Number(member.ltvCents ?? 0),
         tags: Array.isArray(member.tags) ? member.tags : [],
         lastSeenAt: serializeDate(member.lastSeenAt),
         createdAt: serializeDate(member.createdAt),

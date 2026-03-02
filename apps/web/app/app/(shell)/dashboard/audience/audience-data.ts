@@ -8,6 +8,7 @@ import {
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
@@ -122,6 +123,7 @@ function transformMemberRow(member: {
   phone: string | null;
   spotifyConnected: boolean | null;
   purchaseCount: number;
+  ltvCents: number;
   tags: string[] | null;
   lastSeenAt: Date;
 }): AudienceServerRow {
@@ -142,6 +144,7 @@ function transformMemberRow(member: {
     phone: member.phone,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
+    ltvCents: Number(member.ltvCents ?? 0),
     tags: Array.isArray(member.tags) ? member.tags : [],
     deviceType: member.deviceType,
     lastSeenAt: toISOStringOrNull(member.lastSeenAt),
@@ -251,6 +254,13 @@ function buildMemberSelectFields(includeDetails: boolean) {
     phone: audienceMembers.phone,
     spotifyConnected: audienceMembers.spotifyConnected,
     purchaseCount: audienceMembers.purchaseCount,
+    ltvCents: drizzleSql<number>`COALESCE((
+      SELECT ${tipAudience.tipAmountTotalCents}
+      FROM ${tipAudience}
+      WHERE ${tipAudience.profileId} = ${audienceMembers.creatorProfileId}
+        AND ${tipAudience.email} = ${audienceMembers.email}
+      LIMIT 1
+    ), 0)`,
     tags: audienceMembers.tags,
     lastSeenAt: audienceMembers.lastSeenAt,
   };
@@ -467,6 +477,7 @@ async function fetchSubscribersData(
       phone: subscriber.phone,
       spotifyConnected: false,
       purchaseCount: 0,
+      ltvCents: 0,
       tags: [],
       deviceType: null,
       lastSeenAt: createdAt,

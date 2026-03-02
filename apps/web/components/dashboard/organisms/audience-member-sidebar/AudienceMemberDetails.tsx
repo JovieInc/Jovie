@@ -114,6 +114,16 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
         }
       />
       <DrawerPropertyRow label='Visits' value={String(member.visits)} />
+      {member.ltvCents > 0 && (
+        <DrawerPropertyRow
+          label='Lifetime Value'
+          value={
+            <span className='text-emerald-600 dark:text-emerald-400 font-medium tabular-nums'>
+              {`$${(member.ltvCents / 100).toFixed(2)}`}
+            </span>
+          }
+        />
+      )}
       <DrawerPropertyRow
         label='Last seen'
         value={formatLongDate(member.lastSeenAt)}

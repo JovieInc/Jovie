@@ -319,6 +319,7 @@ describe('Dashboard API contracts', () => {
               phone: null,
               spotifyConnected: false,
               purchaseCount: 1,
+              ltvCents: 0,
               tags: ['vip'],
               lastSeenAt: new Date('2024-01-02T00:00:00Z'),
               createdAt: new Date('2023-12-31T00:00:00Z'),

@@ -40,6 +40,7 @@ import {
   renderEmailCell,
   renderIntentScoreCell,
   renderLastActionCell,
+  renderLtvCell,
   renderReturningCell,
   renderSourceCell,
   renderUserCell,
@@ -100,6 +101,12 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     header: 'Source',
     cell: renderSourceCell,
     size: 140,
+  }),
+  memberColumnHelper.accessor('ltvCents', {
+    id: 'ltv',
+    header: 'LTV',
+    cell: renderLtvCell,
+    size: 90,
   }),
   memberColumnHelper.accessor('latestActions', {
     id: 'lastAction',
