@@ -2,13 +2,11 @@
 
 import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 
 export interface ClaimBannerProps {
-  /** The claim token for this profile */
-  readonly claimToken: string;
   /** The profile handle/username */
   readonly profileHandle: string;
   /** Optional: Override the display name shown in the banner */
@@ -17,33 +15,17 @@ export interface ClaimBannerProps {
 
 /**
  * ClaimBanner displays a prominent banner on unclaimed profiles,
- * allowing the rightful owner to claim their profile.
+ * directing the profile owner to sign up and claim their profile.
  *
- * Behavior:
- * - If user is signed in: links directly to /{username}/claim?token={token}
- * - If user is signed out: links to /signup with redirect_url
+ * Note: The actual claim flow requires a claim token sent via email.
+ * This banner directs users to sign up; token-based claiming happens
+ * through the dedicated /[username]/claim?token=... route.
  */
-export function ClaimBanner({
-  claimToken,
-  profileHandle,
-  displayName,
-}: ClaimBannerProps) {
-  const { isSignedIn, isLoaded } = useUserSafe();
+export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
+  const { isLoaded } = useUserSafe();
   const hasTrackedImpression = useRef(false);
 
-  const claimPath = `/${encodeURIComponent(profileHandle)}/claim?token=${encodeURIComponent(claimToken)}`;
-
-  const claimUrl = useMemo(() => {
-    if (!isLoaded) {
-      return `/signup?redirect_url=${encodeURIComponent(claimPath)}`;
-    }
-
-    if (isSignedIn) {
-      return claimPath;
-    }
-
-    return `/signup?redirect_url=${encodeURIComponent(claimPath)}`;
-  }, [isLoaded, isSignedIn, claimPath]);
+  const signupUrl = `/signup?redirect_url=${encodeURIComponent(`/${encodeURIComponent(profileHandle)}`)}`;
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -52,11 +34,9 @@ export function ClaimBanner({
 
     track('profile_claim_banner_impression', {
       profile_handle: profileHandle,
-      claim_path: claimPath,
-      is_signed_in: isSignedIn,
       auth_loaded: isLoaded,
     });
-  }, [claimPath, isLoaded, isSignedIn, profileHandle]);
+  }, [isLoaded, profileHandle]);
 
   const name = displayName || profileHandle;
 
@@ -81,16 +61,14 @@ export function ClaimBanner({
 
           {/* CTA Button */}
           <Link
-            href={claimUrl}
+            href={signupUrl}
             className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-btn-primary text-btn-primary-foreground font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-subtle hover:opacity-95 transition-opacity focus-ring-transparent-offset'
             data-testid='claim-banner-cta'
             aria-label={`Claim profile for ${name}`}
             onClick={() => {
               track('profile_claim_banner_click', {
                 profile_handle: profileHandle,
-                claim_path: claimPath,
-                destination: claimUrl,
-                is_signed_in: isSignedIn,
+                destination: signupUrl,
                 auth_loaded: isLoaded,
               });
             }}

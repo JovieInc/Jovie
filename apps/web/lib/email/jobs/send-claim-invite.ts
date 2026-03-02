@@ -144,37 +144,22 @@ export async function processSendClaimInviteJob(
     };
   }
 
-  const inviteMeta = (invite.meta ?? {}) as {
-    source?: 'admin_click' | 'bulk' | 'auto';
-    claimToken?: string;
-  };
+  // Always generate a fresh token pair per email send.
+  // The raw token is never stored at rest — only the hash is persisted in the DB.
+  const {
+    token: claimToken,
+    tokenHash,
+    expiresAt,
+  } = await generateClaimTokenPair();
 
-  let claimToken = inviteMeta.claimToken;
-
-  if (!claimToken) {
-    const { token, tokenHash, expiresAt } = await generateClaimTokenPair();
-    claimToken = token;
-
-    await tx
-      .update(creatorProfiles)
-      .set({
-        claimToken: tokenHash,
-        claimTokenExpiresAt: expiresAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
-
-    await tx
-      .update(creatorClaimInvites)
-      .set({
-        meta: {
-          ...inviteMeta,
-          claimToken,
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorClaimInvites.id, invite.id));
-  }
+  await tx
+    .update(creatorProfiles)
+    .set({
+      claimToken: tokenHash,
+      claimTokenExpiresAt: expiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
 
   // Check if the email is suppressed (user unsubscribed or bounced)
   const suppressionCheck = await isEmailSuppressed(invite.email);

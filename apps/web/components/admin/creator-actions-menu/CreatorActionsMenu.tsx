@@ -10,7 +10,6 @@ import {
 } from '@jovie/ui';
 import {
   Check,
-  Copy,
   ExternalLink,
   Mail,
   MailX,
@@ -22,15 +21,11 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { copyToClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { CreatorActionsMenuProps } from './types';
 
 interface MenuItemsProps {
   readonly profile: CreatorActionsMenuProps['profile'];
-  readonly copySuccess: boolean;
   readonly isLoading: boolean;
   readonly onRefreshIngest?: () => void;
   readonly onToggleVerification: () => void;
@@ -38,7 +33,6 @@ interface MenuItemsProps {
   readonly onToggleMarketing: () => void;
   readonly onSendInvite?: () => void;
   readonly onDelete: () => void;
-  readonly handleCopyClaimLink: () => void;
 }
 
 /**
@@ -46,7 +40,6 @@ interface MenuItemsProps {
  */
 function MenuItems({
   profile,
-  copySuccess,
   isLoading,
   onRefreshIngest,
   onToggleVerification,
@@ -54,7 +47,6 @@ function MenuItems({
   onToggleMarketing,
   onSendInvite,
   onDelete,
-  handleCopyClaimLink,
 }: Readonly<MenuItemsProps>) {
   return (
     <>
@@ -120,19 +112,13 @@ function MenuItems({
         </Link>
       </DropdownMenuItem>
 
-      {!profile.isClaimed && profile.claimToken && (
+      {!profile.isClaimed && profile.claimToken && onSendInvite && (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleCopyClaimLink}>
-            <Copy className='h-3.5 w-3.5' />
-            {copySuccess ? 'Copied!' : 'Copy claim link'}
+          <DropdownMenuItem onClick={onSendInvite}>
+            <Send className='h-3.5 w-3.5' />
+            Send invite
           </DropdownMenuItem>
-          {onSendInvite && (
-            <DropdownMenuItem onClick={onSendInvite}>
-              <Send className='h-3.5 w-3.5' />
-              Send invite
-            </DropdownMenuItem>
-          )}
         </>
       )}
 
@@ -160,32 +146,9 @@ export function CreatorActionsMenu({
   open,
   onOpenChange,
 }: Readonly<CreatorActionsMenuProps>) {
-  const [copySuccess, setCopySuccess] = useState(false);
-  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    };
-  }, []);
-
   const isLoading = status === 'loading' || refreshIngestStatus === 'loading';
   const isSuccess = status === 'success';
   const isError = status === 'error';
-
-  const handleCopyClaimLink = useCallback(async () => {
-    if (!profile.claimToken) return;
-
-    const baseUrl = getBaseUrl();
-    const claimUrl = `${baseUrl}/${profile.username}/claim?token=${profile.claimToken}`;
-    const success = await copyToClipboard(claimUrl);
-
-    if (success) {
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-      setCopySuccess(true);
-      copyTimeoutRef.current = setTimeout(() => setCopySuccess(false), 2000);
-    }
-  }, [profile.claimToken, profile.username]);
 
   const stateClass = cn(
     'transition duration-200 ease-out transform',
@@ -213,7 +176,6 @@ export function CreatorActionsMenu({
           <DropdownMenuContent align='end' sideOffset={8}>
             <MenuItems
               profile={profile}
-              copySuccess={copySuccess}
               isLoading={isLoading}
               onRefreshIngest={onRefreshIngest}
               onToggleVerification={onToggleVerification}
@@ -221,7 +183,6 @@ export function CreatorActionsMenu({
               onToggleMarketing={onToggleMarketing}
               onSendInvite={onSendInvite}
               onDelete={onDelete}
-              handleCopyClaimLink={handleCopyClaimLink}
             />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -246,7 +207,6 @@ export function CreatorActionsMenu({
       <DropdownMenuContent align='end' sideOffset={8} className='w-56'>
         <MenuItems
           profile={profile}
-          copySuccess={copySuccess}
           isLoading={isLoading}
           onRefreshIngest={onRefreshIngest}
           onToggleVerification={onToggleVerification}
@@ -254,7 +214,6 @@ export function CreatorActionsMenu({
           onToggleMarketing={onToggleMarketing}
           onSendInvite={onSendInvite}
           onDelete={onDelete}
-          handleCopyClaimLink={handleCopyClaimLink}
         />
       </DropdownMenuContent>
     </DropdownMenu>

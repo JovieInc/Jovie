@@ -1,7 +1,12 @@
 'use client';
 
-import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
-
+/**
+ * ClaimLinkCopyButton - Deprecated
+ *
+ * Claim tokens are now hashed at rest (JOV-412). The raw token is only
+ * available at generation time and sent via email. Admin users should
+ * use the "Send Claim Invite" action to deliver claim links.
+ */
 export interface ClaimLinkCopyButtonProps
   extends Readonly<{
     readonly claimToken: string;
@@ -10,18 +15,19 @@ export interface ClaimLinkCopyButtonProps
 
 export function ClaimLinkCopyButton({
   claimToken,
-  username,
 }: Readonly<ClaimLinkCopyButtonProps>) {
+  // After hashing, the stored value is a hash — not a usable claim token.
+  // Claim links can only be sent via email at token generation time.
   if (!claimToken) {
     return null;
   }
 
   return (
-    <CopyToClipboardButton
-      relativePath={`/${encodeURIComponent(username)}/claim?token=${encodeURIComponent(claimToken)}`}
-      idleLabel='Copy claim link'
-      successLabel='✓ Link copied!'
-      errorLabel='Failed to copy'
-    />
+    <span
+      className='text-xs text-tertiary-token'
+      title='Claim token is hashed. Use "Send Claim Invite" to deliver claim links.'
+    >
+      Token hashed
+    </span>
   );
 }

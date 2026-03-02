@@ -41,7 +41,6 @@ vi.mock('next/link', () => ({
 
 describe('ClaimBanner', () => {
   const defaultProps = {
-    claimToken: 'test-claim-token-123',
     profileHandle: 'testartist',
   };
 
@@ -99,56 +98,23 @@ describe('ClaimBanner', () => {
   });
 
   describe('URL generation', () => {
-    it('generates signup URL with redirect for signed-out users', () => {
+    it('generates signup URL with redirect for all users', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
       const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute(
-        'href',
-        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-claim-token-123'
-      );
+      // ClaimBanner no longer includes a claim token — it directs to signup
+      expect(cta).toHaveAttribute('href', '/signup?redirect_url=%2Ftestartist');
     });
 
-    it('generates direct claim URL for signed-in users', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: true, isLoaded: true });
-
-      render(<ClaimBanner {...defaultProps} />);
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute(
-        'href',
-        '/testartist/claim?token=test-claim-token-123'
-      );
-    });
-
-    it('defaults to signup URL while loading', () => {
+    it('generates signup URL while loading', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: false });
 
       render(<ClaimBanner {...defaultProps} />);
 
       const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute(
-        'href',
-        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-claim-token-123'
-      );
-    });
-
-    it('properly encodes special characters in claim token', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
-
-      render(
-        <ClaimBanner
-          claimToken='token-with-special/chars&stuff'
-          profileHandle='test'
-        />
-      );
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      const href = cta.getAttribute('href');
-      // The claim path contains encoded token, then the whole redirect_url is encoded
-      expect(href).toContain('token%3Dtoken-with-special');
+      expect(cta).toHaveAttribute('href', '/signup?redirect_url=%2Ftestartist');
     });
   });
 
