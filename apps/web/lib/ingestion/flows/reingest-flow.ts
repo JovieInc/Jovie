@@ -63,7 +63,6 @@ export async function handleReingestProfile({
           id: existing.id,
           username: existing.usernameNormalized,
           usernameNormalized: existing.usernameNormalized,
-          claimToken: existing.claimToken,
         },
         links: extraction.links.length,
         warning: mergeError

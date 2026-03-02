@@ -207,7 +207,7 @@ const fetchProfileAndLinks = async (
       is_public: !!result.isPublic,
       is_verified: !!result.isVerified,
       is_claimed: !!result.isClaimed,
-      claim_token: result.claimToken ?? null,
+      claim_token: null, // Hash stored in DB; raw token never exposed on public pages
       claimed_at: null,
       settings: result.settings,
       theme: result.theme,
@@ -549,12 +549,8 @@ export default async function ArtistPage({
       />
 
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
-      {!profile.is_claimed && profile.claim_token ? (
-        <ClaimBanner
-          claimToken={profile.claim_token}
-          profileHandle={artist.handle}
-          displayName={artist.name}
-        />
+      {!profile.is_claimed ? (
+        <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
       ) : null}
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />

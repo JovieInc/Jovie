@@ -372,7 +372,6 @@ export const creatorClaimInvites = pgTable(
     meta: jsonb('meta')
       .$type<{
         source?: 'admin_click' | 'bulk' | 'auto';
-        claimToken?: string;
       }>()
       .default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),

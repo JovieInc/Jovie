@@ -564,7 +564,6 @@ export async function GET() {
     if (!entry?.id || entry.status !== 'invited') return null;
     const [row] = await db
       .select({
-        claimToken: waitlistInvites.claimToken,
         username: creatorProfiles.username,
       })
       .from(waitlistInvites)
@@ -582,7 +581,8 @@ export async function GET() {
     {
       hasEntry: Boolean(entry),
       status: entry?.status ?? null,
-      inviteToken: invite?.claimToken ?? null,
+      // claim token hash is never exposed via API — raw tokens are only sent via email
+      inviteToken: null,
       inviteUsername: invite?.username ?? null,
     },
     { headers: NO_STORE_HEADERS }
