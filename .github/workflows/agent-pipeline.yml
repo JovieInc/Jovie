@@ -8,8 +8,12 @@
 #
 # TRIGGERS:
 # 1. CI failure on agent branches → fix job (Claude Code fixes)
-# 2. CodeRabbit blocking review → fix job (Claude Code fixes)
-# 3. CI + Scope Judge both pass → approve job (auto-approve + auto-merge)
+# 2. CI + Scope Judge both pass → approve job (auto-approve + auto-merge)
+#
+# NOTE: CodeRabbit blocking review trigger (pull_request_review) was removed
+# because bot-submitted reviews create action_required runs that clog the
+# CI queue. CodeRabbit fixes are now handled via issue_comment trigger
+# when @claude is mentioned in a CodeRabbit review thread.
 #
 # SAFETY:
 # - Only runs on agent branches (linear/*, claude/*, codegen-bot/*, codex/*)
@@ -27,9 +31,9 @@ on:
     workflows: ["CI", "Scope Judge"]
     types: [completed]
 
-  # Trigger on CodeRabbit blocking review
-  pull_request_review:
-    types: [submitted]
+  # NOTE: pull_request_review trigger removed — bot-submitted reviews
+  # (CodeRabbit, Copilot) create action_required runs that block the CI
+  # queue and consume runner slots. See comment at top of file.
 
 permissions: {}
 
