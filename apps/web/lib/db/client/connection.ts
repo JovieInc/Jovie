@@ -13,7 +13,7 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import { env } from '@/lib/env-server';
 import * as schema from '../schema';
-import { logDbInfo } from './logging';
+import { logDbError, logDbInfo } from './logging';
 import type { DbType, PoolMetrics } from './types';
 
 // Configure Neon to use the ws library for WebSocket connections in Node.js
@@ -60,7 +60,36 @@ export function initializeDb(): DbType {
   );
 
   // Create Neon WebSocket pool - stateful, supports transactions for RLS
-  const pool = new Pool({ connectionString: databaseUrl });
+  //
+  // Pool settings tuned for Neon serverless to prevent
+  // "Connection terminated unexpectedly" errors:
+  //   - max: 10 — conservative limit; Neon serverless has its own concurrency
+  //     limits and excessive pooled connections get killed server-side
+  //   - idleTimeoutMillis: 20s — close idle connections before Neon's server-side
+  //     timeout (typically 30-60s) can terminate them unexpectedly
+  //   - connectionTimeoutMillis: 15s — allow time for Neon cold starts (up to ~10s)
+  //     without waiting forever
+  //   - allowExitOnIdle: true — let the Node process exit even if pool connections
+  //     remain (important for serverless/edge runtimes)
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    max: 10,
+    idleTimeoutMillis: 20_000,
+    connectionTimeoutMillis: 15_000,
+    allowExitOnIdle: true,
+  });
+
+  // Handle pool-level errors so unexpected connection terminations
+  // are logged and do not crash the process with an unhandled 'error' event.
+  pool.on('error', (err: Error) => {
+    logDbError(
+      'pool_error',
+      err,
+      { event: 'pool_background_error' },
+      { asBreadcrumb: true }
+    );
+  });
+
   _pool = pool;
 
   // Create drizzle instance with WebSocket driver
@@ -123,6 +152,31 @@ export const db = new Proxy({} as DbType, {
     return typeof value === 'function' ? value.bind(_db) : value;
   },
 });
+
+/**
+ * Tear down the current pool and force a fresh connection on the next query.
+ *
+ * This is the nuclear option for recovering from a pool whose connections have
+ * all been terminated server-side (e.g. after a Neon branch reset or prolonged
+ * outage). Normal transient errors are handled by `withRetry`; call this only
+ * when the pool itself is irrecoverably broken.
+ */
+export async function resetPool(): Promise<void> {
+  logDbInfo('pool_reset', 'Resetting database connection pool', {});
+  const oldPool = _pool;
+  _pool = undefined;
+  _db = undefined;
+  if (typeof global !== 'undefined') {
+    globalThis.db = undefined;
+  }
+  if (oldPool) {
+    try {
+      await oldPool.end();
+    } catch (err) {
+      logDbError('pool_reset_end', err, {}, { asBreadcrumb: true });
+    }
+  }
+}
 
 /**
  * Get connection pool metrics for monitoring.

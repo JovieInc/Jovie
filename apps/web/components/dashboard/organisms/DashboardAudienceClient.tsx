@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+import { BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
@@ -14,7 +16,7 @@ import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AudienceMember } from '@/types';
-import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
+import { AnalyticsSidebar } from './AnalyticsSidebar';
 import type {
   AudienceFilters,
   AudienceView,
@@ -88,6 +90,15 @@ export function DashboardAudienceClient({
   subscriberCount,
   filters: initialFilters,
 }: Readonly<DashboardAudienceClientProps>) {
+  // Analytics sidebar state
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = React.useState(false);
+  const toggleAnalytics = React.useCallback(() => {
+    setIsAnalyticsOpen(prev => !prev);
+  }, []);
+  const closeAnalytics = React.useCallback(() => {
+    setIsAnalyticsOpen(false);
+  }, []);
+
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
@@ -169,31 +180,51 @@ export function DashboardAudienceClient({
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
       <div
         data-testid='dashboard-audience-client'
-        className='flex h-full min-h-0 flex-col'
+        className='flex h-full min-h-0 flex-row'
       >
-        <div className='shrink-0 px-4 pt-4 sm:px-6 sm:pt-5'>
-          <AudienceFunnelMetrics />
+        {/* Main content area */}
+        <div className='flex-1 min-w-0 flex flex-col'>
+          {/* Analytics toggle bar */}
+          <div className='shrink-0 flex items-center justify-end px-4 pt-3 pb-1 sm:px-6'>
+            <Button
+              size='sm'
+              variant={isAnalyticsOpen ? 'secondary' : 'ghost'}
+              onClick={toggleAnalytics}
+              className='gap-1.5 text-[13px]'
+              aria-label={
+                isAnalyticsOpen ? 'Close analytics' : 'Open analytics'
+              }
+              aria-expanded={isAnalyticsOpen}
+            >
+              <BarChart3 className='h-3.5 w-3.5' />
+              Analytics
+            </Button>
+          </div>
+
+          <div className='flex-1 min-h-0 flex flex-col'>
+            <DashboardAudienceTable
+              mode={mode}
+              view={view}
+              rows={rows}
+              total={totalCount}
+              sort={sort}
+              direction={direction}
+              onSortChange={handleSortChange}
+              onViewChange={handleViewChange}
+              onFiltersChange={handleFiltersChange}
+              profileUrl={profileUrl}
+              profileId={profileId}
+              subscriberCount={subscriberCount}
+              filters={initialFilters}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={handleLoadMore}
+            />
+          </div>
         </div>
-        <div className='flex-1 min-h-0 flex flex-col'>
-          <DashboardAudienceTable
-            mode={mode}
-            view={view}
-            rows={rows}
-            total={totalCount}
-            sort={sort}
-            direction={direction}
-            onSortChange={handleSortChange}
-            onViewChange={handleViewChange}
-            onFiltersChange={handleFiltersChange}
-            profileUrl={profileUrl}
-            profileId={profileId}
-            subscriberCount={subscriberCount}
-            filters={initialFilters}
-            hasNextPage={hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
-            onLoadMore={handleLoadMore}
-          />
-        </div>
+
+        {/* Analytics right drawer */}
+        <AnalyticsSidebar isOpen={isAnalyticsOpen} onClose={closeAnalytics} />
       </div>
     </QueryErrorBoundary>
   );

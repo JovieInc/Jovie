@@ -11,6 +11,11 @@
     if (pref === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
 
+    // Update theme-color meta tag to match active theme (PWA system bar color)
+    var themeColor = pref === 'dark' ? '#0a0a0a' : '#ffffff';
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', themeColor);
+
     // High contrast mode (independent of light/dark)
     var hc = localStorage.getItem('jovie-high-contrast');
     if (hc === 'true') root.classList.add('high-contrast');

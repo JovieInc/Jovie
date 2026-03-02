@@ -4,21 +4,6 @@ import { APP_ROUTES } from '@/constants/routes';
 
 const entitlementsMock = vi.hoisted(() => ({
   getCurrentUserEntitlements: vi.fn(),
-  BillingUnavailableError: class BillingUnavailableError extends Error {
-    isAdmin: boolean;
-    userId: string | null;
-
-    constructor(
-      message: string,
-      isAdmin = false,
-      userId: string | null = null
-    ) {
-      super(message);
-      this.name = 'BillingUnavailableError';
-      this.isAdmin = isAdmin;
-      this.userId = userId;
-    }
-  },
 }));
 
 const errorTrackingMock = vi.hoisted(() => ({
@@ -149,14 +134,18 @@ describe('admin creator toggle routes', () => {
     expect(errorTrackingMock.captureWarning).toHaveBeenCalledOnce();
   });
 
-  it('allows admin fallback when billing service is unavailable', async () => {
-    entitlementsMock.getCurrentUserEntitlements.mockRejectedValue(
-      new entitlementsMock.BillingUnavailableError(
-        'billing down',
-        true,
-        'admin_1'
-      )
-    );
+  it('allows admin access when billing degrades to free tier', async () => {
+    // getCurrentUserEntitlements degrades gracefully -- returns free-tier
+    // defaults with admin status preserved (fetched independently via Redis).
+    entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
+      isAdmin: true,
+      userId: 'admin_1',
+      email: null,
+      isAuthenticated: true,
+      plan: 'free',
+      isPro: false,
+      hasAdvancedFeatures: false,
+    });
     adminActionsMock.toggleCreatorFeaturedAction.mockResolvedValue(undefined);
 
     const { POST } = await import(

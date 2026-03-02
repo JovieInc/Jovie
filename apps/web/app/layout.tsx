@@ -100,16 +100,16 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
     'application-name': APP_NAME,
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
     'msapplication-config': 'none',
-    'theme-color': '#ffffff',
+    'theme-color': '#0a0a0a',
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: APP_NAME,
   },
   icons: {
