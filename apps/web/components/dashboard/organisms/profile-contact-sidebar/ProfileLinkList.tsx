@@ -9,7 +9,10 @@ import type {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
-import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import {
+  DspProviderIcon,
+  PROVIDER_LABELS,
+} from '@/components/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import {
@@ -91,7 +94,7 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   );
 }
 
-function ConnectedDspPills({
+function ConnectedDspRows({
   dspConnections,
 }: {
   readonly dspConnections: PreviewDspConnections;
@@ -118,14 +121,22 @@ function ConnectedDspPills({
   }
 
   return (
-    <div className='flex flex-wrap gap-2'>
+    <div className='space-y-0.5'>
       {connectedProviders.map(provider => (
-        <DspConnectionPill
+        <div
           key={provider.provider}
-          provider={provider.provider}
-          connected={provider.connected}
-          artistName={provider.artistName}
-        />
+          className='flex items-center gap-2.5 px-3 py-1.5 lg:rounded-md hover:bg-interactive-hover transition-colors'
+        >
+          <span className='shrink-0 w-5 flex items-center justify-center'>
+            <DspProviderIcon provider={provider.provider} size='sm' />
+          </span>
+          <span className='text-xs text-secondary-token truncate'>
+            {provider.artistName || PROVIDER_LABELS[provider.provider]}
+          </span>
+          <span className='text-[10px] text-tertiary-token shrink-0'>
+            Connected
+          </span>
+        </div>
       ))}
     </div>
   );
@@ -167,24 +178,24 @@ export function ProfileLinkList({
   if (selectedCategory !== 'all') {
     if (selectedCategory === 'dsp' && dspConnections) {
       return (
-        <div className='space-y-4'>
-          <DrawerLinkSection title='Music connections' isEmpty={false}>
-            <ConnectedDspPills dspConnections={dspConnections} />
-          </DrawerLinkSection>
-          <DrawerLinkSection
-            title='Music links'
-            onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
-            addLabel='Add Music link'
-            isEmpty={filteredLinks.length === 0}
-            emptyMessage='No music links yet. Click + to add one.'
-          >
-            <div className='space-y-2'>
-              {filteredLinks.map(link => (
-                <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
-              ))}
-            </div>
-          </DrawerLinkSection>
-        </div>
+        <DrawerLinkSection
+          title='Music links'
+          onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
+          addLabel='Add Music link'
+          isEmpty={
+            filteredLinks.length === 0 &&
+            !dspConnections.spotify.connected &&
+            !dspConnections.appleMusic.connected
+          }
+          emptyMessage='No music links yet. Click + to add one.'
+        >
+          <div className='space-y-0.5'>
+            <ConnectedDspRows dspConnections={dspConnections} />
+            {filteredLinks.map(link => (
+              <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+            ))}
+          </div>
+        </DrawerLinkSection>
       );
     }
 
