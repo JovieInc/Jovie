@@ -1,11 +1,18 @@
 /**
- * Database Connection Management
+ * Database Connection Management — CANONICAL DB MODULE
+ *
+ * This is THE single source of truth for database connections in the app.
+ * All application code MUST use `import { db } from '@/lib/db'` which
+ * re-exports the `db` proxy from this file.
  *
  * Uses Neon WebSocket driver for stateful connection pooling.
  * This is the serverless-native pattern:
- * - Stateful WebSocket requests required for Row Level Security (RLS)
+ * - Stateful WebSocket connections required for Row Level Security (RLS)
  * - db.transaction() is supported and maintains connection state
  * - set_config applies properly within the transaction
+ *
+ * DO NOT create additional database connections elsewhere in the app.
+ * Scripts in apps/web/scripts/ are exempt since they run standalone.
  */
 
 import { neonConfig, Pool } from '@neondatabase/serverless';

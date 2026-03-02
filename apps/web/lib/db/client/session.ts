@@ -2,7 +2,7 @@
  * Database Session Helpers
  *
  * Helper functions for database sessions and RLS.
- * Note: Neon HTTP driver does not support transactions.
+ * The Neon WebSocket driver supports transactions for RLS isolation.
  */
 
 import { sql as drizzleSql } from 'drizzle-orm';
@@ -35,10 +35,9 @@ export async function withDb<T>(
 /**
  * Set session user ID for RLS policies with retry logic.
  *
- * Uses set_config with is_local=false (session-scoped) instead of SET LOCAL,
- * because SET LOCAL is a no-op outside a transaction block and the Neon HTTP
- * driver does not support transactions. Session-scoped settings persist for
- * the lifetime of the connection (one HTTP request with Neon HTTP).
+ * Uses set_config with is_local=false (session-scoped) so the setting
+ * persists for the lifetime of the connection. For transaction-scoped
+ * isolation, wrap in db.transaction() with is_local=true instead.
  */
 export async function setSessionUser(userId: string): Promise<void> {
   try {
