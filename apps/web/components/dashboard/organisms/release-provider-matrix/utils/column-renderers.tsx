@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
@@ -331,11 +331,9 @@ export function renderReleaseTypeCell({
   const style = getReleaseTypeStyle(type);
 
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0 text-[10px] leading-[20px] font-medium ${style.border} ${style.bg} ${style.text}`}
-    >
+    <Badge size='sm' className={`${style.border} ${style.bg} ${style.text}`}>
       {style.label}
-    </span>
+    </Badge>
   );
 }
 
