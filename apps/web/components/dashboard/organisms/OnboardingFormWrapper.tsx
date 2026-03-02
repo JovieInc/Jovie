@@ -12,7 +12,7 @@ const PENDING_CLAIM_MAX_AGE_MS = 10 * 60 * 1000;
  */
 function readPendingClaimHandle(): string {
   try {
-    const raw = sessionStorage.getItem('pendingClaim');
+    const raw = globalThis.sessionStorage?.getItem('pendingClaim');
     if (!raw) return '';
 
     const parsed = JSON.parse(raw) as { handle?: string; ts?: number };
@@ -56,7 +56,11 @@ export function OnboardingFormWrapper({
   // Clean up sessionStorage after mount (side effect deferred from render)
   useEffect(() => {
     if (!initialHandle && resolvedHandle) {
-      sessionStorage.removeItem('pendingClaim');
+      try {
+        globalThis.sessionStorage?.removeItem('pendingClaim');
+      } catch {
+        // sessionStorage may be unavailable in restricted contexts
+      }
     }
   }, [initialHandle, resolvedHandle]);
 
