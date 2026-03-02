@@ -11,6 +11,7 @@
  */
 
 import 'server-only';
+import * as Sentry from '@sentry/nextjs';
 import { z } from 'zod';
 
 // ============================================================================
@@ -194,6 +195,13 @@ export function validateSpotifyConfigOnStartup(): void {
     if (!validation.success && validation.errors) {
       console.warn('[Spotify] Configuration issues:', validation.errors);
     }
+
+    Sentry.captureMessage('Spotify not configured at startup', {
+      level: 'warning',
+      extra: {
+        errors: validation.success ? undefined : validation.errors,
+      },
+    });
   }
 }
 
