@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu/CreatorActionsMenu';
-import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 vi.mock('next/link', () => ({
@@ -21,12 +20,6 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }));
-
-vi.mock('@/hooks/useClipboard', () => ({
-  copyToClipboard: vi.fn(),
-}));
-
-const mockedCopyToClipboard = vi.mocked(copyToClipboard);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -112,9 +105,6 @@ describe('CreatorActionsMenu interaction tests', () => {
       within(menu).getByRole('menuitem', { name: /view profile/i })
     ).toBeInTheDocument();
     expect(
-      within(menu).getByRole('menuitem', { name: /copy claim link/i })
-    ).toBeInTheDocument();
-    expect(
       within(menu).getByRole('menuitem', { name: /send invite/i })
     ).toBeInTheDocument();
     expect(
@@ -177,34 +167,15 @@ describe('CreatorActionsMenu interaction tests', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows copy feedback and reverts after 2000ms', async () => {
-    mockedCopyToClipboard.mockResolvedValue(true);
+  it('does not show copy claim link (tokens are hashed)', async () => {
     const user = userEvent.setup();
 
     renderMenu(createProfile());
 
     await openMenu(user);
-    await user.click(
-      screen.getByRole('menuitem', { name: /copy claim link/i })
-    );
-
-    expect(mockedCopyToClipboard).toHaveBeenCalledWith(
-      expect.stringContaining('/dina/claim?token=claim-token-123')
-    );
-
-    await openMenu(user);
     expect(
-      screen.getByRole('menuitem', { name: /copied!/i })
-    ).toBeInTheDocument();
-
-    await waitFor(
-      () => {
-        expect(
-          screen.getByRole('menuitem', { name: /copy claim link/i })
-        ).toBeInTheDocument();
-      },
-      { timeout: 3000 }
-    );
+      screen.queryByRole('menuitem', { name: /copy claim link/i })
+    ).not.toBeInTheDocument();
   });
 
   it('disables trigger while loading', () => {
@@ -222,9 +193,6 @@ describe('CreatorActionsMenu interaction tests', () => {
 
     await openMenu(user);
 
-    expect(
-      screen.getByRole('menuitem', { name: /copy claim link/i })
-    ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: /send invite/i })
     ).toBeInTheDocument();
