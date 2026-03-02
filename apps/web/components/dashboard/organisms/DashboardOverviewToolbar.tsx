@@ -49,7 +49,7 @@ export function DashboardOverviewToolbar({
         type='button'
         aria-label='Refresh dashboard'
         onClick={onRefresh}
-        className='inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-subtle bg-surface-1/40 px-2.5 text-xs font-semibold text-primary-token ring-1 ring-inset ring-white/3 transition-colors hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base dark:ring-white/5'
+        className='inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-subtle bg-surface-1/40 px-2.5 text-xs font-semibold text-primary-token ring-1 ring-inset ring-white/3 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page dark:ring-white/5'
       >
         <Icon name='RefreshCw' className='h-3.5 w-3.5' />
         <span className='text-[11px] font-semibold'>Refresh</span>
