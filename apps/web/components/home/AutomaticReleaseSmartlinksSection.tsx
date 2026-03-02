@@ -47,15 +47,14 @@ export function AutomaticReleaseSmartlinksSection() {
                 builds a smart link and automatically notifies your fans via
                 email (SMS coming soon).
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-0)] border-[var(--linear-border-subtle)]'>
-                Smartlinks · Auto-generated{' '}
-                <span className='text-[var(--linear-text-tertiary)]'>→</span>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
+                Smartlinks · Auto-generated
               </span>
             </div>
           </div>
 
           {/* Full Width Product Mockup */}
-          <div className='relative mt-16 md:mt-24 mx-auto w-full'>
+          <div className='relative mt-12 md:mt-16 mx-auto w-full'>
             <div className='relative w-full'>
               {/* Left panel — Dashboard Window */}
               <div
