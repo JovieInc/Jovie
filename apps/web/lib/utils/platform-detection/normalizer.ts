@@ -175,6 +175,42 @@ function canonicalizeTwitterDomain(parsedUrl: URL): void {
 }
 
 /**
+ * Social platforms where handles are case-insensitive.
+ * For these, we lowercase the path to prevent duplicates like @loren vs @LOREN.
+ */
+const CASE_INSENSITIVE_HANDLE_HOSTS = new Set([
+  'instagram.com',
+  'www.instagram.com',
+  'x.com',
+  'www.x.com',
+  'twitter.com',
+  'www.twitter.com',
+  'tiktok.com',
+  'www.tiktok.com',
+  'facebook.com',
+  'www.facebook.com',
+  'twitch.tv',
+  'www.twitch.tv',
+  'linkedin.com',
+  'www.linkedin.com',
+  'soundcloud.com',
+  'www.soundcloud.com',
+  'threads.net',
+  'www.threads.net',
+  'pinterest.com',
+  'www.pinterest.com',
+]);
+
+/**
+ * Lowercase the pathname for platforms with case-insensitive handles.
+ */
+function normalizeCaseInsensitiveHandles(parsedUrl: URL): void {
+  if (CASE_INSENSITIVE_HANDLE_HOSTS.has(parsedUrl.hostname.toLowerCase())) {
+    parsedUrl.pathname = parsedUrl.pathname.toLowerCase();
+  }
+}
+
+/**
  * Normalize a URL by cleaning UTM parameters and enforcing HTTPS
  */
 export function normalizeUrl(url: string): string {
@@ -204,7 +240,7 @@ export function normalizeUrl(url: string): string {
 
     // Support bare X (Twitter) handles like @username
     if (/^@[a-zA-Z0-9._]+$/.test(url)) {
-      return `https://x.com/${url.slice(1)}`;
+      return `https://x.com/${url.slice(1).toLowerCase()}`;
     }
 
     // Add protocol if missing
@@ -222,6 +258,9 @@ export function normalizeUrl(url: string): string {
 
     // Normalize TikTok paths
     normalizeTikTokPath(parsedUrl);
+
+    // Lowercase handles for social platforms (prevents @loren vs @LOREN dupes)
+    normalizeCaseInsensitiveHandles(parsedUrl);
 
     // Remove tracking parameters
     removeTrackingParams(parsedUrl);

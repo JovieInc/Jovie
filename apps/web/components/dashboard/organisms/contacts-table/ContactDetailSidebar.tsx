@@ -299,7 +299,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               <SelectTrigger className='h-9 text-xs rounded-lg border border-subtle bg-surface-1 px-3'>
                 <SelectValue>{roleLabel}</SelectValue>
               </SelectTrigger>
-              <SelectContent className='rounded-lg border border-subtle bg-surface-1 shadow-lg p-1'>
+              <SelectContent className='p-1'>
                 {CONTACT_ROLE_OPTIONS.map(option => (
                   <SelectItem
                     key={option.value}
