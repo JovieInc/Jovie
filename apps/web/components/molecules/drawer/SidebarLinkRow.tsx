@@ -1,6 +1,19 @@
 'use client';
 
-import { Check, Copy, ExternalLink, Trash2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  MoreHorizontal,
+  Trash2,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
 import {
@@ -9,13 +22,6 @@ import {
   openDeepLink,
 } from '@/lib/deep-links';
 import { cn } from '@/lib/utils';
-
-const ACTION_BUTTON_CLASS = [
-  'p-1 rounded hover:bg-surface-2',
-  'text-tertiary-token hover:text-primary-token',
-  'transition-colors focus-visible:outline-none',
-  'focus-visible:ring-2 focus-visible:ring-interactive',
-].join(' ');
 
 const SWIPE_ACTION_BUTTON_CLASS = [
   'flex h-full items-center justify-center px-4',
@@ -147,7 +153,7 @@ export function SidebarLinkRow({
       <div
         className={cn(
           'group flex items-center justify-between lg:rounded-md',
-          'px-3 py-1.5 bg-surface-2 hover:bg-interactive-hover',
+          'px-3 py-1.5 hover:bg-interactive-hover',
           'transition-colors',
           !isVisible && 'opacity-60',
           className
@@ -168,47 +174,57 @@ export function SidebarLinkRow({
           {trailingContent}
         </div>
 
-        {/* Right: Actions (desktop only — mobile uses swipe-to-reveal) */}
+        {/* Right: Kebab dropdown (desktop only — mobile uses swipe-to-reveal) */}
         <div
           className={[
-            'hidden lg:flex items-center gap-0.5 opacity-0',
+            'hidden lg:flex items-center shrink-0 opacity-0',
             'group-hover:opacity-100 group-focus:opacity-100',
-            'group-focus-within:opacity-100 transition-opacity shrink-0',
+            'group-focus-within:opacity-100 transition-opacity',
           ].join(' ')}
         >
-          <button
-            type='button'
-            onClick={handleOpen}
-            disabled={!hasUrl}
-            className={ACTION_BUTTON_CLASS}
-            aria-label={`Open ${label}`}
-          >
-            <ExternalLink className='h-4 w-4' aria-hidden='true' />
-          </button>
-          <button
-            type='button'
-            onClick={handleCopy}
-            disabled={!hasUrl}
-            className={ACTION_BUTTON_CLASS}
-            aria-label={copied ? 'Copied!' : `Copy ${label} link`}
-          >
-            {copied ? (
-              <Check className='h-4 w-4 text-success' aria-hidden='true' />
-            ) : (
-              <Copy className='h-4 w-4' aria-hidden='true' />
-            )}
-          </button>
-          {hasRemove && (
-            <button
-              type='button'
-              onClick={onRemove}
-              disabled={isRemoving}
-              className={cn(ACTION_BUTTON_CLASS, 'disabled:opacity-50')}
-              aria-label={`Remove ${label}`}
-            >
-              <Trash2 className='h-4 w-4' aria-hidden='true' />
-            </button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type='button'
+                className={cn(
+                  'p-1 rounded text-tertiary-token',
+                  'hover:text-primary-token hover:bg-surface-2',
+                  'transition-colors focus-visible:outline-none',
+                  'focus-visible:ring-2 focus-visible:ring-interactive'
+                )}
+                aria-label={`Actions for ${label}`}
+              >
+                <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end' sideOffset={4}>
+              <DropdownMenuItem onClick={handleOpen} disabled={!hasUrl}>
+                <ExternalLink className='h-3.5 w-3.5' />
+                Open
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleCopy} disabled={!hasUrl}>
+                {copied ? (
+                  <Check className='h-3.5 w-3.5 text-success' />
+                ) : (
+                  <Copy className='h-3.5 w-3.5' />
+                )}
+                {copied ? 'Copied!' : 'Copy URL'}
+              </DropdownMenuItem>
+              {hasRemove && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    variant='destructive'
+                    onClick={onRemove}
+                    disabled={isRemoving}
+                  >
+                    <Trash2 className='h-3.5 w-3.5' />
+                    Delete
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </SwipeToReveal>
