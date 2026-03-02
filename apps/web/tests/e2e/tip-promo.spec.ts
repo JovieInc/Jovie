@@ -18,9 +18,15 @@ test.describe
           });
         });
 
-        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/profile/view', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/audience/visit', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/track', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
         await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
         await waitForHydration(page);
       });
@@ -124,9 +130,15 @@ test.describe
           });
         });
 
-        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/profile/view', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/audience/visit', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/track', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
         await page.goto('/', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
         await waitForHydration(page);
       });

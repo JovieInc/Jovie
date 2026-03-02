@@ -208,9 +208,15 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
     await signInUser(page);
     await ensureUserIsFree(page, stripeClient);
 
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
     await expect(
       page.getByRole('button', { name: /upgrade to standard/i })
@@ -246,9 +252,15 @@ test.describe('Billing payment flow - Stripe Checkout', () => {
       })
       .toBe(true);
 
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/billing', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText(/Standard Subscription Active/i)).toBeVisible({
       timeout: 10_000,
@@ -317,9 +329,15 @@ test.describe('Billing plan selection resiliency', () => {
       })
     );
 
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/billing', {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
