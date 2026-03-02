@@ -100,16 +100,19 @@ export function ReleaseSmartLinkAnalytics({
   return (
     <DrawerSection title='Smart link analytics'>
       {isLoading && (
-        <div className='grid grid-cols-2 divide-x divide-subtle rounded-md border border-subtle/70 bg-surface/40 p-3'>
-          <div className='pr-3'>
+        <div
+          className='grid grid-cols-2 divide-x divide-subtle rounded-md border border-subtle/70 bg-surface/40 p-3'
+          style={{ minHeight: 72 }}
+        >
+          <div className='pr-3 space-y-1'>
             <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-2 h-7 w-14 rounded skeleton' />
-            <div className='mt-1 h-[11px] w-12 rounded skeleton' />
+            <div className='h-7 w-14 rounded skeleton' />
+            <div className='h-[11px] w-12 rounded skeleton' />
           </div>
-          <div className='pl-3'>
+          <div className='pl-3 space-y-1'>
             <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-2 h-7 w-14 rounded skeleton' />
-            <div className='mt-1 h-[11px] w-12 rounded skeleton' />
+            <div className='h-7 w-14 rounded skeleton' />
+            <div className='h-[11px] w-12 rounded skeleton' />
           </div>
         </div>
       )}
