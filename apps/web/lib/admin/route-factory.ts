@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 
 /**
@@ -41,22 +38,12 @@ function wantsJsonResponse(request: NextRequest): boolean {
 }
 
 /**
- * Resolves user entitlements, falling back to partial data if billing is unavailable.
+ * Resolves user entitlements for the current request.
+ * getCurrentUserEntitlements degrades gracefully on billing failure --
+ * it never throws, returning free-tier defaults with admin status preserved.
  */
 async function resolveEntitlements() {
-  try {
-    return await getCurrentUserEntitlements();
-  } catch (error) {
-    if (error instanceof BillingUnavailableError) {
-      return {
-        isAdmin: error.isAdmin,
-        userId: error.userId,
-        email: null,
-        isAuthenticated: true,
-      };
-    }
-    throw error;
-  }
+  return getCurrentUserEntitlements();
 }
 
 /**
