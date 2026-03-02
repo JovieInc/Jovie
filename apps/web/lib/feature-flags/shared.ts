@@ -14,6 +14,8 @@ export const FEATURE_FLAG_KEYS = {
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
   STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
+  SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',
+  ENABLE_LIGHT_MODE: 'enable_light_mode',
 } as const;
 
 export type FeatureFlagKey =
