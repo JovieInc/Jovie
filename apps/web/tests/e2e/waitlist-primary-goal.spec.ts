@@ -14,6 +14,15 @@ test.describe('Waitlist primary goal', () => {
   test('requires authentication before showing the waitlist form', async ({
     page,
   }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
     // App redirects unauthenticated users to signup with redirect_url
     await expect(page).toHaveURL(/\/(signin|signup)/);
