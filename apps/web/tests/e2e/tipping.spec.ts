@@ -99,6 +99,9 @@ test.describe('Tipping MVP', () => {
           };
         });
 
+        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
         // Visit the profile page and wait for hydration (not networkidle)
         await page.goto('/testartist', {
           waitUntil: 'domcontentloaded',
@@ -197,6 +200,9 @@ test.describe('Tipping MVP', () => {
         // Set viewport to desktop size
         await page.setViewportSize({ width: 1280, height: 800 });
 
+        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
         // Visit the profile page and wait for hydration (not networkidle)
         await page.goto('/testartist?mode=tip', {
           waitUntil: 'domcontentloaded',
@@ -270,6 +276,9 @@ test.describe('Tipping MVP', () => {
           return;
         }
 
+        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
         // Visit the tip page and wait for hydration (not networkidle)
         await page.goto('/testartist?mode=tip', {
           waitUntil: 'domcontentloaded',
@@ -331,6 +340,9 @@ test.describe('Tipping MVP', () => {
           return;
         }
 
+        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
         // Visit the tip page and wait for hydration (not networkidle)
         await page.goto('/testartist?mode=tip', {
           waitUntil: 'domcontentloaded',

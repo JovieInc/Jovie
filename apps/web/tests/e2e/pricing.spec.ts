@@ -1,4 +1,5 @@
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Pricing Page Tests
@@ -12,7 +13,11 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Pricing Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/pricing', { timeout: 60000 });
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.goto('/pricing', { timeout: SMOKE_TIMEOUTS.NAVIGATION });
+    await waitForHydration(page);
   });
 
   test('displays pricing plans correctly', async ({ page }) => {
