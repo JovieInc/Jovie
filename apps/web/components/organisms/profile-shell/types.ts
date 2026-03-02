@@ -62,4 +62,5 @@ export const SOCIAL_NETWORK_PLATFORMS = [
   'linkedin',
   'discord',
   'twitch',
+  'website',
 ] as const;
