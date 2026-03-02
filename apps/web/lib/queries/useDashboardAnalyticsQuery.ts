@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -73,6 +73,7 @@ export function useDashboardAnalyticsQuery({
     queryFn: ({ signal }) =>
       fetchDashboardAnalytics(cacheRange, requestView, signal),
     staleTime,
+    placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,

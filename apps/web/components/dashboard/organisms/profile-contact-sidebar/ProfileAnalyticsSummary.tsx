@@ -12,6 +12,9 @@ import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQ
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
 
+/** Minimum height to prevent CLS when switching time ranges */
+const STAT_MIN_HEIGHT = 'min-h-[52px]';
+
 const numberFormatter = new Intl.NumberFormat();
 
 interface RangeOption {
@@ -48,7 +51,7 @@ function StatTile({
 
 export function ProfileAnalyticsSummary() {
   const [range, setRange] = useState<AnalyticsRange>('30d');
-  const { data, isLoading, isError } = useDashboardAnalyticsQuery({
+  const { data, isLoading, isFetching, isError } = useDashboardAnalyticsQuery({
     range,
     view: 'traffic',
   });
@@ -56,10 +59,16 @@ export function ProfileAnalyticsSummary() {
   const currentOption =
     RANGE_OPTIONS.find(o => o.value === range) ?? RANGE_OPTIONS[1];
 
-  if (isLoading) {
+  // Only show skeleton on first load (no data yet)
+  if (isLoading && !data) {
     return (
       <div className='rounded-md border border-subtle/70 bg-surface/40'>
-        <div className='grid grid-cols-2 divide-x divide-subtle p-3'>
+        <div
+          className={cn(
+            'grid grid-cols-2 divide-x divide-subtle p-3',
+            STAT_MIN_HEIGHT
+          )}
+        >
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
             <div className='mt-2 h-7 w-14 rounded skeleton' />
@@ -73,7 +82,7 @@ export function ProfileAnalyticsSummary() {
     );
   }
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <p className='text-xs text-tertiary-token'>
         Analytics temporarily unavailable.
@@ -86,7 +95,13 @@ export function ProfileAnalyticsSummary() {
 
   return (
     <div className='rounded-md border border-subtle/70 bg-surface/40'>
-      <div className='grid grid-cols-2 divide-x divide-subtle p-3'>
+      <div
+        className={cn(
+          'grid grid-cols-2 divide-x divide-subtle p-3 transition-opacity duration-150',
+          STAT_MIN_HEIGHT,
+          isFetching && 'opacity-50'
+        )}
+      >
         <div className='pr-3'>
           <StatTile
             label='Profile views'
