@@ -37,7 +37,9 @@ export interface NormalizedEvent {
     | 'link_click'
     | 'form_submit'
     | 'scroll_depth'
-    | 'subscribe';
+    | 'subscribe'
+    | 'tip_page_view'
+    | 'tip_intent';
   eventTime: number; // Unix timestamp in seconds
   sourceUrl: string;
   referrer?: string;
@@ -57,6 +59,10 @@ export interface NormalizedEvent {
   linkId?: string;
   linkUrl?: string;
   formType?: string;
+
+  // Tip-specific data
+  tipAmount?: number;
+  tipMethod?: string;
 
   // Hashed PII for improved ad platform matching (SHA-256 hex)
   hashedEmail?: string;
@@ -98,6 +104,8 @@ export function normalizeEvent(event: PixelEvent): NormalizedEvent {
     linkId: (eventData?.linkId as string) || undefined,
     linkUrl: (eventData?.linkUrl as string) || undefined,
     formType: (eventData?.formType as string) || undefined,
+    tipAmount: (eventData?.tipAmount as number) || undefined,
+    tipMethod: (eventData?.tipMethod as string) || undefined,
   };
 }
 
