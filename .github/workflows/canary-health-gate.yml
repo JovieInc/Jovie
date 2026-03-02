@@ -169,7 +169,9 @@ jobs:
             exit 1
           fi
 
-          if [[ "$health_content" != *'"database":{"ok":true'* ]]; then
+          # /api/health returns "database":"ok" (string), while /api/health/deploy
+          # returns "database":{"ok":true,...} (object). Accept both formats.
+          if [[ "$health_content" != *'"database":"ok"'* ]] && [[ "$health_content" != *'"database":{"ok":true'* ]]; then
             echo "❌ Canary failed: Database health not ok"
             echo "Health response: $health_content"
             echo "canary_status=failed_database" >> "$GITHUB_OUTPUT"
