@@ -5,10 +5,8 @@ import {
   BarChart3,
   Check,
   Copy,
-  Download,
   Link2,
   MousePointerClick,
-  QrCode,
   ScanLine,
   Wallet,
   X,
@@ -16,8 +14,7 @@ import {
 import { memo, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
-import { getQrCodeUrl } from '@/components/molecules/QRCode';
-import { QRCodeCard } from '@/components/molecules/QRCodeCard';
+import { EarningsTab } from '@/components/dashboard/organisms/EarningsTab';
 import { BASE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
@@ -26,9 +23,6 @@ import { formatCount } from './utils';
 // =============================================================================
 // Constants
 // =============================================================================
-
-const QR_DISPLAY_SIZE = 160;
-const QR_DOWNLOAD_SIZE = 420;
 
 // =============================================================================
 // Sub-components
@@ -305,54 +299,6 @@ const TipLinkSection = memo(function TipLinkSection({
 
 // -----------------------------------------------------------------------------
 
-interface QRCodeSectionProps {
-  readonly tipShareUrlQr: string;
-  readonly qrDownloadUrl: string;
-  readonly displayHandle: string;
-}
-
-const QRCodeSection = memo(function QRCodeSection({
-  tipShareUrlQr,
-  qrDownloadUrl,
-  displayHandle,
-}: QRCodeSectionProps) {
-  return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
-      <div className='flex items-center gap-2 mb-4'>
-        <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-subtle'
-          aria-hidden='true'
-        >
-          <QrCode className='h-3.5 w-3.5 text-accent-token' />
-        </div>
-        <h3 className='text-sm font-medium text-primary-token'>QR code</h3>
-      </div>
-
-      <div className='flex flex-col items-center gap-4'>
-        <div className='w-full rounded-xl bg-surface-0 p-4 sm:p-6'>
-          <QRCodeCard
-            data={tipShareUrlQr}
-            qrSize={QR_DISPLAY_SIZE}
-            title='Scan to tip'
-            description='Opens your Jovie tip page.'
-          />
-        </div>
-        <Button variant='secondary' size='sm' className='gap-2' asChild>
-          <a
-            href={qrDownloadUrl}
-            download={`jovie-tip-${displayHandle}.png`}
-            target='_blank'
-            rel='noreferrer'
-          >
-            <Download className='h-3.5 w-3.5' />
-            Download QR
-          </a>
-        </Button>
-      </div>
-    </div>
-  );
-});
-
 // =============================================================================
 // Main Component
 // =============================================================================
@@ -375,19 +321,13 @@ export function DashboardTipping() {
 
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';
-    const displayHandle = tipHandle || 'your-handle';
     const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
     const tipRelativePathLink = `${tipRelativePath}?source=link`;
-    const tipShareUrlQr = `${BASE_URL}${tipRelativePath}?source=qr`;
     const tipUrl = `${BASE_URL}${tipRelativePathLink}`;
-    const qrDownloadUrl = getQrCodeUrl(tipShareUrlQr, QR_DOWNLOAD_SIZE);
 
     return {
-      displayHandle,
       tipRelativePathLink,
-      tipShareUrlQr,
       tipUrl,
-      qrDownloadUrl,
     };
   }, [artist?.handle]);
 
@@ -498,12 +438,10 @@ export function DashboardTipping() {
             tipUrl={tipUrls.tipUrl}
             tipRelativePathLink={tipUrls.tipRelativePathLink}
           />
-          <QRCodeSection
-            tipShareUrlQr={tipUrls.tipShareUrlQr}
-            qrDownloadUrl={tipUrls.qrDownloadUrl}
-            displayHandle={tipUrls.displayHandle}
-          />
         </div>
+
+        {/* QR Code generation & download */}
+        <EarningsTab />
       </div>
     </div>
   );
