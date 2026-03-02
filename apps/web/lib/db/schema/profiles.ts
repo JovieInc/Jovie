@@ -169,6 +169,14 @@ export const creatorProfiles = pgTable(
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
     outreachPriority: integer('outreach_priority'),
+    // Stripe Connect fields for Express onboarding
+    stripeAccountId: text('stripe_account_id'),
+    stripeOnboardingComplete: boolean('stripe_onboarding_complete')
+      .default(false)
+      .notNull(),
+    stripePayoutsEnabled: boolean('stripe_payouts_enabled')
+      .default(false)
+      .notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

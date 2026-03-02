@@ -11,7 +11,7 @@
  * can be imported and called from any webhook handler.
  */
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -91,15 +91,15 @@ export async function processTipCompleted(
       .onConflictDoUpdate({
         target: [tipAudience.profileId, tipAudience.email],
         set: {
-          name: name ?? sql`COALESCE(${tipAudience.name}, NULL)`,
-          tipAmountTotalCents: sql`${tipAudience.tipAmountTotalCents} + ${amountCents}`,
-          tipCount: sql`${tipAudience.tipCount} + 1`,
+          name: name ?? drizzleSql`COALESCE(${tipAudience.name}, NULL)`,
+          tipAmountTotalCents: drizzleSql`${tipAudience.tipAmountTotalCents} + ${amountCents}`,
+          tipCount: drizzleSql`${tipAudience.tipCount} + 1`,
           lastSeenAt: now,
           updatedAt: now,
           // Merge metadata if provided
           ...(metadata
             ? {
-                metadata: sql`COALESCE(${tipAudience.metadata}, '{}'::jsonb) || ${JSON.stringify(metadata)}::jsonb`,
+                metadata: drizzleSql`COALESCE(${tipAudience.metadata}, '{}'::jsonb) || ${JSON.stringify(metadata)}::jsonb`,
               }
             : {}),
         },

@@ -12,6 +12,7 @@ import { SettingsAudienceSection } from '@/components/dashboard/organisms/Settin
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
+import { SettingsPaymentsSection } from '@/components/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/components/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
@@ -19,6 +20,8 @@ import { ConnectedDspList } from '@/components/dashboard/organisms/settings-arti
 import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
 
 import { publicEnv } from '@/lib/env-public';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
@@ -39,6 +42,9 @@ export function SettingsPolished({
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const isGrowth = billingData?.plan === 'growth';
+  const isStripeConnectEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
+  );
 
   const renderAccountSection = useCallback(
     () => (
@@ -79,6 +85,16 @@ export function SettingsPolished({
         description: 'Subscription, payment methods, and invoices.',
         render: () => <SettingsBillingSection />,
       },
+      ...(isStripeConnectEnabled
+        ? [
+            {
+              id: 'payments',
+              title: 'Payments',
+              description: 'Connect Stripe to receive payments from fans.',
+              render: () => <SettingsPaymentsSection />,
+            },
+          ]
+        : []),
       {
         id: 'data-privacy',
         title: 'Data & Privacy',
@@ -86,7 +102,7 @@ export function SettingsPolished({
         render: () => <DataPrivacySection />,
       },
     ],
-    [renderAccountSection]
+    [renderAccountSection, isStripeConnectEnabled]
   );
 
   // -- Artist-level settings --

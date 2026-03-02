@@ -358,6 +358,20 @@
       "when": 1772524800000,
       "tag": "0046_add_tip_checkout_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1772524800001,
+      "tag": "0046_add_tip_audience",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1772265600000,
+      "tag": "0047_add_stripe_connect_fields",
+      "breakpoints": true
     }
   ]
 }

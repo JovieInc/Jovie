@@ -64,6 +64,7 @@ export const ServerEnvSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
   TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
 
@@ -193,6 +194,7 @@ export const ENV_KEYS = [
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_TIP_WEBHOOK_SECRET',
+  'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',
   'TIP_PLATFORM_FEE_PERCENT',
   'STRIPE_PRICE_FOUNDING_MONTHLY',
