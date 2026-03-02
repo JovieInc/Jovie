@@ -157,7 +157,7 @@ async function navigateAndSettle(page: Page, path: string): Promise<boolean> {
     await waitForHydration(page);
     await Promise.race([
       page.waitForLoadState('networkidle'),
-      page.waitForTimeout(8000),
+      page.waitForLoadState('domcontentloaded', { timeout: 8000 }),
     ]).catch(() => {});
     return true;
   } catch {
@@ -264,7 +264,7 @@ test.describe('Dashboard Interaction Smoke Tests @smoke', () => {
       // Click first row to open drawer
       try {
         await page.locator(config.rowSelector).first().click();
-        await page.waitForTimeout(2000); // Allow drawer animation
+        await page.waitForLoadState('domcontentloaded');
 
         // Check for React errors after interaction
         if (errors.length > 0) {
@@ -361,7 +361,7 @@ test.describe('Dashboard Interaction Smoke Tests @smoke', () => {
       // Right-click a table row to trigger context menu
       try {
         await page.locator(rowSelector).first().click({ button: 'right' });
-        await page.waitForTimeout(500); // Allow menu to open
+        await page.waitForLoadState('domcontentloaded');
 
         // Check for React errors
         if (errors.length > 0) {
@@ -376,7 +376,7 @@ test.describe('Dashboard Interaction Smoke Tests @smoke', () => {
 
         // Dismiss menu by pressing Escape
         await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
+        await page.waitForLoadState('domcontentloaded');
 
         results.push({
           page: config.name,
@@ -490,7 +490,7 @@ test.describe('Admin Interaction Smoke Tests @smoke', () => {
 
       try {
         await page.locator(config.rowSelector).first().click();
-        await page.waitForTimeout(2000);
+        await page.waitForLoadState('domcontentloaded');
 
         if (errors.length > 0) {
           results.push({
@@ -596,7 +596,7 @@ test.describe('Admin Interaction Smoke Tests @smoke', () => {
 
       try {
         await page.locator(rowSelector).first().click({ button: 'right' });
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('domcontentloaded');
 
         if (errors.length > 0) {
           results.push({
@@ -609,7 +609,7 @@ test.describe('Admin Interaction Smoke Tests @smoke', () => {
         }
 
         await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
+        await page.waitForLoadState('domcontentloaded');
 
         results.push({
           page: config.name,
@@ -684,7 +684,7 @@ test.describe('Admin Interaction Smoke Tests @smoke', () => {
       try {
         // Toggle open
         await page.locator(config.toggleSelector).first().click();
-        await page.waitForTimeout(1000);
+        await page.waitForLoadState('domcontentloaded');
 
         if (errors.length > 0) {
           results.push({
@@ -698,7 +698,7 @@ test.describe('Admin Interaction Smoke Tests @smoke', () => {
 
         // Toggle closed
         await page.locator(config.toggleSelector).first().click();
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('domcontentloaded');
 
         if (errors.length > 0) {
           results.push({

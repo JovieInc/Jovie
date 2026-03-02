@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './setup';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Marketing Homepage Visual Regression & Accessibility Test
@@ -53,10 +54,13 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('all critical sections render with content (not blank)', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       // Wait for client-side hydration
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       const sectionResults: Array<{
         name: string;
@@ -134,6 +138,9 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('hero heading (h1) has meaningful text', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
 
@@ -153,16 +160,19 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Visual Regression', () => {
     test('homepage renders consistently (light mode)', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Force light mode
       await page.evaluate(() => {
         document.documentElement.classList.remove('dark');
         localStorage.setItem('jovie-theme', 'light');
       });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       // Take full-page screenshot (will auto-create baseline on first run)
       await expect(page).toHaveScreenshot('homepage-light.png', {
@@ -172,16 +182,19 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('homepage renders consistently (dark mode)', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Force dark mode
       await page.evaluate(() => {
         document.documentElement.classList.add('dark');
         localStorage.setItem('jovie-theme', 'dark');
       });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       // Take full-page screenshot
       await expect(page).toHaveScreenshot('homepage-dark.png', {
@@ -193,9 +206,12 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('hero section renders consistently above the fold', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Set consistent viewport for above-the-fold test
       await page.setViewportSize({ width: 1280, height: 720 });
@@ -210,20 +226,23 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections render with correct background (light mode)', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Force light mode
       await page.evaluate(() => {
         document.documentElement.classList.remove('dark');
         localStorage.setItem('jovie-theme', 'light');
       });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       // Scroll to below-the-fold content
       await page.evaluate(() => window.scrollTo(0, window.innerHeight));
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       // Take screenshot of below-the-fold area
       await expect(page).toHaveScreenshot('homepage-below-fold-light.png', {
@@ -245,20 +264,23 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections render with correct background (dark mode)', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Force dark mode
       await page.evaluate(() => {
         document.documentElement.classList.add('dark');
         localStorage.setItem('jovie-theme', 'dark');
       });
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       // Scroll to below-the-fold content
       await page.evaluate(() => window.scrollTo(0, window.innerHeight));
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       // Take screenshot
       await expect(page).toHaveScreenshot('homepage-below-fold-dark.png', {
@@ -280,9 +302,12 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Accessibility', () => {
     test('homepage has no WCAG 2.1 AA violations', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -310,15 +335,18 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('homepage has no critical a11y issues in dark mode', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Force dark mode
       await page.evaluate(() => {
         document.documentElement.classList.add('dark');
       });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('domcontentloaded');
 
       const results = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -343,13 +371,16 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections meet contrast requirements', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Scroll to ensure all sections are loaded
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
       await page.evaluate(() => window.scrollTo(0, 0));
 
       const results = await new AxeBuilder({ page })
@@ -375,6 +406,9 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('homepage has proper heading hierarchy', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
 
@@ -413,9 +447,12 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('all interactive elements are keyboard accessible', async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Find all buttons and links
       const buttons = await page.locator('button:visible').all();
@@ -449,9 +486,12 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('images have alt text', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       const images = await page.locator('img:visible').all();
       const missingAlt: string[] = [];
@@ -480,9 +520,12 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Theme Switching', () => {
     test('theme switches correctly without layout shift', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       // Get initial layout measurements
       const getLayoutMetrics = async () => {
@@ -502,7 +545,7 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
       await page.evaluate(() => {
         document.documentElement.classList.add('dark');
       });
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('domcontentloaded');
 
       const darkMetrics = await getLayoutMetrics();
 

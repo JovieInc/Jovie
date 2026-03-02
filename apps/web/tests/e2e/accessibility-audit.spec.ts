@@ -1,6 +1,6 @@
 import { type Page, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
-import { waitForLoad } from './utils/smoke-test-utils';
+import { SMOKE_TIMEOUTS, waitForHydration, waitForLoad } from './utils/smoke-test-utils';
 
 const baseUrl = process.env.BASE_URL || 'http://localhost:3100';
 
@@ -62,7 +62,7 @@ function _getSeverity(ratio: number, isLargeText: boolean) {
 
 async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(2000);
+  await waitForHydration(page);
 
   const violations = await page.evaluate(
     ({ theme, route }) => {
@@ -259,12 +259,15 @@ test.describe('Accessibility Audit', () => {
           document.documentElement.classList.remove('dark');
         }
       }, theme);
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('domcontentloaded');
     }
 
     for (const route of routes) {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url, { timeout: 120_000 });
+      await page.goto(url, { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
       await waitForLoad(page);
 
       // Always test BOTH themes for every page
@@ -323,12 +326,15 @@ test.describe('Accessibility Audit', () => {
           document.documentElement.classList.remove('dark');
         }
       }, theme);
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('domcontentloaded');
     }
 
     for (const route of authRoutes) {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.goto(url, { timeout: 120_000 });
+      await page.goto(url, { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
       await waitForLoad(page);
 
       // Check if we got redirected to signin (auth failed)

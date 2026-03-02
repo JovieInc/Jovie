@@ -15,6 +15,9 @@ test.describe('Error states for API failures', () => {
       });
     });
 
+    await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
     await page.goto('/demo/notifications');
 
     await page.getByLabel('Email').fill('fan@example.com');

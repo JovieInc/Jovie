@@ -1,5 +1,6 @@
 import { signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
+import { waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Visual Regression Tests
@@ -34,7 +35,7 @@ async function setTheme(
       localStorage.setItem('jovie-theme', 'light');
     }
   }, theme);
-  await page.waitForTimeout(300); // Allow theme transition
+  await page.waitForLoadState('domcontentloaded');
 }
 
 // Helper to mask dynamic content that changes between runs
@@ -62,6 +63,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Visual Regression @visual-regression', () => {
   test.describe('Public Pages', () => {
     test('pricing page - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/pricing', { waitUntil: 'networkidle' });
       await setTheme(page, 'light');
       await maskDynamicContent(page);
@@ -73,6 +77,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('pricing page - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/pricing', { waitUntil: 'networkidle' });
       await setTheme(page, 'dark');
       await maskDynamicContent(page);
@@ -84,6 +91,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('signin page - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/signin', { waitUntil: 'networkidle' });
       await setTheme(page, 'light');
 
@@ -94,6 +104,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('signin page - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/signin', { waitUntil: 'networkidle' });
       await setTheme(page, 'dark');
 
@@ -104,6 +117,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('signup page - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/signup', { waitUntil: 'networkidle' });
       await setTheme(page, 'light');
 
@@ -114,6 +130,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('signup page - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/signup', { waitUntil: 'networkidle' });
       await setTheme(page, 'dark');
 
@@ -129,6 +148,9 @@ test.describe('Visual Regression @visual-regression', () => {
     const testHandle = process.env.E2E_TEST_PROFILE_HANDLE || 'dualipa';
 
     test('public profile - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
 
       // Check if profile exists (not 404)
@@ -151,6 +173,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('public profile - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
 
       const is404 = await page
@@ -173,6 +198,9 @@ test.describe('Visual Regression @visual-regression', () => {
 
     test('public profile - mobile viewport', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(`/${testHandle}`, { waitUntil: 'networkidle' });
 
       const is404 = await page
@@ -194,8 +222,11 @@ test.describe('Visual Regression @visual-regression', () => {
 
     test('public profile - mobile tip drawer open', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(`/${testHandle}`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       const is404 = await page
         .locator('text=not found')
@@ -218,7 +249,7 @@ test.describe('Visual Regression @visual-regression', () => {
       await page
         .locator('[data-test="tip-selector"]')
         .waitFor({ state: 'visible', timeout: 5000 });
-      await page.waitForTimeout(300); // Allow animation to settle
+      await page.waitForLoadState('domcontentloaded');
 
       await maskDynamicContent(page);
 
@@ -229,8 +260,11 @@ test.describe('Visual Regression @visual-regression', () => {
 
     test('public profile - mobile listen drawer open', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 812 }); // iPhone X
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(`/${testHandle}`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await waitForHydration(page);
 
       const is404 = await page
         .locator('text=not found')
@@ -253,7 +287,7 @@ test.describe('Visual Regression @visual-regression', () => {
       await listenButton.click();
 
       // Wait for drawer animation
-      await page.waitForTimeout(500);
+      await page.waitForLoadState('domcontentloaded');
 
       await maskDynamicContent(page);
 
@@ -273,6 +307,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard home - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard', { waitUntil: 'networkidle' });
 
       // Skip if redirected to signin
@@ -291,6 +328,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard home - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -308,6 +348,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard links - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard/links', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -325,6 +368,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard links - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard/links', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -342,6 +388,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard analytics - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard/analytics', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -359,6 +408,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard analytics - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard/analytics', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -376,6 +428,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard earnings - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard/earnings', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -393,6 +448,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('dashboard earnings - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/dashboard/earnings', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -410,6 +468,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('settings page - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/settings', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -427,6 +488,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('settings page - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/settings', { waitUntil: 'networkidle' });
 
       if (page.url().includes('/signin')) {
@@ -454,6 +518,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('admin creators - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/admin/creators', { waitUntil: 'networkidle' });
 
       // Skip if not admin or redirected
@@ -475,6 +542,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('admin creators - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/admin/creators', { waitUntil: 'networkidle' });
 
       if (
@@ -495,6 +565,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('admin overview - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/admin', { waitUntil: 'networkidle' });
 
       if (
@@ -515,6 +588,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('admin overview - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/admin', { waitUntil: 'networkidle' });
 
       if (
@@ -535,6 +611,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('admin activity - light mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/admin/activity', { waitUntil: 'networkidle' });
 
       if (
@@ -555,6 +634,9 @@ test.describe('Visual Regression @visual-regression', () => {
     });
 
     test('admin activity - dark mode', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto('/app/admin/activity', { waitUntil: 'networkidle' });
 
       if (
@@ -588,6 +670,9 @@ test.describe('Visual Regression @visual-regression', () => {
           width: viewport.width,
           height: viewport.height,
         });
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
         await page.goto('/', { waitUntil: 'networkidle' });
         await maskDynamicContent(page);
 

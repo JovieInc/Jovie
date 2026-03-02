@@ -33,6 +33,9 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
     test(`${route.name} (${route.path}) should have no a11y violations`, async ({
       page,
     }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(route.path, { timeout: 120_000 });
       await waitForLoad(page);
 
@@ -72,6 +75,9 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
       page,
     }) => {
       test.skip(smokeOnly, 'Skip authenticated routes in smoke mode');
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
       await page.goto(route.path, { timeout: 120_000 });
       await waitForLoad(page);
 
@@ -100,6 +106,9 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
 
 test.describe('Axe Best Practices', () => {
   test('Homepage should follow best practices', async ({ page }) => {
+      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
     await page.goto('/', { timeout: 120_000 });
     await waitForLoad(page);
 
