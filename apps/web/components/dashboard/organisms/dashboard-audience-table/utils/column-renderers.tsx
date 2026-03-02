@@ -1,10 +1,12 @@
 'use client';
 
 import type { CellContext } from '@tanstack/react-table';
+import { Bell, Eye } from 'lucide-react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
+  AudienceIdentificationIndicator,
   AudienceIntentScoreCell,
   AudienceLastActionCell,
   AudienceLastSeenCell,
@@ -13,6 +15,7 @@ import {
   AudienceReturningCell,
   AudienceRowSelectionCell,
   AudienceSourceCell,
+  AudienceTouringBadge,
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
@@ -192,17 +195,79 @@ export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
 }
 
 /**
- * Quick actions cell with Export and Block buttons.
+ * Renders the identification indicator cell
+ */
+export function renderIdentificationCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['type']>) {
+  return (
+    <AudienceIdentificationIndicator
+      type={row.original.type}
+      hasEmail={Boolean(row.original.email)}
+      hasPhone={Boolean(row.original.phone)}
+      spotifyConnected={row.original.spotifyConnected}
+    />
+  );
+}
+
+/**
+ * Touring city badge cell - reads touring city map from context.
+ */
+export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
+  const { getTouringCity } = useAudienceTableContext();
+  const info = getTouringCity(row.original);
+  return (
+    <AudienceTouringBadge
+      touringCity={info?.city ?? null}
+      showDate={info?.showDate ?? null}
+    />
+  );
+}
+
+/**
+ * Quick actions cell with View Profile, Send Notification, Export, and Block.
  * Reads handlers from context to keep column defs stable.
  */
 export function QuickActionsCell({
   row,
 }: CellContext<AudienceMember, unknown>) {
-  const { onExportMember, onBlockMember } = useAudienceTableContext();
+  const { onExportMember, onBlockMember, onViewProfile, onSendNotification } =
+    useAudienceTableContext();
+  const member = row.original;
+  const canNotify = Boolean(member.email || member.phone);
+
   return (
-    <AudienceQuickActionsCell
-      onExport={() => onExportMember(row.original)}
-      onBlock={() => onBlockMember(row.original)}
-    />
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation prevents row click when using action buttons
+    <div
+      role='toolbar'
+      className='flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100'
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      <button
+        type='button'
+        onClick={() => onViewProfile(member)}
+        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+        aria-label='View profile'
+        title='View profile'
+      >
+        <Eye className='h-4 w-4' />
+      </button>
+      {canNotify && (
+        <button
+          type='button'
+          onClick={() => onSendNotification(member)}
+          className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+          aria-label='Send notification'
+          title='Send notification'
+        >
+          <Bell className='h-4 w-4' />
+        </button>
+      )}
+      <AudienceQuickActionsCell
+        onExport={() => onExportMember(member)}
+        onBlock={() => onBlockMember(member)}
+      />
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFal
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 import { AnalyticsSidebar } from './AnalyticsSidebar';
 import type {
@@ -67,6 +68,7 @@ export interface DashboardAudienceClientProps {
   readonly profileId?: string;
   readonly subscriberCount: number;
   readonly filters: AudienceFilters;
+  readonly tourDates?: TourDateForMatching[];
 }
 
 /**
@@ -89,6 +91,7 @@ export function DashboardAudienceClient({
   profileId,
   subscriberCount,
   filters: initialFilters,
+  tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   // Analytics sidebar state
   const [isAnalyticsOpen, setIsAnalyticsOpen] = React.useState(false);
@@ -219,6 +222,7 @@ export function DashboardAudienceClient({
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
               onLoadMore={handleLoadMore}
+              tourDates={tourDates}
             />
           </div>
         </div>
