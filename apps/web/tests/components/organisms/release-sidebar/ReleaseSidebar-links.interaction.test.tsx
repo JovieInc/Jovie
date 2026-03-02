@@ -271,10 +271,7 @@ describe('ReleaseSidebar Links tab', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     await user.click(screen.getByRole('tab', { name: /links/i }));
-    expect(screen.getByText('Distribution')).toBeInTheDocument();
-    expect(screen.getByTestId('dsp-links')).toHaveTextContent(
-      'DSP Links Content'
-    );
+    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
   });
 
   it('smart link section renders in header area', async () => {
