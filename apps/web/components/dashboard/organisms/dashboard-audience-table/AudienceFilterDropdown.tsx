@@ -123,7 +123,7 @@ export function AudienceFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
+                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
                 buttonClassName
               )}
             >
@@ -150,7 +150,7 @@ export function AudienceFilterDropdown({
                 }}
                 className={cn(
                   'justify-between',
-                  checked && 'bg-primary/5 dark:bg-primary/10'
+                  checked && 'bg-interactive-active'
                 )}
               >
                 <div className='flex items-center gap-2'>
