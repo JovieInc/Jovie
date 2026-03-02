@@ -80,7 +80,7 @@ describe('ProfilePhotoContextMenu', () => {
       screen.getByRole('menuitem', { name: 'Download QR Code' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Download Profile Photo' })
+      screen.getByRole('menuitem', { name: 'Original' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Download Profile as JSON' })
@@ -102,8 +102,6 @@ describe('ProfilePhotoContextMenu', () => {
     expect(
       screen.getByRole('button', { name: 'Avatar Trigger' })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText('Download Profile Photo')
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Original')).not.toBeInTheDocument();
   });
 });
