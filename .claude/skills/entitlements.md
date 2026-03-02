@@ -43,8 +43,7 @@ Use this skill whenever you touch plan gating, feature flags, limits, billing-de
 ## Non-Negotiable Guardrails
 
 - Do **not** duplicate plan constants or entitlement matrices in route handlers/components.
-- Do **not** silently downgrade authenticated users to free when billing lookup fails.
-  - `BillingUnavailableError` exists to force explicit error handling.
+- Billing outages degrade gracefully to free-tier entitlements. `BillingUnavailableError` is retained for backwards compatibility but `getCurrentUserEntitlements` no longer throws it.
 - Do **not** bypass `getCurrentUserEntitlements()` by reading billing rows directly for access checks.
 - Do **not** add ad-hoc feature gates that skip the registry.
 
