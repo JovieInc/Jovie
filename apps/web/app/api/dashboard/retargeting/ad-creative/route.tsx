@@ -363,7 +363,10 @@ export async function GET(req: NextRequest) {
       // Rejects javascript:, data:, and other dangerous URI schemes (CodeQL XSS fix).
       let avatarUrl: string | null = profile.avatarUrl || null;
       if (avatarUrl) {
-        if (avatarUrl.startsWith('https://') || avatarUrl.startsWith('http://')) {
+        if (
+          avatarUrl.startsWith('https://') ||
+          avatarUrl.startsWith('http://')
+        ) {
           // Already absolute and safe — Satori requires absolute URLs for <img>
         } else if (avatarUrl.startsWith('/')) {
           avatarUrl = `${req.nextUrl.origin}${avatarUrl}`;
