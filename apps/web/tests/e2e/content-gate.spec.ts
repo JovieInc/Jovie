@@ -300,7 +300,7 @@ test.describe('Content Gate — Public Pages', () => {
       lower.includes('loading artist profile')
     ) {
       // Wait a bit more
-      await page.waitForTimeout(5000);
+      await page.waitForFunction(() => document.readyState === 'complete', { timeout: 10000 }).catch(() => {});
       const retry = await page
         .locator('body')
         .innerText()

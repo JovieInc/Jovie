@@ -13,6 +13,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Wait for React to fully hydrate using deterministic method
     await waitForHydration(page);
@@ -64,7 +67,7 @@ test.describe('Homepage', () => {
     await page.evaluate(() => {
       window.scrollTo(0, document.body.scrollHeight);
     });
-    await page.waitForTimeout(1000);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
 
     // Check for section elements
     const sections = page.locator('section');

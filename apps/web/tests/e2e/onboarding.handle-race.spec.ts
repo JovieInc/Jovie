@@ -12,6 +12,9 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Onboarding Handle Race Conditions', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
     // Mock the API endpoints to simulate network delays and control responses
     await page.route('/api/handle/check*', async (route, request) => {
       const url = new URL(request.url());
@@ -82,7 +85,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test simulates rapid typing across different handles
     // to ensure the final availability state matches the last input
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible();
 
     // Simulate rapid typing sequence: taken1 -> available1 -> taken2 -> available2
@@ -104,8 +107,6 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await page.waitForTimeout(50);
     }
 
-    // Wait for debouncing to complete (component uses ~450ms debounce)
-    await page.waitForTimeout(650);
 
     // Final state should match the last typed value
     const lastHandle = typingSequence[typingSequence.length - 1];
@@ -119,16 +120,16 @@ test.describe('Onboarding Handle Race Conditions', () => {
       const submitButton = page.getByRole('button', {
         name: `Claim @${lastHandle.handle}`,
       });
-      await expect(submitButton).toBeEnabled();
+      await expect(submitButton).toBeEnabled({ timeout: 5000 });
     } else {
       // Should show error for unavailable handle
-      await expect(page.locator('text="Handle already taken"')).toBeVisible();
+      await expect(page.locator('text="Handle already taken"')).toBeVisible({ timeout: 5000 });
 
       // Submit button should be disabled
       const submitButton = page.getByRole('button', {
         name: 'Request Early Access',
       });
-      await expect(submitButton).toBeDisabled();
+      await expect(submitButton).toBeDisabled({ timeout: 5000 });
     }
   });
 
@@ -138,7 +139,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test specifically checks that a taken handle doesn't show as available
     // even if there are race conditions with previous requests
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible();
 
     // Type sequence: available1 -> taken1 rapidly
@@ -146,18 +147,16 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await page.waitForTimeout(100); // Small delay
     await handleInput.fill('taken1');
 
-    // Wait for all requests to complete
-    await page.waitForTimeout(650);
 
     // Final state must show taken1 as unavailable
     await expect(handleInput).toHaveValue('taken1');
-    await expect(page.locator('text="Handle already taken"')).toBeVisible();
+    await expect(page.locator('text="Handle already taken"')).toBeVisible({ timeout: 5000 });
 
     // Submit button must be disabled for taken handle
     const submitButton = page.getByRole('button', {
       name: 'Request Early Access',
     });
-    await expect(submitButton).toBeDisabled();
+    await expect(submitButton).toBeDisabled({ timeout: 5000 });
   });
 
   test('handles rapid sequential handle checks with different results', async ({
@@ -165,7 +164,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test rapid sequence of different handles to stress test the race condition protection
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible();
 
     const rapidSequence = [
@@ -183,8 +182,6 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await page.waitForTimeout(50); // Very fast typing simulation
     }
 
-    // Wait for debouncing and all network requests to settle
-    await page.waitForTimeout(900);
 
     // Verify final state
     const finalHandle = rapidSequence[rapidSequence.length - 1];
@@ -194,7 +191,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     const submitButton = page.getByRole('button', {
       name: `Claim @${finalHandle}`,
     });
-    await expect(submitButton).toBeEnabled();
+    await expect(submitButton).toBeEnabled({ timeout: 5000 });
   });
 
   test('aborts previous requests when typing rapidly', async ({ page }) => {
@@ -228,7 +225,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible();
 
     // Type rapidly to trigger request cancellation
@@ -238,8 +235,6 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await page.waitForTimeout(50);
     }
 
-    // Wait for final request to complete
-    await page.waitForTimeout(900);
 
     // Verify final state
     await expect(handleInput).toHaveValue('final');
@@ -256,7 +251,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test that the UI doesn't flicker or show inconsistent states
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     const submitButton = page.getByRole('button', {
       name: 'Request Early Access',
     });
@@ -265,19 +260,17 @@ test.describe('Onboarding Handle Race Conditions', () => {
 
     // Start with a taken handle
     await handleInput.fill('taken1');
-    await page.waitForTimeout(650);
 
     // Verify initial state - taken handle
-    await expect(submitButton).toBeDisabled();
+    await expect(submitButton).toBeDisabled({ timeout: 5000 });
 
     // Quickly switch to available handle
     await handleInput.fill('available1');
-    await page.waitForTimeout(650);
 
     // Verify final state - available handle
     await expect(
       page.getByRole('button', { name: 'Claim @available1' })
-    ).toBeEnabled();
+    ).toBeEnabled({ timeout: 5000 });
 
     // No error message should be visible for available handle
     await expect(page.locator('text="Handle already taken"')).not.toBeVisible();
@@ -310,24 +303,22 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible();
 
     // Type handle that will cause network error
     await handleInput.fill('errorhandle');
-    await page.waitForTimeout(650);
 
     // Should show network error
-    await expect(page.locator('text="Network error"')).toBeVisible();
+    await expect(page.locator('text="Network error"')).toBeVisible({ timeout: 5000 });
 
     // Type new handle that succeeds
     await handleInput.fill('recovery');
-    await page.waitForTimeout(650);
 
     // Should recover and show success state
     await expect(
       page.getByRole('button', { name: 'Claim @recovery' })
-    ).toBeEnabled();
+    ).toBeEnabled({ timeout: 5000 });
     await expect(page.locator('text="Network error"')).not.toBeVisible();
   });
 });
