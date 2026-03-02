@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
   Skeleton,
 } from '@jovie/ui';
-import { Ellipsis, MessageSquare, Trash2 } from 'lucide-react';
+import { Copy, Ellipsis, MessageSquare, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -168,6 +168,19 @@ export function RecentChats() {
                       </SidebarMenuAction>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side='bottom' align='end'>
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(convo.id);
+                            notifications.success('Session ID copied');
+                          } catch {
+                            notifications.error('Could not copy session ID');
+                          }
+                        }}
+                      >
+                        <Copy className='size-4' aria-hidden='true' />
+                        Copy Session ID
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setDeleteTarget({ id: convo.id, title })}
                         className='text-destructive focus:text-destructive'
