@@ -8,7 +8,7 @@ export function FinalCTASection() {
       className='bg-[var(--linear-bg-page)] relative z-10'
       style={{
         paddingTop: 'var(--linear-section-pt-lg)',
-        paddingBottom: '180px', // Extra padding to catch the floating claim bar
+        paddingBottom: '140px', // Padding to accommodate floating claim bar
       }}
     >
       <Container size='homepage'>
@@ -27,16 +27,16 @@ export function FinalCTASection() {
             Claim your piece of the internet.
           </h2>
           <p className='mt-4 marketing-lead-linear text-[var(--linear-text-secondary)]'>
-            Get started for free. No credit card required.
+            Free forever. No credit card required.
           </p>
 
-          <div className='mt-8 flex flex-col items-center gap-4 w-full'>
+          <div className='mt-6 flex flex-col items-center gap-4 w-full'>
             <Button
               size='lg'
-              className='h-[var(--linear-button-height-md)] rounded-[var(--linear-radius-md)] px-6 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] bg-[var(--linear-btn-primary-bg)] text-[var(--linear-btn-primary-fg)] shadow-[var(--linear-shadow-button)] hover:opacity-90 transition-opacity'
+              className='btn-linear-signup h-[var(--linear-button-height-md)] px-6'
               asChild
             >
-              <Link href='/signup'>Get Started Now</Link>
+              <Link href='/signup'>Claim Your Handle</Link>
             </Button>
           </div>
         </div>

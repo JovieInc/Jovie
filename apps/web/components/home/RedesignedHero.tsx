@@ -31,11 +31,11 @@ export function RedesignedHero() {
           build a beautifully optimized profile designed to convert.
         </p>
 
-        <div className='mt-8 w-full max-w-[480px] text-left'>
+        <div className='mt-6 w-full max-w-[480px] text-left'>
           <ClaimHandleForm />
         </div>
 
-        <p className='mt-4 flex items-center justify-center gap-2 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] tracking-[var(--linear-tracking-wide)] text-[var(--linear-text-tertiary)]'>
+        <p className='mt-3 flex items-center justify-center gap-2 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] tracking-[var(--linear-tracking-wide)] text-[var(--linear-text-tertiary)]'>
           <span
             aria-hidden='true'
             className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_8px_var(--linear-success)]'

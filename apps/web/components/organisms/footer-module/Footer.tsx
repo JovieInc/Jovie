@@ -309,11 +309,7 @@ export function Footer({
                     'var(--linear-text-quaternary, var(--linear-text-tertiary))',
                 }}
               />
-              {variant === 'minimal' && (
-                <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
-                  Made for musicians, by musicians
-                </p>
-              )}
+              {/* Removed "Made for musicians" tagline — tightened per JOV-1094 */}
             </div>
 
             <div
