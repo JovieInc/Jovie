@@ -45,6 +45,24 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: '*.scdn.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.spotifycdn.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.dzcdn.net',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'res.cloudinary.com',
         port: '',
         pathname: '/**',
