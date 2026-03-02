@@ -119,6 +119,7 @@ export function JovieChat({
     artistContext,
     conversationId,
     onConversationCreate,
+    username,
   });
 
   // Image attachments for chat messages
