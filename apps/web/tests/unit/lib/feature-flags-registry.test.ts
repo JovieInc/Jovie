@@ -85,6 +85,9 @@ function collectSourceFiles(rootDir: string): string[] {
 }
 
 describe('feature flag registry integrity', () => {
+  /** Known false positives -- strings matching flag prefixes but not actual flags. */
+  const falsePositives = new Set(['show_dialog']);
+
   it('keeps all production feature-flag literals registered', () => {
     const sourceFiles = collectSourceFiles(WEB_ROOT);
 
@@ -101,7 +104,7 @@ describe('feature flag registry integrity', () => {
     }
 
     const unregisteredFlags = [...discoveredFlags]
-      .filter(flag => !registeredFlags.has(flag))
+      .filter(flag => !registeredFlags.has(flag) && !falsePositives.has(flag))
       .sort();
 
     expect(unregisteredFlags).toEqual([]);

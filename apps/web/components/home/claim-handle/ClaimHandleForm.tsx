@@ -99,13 +99,11 @@ export function ClaimHandleForm({
   const helperToneClass = HELPER_TONE_CLASSES[helperState.tone];
 
   const buttonContent = useMemo((): ReactNode => {
+    // Only show a spinner in the button for navigation (post-submit).
+    // The input-adjacent HandleStatusIcon already shows a spinner while checking,
+    // so we avoid rendering two simultaneous spinners.
     if (showChecking) {
-      return (
-        <>
-          <div className='h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent motion-reduce:animate-none' />
-          <span>Checking…</span>
-        </>
-      );
+      return <span>Checking…</span>;
     }
     if (navigating) {
       return (

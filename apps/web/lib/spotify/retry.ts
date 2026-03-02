@@ -214,6 +214,19 @@ export async function withRetry<T>(
     }
   }
 
+  // Capture to Sentry when all retries are exhausted
+  if (lastError) {
+    Sentry.captureException(lastError, {
+      level: 'error',
+      tags: { component: 'spotify-retry' },
+      extra: {
+        attempts: actualAttempts,
+        maxRetries: mergedConfig.maxRetries,
+        totalDelay,
+      },
+    });
+  }
+
   return {
     success: false,
     error: lastError,

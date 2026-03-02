@@ -23,7 +23,7 @@ export function LegalHero({
         {description}
       </p>
       {highlight && (
-        <div className='mt-6 inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 border border-subtle'>
+        <div className='mt-6 inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-surface-1 text-secondary-token border border-subtle'>
           {highlight}
         </div>
       )}

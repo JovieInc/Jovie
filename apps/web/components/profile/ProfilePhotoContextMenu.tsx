@@ -210,18 +210,17 @@ export function ProfilePhotoContextMenu({
               <QrCode className='mr-2 h-4 w-4' />
               Download QR Code
             </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() => {
-                const originalSize =
-                  sizes.find(size => size.key === 'original') ?? sizes[0];
-                if (originalSize) {
-                  handleDownload(originalSize).catch(() => {});
-                }
-              }}
-            >
-              <ImageDown className='mr-2 h-4 w-4' />
-              Download Profile Photo
-            </ContextMenuItem>
+            {sizes.map(size => (
+              <ContextMenuItem
+                key={size.key}
+                onClick={() => {
+                  handleDownload(size).catch(() => {});
+                }}
+              >
+                <ImageDown className='mr-2 h-4 w-4' />
+                {size.label}
+              </ContextMenuItem>
+            ))}
             <ContextMenuItem onClick={handleDownloadProfileJson}>
               <FileCode2 className='mr-2 h-4 w-4' />
               Download Profile as JSON
