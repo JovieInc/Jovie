@@ -124,7 +124,10 @@ export function SignUpForm() {
                 role='alert'
               >
                 <p className='text-sm font-medium text-destructive'>
-                  {getOAuthErrorMessage(error)}
+                  {getOAuthErrorMessage(
+                    error,
+                    OAUTH_PROVIDER_COPY[oauthFailureProvider]
+                  )}
                 </p>
                 <p className='text-sm text-[#4c515a] dark:text-[#a8aaad]'>
                   Try another sign-up method to keep going right away.

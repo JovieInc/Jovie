@@ -154,7 +154,10 @@ export function isSessionExists(error: unknown): boolean {
  * Map an OAuth error message string to a more specific, user-friendly message.
  * Used to provide contextual help when OAuth flows fail (timeout, scope rejection, etc.).
  */
-export function getOAuthErrorMessage(errorMessage: string): string {
+export function getOAuthErrorMessage(
+  errorMessage: string,
+  providerName?: string
+): string {
   const lower = errorMessage.toLowerCase();
 
   if (lower.includes('timeout') || lower.includes('connection')) {
@@ -169,6 +172,10 @@ export function getOAuthErrorMessage(errorMessage: string): string {
     lower.includes('account')
   ) {
     return 'An account with this email already exists. Try signing in instead.';
+  }
+
+  if (providerName) {
+    return `${providerName} connection failed.`;
   }
 
   return errorMessage;
