@@ -19,6 +19,7 @@ import {
   currencyCodeEnum,
   linkTypeEnum,
   notificationChannelEnum,
+  tipStatusEnum,
 } from './enums';
 import { socialLinks } from './links';
 import { creatorProfiles } from './profiles';
@@ -276,12 +277,17 @@ export const tips = pgTable(
     amountCents: integer('amount_cents').notNull(),
     currency: currencyCodeEnum('currency').notNull().default('USD'),
     paymentIntentId: text('payment_intent_id').notNull().unique(),
+    stripeCheckoutSessionId: text('stripe_checkout_session_id'),
     contactEmail: text('contact_email'),
     contactPhone: text('contact_phone'),
+    tipperName: text('tipper_name'),
     message: text('message'),
     isAnonymous: boolean('is_anonymous').default(false),
+    status: tipStatusEnum('status').default('pending').notNull(),
+    platformFeeCents: integer('platform_fee_cents'),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
     creatorProfileIdx: index('tips_creator_profile_id_idx').on(
@@ -292,6 +298,9 @@ export const tips = pgTable(
       table.creatorProfileId,
       table.createdAt
     ),
+    checkoutSessionIdx: uniqueIndex(
+      'tips_stripe_checkout_session_id_unique'
+    ).on(table.stripeCheckoutSessionId),
   })
 );
 

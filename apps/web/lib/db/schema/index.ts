@@ -260,6 +260,7 @@ export {
   subscriptionStatusEnum,
   suppressionReasonEnum,
   themeModeEnum,
+  tipStatusEnum,
   userStatusLifecycleEnum,
   waitlistInviteStatusEnum,
   waitlistStatusEnum,
