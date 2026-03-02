@@ -8,23 +8,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   Input,
   Label,
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  Calendar,
-  CheckCircle2,
-  MoreHorizontal,
-  Plus,
-  RefreshCw,
-  Unlink,
-} from 'lucide-react';
+import { Calendar, CheckCircle2, Plus, RefreshCw, Unlink } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -167,7 +155,7 @@ export function SettingsTouringSection({
 }
 
 // ---------------------------------------------------------------------------
-// BandsintownConnectionPill
+// BandsintownConnectionPill -- connected button group
 // ---------------------------------------------------------------------------
 
 interface BandsintownConnectionPillProps {
@@ -189,70 +177,98 @@ function BandsintownConnectionPill({
   onSyncNow,
   onDisconnect,
 }: BandsintownConnectionPillProps) {
-  const [hovered, setHovered] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const accent = BANDSINTOWN_ACCENT;
+
+  // Shared styles for connected button group segments
+  const segmentBase =
+    'inline-flex items-center gap-1.5 border py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
 
   if (connected) {
     return (
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type='button'
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
-            )}
-            style={
-              {
-                borderColor: `${accent}30`,
-                backgroundColor: `${accent}10`,
-                '--tw-ring-color': `${accent}50`,
-              } as React.CSSProperties
-            }
-            aria-label={`Bandsintown connection: ${artistName || 'Connected'}`}
-          >
-            <Calendar className='h-4 w-4 shrink-0' style={{ color: accent }} />
-            <span className='truncate max-w-[160px] text-secondary-token'>
-              {artistName || 'Connected'}
+      <fieldset
+        className='inline-flex items-center border-0 p-0 m-0'
+        aria-label='Bandsintown connection actions'
+      >
+        {/* Left segment -- connection status */}
+        <button
+          type='button'
+          onClick={onConnect}
+          className={cn(
+            segmentBase,
+            'rounded-l-md border-r-0 pl-2.5 pr-3 cursor-pointer'
+          )}
+          style={
+            {
+              borderColor: `${accent}30`,
+              backgroundColor: `${accent}10`,
+              '--tw-ring-color': `${accent}50`,
+            } as React.CSSProperties
+          }
+          aria-label={`Connected to ${artistName || 'Bandsintown'} -- click to edit`}
+        >
+          <Calendar className='h-4 w-4 shrink-0' style={{ color: accent }} />
+          <span className='truncate max-w-[160px] text-secondary-token'>
+            {artistName || 'Connected'}
+          </span>
+          {lastSyncedAt && (
+            <span className='text-[10px] text-tertiary-token ml-0.5'>
+              {new Date(lastSyncedAt).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
             </span>
-            {lastSyncedAt && !hovered && !menuOpen && (
-              <span className='text-[10px] text-tertiary-token ml-0.5'>
-                {new Date(lastSyncedAt).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </span>
-            )}
-            {hovered || menuOpen ? (
-              <MoreHorizontal
-                className='h-4 w-4 shrink-0'
-                style={{ color: accent }}
-              />
-            ) : (
-              <CheckCircle2
-                className='h-4 w-4 shrink-0'
-                style={{ color: accent }}
-              />
-            )}
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align='start' sideOffset={4}>
-          <DropdownMenuItem onClick={onSyncNow} disabled={isSyncing}>
-            <RefreshCw
-              className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')}
-            />
-            {isSyncing ? 'Syncing...' : 'Sync now'}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant='destructive' onClick={onDisconnect}>
-            <Unlink className='h-4 w-4' />
-            Disconnect
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          )}
+          <CheckCircle2
+            className='h-4 w-4 shrink-0'
+            style={{ color: accent }}
+          />
+        </button>
+
+        {/* Middle segment -- sync */}
+        <button
+          type='button'
+          onClick={onSyncNow}
+          disabled={isSyncing}
+          className={cn(
+            segmentBase,
+            'border-r-0 px-2.5 cursor-pointer hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed'
+          )}
+          style={
+            {
+              borderColor: `${accent}30`,
+              '--tw-ring-color': `${accent}50`,
+            } as React.CSSProperties
+          }
+          aria-label={isSyncing ? 'Syncing tour dates' : 'Sync tour dates'}
+        >
+          <RefreshCw
+            className={cn('h-3.5 w-3.5', isSyncing && 'animate-spin')}
+            style={{ color: accent }}
+          />
+          <span className='text-secondary-token'>
+            {isSyncing ? 'Syncing' : 'Sync'}
+          </span>
+        </button>
+
+        {/* Right segment -- disconnect */}
+        <button
+          type='button'
+          onClick={onDisconnect}
+          className={cn(
+            segmentBase,
+            'rounded-r-md px-2.5 cursor-pointer hover:bg-surface-2'
+          )}
+          style={
+            {
+              borderColor: `${accent}30`,
+              '--tw-ring-color': `${accent}50`,
+            } as React.CSSProperties
+          }
+          aria-label='Disconnect from Bandsintown'
+        >
+          <Unlink className='h-3.5 w-3.5 text-tertiary-token' />
+        </button>
+      </fieldset>
     );
   }
 
@@ -261,7 +277,7 @@ function BandsintownConnectionPill({
       type='button'
       onClick={onConnect}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-xs font-medium text-secondary-token transition-colors',
+        'inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-xs font-medium text-secondary-token transition-colors',
         'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
       )}
       style={

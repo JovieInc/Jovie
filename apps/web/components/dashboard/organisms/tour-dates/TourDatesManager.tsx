@@ -153,12 +153,16 @@ export function TourDatesManager({
                 on Bandsintown
               </span>
             </div>
-            <div className='flex items-center gap-2'>
+            <fieldset
+              className='inline-flex items-center border-0 p-0 m-0'
+              aria-label='Tour date sync actions'
+            >
               <Button
                 variant='ghost'
                 size='sm'
                 onClick={handleSync}
                 disabled={syncMutation.isPending}
+                className='rounded-r-none border border-subtle'
               >
                 <Icon
                   name='RefreshCw'
@@ -174,12 +178,12 @@ export function TourDatesManager({
                 size='sm'
                 onClick={handleDisconnectClick}
                 disabled={disconnectMutation.isPending}
-                className='text-tertiary-token hover:text-secondary-token'
+                className='rounded-l-none border border-l-0 border-subtle text-tertiary-token hover:text-secondary-token'
               >
                 <Icon name='Unlink' className='mr-1.5 h-4 w-4' />
                 Disconnect
               </Button>
-            </div>
+            </fieldset>
           </div>
         )}
 
