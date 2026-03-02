@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  getOAuthErrorMessage,
   isCodeExpired,
   isSessionExists,
   isSignInSuggested,
@@ -306,7 +307,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         }
 
         const message = parseClerkError(err);
-        base.setError(message);
+        base.setError(getOAuthErrorMessage(message));
         setOauthFailureProvider(provider);
         base.setLoadingState({ type: 'idle' });
       }

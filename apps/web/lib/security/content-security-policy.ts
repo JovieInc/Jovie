@@ -93,6 +93,7 @@ const STATIC_CSP_PARTS = {
     'https://*.mzstatic.com',
     'https://vercel.live',
     'https://vercel.com',
+    'https://*.bcbits.com',
   ].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)
