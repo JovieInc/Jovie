@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { AiDemo } from '@/components/home/AiDemo';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
@@ -7,9 +8,34 @@ import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
+import { captureWarning } from '@/lib/error-tracking';
+import { getProfileByUsername } from '@/lib/services/profile';
 
-// Fully static - no database dependency, instant cold starts
-export const revalidate = false;
+// ISR with 1-hour revalidation to keep profile data fresh (JOV-888)
+export const revalidate = 3600;
+
+/** Fetch the /tim profile data for the subscribe preview mockup (JOV-888). */
+const getTimProfile = unstable_cache(
+  async () => {
+    try {
+      const profile = await getProfileByUsername('tim');
+      if (!profile) return null;
+      return {
+        name: profile.displayName ?? null,
+        tagline: profile.bio ?? null,
+        handle: profile.username,
+        avatarUrl: profile.avatarUrl ?? null,
+      };
+    } catch (error) {
+      void captureWarning('[launch] Failed to fetch /tim profile for mockup', {
+        error,
+      });
+      return null;
+    }
+  },
+  ['launch-tim-profile'],
+  { revalidate: 3600, tags: ['profile:tim'] }
+);
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — Your Entire Music Career. One Intelligent Link.`;
@@ -236,7 +262,9 @@ function Divider() {
   return <hr className='border-t border-subtle' />;
 }
 
-export default function LaunchPage() {
+export default async function LaunchPage() {
+  const timProfile = await getTimProfile();
+
   return (
     <div className='relative min-h-screen'>
       <AuthRedirectHandler />
@@ -447,7 +475,12 @@ export default function LaunchPage() {
 
       {/* ═══ 6. PROFILE MOCKUP ═══ */}
       <div className={`${WRAP} pb-16`}>
-        <ProfileMockup />
+        <ProfileMockup
+          name={timProfile?.name}
+          tagline={timProfile?.tagline}
+          handle={timProfile?.handle}
+          avatarUrl={timProfile?.avatarUrl}
+        />
       </div>
 
       {/* ═══ 7. SMART LINKS ═══ */}

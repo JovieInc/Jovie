@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { preSaveTokens } from '@/lib/db/schema/pre-save';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 import {
   refreshSpotifyAccessToken,
   saveReleaseToSpotifyLibrary,
@@ -90,6 +91,11 @@ async function processPreSaveRow(row: {
     return true;
   } catch (error) {
     console.error(`[pre-save] Failed to process row ${row.id}:`, error);
+    captureError('Pre-save processing failed', error, {
+      route: 'cron/process-pre-saves',
+      rowId: row.id,
+      releaseId: row.releaseId,
+    });
     return false;
   }
 }

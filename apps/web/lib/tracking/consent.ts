@@ -44,9 +44,14 @@ export function getConsentState(): ConsentState {
   if (isGPCEnabled()) return 'gpc-opted-out';
 
   // Check localStorage first (more reliable)
-  const stored = localStorage.getItem(CONSENT_STORAGE_KEY);
-  if (stored === 'accepted' || stored === 'rejected') {
-    return stored;
+  // Guard against null localStorage (private browsing, restricted contexts) (JOV-848)
+  try {
+    const stored = window.localStorage?.getItem(CONSENT_STORAGE_KEY);
+    if (stored === 'accepted' || stored === 'rejected') {
+      return stored;
+    }
+  } catch {
+    // localStorage access can throw in some restricted contexts
   }
 
   // Fall back to cookie
@@ -69,8 +74,12 @@ export function getConsentState(): ConsentState {
 export function setConsentState(state: 'accepted' | 'rejected'): void {
   if (typeof window === 'undefined') return;
 
-  // Store in localStorage
-  localStorage.setItem(CONSENT_STORAGE_KEY, state);
+  // Store in localStorage (guard against null in restricted contexts)
+  try {
+    window.localStorage?.setItem(CONSENT_STORAGE_KEY, state);
+  } catch {
+    // localStorage may be unavailable
+  }
 
   // Also set as cookie for server-side access
   // 1 year expiry
@@ -97,20 +106,25 @@ export function getOrCreateSessionId(): string {
   if (typeof window === 'undefined') return '';
 
   const SESSION_KEY = 'jv_session_id';
-  let sessionId = sessionStorage.getItem(SESSION_KEY);
+  try {
+    let sessionId = window.sessionStorage?.getItem(SESSION_KEY) ?? null;
 
-  if (!sessionId) {
-    // Generate a random session ID using crypto for better randomness
-    const randomBytes = new Uint8Array(16);
-    crypto.getRandomValues(randomBytes);
-    const randomHex = Array.from(randomBytes)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    sessionId = `${Date.now()}-${randomHex}`;
-    sessionStorage.setItem(SESSION_KEY, sessionId);
+    if (!sessionId) {
+      // Generate a random session ID using crypto for better randomness
+      const randomBytes = new Uint8Array(16);
+      crypto.getRandomValues(randomBytes);
+      const randomHex = Array.from(randomBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      sessionId = `${Date.now()}-${randomHex}`;
+      window.sessionStorage?.setItem(SESSION_KEY, sessionId);
+    }
+
+    return sessionId;
+  } catch {
+    // sessionStorage may be unavailable in restricted contexts
+    return '';
   }
-
-  return sessionId;
 }
 
 /**
@@ -119,6 +133,10 @@ export function getOrCreateSessionId(): string {
 export function clearConsentState(): void {
   if (typeof window === 'undefined') return;
 
-  localStorage.removeItem(CONSENT_STORAGE_KEY);
+  try {
+    window.localStorage?.removeItem(CONSENT_STORAGE_KEY);
+  } catch {
+    // localStorage may be unavailable
+  }
   document.cookie = `${CONSENT_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }

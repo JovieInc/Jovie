@@ -87,7 +87,7 @@ export function renderPrimarySocialCell(entry: WaitlistEntryRow) {
 
   return (
     <PlatformPill
-      platformIcon={entry.primarySocialPlatform.toLowerCase()}
+      platformIcon={entry.primarySocialPlatform?.toLowerCase() ?? ''}
       platformName={platformLabel}
       primaryText={`@${username}`}
       onClick={() =>

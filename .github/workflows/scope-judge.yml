@@ -24,10 +24,7 @@ on:
     types: [opened, synchronize, ready_for_review]
     branches: [main]
 
-permissions:
-  contents: read
-  pull-requests: read
-  statuses: write
+permissions: {}
 
 concurrency:
   group: scope-judge-${{ github.event.pull_request.number }}
@@ -38,6 +35,10 @@ jobs:
     name: Scope Alignment Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
     # Only run on agent branches
     if: >-
       !github.event.pull_request.draft &&
@@ -50,7 +51,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

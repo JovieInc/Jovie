@@ -67,7 +67,8 @@ if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   # Check if pnpm is available
   if ! command -v pnpm &> /dev/null; then
     echo "Installing pnpm..."
-    corepack enable 2>/dev/null || npm install -g pnpm@9.15.4
+    corepack enable 2>/dev/null
+    corepack prepare pnpm@9.15.4 --activate
   fi
 
   # Install with frozen lockfile for reproducibility

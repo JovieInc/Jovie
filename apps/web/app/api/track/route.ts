@@ -26,6 +26,24 @@ export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
 
+/**
+ * Check if a referrer URL is from the same origin as the request.
+ * Used to filter out the HTTP Referer header on same-origin fetch() calls,
+ * which would incorrectly record the app's own URL as the traffic source.
+ */
+function isSameOriginReferrer(
+  referrerUrl: string,
+  requestUrl: string
+): boolean {
+  try {
+    const referrerHost = new URL(referrerUrl).hostname;
+    const requestHost = new URL(requestUrl).hostname;
+    return referrerHost === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 function inferAudienceDeviceType(
   userAgent: string | null
 ): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
@@ -95,7 +113,13 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
     // ipAddress already extracted above for rate limiting
-    const referrer = request.headers.get('referer') ?? undefined;
+    // Filter out self-referrals: the HTTP Referer header on same-origin fetch()
+    // is the current page URL, not the external traffic source.
+    const httpReferer = request.headers.get('referer') ?? undefined;
+    const referrer =
+      httpReferer && isSameOriginReferrer(httpReferer, request.url)
+        ? undefined
+        : httpReferer;
     const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??

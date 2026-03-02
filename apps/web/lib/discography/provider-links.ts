@@ -1,5 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 
+import { captureError } from '@/lib/error-tracking';
+
 import {
   isMusicfetchAvailable,
   lookupByIsrc as musicfetchLookupByIsrc,
@@ -327,7 +329,16 @@ async function runIsrcLookups(
     );
   }
 
-  await Promise.all(lookupPromises);
+  const results = await Promise.allSettled(lookupPromises);
+
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      captureError('DSP ISRC lookup failed', result.reason, {
+        route: 'discography',
+        isrc: track.isrc,
+      });
+    }
+  }
 }
 
 export async function resolveProviderLinks(

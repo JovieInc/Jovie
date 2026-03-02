@@ -1,6 +1,8 @@
 (function () {
   try {
     if (typeof globalThis.matchMedia !== 'function') return;
+    // Guard against null localStorage (private browsing, restricted contexts)
+    if (typeof localStorage === 'undefined' || !localStorage) return;
     var ls = localStorage.getItem('jovie-theme');
     var mql = globalThis.matchMedia('(prefers-color-scheme: dark)');
     var systemPref = mql.matches ? 'dark' : 'light';

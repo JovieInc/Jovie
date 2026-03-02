@@ -30,7 +30,7 @@ export interface BandsintownEvent {
   offers: Array<{
     type: string;
     url: string;
-    status: string;
+    status?: string | null;
   }>;
 }
 

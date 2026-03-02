@@ -30,9 +30,9 @@ const baseDashboardData: DashboardData = {
     monthReceivedCents: 0,
   },
   profileCompletion: {
-    percentage: 57,
+    percentage: 67,
     completedCount: 4,
-    totalCount: 7,
+    totalCount: 6,
     steps: [
       {
         id: 'avatar',
@@ -56,8 +56,8 @@ describe('HeaderProfileProgress', () => {
   it('renders progress when profile setup is incomplete', () => {
     const { getByLabelText, getByText } = renderProgress();
 
-    expect(getByLabelText(/Profile 57% complete/)).toBeDefined();
-    expect(getByText('57%')).toBeDefined();
+    expect(getByLabelText(/Profile 67% complete/)).toBeDefined();
+    expect(getByText('67%')).toBeDefined();
   });
 
   it('uses accent semantic tokens for progress ring gradient', () => {

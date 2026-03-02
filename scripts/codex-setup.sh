@@ -117,7 +117,10 @@ setup_node() {
 
   # Fallback: Install nvm and then Node
   log_info "Installing nvm..."
-  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+  NVM_INSTALLER="/tmp/nvm-install-v0.40.3.sh"
+  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh -o "$NVM_INSTALLER"
+  echo "2d8359a64a3cb07c02389ad88ceecd43f2fa469c06104f92f98df5b6f315275f  $NVM_INSTALLER" | sha256sum -c -
+  bash "$NVM_INSTALLER"
   export NVM_DIR="$HOME/.nvm"
   # shellcheck source=/dev/null
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
@@ -194,9 +197,8 @@ setup_doppler() {
           sudo yum update -y && sudo yum install -y doppler
         # Alpine
         elif check_command apk; then
-          sudo apk add --no-cache curl gnupg
-          curl -sLf --retry 3 --tlsv1.2 --proto "=https" \
-            'https://packages.doppler.com/public/cli/setup.sh' | sudo sh
+          log_error "Alpine Doppler auto-install is disabled for supply-chain safety. Install Doppler manually with a pinned package version."
+          exit 1
         else
           log_error "Unsupported Linux distribution for Doppler installation"
           exit 1

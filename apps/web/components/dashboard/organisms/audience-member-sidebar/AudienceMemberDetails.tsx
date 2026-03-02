@@ -6,7 +6,7 @@
  * Renders the main member details section (location, device, visits, etc.)
  */
 
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, MapPin, Monitor, Smartphone, Tablet } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
@@ -62,6 +62,16 @@ function CopyableValue({ value, label }: CopyableValueProps) {
   );
 }
 
+/** Returns the appropriate Lucide device icon for the given device type. */
+function DeviceIcon({ deviceType }: { readonly deviceType: string }) {
+  const normalized = deviceType.trim().toLowerCase();
+  const cls = 'h-3.5 w-3.5 shrink-0 text-tertiary-token';
+  if (normalized === 'mobile')
+    return <Smartphone className={cls} aria-hidden />;
+  if (normalized === 'tablet') return <Tablet className={cls} aria-hidden />;
+  return <Monitor className={cls} aria-hidden />;
+}
+
 interface AudienceMemberDetailsProps {
   readonly member: AudienceMember;
 }
@@ -78,7 +88,13 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
         label='Location'
         value={
           member.locationLabel ? (
-            member.locationLabel
+            <span className='inline-flex items-center gap-1.5'>
+              <MapPin
+                className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                aria-hidden
+              />
+              {member.locationLabel}
+            </span>
           ) : (
             <span className='text-secondary-token'>Unknown</span>
           )
@@ -88,7 +104,10 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
         label='Device'
         value={
           member.deviceType ? (
-            formatDeviceTypeLabel(member.deviceType)
+            <span className='inline-flex items-center gap-1.5'>
+              <DeviceIcon deviceType={member.deviceType} />
+              {formatDeviceTypeLabel(member.deviceType)}
+            </span>
           ) : (
             <span className='text-secondary-token'>Unknown</span>
           )

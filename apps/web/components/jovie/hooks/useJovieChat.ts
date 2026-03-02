@@ -76,6 +76,9 @@ export function useJovieChat({
   const pendingInitialSendRef = useRef<{
     text: string;
     files?: FileUIPart[];
+    /** Deferred conversation create callback — called after sendMessage so navigation doesn't cause a remount before the AI request fires. */
+    onConversationCreateDeferred?: (conversationId: string) => void;
+    conversationId?: string;
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -174,6 +177,9 @@ export function useJovieChat({
         queryKey: queryKeys.chat.usage(),
       });
 
+      // Clear pending messages ref so the persistence effect doesn't
+      // keep trying to find an assistant message that will never arrive
+      pendingMessagesRef.current = null;
       setIsSubmitting(false);
     },
   });
@@ -227,6 +233,23 @@ export function useJovieChat({
     return () => clearTimeout(timer);
   }, [titlePollingSince]);
 
+  // Safety timeout: if isSubmitting stays true for more than 30 seconds,
+  // force-clear it to prevent the input from being permanently blocked.
+  // This guards against edge cases where the status/persistence effects
+  // fail to clear the flag (e.g. stream silently drops, component re-mounts).
+  useEffect(() => {
+    if (!isSubmitting) return;
+
+    const safetyTimer = globalThis.setTimeout(() => {
+      setIsSubmitting(false);
+      pendingMessagesRef.current = null;
+    }, 30_000);
+
+    return () => {
+      globalThis.clearTimeout(safetyTimer);
+    };
+  }, [isSubmitting]);
+
   // Clear error when user starts typing
   useEffect(() => {
     if (input && chatError) {
@@ -241,6 +264,8 @@ export function useJovieChat({
 
   // Ensure the first message in a new chat is sent only after activeConversationId
   // has been committed, so transport includes conversationId on the request.
+  // Also fires the deferred onConversationCreate callback AFTER sendMessage so that
+  // the resulting navigation/remount doesn't race against the AI request (JOV-1117).
   useEffect(() => {
     if (!activeConversationId || !pendingInitialSendRef.current) return;
 
@@ -253,6 +278,17 @@ export function useJovieChat({
         ? { files: pendingPayload.files }
         : {}),
     });
+
+    // Notify parent after sendMessage — the route update (e.g. /app/chat → /app/chat/[id])
+    // can now safely happen because the AI stream has been initiated.
+    if (
+      pendingPayload.onConversationCreateDeferred &&
+      pendingPayload.conversationId
+    ) {
+      pendingPayload.onConversationCreateDeferred(
+        pendingPayload.conversationId
+      );
+    }
   }, [activeConversationId, sendMessage]);
 
   // Save messages to database when streaming completes.
@@ -411,7 +447,6 @@ export function useJovieChat({
             initialMessage: trimmedText || '(image attachment)',
           });
           setActiveConversationId(result.conversation.id);
-          onConversationCreate?.(result.conversation.id);
 
           // User message already persisted via initialMessage in conversation creation.
           // Only store pending ref to persist the assistant response.
@@ -420,7 +455,14 @@ export function useJovieChat({
             assistantMessage: '', // Will be filled when response completes
           };
 
-          pendingInitialSendRef.current = payload;
+          // Defer onConversationCreate until after sendMessage fires in the effect.
+          // Calling it here would trigger router.replace (e.g. /chat → /chat/[id]),
+          // which remounts the component and loses the pending send ref (JOV-1117).
+          pendingInitialSendRef.current = {
+            ...payload,
+            onConversationCreateDeferred: onConversationCreate,
+            conversationId: result.conversation.id,
+          };
         } catch (err) {
           Sentry.captureException(err, {
             tags: {

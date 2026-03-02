@@ -69,12 +69,14 @@ export function useProfileVisitTracking(artistId?: string) {
     if (!artistId) return;
 
     const utmParams = extractUtmParams();
+    const referrer = document.referrer || undefined;
 
     fetch('/api/audience/visit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         profileId: artistId,
+        referrer,
         ...(utmParams && { utmParams }),
       }),
       keepalive: true,

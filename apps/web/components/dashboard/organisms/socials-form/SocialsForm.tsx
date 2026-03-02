@@ -57,6 +57,7 @@ const SUGGESTED_PLATFORM_IDS = [
   'youtube',
   'x',
   'facebook',
+  'venmo',
   'linkedin',
   'discord',
   'reddit',
@@ -84,7 +85,7 @@ const EXCLUDED_PLATFORM_IDS = new Set([
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
-    (['social', 'creator', 'messaging', 'professional'].includes(
+    (['social', 'creator', 'messaging', 'professional', 'payment'].includes(
       platform.category
     ) ||
       (platform.category === 'music' && !PRIMARY_DSP_IDS.has(platform.id))) &&
@@ -130,6 +131,7 @@ PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
 PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
 PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
 PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
+PLATFORM_PLACEHOLDERS.venmo = 'https://venmo.com/yourhandle';
 
 // Music DSP placeholders (canonical underscore IDs from ALL_PLATFORMS)
 PLATFORM_PLACEHOLDERS.youtube_music =
@@ -152,7 +154,9 @@ function getPlatformLabel(platform: string): string {
 
 /** Build dropdown items for the platform selector, grouped by category with search support. */
 function buildPlatformItems(
-  onSelect: (platformId: string) => void
+  onSelect: (platformId: string) => void,
+  currentPlatform: string,
+  usedPlatforms: Set<string>
 ): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [];
 
@@ -166,12 +170,14 @@ function buildPlatformItems(
       label: group.label,
     });
     for (const p of group.platforms) {
+      const alreadyUsed = usedPlatforms.has(p.id) && p.id !== currentPlatform;
       items.push({
         type: 'action',
         id: p.id,
-        label: p.name,
+        label: alreadyUsed ? `${p.name} (already added)` : p.name,
         icon: <SocialIcon platform={p.id} className='h-4 w-4' aria-hidden />,
         onClick: () => onSelect(p.id),
+        disabled: alreadyUsed,
       });
     }
   });
@@ -244,15 +250,26 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     [focusUrlField, handleAddSocialLink, socialLinks.length]
   );
 
+  /** Set of platform IDs already used across social links (for duplicate prevention). */
+  const usedPlatforms = useMemo(() => {
+    const used = new Set<string>();
+    for (const link of socialLinks) {
+      if (link.platform) used.add(link.platform);
+    }
+    return used;
+  }, [socialLinks]);
+
   /** Memoize platform dropdown items per-row so onClick closures stay stable. */
   const platformItemsByIndex = useMemo(
     () =>
-      socialLinks.map((_, index) =>
-        buildPlatformItems(platformId =>
-          updateSocialLink(index, 'platform', platformId)
+      socialLinks.map((link, index) =>
+        buildPlatformItems(
+          platformId => updateSocialLink(index, 'platform', platformId),
+          link.platform,
+          usedPlatforms
         )
       ),
-    [socialLinks, updateSocialLink]
+    [socialLinks, updateSocialLink, usedPlatforms]
   );
 
   if (loading) {

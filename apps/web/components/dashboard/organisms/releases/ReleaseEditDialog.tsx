@@ -1,8 +1,8 @@
 'use client';
 
 import { Badge, Button, Input } from '@jovie/ui';
-import Image from 'next/image';
 import { Icon } from '@/components/atoms/Icon';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import {
   Dialog,
   DialogActions,
@@ -74,23 +74,14 @@ export function ReleaseEditDialog({
             <div className='flex items-center gap-4 rounded-xl border border-subtle bg-surface-2/60 p-4'>
               {/* Artwork */}
               <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt={`${release.title} artwork`}
-                    fill
-                    className='object-cover'
-                    sizes='64px'
-                  />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    <Icon
-                      name='Disc3'
-                      className='h-8 w-8 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  </div>
-                )}
+                <ImageWithFallback
+                  src={release.artworkUrl}
+                  alt={`${release.title} artwork`}
+                  fill
+                  className='object-cover'
+                  sizes='64px'
+                  fallbackVariant='release'
+                />
               </div>
               <div className='min-w-0 flex-1'>
                 <p className='text-base font-semibold text-primary-token'>

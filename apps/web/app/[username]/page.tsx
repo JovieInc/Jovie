@@ -115,8 +115,12 @@ function generateProfileStructuredData(
 
 /**
  * Calculate profile completion percentage based on filled fields.
- * Fields: displayName, bio, avatarUrl, spotifyUrl, appleMusicUrl, youtubeUrl,
- * and having at least one social link.
+ *
+ * Criteria (6 total): displayName, bio, avatarUrl, any DSP/music link,
+ * at least one social link, and venmoHandle (tip jar).
+ *
+ * This mirrors the dashboard's buildProfileCompletion() criteria so that
+ * the public profile page and the dashboard show consistent scores.
  */
 function calculateProfileCompletion(result: {
   displayName?: string | null;
@@ -126,6 +130,7 @@ function calculateProfileCompletion(result: {
   appleMusicUrl?: string | null;
   youtubeUrl?: string | null;
   socialLinks?: unknown[] | null;
+  venmoHandle?: string | null;
 }): number {
   const fields = [
     result.displayName,
@@ -133,6 +138,7 @@ function calculateProfileCompletion(result: {
     result.avatarUrl,
     result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl, // any DSP link
     result.socialLinks && result.socialLinks.length > 0 ? true : null,
+    result.venmoHandle, // tip jar
   ];
   const filled = fields.filter(Boolean).length;
   return Math.round((filled / fields.length) * 100);
@@ -610,7 +616,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     genres && genres.length > 0
       ? `. ${genres.slice(0, 3).join(', ')} artist`
       : '';
-  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more.`;
+  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more on Jovie.`;
 
   // Build dynamic keywords based on artist data
   const baseKeywords = [

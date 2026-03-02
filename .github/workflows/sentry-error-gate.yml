@@ -219,7 +219,7 @@ jobs:
           echo "Sentry error gate FAILED. Triggering auto-rollback..."
 
           # Install Vercel CLI
-          npm install -g vercel@latest 2>/dev/null
+          npm install -g vercel@50.22.1 2>/dev/null
 
           vercel rollback --yes --token "$VERCEL_TOKEN" 2>&1 || {
             echo "Auto-rollback failed or not supported. Manual intervention required."

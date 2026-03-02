@@ -31,13 +31,12 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
-  pull_request_review:
-    types: [submitted]
+  # NOTE: pull_request_review trigger removed — bot-submitted reviews
+  # (CodeRabbit, Copilot) create action_required runs that clog the CI
+  # queue. Fork PR approval is still enforced on PR open/sync events.
+  # Human approval for fork PRs re-triggers via the PR synchronize event.
 
-permissions:
-  contents: read
-  pull-requests: read
-  statuses: write
+permissions: {}
 
 concurrency:
   group: fork-pr-gate-${{ github.event.pull_request.number }}
@@ -49,10 +48,14 @@ jobs:
     if: github.actor != 'copilot-swe-agent[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: read
+      pull-requests: read
+      statuses: write
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

@@ -56,29 +56,33 @@ vi.mock('@/lib/queries', () => ({
   }),
 }));
 
-const { useQueryMock } = vi.hoisted(() => ({
-  useQueryMock: vi.fn(() => ({
-    data: {
-      pixels: {
-        facebookPixelId: '1234567890123456',
-        googleMeasurementId: 'G-ABCD1234EF',
-        tiktokPixelId: null,
-        enabled: true,
-        facebookEnabled: true,
-        googleEnabled: true,
-        tiktokEnabled: false,
-      },
-      hasTokens: {
-        facebook: true,
-        google: true,
-        tiktok: false,
-      },
+const { useQueryMock } = vi.hoisted(() => {
+  const mockPixelSettings = {
+    pixels: {
+      facebookPixelId: '1234567890123456',
+      googleMeasurementId: 'G-ABCD1234EF',
+      tiktokPixelId: null,
+      enabled: true,
+      facebookEnabled: true,
+      googleEnabled: true,
+      tiktokEnabled: false,
     },
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
-  })),
-}));
+    hasTokens: {
+      facebook: true,
+      google: true,
+      tiktok: false,
+    },
+  };
+
+  return {
+    useQueryMock: vi.fn(() => ({
+      data: mockPixelSettings,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    })),
+  };
+});
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: useQueryMock,

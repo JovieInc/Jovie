@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
@@ -71,11 +72,22 @@ const mockArtist: Artist = {
 
 describe('SettingsContactsSection', () => {
   it('registers the contact sidebar in the right panel', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          gcTime: 0,
+        },
+        mutations: { retry: false },
+      },
+    });
     render(
-      <RightPanelProvider>
-        <SettingsContactsSection artist={mockArtist} />
-        <RightPanelRenderer />
-      </RightPanelProvider>
+      <QueryClientProvider client={queryClient}>
+        <RightPanelProvider>
+          <SettingsContactsSection artist={mockArtist} />
+          <RightPanelRenderer />
+        </RightPanelProvider>
+      </QueryClientProvider>
     );
 
     const sidebar = await screen.findByTestId('contact-detail-sidebar');

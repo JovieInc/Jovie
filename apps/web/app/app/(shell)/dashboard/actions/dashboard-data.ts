@@ -184,7 +184,10 @@ function buildProfileCompletion(
   hasSocialLinks: boolean,
   hasMusicLinks: boolean
 ): ProfileCompletion {
-  const totalCount = 7;
+  // Criteria: name, avatar, bio, social links, music links, tip jar.
+  // Handle (username) is excluded because it is always present for existing profiles
+  // and would inflate the score with "free" points.
+  const totalCount = 6;
 
   if (!selectedProfile) {
     return {
@@ -196,7 +199,6 @@ function buildProfileCompletion(
   }
 
   const checks = {
-    handle: hasText(selectedProfile.username),
     name: hasText(selectedProfile.displayName),
     avatar: hasText(selectedProfile.avatarUrl),
     bio: hasText(selectedProfile.bio),

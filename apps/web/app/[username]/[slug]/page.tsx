@@ -539,7 +539,7 @@ function buildContentDescription(
     : '';
 
   if (isUnreleased) {
-    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`;
+    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops on Jovie.`;
   }
 
   const streamingPlatforms =
@@ -554,7 +554,7 @@ function buildContentDescription(
           .join(', ')
       : 'Spotify, Apple Music';
 
-  return `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+  return `Listen to "${content.title}"${releaseYear} by ${artistName} on Jovie. Available on ${streamingPlatforms} and more.`;
 }
 
 export async function generateMetadata({

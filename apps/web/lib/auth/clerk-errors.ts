@@ -37,8 +37,10 @@ const CLERK_ERROR_MESSAGES: Record<string, string> = {
   // OAuth errors
   external_account_not_found:
     'No account found with this provider. Please sign up first.',
-  external_account_exists: 'This account is already linked to another user.',
-  oauth_access_denied: 'Access was denied. Please try again.',
+  external_account_exists:
+    'An account with this email already exists. Try signing in instead.',
+  oauth_access_denied:
+    'Required permissions were not granted. Please try again and accept all permissions.',
   oauth_callback_error:
     'Something went wrong with the sign-in. Please try again.',
 
@@ -146,4 +148,35 @@ export function isSessionExists(error: unknown): boolean {
     return code === 'session_exists';
   }
   return false;
+}
+
+/**
+ * Map an OAuth error message string to a more specific, user-friendly message.
+ * Used to provide contextual help when OAuth flows fail (timeout, scope rejection, etc.).
+ */
+export function getOAuthErrorMessage(
+  errorMessage: string,
+  providerName?: string
+): string {
+  const lower = errorMessage.toLowerCase();
+
+  if (lower.includes('timeout') || lower.includes('connection')) {
+    return 'Connection timed out. Please try again.';
+  }
+  if (lower.includes('scope') || lower.includes('permission')) {
+    return 'Required permissions were not granted. Please try again and accept all permissions.';
+  }
+  if (
+    lower.includes('already') ||
+    lower.includes('exists') ||
+    lower.includes('account')
+  ) {
+    return 'An account with this email already exists. Try signing in instead.';
+  }
+
+  if (providerName) {
+    return `${providerName} connection failed.`;
+  }
+
+  return errorMessage;
 }

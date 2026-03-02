@@ -3,13 +3,13 @@ name: Claude Code
 on:
   issue_comment:
     types: [created]
-  pull_request_review_comment:
-    types: [created]
   issues:
     types: [opened, assigned]
-  # NOTE: pull_request_review removed — it triggered action_required approval
-  # gates for every CodeRabbit review (even without @claude). Use
-  # pull_request_review_comment or issue_comment to invoke Claude instead.
+  # NOTE: pull_request_review AND pull_request_review_comment both removed.
+  # Bot-submitted reviews/comments (CodeRabbit, Copilot) create
+  # action_required runs that clog the CI queue and consume runner slots.
+  # Claude can still be invoked via issue_comment (@claude in a PR comment)
+  # which doesn't trigger the action_required approval gate.
 
 permissions:
   contents: read
@@ -27,7 +27,6 @@ jobs:
       github.actor != 'copilot-swe-agent[bot]' &&
       (
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
         (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
       )
     runs-on: ubuntu-latest
@@ -40,7 +39,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

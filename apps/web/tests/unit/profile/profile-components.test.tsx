@@ -414,7 +414,10 @@ describe('LatestReleaseCard', () => {
       <LatestReleaseCard release={noArtwork as any} artistHandle='testartist' />
     );
 
-    expect(screen.getByTestId('music-icon')).toBeDefined();
+    // ImageWithFallback renders a role="img" placeholder with aria-label when src is null
+    expect(
+      screen.getByRole('img', { name: 'Midnight Dreams artwork' })
+    ).toBeDefined();
   });
 
   it('listen button links to /{handle}/{slug}', async () => {

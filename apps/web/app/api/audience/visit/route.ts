@@ -28,6 +28,24 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+/**
+ * Check if a referrer URL is from the same origin as the request.
+ * Used to filter out the HTTP Referer header on same-origin fetch() calls,
+ * which would incorrectly record the app's own URL as the traffic source.
+ */
+function isSameOriginReferrer(
+  referrerUrl: string,
+  requestUrl: string
+): boolean {
+  try {
+    const referrerHost = new URL(referrerUrl).hostname;
+    const requestHost = new URL(requestUrl).hostname;
+    return referrerHost === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 function inferDeviceType(
   userAgent: string | null
 ): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
@@ -111,8 +129,15 @@ export async function POST(request: NextRequest) {
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
     const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
+    // Use the client-provided referrer (document.referrer) if available.
+    // The HTTP Referer header on same-origin fetch() is the current page URL,
+    // NOT the external referrer, so we filter out self-referrals from the fallback.
+    const httpReferer = request.headers.get('referer') ?? undefined;
+    const isSelfReferral = httpReferer
+      ? isSameOriginReferrer(httpReferer, request.url)
+      : false;
     const resolvedReferrer =
-      referrer ?? request.headers.get('referer') ?? undefined;
+      referrer ?? (isSelfReferral ? undefined : httpReferer);
     const resolvedGeoCity =
       geoCity ?? request.headers.get('x-vercel-ip-city') ?? undefined;
     const resolvedGeoCountry =
