@@ -36,7 +36,8 @@
       "ajv@^8.0.0": "^8.18.0",
       "undici": "^6.23.0",
       "webpack": "5.105.0",
-      "qs": "6.15.0"
+      "qs": "6.15.0",
+      "basic-ftp": "5.2.0"
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
