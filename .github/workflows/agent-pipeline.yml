@@ -31,11 +31,7 @@ on:
   pull_request_review:
     types: [submitted]
 
-permissions:
-  contents: read
-  pull-requests: read
-  issues: read
-  actions: read
+permissions: {}
 
 concurrency:
   group: agent-pipeline-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
@@ -51,6 +47,11 @@ jobs:
     if: github.actor != 'copilot-swe-agent[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+      issues: read
     outputs:
       should_fix: ${{ steps.evaluate.outputs.should_fix }}
       should_approve: ${{ steps.evaluate.outputs.should_approve }}

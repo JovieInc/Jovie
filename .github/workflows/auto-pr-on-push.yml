@@ -23,9 +23,7 @@ on:
       - 'linear/**'
       - 'claude/**'
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 concurrency:
   group: auto-pr-${{ github.ref }}
@@ -36,6 +34,9 @@ jobs:
     name: Open PR
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Stagger start to avoid CI stampede
         env:
