@@ -99,10 +99,10 @@ jobs:
               exit 0
             fi
 
-            # Find the PR for this branch using jq --arg to avoid injection
+            # Find the PR for this branch using jq -s to slurp all input before filtering
+            # (avoids truncation when piping multi-object output through head -1)
             PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
-              | jq --arg branch "$HEAD_BRANCH" '.[] | select(.head.ref == $branch and .state == "open") | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [.labels[].name]}' \
-              | head -1)
+              | jq -s --arg branch "$HEAD_BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | first | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [.labels[].name]}')
 
             if [[ -z "$PR_DATA" ]]; then
               echo "No open PR found for branch. Skipping."
