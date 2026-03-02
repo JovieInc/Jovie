@@ -56,7 +56,10 @@ describe('useProfileSaveToasts', () => {
 
     rerender({ status: { ...base, success: false, error: 'Nope' } });
     await waitFor(() => {
-      expect(error).toHaveBeenCalledWith('Nope', { id: toastId });
+      expect(error).toHaveBeenCalledWith(
+        'Failed to save changes. Please try again.',
+        { id: toastId }
+      );
     });
 
     rerender({ status: base });

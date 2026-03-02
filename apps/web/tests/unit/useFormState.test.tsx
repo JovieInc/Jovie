@@ -59,7 +59,9 @@ describe('useFormState', () => {
     await expect(promise!).rejects.toThrow('network');
     expect(failing).toHaveBeenCalledTimes(2);
     expect(onRetry).toHaveBeenCalledWith(1, error);
-    expect(result.current.error).toBe('network');
+    expect(result.current.error).toBe(
+      'Something went wrong. Please try again.'
+    );
     expect(result.current.canRetry).toBe(true);
     expect(result.current.isRetrying).toBe(false);
   });
@@ -73,7 +75,9 @@ describe('useFormState', () => {
       ).rejects.toBe('bad');
     });
 
-    expect(result.current.error).toBe('An error occurred');
+    expect(result.current.error).toBe(
+      'Something went wrong. Please try again.'
+    );
     expect(result.current.canRetry).toBe(true);
   });
 
