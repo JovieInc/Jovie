@@ -2,7 +2,7 @@
 
 import { SimpleTooltip } from '@jovie/ui';
 import * as Sentry from '@sentry/nextjs';
-import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -17,6 +17,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
@@ -106,6 +107,11 @@ export function ChatPageClient({
     });
   }, [selectedProfile, previewLinks, setPreviewData]);
 
+  const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
+    onSuccess: () => notifications.success('Session ID copied'),
+    onError: () => notifications.error('Could not copy session ID'),
+  });
+
   const handleCopyConversationId = useCallback(async () => {
     if (!conversationId) {
       notifications.error(
@@ -113,31 +119,35 @@ export function ChatPageClient({
       );
       return;
     }
-
-    try {
-      await navigator.clipboard.writeText(conversationId);
-      notifications.success('Session ID copied');
-    } catch {
-      notifications.error('Could not copy session ID');
-    }
-  }, [conversationId, notifications]);
+    copySessionId(conversationId);
+  }, [conversationId, notifications, copySessionId]);
 
   const headerActions = useMemo(
     () => (
       <>
         {conversationId && (
-          <SimpleTooltip content='Copy session ID'>
+          <SimpleTooltip
+            content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
+          >
             <DashboardHeaderActionButton
-              ariaLabel='Copy session ID'
+              ariaLabel={
+                sessionIdCopied ? 'Session ID copied' : 'Copy session ID'
+              }
               onClick={handleCopyConversationId}
-              icon={<Copy aria-hidden='true' className='size-4' />}
+              icon={
+                sessionIdCopied ? (
+                  <Check aria-hidden='true' className='size-4' />
+                ) : (
+                  <Copy aria-hidden='true' className='size-4' />
+                )
+              }
             />
           </SimpleTooltip>
         )}
         <PreviewToggleButton />
       </>
     ),
-    [conversationId, handleCopyConversationId]
+    [conversationId, sessionIdCopied, handleCopyConversationId]
   );
 
   const handleConversationCreate = useCallback(
