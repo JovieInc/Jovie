@@ -6,6 +6,8 @@
  */
 
 export { ReleaseSidebar } from './ReleaseSidebar';
+export type { TrackSidebarData, TrackSidebarProps } from './TrackSidebar';
+export { TrackSidebar } from './TrackSidebar';
 export type {
   DspLink,
   Release,
