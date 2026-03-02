@@ -39,11 +39,11 @@ import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
 /** Tab for organizing sidebar content into focused views */
-type SidebarTab = 'catalog' | 'links' | 'details' | 'lyrics';
+type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics';
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
-  { value: 'catalog' as const, label: 'Catalog' },
+  { value: 'tracklist' as const, label: 'Track list' },
   { value: 'links' as const, label: 'Links' },
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
@@ -198,7 +198,7 @@ export function ReleaseSidebar({
   const canRevertArtwork = readOnly ? false : _canRevertArtwork;
 
   // Sidebar tab state
-  const [activeTab, setActiveTab] = useState<SidebarTab>('catalog');
+  const [activeTab, setActiveTab] = useState<SidebarTab>('tracklist');
 
   // Track detail panel state — track shape comes from the sidebar route handler
   const [selectedTrack, setSelectedTrack] = useState<TrackForDetail | null>(
@@ -264,11 +264,23 @@ export function ReleaseSidebar({
           onCopySmartLink={handleCopySmartLink}
         />
 
-        {/* Artwork + analytics + tabs (always visible when release selected) */}
+        {/* Header info + tabs (always visible when release selected) */}
         {release && !selectedTrack && (
           <div className='shrink-0 px-5 pt-5 pb-4 space-y-4'>
-            {/* Artwork + analytics row */}
+            {/* Metadata left, artwork right */}
             <div className='flex items-start gap-4'>
+              <div className='min-w-0 flex-1 space-y-3'>
+                {/* Release date + SmartLink */}
+                <ReleaseFields releaseDate={release.releaseDate} />
+                <ReleaseSmartLinkSection
+                  smartLinkPath={release.smartLinkPath}
+                />
+                {/* Analytics grouped with SmartLink */}
+                <ReleaseSmartLinkAnalytics
+                  release={release}
+                  providerConfig={providerConfig}
+                />
+              </div>
               <AlbumArtworkContextMenu
                 title={release.title}
                 sizes={buildArtworkSizes(undefined, release.artworkUrl)}
@@ -310,12 +322,6 @@ export function ReleaseSidebar({
                   </div>
                 )}
               </AlbumArtworkContextMenu>
-              <div className='min-w-0 flex-1'>
-                <ReleaseSmartLinkAnalytics
-                  release={release}
-                  providerConfig={providerConfig}
-                />
-              </div>
             </div>
 
             {/* Tab controls */}
@@ -339,23 +345,12 @@ export function ReleaseSidebar({
           )}
           {!(selectedTrack && release) && release && (
             <>
-              {/* Catalog tab: Fields, Track list */}
-              {activeTab === 'catalog' && (
-                <>
-                  <div className='pb-5'>
-                    <ReleaseFields releaseDate={release.releaseDate} />
-                    <div className='mt-3'>
-                      <ReleaseSmartLinkSection
-                        smartLinkPath={release.smartLinkPath}
-                      />
-                    </div>
-                  </div>
-
-                  <ReleaseTrackList
-                    release={release}
-                    onTrackClick={handleTrackClick}
-                  />
-                </>
+              {/* Track list tab */}
+              {activeTab === 'tracklist' && (
+                <ReleaseTrackList
+                  release={release}
+                  onTrackClick={handleTrackClick}
+                />
               )}
 
               {/* Links tab: DSP links management */}

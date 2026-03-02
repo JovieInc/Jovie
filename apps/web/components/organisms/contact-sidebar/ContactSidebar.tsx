@@ -18,7 +18,6 @@ import { ContactAvatar } from './ContactAvatar';
 import { ContactFields } from './ContactFields';
 import { ContactSidebarHeader } from './ContactSidebarHeader';
 import { ContactSocialLinks } from './ContactSocialLinks';
-import { ContactWebsite } from './ContactWebsite';
 import type { ContactSidebarProps } from './types';
 import { useContactSidebar } from './useContactSidebar';
 
@@ -55,7 +54,6 @@ export const ContactSidebar = memo(function ContactSidebar({
     handleCopyProfileUrl,
     handleNameChange,
     handleUsernameChange,
-    handleWebsiteChange,
     handleAddLink,
     handleRemoveLink,
     handleNewLinkKeyDown,
@@ -164,24 +162,17 @@ export const ContactSidebar = memo(function ContactSidebar({
             )}
 
             {activeTab === 'social' && (
-              <>
-                <ContactWebsite
-                  website={contact.website}
-                  onWebsiteChange={handleWebsiteChange}
-                />
-
-                <ContactSocialLinks
-                  contact={contact}
-                  fullName={fullName}
-                  isAddingLink={isAddingLink}
-                  newLinkUrl={newLinkUrl}
-                  onSetIsAddingLink={setIsAddingLink}
-                  onSetNewLinkUrl={setNewLinkUrl}
-                  onAddLink={handleAddLink}
-                  onRemoveLink={handleRemoveLink}
-                  onNewLinkKeyDown={handleNewLinkKeyDown}
-                />
-              </>
+              <ContactSocialLinks
+                contact={contact}
+                fullName={fullName}
+                isAddingLink={isAddingLink}
+                newLinkUrl={newLinkUrl}
+                onSetIsAddingLink={setIsAddingLink}
+                onSetNewLinkUrl={setNewLinkUrl}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                onNewLinkKeyDown={handleNewLinkKeyDown}
+              />
             )}
 
             {onSave && contact && (
