@@ -3,6 +3,7 @@
 # This workflow complements CodeQL by adding:
 # - Gitleaks: Secret detection in git history
 # - Trivy: Vulnerability scanning for dependencies and filesystem (added in subtask-1-4)
+# - Semgrep: SAST coverage with additional language-aware security rules
 # - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
 #
 name: Security Scanning
@@ -24,6 +25,34 @@ permissions:
   contents: read
 
 jobs:
+  semgrep:
+    name: Semgrep SAST Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run Semgrep
+        uses: semgrep/semgrep-action@5f4b2ec6f5de0be3f122cef87037e4d64f5f344d # v1.109.0
+        with:
+          config: >-
+            p/javascript
+            p/typescript
+            p/secrets
+            p/owasp-top-ten
+            p/nodejs
+          generateSarif: '1'
+
+      - name: Upload Semgrep scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@89a39a4e59826350b863aa6b6252a07ad50cf83e # v3.28.15
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
   gitleaks:
     name: Gitleaks Secret Scanning
     runs-on: ubuntu-latest
