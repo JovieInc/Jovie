@@ -14,7 +14,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerEmptyState, DrawerSection } from '@/components/molecules/drawer';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import {
@@ -364,26 +364,24 @@ export function ReleaseSidebar({
               {/* Links tab: DSP links management */}
               {activeTab === 'links' && (
                 <div className='space-y-5'>
-                  <DrawerSection title='Distribution'>
-                    <ReleaseDspLinks
-                      release={release}
-                      providerConfig={providerConfig}
-                      isEditable={isEditable}
-                      isAddingLink={isAddingLink}
-                      newLinkUrl={newLinkUrl}
-                      selectedProvider={selectedProvider}
-                      isAddingDspLink={isAddingDspLink}
-                      isRemovingDspLink={isRemovingDspLink}
-                      onSetIsAddingLink={setIsAddingLink}
-                      onSetNewLinkUrl={setNewLinkUrl}
-                      onSetSelectedProvider={setSelectedProvider}
-                      onAddLink={handleAddLink}
-                      onRemoveLink={handleRemoveLink}
-                      onNewLinkKeyDown={handleNewLinkKeyDown}
-                      onRescanIsrc={onRescanIsrc}
-                      isRescanningIsrc={isRescanningIsrc}
-                    />
-                  </DrawerSection>
+                  <ReleaseDspLinks
+                    release={release}
+                    providerConfig={providerConfig}
+                    isEditable={isEditable}
+                    isAddingLink={isAddingLink}
+                    newLinkUrl={newLinkUrl}
+                    selectedProvider={selectedProvider}
+                    isAddingDspLink={isAddingDspLink}
+                    isRemovingDspLink={isRemovingDspLink}
+                    onSetIsAddingLink={setIsAddingLink}
+                    onSetNewLinkUrl={setNewLinkUrl}
+                    onSetSelectedProvider={setSelectedProvider}
+                    onAddLink={handleAddLink}
+                    onRemoveLink={handleRemoveLink}
+                    onNewLinkKeyDown={handleNewLinkKeyDown}
+                    onRescanIsrc={onRescanIsrc}
+                    isRescanningIsrc={isRescanningIsrc}
+                  />
                 </div>
               )}
 

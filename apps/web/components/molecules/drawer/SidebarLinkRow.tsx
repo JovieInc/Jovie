@@ -161,11 +161,11 @@ export function SidebarLinkRow({
         data-testid={testId}
       >
         {/* Left: Icon + Label */}
-        <div className='flex items-center gap-2.5 min-w-0'>
+        <div className='flex items-center gap-2.5 min-w-0 flex-1'>
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
-          <span className='text-xs text-secondary-token truncate'>{label}</span>
+          <span className='text-xs text-secondary-token'>{label}</span>
           {badge && (
             <span className='text-[10px] text-tertiary-token shrink-0'>
               {badge}
