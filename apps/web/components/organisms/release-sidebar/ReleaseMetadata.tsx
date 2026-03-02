@@ -50,20 +50,12 @@ const CANVAS_STATUS_CONFIG: Record<
 
 const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 
-function PopularityBar({ value }: { readonly value: number }) {
+function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div className='flex items-center gap-2'>
-      <div className='h-1.5 flex-1 rounded-full bg-surface-2'>
-        <div
-          className='h-full rounded-full bg-primary transition-all'
-          style={{ width: `${clamped}%` }}
-        />
-      </div>
-      <span className='text-xs tabular-nums text-secondary-token'>
-        {clamped}
-      </span>
-    </div>
+    <span className='text-xs tabular-nums text-secondary-token'>
+      {clamped} / 100
+    </span>
   );
 }
 
@@ -248,7 +240,7 @@ export function ReleaseMetadata({
                 />
               </span>
             }
-            value={<PopularityBar value={release.spotifyPopularity} />}
+            value={<PopularityScore value={release.spotifyPopularity} />}
           />
         )}
       </div>

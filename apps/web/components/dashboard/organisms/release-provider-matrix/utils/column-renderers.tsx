@@ -447,11 +447,11 @@ export function renderMetricsCell({
         {duration ?? '—'}
       </span>
 
-      {/* Label - truncated */}
+      {/* Label */}
       {release.label && (
         <TruncatedText
           lines={1}
-          className='max-w-24 text-tertiary-token'
+          className='max-w-48 text-tertiary-token'
           tooltipSide='top'
         >
           {release.label}

@@ -199,7 +199,7 @@ export function ReleaseDspLinks({
 
   return (
     <DrawerLinkSection
-      title='DSP Links'
+      title='Links'
       onAdd={
         isEditable && availableProviders.length > 0
           ? () => onSetIsAddingLink(true)
