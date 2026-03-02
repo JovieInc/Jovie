@@ -3,7 +3,6 @@ import { cookies } from 'next/headers';
 import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/components/admin/OperatorBanner';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { VersionUpdateBannerWrapper } from '@/components/feedback/VersionUpdateBannerWrapper';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -49,7 +48,6 @@ export default async function AppShellLayout({
         {/* ENG-004: Show environment issues to admins in non-production */}
         <OperatorBanner isAdmin={dashboardData.isAdmin} />
         <ImpersonationBannerWrapper />
-        <VersionUpdateBannerWrapper />
         <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
           <DashboardDataProvider value={dashboardData}>
             <ProfileCompletionRedirect />
