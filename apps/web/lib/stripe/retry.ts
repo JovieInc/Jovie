@@ -70,7 +70,10 @@ export function isTransientStripeError(error: unknown): boolean {
   return false;
 }
 
-function delay(ms: number) {
+function jitteredDelay(baseMs: number): Promise<void> {
+  // Add +-25% jitter to prevent thundering herd on concurrent retries
+  const jitter = baseMs * 0.25 * (2 * Math.random() - 1);
+  const ms = Math.max(0, Math.round(baseMs + jitter));
   return new Promise(resolve => globalThis.setTimeout(resolve, ms));
 }
 
@@ -110,7 +113,7 @@ export async function withStripeRetry<T>(
         throw new StripeRetryExhaustedError(operation, attemptNumber, error);
       }
 
-      await delay(baseDelayMs * 2 ** attempt);
+      await jitteredDelay(baseDelayMs * 2 ** attempt);
     }
   }
 
