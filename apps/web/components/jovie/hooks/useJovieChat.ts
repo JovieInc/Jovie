@@ -5,7 +5,9 @@ import * as Sentry from '@sentry/nextjs';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { matchCommand } from '@/lib/chat/command-registry';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys } from '@/lib/queries/keys';
 import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
@@ -30,6 +32,8 @@ interface UseJovieChatOptions {
   readonly artistContext?: ArtistContext; // NOSONAR - kept for backward compatibility
   readonly conversationId?: string | null;
   readonly onConversationCreate?: (conversationId: string) => void;
+  /** Artist username — used by deterministic commands (e.g. "preview my profile") */
+  readonly username?: string;
 }
 
 /**
@@ -57,7 +61,9 @@ export function useJovieChat({
   artistContext, // NOSONAR - kept for backward compatibility
   conversationId,
   onConversationCreate,
+  username,
 }: UseJovieChatOptions) {
+  const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
   const hasHydratedRef = useRef<string | null>(null);
@@ -423,6 +429,37 @@ export function useJovieChat({
       }
 
       const trimmedText = text.trim();
+
+      // Check for deterministic commands before hitting AI
+      if (!hasFiles) {
+        const commandCtx = { username, router };
+        const command = matchCommand(trimmedText, commandCtx);
+        if (command) {
+          // Add user + assistant messages directly — no AI call needed
+          const userMsg = {
+            id: `cmd-user-${Date.now()}`,
+            role: 'user' as const,
+            parts: [{ type: 'text' as const, text: trimmedText }],
+            createdAt: new Date(),
+          };
+          const assistantMsg = {
+            id: `cmd-assistant-${Date.now()}`,
+            role: 'assistant' as const,
+            parts: [
+              { type: 'text' as const, text: command.confirmationMessage },
+            ],
+            createdAt: new Date(),
+          };
+          setMessages(prev => [...prev, userMsg, assistantMsg]);
+          setInput('');
+          if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+          }
+          command.execute(commandCtx);
+          return;
+        }
+      }
+
       const payload = {
         text: trimmedText,
         ...(hasFiles ? { files } : {}),
@@ -509,10 +546,13 @@ export function useJovieChat({
       isLoading,
       isSubmitting,
       sendMessage,
+      setMessages,
       activeConversationId,
       createConversationMutation,
       onConversationCreate,
       profileId,
+      username,
+      router,
     ]
   );
 
