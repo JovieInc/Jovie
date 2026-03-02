@@ -6,9 +6,8 @@
  * Matches the visual style of UnreleasedReleaseHero but stripped down.
  */
 
-import Image from 'next/image';
 import Link from 'next/link';
-import { Icon } from '@/components/atoms/Icon';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 
 interface ScheduledReleasePageProps {
   readonly release: {
@@ -38,24 +37,15 @@ export function ScheduledReleasePage({
         <div className='w-full max-w-[17rem]'>
           {/* Release Artwork */}
           <div className='bg-surface-1/30 ring-border relative aspect-square w-full overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'>
-            {release.artworkUrl ? (
-              <Image
-                src={release.artworkUrl}
-                alt={`${release.title} artwork`}
-                fill
-                className='object-cover'
-                sizes='272px'
-                priority
-              />
-            ) : (
-              <div className='flex h-full w-full items-center justify-center'>
-                <Icon
-                  name='Disc3'
-                  className='text-muted-foreground size-16'
-                  aria-hidden='true'
-                />
-              </div>
-            )}
+            <ImageWithFallback
+              src={release.artworkUrl}
+              alt={`${release.title} artwork`}
+              fill
+              className='object-cover'
+              sizes='272px'
+              priority
+              fallbackVariant='release'
+            />
           </div>
 
           {/* Release Info */}

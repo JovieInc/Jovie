@@ -1,9 +1,8 @@
 'use client';
 
-import { Music } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist } from '@/types/db';
@@ -61,23 +60,14 @@ export function LatestReleaseCard({
     <div className='flex items-center gap-3 rounded-xl border border-subtle bg-surface-0/60 p-2.5 backdrop-blur-sm'>
       {/* Album Art */}
       <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded bg-surface-1'>
-        {release.artworkUrl ? (
-          <Image
-            src={release.artworkUrl}
-            alt={`${release.title} artwork`}
-            fill
-            sizes='56px'
-            className='object-cover'
-          />
-        ) : (
-          <div className='flex h-full w-full items-center justify-center'>
-            <Music
-              className='h-6 w-6 text-tertiary-token'
-              strokeWidth={1.5}
-              aria-label='Music note'
-            />
-          </div>
-        )}
+        <ImageWithFallback
+          src={release.artworkUrl}
+          alt={`${release.title} artwork`}
+          fill
+          sizes='56px'
+          className='object-cover'
+          fallbackVariant='release'
+        />
       </div>
 
       {/* Release Info */}
