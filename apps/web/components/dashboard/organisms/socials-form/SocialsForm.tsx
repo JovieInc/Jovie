@@ -57,6 +57,7 @@ const SUGGESTED_PLATFORM_IDS = [
   'youtube',
   'x',
   'facebook',
+  'venmo',
   'linkedin',
   'discord',
   'reddit',
@@ -84,7 +85,7 @@ const EXCLUDED_PLATFORM_IDS = new Set([
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
-    (['social', 'creator', 'messaging', 'professional'].includes(
+    (['social', 'creator', 'messaging', 'professional', 'payment'].includes(
       platform.category
     ) ||
       (platform.category === 'music' && !PRIMARY_DSP_IDS.has(platform.id))) &&
@@ -130,6 +131,7 @@ PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
 PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
 PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
 PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
+PLATFORM_PLACEHOLDERS.venmo = 'https://venmo.com/yourhandle';
 
 // Music DSP placeholders (canonical underscore IDs from ALL_PLATFORMS)
 PLATFORM_PLACEHOLDERS.youtube_music =

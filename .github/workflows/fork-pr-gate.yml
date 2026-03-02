@@ -31,8 +31,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
-  pull_request_review:
-    types: [submitted]
+  # NOTE: pull_request_review trigger removed — bot-submitted reviews
+  # (CodeRabbit, Copilot) create action_required runs that clog the CI
+  # queue. Fork PR approval is still enforced on PR open/sync events.
+  # Human approval for fork PRs re-triggers via the PR synchronize event.
 
 permissions: {}
 
