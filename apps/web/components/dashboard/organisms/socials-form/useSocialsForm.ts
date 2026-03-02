@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import {
   useDashboardSocialLinksQuery,
@@ -126,6 +127,18 @@ export function useSocialsForm({
           };
         });
 
+      // Check for duplicate platforms
+      const seenPlatforms = new Set<string>();
+      for (const link of linksToInsert) {
+        if (seenPlatforms.has(link.platform)) {
+          setSubmitError(
+            `Duplicate platform: each platform can only be added once.`
+          );
+          return;
+        }
+        seenPlatforms.add(link.platform);
+      }
+
       const websiteCount = linksToInsert.filter(
         link => link.platform === 'website'
       ).length;
@@ -155,6 +168,16 @@ export function useSocialsForm({
   const updateSocialLink = useCallback(
     (index: number, field: keyof SocialLink, value: string) => {
       setSocialLinks(prev => {
+        // Prevent switching to a platform that's already used by another row
+        if (field === 'platform') {
+          const isDuplicate = prev.some(
+            (link, i) => i !== index && link.platform === value
+          );
+          if (isDuplicate) {
+            toast.error('This platform is already connected');
+            return prev;
+          }
+        }
         const updatedLinks = [...prev];
         updatedLinks[index] = { ...updatedLinks[index], [field]: value };
         return updatedLinks;
