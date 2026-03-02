@@ -1,7 +1,7 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import { SMOKE_TIMEOUTS, waitForHydration, waitForNetworkIdle } from './utils/smoke-test-utils';
 
 /**
  * Check if Clerk credentials are available for authenticated tests
@@ -33,6 +33,10 @@ test.describe('Dashboard Routing', () => {
       test.skip();
       return;
     }
+
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
 
     // Set up Clerk testing token and sign in
     await setupClerkTestingToken({ page });
@@ -169,12 +173,7 @@ test.describe('Dashboard Routing', () => {
       await waitForHydration(page);
 
       // Wait for network to settle (content may be loading)
-      await page.waitForLoadState('networkidle').catch(() => {
-        // networkidle may timeout, continue anyway
-      });
-
-      // Additional wait for dynamic content to render
-      await page.waitForTimeout(1000);
+      await waitForNetworkIdle(page);
 
       // Try to find matching content in main, fallback to checking page has content
       const mainContent = page.locator('main').getByText(content).first();

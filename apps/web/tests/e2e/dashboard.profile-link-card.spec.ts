@@ -2,6 +2,7 @@ import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 // Helper function to locate and wait for ProfileLinkCard
 // Returns null if the component is not rendered on the current page
@@ -11,7 +12,7 @@ async function getProfileLinkCard(page: Page): Promise<Locator | null> {
     .or(page.getByText('Your Profile Link'));
   const isVisible = await profileLinkCard
     .first()
-    .isVisible({ timeout: 10000 })
+    .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
     .catch(() => false);
   if (!isVisible) return null;
   return profileLinkCard.first();
@@ -43,6 +44,10 @@ test.describe('ProfileLinkCard E2E Tests', () => {
       test.skip();
       return;
     }
+
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
 
     // Grant clipboard permissions to avoid permission prompts
     await context.grantPermissions(['clipboard-read']);
@@ -153,9 +158,9 @@ test.describe('ProfileLinkCard E2E Tests', () => {
 
     await expect(copyButton).toHaveText('Copy');
 
-    await page.waitForTimeout(1000);
-    expect(
-      consoleErrors.some(error => error.includes('Failed to copy'))
+    await expect.poll(
+      () => consoleErrors.some(error => error.includes('Failed to copy')),
+      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     ).toBeTruthy();
   });
 
