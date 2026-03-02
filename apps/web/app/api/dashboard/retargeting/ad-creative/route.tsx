@@ -359,11 +359,18 @@ export async function GET(req: NextRequest) {
       const artistName = profile.displayName || profile.username || 'Artist';
       const username = profile.username || '';
 
-      // Ensure avatar URL is absolute — Satori (ImageResponse) requires absolute URLs for <img>
+      // Sanitize avatar URL — only allow https/http and relative paths.
+      // Rejects javascript:, data:, and other dangerous URI schemes (CodeQL XSS fix).
       let avatarUrl: string | null = profile.avatarUrl || null;
-      if (avatarUrl && !avatarUrl.startsWith('http')) {
-        const origin = req.nextUrl.origin;
-        avatarUrl = `${origin}${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
+      if (avatarUrl) {
+        if (avatarUrl.startsWith('https://') || avatarUrl.startsWith('http://')) {
+          // Already absolute and safe — Satori requires absolute URLs for <img>
+        } else if (avatarUrl.startsWith('/')) {
+          avatarUrl = `${req.nextUrl.origin}${avatarUrl}`;
+        } else {
+          // Reject non-http(s), non-relative URLs
+          avatarUrl = null;
+        }
       }
 
       const element =
