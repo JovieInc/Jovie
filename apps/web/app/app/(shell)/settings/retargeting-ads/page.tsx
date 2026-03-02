@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Download } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
@@ -45,6 +45,8 @@ function getAdCreativeUrl(type: string, size: string): string {
 
 function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
   const [downloading, setDownloading] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [cacheKey, setCacheKey] = useState(0);
   const notifications = useNotifications();
 
   const handleDownload = useCallback(async () => {
@@ -70,6 +72,23 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
     }
   }, [variant, notifications]);
 
+  const handleRegenerate = useCallback(async () => {
+    setRegenerating(true);
+    try {
+      const url = `${getAdCreativeUrl(variant.type, variant.size)}&regenerate=1`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to regenerate ad');
+      setCacheKey(prev => prev + 1);
+      notifications.success('Ad image regenerated');
+    } catch {
+      notifications.error('Failed to regenerate ad image');
+    } finally {
+      setRegenerating(false);
+    }
+  }, [variant, notifications]);
+
+  const previewUrl = `${getAdCreativeUrl(variant.type, variant.size)}${cacheKey ? `&v=${cacheKey}` : ''}`;
+
   return (
     <div className='flex flex-col gap-3 rounded-xl border border-subtle bg-surface-0 p-4'>
       <div
@@ -79,7 +98,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- Preview image from our own API */}
         <img
-          src={getAdCreativeUrl(variant.type, variant.size)}
+          src={previewUrl}
           alt={`${variant.label} ad preview`}
           className='h-full w-full object-contain'
           loading='lazy'
@@ -93,15 +112,28 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
           </p>
           <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>
         </div>
-        <Button
-          variant='secondary'
-          size='sm'
-          onClick={() => void handleDownload()}
-          disabled={downloading}
-        >
-          <Download className='mr-1.5 h-3.5 w-3.5' />
-          {downloading ? 'Generating…' : 'Download'}
-        </Button>
+        <div className='flex items-center gap-2'>
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={() => void handleRegenerate()}
+            disabled={regenerating || downloading}
+            aria-label={`Regenerate ${variant.label} ad`}
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${regenerating ? 'animate-spin' : ''}`}
+            />
+          </Button>
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={() => void handleDownload()}
+            disabled={downloading || regenerating}
+          >
+            <Download className='mr-1.5 h-3.5 w-3.5' />
+            {downloading ? 'Generating...' : 'Download'}
+          </Button>
+        </div>
       </div>
     </div>
   );

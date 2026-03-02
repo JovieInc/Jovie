@@ -2,7 +2,6 @@
 
 import { Badge } from '@jovie/ui';
 import { memo } from 'react';
-import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -16,10 +15,9 @@ interface ReleaseCellProps {
 }
 
 /**
- * ReleaseCell - Displays release artwork, title, and artist name
+ * ReleaseCell - Displays release title and artist name
  *
  * Shows:
- * - Album artwork thumbnail (40x40px)
  * - Release title with tooltip (only when truncated)
  * - Release type badge (Single, EP, Album, etc.)
  * - Popularity signal-bars icon
@@ -41,13 +39,6 @@ export const ReleaseCell = memo(function ReleaseCell({
 
   return (
     <div className='flex items-center gap-3'>
-      {/* Artwork thumbnail - hidden on mobile to save space */}
-      <ReleaseArtworkThumb
-        src={release.artworkUrl}
-        alt={`${release.title} artwork`}
-        className='hidden sm:block'
-      />
-
       {/* Title and metadata */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
