@@ -5,6 +5,7 @@ import { useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
+import { SettingsAdminSection } from '@/components/dashboard/organisms/SettingsAdminSection';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/components/dashboard/organisms/SettingsAudienceSection';
@@ -25,12 +26,14 @@ interface SettingsPolishedProps {
   readonly artist: Artist;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
   readonly focusSection?: string;
+  readonly isAdmin?: boolean;
 }
 
 export function SettingsPolished({
   artist,
   onArtistUpdate,
   focusSection,
+  isAdmin = false,
 }: SettingsPolishedProps) {
   const router = useRouter();
   const { data: billingData } = useBillingStatusQuery();
@@ -171,7 +174,24 @@ export function SettingsPolished({
     [artist, isPro, onArtistUpdate, router]
   );
 
-  const allSections = [...userSections, ...artistSections];
+  // -- Admin-only settings (only visible to admin users) --
+  const adminSections = useMemo(
+    () =>
+      isAdmin
+        ? [
+            {
+              id: 'admin',
+              title: 'Admin',
+              description:
+                'Platform administration: waitlist, campaigns, and system settings.',
+              render: () => <SettingsAdminSection />,
+            },
+          ]
+        : [],
+    [isAdmin]
+  );
+
+  const allSections = [...userSections, ...artistSections, ...adminSections];
 
   // When focusing a single section, show just that section
   if (focusSection) {
@@ -179,7 +199,7 @@ export function SettingsPolished({
     if (!section) return null;
 
     return (
-      <div className='space-y-6 pb-6 sm:pb-8' data-testid='settings-polished'>
+      <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
         <SettingsSection
           id={section.id}
           title={section.title}
@@ -227,6 +247,26 @@ export function SettingsPolished({
           </SettingsSection>
         ))}
       </div>
+
+      {/* Admin settings - only visible to admin users */}
+      {adminSections.length > 0 && (
+        <div className='space-y-6'>
+          <h3 className='text-[13px] font-medium text-secondary-token'>
+            Admin
+          </h3>
+          {adminSections.map(section => (
+            <SettingsSection
+              key={section.id}
+              id={section.id}
+              title={section.title}
+              description={section.description}
+              className='mt-6 first:mt-0'
+            >
+              {section.render()}
+            </SettingsSection>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -54,7 +54,7 @@ function PlatformSection({
   const [showToken, setShowToken] = useState(false);
 
   return (
-    <div className='space-y-4 rounded-xl border border-subtle bg-surface-0 p-4'>
+    <div className='space-y-4'>
       <div className='flex items-center justify-between'>
         <div>
           <h4 className='text-sm font-medium text-primary'>{platform}</h4>

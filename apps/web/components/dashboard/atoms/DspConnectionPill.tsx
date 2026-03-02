@@ -29,6 +29,8 @@ const CONNECTION_PILL_PROVIDERS = [
   'youtube_music',
   'soundcloud',
   'tidal',
+  'deezer',
+  'amazon_music',
 ] as const satisfies ReadonlyArray<DspProviderId>;
 
 type DspProvider = (typeof CONNECTION_PILL_PROVIDERS)[number];

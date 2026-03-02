@@ -12,6 +12,7 @@ import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
+import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { queryKeys } from '@/lib/queries/keys';
 import {
   useRejectDspMatchMutation,
@@ -22,15 +23,34 @@ import {
   useDspMatchesQuery,
 } from '@/lib/queries/useDspMatchesQuery';
 
-const DSP_DISPLAY: Record<
-  'spotify' | 'apple_music',
-  { label: string; color: string }
-> = {
-  spotify: { label: 'Spotify', color: 'text-[#1DB954]' },
-  apple_music: { label: 'Apple Music', color: 'text-[#FA243C]' },
-};
+type PrimaryDspProvider = 'spotify' | 'apple_music';
 
-type DspProvider = 'spotify' | 'apple_music';
+/** Non-primary DSP providers that can appear in the secondary section */
+type NonPrimaryDspProvider =
+  | 'youtube_music'
+  | 'soundcloud'
+  | 'tidal'
+  | 'deezer'
+  | 'amazon_music';
+
+const NON_PRIMARY_PROVIDERS: NonPrimaryDspProvider[] = [
+  'youtube_music',
+  'soundcloud',
+  'tidal',
+  'deezer',
+  'amazon_music',
+];
+
+const PROVIDER_LABELS: Record<DspProviderId, string> = {
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  youtube_music: 'YouTube Music',
+  soundcloud: 'SoundCloud',
+  tidal: 'Tidal',
+  deezer: 'Deezer',
+  amazon_music: 'Amazon Music',
+  musicbrainz: 'MusicBrainz',
+};
 
 interface ArtistSelection {
   id: string;
@@ -45,13 +65,13 @@ function isConfirmedMatch(match: DspMatch): boolean {
 
 function findConfirmedMatch(
   matches: DspMatch[] | undefined,
-  providerId: DspProvider
+  providerId: DspProviderId
 ): DspMatch | undefined {
   return matches?.find(m => m.providerId === providerId && isConfirmedMatch(m));
 }
 
 async function connectProvider(
-  provider: DspProvider,
+  provider: PrimaryDspProvider,
   artist: ArtistSelection
 ): Promise<{ success: boolean; message?: string }> {
   if (provider === 'spotify') {
@@ -69,8 +89,8 @@ async function connectProvider(
   });
 }
 
-function getProviderLabel(provider: DspProvider): string {
-  return DSP_DISPLAY[provider]?.label ?? provider;
+function getProviderLabel(provider: DspProviderId): string {
+  return PROVIDER_LABELS[provider] ?? provider;
 }
 
 interface ConnectedDspListProps {
@@ -99,7 +119,7 @@ export function ConnectedDspList({
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteProvider, setPaletteProvider] =
-    useState<DspProvider>('apple_music');
+    useState<PrimaryDspProvider>('apple_music');
   const [matchToDisconnect, setMatchToDisconnect] = useState<
     DspMatch | undefined
   >(undefined);
@@ -111,7 +131,9 @@ export function ConnectedDspList({
 
   const handleDisconnectConfirm = useCallback(async () => {
     if (!matchToDisconnect) return;
-    const label = getProviderLabel(matchToDisconnect.providerId as DspProvider);
+    const label = getProviderLabel(
+      matchToDisconnect.providerId as DspProviderId
+    );
     try {
       await rejectMatchAsync({
         matchId: matchToDisconnect.id,
@@ -135,7 +157,7 @@ export function ConnectedDspList({
   );
 
   const handleSyncNow = useCallback(
-    (provider: DspProvider) => {
+    (provider: DspProviderId) => {
       if (!spotifyId) {
         toast.error('A Spotify ID is required to sync DSP profiles');
         return;
@@ -155,7 +177,7 @@ export function ConnectedDspList({
     [profileId, spotifyId, triggerDiscovery]
   );
 
-  const handleOpenPalette = useCallback((provider: DspProvider) => {
+  const handleOpenPalette = useCallback((provider: PrimaryDspProvider) => {
     setPaletteProvider(provider);
     setPaletteOpen(true);
   }, []);
@@ -198,6 +220,21 @@ export function ConnectedDspList({
     [matches]
   );
 
+  // Collect confirmed non-primary DSP matches
+  const nonPrimaryMatches = useMemo(
+    () =>
+      NON_PRIMARY_PROVIDERS.map(provider => ({
+        provider,
+        match: findConfirmedMatch(matches, provider),
+      })).filter(
+        (
+          entry
+        ): entry is { provider: NonPrimaryDspProvider; match: DspMatch } =>
+          !!entry.match
+      ),
+    [matches]
+  );
+
   if (isLoading) {
     return (
       <DashboardCard variant='settings'>
@@ -233,6 +270,7 @@ export function ConnectedDspList({
         spotifyId={spotifyId}
         spotifyMatch={spotifyMatch}
         appleMusicMatch={appleMusicMatch}
+        nonPrimaryMatches={nonPrimaryMatches}
         hasNoConnections={hasNoConnections}
         handleOpenPalette={handleOpenPalette}
         handleSyncNow={handleSyncNow}
@@ -245,7 +283,7 @@ export function ConnectedDspList({
       <ConfirmDialog
         open={!!matchToDisconnect}
         onOpenChange={handleDisconnectCancel}
-        title={`Disconnect ${matchToDisconnect ? getProviderLabel(matchToDisconnect.providerId as DspProvider) : 'provider'}?`}
+        title={`Disconnect ${matchToDisconnect ? getProviderLabel(matchToDisconnect.providerId as DspProviderId) : 'provider'}?`}
         description='Disconnecting will stop sync updates for this provider until you reconnect it.'
         confirmLabel='Disconnect'
         variant='destructive'
@@ -260,59 +298,44 @@ interface ConnectedDspListContentProps {
   readonly spotifyId: string | null;
   readonly spotifyMatch: DspMatch | undefined;
   readonly appleMusicMatch: DspMatch | undefined;
+  readonly nonPrimaryMatches: ReadonlyArray<{
+    provider: NonPrimaryDspProvider;
+    match: DspMatch;
+  }>;
   readonly hasNoConnections: boolean;
-  readonly handleOpenPalette: (provider: DspProvider) => void;
-  readonly handleSyncNow: (provider: DspProvider) => void;
+  readonly handleOpenPalette: (provider: PrimaryDspProvider) => void;
+  readonly handleSyncNow: (provider: DspProviderId) => void;
   readonly handleDisconnect: (match: DspMatch | undefined) => void;
   readonly paletteOpen: boolean;
   readonly setPaletteOpen: (open: boolean) => void;
-  readonly paletteProvider: DspProvider;
+  readonly paletteProvider: PrimaryDspProvider;
   readonly handlePaletteSelect: (artist: ArtistSelection) => Promise<void>;
 }
 
-function getSpotifyPillProps(
-  isSpotifyConnected: boolean,
+/**
+ * Build pill props for a primary DSP provider.
+ *
+ * Both Spotify and Apple Music use the same pattern:
+ * - When connected: show sync (if spotifyId available) + disconnect
+ * - When not connected: show connect action
+ */
+function getPrimaryPillProps(
+  provider: PrimaryDspProvider,
+  isConnected: boolean,
+  match: DspMatch | undefined,
   spotifyId: string | null,
-  spotifyMatch: DspMatch | undefined,
-  handleOpenPalette: (provider: DspProvider) => void,
-  handleSyncNow: (provider: DspProvider) => void,
+  handleOpenPalette: (provider: PrimaryDspProvider) => void,
+  handleSyncNow: (provider: DspProviderId) => void,
   handleDisconnect: (match: DspMatch | undefined) => void
 ) {
   return {
-    provider: 'spotify' as const,
-    connected: isSpotifyConnected,
-    artistName: spotifyMatch?.externalArtistName,
-    onClick: isSpotifyConnected
-      ? undefined
-      : () => handleOpenPalette('spotify'),
-    onSyncNow: spotifyId ? () => handleSyncNow('spotify') : undefined,
-    onDisconnect: spotifyMatch
-      ? () => handleDisconnect(spotifyMatch)
-      : undefined,
-  };
-}
-
-function getAppleMusicPillProps(
-  spotifyId: string | null,
-  appleMusicMatch: DspMatch | undefined,
-  handleOpenPalette: (provider: DspProvider) => void,
-  handleSyncNow: (provider: DspProvider) => void,
-  handleDisconnect: (match: DspMatch | undefined) => void
-) {
-  return {
-    provider: 'apple_music' as const,
-    connected: !!appleMusicMatch,
-    artistName: appleMusicMatch?.externalArtistName,
-    onClick: appleMusicMatch
-      ? undefined
-      : () => handleOpenPalette('apple_music'),
+    provider,
+    connected: isConnected,
+    artistName: match?.externalArtistName,
+    onClick: isConnected ? undefined : () => handleOpenPalette(provider),
     onSyncNow:
-      appleMusicMatch && spotifyId
-        ? () => handleSyncNow('apple_music')
-        : undefined,
-    onDisconnect: appleMusicMatch
-      ? () => handleDisconnect(appleMusicMatch)
-      : undefined,
+      isConnected && spotifyId ? () => handleSyncNow(provider) : undefined,
+    onDisconnect: match ? () => handleDisconnect(match) : undefined,
   };
 }
 
@@ -321,6 +344,7 @@ function ConnectedDspListContent({
   spotifyId,
   spotifyMatch,
   appleMusicMatch,
+  nonPrimaryMatches,
   hasNoConnections,
   handleOpenPalette,
   handleSyncNow,
@@ -330,17 +354,20 @@ function ConnectedDspListContent({
   paletteProvider,
   handlePaletteSelect,
 }: ConnectedDspListContentProps) {
-  const spotifyProps = getSpotifyPillProps(
+  const spotifyProps = getPrimaryPillProps(
+    'spotify',
     isSpotifyConnected,
-    spotifyId,
     spotifyMatch,
+    spotifyId,
     handleOpenPalette,
     handleSyncNow,
     handleDisconnect
   );
-  const appleProps = getAppleMusicPillProps(
-    spotifyId,
+  const appleProps = getPrimaryPillProps(
+    'apple_music',
+    !!appleMusicMatch,
     appleMusicMatch,
+    spotifyId,
     handleOpenPalette,
     handleSyncNow,
     handleDisconnect
@@ -364,6 +391,29 @@ function ConnectedDspListContent({
             <p className='text-sm text-secondary-token'>
               Click a pill above to connect your streaming profiles.
             </p>
+          </div>
+        )}
+
+        {/* Non-primary DSP connections */}
+        {nonPrimaryMatches.length > 0 && (
+          <div className='border-t border-subtle pt-4'>
+            <p className='text-xs font-medium text-secondary-token mb-2'>
+              Other platforms
+            </p>
+            <div className='flex flex-wrap items-center gap-2'>
+              {nonPrimaryMatches.map(({ provider, match }) => (
+                <DspConnectionPill
+                  key={provider}
+                  provider={provider}
+                  connected
+                  artistName={match.externalArtistName}
+                  onSyncNow={
+                    spotifyId ? () => handleSyncNow(provider) : undefined
+                  }
+                  onDisconnect={() => handleDisconnect(match)}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
