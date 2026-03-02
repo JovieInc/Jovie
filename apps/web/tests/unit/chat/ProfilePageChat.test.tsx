@@ -5,6 +5,17 @@ import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardData
 import { ProfilePageChat } from '@/app/app/(shell)/dashboard/profile/ProfilePageChat';
 import { fastRender } from '@/tests/utils/fast-render';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/app/dashboard/profile',
+}));
+
 vi.mock('@/components/jovie/JovieChat', () => ({
   JovieChat: (props: {
     profileId?: string;
@@ -89,5 +100,30 @@ describe('ProfilePageChat', () => {
     // Verify skeleton elements are rendered
     const skeletons = container.querySelectorAll('.skeleton');
     expect(skeletons.length).toBeGreaterThanOrEqual(2); // message area + input bar skeletons
+  });
+
+  it('shows error recovery UI when dashboard load error exists', () => {
+    const { queryByTestId, container } = renderProfilePageChat({
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message: 'DB timeout',
+        code: 'QUERY_TIMEOUT',
+        errorType: 'QueryTimeoutError',
+      },
+    });
+
+    expect(queryByTestId('jovie-chat')).toBeNull();
+
+    // Should show error message, not skeleton
+    expect(container.textContent).toContain(
+      'We hit a problem loading your profile. Please retry in a moment.'
+    );
+
+    // Should have a retry button
+    const retryButton = container.querySelector('button');
+    expect(retryButton).not.toBeNull();
+    expect(retryButton?.textContent).toContain('Retry');
   });
 });

@@ -292,16 +292,37 @@ export function ChatPageClient({
   }
 
   return (
-    <JovieChat
-      profileId={selectedProfile.id}
-      conversationId={conversationId}
-      onConversationCreate={handleConversationCreate}
-      onTitleChange={handleTitleChange}
-      initialQuery={initialQuery ?? undefined}
-      displayName={selectedProfile.displayName ?? undefined}
-      avatarUrl={selectedProfile.avatarUrl}
-      username={selectedProfile.username ?? undefined}
-      isFirstSession={isFirstSession}
-    />
+    <ErrorBoundary
+      fallback={
+        <div className='flex h-full items-center justify-center'>
+          <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            <p className='text-sm text-secondary-token'>
+              Something went wrong loading chat. Please try again.
+            </p>
+            <button
+              type='button'
+              onClick={() => router.refresh()}
+              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <JovieChat
+        profileId={selectedProfile.id}
+        conversationId={conversationId}
+        onConversationCreate={handleConversationCreate}
+        onTitleChange={handleTitleChange}
+        initialQuery={initialQuery ?? undefined}
+        displayName={selectedProfile.displayName ?? undefined}
+        avatarUrl={selectedProfile.avatarUrl}
+        username={selectedProfile.username ?? undefined}
+        isFirstSession={isFirstSession}
+      />
+    </ErrorBoundary>
   );
 }
