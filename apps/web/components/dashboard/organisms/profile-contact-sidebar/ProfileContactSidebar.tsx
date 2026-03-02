@@ -134,6 +134,18 @@ export function ProfileContactSidebar() {
     async (link: DetectedLink) => {
       if (!selectedProfile || !previewData) return;
 
+      // Prevent duplicate platforms (except YouTube which can have multiple channels)
+      if (link.platform.id !== 'youtube') {
+        const existingLink = previewData.links.find(
+          l => l.platform === link.platform.id
+        );
+        if (existingLink) {
+          toast.error(`${link.platform.name} link already exists`);
+          setIsAddingLink(false);
+          return;
+        }
+      }
+
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
         id: `temp-${Date.now()}`,

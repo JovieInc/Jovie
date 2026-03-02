@@ -57,7 +57,7 @@ export function QRCode({
       <div
         aria-hidden='true'
         className={cn(
-          'flex items-center justify-center rounded bg-gray-100 text-gray-500',
+          'flex items-center justify-center rounded bg-surface-1 text-secondary-token',
           className
         )}
         style={{ width: size, height: size }}
@@ -72,7 +72,7 @@ export function QRCode({
       {/* Loading skeleton */}
       {isLoading && (
         <div
-          className='absolute inset-0 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse motion-reduce:animate-none'
+          className='absolute inset-0 bg-surface-2 rounded-lg animate-pulse motion-reduce:animate-none'
           aria-hidden='true'
         />
       )}
