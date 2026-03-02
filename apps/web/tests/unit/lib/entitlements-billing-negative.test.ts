@@ -6,10 +6,7 @@
  * and enforces plan boundaries under adversarial conditions.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import type { UserEntitlements } from '@/types';
 
 const { mockCachedAuth, mockCachedCurrentUser } = vi.hoisted(() => ({
@@ -215,7 +212,7 @@ describe('Entitlements – Unauthenticated User Safety', () => {
 });
 
 describe('Entitlements – Billing Failure Safety', () => {
-  it('BillingUnavailableError does not contain billing data', async () => {
+  it('billing failure degrades gracefully to free tier', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_fail' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'fail@example.com' },
@@ -226,23 +223,18 @@ describe('Entitlements – Billing Failure Safety', () => {
       error: 'connection timeout',
     });
 
-    try {
-      await getCurrentUserEntitlements();
-      expect.fail('Should have thrown');
-    } catch (error) {
-      expect(error).toBeInstanceOf(BillingUnavailableError);
-      const bue = error as BillingUnavailableError;
-      // Should expose userId and admin status for callers
-      expect(bue.userId).toBe('user_fail');
-      expect(bue.isAdmin).toBe(false);
-      // Should NOT expose billing data, stripe IDs, etc.
-      expect(bue).not.toHaveProperty('stripeCustomerId');
-      expect(bue).not.toHaveProperty('isPro');
-      expect(bue).not.toHaveProperty('plan');
-    }
+    const e = await getCurrentUserEntitlements();
+    // Should degrade to free tier, not throw
+    expect(e.userId).toBe('user_fail');
+    expect(e.email).toBe('fail@example.com');
+    expect(e.isAuthenticated).toBe(true);
+    expect(e.isAdmin).toBe(false);
+    expect(e.plan).toBe('free');
+    expect(e.isPro).toBe(false);
+    expect(e.contactsLimit).toBe(100);
   });
 
-  it('billing failure for admin preserves admin flag in error', async () => {
+  it('billing failure for admin preserves admin flag in degraded result', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_admin_fail' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
@@ -253,16 +245,13 @@ describe('Entitlements – Billing Failure Safety', () => {
       error: 'db unreachable',
     });
 
-    try {
-      await getCurrentUserEntitlements();
-      expect.fail('Should have thrown');
-    } catch (error) {
-      const bue = error as BillingUnavailableError;
-      expect(bue.isAdmin).toBe(true);
-    }
+    const e = await getCurrentUserEntitlements();
+    expect(e.isAdmin).toBe(true);
+    expect(e.isAuthenticated).toBe(true);
+    expect(e.plan).toBe('free');
   });
 
-  it('throws on billing failure, does not silently downgrade', async () => {
+  it('billing failure returns free entitlements instead of throwing', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_paying' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'paying@example.com' },
@@ -273,10 +262,11 @@ describe('Entitlements – Billing Failure Safety', () => {
       error: 'Stripe API error',
     });
 
-    // Must throw — never silently return free entitlements for paying users
-    await expect(getCurrentUserEntitlements()).rejects.toThrow(
-      BillingUnavailableError
-    );
+    // Should NOT throw — degrades gracefully to free tier
+    const e = await getCurrentUserEntitlements();
+    expect(e.plan).toBe('free');
+    expect(e.isPro).toBe(false);
+    expect(e.isAuthenticated).toBe(true);
   });
 });
 

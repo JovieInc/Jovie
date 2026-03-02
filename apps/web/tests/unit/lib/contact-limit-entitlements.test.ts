@@ -133,20 +133,15 @@ describe('Contact Limit Enforcement Contract', () => {
       error: 'timeout',
     });
 
-    // The contact actions code catches this and sets entitlements=null
-    // Then: contactsLimit = entitlements?.contactsLimit → undefined
-    // Then: if (contactsLimit !== null && contactsLimit !== undefined) → false
-    // Result: no limit enforcement (graceful degradation)
-    let entitlements;
-    try {
-      entitlements = await getCurrentUserEntitlements();
-    } catch {
-      entitlements = null;
-    }
+    // When billing fails, the function degrades gracefully to free-tier
+    // entitlements instead of throwing. This keeps the app functional
+    // during transient billing outages.
+    const entitlements = await getCurrentUserEntitlements();
 
-    const contactsLimit = entitlements?.contactsLimit;
-    const shouldEnforce = contactsLimit !== null && contactsLimit !== undefined;
-    expect(shouldEnforce).toBe(false);
+    expect(entitlements.isAuthenticated).toBe(true);
+    expect(entitlements.plan).toBe('free');
+    // Free-tier contactsLimit is defined but generous enough for graceful degradation
+    expect(entitlements.contactsLimit).toBeDefined();
   });
 
   it('unauthenticated user gets the free contact limit', async () => {

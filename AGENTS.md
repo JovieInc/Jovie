@@ -245,7 +245,7 @@ Required patterns:
 
 - Always enforce access via `getCurrentUserEntitlements()` in API routes/actions.
 - Always derive plan capabilities from `ENTITLEMENT_REGISTRY`; do not duplicate booleans/limits in call-sites.
-- Treat billing outages as explicit errors (`BillingUnavailableError`), not silent free-plan downgrades.
+- Billing outages degrade gracefully to free-tier entitlements (`getCurrentUserEntitlements` never throws). `BillingUnavailableError` is retained for backwards compatibility but is no longer thrown by default.
 - Treat admin role as independent from billing status; use role-check-backed `isAdmin`.
 
 Forbidden patterns:

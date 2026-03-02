@@ -78,13 +78,23 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
       };
     }
 
-    // Billing lookup failed — throw so callers surface an error state
-    // instead of silently revoking pro features for paying users.
-    logger.warn('Billing lookup failed in entitlements (transient)', {
+    // Billing lookup failed (transient DB/connection error).
+    // Degrade gracefully to free-tier entitlements instead of throwing.
+    // This prevents unhandled BillingUnavailableError from crashing API
+    // routes and dashboard pages. Pro users temporarily lose features
+    // during the outage, but the app remains functional. The underlying
+    // DB failure is already captured upstream in fetchUserBillingData.
+    logger.warn('Billing lookup failed, degrading to free tier', {
       userId,
       error: billing.error,
     });
-    throw new BillingUnavailableError(userId, adminStatus, billing.error);
+    return {
+      ...UNAUTHENTICATED_ENTITLEMENTS,
+      userId,
+      email: clerkEmail,
+      isAuthenticated: true,
+      isAdmin: adminStatus,
+    };
   }
 
   if (!billing.data) {
