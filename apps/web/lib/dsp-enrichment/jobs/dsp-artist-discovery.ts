@@ -18,6 +18,7 @@ import { discogTracks } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
+import { captureError } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
 
@@ -734,6 +735,21 @@ export async function processDspArtistDiscoveryJob(
         error instanceof Error ? error.message : 'Unknown error occurred';
       result.errors.push(`${providerId}: ${message}`);
     }
+  }
+
+  // If no matches were found but errors occurred, capture to Sentry so
+  // failed discovery jobs are visible in production monitoring.
+  if (result.matches.length === 0 && result.errors.length > 0) {
+    void captureError(
+      '[DSP Discovery] All providers failed for artist discovery',
+      new Error(result.errors.join('; ')),
+      {
+        creatorProfileId,
+        spotifyArtistId,
+        targetProviders,
+        errors: result.errors,
+      }
+    );
   }
 
   return result;

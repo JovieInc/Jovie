@@ -281,6 +281,17 @@ export class CircuitBreaker {
       level: 'info',
       data: this.getStats(),
     });
+
+    // Alert Sentry when the circuit opens so we know Spotify is failing
+    if (newState === 'OPEN') {
+      Sentry.captureMessage(
+        `Spotify circuit breaker opened (${oldState} -> OPEN)`,
+        {
+          level: 'warning',
+          extra: { ...this.getStats() },
+        }
+      );
+    }
   }
 
   /**
