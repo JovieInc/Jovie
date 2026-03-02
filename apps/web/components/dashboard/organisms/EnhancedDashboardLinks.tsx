@@ -209,6 +209,8 @@ export function EnhancedDashboardLinks({
       username,
       displayName,
       avatarUrl: avatarUrl || null,
+      bio: selectedProfile?.bio ?? null,
+      genres: selectedProfile?.genres ?? null,
       links: dashboardLinks,
       profilePath,
       dspConnections: {
@@ -221,6 +223,8 @@ export function EnhancedDashboardLinks({
     dashboardLinks,
     displayName,
     profilePath,
+    selectedProfile?.bio,
+    selectedProfile?.genres,
     setPreviewData,
     username,
   ]);

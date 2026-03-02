@@ -95,6 +95,8 @@ export function ChatPageClient({
       username: selectedProfile.username,
       displayName: selectedProfile.displayName ?? selectedProfile.username,
       avatarUrl: selectedProfile.avatarUrl ?? null,
+      bio: selectedProfile.bio ?? null,
+      genres: selectedProfile.genres ?? null,
       links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
       dspConnections: {

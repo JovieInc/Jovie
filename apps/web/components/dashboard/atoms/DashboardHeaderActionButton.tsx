@@ -30,7 +30,7 @@ export function DashboardHeaderActionButton({
       aria-pressed={pressed}
       disabled={disabled}
       className={cn(
-        'h-8 w-8 rounded-md border border-transparent bg-transparent text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover [&>svg]:h-4 [&>svg]:w-4',
+        'h-8 w-8 rounded-md border border-transparent bg-transparent text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover [&>svg]:h-4 [&>svg]:w-4',
         pressed && 'bg-surface-2 text-primary-token',
         className
       )}

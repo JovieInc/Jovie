@@ -292,6 +292,11 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
+      <p className='text-xs text-secondary-token'>
+        Links are shown contextually on your public profile based on where
+        visitors come from. Not every link will display at all times.
+      </p>
+
       {!suggestionsLoading && suggestions.length > 0 && (
         <SocialLinkSuggestionRows
           suggestions={suggestions}

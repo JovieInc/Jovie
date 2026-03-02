@@ -3,6 +3,7 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
@@ -49,12 +50,14 @@ interface ReleaseTableProps {
   readonly flashedReleaseId?: string | null;
   /** Currently selected release ID for active row highlighting */
   readonly selectedReleaseId?: string | null;
+  readonly selectedTrackId?: string | null;
   /** Check if a release's smart link is locked behind the pro gate */
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   /** Get the reason a smartlink is locked ('scheduled' | 'cap' | null) */
   readonly getSmartLinkLockReason?: (
     releaseId: string
   ) => 'scheduled' | 'cap' | null;
+  readonly onTrackClick?: (trackData: TrackSidebarData) => void;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -85,10 +88,12 @@ export function ReleaseTable({
   showTracks = false,
   groupByYear = false,
   selectedReleaseId,
+  selectedTrackId,
   refreshingReleaseId,
   flashedReleaseId,
   isSmartLinkLocked,
   getSmartLinkLockReason,
+  onTrackClick,
 }: ReleaseTableProps) {
   // Mobile detection - render list view on small screens
   const isMobile = useBreakpointDown('md');
@@ -263,10 +268,13 @@ export function ReleaseTable({
       return (
         <TrackRowsContainer
           tracks={tracks}
+          release={release}
           providerConfig={providerConfig}
           allProviders={allProviders}
           columnCount={columnCount}
           columnVisibility={tanstackColumnVisibility}
+          onTrackClick={onTrackClick}
+          selectedTrackId={selectedTrackId}
         />
       );
     },
@@ -276,6 +284,8 @@ export function ReleaseTable({
       providerConfig,
       allProviders,
       tanstackColumnVisibility,
+      onTrackClick,
+      selectedTrackId,
     ]
   );
 

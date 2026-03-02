@@ -9,6 +9,10 @@ import {
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  detectSourcePlatform,
+  getContextAwareLinks,
+} from '@/lib/utils/context-aware-links';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import type { LegacySocialLink } from '@/types/db';
@@ -183,9 +187,20 @@ export function useProfileShell({
     ]
   );
 
-  const socialNetworkLinks = socialLinks.filter(
-    link => link.is_visible !== false && isSafePublicSocialLink(link)
-  );
+  const socialNetworkLinks = useMemo(() => {
+    const visibleLinks = socialLinks.filter(
+      link => link.is_visible !== false && isSafePublicSocialLink(link)
+    );
+
+    // Detect source platform from referrer or UTM params
+    const referrer = typeof document !== 'undefined' ? document.referrer : '';
+    const params = searchParams
+      ? new URLSearchParams(searchParams.toString())
+      : new URLSearchParams();
+    const sourcePlatform = detectSourcePlatform(referrer, params);
+
+    return getContextAwareLinks(visibleLinks, sourcePlatform);
+  }, [socialLinks, searchParams]);
   const hasSocialLinks = socialNetworkLinks.length > 0;
   const hasContacts = contacts.length > 0;
 
