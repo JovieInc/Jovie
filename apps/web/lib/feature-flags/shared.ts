@@ -17,6 +17,7 @@ export const FEATURE_FLAG_KEYS = {
   SHOW_EXAMPLE_PROFILES_CAROUSEL: 'show_example_profiles_carousel',
   ENABLE_LIGHT_MODE: 'enable_light_mode',
   SHOW_AUDIENCE_CRM_SECTION: 'show_audience_crm_section',
+  RETARGETING_PIXELS_TIP_PAGE: 'feature_retargeting_pixels_tip_page',
 } as const;
 
 export type FeatureFlagKey =

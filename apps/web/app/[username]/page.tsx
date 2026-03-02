@@ -7,7 +7,7 @@ import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import { JoviePixel } from '@/components/tracking';
+import { JoviePixel, RetargetingPixels } from '@/components/tracking';
 import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
@@ -416,6 +416,20 @@ const getCachedLatestReleaseGate = unstable_cache(
   }
 );
 
+const getCachedRetargetingPixelsGate = unstable_cache(
+  async () => {
+    return checkGate(
+      null,
+      FEATURE_FLAG_KEYS.RETARGETING_PIXELS_TIP_PAGE,
+      false
+    );
+  },
+  ['public-profile-retargeting-pixels-gate'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
 const getCachedSubscribeCTAVariant = unstable_cache(
   async (profileId: string) => {
     return getSubscribeCTAVariant(profileId);
@@ -493,10 +507,12 @@ export default async function ArtistPage({
   const artist = convertCreatorProfileToArtist(profile);
 
   // Cache Statsig decisions for public profile traffic to avoid per-request latency.
-  const [showLatestRelease, subscribeCTAVariant] = await Promise.all([
-    getCachedLatestReleaseGate(),
-    getCachedSubscribeCTAVariant(profile.id),
-  ]);
+  const [showLatestRelease, subscribeCTAVariant, retargetingPixelsEnabled] =
+    await Promise.all([
+      getCachedLatestReleaseGate(),
+      getCachedSubscribeCTAVariant(profile.id),
+      getCachedRetargetingPixelsGate(),
+    ]);
 
   const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
   const subscribeTwoStep = subscribeCTAVariant === 'two_step';
@@ -554,6 +570,10 @@ export default async function ArtistPage({
       ) : null}
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
+      {/* Client-side retargeting pixels on tip page */}
+      {mode === 'tip' && retargetingPixelsEnabled ? (
+        <RetargetingPixels profileId={profile.id} />
+      ) : null}
       <StaticArtistPage
         mode={mode}
         artist={artist}
