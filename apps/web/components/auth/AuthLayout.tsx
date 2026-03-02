@@ -162,7 +162,7 @@ export function AuthLayout({
       {/* Logo container - fixed dimensions to prevent layout shift between screens */}
       <div
         className={cn(
-          'mb-8 h-12 w-12 flex items-center justify-center',
+          'mb-8 h-8 w-8 flex items-center justify-center',
           'transition-opacity duration-200 ease-out',
           // Hide visually when keyboard visible or showLogo=false, but preserve space
           (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
@@ -180,7 +180,7 @@ export function AuthLayout({
               shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
             }
           >
-            <BrandLogo size={48} tone='auto' priority />
+            <BrandLogo size={32} tone='auto' priority />
           </span>
         </Link>
       </div>
