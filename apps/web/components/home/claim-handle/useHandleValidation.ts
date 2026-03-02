@@ -9,7 +9,7 @@
  * @see https://tanstack.com/pacer
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 
 export interface HandleValidationResult {
@@ -27,6 +27,12 @@ interface HandleCheckResponse {
 }
 
 /**
+ * Maximum time (ms) to wait for an availability check before showing an error.
+ * Covers debounce (450ms) + API timeout (5s) + buffer.
+ */
+const AVAILABILITY_CHECK_TIMEOUT_MS = 8_000;
+
+/**
  * Hook for validating handle format and availability.
  *
  * Uses the shared useAsyncValidation hook to reduce code duplication
@@ -35,6 +41,7 @@ interface HandleCheckResponse {
 export function useHandleValidation(handle: string): HandleValidationResult {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
+  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Client-side handle validation
   const handleError = useMemo(() => {
@@ -95,6 +102,35 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     }
   }, [error]);
 
+  // Determine if we're in a loading state
+  const isLoading = isValidating || isPending;
+
+  // Safety timeout: if loading state persists beyond a reasonable window,
+  // force-clear it and show an error so the user isn't stuck forever.
+  // This handles edge cases where the debouncer/fetch gets stuck on mobile.
+  useEffect(() => {
+    if (safetyTimerRef.current) {
+      clearTimeout(safetyTimerRef.current);
+      safetyTimerRef.current = null;
+    }
+
+    if (isLoading && handle && !handleError) {
+      safetyTimerRef.current = setTimeout(() => {
+        // Still loading after timeout — force error state
+        cancel();
+        setAvailable(null);
+        setAvailError("Couldn't check availability \u2014 try again");
+      }, AVAILABILITY_CHECK_TIMEOUT_MS);
+    }
+
+    return () => {
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
+        safetyTimerRef.current = null;
+      }
+    };
+  }, [isLoading, handle, handleError, cancel]);
+
   // Trigger validation when handle changes
   useEffect(() => {
     setAvailError(null);
@@ -115,7 +151,7 @@ export function useHandleValidation(handle: string): HandleValidationResult {
 
   return {
     handleError,
-    checkingAvail: isValidating || isPending,
+    checkingAvail: isLoading,
     available,
     availError,
     cancel: handleCancel,
