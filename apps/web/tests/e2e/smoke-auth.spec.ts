@@ -42,6 +42,12 @@ function hasRealClerkConfig(): boolean {
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Auth Smoke Tests @smoke', () => {
+  test.beforeEach(async ({ page }) => {
+    if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
+      test.skip(true, 'Auth setup not available');
+    }
+  });
+
   // =========================================================================
   // AUTH PAGES - Consolidated test (was 2 separate tests)
   // =========================================================================
@@ -51,6 +57,17 @@ test.describe('Auth Smoke Tests @smoke', () => {
     if (!hasRealClerkConfig()) {
       test.skip();
     }
+
+    // Intercept analytics to prevent test interference
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     const { getContext, cleanup } = setupPageMonitoring(page);
     const authPages = ['/signin', '/sign-up'];
@@ -91,6 +108,17 @@ test.describe('Auth Smoke Tests @smoke', () => {
     // Use a fresh context WITHOUT Clerk testing token to simulate unauthenticated user
     const context = await browser.newContext();
     const page = await context.newPage();
+
+    // Intercept analytics to prevent test interference
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     const { getContext, cleanup } = setupPageMonitoring(page);
     const protectedRoutes = ['/app/dashboard', '/onboarding'];
