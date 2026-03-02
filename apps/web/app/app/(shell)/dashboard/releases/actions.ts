@@ -48,7 +48,8 @@ import {
   enqueueDspTrackEnrichmentJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
-import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
+import type { LyricsFormat } from '@/lib/lyrics';
+import { formatLyrics } from '@/lib/lyrics';
 import {
   checkAppleMusicRescanRateLimit,
   checkIsrcRescanRateLimit,
@@ -510,9 +511,11 @@ export async function formatReleaseLyrics(params: {
   profileId: string;
   releaseId: string;
   lyrics: string;
+  format?: LyricsFormat;
 }): Promise<{ release: ReleaseViewModel; changesSummary: string[] }> {
-  const { formatted, changesSummary } = formatLyricsForAppleMusic(
-    params.lyrics
+  const { formatted, changesSummary } = formatLyrics(
+    params.lyrics,
+    params.format ?? 'apple-music'
   );
   const release = await saveReleaseLyrics({
     profileId: params.profileId,
