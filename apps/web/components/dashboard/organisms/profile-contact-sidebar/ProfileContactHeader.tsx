@@ -142,7 +142,7 @@ export function ProfileContactHeader({
         />
 
         <EditableUsername
-          editable={editable}
+          editable={editable && Boolean(onUsernameChange)}
           isEditing={editingField === 'username'}
           inputRef={usernameRef}
           value={localUsername}

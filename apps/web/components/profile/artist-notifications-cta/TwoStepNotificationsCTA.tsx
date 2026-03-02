@@ -403,7 +403,7 @@ export function TwoStepNotificationsCTA({
   return (
     <div className='space-y-3'>
       <p
-        className='text-center text-sm font-semibold text-emerald-400'
+        className='text-center text-sm font-semibold text-primary-token'
         style={noFontSynthesisStyle}
       >
         Never miss a release.
