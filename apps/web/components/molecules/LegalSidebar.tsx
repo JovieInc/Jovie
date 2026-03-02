@@ -38,7 +38,7 @@ export function LegalSidebar({ toc, className }: LegalSidebarProps) {
             'block px-3 py-1.5 text-sm rounded-md transition-colors',
             'text-neutral-600 dark:text-neutral-400',
             'hover:text-neutral-900 dark:hover:text-white',
-            'hover:bg-neutral-100 dark:hover:bg-white/5'
+            'hover:bg-interactive-hover'
           )}
         >
           {entry.title}

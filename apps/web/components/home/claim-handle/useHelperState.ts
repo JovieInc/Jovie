@@ -43,12 +43,14 @@ export function useHelperState({
       };
     }
 
-    if (available === false) {
-      return { tone: 'error' as const, text: 'Handle already taken' };
-    }
-
+    // Show availError before "already taken" so timeout/network errors
+    // display their specific message instead of a misleading "taken" label.
     if (availError) {
       return { tone: 'error' as const, text: availError };
+    }
+
+    if (available === false) {
+      return { tone: 'error' as const, text: 'Handle already taken' };
     }
 
     return {
