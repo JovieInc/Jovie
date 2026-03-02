@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Textarea,
 } from '@jovie/ui';
@@ -18,9 +19,13 @@ import {
 } from 'react';
 import { toast } from 'sonner';
 import { DrawerSection } from '@/components/molecules/drawer';
+import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 
 /** Auto-save debounce delay in milliseconds */
 const AUTO_SAVE_DELAY_MS = 1500;
+
+/** All available format options in display order */
+const FORMAT_OPTIONS: LyricsFormat[] = ['apple-music', 'deezer', 'genius'];
 
 type SaveStatus = 'idle' | 'saving' | 'saved';
 
@@ -32,7 +37,8 @@ interface ReleaseLyricsSectionProps {
   readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
   readonly onFormatLyrics?: (
     releaseId: string,
-    lyrics: string
+    lyrics: string,
+    format: LyricsFormat
   ) => Promise<string[]>;
 }
 
@@ -48,6 +54,8 @@ export function ReleaseLyricsSection({
   const [isCopying, setIsCopying] = useState(false);
   const [isFormatting, setIsFormatting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [selectedFormat, setSelectedFormat] =
+    useState<LyricsFormat>('apple-music');
 
   // Refs for auto-save to avoid stale closures
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -129,6 +137,44 @@ export function ReleaseLyricsSection({
     };
   }, []);
 
+  const handleFormat = useCallback(
+    async (format: LyricsFormat) => {
+      if (!onFormatLyrics || !draftLyrics.trim()) return;
+      setSelectedFormat(format);
+      setIsFormatting(true);
+      try {
+        const changes = await onFormatLyrics(releaseId, draftLyrics, format);
+        if (changes.length > 0) {
+          toast.info(changes.join(' · '));
+        }
+      } catch {
+        toast.error('Unable to format lyrics right now');
+      } finally {
+        setIsFormatting(false);
+      }
+    },
+    [onFormatLyrics, releaseId, draftLyrics]
+  );
+
+  const handleCopy = useCallback(async () => {
+    if (!draftLyrics.trim()) {
+      toast.info('Add lyrics before copying');
+      return;
+    }
+    try {
+      setIsCopying(true);
+      await navigator.clipboard.writeText(draftLyrics);
+      toast.success('Lyrics copied');
+    } catch {
+      toast.error('Unable to copy lyrics');
+    } finally {
+      setIsCopying(false);
+    }
+  }, [draftLyrics]);
+
+  const isActionsDisabled = !draftLyrics.trim() || isSaving;
+  const showFormatOptions = isEditable && onFormatLyrics;
+
   return (
     <DrawerSection title='Lyrics'>
       <div className='space-y-2'>
@@ -159,75 +205,81 @@ export function ReleaseLyricsSection({
         )}
       </div>
 
-      <div className='mt-3'>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+      <div className='mt-3 flex items-center gap-2'>
+        {/* Copy button */}
+        <Button
+          type='button'
+          size='sm'
+          variant='secondary'
+          disabled={isActionsDisabled || isCopying}
+          onClick={handleCopy}
+        >
+          {isCopying ? (
+            <Check className='h-3.5 w-3.5 text-success' />
+          ) : (
+            <Copy className='h-3.5 w-3.5' />
+          )}
+          {isCopying ? 'Copied!' : 'Copy'}
+        </Button>
+
+        {/* Format split button: primary action + dropdown chevron */}
+        {showFormatOptions && (
+          <div className='inline-flex items-center rounded-[var(--radius-default)] shadow-sm'>
+            {/* Primary format action — uses the most recently selected format */}
             <Button
               type='button'
               size='sm'
               variant='secondary'
-              disabled={!draftLyrics.trim() || isSaving}
+              disabled={isActionsDisabled || isFormatting}
+              onClick={() => handleFormat(selectedFormat)}
+              className='rounded-r-none border-r border-r-border-default'
             >
-              Actions
-              <ChevronDown className='h-3.5 w-3.5' />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='start'>
-            <DropdownMenuItem
-              onClick={async () => {
-                if (!draftLyrics.trim()) {
-                  toast.info('Add lyrics before copying');
-                  return;
-                }
-                try {
-                  setIsCopying(true);
-                  await navigator.clipboard.writeText(draftLyrics);
-                  toast.success('Lyrics copied');
-                } catch {
-                  toast.error('Unable to copy lyrics');
-                } finally {
-                  setIsCopying(false);
-                }
-              }}
-              disabled={isCopying || !draftLyrics.trim()}
-            >
-              {isCopying ? (
-                <Check className='h-3.5 w-3.5 text-success' />
+              {isFormatting ? (
+                <Loader2 className='h-3.5 w-3.5 animate-spin' />
               ) : (
-                <Copy className='h-3.5 w-3.5' />
+                <Sparkles className='h-3.5 w-3.5' />
               )}
-              {isCopying ? 'Copied!' : 'Copy lyrics'}
-            </DropdownMenuItem>
-            {isEditable && onFormatLyrics && (
-              <DropdownMenuItem
-                onClick={async () => {
-                  setIsFormatting(true);
-                  try {
-                    const changes = await onFormatLyrics(
-                      releaseId,
-                      draftLyrics
-                    );
-                    if (changes.length > 0) {
-                      toast.info(changes.join(' · '));
-                    }
-                  } catch {
-                    toast.error('Unable to format lyrics right now');
-                  } finally {
-                    setIsFormatting(false);
-                  }
-                }}
-                disabled={isFormatting || isSaving || !draftLyrics.trim()}
-              >
-                {isFormatting ? (
-                  <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                ) : (
-                  <Sparkles className='h-3.5 w-3.5' />
-                )}
-                {isFormatting ? 'Formatting…' : 'Format for Apple Music'}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              {isFormatting
+                ? 'Formatting…'
+                : `Format: ${LYRICS_FORMAT_LABELS[selectedFormat]}`}
+            </Button>
+
+            {/* Dropdown chevron — shows all format options */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='secondary'
+                  disabled={isActionsDisabled || isFormatting}
+                  className='rounded-l-none px-1.5'
+                  aria-label='Choose format'
+                >
+                  <ChevronDown className='h-3.5 w-3.5' />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align='end'>
+                {FORMAT_OPTIONS.map(format => (
+                  <DropdownMenuItem
+                    key={format}
+                    onClick={() => handleFormat(format)}
+                    disabled={isFormatting}
+                  >
+                    <Sparkles className='h-3.5 w-3.5' />
+                    {LYRICS_FORMAT_LABELS[format]}
+                    {format === selectedFormat && (
+                      <Check className='ml-auto h-3.5 w-3.5 text-success' />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <div className='px-2 py-1.5 text-2xs text-tertiary-token'>
+                  Formats lyrics for the selected platform
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </div>
     </DrawerSection>
   );

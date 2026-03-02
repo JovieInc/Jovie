@@ -79,10 +79,11 @@ export interface ReleaseSidebarProps {
     releaseId: string,
     status: CanvasStatus
   ) => Promise<void>;
-  /** Format lyrics with Apple Music deterministic rules */
+  /** Format lyrics for the specified platform */
   readonly onFormatLyrics?: (
     releaseId: string,
-    lyrics: string
+    lyrics: string,
+    format: import('@/lib/lyrics/types').LyricsFormat
   ) => Promise<string[]>;
   /** Whether lyrics operations are currently pending */
   readonly isLyricsSaving?: boolean;
