@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { AuthLayout, SignUpForm } from '@/components/auth';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -13,22 +13,23 @@ import {
 } from '@/lib/auth/signup-claim-storage';
 
 /**
- * Persist pre-signup claim data from the homepage hero into sessionStorage.
- * This data survives Clerk's auth redirects (OTP, SSO callbacks)
- * and is consumed by the onboarding flow after signup.
+ * Persist pre-signup claim data from the homepage hero into sessionStorage,
+ * and display a handle availability banner when a handle param is present.
  */
 function SignUpClaimDataPersistence() {
   const searchParams = useSearchParams();
+  const handle = searchParams.get('handle');
+  const [availability, setAvailability] = useState<
+    'checking' | 'available' | 'taken' | null
+  >(null);
 
   useEffect(() => {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
-    const handle = searchParams.get('handle');
 
     try {
       const now = Date.now();
 
-      // Clear stale values before persisting new ones
       clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
       clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
       clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
@@ -50,18 +51,57 @@ function SignUpClaimDataPersistence() {
     } catch {
       // sessionStorage may be unavailable (incognito quota, etc.)
     }
-  }, [searchParams]);
+  }, [searchParams, handle]);
 
-  return null;
+  useEffect(() => {
+    if (!handle || handle.length < 3) return;
+
+    setAvailability('checking');
+
+    const controller = new AbortController();
+    fetch(
+      `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
+      { signal: controller.signal }
+    )
+      .then(res => res.json())
+      .then(data => {
+        setAvailability(data.available ? 'available' : 'taken');
+      })
+      .catch(() => {
+        setAvailability(null);
+      });
+
+    return () => controller.abort();
+  }, [handle]);
+
+  const normalizedHandle = useMemo(() => handle?.toLowerCase() ?? '', [handle]);
+
+  if (!handle || !availability) return null;
+
+  return (
+    <div className='mb-4 rounded-[var(--linear-radius-sm)] border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-4 py-3 text-center'>
+      {availability === 'checking' && (
+        <p className='text-[13px] font-[450] text-[var(--linear-text-secondary)]'>
+          Checking if @{normalizedHandle} is available...
+        </p>
+      )}
+      {availability === 'available' && (
+        <p className='text-[13px] font-[450] text-[var(--linear-text-primary)]'>
+          @{normalizedHandle} is available. Sign up to claim it.
+        </p>
+      )}
+      {availability === 'taken' && (
+        <p className='text-[13px] font-[450] text-[var(--linear-text-secondary)]'>
+          @{normalizedHandle} is already taken. You can pick another handle
+          after signing up.
+        </p>
+      )}
+    </div>
+  );
 }
 
 /**
  * Sign-up page using new Clerk Core API implementation.
- * No longer depends on Clerk Elements.
- *
- * When arriving from the homepage claim flow, query params
- * (handle, spotify_url, artist_name) are persisted to sessionStorage
- * for use during onboarding.
  */
 export default function SignUpPage() {
   return (
