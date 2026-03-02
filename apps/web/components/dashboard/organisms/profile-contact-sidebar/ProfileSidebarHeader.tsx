@@ -129,7 +129,7 @@ export function ProfileSidebarHeader({
 
   return (
     <DrawerHeader
-      title='Profile details'
+      title='Profile'
       actions={
         <DrawerHeaderActions
           primaryActions={primaryActions}
