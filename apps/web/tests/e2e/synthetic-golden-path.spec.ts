@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import {
+  SMOKE_TIMEOUTS,
+  waitForHydration,
+  waitForNetworkIdle,
+} from './utils/smoke-test-utils';
 
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -35,12 +40,18 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     );
 
     try {
+      // Intercept analytics to prevent test interference
+      await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
       // CRITICAL PATH 1: Homepage loads
       console.log('[Synthetic] Step 1: Homepage load test');
       await page.goto('/', {
-        waitUntil: 'networkidle',
-        timeout: 30000,
+        waitUntil: 'commit',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
+      await waitForHydration(page);
 
       // Essential homepage elements
       await expect(page.locator('[data-test="signup-btn"]')).toBeVisible({
@@ -67,23 +78,20 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
 
       // Handle both test and production Clerk flows
       const submitButton = page
-        .locator(
-          'button[type="submit"], button:has-text("Continue"), button:has-text("Sign up")'
-        )
+        .getByRole('button', { name: /continue|sign up/i })
         .first();
       await submitButton.click();
 
-      // Production environment might require email verification
-      await page.waitForTimeout(3000);
+      // Wait for navigation after submit instead of arbitrary timeout
+      await page.waitForLoadState('domcontentloaded');
 
+      // Production environment might require email verification
       // Skip verification if in test mode, otherwise handle production flow
       if (process.env.E2E_ENVIRONMENT === 'production') {
         // In production, we might need to handle verification differently
         // This is a placeholder for production-specific verification handling
         try {
-          const verifyButton = page.locator(
-            'button:has-text("Verify"), button:has-text("Continue")'
-          );
+          const verifyButton = page.getByRole('button', { name: /verify|continue/i });
           if (await verifyButton.isVisible({ timeout: 5000 })) {
             await verifyButton.click();
           }
@@ -100,7 +108,16 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       await expect(usernameInput).toBeVisible({ timeout: 15000 });
 
       await usernameInput.fill(testHandle);
-      await page.waitForTimeout(2000); // Allow for validation
+      // Poll for validation to clear instead of arbitrary wait
+      await expect
+        .poll(
+          async () => {
+            const claimBtn = page.locator('[data-test="claim-btn"]');
+            return claimBtn.isEnabled().catch(() => false);
+          },
+          { timeout: SMOKE_TIMEOUTS.VISIBILITY, intervals: [300, 500, 1000] }
+        )
+        .toBeTruthy();
 
       const claimButton = page.locator('[data-test="claim-btn"]');
       await expect(claimButton).toBeEnabled({ timeout: 15000 });
@@ -116,9 +133,10 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       // CRITICAL PATH 6: Public profile accessibility
       console.log('[Synthetic] Step 6: Public profile test');
       await page.goto(`/${testHandle}`, {
-        waitUntil: 'networkidle',
-        timeout: 30000,
+        waitUntil: 'commit',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
+      await waitForHydration(page);
 
       await expect(page).toHaveURL(`/${testHandle}`);
       const publicProfile = page.locator('[data-test="public-profile-root"]');
@@ -149,6 +167,11 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
   test('Critical page health checks', async ({ page }) => {
     test.setTimeout(60_000);
 
+    // Intercept analytics to prevent test interference
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
     const criticalPages = [
       { path: '/', name: 'Homepage' },
       { path: '/dualipa', name: 'Profile Page' },
@@ -161,9 +184,10 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
       console.log(`[Synthetic] Health check: ${name} (${path})`);
 
       await page.goto(path, {
-        waitUntil: 'networkidle',
-        timeout: 20000,
+        waitUntil: 'commit',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
+      await waitForHydration(page);
 
       // Basic health checks
       await expect(page).toHaveURL(
@@ -192,14 +216,20 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
   test('Performance baseline check', async ({ page }) => {
     test.setTimeout(60_000);
 
+    // Intercept analytics to prevent test interference
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
     console.log('[Synthetic] Performance baseline check');
 
     const startTime = Date.now();
 
     await page.goto('/', {
-      waitUntil: 'networkidle',
-      timeout: 30000,
+      waitUntil: 'commit',
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
+    await waitForHydration(page);
 
     const loadTime = Date.now() - startTime;
 

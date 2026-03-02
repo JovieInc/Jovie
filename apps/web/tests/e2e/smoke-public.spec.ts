@@ -48,6 +48,11 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   test('homepage loads correctly with content and no errors', async ({
     page,
   }, testInfo) => {
+    // Intercept analytics to prevent test interference
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
     const { getContext, cleanup } = setupPageMonitoring(page);
     const hydrationErrors: string[] = [];
 
@@ -154,6 +159,11 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   // =========================================================================
   test.describe('Public Profile', () => {
     test('loads and displays creator name', async ({ page }, testInfo) => {
+      // Intercept analytics to prevent test interference
+      await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
       const { getContext, cleanup } = setupPageMonitoring(page);
 
       try {
@@ -190,13 +200,21 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           bodyTextRaw?.toLowerCase().includes('loading jovie profile') ||
           bodyTextRaw?.toLowerCase().includes('loading artist profile');
         if (isLoadingSkeleton) {
-          // Wait a bit more for it to resolve
-          await page.waitForTimeout(5000);
-          const bodyTextRetry = await page
-            .locator('body')
-            .textContent()
-            .catch(() => '');
-          if (bodyTextRetry?.toLowerCase().includes('loading jovie profile')) {
+        if (isLoadingSkeleton) {
+          // Poll for skeleton to resolve rather than a fixed wait
+          const resolved = await expect
+            .poll(
+              async () => {
+                const t = await page.locator('body').textContent().catch(() => ''');
+                return !t?.toLowerCase().includes('loading jovie profile');
+              },
+              { timeout: 10000, intervals: [500, 1000, 2000] }
+            )
+            .toBeTruthy()
+            .then(() => true)
+            .catch(() => false);
+
+          if (!resolved) {
             test.skip(
               true,
               'Profile stuck on loading skeleton (API/DB likely unavailable)'
@@ -285,6 +303,11 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
         test(`${profile}${path} loads without errors (${name})`, async ({
           page,
         }, testInfo) => {
+          // Intercept analytics to prevent test interference
+          await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+          await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+          await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
           const { getContext, cleanup } = setupPageMonitoring(page);
 
           try {
@@ -371,6 +394,11 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
     test('handles non-existent routes gracefully without 500 errors', async ({
       page,
     }, testInfo) => {
+      // Intercept analytics to prevent test interference
+      await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
       const { getContext, cleanup } = setupPageMonitoring(page);
       const testRoutes = [
         '/nonexistent-handle-xyz-123', // Non-existent profile
@@ -390,7 +418,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
             console.warn(
               `Route ${route}: Got ${status} on attempt ${retries}, retrying (likely Turbopack cold compile)...`
             );
-            await page.waitForTimeout(2000 * retries);
+            await page.waitForLoadState('domcontentloaded');
             response = await smokeNavigate(page, route);
             status = response?.status() ?? 0;
           }
@@ -444,6 +472,11 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   test('critical pages respond without 500 errors', async ({
     page,
   }, testInfo) => {
+    // Intercept analytics to prevent test interference
+    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+
     const { getContext, cleanup } = setupPageMonitoring(page);
     const routes = ['/', '/sign-up', '/pricing'];
 
@@ -460,7 +493,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           console.warn(
             `Route ${route}: Got ${status} on attempt ${retries}, retrying (likely Turbopack cold compile)...`
           );
-          await page.waitForTimeout(2000 * retries);
+          await page.waitForLoadState('domcontentloaded');
           response = await smokeNavigate(page, route);
           status = response?.status() ?? 0;
         }

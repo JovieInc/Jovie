@@ -238,9 +238,9 @@ test.describe('Golden Path - Complete User Journey', () => {
     });
 
     // Should show DSP options (e.g., "Open in Spotify") or "not available" message
-    const spotifyButton = page.locator(
-      'button:has-text("Open in Spotify"), a:has-text("Spotify")'
-    );
+    const spotifyButton = page
+      .getByRole('button', { name: /open in spotify/i })
+      .or(page.getByRole('link', { name: /spotify/i }));
     const noLinksMsg = page.getByText(/streaming links aren.t available/i);
     await expect(spotifyButton.first().or(noLinksMsg)).toBeVisible({
       timeout: 120_000,
