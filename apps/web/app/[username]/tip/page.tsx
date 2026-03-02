@@ -1,10 +1,7 @@
-import { eq } from 'drizzle-orm';
-import { type Metadata } from 'next';
-import { notFound } from 'next/navigation';
-import { BASE_URL } from '@/constants/app';
-import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { TipPageClient } from './TipPageClient';
+'use client';
+
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
 interface Props {
   readonly params: Promise<{
@@ -12,61 +9,26 @@ interface Props {
   }>;
 }
 
-async function getArtistProfile(username: string) {
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      username: creatorProfiles.username,
-      displayName: creatorProfiles.displayName,
-      bio: creatorProfiles.bio,
-      avatarUrl: creatorProfiles.avatarUrl,
-      isPublic: creatorProfiles.isPublic,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
-    .limit(1);
+export default function TipPage({ params }: Readonly<Props>) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  return profile ?? null;
-}
+  useEffect(() => {
+    // Get the username from params and redirect
+    params.then(({ username }) => {
+      const source = searchParams?.get('source');
+      const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
+      router.replace(`/${username}?mode=tip${sourceParam}`);
+    });
+  }, [params, router, searchParams]);
 
-export default async function TipPage({ params }: Readonly<Props>) {
-  const { username } = await params;
-  const profile = await getArtistProfile(username);
-
-  if (!profile || !profile.isPublic) {
-    notFound();
-  }
-
-  const artistName = profile.displayName || profile.username;
-
+  // Show loading while redirecting
   return (
-    <TipPageClient
-      profileId={profile.id}
-      handle={profile.username}
-      artistName={artistName}
-      avatarUrl={profile.avatarUrl}
-      bio={profile.bio}
-    />
+    <div className='flex items-center justify-center min-h-screen'>
+      <div className='text-center'>
+        <div className='animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white mx-auto mb-4' />
+        <p className='text-gray-600 dark:text-gray-400'>Redirecting...</p>
+      </div>
+    </div>
   );
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { username } = await params;
-  const profile = await getArtistProfile(username);
-
-  if (!profile) {
-    return { title: 'Artist Not Found' };
-  }
-
-  const artistName = profile.displayName || profile.username;
-
-  return {
-    title: `Tip ${artistName} - Jovie`,
-    description: `Support ${artistName} by sending a tip on Jovie.`,
-    openGraph: {
-      title: `Tip ${artistName}`,
-      description: `Support ${artistName} by sending a tip.`,
-      url: `${BASE_URL}/${profile.username}/tip`,
-    },
-  };
 }
