@@ -1,10 +1,13 @@
 /**
- * Database Module
+ * Database Module — CANONICAL IMPORT PATH
  *
- * Main entry point for database operations. Re-exports from the modular
- * client directory for cleaner organization.
+ * All application code MUST import from '@/lib/db':
+ *   import { db } from '@/lib/db'
  *
- * IMPORTANT: For better build performance, import directly from submodules:
+ * This is the single entry point for database operations. Re-exports
+ * from the modular client directory for cleaner organization.
+ *
+ * For better build performance, import directly from submodules:
  * - Schema: import { users } from '@/lib/db/schema/auth'
  * - SQL helpers: import { sqlArray } from '@/lib/db/sql-helpers'
  * - Drizzle utilities: import { eq, and } from 'drizzle-orm'

@@ -3,10 +3,14 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { env } from '../lib/env-server';
 
 /**
- * Drizzle ORM database connection factory for Neon serverless
+ * @deprecated Legacy HTTP-based DB connection factory.
  *
- * Uses @neondatabase/serverless HTTP driver for all connections.
- * This is the standard driver for Neon PostgreSQL in serverless environments.
+ * DO NOT use this in application code. The canonical database client is:
+ *   import { db } from '@/lib/db'
+ *
+ * This file exists only for its test suite and potential migration scripts.
+ * It uses neon-http (stateless), whereas the app uses neon-serverless
+ * (WebSocket, stateful, supports transactions).
  */
 
 // Connection singleton to avoid multiple connections in development
