@@ -1,6 +1,7 @@
 import {
   Banknote,
   CalendarDays,
+  HandCoins,
   Home,
   IdCard,
   Image as ImageIcon,
@@ -60,6 +61,13 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
+  },
+  {
+    name: 'Earnings',
+    href: APP_ROUTES.DASHBOARD_EARNINGS,
+    id: 'earnings',
+    icon: HandCoins,
+    description: 'QR codes, tip links, and payout settings',
   },
 ];
 
