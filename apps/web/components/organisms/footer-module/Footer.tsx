@@ -97,7 +97,6 @@ export function Footer({
 
   if (variant === 'regular') {
     const productLinks = [
-      { href: APP_ROUTES.PRICING, label: 'Pricing' },
       ...FEATURES.map(f => ({ href: f.href, label: f.title })),
     ];
 

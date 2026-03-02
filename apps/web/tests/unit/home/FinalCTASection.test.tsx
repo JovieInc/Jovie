@@ -19,6 +19,6 @@ describe('FinalCTASection', () => {
 
   it('renders subtext', () => {
     render(<FinalCTASection />);
-    expect(screen.getByText(/no credit card required/i)).toBeInTheDocument();
+    expect(screen.getByText(/set up in under 60 seconds/i)).toBeInTheDocument();
   });
 });
