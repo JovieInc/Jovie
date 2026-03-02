@@ -107,7 +107,7 @@ async function chaosTestPage(
         if (!(await locator.isVisible().catch(() => false))) continue;
 
         await locator.click({ timeout: 3000 });
-        await page.waitForTimeout(300);
+        await page.waitForLoadState('domcontentloaded');
         clicked++;
 
         const newErrors = getContext().consoleErrors.filter(

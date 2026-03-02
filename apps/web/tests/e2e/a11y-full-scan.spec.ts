@@ -11,6 +11,15 @@ test.describe('Full A11y Scan', () => {
 
   for (const route of routes) {
     test(`${route} full scan`, async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto(route, { timeout: 120_000 });
       await waitForLoad(page);
 

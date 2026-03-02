@@ -16,6 +16,15 @@ test.describe('Legal Pages', () => {
 
   test.describe('Privacy Policy', () => {
     test.beforeEach(async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/privacy', { timeout: 180_000 });
     });
 
@@ -74,6 +83,15 @@ test.describe('Legal Pages', () => {
 
   test.describe('Terms of Service', () => {
     test.beforeEach(async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/terms', { timeout: 180_000 });
     });
 
@@ -132,6 +150,15 @@ test.describe('Legal Pages', () => {
 
   test.describe('Navigation between legal pages', () => {
     test('can navigate from privacy to home', async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/privacy', { timeout: 180_000 });
 
       // Click on logo to go home
@@ -140,6 +167,15 @@ test.describe('Legal Pages', () => {
     });
 
     test('can navigate from terms to home', async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/terms', { timeout: 180_000 });
 
       // Click on logo to go home
@@ -150,6 +186,15 @@ test.describe('Legal Pages', () => {
 
   test.describe('Accessibility', () => {
     test('privacy policy has proper heading structure', async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/privacy', { timeout: 180_000 });
 
       // The hero h1 should be the first heading
@@ -162,6 +207,15 @@ test.describe('Legal Pages', () => {
     });
 
     test('terms of service has proper heading structure', async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/terms', { timeout: 180_000 });
 
       // The hero h1 should be the first heading
@@ -174,6 +228,15 @@ test.describe('Legal Pages', () => {
     });
 
     test('has proper link accessibility', async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/privacy', { timeout: 180_000 });
 
       // Check that links have accessible names (text content or aria-label)
@@ -189,6 +252,15 @@ test.describe('Legal Pages', () => {
   test.describe('SEO and Performance', () => {
     test('privacy policy loads quickly', async ({ page }) => {
       const startTime = Date.now();
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/privacy', { timeout: 180_000 });
       const loadTime = Date.now() - startTime;
 
@@ -200,6 +272,15 @@ test.describe('Legal Pages', () => {
 
     test('terms of service loads quickly', async ({ page }) => {
       const startTime = Date.now();
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/terms', { timeout: 180_000 });
       const loadTime = Date.now() - startTime;
 
@@ -208,10 +289,28 @@ test.describe('Legal Pages', () => {
     });
 
     test('has proper canonical URLs', async ({ page }) => {
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/privacy', { timeout: 180_000 });
       const canonical = page.locator('link[rel="canonical"]');
       await expect(canonical).toHaveAttribute('href', /\/legal\/privacy/);
 
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/legal/terms', { timeout: 180_000 });
       const canonical2 = page.locator('link[rel="canonical"]');
       await expect(canonical2).toHaveAttribute('href', /\/legal\/terms/);
