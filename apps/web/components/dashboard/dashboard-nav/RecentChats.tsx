@@ -190,16 +190,18 @@ export function RecentChats() {
           if (!open && !deleteConversation.isPending) setDeleteTarget(null);
         }}
       >
-        <AlertDialogContent className='max-w-sm'>
+        <AlertDialogContent className='max-w-sm gap-3 p-5'>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete thread</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className='text-sm font-semibold text-primary-token'>
+              Delete thread
+            </AlertDialogTitle>
+            <AlertDialogDescription className='text-[13px] text-secondary-token'>
               This will permanently delete &ldquo;
               {deleteTarget?.title ?? 'Untitled thread'}&rdquo;. This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className='gap-2 sm:gap-2'>
             <AlertDialogCancel disabled={deleteConversation.isPending}>
               Cancel
             </AlertDialogCancel>
