@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './setup';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import { waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Marketing Homepage Visual Regression & Accessibility Test
@@ -54,9 +54,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('all critical sections render with content (not blank)', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       // Wait for client-side hydration
@@ -138,9 +144,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('hero heading (h1) has meaningful text', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
 
@@ -160,9 +172,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Visual Regression', () => {
     test('homepage renders consistently (light mode)', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -182,9 +200,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('homepage renders consistently (dark mode)', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -206,9 +230,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('hero section renders consistently above the fold', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -226,9 +256,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections render with correct background (light mode)', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -264,9 +300,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections render with correct background (dark mode)', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -302,9 +344,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Accessibility', () => {
     test('homepage has no WCAG 2.1 AA violations', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -335,9 +383,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('homepage has no critical a11y issues in dark mode', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -371,9 +425,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('below-the-fold sections meet contrast requirements', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -406,9 +466,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('homepage has proper heading hierarchy', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
 
@@ -447,9 +513,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     test('all interactive elements are keyboard accessible', async ({
       page,
     }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -486,9 +558,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
     });
 
     test('images have alt text', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);
@@ -520,9 +598,15 @@ test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
 
   test.describe('Theme Switching', () => {
     test('theme switches correctly without layout shift', async ({ page }) => {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto('/', { timeout: 60_000 });
       await page.waitForLoadState('domcontentloaded');
       await waitForHydration(page);

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import { waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Layout Overlap Guard
@@ -41,9 +41,15 @@ for (const viewport of VIEWPORTS) {
         test(`${pageUnderTest.label} has no overlapping/touching content in ${theme}`, async ({
           page,
         }) => {
-          await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-          await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-          await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+          await page.route('**/api/profile/view', r =>
+            r.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/audience/visit', r =>
+            r.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/track', r =>
+            r.fulfill({ status: 200, body: '{}' })
+          );
           await page.goto(pageUnderTest.path, {
             waitUntil: 'networkidle',
             timeout: 45_000,
