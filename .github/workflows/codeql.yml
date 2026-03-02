@@ -20,10 +20,7 @@ on:
   schedule:
     - cron: '36 13 * * 1' # Weekly on Monday at 13:36 UTC
 
-permissions:
-  security-events: write
-  actions: read
-  contents: read
+permissions: {}
 
 concurrency:
   group: codeql-${{ github.ref }}
@@ -34,6 +31,10 @@ jobs:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     strategy:
       fail-fast: false

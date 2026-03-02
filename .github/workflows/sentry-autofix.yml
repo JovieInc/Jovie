@@ -4,6 +4,8 @@ on:
   repository_dispatch:
     types: [sentry-issue]
 
+permissions: {}
+
 concurrency:
   group: sentry-autofix-${{ github.event.client_payload.issue_id }}
   cancel-in-progress: false
