@@ -72,6 +72,9 @@ export function RecentChats() {
     title: string;
   } | null>(null);
 
+  // Track which thread's dropdown menu is open so only one can be open at a time
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
 
@@ -155,13 +158,16 @@ export function RecentChats() {
                 </span>
 
                 <SidebarMenuActions showOnHover>
-                  <DropdownMenu>
+                  <DropdownMenu
+                    open={openMenuId === convo.id}
+                    onOpenChange={open => setOpenMenuId(open ? convo.id : null)}
+                  >
                     <DropdownMenuTrigger asChild>
                       <SidebarMenuAction aria-label='Thread options'>
                         <Ellipsis aria-hidden='true' className='size-4' />
                       </SidebarMenuAction>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent side='right' align='start'>
+                    <DropdownMenuContent side='bottom' align='end'>
                       <DropdownMenuItem
                         onClick={() => setDeleteTarget({ id: convo.id, title })}
                         className='text-destructive focus:text-destructive'

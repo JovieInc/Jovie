@@ -174,6 +174,9 @@ export function useJovieChat({
         queryKey: queryKeys.chat.usage(),
       });
 
+      // Clear pending messages ref so the persistence effect doesn't
+      // keep trying to find an assistant message that will never arrive
+      pendingMessagesRef.current = null;
       setIsSubmitting(false);
     },
   });
@@ -226,6 +229,23 @@ export function useJovieChat({
     const timer = setTimeout(() => setTitlePollingSince(null), remaining);
     return () => clearTimeout(timer);
   }, [titlePollingSince]);
+
+  // Safety timeout: if isSubmitting stays true for more than 30 seconds,
+  // force-clear it to prevent the input from being permanently blocked.
+  // This guards against edge cases where the status/persistence effects
+  // fail to clear the flag (e.g. stream silently drops, component re-mounts).
+  useEffect(() => {
+    if (!isSubmitting) return;
+
+    const safetyTimer = globalThis.setTimeout(() => {
+      setIsSubmitting(false);
+      pendingMessagesRef.current = null;
+    }, 30_000);
+
+    return () => {
+      globalThis.clearTimeout(safetyTimer);
+    };
+  }, [isSubmitting]);
 
   // Clear error when user starts typing
   useEffect(() => {
