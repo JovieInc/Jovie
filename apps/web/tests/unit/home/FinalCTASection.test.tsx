@@ -13,7 +13,7 @@ describe('FinalCTASection', () => {
   it('renders CTA button', () => {
     render(<FinalCTASection />);
     expect(
-      screen.getByRole('link', { name: /get started/i })
+      screen.getByRole('link', { name: /claim your handle/i })
     ).toBeInTheDocument();
   });
 
