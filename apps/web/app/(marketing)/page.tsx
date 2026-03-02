@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
 import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticReleaseSmartlinksSection';
 
@@ -257,6 +258,10 @@ export default function HomePage() {
 
       <DeferredSection placeholderHeight={560}>
         <AutomaticReleaseSmartlinksSection />
+      </DeferredSection>
+
+      <DeferredSection placeholderHeight={560}>
+        <AudienceCRMSection />
       </DeferredSection>
 
       <DeferredSection placeholderHeight={520}>
