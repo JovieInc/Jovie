@@ -25,15 +25,23 @@ describe('DesktopQrOverlay', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders QR code on desktop', async () => {
+  it('starts as icon on desktop (hidden by default)', () => {
     render(<DesktopQrOverlay handle='tim' />);
+    expect(screen.getByLabelText('View on mobile')).toBeInTheDocument();
+    expect(screen.queryByAltText('Scan to view on mobile')).toBeNull();
+  });
+
+  it('opens QR code when icon is clicked', async () => {
+    render(<DesktopQrOverlay handle='tim' />);
+    fireEvent.click(screen.getByLabelText('View on mobile'));
     expect(
       await screen.findByAltText('Scan to view on mobile')
     ).toBeInTheDocument();
   });
 
-  it('shows reopen icon after dismiss', async () => {
+  it('closes back to icon when dismiss is clicked', async () => {
     render(<DesktopQrOverlay handle='tim' />);
+    fireEvent.click(screen.getByLabelText('View on mobile'));
     fireEvent.click(await screen.findByLabelText('Close'));
     expect(screen.queryByAltText('Scan to view on mobile')).toBeNull();
     expect(screen.getByLabelText('View on mobile')).toBeInTheDocument();

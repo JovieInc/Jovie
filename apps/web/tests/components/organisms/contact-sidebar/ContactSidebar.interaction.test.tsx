@@ -105,7 +105,6 @@ const mockContact: Contact = {
   displayName: 'John Doe',
   avatarUrl: null,
   isVerified: false,
-  website: 'https://example.com',
   socialLinks: [{ id: '1', label: 'Twitter', url: 'https://twitter.com/test' }],
 };
 

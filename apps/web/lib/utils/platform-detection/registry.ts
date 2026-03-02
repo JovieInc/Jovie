@@ -301,9 +301,6 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
   { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
   { pattern: /music\.163\.com/i, platformId: 'netease' },
-
-  // Website fallback - keep last
-  { pattern: /./, platformId: 'website' },
 ];
 
 /**

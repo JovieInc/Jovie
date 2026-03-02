@@ -31,6 +31,7 @@ export interface ProfileLinkListProps {
   readonly onAddLink?: (category: LinkSection) => void;
   readonly onRemoveLink?: (linkId: string) => void;
   readonly dspConnections?: PreviewDspConnections;
+  readonly onDisconnectDsp?: (provider: 'spotify' | 'apple_music') => void;
 }
 
 function getLinkSection(platform: string): LinkSection {
@@ -96,8 +97,10 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
 
 function ConnectedDspRows({
   dspConnections,
+  onDisconnect,
 }: {
   readonly dspConnections: PreviewDspConnections;
+  readonly onDisconnect?: (provider: 'spotify' | 'apple_music') => void;
 }) {
   const connectedProviders = [
     {
@@ -110,7 +113,7 @@ function ConnectedDspRows({
       connected: dspConnections.appleMusic.connected,
       artistName: dspConnections.appleMusic.artistName,
     },
-  ].filter(provider => provider.connected);
+  ].filter(entry => entry.connected);
 
   if (connectedProviders.length === 0) {
     return (
@@ -122,21 +125,18 @@ function ConnectedDspRows({
 
   return (
     <div className='space-y-0.5'>
-      {connectedProviders.map(provider => (
-        <div
-          key={provider.provider}
-          className='flex items-center gap-2.5 px-3 py-1.5 lg:rounded-md hover:bg-interactive-hover transition-colors'
-        >
-          <span className='shrink-0 w-5 flex items-center justify-center'>
-            <DspProviderIcon provider={provider.provider} size='sm' />
-          </span>
-          <span className='text-xs text-secondary-token truncate'>
-            {provider.artistName || PROVIDER_LABELS[provider.provider]}
-          </span>
-          <span className='text-[10px] text-tertiary-token shrink-0'>
-            Connected
-          </span>
-        </div>
+      {connectedProviders.map(entry => (
+        <SidebarLinkRow
+          key={entry.provider}
+          icon={<DspProviderIcon provider={entry.provider} size='sm' />}
+          label={entry.artistName || PROVIDER_LABELS[entry.provider]}
+          url=''
+          badge='Connected'
+          isEditable={Boolean(onDisconnect)}
+          onRemove={
+            onDisconnect ? () => onDisconnect(entry.provider) : undefined
+          }
+        />
       ))}
     </div>
   );
@@ -148,6 +148,7 @@ export function ProfileLinkList({
   onAddLink,
   onRemoveLink,
   dspConnections,
+  onDisconnectDsp,
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -190,7 +191,10 @@ export function ProfileLinkList({
           emptyMessage='No music links yet. Click + to add one.'
         >
           <div className='space-y-0.5'>
-            <ConnectedDspRows dspConnections={dspConnections} />
+            <ConnectedDspRows
+              dspConnections={dspConnections}
+              onDisconnect={onDisconnectDsp}
+            />
             {filteredLinks.map(link => (
               <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
             ))}

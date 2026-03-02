@@ -103,8 +103,19 @@ export function detectPlatform(
     }
   }
 
-  // Fallback to custom/website
-  detectedPlatform ??= PLATFORMS.website;
+  // If no known platform matched, mark as unrecognized (website fallback removed)
+  if (!detectedPlatform) {
+    const fallback = PLATFORMS.website;
+    return {
+      platform: fallback,
+      normalizedUrl,
+      originalUrl: url,
+      suggestedTitle: 'Link',
+      isValid: false,
+      error:
+        'Only links to recognized social networks and music platforms are allowed.',
+    };
+  }
 
   // Generate suggested title
   const suggestedTitle = generateSuggestedTitle(

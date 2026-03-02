@@ -6,7 +6,6 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { StatusBadge } from '@/components/atoms/StatusBadge';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
@@ -61,13 +60,13 @@ const SUGGESTED_PLATFORM_IDS = [
   'linkedin',
   'discord',
   'reddit',
-  'website',
 ] as const;
 
 const EXCLUDED_PLATFORM_IDS = new Set([
   'onlyfans',
   'twitter',
-  // Professional links (only 'website' remains)
+  // Professional / generic links — blocked
+  'website',
   'blog',
   'portfolio',
   'booking',
@@ -128,7 +127,6 @@ const PLATFORM_PLACEHOLDERS = Object.fromEntries(
 
 PLATFORM_PLACEHOLDERS.x = 'https://x.com/yourhandle';
 PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
-PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
 PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
 PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
 PLATFORM_PLACEHOLDERS.venmo = 'https://venmo.com/yourhandle';
@@ -396,48 +394,9 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                 >
                   <Trash2 className='h-4 w-4' />
                 </Button>
-
-                {link.platform === 'website' && link.url.trim().length > 0 && (
-                  <div className='flex items-center gap-2'>
-                    <StatusBadge
-                      variant={
-                        link.verificationStatus === 'verified'
-                          ? 'green'
-                          : 'blue'
-                      }
-                      size='sm'
-                    >
-                      {link.verificationStatus === 'verified'
-                        ? 'Verified'
-                        : 'Pending'}
-                    </StatusBadge>
-                    {link.verificationStatus !== 'verified' && link.id && (
-                      <Button
-                        type='button'
-                        size='sm'
-                        variant='outline'
-                        onClick={() => setVerifyModalLinkId(link.id)}
-                        data-testid='open-verify-modal'
-                      >
-                        Verify
-                      </Button>
-                    )}
-                  </div>
-                )}
               </div>
             ))}
           </DashboardCard>
-
-          {socialLinks.some(link => link.platform === 'website') && (
-            <p className='pt-3 text-xs text-secondary-token'>
-              Add this TXT record to your domain:{' '}
-              <code>
-                {socialLinks.find(link => link.platform === 'website')
-                  ?.verificationToken ?? 'jovie-verify=...'}
-              </code>
-              {'. Then click Verify.'}
-            </p>
-          )}
 
           <div className='flex flex-col gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
             <Button

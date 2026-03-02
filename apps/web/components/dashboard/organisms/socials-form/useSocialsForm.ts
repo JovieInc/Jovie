@@ -139,14 +139,6 @@ export function useSocialsForm({
         seenPlatforms.add(link.platform);
       }
 
-      const websiteCount = linksToInsert.filter(
-        link => link.platform === 'website'
-      ).length;
-      if (websiteCount > 1) {
-        setSubmitError('You can only add one official website link.');
-        return;
-      }
-
       for (const link of linksToInsert) {
         const platform = getPlatform(link.platform);
         if (!platform) continue;

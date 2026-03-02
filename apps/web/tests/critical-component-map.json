@@ -9,9 +9,6 @@
   "components/organisms/contact-sidebar/ContactFields.tsx": [
     "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
   ],
-  "components/organisms/contact-sidebar/ContactWebsite.tsx": [
-    "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
-  ],
   "components/organisms/contact-sidebar/ContactSocialLinks.tsx": [
     "tests/components/organisms/contact-sidebar/ContactSidebar.interaction.test.tsx"
   ],
