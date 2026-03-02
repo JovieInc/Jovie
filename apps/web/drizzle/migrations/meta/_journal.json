@@ -351,6 +351,13 @@
       "when": 1772179200000,
       "tag": "0045_add_users_stripe_price_id",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1772265600000,
+      "tag": "0046_add_stripe_connect_fields",
+      "breakpoints": true
     }
   ]
 }
