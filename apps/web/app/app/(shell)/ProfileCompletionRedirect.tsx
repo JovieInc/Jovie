@@ -16,10 +16,17 @@ function isBlank(value: string | null | undefined): boolean {
  * (missing handle or display name) are sent to onboarding.
  */
 export function ProfileCompletionRedirect() {
-  const { selectedProfile } = useDashboardData();
+  const { selectedProfile, dashboardLoadError } = useDashboardData();
   const router = useRouter();
 
   useEffect(() => {
+    // Don't redirect when profile is null due to a data loading error —
+    // the null selectedProfile reflects a transient failure, not a missing
+    // profile. Redirecting here would loop: /app → /onboarding → /app.
+    if (dashboardLoadError) {
+      return;
+    }
+
     if (!selectedProfile) {
       router.replace('/onboarding');
       return;
@@ -31,7 +38,7 @@ export function ProfileCompletionRedirect() {
     ) {
       router.replace('/onboarding');
     }
-  }, [router, selectedProfile]);
+  }, [router, selectedProfile, dashboardLoadError]);
 
   return null;
 }

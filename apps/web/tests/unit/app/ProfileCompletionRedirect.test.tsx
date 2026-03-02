@@ -95,4 +95,20 @@ describe('ProfileCompletionRedirect', () => {
 
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
+
+  it('does not redirect when selectedProfile is null due to a dashboard load error', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message: 'DB timeout',
+        code: null,
+        errorType: 'QueryTimeoutError',
+      },
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 });

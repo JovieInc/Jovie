@@ -30,13 +30,15 @@ export default async function AdminLayout({
     }
   }
 
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
-    redirect('/sign-in?redirect_url=/app/admin');
-  }
-
-  // Redirect non-admins to dashboard instead of returning 404.
-  // A 404 is misleading — the routes exist, the user just lacks permission.
-  if (!entitlements.isAdmin) {
+  // Redirect unauthorized users to dashboard.
+  // Middleware already gates /app/admin as a protected path, so unauthenticated
+  // users never reach this layout. If auth state is transiently unavailable,
+  // redirecting to /sign-in would loop (middleware redirects authed users back).
+  if (
+    !entitlements.isAuthenticated ||
+    !entitlements.userId ||
+    !entitlements.isAdmin
+  ) {
     redirect(APP_ROUTES.DASHBOARD);
   }
 

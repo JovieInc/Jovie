@@ -443,10 +443,10 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (
-        (pathname === '/signin' || pathname === '/signup') &&
-        !isRSCPrefetch
-      ) {
+      } else if (pathInfo.isAuthPath && !isRSCPrefetch) {
+        // Redirect authenticated users away from any auth page (/signin, /sign-in,
+        // /signup, /sign-up). This handles both canonical and hyphenated variants
+        // that server components may redirect to.
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else {
         // Single domain: no rewrites needed, routes are at their canonical paths
