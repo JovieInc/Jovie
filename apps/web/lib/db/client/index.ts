@@ -14,6 +14,7 @@ export {
   getPoolMetrics,
   getPoolState,
   initializeDb,
+  resetPool,
 } from './connection';
 // Type Guards
 export { isActiveConnectionsRow, isRecord, isTableExistsRow } from './guards';
