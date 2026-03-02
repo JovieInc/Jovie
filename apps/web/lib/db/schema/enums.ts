@@ -301,6 +301,8 @@ export const pixelEventTypeEnum = pgEnum('pixel_event_type', [
   'link_click',
   'form_submit',
   'scroll_depth',
+  'tip_page_view',
+  'tip_intent',
 ]);
 
 export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [

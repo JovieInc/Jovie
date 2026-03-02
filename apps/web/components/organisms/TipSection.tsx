@@ -94,6 +94,16 @@ export function TipSection({
   const handleStripePayment = async (amount: number) => {
     if (!onStripePayment) return;
 
+    // Fire tip_intent pixel event for retargeting
+    // @ts-expect-error - joviePixel is set by JoviePixel component
+    if (globalThis.joviePixel?.track) {
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      globalThis.joviePixel.track('tip_intent', {
+        tipAmount: amount,
+        tipMethod: 'stripe',
+      });
+    }
+
     setLoading(amount);
     try {
       await onStripePayment(amount);
@@ -118,6 +128,16 @@ export function TipSection({
     const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
       venmoUsername ?? ''
     )}`;
+
+    // Fire tip_intent pixel event for retargeting
+    // @ts-expect-error - joviePixel is set by JoviePixel component
+    if (globalThis.joviePixel?.track) {
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      globalThis.joviePixel.track('tip_intent', {
+        tipAmount: amount,
+        tipMethod: 'venmo',
+      });
+    }
 
     onVenmoPayment(url);
     globalThis.open(url, '_blank', 'noopener,noreferrer');

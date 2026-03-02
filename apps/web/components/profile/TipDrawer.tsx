@@ -47,6 +47,13 @@ export function TipDrawer({
       handle: artistHandle,
     });
 
+    // Fire tip_page_view pixel event for retargeting
+    // @ts-expect-error - joviePixel is set by JoviePixel component
+    if (globalThis.joviePixel?.track) {
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      globalThis.joviePixel.track('tip_page_view');
+    }
+
     if (!historyPushedRef.current) {
       globalThis.history.pushState({ tipDrawer: true }, '');
       historyPushedRef.current = true;
@@ -82,6 +89,16 @@ export function TipDrawer({
       const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
         venmoUsername ?? ''
       )}`;
+
+      // Fire tip_intent pixel event for retargeting
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      if (globalThis.joviePixel?.track) {
+        // @ts-expect-error - joviePixel is set by JoviePixel component
+        globalThis.joviePixel.track('tip_intent', {
+          tipAmount: amount,
+          tipMethod: 'venmo',
+        });
+      }
 
       globalThis.open(url, '_blank', 'noopener,noreferrer');
     },

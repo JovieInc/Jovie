@@ -13,7 +13,13 @@ interface JoviePixelProps {
 interface PixelEventPayload {
   profileId: string;
   sessionId: string;
-  eventType: 'page_view' | 'link_click' | 'form_submit' | 'scroll_depth';
+  eventType:
+    | 'page_view'
+    | 'link_click'
+    | 'form_submit'
+    | 'scroll_depth'
+    | 'tip_page_view'
+    | 'tip_intent';
   eventData?: Record<string, unknown>;
   consent: boolean;
   referrer?: string;
