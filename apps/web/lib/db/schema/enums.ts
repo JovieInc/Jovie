@@ -380,6 +380,14 @@ export const insightRunStatusEnum = pgEnum('insight_run_status', [
   'failed',
 ]);
 
+// Tip Status Enum
+export const tipStatusEnum = pgEnum('tip_status', [
+  'pending',
+  'completed',
+  'failed',
+  'refunded',
+]);
+
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [
   'pending', // Referred user signed up but not yet subscribed
