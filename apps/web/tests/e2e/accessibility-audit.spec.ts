@@ -1,6 +1,10 @@
 import { type Page, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
-import { SMOKE_TIMEOUTS, waitForHydration, waitForLoad } from './utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  waitForHydration,
+  waitForLoad,
+} from './utils/smoke-test-utils';
 
 const baseUrl = process.env.BASE_URL || 'http://localhost:3100';
 
@@ -263,9 +267,15 @@ test.describe('Accessibility Audit', () => {
     }
 
     for (const route of routes) {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
       await page.goto(url, { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
       await waitForLoad(page);
@@ -330,9 +340,15 @@ test.describe('Accessibility Audit', () => {
     }
 
     for (const route of authRoutes) {
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
       await page.goto(url, { timeout: SMOKE_TIMEOUTS.NAVIGATION * 2 });
       await waitForLoad(page);

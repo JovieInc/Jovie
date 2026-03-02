@@ -111,10 +111,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
     hasAdminAccess = await expect
-      .poll(
-        async () => adminNavSection.isVisible().catch(() => false),
-        { timeout: 10000, intervals: [500, 1000, 2000] }
-      )
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      })
       .toBeTruthy()
       .then(() => true)
       .catch(() => false);
@@ -273,10 +273,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
     hasAdminAccess = await expect
-      .poll(
-        async () => adminNavSection.isVisible().catch(() => false),
-        { timeout: 10000, intervals: [500, 1000, 2000] }
-      )
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      })
       .toBeTruthy()
       .then(() => true)
       .catch(() => false);
@@ -373,10 +373,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
     hasAdminAccess = await expect
-      .poll(
-        async () => adminNavSection.isVisible().catch(() => false),
-        { timeout: 10000, intervals: [500, 1000, 2000] }
-      )
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      })
       .toBeTruthy()
       .then(() => true)
       .catch(() => false);

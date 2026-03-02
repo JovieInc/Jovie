@@ -13,7 +13,7 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import { waitForHydration } from './utils/smoke-test-utils';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -274,9 +274,15 @@ test.describe('Icon Contrast Audit — WCAG AA Non-Text (3:1)', () => {
       test.setTimeout(120_000);
 
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
-      await page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto(url, { timeout: 60_000 });
       await waitForHydration(page);
 
