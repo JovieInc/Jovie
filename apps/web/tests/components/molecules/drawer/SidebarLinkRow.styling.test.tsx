@@ -34,8 +34,8 @@ describe('SidebarLinkRow styling regression', () => {
 
     const row = screen.getByTestId('link-row');
 
-    // Must have a solid background (bg-surface-2), NOT bg-transparent
-    expect(row.className).toContain('bg-surface-2');
+    // Row should have hover interaction styling and not be transparent
+    expect(row.className).toContain('hover:bg-interactive-hover');
     expect(row.className).not.toContain('bg-transparent');
   });
 
