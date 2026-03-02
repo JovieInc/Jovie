@@ -9,6 +9,7 @@ import {
   AudienceLastActionCell,
   AudienceLastSeenCell,
   AudienceLocationCell,
+  AudienceLtvCell,
   AudienceQuickActionsCell,
   AudienceReturningCell,
   AudienceRowSelectionCell,
@@ -129,6 +130,20 @@ export function renderLastActionCell({
   row,
 }: CellContext<AudienceMember, AudienceMember['latestActions']>) {
   return <AudienceLastActionCell actions={row.original.latestActions} />;
+}
+
+/**
+ * Renders the LTV (Lifetime Value) cell with tier indicator and tooltip
+ */
+export function renderLtvCell({ row }: CellContext<AudienceMember, number>) {
+  return (
+    <AudienceLtvCell
+      tipAmountTotalCents={row.original.tipAmountTotalCents}
+      tipCount={row.original.tipCount}
+      visits={row.original.visits}
+      engagementScore={row.original.engagementScore}
+    />
+  );
 }
 
 /**

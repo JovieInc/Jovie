@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceMembers } from '@/lib/db/schema/analytics';
+import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
@@ -126,11 +127,25 @@ export async function GET(request: NextRequest) {
           phone: audienceMembers.phone,
           spotifyConnected: audienceMembers.spotifyConnected,
           purchaseCount: audienceMembers.purchaseCount,
+          tipAmountTotalCents:
+            drizzleSql<number>`COALESCE(${tipAudience.tipAmountTotalCents}, 0)`.as(
+              'tip_amount_total_cents'
+            ),
+          tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
+            'tip_count'
+          ),
           tags: audienceMembers.tags,
           lastSeenAt: audienceMembers.lastSeenAt,
           createdAt: audienceMembers.firstSeenAt,
         })
         .from(audienceMembers)
+        .leftJoin(
+          tipAudience,
+          and(
+            eq(tipAudience.profileId, audienceMembers.creatorProfileId),
+            eq(tipAudience.email, audienceMembers.email)
+          )
+        )
         .where(
           and(eq(audienceMembers.creatorProfileId, profileId), segmentCondition)
         );
@@ -176,6 +191,8 @@ export async function GET(request: NextRequest) {
         phone: member.phone,
         spotifyConnected: Boolean(member.spotifyConnected),
         purchaseCount: member.purchaseCount,
+        tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
+        tipCount: member.tipCount ?? 0,
         tags: Array.isArray(member.tags) ? member.tags : [],
         lastSeenAt: serializeDate(member.lastSeenAt),
         createdAt: serializeDate(member.createdAt),

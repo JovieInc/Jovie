@@ -40,6 +40,7 @@ import {
   renderEmailCell,
   renderIntentScoreCell,
   renderLastActionCell,
+  renderLtvCell,
   renderReturningCell,
   renderSourceCell,
   renderUserCell,
@@ -65,7 +66,7 @@ function getSrDescription(
 /**
  * Redesigned column definitions for members mode.
  *
- * Columns: Select | User | Intent Score | Returning | Source | Last Action | Quick Actions
+ * Columns: Select | User | Intent Score | LTV | Returning | Source | Last Action | Quick Actions
  *
  * Cell renderers that need dynamic state (selection, menu, quick actions) read from
  * AudienceTableContext instead of closing over values, keeping these definitions fully stable.
@@ -88,6 +89,12 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     header: 'Intent',
     cell: renderIntentScoreCell,
     size: 110,
+  }),
+  memberColumnHelper.accessor('tipAmountTotalCents', {
+    id: 'ltv',
+    header: 'LTV',
+    cell: renderLtvCell,
+    size: 80,
   }),
   memberColumnHelper.accessor('visits', {
     id: 'returning',

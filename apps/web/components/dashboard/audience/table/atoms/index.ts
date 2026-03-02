@@ -14,6 +14,8 @@ export type { AudienceLastSeenCellProps } from './AudienceLastSeenCell';
 export { AudienceLastSeenCell } from './AudienceLastSeenCell';
 export type { AudienceLocationCellProps } from './AudienceLocationCell';
 export { AudienceLocationCell } from './AudienceLocationCell';
+export type { AudienceLtvCellProps } from './AudienceLtvCell';
+export { AudienceLtvCell } from './AudienceLtvCell';
 export type { AudienceMobileCardProps } from './AudienceMobileCard';
 export { AudienceMobileCard } from './AudienceMobileCard';
 export type { AudienceQuickActionsCellProps } from './AudienceQuickActionsCell';
