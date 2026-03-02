@@ -41,6 +41,8 @@ export type AudienceMember = {
   phone: string | null;
   spotifyConnected: boolean;
   purchaseCount: number;
+  tipAmountTotalCents: number;
+  tipCount: number;
   tags: string[];
   deviceType: string | null;
   lastSeenAt: string | null;
