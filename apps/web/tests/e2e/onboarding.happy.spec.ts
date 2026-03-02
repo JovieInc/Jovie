@@ -59,9 +59,15 @@ test.describe('Onboarding Happy Path', () => {
     // Turbopack compilation + Clerk CDN + onboarding flow can be slow
     test.setTimeout(120_000);
 
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     // Setup Clerk testing token for programmatic authentication
     await setupClerkTestingToken({ page });
@@ -249,9 +255,15 @@ test.describe('Onboarding Happy Path', () => {
     // are not redirected to onboarding again
     test.setTimeout(120_000);
 
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     // Setup Clerk testing token
     await setupClerkTestingToken({ page });

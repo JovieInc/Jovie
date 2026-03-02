@@ -12,9 +12,15 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Onboarding Handle Race Conditions', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     // Mock the API endpoints to simulate network delays and control responses
     await page.route('/api/handle/check*', async (route, request) => {
       const url = new URL(request.url());
@@ -107,7 +113,6 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await page.waitForTimeout(50);
     }
 
-
     // Final state should match the last typed value
     const lastHandle = typingSequence[typingSequence.length - 1];
 
@@ -123,7 +128,9 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await expect(submitButton).toBeEnabled({ timeout: 5000 });
     } else {
       // Should show error for unavailable handle
-      await expect(page.locator('text="Handle already taken"')).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('text="Handle already taken"')).toBeVisible({
+        timeout: 5000,
+      });
 
       // Submit button should be disabled
       const submitButton = page.getByRole('button', {
@@ -147,10 +154,11 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await page.waitForTimeout(100); // Small delay
     await handleInput.fill('taken1');
 
-
     // Final state must show taken1 as unavailable
     await expect(handleInput).toHaveValue('taken1');
-    await expect(page.locator('text="Handle already taken"')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text="Handle already taken"')).toBeVisible({
+      timeout: 5000,
+    });
 
     // Submit button must be disabled for taken handle
     const submitButton = page.getByRole('button', {
@@ -181,7 +189,6 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await handleInput.fill(handle);
       await page.waitForTimeout(50); // Very fast typing simulation
     }
-
 
     // Verify final state
     const finalHandle = rapidSequence[rapidSequence.length - 1];
@@ -234,7 +241,6 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await handleInput.fill(handle);
       await page.waitForTimeout(50);
     }
-
 
     // Verify final state
     await expect(handleInput).toHaveValue('final');
@@ -310,7 +316,9 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await handleInput.fill('errorhandle');
 
     // Should show network error
-    await expect(page.locator('text="Network error"')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text="Network error"')).toBeVisible({
+      timeout: 5000,
+    });
 
     // Type new handle that succeeds
     await handleInput.fill('recovery');

@@ -24,9 +24,15 @@ test.describe('Onboarding Handle Taken Prevention', () => {
   const runWithRealAPI = process.env.E2E_ONBOARDING_HANDLE_TAKEN === '1';
 
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     if (runWithRealAPI) {
       // Validate required environment variables when using real API
       const requiredEnvVars = {
@@ -119,7 +125,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     // Enter a known taken handle from seed data
     await handleInput.fill('musicmaker');
 
-
     // Verify error message is displayed
     await expect(page.locator('text="Handle already taken"')).toBeVisible({
       timeout: 5_000,
@@ -169,7 +174,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     // Now switch to an available handle
     const uniqueHandle = `e2e-${Date.now().toString(36)}`;
     await handleInput.fill(uniqueHandle);
-
 
     if (runWithRealAPI) {
       // Verify green checkmark is visible

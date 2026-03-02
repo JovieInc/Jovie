@@ -16,9 +16,15 @@ test.describe('New user completes onboarding and sees live profile', () => {
   test('onboarding -> dashboard -> public profile', async ({ page }) => {
     test.setTimeout(60_000);
 
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     await setupClerkTestingToken({ page });
 
