@@ -1,13 +1,25 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Check, Copy, FileCode2, FileImage, Link2, QrCode } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  DollarSign,
+  FileCode2,
+  FileImage,
+  Hash,
+  Link2,
+  QrCode,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
 import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useEarningsQuery } from '@/lib/queries/useEarningsQuery';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
 import { generateQrCodeDataUrl, generateQrCodeSvg } from '@/lib/utils/qr-code';
 
@@ -19,8 +31,59 @@ const QR_DISPLAY_SIZE = 200;
 const QR_PRINT_SIZE = 1024;
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+function formatCents(cents: number): string {
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+// =============================================================================
 // Sub-components
 // =============================================================================
+
+interface StatCardProps {
+  readonly label: string;
+  readonly value: string;
+  readonly icon: React.ComponentType<{ className?: string }>;
+  readonly iconBg: string;
+  readonly iconColor: string;
+}
+
+const StatCard = memo(function StatCard({
+  label,
+  value,
+  icon: Icon,
+  iconBg,
+  iconColor,
+}: StatCardProps) {
+  return (
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+      <div className='flex items-center gap-2'>
+        <div
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconBg}`}
+          aria-hidden='true'
+        >
+          <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
+        </div>
+        <dt className='text-xs font-medium text-secondary-token'>{label}</dt>
+      </div>
+      <dd className='mt-2 text-2xl font-semibold tabular-nums leading-none tracking-tight text-primary-token'>
+        {value}
+      </dd>
+    </div>
+  );
+});
+
+// -----------------------------------------------------------------------------
 
 interface QrPreviewProps {
   readonly dataUrl: string | null;
@@ -62,6 +125,9 @@ const QrPreview = memo(function QrPreview({
 export function EarningsTab() {
   const { selectedProfile } = useDashboardData();
   const notifications = useNotifications();
+  const { data: earnings, isLoading: isEarningsLoading } = useEarningsQuery(
+    Boolean(selectedProfile)
+  );
 
   const handle =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username ?? '';
@@ -112,7 +178,6 @@ export function EarningsTab() {
     setIsDownloadingPng(true);
     try {
       const dataUrl = await generateQrCodeDataUrl(tipUrl, QR_PRINT_SIZE);
-      // Convert data URL to blob for download
       const response = await fetch(dataUrl);
       const blob = await response.blob();
       downloadBlob(blob, `jovie-tip-${handle}.png`);
@@ -174,9 +239,138 @@ export function EarningsTab() {
     );
   }
 
+  const stats = earnings?.stats;
+  const tippers = earnings?.tippers ?? [];
+
   return (
     <div className='flex flex-col gap-6'>
+      {/* ── Earnings Stats ─────────────────────────── */}
+      <p className='text-[11px] font-semibold uppercase tracking-[0.2em] text-tertiary-token'>
+        Revenue
+      </p>
+
+      {isEarningsLoading ? (
+        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+          {[1, 2, 3].map(i => (
+            <div
+              key={i}
+              className='space-y-2 rounded-xl border border-subtle bg-surface-1 p-4'
+            >
+              <div className='flex items-center gap-2'>
+                <div className='h-7 w-7 rounded-lg skeleton' />
+                <div className='h-3 w-16 rounded-sm skeleton' />
+              </div>
+              <div className='h-7 w-20 rounded-md skeleton' />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <dl className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+          <StatCard
+            label='Total revenue'
+            value={formatCents(stats?.totalRevenueCents ?? 0)}
+            icon={DollarSign}
+            iconBg='bg-success-subtle'
+            iconColor='text-success'
+          />
+          <StatCard
+            label='Tips received'
+            value={String(stats?.totalTips ?? 0)}
+            icon={Hash}
+            iconBg='bg-info-subtle'
+            iconColor='text-info'
+          />
+          <StatCard
+            label='Average tip'
+            value={formatCents(stats?.averageTipCents ?? 0)}
+            icon={TrendingUp}
+            iconBg='bg-accent-subtle'
+            iconColor='text-accent-token'
+          />
+        </dl>
+      )}
+
+      {/* ── Tippers Table ──────────────────────────── */}
+      <p className='text-[11px] font-semibold uppercase tracking-[0.2em] text-tertiary-token'>
+        Recent tippers
+      </p>
+
+      <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
+        {isEarningsLoading ? (
+          <div className='space-y-3 p-4'>
+            {[1, 2, 3].map(i => (
+              <div key={i} className='flex items-center gap-3'>
+                <div className='h-8 w-8 rounded-full skeleton' />
+                <div className='flex-1 space-y-1.5'>
+                  <div className='h-3 w-24 rounded-sm skeleton' />
+                  <div className='h-3 w-36 rounded-sm skeleton' />
+                </div>
+                <div className='h-4 w-12 rounded-sm skeleton' />
+              </div>
+            ))}
+          </div>
+        ) : tippers.length === 0 ? (
+          <div className='flex flex-col items-center gap-3 px-6 py-12 text-center'>
+            <div
+              className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2'
+              aria-hidden='true'
+            >
+              <Users className='h-5 w-5 text-tertiary-token' />
+            </div>
+            <p className='text-sm text-secondary-token'>
+              No tips yet. Share your tip link to get started.
+            </p>
+          </div>
+        ) : (
+          <div className='overflow-x-auto'>
+            <table className='w-full text-left text-sm'>
+              <thead>
+                <tr className='border-b border-subtle'>
+                  <th className='px-4 py-3 text-xs font-medium text-tertiary-token'>
+                    Name
+                  </th>
+                  <th className='px-4 py-3 text-xs font-medium text-tertiary-token'>
+                    Email
+                  </th>
+                  <th className='px-4 py-3 text-right text-xs font-medium text-tertiary-token'>
+                    Amount
+                  </th>
+                  <th className='px-4 py-3 text-right text-xs font-medium text-tertiary-token'>
+                    Date
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {tippers.map(tipper => (
+                  <tr
+                    key={tipper.id}
+                    className='border-b border-subtle last:border-b-0 transition-colors hover:bg-white/[0.02]'
+                  >
+                    <td className='px-4 py-3 text-primary-token'>
+                      {tipper.tipperName ?? 'Anonymous'}
+                    </td>
+                    <td className='px-4 py-3 text-secondary-token'>
+                      {tipper.contactEmail ?? '--'}
+                    </td>
+                    <td className='px-4 py-3 text-right font-medium tabular-nums text-primary-token'>
+                      {formatCents(tipper.amountCents)}
+                    </td>
+                    <td className='px-4 py-3 text-right text-secondary-token'>
+                      {formatDate(tipper.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* ── QR Code Card ───────────────────────────── */}
+      <p className='text-[11px] font-semibold uppercase tracking-[0.2em] text-tertiary-token'>
+        QR Code
+      </p>
+
       <div className='rounded-xl border border-subtle bg-surface-1 p-5 sm:p-6'>
         <div className='flex items-center gap-2 mb-5'>
           <div
