@@ -534,14 +534,16 @@ export function useFormState(
       if (isLastAttempt) {
         // Final attempt failed - store function for manual retry
         lastAsyncFnRef.current = asyncFn;
-        const errorMessage =
-          error instanceof Error ? error.message : 'An error occurred';
+        // Log raw error for debugging; show user-friendly message in UI (JOV-1088)
+        if (error instanceof Error) {
+          console.error('[useFormState] retry exhausted:', error.message);
+        }
         setState(prev => ({
           ...prev,
           canRetry: true,
           isRetrying: false,
           loading: false,
-          error: errorMessage,
+          error: 'Something went wrong. Please try again.',
         }));
         return false;
       }

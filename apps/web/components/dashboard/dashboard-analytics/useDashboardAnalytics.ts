@@ -57,7 +57,7 @@ export function useDashboardAnalyticsState(): UseDashboardAnalyticsReturn {
     rangePanelId,
     activeRangeTabId,
     data,
-    error: error?.message ?? null,
+    error: error ? 'Unable to load analytics. Please try again.' : null,
     loading: isLoading,
     refresh,
     rangeLabel,

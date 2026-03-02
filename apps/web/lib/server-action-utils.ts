@@ -15,8 +15,9 @@ export async function withErrorHandling<T>(
     Sentry.captureException(error, {
       tags: { context: context ?? 'server-action' },
     });
-    const message =
+    const rawMessage =
       error instanceof Error ? error.message : 'An unexpected error occurred';
-    return { success: false, error: message };
+    console.error(`[server-action${context ? `:${context}` : ''}]`, rawMessage);
+    return { success: false, error: 'Something went wrong. Please try again.' };
   }
 }

@@ -78,6 +78,7 @@ describe('SettingsContactsSection', () => {
           retry: false,
           gcTime: 0,
         },
+        mutations: { retry: false },
       },
     });
     render(

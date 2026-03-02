@@ -120,9 +120,8 @@ export function ConnectedDspList({
       });
       toast.success(`${label} disconnected`);
     } catch (err: unknown) {
-      toast.error(
-        err instanceof Error ? err.message : `Failed to disconnect ${label}`
-      );
+      console.error(`Failed to disconnect ${label}`, err);
+      toast.error(`Failed to disconnect ${label}. Please try again.`);
     }
   }, [matchToDisconnect, profileId, rejectMatchAsync]);
 
@@ -146,7 +145,10 @@ export function ConnectedDspList({
         { profileId, spotifyArtistId: spotifyId, targetProviders: [provider] },
         {
           onSuccess: () => toast.success(`${label} sync started`),
-          onError: err => toast.error(err.message || `Failed to sync ${label}`),
+          onError: err => {
+            console.error(`Failed to sync ${label}`, err);
+            toast.error(`Failed to sync ${label}. Please try again.`);
+          },
         }
       );
     },
@@ -175,10 +177,12 @@ export function ConnectedDspList({
           queryKey: queryKeys.dspEnrichment.matches(profileId),
         });
       } catch (err) {
+        console.error(
+          `Failed to connect ${getProviderLabel(paletteProvider)}`,
+          err
+        );
         toast.error(
-          err instanceof Error
-            ? err.message
-            : `Failed to connect ${getProviderLabel(paletteProvider)}`
+          `Failed to connect ${getProviderLabel(paletteProvider)}. Please try again.`
         );
       }
     },
