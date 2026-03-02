@@ -19,7 +19,7 @@ const ACTION_BUTTON_CLASS = [
 
 const SWIPE_ACTION_BUTTON_CLASS = [
   'flex h-full items-center justify-center px-4',
-  'text-white transition-colors active:opacity-80',
+  'text-accent-foreground transition-colors active:opacity-80',
 ].join(' ');
 
 export interface SidebarLinkRowProps {
