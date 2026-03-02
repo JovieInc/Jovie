@@ -26,6 +26,7 @@ export * from './HeaderIconButton';
 export * from './HeaderText';
 export * from './Icon';
 export * from './IconBadge';
+export * from './ImageWithFallback';
 export * from './JovieIcon';
 export * from './JovieLogo';
 export * from './Label';
