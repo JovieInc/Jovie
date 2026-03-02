@@ -7,8 +7,8 @@
  * - Client-side error detection
  */
 
-import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 // ============================================================================
 // Admin Credentials
@@ -179,13 +179,10 @@ export async function waitForAdminNav(
   // Use expect.poll() to check for admin nav visibility without fixed delays
   try {
     await expect
-      .poll(
-        async () => adminNavSection.isVisible().catch(() => false),
-        {
-          timeout: maxAttempts * delayMs,
-          intervals: Array(maxAttempts).fill(delayMs),
-        }
-      )
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: maxAttempts * delayMs,
+        intervals: Array(maxAttempts).fill(delayMs),
+      })
       .toBe(true);
     return true;
   } catch {

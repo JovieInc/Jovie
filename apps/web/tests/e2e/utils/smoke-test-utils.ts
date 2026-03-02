@@ -487,7 +487,11 @@ export async function waitForNetworkIdle(
   });
 
   // Buffer absorbed by domcontentloaded check — no fixed timeout needed
-  await page.waitForLoadState('domcontentloaded', { timeout: Math.min(idleTime * 2, 2000) }).catch(() => {});
+  await page
+    .waitForLoadState('domcontentloaded', {
+      timeout: Math.min(idleTime * 2, 2000),
+    })
+    .catch(() => {});
 }
 
 /**

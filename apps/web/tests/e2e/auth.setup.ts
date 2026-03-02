@@ -129,16 +129,23 @@ setup('authenticate', async ({ page, baseURL }) => {
     );
     if (await overlay.isVisible({ timeout: 1000 }).catch(() => false)) {
       await page.keyboard.press('Escape');
-      await page.waitForFunction(
-        () => !document.querySelector('[data-nextjs-dialog-overlay], [data-nextjs-toast]'),
-        { timeout: 5000 }
-      ).catch(() => {});
+      await page
+        .waitForFunction(
+          () =>
+            !document.querySelector(
+              '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+            ),
+          { timeout: 5000 }
+        )
+        .catch(() => {});
     }
     // Click "Try again" on error boundary if present
     const tryAgain = page.getByRole('button', { name: 'Try again' });
     if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
       await tryAgain.click();
-      await page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
+      await page
+        .waitForLoadState('domcontentloaded', { timeout: 10000 })
+        .catch(() => {});
     }
     // If nav still not visible and we haven't reloaded, try a full page reload
     // This reliably recovers from stuck error overlays and Turbopack issues
