@@ -455,7 +455,15 @@ export {
   type WebhookEvent,
   webhookEvents,
 } from './suppression';
-
+// Tip Audience (Fan email capture from tips)
+export {
+  insertTipAudienceSchema,
+  type NewTipAudienceMember,
+  selectTipAudienceSchema,
+  type TipAudienceMember,
+  tipAudience,
+  tipAudienceSourceEnum,
+} from './tip-audience';
 // Tour (Tour Dates)
 export {
   insertTourDateSchema,

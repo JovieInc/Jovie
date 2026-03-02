@@ -6,3 +6,4 @@
 
 export * from './claim-invite';
 export * from './dsp-bio-update';
+export * from './tip-thank-you';
