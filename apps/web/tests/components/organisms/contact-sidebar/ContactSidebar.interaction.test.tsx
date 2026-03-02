@@ -105,7 +105,6 @@ const mockContact: Contact = {
   displayName: 'John Doe',
   avatarUrl: null,
   isVerified: false,
-  website: 'https://example.com',
   socialLinks: [{ id: '1', label: 'Twitter', url: 'https://twitter.com/test' }],
 };
 
@@ -143,8 +142,8 @@ describe('ContactSidebar', () => {
     expect(socialTab).toHaveAttribute('aria-selected', 'true');
     expect(detailsTab).toHaveAttribute('aria-selected', 'false');
 
-    // Social content visible — Website label
-    expect(screen.getByText('Website')).toBeInTheDocument();
+    // Social content visible — Social links section
+    expect(screen.getByText('Social links')).toBeInTheDocument();
     // Avatar still visible above tabs
     expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
   });
@@ -157,13 +156,12 @@ describe('ContactSidebar', () => {
     expect(screen.getByPlaceholderText('Last')).toHaveValue('Doe');
   });
 
-  it('Social tab shows website and social links', async () => {
+  it('Social tab shows social links', async () => {
     const user = userEvent.setup();
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     await user.click(screen.getByRole('tab', { name: /social/i }));
 
-    expect(screen.getByDisplayValue('https://example.com')).toBeInTheDocument();
     expect(screen.getByText('Social links')).toBeInTheDocument();
   });
 

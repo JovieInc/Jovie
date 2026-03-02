@@ -13,7 +13,6 @@ interface DesktopQrOverlayProps {
 
 export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
-  const [dismissed, setDismissed] = useState(false);
   const [url, setUrl] = useState('');
   const prefersReducedMotion = useReducedMotion();
 
@@ -26,7 +25,6 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
         '(any-pointer: fine)'
       ).matches;
       if (!isMdUp || !hasFinePointer) return;
-      setDismissed(false);
       setMode('open');
       setUrl(`${globalThis.location.origin}/${handle}`);
     };
@@ -41,22 +39,11 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     if (typeof globalThis.matchMedia !== 'function') return;
 
     const isMdUp = globalThis.matchMedia('(min-width: 768px)').matches;
-    const isLgUp = globalThis.matchMedia('(min-width: 1024px)').matches;
     const hasFinePointer = globalThis.matchMedia('(any-pointer: fine)').matches;
-    const hasDismissed =
-      localStorage.getItem('viewOnMobileDismissed') === 'true';
-
-    setDismissed(hasDismissed);
 
     if (!isMdUp || !hasFinePointer) {
       setMode('hidden');
       setUrl('');
-      return;
-    }
-
-    if (isLgUp && !hasDismissed) {
-      setMode('open');
-      setUrl(`${globalThis.location.origin}/${handle}`);
       return;
     }
 
@@ -69,24 +56,15 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     if (typeof globalThis.matchMedia !== 'function') return;
 
     const mqlMd = globalThis.matchMedia('(min-width: 768px)');
-    const mqlLg = globalThis.matchMedia('(min-width: 1024px)');
-
     const mqlPointer = globalThis.matchMedia('(any-pointer: fine)');
 
     const onChange = (_e: MediaQueryListEvent | MediaQueryList) => {
       const isMdUp = mqlMd.matches;
-      const isLgUp = mqlLg.matches;
       const hasFinePointer = mqlPointer.matches;
 
       if (!isMdUp || !hasFinePointer) {
         setMode('hidden');
         setUrl('');
-        return;
-      }
-
-      if (isLgUp && !dismissed) {
-        setMode('open');
-        setUrl(`${globalThis.location.origin}/${handle}`);
         return;
       }
 
@@ -98,22 +76,18 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     onChange(mqlMd);
 
     mqlMd.addEventListener('change', onChange);
-    mqlLg.addEventListener('change', onChange);
     mqlPointer.addEventListener('change', onChange);
 
     return () => {
       mqlMd.removeEventListener('change', onChange);
-      mqlLg.removeEventListener('change', onChange);
       mqlPointer.removeEventListener('change', onChange);
     };
-  }, [dismissed, handle]);
+  }, [handle]);
 
   const close = () => {
     // Clear URL first so the <img> disappears immediately, even during exit animation
     setUrl('');
     setMode('icon');
-    setDismissed(true);
-    localStorage.setItem('viewOnMobileDismissed', 'true');
   };
 
   const reopen = () => {

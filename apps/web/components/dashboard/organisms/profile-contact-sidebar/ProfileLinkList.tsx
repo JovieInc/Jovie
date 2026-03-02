@@ -9,7 +9,10 @@ import type {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
-import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import {
+  DspProviderIcon,
+  PROVIDER_LABELS,
+} from '@/components/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import {
@@ -28,6 +31,7 @@ export interface ProfileLinkListProps {
   readonly onAddLink?: (category: LinkSection) => void;
   readonly onRemoveLink?: (linkId: string) => void;
   readonly dspConnections?: PreviewDspConnections;
+  readonly onDisconnectDsp?: (provider: 'spotify' | 'apple_music') => void;
 }
 
 function getLinkSection(platform: string): LinkSection {
@@ -91,10 +95,12 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   );
 }
 
-function ConnectedDspPills({
+function ConnectedDspRows({
   dspConnections,
+  onDisconnect,
 }: {
   readonly dspConnections: PreviewDspConnections;
+  readonly onDisconnect?: (provider: 'spotify' | 'apple_music') => void;
 }) {
   const connectedProviders = [
     {
@@ -107,7 +113,7 @@ function ConnectedDspPills({
       connected: dspConnections.appleMusic.connected,
       artistName: dspConnections.appleMusic.artistName,
     },
-  ].filter(provider => provider.connected);
+  ].filter(entry => entry.connected);
 
   if (connectedProviders.length === 0) {
     return (
@@ -118,13 +124,18 @@ function ConnectedDspPills({
   }
 
   return (
-    <div className='flex flex-wrap gap-2'>
-      {connectedProviders.map(provider => (
-        <DspConnectionPill
-          key={provider.provider}
-          provider={provider.provider}
-          connected={provider.connected}
-          artistName={provider.artistName}
+    <div className='space-y-0.5'>
+      {connectedProviders.map(entry => (
+        <SidebarLinkRow
+          key={entry.provider}
+          icon={<DspProviderIcon provider={entry.provider} size='sm' />}
+          label={entry.artistName || PROVIDER_LABELS[entry.provider]}
+          url=''
+          badge='Connected'
+          isEditable={Boolean(onDisconnect)}
+          onRemove={
+            onDisconnect ? () => onDisconnect(entry.provider) : undefined
+          }
         />
       ))}
     </div>
@@ -137,6 +148,7 @@ export function ProfileLinkList({
   onAddLink,
   onRemoveLink,
   dspConnections,
+  onDisconnectDsp,
 }: ProfileLinkListProps) {
   // Group links by category
   const groupedLinks = useMemo(() => {
@@ -167,24 +179,27 @@ export function ProfileLinkList({
   if (selectedCategory !== 'all') {
     if (selectedCategory === 'dsp' && dspConnections) {
       return (
-        <div className='space-y-4'>
-          <DrawerLinkSection title='Music connections' isEmpty={false}>
-            <ConnectedDspPills dspConnections={dspConnections} />
-          </DrawerLinkSection>
-          <DrawerLinkSection
-            title='Music links'
-            onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
-            addLabel='Add Music link'
-            isEmpty={filteredLinks.length === 0}
-            emptyMessage='No music links yet. Click + to add one.'
-          >
-            <div className='space-y-2'>
-              {filteredLinks.map(link => (
-                <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
-              ))}
-            </div>
-          </DrawerLinkSection>
-        </div>
+        <DrawerLinkSection
+          title='Music links'
+          onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
+          addLabel='Add Music link'
+          isEmpty={
+            filteredLinks.length === 0 &&
+            !dspConnections.spotify.connected &&
+            !dspConnections.appleMusic.connected
+          }
+          emptyMessage='No music links yet. Click + to add one.'
+        >
+          <div className='space-y-0.5'>
+            <ConnectedDspRows
+              dspConnections={dspConnections}
+              onDisconnect={onDisconnectDsp}
+            />
+            {filteredLinks.map(link => (
+              <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+            ))}
+          </div>
+        </DrawerLinkSection>
       );
     }
 

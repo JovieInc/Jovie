@@ -43,7 +43,7 @@ const CANVAS_STATUS_CONFIG: Record<
   },
   not_set: {
     label: 'Not set',
-    displayLabel: 'Set canvas status.',
+    displayLabel: 'Set',
     className: 'bg-surface-2 text-secondary-token',
   },
 };

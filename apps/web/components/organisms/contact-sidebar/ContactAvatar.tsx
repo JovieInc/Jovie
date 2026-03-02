@@ -51,7 +51,7 @@ export const ContactAvatar = memo(function ContactAvatar({
       badge={
         isVerified ? (
           <BadgeCheck
-            className='h-4 w-4 shrink-0 text-blue-500'
+            className='h-4 w-4 shrink-0 text-accent'
             aria-label='Verified'
           />
         ) : undefined

@@ -13,7 +13,7 @@ export const FEATURE_FLAG_KEYS = {
   IOS_APPLE_MUSIC_PRIORITY: 'feature_ios_apple_music_priority',
   SUBSCRIBE_CTA_EXPERIMENT: 'experiment_subscribe_cta_variant',
   SPOTIFY_OAUTH: 'feature_spotify_oauth',
-  STRIPE_CONNECT: 'feature_stripe_connect',
+  STRIPE_CONNECT_ENABLED: 'stripe-connect-enabled',
 } as const;
 
 export type FeatureFlagKey =

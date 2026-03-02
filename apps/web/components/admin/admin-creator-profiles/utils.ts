@@ -16,7 +16,6 @@ export function mapProfileToContact(
     firstName: undefined,
     lastName: undefined,
     avatarUrl: profile.avatarUrl ?? null,
-    website: null,
     socialLinks: (profile.socialLinks ?? []).map(link => ({
       id: link.id,
       label: link.displayText ?? link.platform,

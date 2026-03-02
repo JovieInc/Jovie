@@ -11,66 +11,63 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { BASE_URL } from '@/constants/domains';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { useRejectDspMatchMutation } from '@/lib/queries/useDspEnrichmentMutations';
+import { useDspMatchesQuery } from '@/lib/queries/useDspMatchesQuery';
 import {
   useAvatarMutation,
   useProfileSaveMutation,
 } from '@/lib/queries/useProfileMutation';
 import { useRemoveSocialLinkMutation } from '@/lib/queries/useRemoveSocialLinkMutation';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { ProfileAboutTab } from './ProfileAboutTab';
+import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
-import {
-  type CategoryOption,
-  getCategoryCounts,
-  ProfileLinkList,
-} from './ProfileLinkList';
+import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { ProfileSidebarHeader } from './ProfileSidebarHeader';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
-/** Tab options for the profile link categories */
+/** Tab options for the profile sidebar categories */
 const PROFILE_TAB_OPTIONS = [
   { value: 'social' as const, label: 'Social' },
   { value: 'dsp' as const, label: 'Music' },
   { value: 'earnings' as const, label: 'Earn' },
-  { value: 'custom' as const, label: 'Web' },
+  { value: 'about' as const, label: 'About' },
 ];
 
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
-  const [selectedCategory, setSelectedCategory] =
-    useState<CategoryOption>('social');
+
+  // Tab state
+  const [selectedCategory, setSelectedCategory] = useState<
+    CategoryOption | 'about'
+  >('social');
 
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
   const avatarMutation = useAvatarMutation();
   const removeLinkMutation = useRemoveSocialLinkMutation();
+  const { mutateAsync: rejectMatchAsync } = useRejectDspMatchMutation();
+  const { data: dspMatches } = useDspMatchesQuery({
+    profileId: selectedProfile?.id ?? '',
+    status: 'all',
+    enabled: !!selectedProfile?.id,
+  });
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
 
-  // Calculate category counts for the selector
-  const categoryCounts = useMemo(() => {
-    if (!previewData?.links) return undefined;
-    return getCategoryCounts(previewData.links);
-  }, [previewData?.links]);
-
-  // Filter tabs to only show categories with links (always show all when editing)
-  const visibleTabs = useMemo(() => {
-    if (!categoryCounts) return PROFILE_TAB_OPTIONS;
-    // Always show all tabs so user can add to empty categories
-    return PROFILE_TAB_OPTIONS;
-  }, [categoryCounts]);
-
-  // Synchronously resolve category to prevent brief mismatch when visibleTabs changes
+  // Resolve category to ensure it's a valid tab value
   const resolvedCategory = useMemo(() => {
-    if (visibleTabs.some(tab => tab.value === selectedCategory)) {
+    if (PROFILE_TAB_OPTIONS.some(tab => tab.value === selectedCategory)) {
       return selectedCategory;
     }
-    return visibleTabs[0]?.value ?? selectedCategory;
-  }, [visibleTabs, selectedCategory]);
+    return 'social' as const;
+  }, [selectedCategory]);
 
   // Sync state when resolved category differs (e.g., after data load)
   useEffect(() => {
@@ -99,36 +96,6 @@ export function ProfileContactSidebar() {
             setPreviewData({
               ...previewData,
               displayName: previewData.displayName,
-            });
-          },
-        }
-      );
-    },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
-  );
-
-  // Handle username change — save to server and instantly update sidebar
-  const handleUsernameChange = useCallback(
-    (value: string) => {
-      if (!selectedProfile || !previewData) return;
-
-      // Instantly update sidebar
-      setPreviewData({
-        ...previewData,
-        username: value,
-        profilePath: `/${value}`,
-      });
-
-      // Save to server
-      profileMutation.mutate(
-        { updates: { username: value } },
-        {
-          onError: () => {
-            // Revert on failure
-            setPreviewData({
-              ...previewData,
-              username: previewData.username,
-              profilePath: previewData.profilePath,
             });
           },
         }
@@ -193,16 +160,15 @@ export function ProfileContactSidebar() {
 
       // Auto-switch to the correct tab for the new link
       const linkCategory = getPlatformCategory(link.platform.id);
-      const mappedCategory: CategoryOption =
-        linkCategory === 'websites'
-          ? 'custom'
+      const mappedCategory =
+        linkCategory === 'websites' || linkCategory === 'custom'
+          ? 'social'
           : (linkCategory as CategoryOption);
       if (
         mappedCategory !== resolvedCategory &&
         (mappedCategory === 'social' ||
           mappedCategory === 'dsp' ||
-          mappedCategory === 'earnings' ||
-          mappedCategory === 'custom')
+          mappedCategory === 'earnings')
       ) {
         setSelectedCategory(mappedCategory);
       }
@@ -274,6 +240,36 @@ export function ProfileContactSidebar() {
     [previewData, selectedProfile, setPreviewData, removeLinkMutation]
   );
 
+  // Handle DSP disconnect
+  const handleDisconnectDsp = useCallback(
+    async (provider: 'spotify' | 'apple_music') => {
+      if (!selectedProfile?.id || !dspMatches) return;
+
+      const match = dspMatches.find(
+        m =>
+          m.providerId === provider &&
+          (m.status === 'confirmed' || m.status === 'auto_confirmed')
+      );
+      if (!match) {
+        toast.error('No active connection found');
+        return;
+      }
+
+      const label = provider === 'spotify' ? 'Spotify' : 'Apple Music';
+      try {
+        await rejectMatchAsync({
+          matchId: match.id,
+          profileId: selectedProfile.id,
+          reason: 'user_disconnected',
+        });
+        toast.success(`${label} disconnected`);
+      } catch {
+        toast.error(`Failed to disconnect ${label}`);
+      }
+    },
+    [selectedProfile?.id, dspMatches, rejectMatchAsync]
+  );
+
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
     return (
@@ -324,10 +320,14 @@ export function ProfileContactSidebar() {
     username,
     displayName,
     avatarUrl,
+    bio,
+    genres,
     links,
     profilePath,
     dspConnections,
   } = previewData;
+
+  const profileUrl = `${BASE_URL}${profilePath}`;
 
   return (
     <RightDrawer
@@ -344,67 +344,91 @@ export function ProfileContactSidebar() {
           onClose={close}
         />
 
-        {/* Contact Header with Avatar, Name — all editable */}
-        <div className='shrink-0 border-b border-subtle px-4 py-3'>
+        {/* Contact Header with Avatar, Name + Analytics + Profile URL */}
+        <div className='shrink-0 px-4 pt-3 pb-4 space-y-3'>
           <ProfileContactHeader
             displayName={displayName}
             username={username}
             avatarUrl={avatarUrl}
             editable
             onDisplayNameChange={handleDisplayNameChange}
-            onUsernameChange={handleUsernameChange}
             onAvatarUpload={handleAvatarUpload}
           />
+
+          {/* Analytics summary */}
+          <ProfileAnalyticsSummary />
+
+          {/* Profile URL */}
+          <a
+            href={profileUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='block text-[12px] text-secondary-token hover:text-primary-token transition-colors truncate'
+          >
+            {profileUrl.replace(/^https?:\/\//, '')}
+          </a>
         </div>
 
         {/* Category tabs */}
-        {visibleTabs.length > 1 && (
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
-            <SegmentControl
-              value={resolvedCategory}
-              onValueChange={setSelectedCategory}
-              options={visibleTabs}
-              size='sm'
-              aria-label='Link categories'
-            />
-          </div>
-        )}
-
-        {/* Links List — with add/remove */}
-        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
-          <ProfileLinkList
-            links={links}
-            selectedCategory={resolvedCategory}
-            onAddLink={handleAddLink}
-            onRemoveLink={handleRemoveLink}
-            dspConnections={dspConnections}
+        <div className='border-b border-t border-subtle px-3 py-1.5 shrink-0'>
+          <SegmentControl
+            value={resolvedCategory}
+            onValueChange={setSelectedCategory}
+            options={PROFILE_TAB_OPTIONS}
+            size='sm'
+            aria-label='Profile sidebar view'
           />
+        </div>
 
-          {/* Smart add link input with platform suggestions */}
-          {isAddingLink && (
-            <div className='mt-3'>
-              <SidebarLinkInput
-                categoryFilter={
-                  resolvedCategory === 'all' ? 'social' : resolvedCategory
+        {/* Tab content */}
+        {resolvedCategory !== 'about' ? (
+          <>
+            {/* Links List — with add/remove */}
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
+              <ProfileLinkList
+                links={links}
+                selectedCategory={resolvedCategory as CategoryOption}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                dspConnections={dspConnections}
+                onDisconnectDsp={handleDisconnectDsp}
+              />
+
+              {/* Smart add link input with platform suggestions */}
+              {isAddingLink && (
+                <div className='mt-3'>
+                  <SidebarLinkInput
+                    categoryFilter={
+                      resolvedCategory === 'social' ||
+                      resolvedCategory === 'dsp' ||
+                      resolvedCategory === 'earnings'
+                        ? resolvedCategory
+                        : 'social'
+                    }
+                    existingPlatforms={existingPlatformIds}
+                    onAdd={handleSmartAddLink}
+                    onCancel={() => setIsAddingLink(false)}
+                    creatorName={previewData?.displayName}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Profile Photo Download Settings */}
+            <div className='shrink-0 border-t border-subtle px-4 py-3'>
+              <ProfilePhotoSettings
+                allowDownloads={
+                  (selectedProfile?.settings as Record<string, unknown> | null)
+                    ?.allowProfilePhotoDownloads === true
                 }
-                existingPlatforms={existingPlatformIds}
-                onAdd={handleSmartAddLink}
-                onCancel={() => setIsAddingLink(false)}
-                creatorName={previewData?.displayName}
               />
             </div>
-          )}
-        </div>
-
-        {/* Profile Photo Download Settings */}
-        <div className='shrink-0 border-t border-subtle px-4 py-3'>
-          <ProfilePhotoSettings
-            allowDownloads={
-              (selectedProfile?.settings as Record<string, unknown> | null)
-                ?.allowProfilePhotoDownloads === true
-            }
-          />
-        </div>
+          </>
+        ) : (
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4'>
+            <ProfileAboutTab bio={bio} genres={genres} />
+          </div>
+        )}
       </div>
     </RightDrawer>
   );
