@@ -96,4 +96,20 @@ export interface ReleaseSidebarProps {
    * Used for free-plan users who can view but not modify their smartlinks.
    */
   readonly readOnly?: boolean;
+  readonly onTrackClick?: (track: {
+    id: string;
+    title: string;
+    slug: string;
+    smartLinkPath: string;
+    trackNumber: number;
+    discNumber: number;
+    durationMs: number | null;
+    isrc: string | null;
+    isExplicit: boolean;
+    providers: Array<{ key: string; label: string; url: string }>;
+    releaseId: string;
+    previewUrl?: string | null;
+    audioUrl?: string | null;
+    audioFormat?: string | null;
+  }) => void;
 }
