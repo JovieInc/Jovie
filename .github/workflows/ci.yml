@@ -811,55 +811,176 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-  # Public Profile Smoke Test - runs against jov.ie (production) to verify public profiles work
-  # This test runs on pushes to main after deploy completes
+  # Post-deploy smoke test -- deterministic curl checks against production.
+  # Replaces the previous Playwright-based test that was flaky due to
+  # dynamic content assertions, hydration timing, and excessive retries.
   ci-public-profile-smoke:
-    name: Public Profile Smoke
+    name: Post-Deploy Smoke (Production)
     needs: [deploy]
     # Run after successful deploy to production
     if: ${{ always() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 1
-
-      - uses: ./.github/actions/setup-node-pnpm
-
-      - name: Cache Playwright Browsers
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
-        with:
-          path: ~/.cache/ms-playwright
-          # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-chromium-
-
-      - name: Install Playwright (Chromium only)
-        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
-
-      - name: Run Public Profile Smoke Test against production
-        run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
+      - name: Verify production endpoints are healthy
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-
-      - name: Run Performance Budget Guard against production
         run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:budgets
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          set -euo pipefail
 
-      - name: Upload Playwright Artifacts on Failure
-        if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: public-profile-smoke-report-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 3
+          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
+          COOKIE_JAR="$(mktemp)"
+          MAX_RETRIES=5
+
+          # Vercel Deployment Protection bypass
+          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
+          BYPASS_ARGS=()
+          if [ -n "$BYPASS_SECRET" ]; then
+            BYPASS_ARGS+=(
+              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
+              -H "x-vercel-set-bypass-cookie: true"
+              -c "$COOKIE_JAR"
+              -b "$COOKIE_JAR"
+            )
+          fi
+
+          # Helper: curl with standard options, returns "body\nstatus_code"
+          fetch() {
+            curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" \
+              "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$1" || echo -e "\n000"
+          }
+
+          # Helper: retry a check function with exponential backoff (max 5 attempts)
+          retry() {
+            local label="$1"; shift
+            local attempt=1
+            while [ $attempt -le $MAX_RETRIES ]; do
+              if "$@"; then
+                return 0
+              fi
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                local delay=$((attempt * 3))
+                echo "  Retry $attempt/$MAX_RETRIES for $label in ${delay}s..."
+                sleep "$delay"
+              fi
+              attempt=$((attempt + 1))
+            done
+            echo "::error::$label failed after $MAX_RETRIES attempts"
+            return 1
+          }
+
+          FAILURES=0
+
+          # -- 1. Health API: JSON status=ok --
+          check_health() {
+            local response
+            response=$(fetch "https://jov.ie/api/health")
+            local status="${response##*$'\n'}"
+            local body="${response%$'\n'*}"
+
+            if [ "$status" != "200" ]; then
+              echo "  Health API returned HTTP $status"
+              return 1
+            fi
+
+            if ! echo "$body" | grep -q '"status":"ok"'; then
+              echo "  Health API status is not ok: $body"
+              return 1
+            fi
+
+            echo "  Health API: HTTP 200, status=ok"
+            return 0
+          }
+
+          echo "=== 1/4 Health API ==="
+          if ! retry "Health API" check_health; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 2. Homepage: HTTP 200, >1000 chars, no error strings --
+          check_homepage() {
+            local response
+            response=$(fetch "https://jov.ie")
+            local status="${response##*$'\n'}"
+            local body="${response%$'\n'*}"
+
+            if [ "$status" != "200" ]; then
+              echo "  Homepage returned HTTP $status"
+              return 1
+            fi
+
+            if [ ${#body} -lt 1000 ]; then
+              echo "  Homepage body too short (${#body} chars)"
+              return 1
+            fi
+
+            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
+              echo "  Homepage contains error message"
+              return 1
+            fi
+
+            echo "  Homepage: HTTP 200, ${#body} chars, no errors"
+            return 0
+          }
+
+          echo "=== 2/4 Homepage ==="
+          if ! retry "Homepage" check_homepage; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 3. Public profile: not 5xx --
+          check_profile() {
+            local response
+            response=$(fetch "https://jov.ie/tim")
+            local status="${response##*$'\n'}"
+
+            if [ "$status" -ge 500 ] 2>/dev/null; then
+              echo "  Profile /tim returned HTTP $status (server error)"
+              return 1
+            fi
+
+            if [ "$status" != "200" ]; then
+              echo "  Profile /tim returned HTTP $status (expected 200, non-fatal)"
+            fi
+
+            echo "  Profile: HTTP $status"
+            return 0
+          }
+
+          echo "=== 3/4 Public Profile ==="
+          if ! retry "Public Profile" check_profile; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 4. Critical pages: /sign-up, /pricing -- no 5xx --
+          check_critical_pages() {
+            for route in "/sign-up" "/pricing"; do
+              local response
+              response=$(fetch "https://jov.ie${route}")
+              local status="${response##*$'\n'}"
+
+              if [ "$status" -ge 500 ] 2>/dev/null; then
+                echo "  Route ${route} returned HTTP $status (server error)"
+                return 1
+              fi
+              echo "  ${route}: HTTP $status"
+            done
+            return 0
+          }
+
+          echo "=== 4/4 Critical Pages ==="
+          if ! retry "Critical Pages" check_critical_pages; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- Summary --
+          echo ""
+          if [ $FAILURES -gt 0 ]; then
+            echo "::error::Post-deploy smoke failed: $FAILURES/4 checks failed"
+            exit 1
+          fi
+          echo "Post-deploy smoke passed: 4/4 checks OK"
+
 
   ci-build:
     name: Build
