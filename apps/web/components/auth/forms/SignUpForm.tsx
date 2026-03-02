@@ -230,7 +230,7 @@ export function SignUpForm() {
         )}
 
         {step === 'method' && (
-          <p className='mt-6 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
+          <p className='mt-4 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
             By signing up, you agree to our{' '}
             <Link
               href={APP_ROUTES.LEGAL_TERMS}

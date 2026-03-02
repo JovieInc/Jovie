@@ -9,7 +9,7 @@ export default function SignInLoading() {
       <div className='w-full max-w-md space-y-6'>
         {/* Logo skeleton */}
         <div className='flex justify-center'>
-          <div className='h-12 w-12 skeleton rounded-lg' />
+          <div className='h-8 w-8 skeleton rounded-lg' />
         </div>
 
         {/* Title skeleton */}
