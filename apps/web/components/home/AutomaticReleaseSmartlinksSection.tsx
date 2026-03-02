@@ -1,9 +1,8 @@
-import { Bolt, Check, ChevronRight, Disc, Link } from 'lucide-react';
+import { ChevronRight, ExternalLink, Link2 } from 'lucide-react';
 import Image from 'next/image';
 
 import { Container } from '@/components/site/Container';
-import type { SmartlinkThreadItem } from './demo/mock-data';
-import { SMARTLINK_KANBAN_COLUMNS, SMARTLINK_THREAD } from './demo/mock-data';
+import { RELEASES } from './demo/mock-data';
 
 /* ------------------------------------------------------------------ */
 /*  DSP icon paths (subset from DspLogo for the demo)                  */
@@ -37,58 +36,57 @@ export function AutomaticReleaseSmartlinksSection() {
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Automatic links.
+              Smart links.
               <br />
-              Instant notifications.
+              Automatic releases.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Sync your Spotify once. When new music drops, Jovie instantly
-                builds a smart link and automatically notifies your fans via
-                email (SMS coming soon).
+                builds a smart link for every release so fans can listen on
+                their preferred platform.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
-                Smartlinks · Auto-generated
+                Smart links · Auto-generated
               </span>
             </div>
           </div>
 
-          {/* Full Width Product Mockup */}
-          <div className='relative mt-12 md:mt-16 mx-auto w-full'>
+          {/* Full Width Product Mockup — desktop window pushed lower, smart link overlays */}
+          <div className='relative mt-12 md:mt-20 mx-auto w-full'>
             <div className='relative w-full'>
-              {/* Left panel — Dashboard Window */}
+              {/* Dashboard Window — releases table */}
               <div
-                className='relative overflow-hidden rounded-xl md:rounded-2xl md:w-[85%]'
+                className='relative overflow-hidden rounded-xl md:rounded-2xl md:w-[85%] md:mt-8'
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   boxShadow: 'var(--linear-shadow-card-elevated)',
                 }}
               >
-                {/* Fake Mac Header */}
+                {/* Mac window chrome */}
                 <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                   <div className='flex gap-2'>
                     <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
                     <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
                     <div className='w-3 h-3 rounded-full bg-[#61C554] border border-black/10' />
                   </div>
+                  <div className='flex-1 text-center text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
+                    Jovie Dashboard
+                  </div>
+                  <div className='w-[52px]' />
                 </div>
 
-                <div className='grid md:grid-cols-[1fr_1.1fr]'>
-                  {/* Left panel — Activity thread */}
-                  <ActivityThread />
-
-                  {/* Right panel — Release kanban */}
-                  <ReleaseKanban />
-                </div>
+                {/* Releases table */}
+                <ReleasesTable />
 
                 {/* Bottom gradient fade */}
                 <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
               </div>
 
-              {/* Right panel — Floating Smart Link Page (matches ReleaseLandingPage) */}
+              {/* Floating Smart Link Card — overlaps dashboard from the right */}
               <div
-                className='absolute z-10 hidden md:flex flex-col right-0 bottom-[-15%] overflow-hidden'
+                className='absolute z-10 hidden md:flex flex-col right-0 top-0 overflow-hidden'
                 style={{
                   width: '320px',
                   borderRadius: '16px',
@@ -111,8 +109,8 @@ export function AutomaticReleaseSmartlinksSection() {
                 </div>
 
                 <div className='relative p-5 flex flex-col items-center'>
-                  {/* Album artwork — matches real page: rounded-lg, shadow, ring */}
-                  <div className='relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1 ring-[hsl(var(--border))]'>
+                  {/* Album artwork — matches ReleaseLandingPage: rounded-lg, shadow, ring */}
+                  <div className='bg-surface-1/30 ring-border relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'>
                     <Image
                       src='https://f4.bcbits.com/img/a0491039755_10.jpg'
                       alt='The Deep End - Cosmic Gate & Tim White'
@@ -123,61 +121,45 @@ export function AutomaticReleaseSmartlinksSection() {
                     />
                   </div>
 
-                  {/* Release info — matches real page typography */}
+                  {/* Release info — matches ReleaseLandingPage typography */}
                   <div className='mt-4 w-full text-center'>
-                    <h3 className='text-lg font-semibold leading-snug tracking-tight text-[hsl(var(--foreground))]'>
+                    <h3 className='text-lg font-semibold leading-snug tracking-tight text-foreground'>
                       The Deep End
                     </h3>
-                    <p className='mt-1 text-sm text-[hsl(var(--muted-foreground))]'>
+                    <p className='mt-1 text-sm text-muted-foreground'>
                       Cosmic Gate & Tim White
                     </p>
                   </div>
 
-                  {/* Platform buttons — matches ReleaseLandingPage styling */}
+                  {/* Platform buttons — matches ReleaseLandingPage styling exactly */}
                   <div className='mt-5 w-full space-y-2'>
                     {DEMO_DSPS.map(dsp => (
                       <div
                         key={dsp.name}
-                        className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out cursor-pointer'
-                        style={
-                          {
-                            backgroundColor: 'hsl(var(--surface-1) / 0.7)',
-                            '--tw-ring-color': 'hsl(var(--border))',
-                          } as React.CSSProperties
-                        }
+                        className='bg-surface-1/70 ring-border group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out cursor-pointer hover:-translate-y-px hover:bg-surface-2/80'
                       >
                         <svg
                           viewBox='0 0 24 24'
                           fill='currentColor'
-                          className='h-5 w-5 shrink-0 transition-colors duration-150'
-                          style={{ color: 'hsl(var(--muted-foreground))' }}
+                          className='text-muted-foreground h-5 w-5 shrink-0 transition-colors duration-150'
                           aria-hidden='true'
                         >
                           <path d={dsp.iconPath} />
                         </svg>
-                        <span className='flex-1 text-base font-semibold text-[hsl(var(--foreground))]'>
+                        <span className='text-foreground flex-1 text-base font-semibold'>
                           {dsp.name}
                         </span>
                         <ChevronRight
-                          className='h-4 w-4'
-                          style={{
-                            color: 'hsl(var(--muted-foreground) / 0.7)',
-                          }}
+                          className='text-muted-foreground/70 h-4 w-4'
                           aria-hidden='true'
                         />
                       </div>
                     ))}
                   </div>
 
-                  {/* Powered by Jovie — matches real page footer */}
+                  {/* Powered by Jovie — matches ReleaseLandingPage footer */}
                   <div className='mt-4 text-center'>
-                    <span
-                      className='inline-flex items-center gap-1 uppercase tracking-widest'
-                      style={{
-                        fontSize: '10px',
-                        color: 'hsl(var(--muted-foreground) / 0.7)',
-                      }}
-                    >
+                    <span className='text-muted-foreground/70 inline-flex items-center gap-1 text-2xs uppercase tracking-widest'>
                       <span>Powered by</span>
                       <span className='font-semibold'>Jovie</span>
                     </span>
@@ -192,181 +174,107 @@ export function AutomaticReleaseSmartlinksSection() {
   );
 }
 
-function ActivityThread() {
+/* ------------------------------------------------------------------ */
+/*  Releases Table — simplified single-panel demo                      */
+/* ------------------------------------------------------------------ */
+
+function ReleasesTable() {
   return (
-    <div className='flex flex-col border-r border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)]'>
-      {/* Title bar */}
-      <div className='flex items-center gap-2 border-b border-[var(--linear-border-subtle)] px-5 py-3'>
-        <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-          Activity
-        </span>
-        <span className='text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
-          · Release automation
-        </span>
-      </div>
-
-      {/* Thread items */}
-      <div className='flex-1 space-y-1 px-3 py-3'>
-        {SMARTLINK_THREAD.map(item => (
-          <div
-            key={item.id}
-            className='flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[var(--linear-bg-hover)]'
-          >
-            {/* Icon */}
-            <span className='mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[var(--linear-bg-surface-2)]'>
-              <ThreadIcon type={item.iconType} color={item.iconColor} />
-            </span>
-
-            <div className='min-w-0 flex-1'>
-              <div className='flex items-baseline justify-between gap-2'>
-                <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-                  {item.label}
-                </p>
-                <span className='flex-shrink-0 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-                  {item.time}
-                </span>
-              </div>
-              {item.detail && (
-                <p className='mt-0.5 text-[var(--linear-label-size)] text-[var(--linear-text-secondary)] leading-[var(--linear-leading-relaxed)]'>
-                  {item.detail}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Command bar */}
-      <div className='border-t border-[var(--linear-border-subtle)] px-4 py-3'>
-        <div
-          className='flex items-center gap-2 rounded-lg px-3 py-2'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            border: '1px solid var(--linear-border-subtle)',
-          }}
-        >
-          <span
-            className='rounded px-1.5 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-accent)]'
-            style={{
-              backgroundColor: 'oklch(from var(--linear-accent) l c h / 0.1)',
-            }}
-          >
-            @jovie
+    <div className='bg-[var(--linear-bg-surface-0)]'>
+      {/* Table header */}
+      <div className='flex items-center justify-between border-b border-[var(--linear-border-subtle)] px-5 py-3'>
+        <div className='flex items-center gap-2'>
+          <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
+            Releases
           </span>
-          <span className='text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
-            create smartlink for upcoming release
+          <span className='rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
+            {RELEASES.length}
+          </span>
+        </div>
+        <div className='flex items-center gap-2'>
+          <span className='text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
+            All synced from Spotify
           </span>
         </div>
       </div>
-    </div>
-  );
-}
 
-function getStatusColor(status: string): string {
-  if (status === 'Live') return 'var(--linear-success)';
-  if (status === 'Syncing') return 'var(--linear-accent)';
-  return 'var(--linear-text-tertiary)';
-}
-
-function getStatusBgColor(status: string): string {
-  if (status === 'Live')
-    return 'oklch(from var(--linear-success) l c h / 0.12)';
-  if (status === 'Syncing')
-    return 'oklch(from var(--linear-accent) l c h / 0.12)';
-  return 'var(--linear-bg-surface-2)';
-}
-
-function ReleaseKanban() {
-  return (
-    <div className='bg-[var(--linear-bg-surface-1)]'>
-      {/* Title bar */}
-      <div className='flex items-center gap-2 border-b border-[var(--linear-border-subtle)] px-5 py-3'>
-        <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-          Releases
+      {/* Column headers */}
+      <div className='grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
+        <span className='w-10' />
+        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
+          Title
         </span>
-        <span className='rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
-          4
+        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden sm:block'>
+          Type
+        </span>
+        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden md:block'>
+          Platforms
+        </span>
+        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
+          Smart Link
         </span>
       </div>
 
-      {/* Columns */}
-      <div className='grid grid-cols-3 gap-px p-3'>
-        {SMARTLINK_KANBAN_COLUMNS.map(column => (
-          <div key={column.title} className='flex flex-col gap-2 px-1.5'>
-            {/* Column header */}
-            <div className='flex items-center justify-between px-1 py-1.5'>
-              <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] tracking-[0.05em] uppercase text-[var(--linear-text-tertiary)]'>
-                {column.title}
-              </span>
-              <span className='text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-                {column.cards.length}
-              </span>
-            </div>
+      {/* Rows */}
+      {RELEASES.map((release, i) => (
+        <div
+          key={release.id}
+          className='grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-[var(--linear-bg-hover)]'
+          style={{
+            borderBottom:
+              i < RELEASES.length - 1
+                ? '1px solid var(--linear-border-subtle)'
+                : undefined,
+          }}
+        >
+          {/* Artwork swatch */}
+          <div
+            className='h-10 w-10 shrink-0 rounded-md'
+            style={{ background: release.gradient }}
+          />
 
-            {/* Cards */}
-            {column.cards.map(card => (
-              <div
-                key={card.id}
-                className='overflow-hidden rounded-lg shadow-sm transition-colors hover:bg-[var(--linear-bg-hover)] cursor-default'
-                style={{
-                  border: '1px solid var(--linear-border-subtle)',
-                  backgroundColor: 'var(--linear-bg-surface-0)',
-                }}
-              >
-                {/* Artwork */}
-                <div
-                  className='h-16 w-full'
-                  style={{ background: card.gradient }}
-                />
-
-                <div className='space-y-1.5 px-2.5 py-2'>
-                  <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-                    {card.title}
-                  </p>
-                  <p className='truncate text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-                    {card.artist}
-                  </p>
-
-                  <div className='flex items-center justify-between'>
-                    <span className='text-[10px] text-[var(--linear-text-tertiary)]'>
-                      {card.platformCount} platforms
-                    </span>
-                    <span
-                      className='rounded-full px-1.5 py-0.5'
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 'var(--linear-font-weight-medium)',
-                        color: getStatusColor(card.status),
-                        backgroundColor: getStatusBgColor(card.status),
-                      }}
-                    >
-                      {card.status}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* Title + date */}
+          <div className='min-w-0'>
+            <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
+              {release.title}
+            </p>
+            <p className='mt-0.5 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
+              {release.date} · {release.trackCount}{' '}
+              {release.trackCount === 1 ? 'track' : 'tracks'}
+            </p>
           </div>
-        ))}
-      </div>
+
+          {/* Type badge */}
+          <span className='hidden sm:inline-flex rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
+            {release.type}
+          </span>
+
+          {/* Platform count */}
+          <span className='hidden md:inline-flex text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
+            {release.platforms.length} platforms
+          </span>
+
+          {/* Smart link status */}
+          {release.hasSmartLink ? (
+            <span
+              className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)]'
+              style={{
+                color: 'var(--linear-success)',
+                backgroundColor:
+                  'oklch(from var(--linear-success) l c h / 0.12)',
+              }}
+            >
+              <Link2 className='h-3 w-3' aria-hidden='true' />
+              Live
+            </span>
+          ) : (
+            <span className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-tertiary)] bg-[var(--linear-bg-surface-2)]'>
+              <ExternalLink className='h-3 w-3' aria-hidden='true' />
+              None
+            </span>
+          )}
+        </div>
+      ))}
     </div>
   );
-}
-
-function ThreadIcon({
-  type,
-  color,
-}: {
-  readonly type: SmartlinkThreadItem['iconType'];
-  readonly color: string;
-}) {
-  const icons = {
-    link: Link,
-    disc: Disc,
-    zap: Bolt,
-    check: Check,
-  } as const;
-
-  const Icon = icons[type];
-  return <Icon aria-hidden='true' className='h-3 w-3' style={{ color }} />;
 }

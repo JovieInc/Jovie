@@ -362,7 +362,7 @@ export const LINKS: DemoLink[] = [
   },
 ];
 
-// ── Automatic release smartlinks ────────────────────────────────────────────
+// ── Smart link release automation ───────────────────────────────────────────
 
 export interface ReleaseAutomationRelease {
   title: string;
