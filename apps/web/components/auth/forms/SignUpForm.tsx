@@ -8,6 +8,7 @@ import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
+import { getOAuthErrorMessage } from '@/lib/auth/clerk-errors';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
@@ -123,7 +124,10 @@ export function SignUpForm() {
                 role='alert'
               >
                 <p className='text-sm font-medium text-destructive'>
-                  {OAUTH_PROVIDER_COPY[oauthFailureProvider]} connection failed.
+                  {getOAuthErrorMessage(
+                    error,
+                    OAUTH_PROVIDER_COPY[oauthFailureProvider]
+                  )}
                 </p>
                 <p className='text-sm text-[#4c515a] dark:text-[#a8aaad]'>
                   Try another sign-up method to keep going right away.

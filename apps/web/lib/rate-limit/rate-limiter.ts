@@ -62,15 +62,17 @@ export class RateLimiter {
       : null;
     this.memoryLimiter = new MemoryRateLimiter(config);
 
-    // Log if using fallback in production
+    // Warn loudly if falling back to in-memory in production — rate limits
+    // stored in memory reset on every Vercel deploy and don't share state
+    // across instances, making them effectively useless in production.
     if (
       this.options.preferRedis &&
       !this.redisLimiter &&
       this.options.warnOnFallback
     ) {
-      this.options.logger(
-        `[RateLimit:${config.name}] Redis unavailable, using in-memory fallback`
-      );
+      const message = `[RateLimit:${config.name}] Redis unavailable, using in-memory fallback — rate limits will reset on deploy`;
+      console.error(message);
+      this.options.logger(message);
     }
   }
 
@@ -93,10 +95,11 @@ export class RateLimiter {
             : `${this.config.name} rate limit exceeded`,
         };
       } catch (error) {
-        // Log error and fall back to memory
-        this.options.logger(
-          `[RateLimit:${this.config.name}] Redis error, falling back to memory: ${error}`
-        );
+        // Log error and fall back to memory — this means rate limits for this
+        // request are enforced in-memory only and won't persist across deploys.
+        const message = `[RateLimit:${this.config.name}] Redis error, falling back to in-memory: ${error}`;
+        console.error(message);
+        this.options.logger(message);
       }
     }
 
