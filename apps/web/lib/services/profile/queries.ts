@@ -5,7 +5,7 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -534,13 +534,17 @@ export async function isClaimTokenValid(
 ): Promise<boolean> {
   const claimTokenHash = await hashClaimToken(claimToken);
 
+  // Try hashed token first (post-migration 0039 flow)
   const [row] = await db
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
       and(
         eq(creatorProfiles.usernameNormalized, username.toLowerCase()),
-        eq(creatorProfiles.claimToken, claimTokenHash),
+        or(
+          eq(creatorProfiles.claimToken, claimTokenHash),
+          eq(creatorProfiles.claimToken, claimToken)
+        ),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )
@@ -567,7 +571,10 @@ export async function lookupUsernameByClaimToken(
     .from(creatorProfiles)
     .where(
       and(
-        eq(creatorProfiles.claimToken, claimTokenHash),
+        or(
+          eq(creatorProfiles.claimToken, claimTokenHash),
+          eq(creatorProfiles.claimToken, claimToken)
+        ),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )

@@ -13,8 +13,6 @@ import { getPlatformCategory } from '@/components/dashboard/organisms/links/util
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
-import { useRejectDspMatchMutation } from '@/lib/queries/useDspEnrichmentMutations';
-import { useDspMatchesQuery } from '@/lib/queries/useDspMatchesQuery';
 import {
   useAvatarMutation,
   useProfileSaveMutation,
@@ -51,12 +49,6 @@ export function ProfileContactSidebar() {
   const profileMutation = useProfileSaveMutation();
   const avatarMutation = useAvatarMutation();
   const removeLinkMutation = useRemoveSocialLinkMutation();
-  const { mutateAsync: rejectMatchAsync } = useRejectDspMatchMutation();
-  const { data: dspMatches } = useDspMatchesQuery({
-    profileId: selectedProfile?.id ?? '',
-    status: 'all',
-    enabled: !!selectedProfile?.id,
-  });
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
@@ -240,36 +232,6 @@ export function ProfileContactSidebar() {
     [previewData, selectedProfile, setPreviewData, removeLinkMutation]
   );
 
-  // Handle DSP disconnect
-  const handleDisconnectDsp = useCallback(
-    async (provider: 'spotify' | 'apple_music') => {
-      if (!selectedProfile?.id || !dspMatches) return;
-
-      const match = dspMatches.find(
-        m =>
-          m.providerId === provider &&
-          (m.status === 'confirmed' || m.status === 'auto_confirmed')
-      );
-      if (!match) {
-        toast.error('No active connection found');
-        return;
-      }
-
-      const label = provider === 'spotify' ? 'Spotify' : 'Apple Music';
-      try {
-        await rejectMatchAsync({
-          matchId: match.id,
-          profileId: selectedProfile.id,
-          reason: 'user_disconnected',
-        });
-        toast.success(`${label} disconnected`);
-      } catch {
-        toast.error(`Failed to disconnect ${label}`);
-      }
-    },
-    [selectedProfile?.id, dspMatches, rejectMatchAsync]
-  );
-
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
     return (
@@ -391,7 +353,6 @@ export function ProfileContactSidebar() {
                 onAddLink={handleAddLink}
                 onRemoveLink={handleRemoveLink}
                 dspConnections={dspConnections}
-                onDisconnectDsp={handleDisconnectDsp}
               />
 
               {/* Smart add link input with platform suggestions */}
