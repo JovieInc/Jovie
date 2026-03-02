@@ -26,7 +26,7 @@ export const DashboardSettings = memo(function DashboardSettings({
   }
 
   return (
-    <div className='mx-auto max-w-3xl'>
+    <div className='mx-auto max-w-3xl pt-2'>
       <SettingsPolished
         artist={artist}
         onArtistUpdate={setArtist}
