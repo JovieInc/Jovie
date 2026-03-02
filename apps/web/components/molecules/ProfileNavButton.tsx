@@ -15,6 +15,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +46,7 @@ export function ProfileNavButton({
 }: ProfileNavButtonProps) {
   const [open, setOpen] = React.useState<boolean>(false);
   const { isSignedIn } = useAuthSafe();
+  const isMdUp = useBreakpoint('md');
 
   const profileUrl = `${BASE_URL}/${artistHandle}`;
 
@@ -90,21 +92,19 @@ export function ProfileNavButton({
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem
-            onSelect={() => {
-              try {
-                const isMdUp =
-                  globalThis.matchMedia('(min-width: 768px)').matches;
-                if (isMdUp) {
+          {isMdUp && (
+            <DropdownMenuItem
+              onSelect={() => {
+                try {
                   globalThis.dispatchEvent(
                     new CustomEvent('jovie:open-profile-qr')
                   );
-                }
-              } catch {}
-            }}
-          >
-            View on mobile
-          </DropdownMenuItem>
+                } catch {}
+              }}
+            >
+              View on mobile
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem
             onSelect={() => {
