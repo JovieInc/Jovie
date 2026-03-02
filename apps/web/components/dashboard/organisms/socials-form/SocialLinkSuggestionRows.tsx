@@ -73,7 +73,7 @@ export function SocialLinkSuggestionRows({
                   disabled={isActioning}
                   className={cn(
                     'inline-flex items-center gap-1 p-1 text-xs rounded-md',
-                    'text-secondary-token hover:bg-surface-2 hover:text-primary-token',
+                    'text-secondary-token hover:bg-interactive-hover hover:text-primary-token',
                     'disabled:opacity-50 transition-colors'
                   )}
                   aria-label={`Dismiss ${suggestion.platformLabel}`}
