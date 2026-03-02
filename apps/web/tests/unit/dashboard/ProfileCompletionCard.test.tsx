@@ -36,9 +36,9 @@ const baseDashboardData: DashboardData = {
     monthReceivedCents: 0,
   },
   profileCompletion: {
-    percentage: 57,
+    percentage: 67,
     completedCount: 4,
-    totalCount: 7,
+    totalCount: 6,
     steps: [
       {
         id: 'avatar',
@@ -68,7 +68,7 @@ describe('ProfileCompletionCard', () => {
   it('renders progress and next steps when profile is incomplete', () => {
     const { getByText } = renderCard();
 
-    expect(getByText('Your profile is 57% complete')).toBeDefined();
+    expect(getByText('Your profile is 67% complete')).toBeDefined();
     expect(getByText('Add a profile photo')).toBeDefined();
     expect(getByText('Set up your tip jar')).toBeDefined();
   });
@@ -86,8 +86,8 @@ describe('ProfileCompletionCard', () => {
     const { queryByText } = renderCard({
       profileCompletion: {
         percentage: 100,
-        completedCount: 7,
-        totalCount: 7,
+        completedCount: 6,
+        totalCount: 6,
         steps: [],
       },
     });

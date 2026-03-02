@@ -128,7 +128,7 @@ const baseDashboardData: DashboardData = {
   profileCompletion: {
     percentage: 0,
     completedCount: 0,
-    totalCount: 7,
+    totalCount: 6,
     steps: [],
   },
 };
