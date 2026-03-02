@@ -22,6 +22,8 @@ export interface PreviewPanelData {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  bio: string | null;
+  genres: string[] | null;
   links: PreviewPanelLink[];
   profilePath: string;
   dspConnections: {

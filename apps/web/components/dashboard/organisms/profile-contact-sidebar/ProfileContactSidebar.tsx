@@ -11,6 +11,7 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { BASE_URL } from '@/constants/domains';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import {
   useAvatarMutation,
@@ -18,6 +19,8 @@ import {
 } from '@/lib/queries/useProfileMutation';
 import { useRemoveSocialLinkMutation } from '@/lib/queries/useRemoveSocialLinkMutation';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { ProfileAboutTab } from './ProfileAboutTab';
+import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import {
   type CategoryOption,
@@ -28,8 +31,17 @@ import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { ProfileSidebarHeader } from './ProfileSidebarHeader';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
-/** Tab options for the profile link categories */
-const PROFILE_TAB_OPTIONS = [
+/** Top-level sidebar tab */
+type SidebarTab = 'overview' | 'about';
+
+/** Top-level tab options */
+const SIDEBAR_TAB_OPTIONS = [
+  { value: 'overview' as const, label: 'Overview' },
+  { value: 'about' as const, label: 'About' },
+];
+
+/** Tab options for the profile link categories (used within Overview tab) */
+const PROFILE_LINK_TAB_OPTIONS = [
   { value: 'social' as const, label: 'Social' },
   { value: 'dsp' as const, label: 'Music' },
   { value: 'earnings' as const, label: 'Earn' },
@@ -40,6 +52,11 @@ export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+
+  // Top-level tab state
+  const [activeTab, setActiveTab] = useState<SidebarTab>('overview');
+
+  // Link category state (within Overview tab)
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryOption>('social');
 
@@ -58,19 +75,19 @@ export function ProfileContactSidebar() {
   }, [previewData?.links]);
 
   // Filter tabs to only show categories with links (always show all when editing)
-  const visibleTabs = useMemo(() => {
-    if (!categoryCounts) return PROFILE_TAB_OPTIONS;
+  const visibleLinkTabs = useMemo(() => {
+    if (!categoryCounts) return PROFILE_LINK_TAB_OPTIONS;
     // Always show all tabs so user can add to empty categories
-    return PROFILE_TAB_OPTIONS;
+    return PROFILE_LINK_TAB_OPTIONS;
   }, [categoryCounts]);
 
-  // Synchronously resolve category to prevent brief mismatch when visibleTabs changes
+  // Synchronously resolve category to prevent brief mismatch when visibleLinkTabs changes
   const resolvedCategory = useMemo(() => {
-    if (visibleTabs.some(tab => tab.value === selectedCategory)) {
+    if (visibleLinkTabs.some(tab => tab.value === selectedCategory)) {
       return selectedCategory;
     }
-    return visibleTabs[0]?.value ?? selectedCategory;
-  }, [visibleTabs, selectedCategory]);
+    return visibleLinkTabs[0]?.value ?? selectedCategory;
+  }, [visibleLinkTabs, selectedCategory]);
 
   // Sync state when resolved category differs (e.g., after data load)
   useEffect(() => {
@@ -324,10 +341,14 @@ export function ProfileContactSidebar() {
     username,
     displayName,
     avatarUrl,
+    bio,
+    genres,
     links,
     profilePath,
     dspConnections,
   } = previewData;
+
+  const profileUrl = `${BASE_URL}${profilePath}`;
 
   return (
     <RightDrawer
@@ -344,8 +365,8 @@ export function ProfileContactSidebar() {
           onClose={close}
         />
 
-        {/* Contact Header with Avatar, Name — all editable */}
-        <div className='shrink-0 border-b border-subtle px-4 py-3'>
+        {/* Contact Header with Avatar, Name + Analytics + Profile URL */}
+        <div className='shrink-0 px-4 pt-3 pb-4 space-y-3'>
           <ProfileContactHeader
             displayName={displayName}
             username={username}
@@ -355,56 +376,91 @@ export function ProfileContactSidebar() {
             onUsernameChange={handleUsernameChange}
             onAvatarUpload={handleAvatarUpload}
           />
+
+          {/* Analytics summary */}
+          <ProfileAnalyticsSummary />
+
+          {/* Profile URL */}
+          <a
+            href={profileUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='block text-[12px] text-secondary-token hover:text-primary-token transition-colors truncate'
+          >
+            {profileUrl.replace(/^https?:\/\//, '')}
+          </a>
         </div>
 
-        {/* Category tabs */}
-        {visibleTabs.length > 1 && (
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
-            <SegmentControl
-              value={resolvedCategory}
-              onValueChange={setSelectedCategory}
-              options={visibleTabs}
-              size='sm'
-              aria-label='Link categories'
-            />
-          </div>
-        )}
-
-        {/* Links List — with add/remove */}
-        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
-          <ProfileLinkList
-            links={links}
-            selectedCategory={resolvedCategory}
-            onAddLink={handleAddLink}
-            onRemoveLink={handleRemoveLink}
-            dspConnections={dspConnections}
+        {/* Top-level tabs */}
+        <div className='border-b border-t border-subtle px-3 py-1.5 shrink-0'>
+          <SegmentControl
+            value={activeTab}
+            onValueChange={setActiveTab}
+            options={SIDEBAR_TAB_OPTIONS}
+            size='sm'
+            aria-label='Profile sidebar view'
           />
+        </div>
 
-          {/* Smart add link input with platform suggestions */}
-          {isAddingLink && (
-            <div className='mt-3'>
-              <SidebarLinkInput
-                categoryFilter={
-                  resolvedCategory === 'all' ? 'social' : resolvedCategory
+        {/* Tab content */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Link category tabs */}
+            {visibleLinkTabs.length > 1 && (
+              <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
+                <SegmentControl
+                  value={resolvedCategory}
+                  onValueChange={setSelectedCategory}
+                  options={visibleLinkTabs}
+                  size='sm'
+                  aria-label='Link categories'
+                />
+              </div>
+            )}
+
+            {/* Links List — with add/remove */}
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
+              <ProfileLinkList
+                links={links}
+                selectedCategory={resolvedCategory}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                dspConnections={dspConnections}
+              />
+
+              {/* Smart add link input with platform suggestions */}
+              {isAddingLink && (
+                <div className='mt-3'>
+                  <SidebarLinkInput
+                    categoryFilter={
+                      resolvedCategory === 'all' ? 'social' : resolvedCategory
+                    }
+                    existingPlatforms={existingPlatformIds}
+                    onAdd={handleSmartAddLink}
+                    onCancel={() => setIsAddingLink(false)}
+                    creatorName={previewData?.displayName}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Profile Photo Download Settings */}
+            <div className='shrink-0 border-t border-subtle px-4 py-3'>
+              <ProfilePhotoSettings
+                allowDownloads={
+                  (selectedProfile?.settings as Record<string, unknown> | null)
+                    ?.allowProfilePhotoDownloads === true
                 }
-                existingPlatforms={existingPlatformIds}
-                onAdd={handleSmartAddLink}
-                onCancel={() => setIsAddingLink(false)}
-                creatorName={previewData?.displayName}
               />
             </div>
-          )}
-        </div>
+          </>
+        )}
 
-        {/* Profile Photo Download Settings */}
-        <div className='shrink-0 border-t border-subtle px-4 py-3'>
-          <ProfilePhotoSettings
-            allowDownloads={
-              (selectedProfile?.settings as Record<string, unknown> | null)
-                ?.allowProfilePhotoDownloads === true
-            }
-          />
-        </div>
+        {activeTab === 'about' && (
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4'>
+            <ProfileAboutTab bio={bio} genres={genres} />
+          </div>
+        )}
       </div>
     </RightDrawer>
   );
