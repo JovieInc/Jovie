@@ -1,5 +1,4 @@
-import { ChevronRight, ExternalLink, Link2 } from 'lucide-react';
-import Image from 'next/image';
+import { ChevronRight, Disc3, ExternalLink, Link2 } from 'lucide-react';
 
 import { Container } from '@/components/site/Container';
 import { RELEASES } from './demo/mock-data';
@@ -25,6 +24,12 @@ const DEMO_DSPS = [
     color: '#FF0000',
     iconPath:
       'M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z',
+  },
+  {
+    name: 'Amazon Music',
+    color: '#25D1DA',
+    iconPath:
+      'M17.964 4.382c-.264-.096-.576-.048-.792.144l-4.56 4.584L8.064 4.574c-.24-.216-.552-.264-.84-.144C6.96 4.55 6.768 4.838 6.768 5.15v13.702c0 .312.192.6.456.72.096.048.192.048.288.048.192 0 .384-.072.552-.24l4.56-4.584 4.548 4.536c.168.168.36.24.552.24.096 0 .192-.024.288-.048.264-.12.456-.408.456-.72V5.102c0-.312-.192-.6-.504-.72z',
   },
 ];
 
@@ -86,48 +91,41 @@ export function AutomaticReleaseSmartlinksSection() {
 
               {/* Floating Smart Link Card — overlaps dashboard from the right */}
               <div
-                className='absolute z-10 hidden md:flex flex-col right-0 top-0 overflow-hidden'
+                className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[320px] overflow-hidden rounded-2xl bg-base text-foreground'
                 style={{
-                  width: '320px',
-                  borderRadius: '16px',
-                  backgroundColor: 'hsl(var(--base))',
-                  border: '1px solid hsl(var(--border))',
+                  border: '1px solid var(--color-border-default)',
                   boxShadow:
                     '0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
                 }}
               >
-                {/* Ambient glow — matches real smart link page */}
+                {/* Ambient glow — mirrors ReleaseLandingPage */}
                 <div className='pointer-events-none absolute inset-0'>
-                  <div
-                    className='absolute left-1/2 top-[20%] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px]'
-                    style={{
-                      width: '200px',
-                      height: '200px',
-                      background: 'hsl(var(--foreground) / 0.04)',
-                    }}
-                  />
+                  <div className='bg-foreground/5 absolute left-1/2 top-[20%] h-[200px] w-[200px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px]' />
                 </div>
 
                 <div className='relative p-5 flex flex-col items-center'>
-                  {/* Album artwork — matches ReleaseLandingPage: rounded-lg, shadow, ring */}
-                  <div className='bg-surface-1/30 ring-border relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'>
-                    <Image
-                      src='https://f4.bcbits.com/img/a0491039755_10.jpg'
-                      alt='The Deep End - Cosmic Gate & Tim White'
-                      className='object-cover'
-                      fill
-                      sizes='280px'
-                      unoptimized
-                    />
+                  {/* Album artwork — gradient placeholder with disc icon, matching Signals release */}
+                  <div
+                    className='bg-surface-1/30 ring-border relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'
+                    style={{
+                      background: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
+                    }}
+                  >
+                    <div className='flex h-full w-full items-center justify-center'>
+                      <Disc3
+                        className='h-16 w-16 text-white/20'
+                        aria-hidden='true'
+                      />
+                    </div>
                   </div>
 
-                  {/* Release info — matches ReleaseLandingPage typography */}
+                  {/* Release info — mirrors ReleaseLandingPage typography */}
                   <div className='mt-4 w-full text-center'>
-                    <h3 className='text-lg font-semibold leading-snug tracking-tight text-foreground'>
-                      The Deep End
+                    <h3 className='text-lg font-semibold leading-snug tracking-tight'>
+                      Signals
                     </h3>
-                    <p className='mt-1 text-sm text-muted-foreground'>
-                      Cosmic Gate & Tim White
+                    <p className='text-muted-foreground mt-1 text-sm'>
+                      NOVA / LANE
                     </p>
                   </div>
 
