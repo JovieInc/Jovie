@@ -3,6 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useJovieChat } from '@/components/jovie/hooks/useJovieChat';
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 const sendMessageMock = vi.fn();
 const maybeExecuteMock = vi.fn();
 const mutateAsyncMock = vi.fn();
