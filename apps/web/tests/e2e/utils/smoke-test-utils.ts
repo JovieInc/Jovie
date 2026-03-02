@@ -486,10 +486,8 @@ export async function waitForNetworkIdle(
     return page.waitForLoadState('domcontentloaded', { timeout });
   });
 
-  // Small buffer for late responses
-  await page.waitForTimeout(
-    Math.min(idleTime, SMOKE_TIMEOUTS.HYDRATION_SETTLE)
-  );
+  // Buffer absorbed by domcontentloaded check — no fixed timeout needed
+  await page.waitForLoadState('domcontentloaded', { timeout: Math.min(idleTime * 2, 2000) }).catch(() => {});
 }
 
 /**
