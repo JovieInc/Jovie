@@ -42,7 +42,7 @@ export function SidebarCollapsibleGroup({
             tooltip={tooltip}
             className={cn(
               'justify-between',
-              'text-sidebar-item-icon hover:bg-transparent',
+              'text-sidebar-item-icon hover:bg-transparent hover:text-sidebar-item-icon',
               'h-6 px-1.5'
             )}
             aria-expanded={open}

@@ -65,18 +65,16 @@ export function SettingsAnalyticsSection({
 
       {isPro && excludeSelf && (
         <div className='px-4 py-3'>
-          <div className='p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg'>
-            <div className='flex items-start gap-3'>
-              <BarChart3 className='h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0' />
-              <div>
-                <p className='text-sm font-medium text-blue-800 dark:text-blue-200'>
-                  Self-Filtering Active
-                </p>
-                <p className='text-xs text-blue-600 dark:text-blue-400 mt-1'>
-                  Your own profile views and link clicks are being excluded from
-                  your analytics.
-                </p>
-              </div>
+          <div className='flex items-start gap-3'>
+            <BarChart3 className='h-4 w-4 text-secondary-token mt-0.5 shrink-0' />
+            <div>
+              <p className='text-sm font-medium text-primary-token'>
+                Self-Filtering Active
+              </p>
+              <p className='text-xs text-secondary-token mt-1'>
+                Your own profile views and link clicks are being excluded from
+                your analytics.
+              </p>
             </div>
           </div>
         </div>

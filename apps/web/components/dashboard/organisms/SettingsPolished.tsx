@@ -179,7 +179,7 @@ export function SettingsPolished({
     if (!section) return null;
 
     return (
-      <div className='space-y-6 pb-6 sm:pb-8' data-testid='settings-polished'>
+      <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
         <SettingsSection
           id={section.id}
           title={section.title}
