@@ -1,6 +1,10 @@
 import { Page } from '@playwright/test';
 import { expect, test } from './setup';
-import { SMOKE_TIMEOUTS, waitForHydration, waitForLoad } from './utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  waitForHydration,
+  waitForLoad,
+} from './utils/smoke-test-utils';
 
 /**
  * Checks if a page has rendered meaningful content.
@@ -54,9 +58,15 @@ test.describe('Dashboard Landing @smoke', () => {
   const DASHBOARD_PAGE = '/app/dashboard/profile';
 
   test.beforeEach(async ({ page, context }) => {
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     // Set onboarding completion cookie to bypass redirect check in proxy.ts
     // This simulates a user who has just completed onboarding

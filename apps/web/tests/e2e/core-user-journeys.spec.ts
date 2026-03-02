@@ -88,9 +88,15 @@ test.describe('Core User Journeys', () => {
     // 1. Be redirected to /signin (when Clerk is configured)
     // 2. Get a 503 error (when Clerk config is missing in test env)
     // 3. See a loading/blocked state without actual dashboard content
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     const response = await page.goto('/app/dashboard', {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
