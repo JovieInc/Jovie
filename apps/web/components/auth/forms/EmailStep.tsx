@@ -146,7 +146,7 @@ export function EmailStep({
 
         <AuthButton
           type='submit'
-          variant='secondary'
+          variant='primary'
           disabled={isLoading}
           aria-busy={isLoading}
           className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'

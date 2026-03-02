@@ -4,6 +4,7 @@ import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { LogoLoader } from '@/components/atoms/LogoLoader';
 
 /** Seconds before showing stall message */
 const STALL_TIMEOUT_SECONDS = 10;
@@ -26,11 +27,11 @@ interface SsoCallbackHandlerProps {
 function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
   return (
     <output
-      className='flex flex-col items-center justify-center min-h-[200px] gap-3'
+      className='flex flex-col items-center justify-center min-h-[200px] gap-4'
       aria-busy='true'
       aria-live='polite'
     >
-      <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary-token' />
+      <LogoLoader size={32} variant='mono' aria-label='Signing you in' />
       <p className='text-sm text-secondary-token'>
         {isStalled ? 'Still signing you in…' : 'Signing you in…'}
       </p>
