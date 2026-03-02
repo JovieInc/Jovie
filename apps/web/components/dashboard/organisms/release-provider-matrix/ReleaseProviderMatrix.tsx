@@ -25,6 +25,7 @@ import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleBut
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
+import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -52,6 +53,13 @@ import { filterReleases } from './utils/filterReleases';
 const ReleaseSidebar = lazy(() =>
   import('@/components/organisms/release-sidebar').then(m => ({
     default: m.ReleaseSidebar,
+  }))
+);
+
+// Lazy load TrackSidebar
+const TrackSidebar = lazy(() =>
+  import('@/components/organisms/release-sidebar').then(m => ({
+    default: m.TrackSidebar,
   }))
 );
 
@@ -104,6 +112,75 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleFormatLyrics,
     isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
+
+  const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
+    null
+  );
+
+  const openTrackDrawer = useCallback(
+    (trackData: TrackSidebarData) => {
+      closeEditor();
+      setEditingTrack(current =>
+        current?.id === trackData.id ? null : trackData
+      );
+    },
+    [closeEditor]
+  );
+
+  const closeTrackDrawer = useCallback(() => {
+    setEditingTrack(null);
+  }, []);
+
+  const handleBackToReleaseFromTrack = useCallback(
+    (releaseId: string) => {
+      const release = rows.find(r => r.id === releaseId);
+      if (release) {
+        setEditingTrack(null);
+        openEditor(release);
+      }
+    },
+    [rows, openEditor]
+  );
+
+  const handleTrackClickFromRelease = useCallback(
+    (track: {
+      id: string;
+      title: string;
+      slug: string;
+      smartLinkPath: string;
+      trackNumber: number;
+      discNumber: number;
+      durationMs: number | null;
+      isrc: string | null;
+      isExplicit: boolean;
+      providers: Array<{ key: string; label: string; url: string }>;
+      releaseId: string;
+      previewUrl?: string | null;
+      audioUrl?: string | null;
+      audioFormat?: string | null;
+    }) => {
+      const parentRelease = rows.find(r => r.id === track.releaseId);
+      openTrackDrawer({
+        id: track.id,
+        title: track.title,
+        slug: track.slug,
+        smartLinkPath: track.smartLinkPath,
+        trackNumber: track.trackNumber,
+        discNumber: track.discNumber,
+        durationMs: track.durationMs,
+        isrc: track.isrc,
+        isExplicit: track.isExplicit,
+        previewUrl: track.previewUrl ?? null,
+        audioUrl: track.audioUrl ?? null,
+        audioFormat: track.audioFormat ?? null,
+        providers: track.providers,
+        releaseTitle: parentRelease?.title ?? '',
+        releaseArtworkUrl: parentRelease?.artworkUrl,
+        releaseId: track.releaseId,
+      });
+    },
+    [rows, openTrackDrawer]
+  );
 
   // Table display preferences (column visibility)
   const {
@@ -361,7 +438,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Show releases table when we have releases or when connected and not importing
   const showReleasesTable = rows.length > 0;
 
-  const isSidebarOpen = Boolean(editingRelease);
+  const isReleaseSidebarOpen = Boolean(editingRelease);
+  const isTrackSidebarOpen = Boolean(editingTrack);
+  const isSidebarOpen = isReleaseSidebarOpen || isTrackSidebarOpen;
 
   // Connect to tableMeta for drawer toggle button
   const { setTableMeta } = useTableMeta();
@@ -373,7 +452,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   useEffect(() => {
     // Toggle function: close if open, open first release if closed
     const toggle = () => {
-      if (editingRelease) {
+      if (editingTrack) {
+        closeTrackDrawer();
+      } else if (editingRelease) {
         closeEditor();
       } else if (rowsRef.current.length > 0) {
         openEditor(rowsRef.current[0]);
@@ -386,7 +467,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
-  }, [editingRelease, rows.length, closeEditor, openEditor, isSidebarOpen]);
+  }, [
+    editingRelease,
+    editingTrack,
+    rows.length,
+    closeEditor,
+    closeTrackDrawer,
+    openEditor,
+    isSidebarOpen,
+  ]);
 
   // Set header badge (DSP pills on left) and actions (drawer toggle on right)
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
@@ -539,10 +628,29 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
   }, [headerBadgeContent, headerActions]);
 
-  // Register right panel with AuthShell instead of rendering inline
-  const sidebarPanel = useMemo(
-    () =>
-      isSidebarOpen ? (
+  // Register right panel - supports both release and track drawers
+  const sidebarPanel = useMemo(() => {
+    if (isTrackSidebarOpen) {
+      return (
+        <Suspense
+          fallback={
+            <div
+              className='h-full animate-pulse bg-surface-2'
+              style={{ width: SIDEBAR_WIDTH }}
+            />
+          }
+        >
+          <TrackSidebar
+            track={editingTrack}
+            isOpen={isTrackSidebarOpen}
+            onClose={closeTrackDrawer}
+            onBackToRelease={handleBackToReleaseFromTrack}
+          />
+        </Suspense>
+      );
+    }
+    if (isReleaseSidebarOpen) {
+      return (
         <Suspense
           fallback={
             <div
@@ -554,7 +662,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           <ReleaseSidebar
             release={editingRelease}
             mode='admin'
-            isOpen={isSidebarOpen}
+            isOpen={isReleaseSidebarOpen}
             providerConfig={providerConfig}
             artistName={artistName}
             onClose={closeEditor}
@@ -581,32 +689,39 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             allowDownloads={allowArtworkDownloads}
             readOnly={!canEditSmartLinks}
             onCanvasStatusUpdate={handleCanvasStatusUpdate}
+            onTrackClick={handleTrackClickFromRelease}
           />
         </Suspense>
-      ) : null,
-    [
-      isSidebarOpen,
-      editingRelease,
-      providerConfig,
-      artistName,
-      closeEditor,
-      handleRefreshRelease,
-      refreshingReleaseId,
-      handleAddUrl,
-      handleRescanIsrc,
-      isRescanningIsrc,
-      handleArtworkUpload,
-      handleArtworkRevert,
-      handleReleaseChange,
-      handleSaveLyrics,
-      handleFormatLyrics,
-      isLyricsSaving,
-      isSaving,
-      allowArtworkDownloads,
-      canEditSmartLinks,
-      handleCanvasStatusUpdate,
-    ]
-  );
+      );
+    }
+    return null;
+  }, [
+    isReleaseSidebarOpen,
+    isTrackSidebarOpen,
+    editingRelease,
+    editingTrack,
+    providerConfig,
+    artistName,
+    closeEditor,
+    closeTrackDrawer,
+    handleRefreshRelease,
+    handleBackToReleaseFromTrack,
+    handleTrackClickFromRelease,
+    refreshingReleaseId,
+    handleAddUrl,
+    handleRescanIsrc,
+    isRescanningIsrc,
+    handleArtworkUpload,
+    handleArtworkRevert,
+    handleReleaseChange,
+    handleSaveLyrics,
+    handleFormatLyrics,
+    isLyricsSaving,
+    isSaving,
+    allowArtworkDownloads,
+    canEditSmartLinks,
+    handleCanvasStatusUpdate,
+  ]);
 
   useRegisterRightPanel(sidebarPanel);
 
@@ -715,10 +830,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   showTracks={showTracksFromView}
                   groupByYear={groupByYear}
                   selectedReleaseId={editingRelease?.id}
+                  selectedTrackId={editingTrack?.id}
                   refreshingReleaseId={refreshingReleaseId}
                   flashedReleaseId={flashedReleaseId}
                   isSmartLinkLocked={isSmartLinkLocked}
                   getSmartLinkLockReason={getSmartLinkLockReason}
+                  onTrackClick={openTrackDrawer}
                 />
               </QueryErrorBoundary>
             )}

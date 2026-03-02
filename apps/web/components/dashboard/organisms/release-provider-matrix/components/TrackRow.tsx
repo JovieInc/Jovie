@@ -1,13 +1,18 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { PROVIDER_TO_DSP } from '@/lib/discography/provider-domains';
-import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
+import type {
+  ProviderKey,
+  ReleaseViewModel,
+  TrackViewModel,
+} from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
 interface ProviderConfig {
@@ -23,6 +28,8 @@ interface TrackRowProps {
   readonly columnCount: number;
   /** Column visibility state from TanStack table */
   readonly columnVisibility?: Record<string, boolean>;
+  readonly isSelected?: boolean;
+  readonly onClick?: () => void;
 }
 
 /**
@@ -41,6 +48,8 @@ export const TrackRow = memo(function TrackRow({
   allProviders,
   columnCount,
   columnVisibility,
+  isSelected,
+  onClick,
 }: TrackRowProps) {
   // Helper to check if a column is visible
   const isVisible = (id: string) => columnVisibility?.[id] !== false;
@@ -71,7 +80,10 @@ export const TrackRow = memo(function TrackRow({
   }, [allProviders, providerMap]);
 
   return (
-    <tr className='group hover:bg-surface-2/30 border-l-2 border-l-transparent'>
+    <tr
+      className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-surface-2/60 hover:bg-surface-2/70' : 'hover:bg-surface-2/30'}`}
+      onClick={onClick}
+    >
       {/* 1. Spacer for checkbox column (always visible) */}
       {isVisible('select') && <td className='w-14' />}
 
@@ -195,20 +207,50 @@ export const TrackRow = memo(function TrackRow({
  */
 interface TrackRowsContainerProps {
   readonly tracks: TrackViewModel[];
+  readonly release?: ReleaseViewModel;
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly allProviders: ProviderKey[];
   readonly columnCount: number;
-  /** Column visibility state from TanStack table */
   readonly columnVisibility?: Record<string, boolean>;
+  readonly onTrackClick?: (trackData: TrackSidebarData) => void;
+  readonly selectedTrackId?: string | null;
 }
 
 export const TrackRowsContainer = memo(function TrackRowsContainer({
   tracks,
+  release,
   providerConfig,
   allProviders,
   columnCount,
   columnVisibility,
+  onTrackClick,
+  selectedTrackId,
 }: TrackRowsContainerProps) {
+  const handleTrackClick = useCallback(
+    (track: TrackViewModel) => {
+      if (!onTrackClick || !release) return;
+      onTrackClick({
+        id: track.id,
+        title: track.title,
+        slug: track.slug,
+        smartLinkPath: track.smartLinkPath,
+        trackNumber: track.trackNumber,
+        discNumber: track.discNumber,
+        durationMs: track.durationMs,
+        isrc: track.isrc,
+        isExplicit: track.isExplicit,
+        previewUrl: track.previewUrl,
+        audioUrl: track.audioUrl,
+        audioFormat: track.audioFormat,
+        providers: track.providers,
+        releaseTitle: release.title,
+        releaseArtworkUrl: release.artworkUrl,
+        releaseId: release.id,
+      });
+    },
+    [onTrackClick, release]
+  );
+
   if (tracks.length === 0) {
     return (
       <tr className='bg-surface-1/50'>
@@ -235,6 +277,8 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
           allProviders={allProviders}
           columnCount={columnCount}
           columnVisibility={columnVisibility}
+          isSelected={selectedTrackId === track.id}
+          onClick={onTrackClick ? () => handleTrackClick(track) : undefined}
         />
       ))}
     </>

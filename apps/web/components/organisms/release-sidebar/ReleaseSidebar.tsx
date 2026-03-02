@@ -160,6 +160,7 @@ export function ReleaseSidebar({
   allowDownloads = false,
   readOnly = false,
   onCanvasStatusUpdate,
+  onTrackClick: externalTrackClick,
 }: ReleaseSidebarProps) {
   const {
     isAddingLink,
@@ -210,9 +211,16 @@ export function ReleaseSidebar({
     setSelectedTrack(null);
   }, [release?.id]);
 
-  const handleTrackClick = useCallback((track: TrackForDetail) => {
-    setSelectedTrack(track);
-  }, []);
+  const handleTrackClick = useCallback(
+    (track: TrackForDetail & Record<string, unknown>) => {
+      if (externalTrackClick) {
+        externalTrackClick(track as Parameters<typeof externalTrackClick>[0]);
+        return;
+      }
+      setSelectedTrack(track);
+    },
+    [externalTrackClick]
+  );
 
   const handleBackToRelease = useCallback(() => {
     setSelectedTrack(null);
