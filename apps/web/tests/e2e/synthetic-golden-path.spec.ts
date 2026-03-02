@@ -1,9 +1,5 @@
 import { expect, test } from '@playwright/test';
-import {
-  SMOKE_TIMEOUTS,
-  waitForHydration,
-  waitForNetworkIdle,
-} from './utils/smoke-test-utils';
+import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -41,9 +37,15 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
 
     try {
       // Intercept analytics to prevent test interference
-      await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
 
       // CRITICAL PATH 1: Homepage loads
       console.log('[Synthetic] Step 1: Homepage load test');
@@ -91,7 +93,9 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
         // In production, we might need to handle verification differently
         // This is a placeholder for production-specific verification handling
         try {
-          const verifyButton = page.getByRole('button', { name: /verify|continue/i });
+          const verifyButton = page.getByRole('button', {
+            name: /verify|continue/i,
+          });
           if (await verifyButton.isVisible({ timeout: 5000 })) {
             await verifyButton.click();
           }
@@ -168,9 +172,15 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     test.setTimeout(60_000);
 
     // Intercept analytics to prevent test interference
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     const criticalPages = [
       { path: '/', name: 'Homepage' },
@@ -217,9 +227,15 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
     test.setTimeout(60_000);
 
     // Intercept analytics to prevent test interference
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     console.log('[Synthetic] Performance baseline check');
 

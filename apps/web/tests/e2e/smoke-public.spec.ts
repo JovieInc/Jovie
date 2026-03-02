@@ -49,9 +49,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
     page,
   }, testInfo) => {
     // Intercept analytics to prevent test interference
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     const { getContext, cleanup } = setupPageMonitoring(page);
     const hydrationErrors: string[] = [];
@@ -160,9 +166,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
   test.describe('Public Profile', () => {
     test('loads and displays creator name', async ({ page }, testInfo) => {
       // Intercept analytics to prevent test interference
-      await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
 
       const { getContext, cleanup } = setupPageMonitoring(page);
 
@@ -200,12 +212,14 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           bodyTextRaw?.toLowerCase().includes('loading jovie profile') ||
           bodyTextRaw?.toLowerCase().includes('loading artist profile');
         if (isLoadingSkeleton) {
-        if (isLoadingSkeleton) {
           // Poll for skeleton to resolve rather than a fixed wait
           const resolved = await expect
             .poll(
               async () => {
-                const t = await page.locator('body').textContent().catch(() => ''');
+                const t = await page
+                  .locator('body')
+                  .textContent()
+                  .catch(() => '');
                 return !t?.toLowerCase().includes('loading jovie profile');
               },
               { timeout: 10000, intervals: [500, 1000, 2000] }
@@ -304,9 +318,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           page,
         }, testInfo) => {
           // Intercept analytics to prevent test interference
-          await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-          await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-          await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+          await page.route('**/api/profile/view', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/audience/visit', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/track', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
 
           const { getContext, cleanup } = setupPageMonitoring(page);
 
@@ -395,9 +415,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
       page,
     }, testInfo) => {
       // Intercept analytics to prevent test interference
-      await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-      await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+      await page.route('**/api/profile/view', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', route =>
+        route.fulfill({ status: 200, body: '{}' })
+      );
 
       const { getContext, cleanup } = setupPageMonitoring(page);
       const testRoutes = [
@@ -473,9 +499,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
     page,
   }, testInfo) => {
     // Intercept analytics to prevent test interference
-    await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-    await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     const { getContext, cleanup } = setupPageMonitoring(page);
     const routes = ['/', '/sign-up', '/pricing'];
