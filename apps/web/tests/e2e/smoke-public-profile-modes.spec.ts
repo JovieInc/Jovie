@@ -57,9 +57,15 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
           page,
         }) => {
           // Intercept analytics to prevent test interference
-          await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-          await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-          await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+          await page.route('**/api/profile/view', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/audience/visit', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/track', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
 
           await page.setViewportSize({
             width: breakpoint.width,
@@ -105,9 +111,15 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
         page,
       }, testInfo) => {
         // Intercept analytics to prevent test interference
-        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/profile/view', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/audience/visit', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/track', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
 
         await page.setViewportSize({ width: 375, height: 812 });
 
@@ -193,9 +205,15 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
         page,
       }) => {
         // Intercept analytics to prevent test interference
-        await page.route('**/api/profile/view', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/audience/visit', route => route.fulfill({ status: 200, body: '{}' }));
-        await page.route('**/api/track', route => route.fulfill({ status: 200, body: '{}' }));
+        await page.route('**/api/profile/view', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/audience/visit', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/track', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
 
         const response = await smokeNavigate(
           page,
