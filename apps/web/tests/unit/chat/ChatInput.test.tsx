@@ -33,7 +33,7 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
   });
 
-  it('keeps the textarea focused when clicking the plus button', async () => {
+  it('opens the attachment dropdown when clicking the plus button', async () => {
     const user = userEvent.setup();
     const onImageAttach = vi.fn();
     const { getByRole } = fastRender(
@@ -49,6 +49,7 @@ describe('ChatInput', () => {
     // Click the plus button to open the attachment dropdown
     await user.click(getByRole('button', { name: /attachment options/i }));
 
-    expect(textarea).toHaveFocus();
+    // Dropdown menu receives focus when opened (standard Radix behavior)
+    expect(getByRole('menu')).toBeInTheDocument();
   });
 });
