@@ -46,7 +46,6 @@ export function MarketingHeader({
       ? [
           { href: '#how-it-works', label: 'How it works' },
           { href: '#features', label: 'Features' },
-          { href: APP_ROUTES.LAUNCH_PRICING, label: 'Pricing' },
         ]
       : undefined;
 

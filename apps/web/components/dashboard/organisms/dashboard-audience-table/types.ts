@@ -1,4 +1,5 @@
 import type { AudienceMode } from '@/components/dashboard/audience/table/types';
+import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 
 export type { AudienceMode };
@@ -12,9 +13,10 @@ export type AudienceSegment =
   | 'highIntent'
   | 'returning'
   | 'frequent'
-  | 'recent24h';
+  | 'recent24h'
+  | 'touringCity';
 
-/** Filter state for audience table — mirrors ReleaseFilters pattern */
+/** Filter state for audience table -- mirrors ReleaseFilters pattern */
 export interface AudienceFilters {
   readonly segments: AudienceSegment[];
 }
@@ -41,6 +43,8 @@ export interface DashboardAudienceTableProps {
   readonly hasNextPage?: boolean;
   readonly isFetchingNextPage?: boolean;
   readonly onLoadMore?: () => void;
+  /** Upcoming tour dates for touring city flagging */
+  readonly tourDates?: TourDateForMatching[];
 }
 
 export interface BulkAction {

@@ -8,6 +8,7 @@ import {
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
@@ -122,6 +123,8 @@ function transformMemberRow(member: {
   phone: string | null;
   spotifyConnected: boolean | null;
   purchaseCount: number;
+  tipAmountTotalCents: number | null;
+  tipCount: number | null;
   tags: string[] | null;
   lastSeenAt: Date;
 }): AudienceServerRow {
@@ -142,6 +145,8 @@ function transformMemberRow(member: {
     phone: member.phone,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
+    tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
+    tipCount: member.tipCount ?? 0,
     tags: Array.isArray(member.tags) ? member.tags : [],
     deviceType: member.deviceType,
     lastSeenAt: toISOStringOrNull(member.lastSeenAt),
@@ -251,6 +256,13 @@ function buildMemberSelectFields(includeDetails: boolean) {
     phone: audienceMembers.phone,
     spotifyConnected: audienceMembers.spotifyConnected,
     purchaseCount: audienceMembers.purchaseCount,
+    tipAmountTotalCents:
+      drizzleSql<number>`COALESCE(${tipAudience.tipAmountTotalCents}, 0)`.as(
+        'tip_amount_total_cents'
+      ),
+    tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
+      'tip_count'
+    ),
     tags: audienceMembers.tags,
     lastSeenAt: audienceMembers.lastSeenAt,
   };
@@ -336,6 +348,13 @@ async function fetchMembersData(
       eq(audienceMembers.creatorProfileId, creatorProfiles.id)
     )
     .innerJoin(users, eq(creatorProfiles.userId, users.id))
+    .leftJoin(
+      tipAudience,
+      and(
+        eq(tipAudience.profileId, audienceMembers.creatorProfileId),
+        eq(tipAudience.email, audienceMembers.email)
+      )
+    )
     .where(whereClause);
 
   const totalQuery = tx
@@ -467,6 +486,8 @@ async function fetchSubscribersData(
       phone: subscriber.phone,
       spotifyConnected: false,
       purchaseCount: 0,
+      tipAmountTotalCents: 0,
+      tipCount: 0,
       tags: [],
       deviceType: null,
       lastSeenAt: createdAt,

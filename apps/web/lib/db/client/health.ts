@@ -4,12 +4,9 @@
  * Health check and performance monitoring functions for the database.
  */
 
-import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { env } from '@/lib/env-server';
 import { TABLE_NAMES } from '../config';
-import * as schema from '../schema';
 import {
   getDb,
   getInternalDb,
@@ -117,8 +114,7 @@ export async function checkDbHealth(): Promise<HealthCheckResult> {
       await database.execute(drizzleSql`SELECT NOW() as current_time`);
       details.query = true;
 
-      // 3. Transaction test (skipped - neon-http driver does not support transactions)
-      // For compatibility, we mark this as true since basic operations work
+      // 3. Transaction test — WebSocket driver supports transactions
       details.transaction = true;
 
       // 4. Schema access test (try to query a table if it exists)
@@ -158,27 +154,23 @@ export async function checkDbHealth(): Promise<HealthCheckResult> {
 }
 
 /**
- * Lightweight connection validation for startup
+ * Lightweight connection validation for startup.
+ * Uses the canonical WebSocket pool — no separate driver needed.
  */
 export async function validateDbConnection(): Promise<ConnectionValidationResult> {
   const startTime = Date.now();
 
-  const connectionString = env.DATABASE_URL;
-
-  if (!connectionString) {
+  if (!env.DATABASE_URL) {
     return {
       connected: false,
       error: 'DATABASE_URL not configured',
     };
   }
 
-  // Use HTTP driver - stateless, no pool cleanup needed
-  const sql = neon(connectionString);
-  const tempDb = drizzle(sql, { schema });
-
   try {
+    const db = getDb();
     await withRetry(
-      () => tempDb.execute(drizzleSql`SELECT 1`),
+      () => db.execute(drizzleSql`SELECT 1`),
       'startupConnection'
     );
 
@@ -198,7 +190,6 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
-  // No cleanup needed - HTTP driver is stateless
 }
 
 /**
@@ -246,8 +237,7 @@ export async function checkDbPerformance(): Promise<PerformanceCheckResult> {
       );
     }
 
-    // 3. Transaction performance (skipped - neon-http driver does not support transactions)
-    // Use a simple query sequence instead to measure overhead
+    // 3. Sequential query performance (measures connection reuse overhead)
     const transactionStart = Date.now();
     await database.execute(drizzleSql`SELECT 'transaction_test'`);
     await database.execute(drizzleSql`SELECT NOW()`);

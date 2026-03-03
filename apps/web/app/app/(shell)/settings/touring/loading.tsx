@@ -6,7 +6,7 @@ import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSk
  */
 export default function SettingsTouringLoading() {
   return (
-    <div className='mx-auto max-w-2xl'>
+    <div className='mx-auto max-w-3xl pt-2'>
       <div className='space-y-8 pb-8'>
         <section className='scroll-mt-4'>
           <div className='mb-6 space-y-2'>

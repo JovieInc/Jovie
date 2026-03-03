@@ -1,21 +1,55 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock @jovie/ui ContextMenu components (needed in CI where importActual may not resolve)
+// ReleaseSidebar directly uses SegmentControl from @jovie/ui for tab navigation.
+// All other sub-components that use additional @jovie/ui parts are mocked below,
+// so only SegmentControl needs to be provided here.
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
-  const passthrough = ({ children }: { children?: React.ReactNode }) => (
-    <>{children}</>
-  );
   return {
     ...actual,
-    ContextMenu: passthrough,
-    ContextMenuContent: passthrough,
-    ContextMenuItem: passthrough,
-    ContextMenuLabel: passthrough,
+    SegmentControl: ({
+      value,
+      onValueChange,
+      options,
+    }: {
+      value: string;
+      onValueChange: (value: string) => void;
+      options: Array<{ value: string; label: string }>;
+    }) => (
+      <div>
+        {options.map(option => (
+          <button
+            key={option.value}
+            type='button'
+            aria-selected={value === option.value}
+            role='tab'
+            onClick={() => onValueChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
+    // ContextMenu components are imported transitively by AlbumArtworkContextMenu
+    // (which is mocked below, but the module still loads), so provide passthroughs.
+    ContextMenu: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuContent: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuItem: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuLabel: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
     ContextMenuSeparator: () => <hr />,
-    ContextMenuTrigger: passthrough,
+    ContextMenuTrigger: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
   };
 });
 
@@ -29,70 +63,27 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
   }) => <div data-testid='right-drawer'>{children}</div>,
 }));
 
-// Mock drawer components
+// Mock drawer molecules — only DrawerEmptyState testid is asserted in tests.
 vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
-    <div data-testid='entity-header-card'>{children}</div>
+    <div>{children}</div>
   ),
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
-  DrawerSection: ({
-    title,
-    children,
-  }: {
-    title?: string;
-    children?: React.ReactNode;
-  }) => (
-    <section data-testid='drawer-section'>
-      {title ? <span>{title}</span> : null}
-      {children}
-    </section>
+  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
+    <section>{children}</section>
   ),
-  DrawerLinkSection: ({
-    title,
-    children,
-  }: {
-    title: string;
-    children?: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <div data-testid='link-section'>
-      <span>{title}</span>
-      {children}
-    </div>
+  DrawerLinkSection: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
   ),
-  SidebarLinkRow: ({
-    label,
-    url,
-  }: {
-    label?: string;
-    url?: string;
-    [key: string]: unknown;
-  }) => <div data-testid='link-row'>{label ?? url}</div>,
+  SidebarLinkRow: () => null,
 }));
 
 // Mock sub-components that are not under test
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
   ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
 }));
-
-// Mock @jovie/ui ContextMenu components (needed in CI where importActual may not resolve)
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
-  const passthrough = ({ children }: { children?: React.ReactNode }) => (
-    <>{children}</>
-  );
-  return {
-    ...actual,
-    ContextMenu: passthrough,
-    ContextMenuContent: passthrough,
-    ContextMenuItem: passthrough,
-    ContextMenuLabel: passthrough,
-    ContextMenuSeparator: () => <hr />,
-    ContextMenuTrigger: passthrough,
-  };
-});
 
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
@@ -159,7 +150,7 @@ vi.mock(
   })
 );
 
-// Mock utilities
+// Utilities
 vi.mock('sonner', () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
@@ -209,6 +200,10 @@ const defaultProps = {
 };
 
 describe('ReleaseSidebar Links tab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('shows empty state when no release selected', () => {
     render(<ReleaseSidebar release={null} {...defaultProps} />);
 

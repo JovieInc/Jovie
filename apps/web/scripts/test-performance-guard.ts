@@ -44,7 +44,7 @@ class TestPerformanceGuard {
     p95: 200, // 200ms
     setupTime: 150000, // 150 seconds (CI cold start + environment initialization)
     individualTest: 200, // 200ms
-    slowTestCount: 5, // Max 5 slow tests allowed
+    slowTestCount: 0, // Zero tolerance — every test must be under individualTest threshold
   };
 
   private budgets: Record<string, PerformanceBudget> = {
@@ -58,9 +58,9 @@ class TestPerformanceGuard {
       description: 'Critical regression suite (includes auth E2E tests)',
     },
     full: {
-      maxTotalDuration: 420000,
+      maxTotalDuration: 300000,
       description:
-        'Full coverage runs should stay under 7 minutes to guard against drift.',
+        'Full coverage runs should stay under 5 minutes to guard against drift.',
     },
   };
 

@@ -26,9 +26,13 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
 };
 
 /**
- * Error thrown when billing data cannot be retrieved for an authenticated user.
- * Callers should catch this and show a retry/error state rather than
- * silently defaulting to free-tier entitlements.
+ * Error class retained for backwards compatibility.
+ *
+ * `getCurrentUserEntitlements` no longer throws this error -- it degrades
+ * gracefully to free-tier entitlements when billing is unavailable.
+ * Admin status is fetched independently (Redis-cached) and preserved.
+ *
+ * @deprecated No longer thrown in production. Will be removed in a future release.
  */
 export class BillingUnavailableError extends Error {
   constructor(

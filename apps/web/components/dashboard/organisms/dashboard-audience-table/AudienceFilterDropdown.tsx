@@ -9,7 +9,16 @@ import {
   DropdownMenuTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
-import { Check, Clock, Filter, RefreshCw, Repeat, X, Zap } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  Filter,
+  MapPin,
+  RefreshCw,
+  Repeat,
+  X,
+  Zap,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { AudienceFilters } from './types';
@@ -40,9 +49,19 @@ const SEGMENT_OPTIONS: readonly {
     label: 'Last 24h',
     icon: <Clock className='h-3.5 w-3.5' />,
   },
+  {
+    id: 'touringCity',
+    label: 'Touring City',
+    icon: <MapPin className='h-3.5 w-3.5' />,
+  },
 ];
 
-type SegmentId = 'highIntent' | 'returning' | 'frequent' | 'recent24h';
+type SegmentId =
+  | 'highIntent'
+  | 'returning'
+  | 'frequent'
+  | 'recent24h'
+  | 'touringCity';
 
 interface ActiveFilterPillProps {
   readonly groupLabel: string;

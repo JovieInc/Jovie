@@ -82,6 +82,47 @@ vi.mock('@sentry/nextjs', () => {
   };
 });
 
+// Mock next/navigation — commonly needed in tests that import components using
+// useRouter, usePathname, or useSearchParams. Missing mocks cause slow dynamic
+// import resolution that degrades p95 performance.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+// Mock next/headers — avoids errors when server components call cookies() or
+// headers() outside of a real Next.js request context.
+vi.mock('next/headers', () => ({
+  headers: () => new Headers(),
+  cookies: () => ({
+    get: vi.fn(() => undefined),
+    getAll: vi.fn(() => []),
+    has: vi.fn(() => false),
+    set: vi.fn(),
+    delete: vi.fn(),
+  }),
+}));
+
+// Mock next/cache — revalidatePath/revalidateTag are no-ops in unit tests;
+// calling the real implementations outside Next.js throws an invariant error.
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
+  unstable_cache: vi.fn((fn: (...args: unknown[]) => unknown) => fn),
+  unstable_noStore: vi.fn(),
+}));
+
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {
   cleanup();

@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { calculateBackoffDelay, useFormState } from '@/lib/hooks/useFormState';
 
@@ -61,6 +61,11 @@ describe('calculateBackoffDelay', () => {
 describe('useFormState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    // Restore real timers if any test activated fake timers
     vi.useRealTimers();
   });
 

@@ -1,11 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { getEntitlements } from '@/lib/entitlements/registry';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
@@ -258,40 +254,16 @@ async function processSocialPlatformIngestion(
  * - Claim token generated at creation time
  * - Error persistence for admin visibility
  */
-async function resolveAdminEntitlements(route: string): Promise<
+async function resolveAdminEntitlements(_route: string): Promise<
   | {
       ok: true;
       entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
     }
   | { ok: false; response: NextResponse }
 > {
-  let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
-  try {
-    entitlements = await getCurrentUserEntitlements();
-  } catch (error) {
-    if (error instanceof BillingUnavailableError && error.isAdmin) {
-      await captureError(
-        'Admin ingest proceeding despite billing unavailability',
-        error,
-        { route, userId: error.userId },
-        'warning'
-      );
-      const freeEnt = getEntitlements('free');
-      entitlements = {
-        userId: error.userId,
-        email: null,
-        isAuthenticated: true,
-        isAdmin: true,
-        plan: 'free',
-        isPro: false,
-        hasAdvancedFeatures: false,
-        ...freeEnt.booleans,
-        ...freeEnt.limits,
-      };
-    } else {
-      throw error;
-    }
-  }
+  // getCurrentUserEntitlements degrades gracefully on billing failure.
+  // Admin status is fetched independently and preserved even when billing is down.
+  const entitlements = await getCurrentUserEntitlements();
 
   if (!entitlements.isAuthenticated || !entitlements.userId) {
     return {

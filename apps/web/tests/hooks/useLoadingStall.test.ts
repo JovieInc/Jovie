@@ -8,6 +8,7 @@ describe('useLoadingStall', () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 

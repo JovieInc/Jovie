@@ -109,8 +109,8 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       // Wait for Clerk to be ready
       await page.waitForFunction(
         () => {
-          // @ts-ignore
-          return window.Clerk && window.Clerk.isReady();
+          // @ts-ignore – Clerk v5 uses `loaded` (boolean getter) instead of `isReady()`
+          return window.Clerk && window.Clerk.loaded;
         },
         { timeout: 10_000 }
       );

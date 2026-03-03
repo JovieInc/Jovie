@@ -2,7 +2,7 @@
 
 import { DollarSign } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
@@ -70,6 +70,16 @@ export function ProfileShell({
 
   const isMobile = useBreakpointDown('md');
   const [tipDrawerOpen, setTipDrawerOpen] = useState(false);
+
+  // Fire tip_page_view pixel event when tip mode is active on page load
+  useEffect(() => {
+    if (!isTipModeActive) return;
+    // @ts-expect-error - joviePixel is set by JoviePixel component
+    if (globalThis.joviePixel?.track) {
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      globalThis.joviePixel.track('tip_page_view');
+    }
+  }, [isTipModeActive]);
 
   // Extract venmo link from social links for the tip drawer
   const venmoLink = useMemo(

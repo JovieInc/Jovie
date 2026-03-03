@@ -95,4 +95,47 @@ describe('ProfileCompletionRedirect', () => {
 
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
+
+  it('does NOT redirect when selectedProfile is null due to dashboardLoadError', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message: 'QueryTimeoutError: timed out',
+        code: 'QUERY_TIMEOUT',
+        errorType: 'QueryTimeoutError',
+      },
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('does NOT redirect when selectedProfile is null due to cache error', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: {
+        stage: 'core_cache',
+        message: 'Connection terminated unexpectedly',
+        code: null,
+        errorType: 'NeonDbError',
+      },
+    });
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('still redirects when profile is genuinely missing (no error)', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: undefined,
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+  });
 });

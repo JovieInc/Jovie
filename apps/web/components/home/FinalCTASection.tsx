@@ -27,7 +27,7 @@ export function FinalCTASection() {
             Claim your piece of the internet.
           </h2>
           <p className='mt-4 marketing-lead-linear text-[var(--linear-text-secondary)]'>
-            Free forever. No credit card required.
+            Set up in under 60 seconds.
           </p>
 
           <div className='mt-6 flex flex-col items-center gap-4 w-full'>

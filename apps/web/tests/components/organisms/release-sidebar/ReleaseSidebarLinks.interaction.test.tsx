@@ -6,6 +6,8 @@ import type { ProviderKey } from '@/lib/discography/types';
 
 import { createMockRelease } from '@/tests/test-utils/factories';
 
+// @jovie/ui: ReleaseSidebar uses SegmentControl; ReleaseDspLinks (real) uses
+// Button, Input, Label, Select*, SimpleTooltip.
 vi.mock('@jovie/ui', async () => {
   const React = await import('react');
   const SelectContext = React.createContext<
@@ -111,22 +113,15 @@ vi.mock('@/components/organisms/RightDrawer', () => ({
   ),
 }));
 
+// Only DrawerEmptyState, DrawerLinkSection, and SidebarLinkRow are used by
+// ReleaseSidebar and the real ReleaseDspLinks component under test.
 vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
   DrawerEmptyState: ({ message }: { message: string }) => <p>{message}</p>,
-  DrawerSection: ({
-    title,
-    children,
-  }: {
-    title: string;
-    children: React.ReactNode;
-  }) => (
-    <section>
-      <h2>{title}</h2>
-      {children}
-    </section>
+  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
+    <section>{children}</section>
   ),
   DrawerLinkSection: ({
     title,
@@ -224,9 +219,7 @@ vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
-    warning: vi.fn(),
     info: vi.fn(),
-    promise: vi.fn(),
   },
 }));
 vi.mock('@/lib/constants/layout', () => ({ SIDEBAR_WIDTH: 360 }));

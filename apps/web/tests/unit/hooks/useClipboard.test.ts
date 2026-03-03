@@ -126,6 +126,7 @@ describe('useClipboard', () => {
     });
     expect(result.current.status).toBe('idle');
 
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 });

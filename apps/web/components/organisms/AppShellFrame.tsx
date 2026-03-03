@@ -30,6 +30,8 @@ export function AppShellFrame({
     <div
       className={cn(
         'flex h-svh w-full overflow-hidden bg-base',
+        /* PWA safe area: pad top for notch/Dynamic Island in standalone mode */
+        'pt-[env(safe-area-inset-top)]',
         containerClassName
       )}
     >

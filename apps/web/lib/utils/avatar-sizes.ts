@@ -49,26 +49,40 @@ function buildCloudinaryResizedUrl(
 }
 
 /**
+ * Build a resized image URL using Next.js Image Optimization API.
+ * Works for any image URL that Next.js is configured to optimize
+ * (e.g. Vercel Blob, configured remote patterns in next.config).
+ */
+function buildNextImageUrl(url: string, width: number): string {
+  const params = new URLSearchParams({
+    url,
+    w: String(width),
+    q: '90',
+  });
+  return `/_next/image?${params.toString()}`;
+}
+
+/**
  * Generate S/M/L size variants from a single source URL.
- * Uses Cloudinary URL transforms when the image is hosted on Cloudinary.
- * Returns only the original if transforms cannot be applied.
+ * Uses Cloudinary URL transforms when the image is hosted on Cloudinary,
+ * otherwise falls back to Next.js Image Optimization API.
  */
 function generateSizeVariants(sourceUrl: string): AvatarSize[] {
   const sizes: AvatarSize[] = [];
 
   for (const preset of SIZE_PRESETS) {
-    const resizedUrl = buildCloudinaryResizedUrl(
+    const cloudinaryUrl = buildCloudinaryResizedUrl(
       sourceUrl,
       preset.dimension,
       preset.dimension
     );
-    if (resizedUrl) {
-      sizes.push({
-        key: preset.key,
-        label: preset.label,
-        url: resizedUrl,
-      });
-    }
+    const resizedUrl =
+      cloudinaryUrl ?? buildNextImageUrl(sourceUrl, preset.dimension);
+    sizes.push({
+      key: preset.key,
+      label: preset.label,
+      url: resizedUrl,
+    });
   }
 
   return sizes;
@@ -85,20 +99,35 @@ export function buildAvatarSizes(
   const originalUrl = sizesMap?.original ?? avatarUrl ?? undefined;
 
   if (sizesMap && Object.keys(sizesMap).length > 0) {
-    // Add S/M/L variants derived from the original URL
-    if (originalUrl) {
-      sizes.push(...generateSizeVariants(originalUrl));
-    }
+    const hasPrecomputedSizes =
+      sizesMap['128'] || sizesMap['256'] || sizesMap['512'];
 
-    // Add pre-computed sizes from the map that weren't covered above
-    if (sizesMap['512']) {
-      sizes.push({ key: '512', label: '512 x 512', url: sizesMap['512'] });
-    }
-    if (sizesMap['256']) {
-      sizes.push({ key: '256', label: '256 x 256', url: sizesMap['256'] });
-    }
-    if (sizesMap['128']) {
-      sizes.push({ key: '128', label: '128 x 128', url: sizesMap['128'] });
+    if (hasPrecomputedSizes) {
+      // Use pre-computed sizes when available (uploaded photos)
+      if (sizesMap['512']) {
+        sizes.push({
+          key: 'large',
+          label: 'Large (512 x 512)',
+          url: sizesMap['512'],
+        });
+      }
+      if (sizesMap['256']) {
+        sizes.push({
+          key: 'medium',
+          label: 'Medium (256 x 256)',
+          url: sizesMap['256'],
+        });
+      }
+      if (sizesMap['128']) {
+        sizes.push({
+          key: 'small',
+          label: 'Small (128 x 128)',
+          url: sizesMap['128'],
+        });
+      }
+    } else if (originalUrl) {
+      // No pre-computed sizes -- generate S/M/L from the original URL
+      sizes.push(...generateSizeVariants(originalUrl));
     }
 
     // Always include original at the end
@@ -110,7 +139,7 @@ export function buildAvatarSizes(
       });
     }
   } else if (avatarUrl) {
-    // No pre-computed sizes map — generate S/M/L from the avatar URL
+    // No pre-computed sizes map -- generate S/M/L from the avatar URL
     sizes.push(...generateSizeVariants(avatarUrl));
     sizes.push({ key: 'original', label: 'Original', url: avatarUrl });
   }

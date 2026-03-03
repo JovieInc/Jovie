@@ -16,21 +16,11 @@ const {
   mockResetProviderLinkDb,
   mockGetProviderLink,
   mockValidateProviderUrl,
-  mockSyncReleasesFromSpotify,
-  mockCheckIsrcRescanRateLimit,
-  mockCheckReleaseRefreshRateLimit,
-  mockFormatTimeRemaining,
-  mockProcessReleaseEnrichmentJobStandalone,
-  mockTrackServerEvent,
-  mockCaptureError,
-  mockEnqueueDspArtistDiscoveryJob,
-  mockEnqueueDspTrackEnrichmentJob,
-  mockEnqueueMusicFetchEnrichmentJob,
   mockThrowIfRedirect,
   mockDbSelect,
-  mockDbInsert,
   mockDbUpdate,
   mockDbDelete,
+  mockCaptureError,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockGetDashboardData: vi.fn(),
@@ -44,21 +34,11 @@ const {
   mockResetProviderLinkDb: vi.fn(),
   mockGetProviderLink: vi.fn(),
   mockValidateProviderUrl: vi.fn(),
-  mockSyncReleasesFromSpotify: vi.fn(),
-  mockCheckIsrcRescanRateLimit: vi.fn(),
-  mockCheckReleaseRefreshRateLimit: vi.fn(),
-  mockFormatTimeRemaining: vi.fn(),
-  mockProcessReleaseEnrichmentJobStandalone: vi.fn(),
-  mockTrackServerEvent: vi.fn(),
-  mockCaptureError: vi.fn(),
-  mockEnqueueDspArtistDiscoveryJob: vi.fn(),
-  mockEnqueueDspTrackEnrichmentJob: vi.fn(),
-  mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
   mockThrowIfRedirect: vi.fn(),
   mockDbSelect: vi.fn(),
-  mockDbInsert: vi.fn(),
   mockDbUpdate: vi.fn(),
   mockDbDelete: vi.fn(),
+  mockCaptureError: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -69,7 +49,6 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: vi.fn().mockResolvedValue(null),
 }));
 
-// The releases/actions.ts imports from '../actions' which resolves to the dashboard actions barrel
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   getDashboardData: mockGetDashboardData,
 }));
@@ -88,7 +67,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
-    insert: mockDbInsert,
     update: mockDbUpdate,
     delete: mockDbDelete,
   },
@@ -96,20 +74,6 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema/content', () => ({
   discogReleases: { id: 'id' },
-}));
-
-vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
-  dspArtistMatches: {
-    id: 'id',
-    creatorProfileId: 'creatorProfileId',
-    providerId: 'providerId',
-    externalArtistId: 'externalArtistId',
-    externalArtistName: 'externalArtistName',
-    externalArtistUrl: 'externalArtistUrl',
-    externalArtistImageUrl: 'externalArtistImageUrl',
-    status: 'status',
-    settings: 'settings',
-  },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -139,7 +103,7 @@ vi.mock('@/lib/discography/queries', () => ({
 }));
 
 vi.mock('@/lib/discography/spotify-import', () => ({
-  syncReleasesFromSpotify: mockSyncReleasesFromSpotify,
+  syncReleasesFromSpotify: vi.fn(),
 }));
 
 vi.mock('@/lib/discography/types', () => ({}));
@@ -155,30 +119,25 @@ vi.mock('@/lib/discography/video-providers', () => ({
   VIDEO_PROVIDER_KEYS: ['youtube'],
 }));
 
-vi.mock('@/lib/dsp-enrichment/jobs/release-enrichment', () => ({
-  processReleaseEnrichmentJobStandalone:
-    mockProcessReleaseEnrichmentJobStandalone,
-}));
-
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
   captureWarning: vi.fn(),
 }));
 
 vi.mock('@/lib/ingestion/jobs', () => ({
-  enqueueDspArtistDiscoveryJob: mockEnqueueDspArtistDiscoveryJob,
-  enqueueDspTrackEnrichmentJob: mockEnqueueDspTrackEnrichmentJob,
-  enqueueMusicFetchEnrichmentJob: mockEnqueueMusicFetchEnrichmentJob,
+  enqueueDspArtistDiscoveryJob: vi.fn(),
+  enqueueDspTrackEnrichmentJob: vi.fn(),
+  enqueueMusicFetchEnrichmentJob: vi.fn(),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  checkIsrcRescanRateLimit: mockCheckIsrcRescanRateLimit,
-  checkReleaseRefreshRateLimit: mockCheckReleaseRefreshRateLimit,
-  formatTimeRemaining: mockFormatTimeRemaining,
+  checkIsrcRescanRateLimit: vi.fn(),
+  checkReleaseRefreshRateLimit: vi.fn().mockResolvedValue({ success: true }),
+  formatTimeRemaining: vi.fn(),
 }));
 
 vi.mock('@/lib/server-analytics', () => ({
-  trackServerEvent: mockTrackServerEvent,
+  trackServerEvent: vi.fn(),
 }));
 
 vi.mock('@/lib/services/canvas/service', () => ({
@@ -210,6 +169,24 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
   ne: vi.fn((a: unknown, b: unknown) => [a, b]),
+}));
+
+vi.mock('@/lib/db/schema/dsp-enrichment', () => ({
+  dspArtistMatches: {
+    id: 'id',
+    creatorProfileId: 'creatorProfileId',
+    providerId: 'providerId',
+    externalArtistId: 'externalArtistId',
+    externalArtistName: 'externalArtistName',
+    externalArtistUrl: 'externalArtistUrl',
+    externalArtistImageUrl: 'externalArtistImageUrl',
+    status: 'status',
+    settings: 'settings',
+  },
+}));
+
+vi.mock('@/lib/dsp-enrichment/jobs/release-enrichment', () => ({
+  processReleaseEnrichmentJobStandalone: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -304,102 +281,19 @@ function setupDbDeleteChain() {
   });
 }
 
-/** Set up a chain mock for db.insert().values().onConflictDoUpdate().returning() */
-function setupDbInsertChain(returnResult: unknown[]) {
-  mockDbInsert.mockReturnValue({
-    values: vi.fn().mockReturnValue({
-      onConflictDoUpdate: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue(returnResult),
-      }),
-    }),
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-describe('@critical releases/actions.ts', () => {
+describe('@critical releases/actions.ts — update/edit operations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDbSelect.mockReset();
-    mockDbInsert.mockReset();
     mockDbUpdate.mockReset();
     mockDbDelete.mockReset();
     mockGetCachedAuth.mockResolvedValue({ userId: MOCK_USER_ID });
     mockGetDashboardData.mockResolvedValue(makeDashboardData());
     mockRedirect.mockImplementation((url: string) => {
       throw new Error(`NEXT_REDIRECT:${url}`);
-    });
-    mockCheckReleaseRefreshRateLimit.mockResolvedValue({ success: true });
-  });
-
-  // =========================================================================
-  // loadReleaseMatrix
-  // =========================================================================
-  describe('loadReleaseMatrix', () => {
-    it('returns mapped releases for authenticated user', async () => {
-      const release = makeRelease();
-      mockGetReleasesForProfile.mockResolvedValue([release]);
-
-      const { loadReleaseMatrix } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await loadReleaseMatrix();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('rel_001');
-      expect(result[0].title).toBe('Test Album');
-      expect(result[0].profileId).toBe(MOCK_PROFILE.id);
-    });
-
-    it('redirects to sign-in when not authenticated', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { loadReleaseMatrix } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(loadReleaseMatrix()).rejects.toThrow('NEXT_REDIRECT');
-      expect(mockRedirect).toHaveBeenCalledWith(
-        expect.stringContaining('/sign-in')
-      );
-    });
-
-    it('redirects to onboarding when profile needs onboarding', async () => {
-      mockGetDashboardData.mockResolvedValue(
-        makeDashboardData({ needsOnboarding: true })
-      );
-
-      const { loadReleaseMatrix } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(loadReleaseMatrix()).rejects.toThrow('NEXT_REDIRECT');
-      expect(mockRedirect).toHaveBeenCalledWith('/onboarding');
-    });
-
-    it('filters provider links to only those with URLs', async () => {
-      const release = makeRelease({
-        providerLinks: [
-          {
-            providerId: 'spotify',
-            url: 'https://open.spotify.com/album/abc',
-            sourceType: 'ingested',
-            updatedAt: new Date(),
-          },
-        ],
-      });
-      mockGetReleasesForProfile.mockResolvedValue([release]);
-
-      const { loadReleaseMatrix } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await loadReleaseMatrix();
-
-      // Should only contain providers that have a URL
-      for (const provider of result[0].providers) {
-        expect(provider.url).not.toBe('');
-      }
     });
   });
 
@@ -584,296 +478,6 @@ describe('@critical releases/actions.ts', () => {
 
       await expect(refreshRelease({ releaseId: 'rel_001' })).rejects.toThrow(
         'Release not found'
-      );
-    });
-  });
-
-  // =========================================================================
-  // rescanIsrcLinks
-  // =========================================================================
-  describe('rescanIsrcLinks', () => {
-    it('runs enrichment when not rate limited and Apple Music match exists', async () => {
-      const release = makeRelease();
-      mockGetReleaseById.mockResolvedValue(release);
-      mockCheckIsrcRescanRateLimit.mockResolvedValue({ success: true });
-      setupDbSelectChain([
-        {
-          id: 'match_001',
-          externalArtistId: 'am_artist_1',
-          status: 'confirmed',
-        },
-      ]);
-      mockProcessReleaseEnrichmentJobStandalone.mockResolvedValue({
-        releasesEnriched: 3,
-      });
-
-      const { rescanIsrcLinks } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await rescanIsrcLinks({ releaseId: 'rel_001' });
-
-      expect(result.rateLimited).toBe(false);
-      expect(result.linksFound).toBe(3);
-      expect(mockProcessReleaseEnrichmentJobStandalone).toHaveBeenCalledWith(
-        expect.objectContaining({
-          creatorProfileId: MOCK_PROFILE.id,
-          providerId: 'apple_music',
-        })
-      );
-      expect(mockRevalidateTag).toHaveBeenCalled();
-    });
-
-    it('returns rate limited response when rate limit hit', async () => {
-      const release = makeRelease();
-      mockGetReleaseById.mockResolvedValue(release);
-      mockCheckIsrcRescanRateLimit.mockResolvedValue({
-        success: false,
-        reset: Date.now() + 300000,
-      });
-      mockFormatTimeRemaining.mockReturnValue('5 minutes');
-
-      const { rescanIsrcLinks } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await rescanIsrcLinks({ releaseId: 'rel_001' });
-
-      expect(result.rateLimited).toBe(true);
-      expect(result.retryAfter).toBe('5 minutes');
-      expect(result.linksFound).toBe(0);
-      expect(mockProcessReleaseEnrichmentJobStandalone).not.toHaveBeenCalled();
-    });
-
-    it('rejects unauthenticated calls', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { rescanIsrcLinks } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(rescanIsrcLinks({ releaseId: 'rel_001' })).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
-  });
-
-  // =========================================================================
-  // syncFromSpotify
-  // =========================================================================
-  describe('syncFromSpotify', () => {
-    it('syncs releases and triggers discovery on success', async () => {
-      mockSyncReleasesFromSpotify.mockResolvedValue({
-        success: true,
-        imported: 5,
-        releases: [],
-        errors: [],
-      });
-      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue(undefined);
-      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue(undefined);
-
-      const { syncFromSpotify } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await syncFromSpotify();
-
-      expect(result.success).toBe(true);
-      expect(result.imported).toBe(5);
-      expect(mockRevalidateTag).toHaveBeenCalled();
-      expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          creatorProfileId: MOCK_PROFILE.id,
-          targetProviders: ['apple_music'],
-        })
-      );
-    });
-
-    it('returns error when no Spotify ID on profile', async () => {
-      mockGetDashboardData.mockResolvedValue(
-        makeDashboardData({
-          selectedProfile: { ...MOCK_PROFILE, spotifyId: null },
-          creatorProfiles: [{ ...MOCK_PROFILE, spotifyId: null }],
-        })
-      );
-
-      const { syncFromSpotify } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await syncFromSpotify();
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('No Spotify artist connected');
-    });
-
-    it('rejects unauthenticated calls', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { syncFromSpotify } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(syncFromSpotify()).rejects.toThrow('Unauthorized');
-    });
-
-    it('returns failure details on sync error', async () => {
-      mockSyncReleasesFromSpotify.mockResolvedValue({
-        success: false,
-        imported: 0,
-        releases: [],
-        errors: ['Spotify API rate limited'],
-      });
-
-      const { syncFromSpotify } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await syncFromSpotify();
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Spotify API rate limited');
-      expect(result.errors).toContain('Spotify API rate limited');
-    });
-  });
-
-  // =========================================================================
-  // checkSpotifyConnection
-  // =========================================================================
-  describe('checkSpotifyConnection', () => {
-    it('returns connected when profile has Spotify ID', async () => {
-      mockGetDashboardData.mockResolvedValue(
-        makeDashboardData({
-          selectedProfile: {
-            ...MOCK_PROFILE,
-            spotifyId: 'sp_123',
-            settings: { spotifyArtistName: 'Test Artist' },
-          },
-        })
-      );
-
-      const { checkSpotifyConnection } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await checkSpotifyConnection();
-
-      expect(result.connected).toBe(true);
-      expect(result.spotifyId).toBe('sp_123');
-      expect(result.artistName).toBe('Test Artist');
-    });
-
-    it('returns not connected when no user', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { checkSpotifyConnection } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await checkSpotifyConnection();
-
-      expect(result.connected).toBe(false);
-      expect(result.spotifyId).toBeNull();
-    });
-
-    it('returns not connected when needs onboarding', async () => {
-      mockGetDashboardData.mockResolvedValue(
-        makeDashboardData({ needsOnboarding: true })
-      );
-
-      const { checkSpotifyConnection } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await checkSpotifyConnection();
-
-      expect(result.connected).toBe(false);
-    });
-  });
-
-  // =========================================================================
-  // connectSpotifyArtist
-  // =========================================================================
-  describe('connectSpotifyArtist', () => {
-    const connectParams = {
-      spotifyArtistId: 'sp_artist_1',
-      spotifyArtistUrl: 'https://open.spotify.com/artist/sp_artist_1',
-      artistName: 'Test Artist',
-    };
-
-    it('connects Spotify artist and syncs releases', async () => {
-      setupDbSelectChain([{ settings: {} }]);
-      setupDbUpdateChain();
-      mockSyncReleasesFromSpotify.mockResolvedValue({
-        success: true,
-        imported: 3,
-        releases: [makeRelease()],
-        errors: [],
-      });
-      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue(undefined);
-      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue(undefined);
-
-      const { connectSpotifyArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await connectSpotifyArtist(connectParams);
-      expect(result.success).toBe(true);
-      expect(result.imported).toBe(3);
-      expect(result.artistName).toBe('Test Artist');
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
-    });
-
-    it('rejects unauthenticated calls', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { connectSpotifyArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(connectSpotifyArtist(connectParams)).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
-
-    it('returns failure when sync fails', async () => {
-      setupDbSelectChain([{ settings: {} }]);
-      setupDbUpdateChain();
-      mockSyncReleasesFromSpotify.mockResolvedValue({
-        success: false,
-        imported: 0,
-        releases: [],
-        errors: ['API error'],
-      });
-
-      const { connectSpotifyArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await connectSpotifyArtist(connectParams);
-
-      expect(result.success).toBe(false);
-      expect(result.imported).toBe(0);
-    });
-
-    it('handles unique constraint race conflicts gracefully', async () => {
-      setupDbSelectChain([{ settings: {} }]);
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockRejectedValue(
-            Object.assign(
-              new Error(
-                'duplicate key value violates unique constraint "creator_profiles_spotify_id_unique"'
-              ),
-              {
-                code: '23505',
-                constraint: 'creator_profiles_spotify_id_unique',
-              }
-            )
-          ),
-        }),
-      });
-
-      const { connectSpotifyArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await connectSpotifyArtist(connectParams);
-
-      expect(result.success).toBe(false);
-      expect(result.imported).toBe(0);
-      expect(result.message).toMatch(
-        /already linked to another jovie account/i
       );
     });
   });
@@ -1170,181 +774,6 @@ describe('@critical releases/actions.ts', () => {
       await expect(revertReleaseArtwork('rel_001')).rejects.toThrow(
         'Release not found'
       );
-    });
-  });
-
-  // =========================================================================
-  // checkAppleMusicConnection
-  // =========================================================================
-  describe('checkAppleMusicConnection', () => {
-    it('returns connected when confirmed match exists', async () => {
-      setupDbSelectChain([
-        {
-          externalArtistName: 'Test Artist AM',
-          externalArtistId: 'am_123',
-          status: 'confirmed',
-        },
-      ]);
-
-      const { checkAppleMusicConnection } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await checkAppleMusicConnection();
-
-      expect(result.connected).toBe(true);
-      expect(result.artistName).toBe('Test Artist AM');
-      expect(result.artistId).toBe('am_123');
-    });
-
-    it('returns not connected when no match', async () => {
-      setupDbSelectChain([]);
-
-      const { checkAppleMusicConnection } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await checkAppleMusicConnection();
-
-      expect(result.connected).toBe(false);
-      expect(result.artistName).toBeNull();
-    });
-
-    it('returns not connected when unauthenticated', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { checkAppleMusicConnection } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await checkAppleMusicConnection();
-
-      expect(result.connected).toBe(false);
-    });
-  });
-
-  // =========================================================================
-  // connectAppleMusicArtist
-  // =========================================================================
-  describe('connectAppleMusicArtist', () => {
-    const appleParams = {
-      externalArtistId: 'am_artist_1',
-      externalArtistName: 'Test Artist',
-      externalArtistUrl:
-        'https://music.apple.com/us/artist/test-artist/am_artist_1',
-    };
-
-    it('connects Apple Music artist and enqueues enrichment', async () => {
-      setupDbInsertChain([{ id: 'match_new' }]);
-      mockEnqueueDspTrackEnrichmentJob.mockResolvedValue(undefined);
-
-      const { connectAppleMusicArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await connectAppleMusicArtist(appleParams);
-
-      expect(result.success).toBe(true);
-      expect(result.artistName).toBe('Test Artist');
-      expect(mockDbInsert).toHaveBeenCalled();
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
-    });
-
-    it('rejects unauthenticated calls', async () => {
-      mockGetCachedAuth.mockResolvedValue({ userId: null });
-
-      const { connectAppleMusicArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(connectAppleMusicArtist(appleParams)).rejects.toThrow(
-        'Unauthorized'
-      );
-    });
-
-    it('rejects empty required fields', async () => {
-      const { connectAppleMusicArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(
-        connectAppleMusicArtist({
-          ...appleParams,
-          externalArtistId: '  ',
-        })
-      ).rejects.toThrow('Apple Music artist data is required');
-    });
-
-    it('rejects invalid Apple Music URL', async () => {
-      const { connectAppleMusicArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-
-      await expect(
-        connectAppleMusicArtist({
-          ...appleParams,
-          externalArtistUrl: 'https://evil.com/artist/test',
-        })
-      ).rejects.toThrow('Invalid Apple Music artist URL');
-    });
-
-    it('returns failure when database insert fails', async () => {
-      mockDbInsert.mockReturnValue({
-        values: vi.fn().mockReturnValue({
-          onConflictDoUpdate: vi.fn().mockReturnValue({
-            returning: vi.fn().mockRejectedValue(new Error('DB error')),
-          }),
-        }),
-      });
-
-      const { connectAppleMusicArtist } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      const result = await connectAppleMusicArtist(appleParams);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('Failed to save');
-    });
-  });
-
-  // =========================================================================
-  // Cache invalidation patterns
-  // =========================================================================
-  describe('cache invalidation', () => {
-    it('saveProviderOverride invalidates tag and path', async () => {
-      mockValidateProviderUrl.mockReturnValue({ valid: true });
-      mockUpsertProviderLink.mockResolvedValue(undefined);
-      mockGetReleaseById.mockResolvedValue(makeRelease());
-
-      const { saveProviderOverride } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      await saveProviderOverride({
-        profileId: MOCK_PROFILE.id,
-        releaseId: 'rel_001',
-        provider: 'spotify' as const,
-        url: 'https://open.spotify.com/album/xyz',
-      });
-
-      expect(mockRevalidateTag).toHaveBeenCalledWith(
-        `releases:${MOCK_USER_ID}:${MOCK_PROFILE.id}`,
-        'max'
-      );
-      // revalidatePath is intentionally skipped to avoid resetting client-side
-      // state (closing the sidebar). TanStack Query handles cache updates.
-      expect(mockRevalidatePath).not.toHaveBeenCalled();
-    });
-
-    it('deleteRelease invalidates tag and path', async () => {
-      mockGetReleaseById.mockResolvedValue(makeRelease());
-      setupDbDeleteChain();
-
-      const { deleteRelease } = await import(
-        '@/app/app/(shell)/dashboard/releases/actions'
-      );
-      await deleteRelease({ releaseId: 'rel_001' });
-
-      expect(mockRevalidateTag).toHaveBeenCalledWith(
-        `releases:${MOCK_USER_ID}:${MOCK_PROFILE.id}`,
-        'max'
-      );
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
     });
   });
 });
