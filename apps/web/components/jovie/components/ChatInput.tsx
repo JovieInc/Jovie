@@ -16,6 +16,114 @@ import type { PendingImage } from '../hooks/useChatImageAttachments';
 import { MAX_MESSAGE_LENGTH } from '../types';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
 
+interface SendButtonProps {
+  canSend: boolean;
+  isLoading: boolean;
+  isSubmitting: boolean;
+  isCompact: boolean;
+  onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+}
+
+function SendButton({
+  canSend,
+  isLoading,
+  isSubmitting,
+  isCompact,
+  onMouseDown,
+}: SendButtonProps) {
+  return (
+    <SimpleTooltip content='Send message'>
+      <button
+        type='submit'
+        onMouseDown={onMouseDown}
+        disabled={!canSend}
+        className={cn(
+          'flex shrink-0 items-center justify-center rounded-full transition-all duration-fast',
+          canSend
+            ? 'bg-accent text-accent-foreground hover:bg-accent/90'
+            : 'bg-surface-2 text-tertiary-token cursor-not-allowed',
+          isCompact ? 'h-8 w-8' : 'h-9 w-9'
+        )}
+        aria-label='Send message'
+      >
+        {isLoading || isSubmitting ? (
+          <Loader2
+            className={cn(
+              'animate-spin',
+              isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4'
+            )}
+          />
+        ) : (
+          <ArrowUp className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+        )}
+      </button>
+    </SimpleTooltip>
+  );
+}
+
+interface AttachDropdownProps {
+  isCompact: boolean;
+  isImageProcessing: boolean;
+  isLoading: boolean;
+  isSubmitting: boolean;
+  plusMenuOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onImageAttach: () => void;
+}
+
+function AttachDropdown({
+  isCompact,
+  isImageProcessing,
+  isLoading,
+  isSubmitting,
+  plusMenuOpen,
+  onOpenChange,
+  onMouseDown,
+  onImageAttach,
+}: AttachDropdownProps) {
+  return (
+    <DropdownMenu open={plusMenuOpen} onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          onMouseDown={onMouseDown}
+          disabled={isImageProcessing || isLoading || isSubmitting}
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-full',
+            'bg-surface-2 text-secondary-token transition-colors',
+            'hover:bg-surface-3 hover:text-primary-token',
+            'disabled:opacity-50 disabled:cursor-not-allowed',
+            isCompact ? 'h-8 w-8' : 'h-9 w-9'
+          )}
+          aria-label='Attachment options'
+        >
+          {isImageProcessing ? (
+            <Loader2
+              className={cn(
+                'animate-spin',
+                isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]'
+              )}
+            />
+          ) : (
+            <Plus className={cn(isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]')} />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='start' side='top' sideOffset={8}>
+        <DropdownMenuItem
+          onSelect={() => {
+            onImageAttach();
+          }}
+        >
+          <ImagePlus className='mr-2 h-4 w-4' />
+          Attach image
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface ChatInputProps {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -129,49 +237,17 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
           <div className='flex items-end gap-2 px-2 py-1.5'>
             {/* Left: Circular plus button with attachment dropdown */}
-            {hasAttachButton && (
-              <DropdownMenu open={plusMenuOpen} onOpenChange={setPlusMenuOpen}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type='button'
-                    onMouseDown={handleMouseDown}
-                    disabled={isImageProcessing || isLoading || isSubmitting}
-                    className={cn(
-                      'flex shrink-0 items-center justify-center rounded-full',
-                      'bg-surface-2 text-secondary-token transition-colors',
-                      'hover:bg-surface-3 hover:text-primary-token',
-                      'disabled:opacity-50 disabled:cursor-not-allowed',
-                      isCompact ? 'h-8 w-8' : 'h-9 w-9'
-                    )}
-                    aria-label='Attachment options'
-                  >
-                    {isImageProcessing ? (
-                      <Loader2
-                        className={cn(
-                          'animate-spin',
-                          isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]'
-                        )}
-                      />
-                    ) : (
-                      <Plus
-                        className={cn(
-                          isCompact ? 'h-4 w-4' : 'h-[18px] w-[18px]'
-                        )}
-                      />
-                    )}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='start' side='top' sideOffset={8}>
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      onImageAttach?.();
-                    }}
-                  >
-                    <ImagePlus className='mr-2 h-4 w-4' />
-                    Attach image
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {hasAttachButton && onImageAttach && (
+              <AttachDropdown
+                isCompact={isCompact}
+                isImageProcessing={isImageProcessing}
+                isLoading={isLoading}
+                isSubmitting={isSubmitting}
+                plusMenuOpen={plusMenuOpen}
+                onOpenChange={setPlusMenuOpen}
+                onMouseDown={handleMouseDown}
+                onImageAttach={onImageAttach}
+              />
             )}
 
             {/* Textarea */}
@@ -196,34 +272,13 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             />
 
             {/* Right: Circular send button */}
-            <SimpleTooltip content='Send message'>
-              <button
-                type='submit'
-                onMouseDown={handleMouseDown}
-                disabled={!canSend}
-                className={cn(
-                  'flex shrink-0 items-center justify-center rounded-full transition-all duration-fast',
-                  canSend
-                    ? 'bg-accent text-accent-foreground hover:bg-accent/90'
-                    : 'bg-surface-2 text-tertiary-token cursor-not-allowed',
-                  isCompact ? 'h-8 w-8' : 'h-9 w-9'
-                )}
-                aria-label='Send message'
-              >
-                {isLoading || isSubmitting ? (
-                  <Loader2
-                    className={cn(
-                      'animate-spin',
-                      isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4'
-                    )}
-                  />
-                ) : (
-                  <ArrowUp
-                    className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
-                  />
-                )}
-              </button>
-            </SimpleTooltip>
+            <SendButton
+              canSend={Boolean(canSend)}
+              isLoading={isLoading}
+              isSubmitting={isSubmitting}
+              isCompact={isCompact}
+              onMouseDown={handleMouseDown}
+            />
           </div>
 
           {isNearLimit && (
