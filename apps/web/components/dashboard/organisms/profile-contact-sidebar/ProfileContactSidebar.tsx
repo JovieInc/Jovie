@@ -355,7 +355,11 @@ export function ProfileContactSidebar() {
         </div>
 
         {/* Tab content */}
-        {resolvedCategory !== 'about' ? (
+        {resolvedCategory === 'about' ? (
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4'>
+            <ProfileAboutTab bio={bio} genres={genres} />
+          </div>
+        ) : (
           <>
             {/* Links List — with add/remove */}
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
@@ -397,10 +401,6 @@ export function ProfileContactSidebar() {
               />
             </div>
           </>
-        ) : (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4'>
-            <ProfileAboutTab bio={bio} genres={genres} />
-          </div>
         )}
       </div>
     </RightDrawer>

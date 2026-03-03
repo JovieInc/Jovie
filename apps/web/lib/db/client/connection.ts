@@ -173,9 +173,7 @@ export async function resetPool(): Promise<void> {
   const oldPool = _pool;
   _pool = undefined;
   _db = undefined;
-  if (typeof global !== 'undefined') {
-    globalThis.db = undefined;
-  }
+  globalThis.db = undefined;
   if (oldPool) {
     try {
       await oldPool.end();

@@ -549,9 +549,9 @@ export default async function ArtistPage({
       />
 
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
-      {!profile.is_claimed ? (
+      {!profile.is_claimed && (
         <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
-      ) : null}
+      )}
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
       <StaticArtistPage

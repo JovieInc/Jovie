@@ -144,7 +144,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       platformFeeCents: platformFeeCents ?? null,
       metadata: {
         source: 'checkout',
-        ...(session.metadata ?? {}),
+        ...session.metadata,
       },
     })
     .onConflictDoNothing({ target: tips.paymentIntentId })
