@@ -121,6 +121,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
             desc(releases.releaseDate),
             desc(releases.createdAt),
           ],
+          limit: 100,
         }),
         new Promise<never>((_, reject) =>
           setTimeout(
@@ -214,7 +215,8 @@ async function queryFeaturedCreatorsForSearch(): Promise<
         eq(creatorProfiles.isFeatured, true),
         eq(creatorProfiles.marketingOptOut, false)
       )
-    );
+    )
+    .limit(200);
 
   const vipMap = new Map<string, VipArtist>();
 
