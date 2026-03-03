@@ -690,6 +690,23 @@ export async function smokeNavigateWithRetry(
 }
 
 /**
+ * Check if an error is a transient infrastructure issue (server crash,
+ * network timeout, browser closed) rather than a real test failure.
+ */
+export function isTransientNavigationError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes('net::ERR_CONNECTION_REFUSED') ||
+    msg.includes('net::ERR_CONNECTION_RESET') ||
+    msg.includes('net::ERR_EMPTY_RESPONSE') ||
+    msg.includes('Target closed') ||
+    msg.includes('Target page, context or browser has been closed') ||
+    msg.includes('browser has disconnected') ||
+    msg.includes('Timeout')
+  );
+}
+
+/**
  * Navigate and wait for the page to be fully interactive
  */
 export async function navigateAndWaitForHydration(
