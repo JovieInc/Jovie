@@ -305,9 +305,13 @@ export function useContactsManager({
 
         // Invalidate TanStack Query contacts cache so background refetches
         // return fresh data and prevent stale reads on re-mount (JOV-920)
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.contacts.list(profileId),
-        });
+        queryClient
+          .invalidateQueries({
+            queryKey: queryKeys.contacts.list(profileId),
+          })
+          .catch(() => {
+            /* background refresh — swallow */
+          });
 
         toast.success('Contact saved', { id: 'contact-save' });
         track(
@@ -394,9 +398,13 @@ export function useContactsManager({
         return next;
       });
       // Invalidate TanStack Query contacts cache after deletion (JOV-920)
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.contacts.list(profileId),
-      });
+      queryClient
+        .invalidateQueries({
+          queryKey: queryKeys.contacts.list(profileId),
+        })
+        .catch(() => {
+          /* background refresh — swallow */
+        });
 
       toast.success('Contact removed');
       track('contacts_contact_deleted', {
