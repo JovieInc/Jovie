@@ -17,7 +17,8 @@ export async function withErrorHandling<T>(
     });
     const rawMessage =
       error instanceof Error ? error.message : 'An unexpected error occurred';
-    console.error(`[server-action${context ? `:${context}` : ''}]`, rawMessage);
+    const tag = context ? `server-action:${context}` : 'server-action';
+    console.error(`[${tag}]`, rawMessage);
     return { success: false, error: 'Something went wrong. Please try again.' };
   }
 }
