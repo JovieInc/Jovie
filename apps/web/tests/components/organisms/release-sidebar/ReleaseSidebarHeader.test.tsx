@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const openSpy = vi.fn();
 
@@ -57,6 +57,10 @@ const release = {
 };
 
 describe('ReleaseSidebarHeader', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('shows open smart link action and opens in new tab', async () => {
     const user = userEvent.setup();
 
