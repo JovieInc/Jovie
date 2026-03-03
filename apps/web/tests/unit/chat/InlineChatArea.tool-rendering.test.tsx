@@ -6,6 +6,24 @@ import { fastRender } from '@/tests/utils/fast-render';
 
 // --- Mocks ---
 
+// Mock @tanstack/react-virtual so the virtualizer renders all items in JSDOM
+// (JSDOM elements have zero dimensions, so the real virtualizer renders nothing)
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: ({ count }: { count: number }) => ({
+    getVirtualItems: () =>
+      Array.from({ length: count }, (_, i) => ({
+        index: i,
+        start: i * 60,
+        size: 60,
+        key: i,
+        measureElement: () => {},
+      })),
+    getTotalSize: () => count * 60,
+    scrollToIndex: vi.fn(),
+    measureElement: vi.fn(),
+  }),
+}));
+
 /** Captured messages from the useJovieChat mock. */
 let mockMessages: Array<{
   id: string;
