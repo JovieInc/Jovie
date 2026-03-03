@@ -94,6 +94,7 @@ describe('Database Monitoring', () => {
         })
       );
 
+      vi.runOnlyPendingTimers();
       vi.useRealTimers();
     });
   });

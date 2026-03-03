@@ -227,6 +227,8 @@ describe('Analytics Tracking Integration', () => {
     });
 
     it('should timeout slow queries', async () => {
+      vi.useFakeTimers();
+
       const { withTimeout, QueryTimeoutError } = await import(
         '@/lib/db/query-timeout'
       );
@@ -235,9 +237,13 @@ describe('Analytics Tracking Integration', () => {
         setTimeout(() => resolve('done'), 200)
       );
 
-      await expect(withTimeout(slowQuery, 50, 'Test')).rejects.toThrow(
-        QueryTimeoutError
-      );
+      const resultPromise = withTimeout(slowQuery, 50, 'Test');
+      vi.advanceTimersByTime(51);
+
+      await expect(resultPromise).rejects.toThrow(QueryTimeoutError);
+
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
     });
   });
 
