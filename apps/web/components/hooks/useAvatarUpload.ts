@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UploadErrorCode } from '@/app/api/images/upload/route';
-import type { AvatarUploadStatus } from '@/components/molecules/AvatarProgressRing';
+import type { AvatarUploadStatus } from '@/components/atoms/AvatarUploadAnnouncer';
 import { track } from '@/lib/analytics';
 import {
   DEFAULT_ACCEPTED_TYPES,
