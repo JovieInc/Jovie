@@ -163,6 +163,72 @@ test.describe('Auth Smoke Tests @smoke', () => {
     }
   });
 
+  // =========================================================================
+  // REDIRECT LOOP DETECTION - Catches the /app → /onboarding → /app loop
+  // that occurs when dashboard data fails to load for authenticated users.
+  // =========================================================================
+  test('dashboard does not redirect-loop when data fails to load', async ({
+    browser,
+  }) => {
+    if (!hasRealClerkConfig()) {
+      test.skip();
+    }
+
+    const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
+    const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
+    if (!username || !password) {
+      test.skip(true, 'No E2E credentials for authenticated test');
+    }
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    // Intercept analytics
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+
+    try {
+      // Navigate to /app and track all redirects
+      const redirectUrls: string[] = [];
+      page.on('framenavigated', frame => {
+        if (frame === page.mainFrame()) {
+          redirectUrls.push(new URL(frame.url()).pathname);
+        }
+      });
+
+      await page.goto('/app', {
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        waitUntil: 'domcontentloaded',
+      });
+
+      // Wait for any redirects to settle
+      await page.waitForTimeout(3000);
+
+      // Check for redirect loop: if /app and /onboarding both appear 2+ times, it's looping
+      const appCount = redirectUrls.filter(u => u.startsWith('/app')).length;
+      const onboardingCount = redirectUrls.filter(
+        u => u === '/onboarding'
+      ).length;
+      const signinCount = redirectUrls.filter(u => u.includes('sign')).length;
+
+      const isLooping =
+        (appCount >= 2 && onboardingCount >= 2) ||
+        (appCount >= 2 && signinCount >= 2) ||
+        redirectUrls.length > 6;
+
+      expect(
+        isLooping,
+        `Redirect loop detected: ${redirectUrls.join(' → ')}`
+      ).toBe(false);
+    } finally {
+      await context.close();
+    }
+  });
+
   // NOTE: Billing route tests moved to billing.spec.ts (full suite only)
   // They test feature details, not critical paths for smoke testing
 });

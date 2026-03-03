@@ -443,10 +443,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (
-        (pathname === '/signin' || pathname === '/signup') &&
-        !isRSCPrefetch
-      ) {
+      } else if (pathInfo.isAuthPath && !isRSCPrefetch) {
+        // Redirect authenticated users away from any auth page (/signin, /sign-in,
+        // /signup, /sign-up). Uses isAuthPath to cover all variants consistently.
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else {
         // Single domain: no rewrites needed, routes are at their canonical paths
