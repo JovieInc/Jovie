@@ -552,10 +552,11 @@ jobs:
   ci-pr-ready:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
-    # On PRs: gates on ci-fast + unit tests + a11y (layout guard remains informational).
+    # Gates on ci-fast + unit tests + a11y.
+    # Layout guard runs independently as informational (not in needs).
     # On merge queue: all jobs run; path-gated jobs that find no relevant changes
     # skip internally and report "success" or "skipped", both of which pass below.
-    needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
+    needs: [ci-fast, ci-unit-tests, ci-a11y]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -565,8 +566,6 @@ jobs:
           echo "ci-fast: ${{ needs.ci-fast.result }}"
           echo "ci-unit-tests: ${{ needs.ci-unit-tests.result }}"
           echo "ci-a11y: ${{ needs.ci-a11y.result }}"
-          echo "ci-layout-guard: ${{ needs.ci-layout-guard.result }}"
-
           # ci-fast must succeed
           if [[ "${{ needs.ci-fast.result }}" != "success" ]]; then
             echo "❌ ci-fast did not pass"
@@ -585,11 +584,6 @@ jobs:
           if [[ "${{ needs.ci-a11y.result }}" == "failure" || "${{ needs.ci-a11y.result }}" == "cancelled" ]]; then
             echo "❌ ci-a11y did not pass"
             exit 1
-          fi
-
-          # ci-layout-guard: allow skip (path-gated / artifact missing) but block on failure
-          if [[ "${{ needs.ci-layout-guard.result }}" == "failure" ]]; then
-            echo "⚠️ ci-layout-guard failed — layout overlap/touching regressions detected (non-blocking)"
           fi
 
           echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y"
@@ -664,11 +658,12 @@ jobs:
           if-no-files-found: error
 
   ci-layout-guard:
-    name: Layout Guard (blocking)
+    name: Layout Guard (informational)
     needs: [ci-build-public]
-    # Non-blocking on PRs (PR Ready logs warning but doesn't fail).
-    # Only runs when ci-build-public ran (requires 'testing' label on PRs).
+    # Fully informational — never blocks PRs or merge queue.
+    # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
     if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:

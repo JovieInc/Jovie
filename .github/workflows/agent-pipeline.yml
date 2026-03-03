@@ -650,7 +650,7 @@ jobs:
             -f body="## Auto-Approved by Agent Pipeline
 
           All quality gates passed:
-          - [x] CI checks (typecheck, lint, unit tests, a11y, layout guard)
+          - [x] CI checks (typecheck, lint, unit tests, a11y)
           - [x] Scope judge (diff aligns with ticket intent)
           - [x] CodeRabbit review (no blocking feedback)
           - [x] Sensitive path check (no auth/billing/migration/CI changes)
