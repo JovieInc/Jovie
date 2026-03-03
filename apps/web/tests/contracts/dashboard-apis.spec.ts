@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TEST_USER_ID = 'user_123';
 const NO_STORE = 'no-store';
+const PRIVATE_CACHE = 'private, max-age=60, stale-while-revalidate=120';
 const PROFILE_ID = '123e4567-e89b-12d3-a456-426614174000';
 
 type QueryRows = Array<Record<string, unknown>>;
@@ -272,7 +273,7 @@ describe('Dashboard API contracts', () => {
       const body = await response.json();
 
       expectStatusOk(response, body);
-      expect(response.headers.get('Cache-Control')).toBe(NO_STORE);
+      expect(response.headers.get('Cache-Control')).toBe(PRIVATE_CACHE);
       expect(Array.isArray(body.activities)).toBe(true);
       expect(body.activities).toEqual(
         expect.arrayContaining([
