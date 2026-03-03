@@ -23,8 +23,15 @@ const nextConfig = {
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
   typescript: {
-    ignoreBuildErrors: false,
+    // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
+    ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
+  eslint: {
+    // CI sets NEXT_IGNORE_ESLINT=1 — skip during build since lint runs separately
+    ignoreDuringBuilds: !!process.env.NEXT_IGNORE_ESLINT,
+  },
+  // Never ship source maps to browsers (Sentry plugin uploads them separately)
+  productionBrowserSourceMaps: false,
   output: 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: path.join(__dirname, '../../'),

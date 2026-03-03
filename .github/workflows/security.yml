@@ -10,11 +10,8 @@ name: Security Scanning
 on:
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
-  # Note: merge_group intentionally excluded — security scanning runs on push to
-  # main and weekly schedule. Running in merge queue caused OIDC token failures
-  # and ejection/retry churn without adding security value.
+  # Removed pull_request trigger — security scanning on push-to-main catches
+  # everything that merges, weekly schedule covers drift. Saves ~300 runs/month.
   schedule:
     - cron: '0 6 * * 1' # Weekly on Monday at 6:00 AM UTC
   workflow_dispatch:

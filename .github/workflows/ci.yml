@@ -662,7 +662,8 @@ jobs:
     needs: [ci-build-public]
     # Fully informational — never blocks PRs or merge queue.
     # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
-    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    # Skipped on push-to-main (merge queue already validated).
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1082,8 +1083,9 @@ jobs:
     needs: [ci-path-changes]
     # Runs in parallel with typecheck/build for faster CI.
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy.
-    # Skipped in merge queue — unit tests already passed on the PR.
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    # Skipped on push-to-main (merge queue already validated) and merge queue.
+    # Still runs on agent branch pushes (codegen-bot/**, claude/**, codex/**).
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     strategy:
@@ -1201,9 +1203,10 @@ jobs:
 
   ci-a11y:
     name: A11y (axe)
-    # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact
+    # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
+    # Skipped on push-to-main (merge queue already validated).
     needs: [ci-build-public, ci-path-changes]
-    if: ${{ (github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref != 'refs/heads/main')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -1395,10 +1398,10 @@ jobs:
   ci-admin-smoke:
     name: Admin E2E Smoke
     environment: Preview – jovie
-    # Gated: only runs with 'testing' label (admin tests need auth credentials)
-    # Also runs on push to main for full coverage
+    # Gated: only runs with 'testing' label (admin tests need auth credentials).
+    # Removed push-to-main trigger — merge queue validates PRs before merge.
     needs: [ci-fast, ci-path-changes]
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
