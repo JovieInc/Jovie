@@ -256,15 +256,6 @@ function setupDbSelectChain(result: unknown[]) {
   });
 }
 
-/** Set up a chain mock for db.update().set().where() */
-function setupDbUpdateChain() {
-  mockDbUpdate.mockReturnValue({
-    set: vi.fn().mockReturnValue({
-      where: vi.fn().mockResolvedValue(undefined),
-    }),
-  });
-}
-
 /** Set up a chain mock for db.delete().where() */
 function setupDbDeleteChain() {
   mockDbDelete.mockReturnValue({
