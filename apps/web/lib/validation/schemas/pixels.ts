@@ -14,6 +14,8 @@ export const pixelEventTypeSchema = z.enum([
   'link_click',
   'form_submit',
   'scroll_depth',
+  'tip_page_view',
+  'tip_intent',
 ]);
 
 export type PixelEventType = z.infer<typeof pixelEventTypeSchema>;
@@ -30,6 +32,10 @@ export const pixelEventDataSchema = z
 
     // Form submit data
     formType: z.enum(['capture', 'contact', 'unknown']).optional(),
+
+    // Tip data
+    tipAmount: z.number().positive().optional(),
+    tipMethod: z.enum(['venmo', 'stripe']).optional(),
 
     // UTM parameters
     utm_source: z.string().max(200).optional(),

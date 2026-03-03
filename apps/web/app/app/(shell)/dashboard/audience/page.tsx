@@ -14,6 +14,7 @@ import {
 } from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
+import { loadUpcomingTourDates } from '../tour-dates/actions';
 import { getAudienceServerData } from './audience-data';
 
 // User-specific page - always render fresh
@@ -57,18 +58,32 @@ async function AudienceContent({
         (audienceFilters as readonly string[]).includes(s)
     );
 
-    const audienceData = await getAudienceServerData({
-      userId: dashboardData.user.id,
-      selectedProfileId: artist?.id ?? null,
-      searchParams: {
-        page: String(parsedParams.page),
-        pageSize: String(parsedParams.pageSize),
-        sort: parsedParams.sort,
-        direction: parsedParams.direction,
-      },
-      view: parsedParams.view,
-      segments: validSegments,
-    });
+    // Fetch audience data and tour dates in parallel
+    const [audienceData, tourDates] = await Promise.all([
+      getAudienceServerData({
+        userId: dashboardData.user.id,
+        selectedProfileId: artist?.id ?? null,
+        searchParams: {
+          page: String(parsedParams.page),
+          pageSize: String(parsedParams.pageSize),
+          sort: parsedParams.sort,
+          direction: parsedParams.direction,
+        },
+        view: parsedParams.view,
+        segments: validSegments,
+      }),
+      artist?.id
+        ? loadUpcomingTourDates(artist.id).catch(() => [])
+        : Promise.resolve([]),
+    ]);
+
+    // Map tour dates to lightweight shape for client-side city matching
+    const tourDatesForMatching = tourDates.map(
+      (td: { city: string; startDate: string }) => ({
+        city: td.city,
+        startDate: td.startDate,
+      })
+    );
 
     return (
       <DashboardAudienceClient
@@ -84,6 +99,7 @@ async function AudienceContent({
         profileId={artist?.id ?? undefined}
         subscriberCount={audienceData.subscriberCount}
         filters={{ segments: validSegments }}
+        tourDates={tourDatesForMatching}
       />
     );
   } catch (error) {

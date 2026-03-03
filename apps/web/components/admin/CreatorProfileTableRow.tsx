@@ -223,15 +223,12 @@ function CreatorProfileTableRowComponent({
       aria-selected={isSelected}
     >
       <td className='w-14 px-4 py-3 align-middle'>
-        <button
-          type='button'
+        <div
           className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
             handleActivationKeyDown(event, e => e.stopPropagation())
           }
-          tabIndex={-1}
-          aria-label='Checkbox container'
         >
           <span
             className={cn(
@@ -255,7 +252,7 @@ function CreatorProfileTableRowComponent({
               className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
             />
           </div>
-        </button>
+        </div>
       </td>
       <td
         className={cn(

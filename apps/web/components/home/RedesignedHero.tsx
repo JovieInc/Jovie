@@ -40,7 +40,7 @@ export function RedesignedHero() {
             aria-hidden='true'
             className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_8px_var(--linear-success)]'
           />{' '}
-          Free forever. No credit card.
+          Set up in under 60 seconds.
         </p>
 
         {/* Small inline Label Logos */}

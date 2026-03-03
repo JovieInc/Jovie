@@ -288,6 +288,12 @@ export const queryKeys = {
     all: ['pixels'] as const,
     settings: () => [...queryKeys.pixels.all, 'settings'] as const,
   },
+
+  // Earnings / tipping data
+  earnings: {
+    all: ['earnings'] as const,
+    stats: () => [...queryKeys.earnings.all, 'stats'] as const,
+  },
 } as const;
 
 export type QueryKeys = typeof queryKeys;

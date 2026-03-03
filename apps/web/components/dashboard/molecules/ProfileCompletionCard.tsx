@@ -63,23 +63,22 @@ export const ProfileCompletionCard = memo(
     return (
       <DashboardCard variant='analytics' hover={false} className='mb-4 sm:mb-6'>
         <div className='flex items-start justify-between gap-3'>
-          <div className='min-w-0 flex-1 space-y-3'>
-            <div className='flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
-              <Sparkles className='h-3.5 w-3.5' aria-hidden='true' />
+          <div className='min-w-0 flex-1 space-y-2'>
+            <div className='flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
+              <Sparkles className='h-3 w-3' aria-hidden='true' />
               Profile momentum
             </div>
-            <div className='space-y-1'>
-              <p className='text-base font-semibold text-primary-token sm:text-lg'>
+            <div className='space-y-0.5'>
+              <p className='text-sm font-semibold text-primary-token'>
                 Your profile is {completionPercentage}% complete
               </p>
-              <p className='text-sm text-secondary-token'>
-                You&apos;re close. Finish these next steps to increase trust and
-                conversion.
+              <p className='text-[13px] text-secondary-token'>
+                Finish these steps to increase trust and conversion.
               </p>
             </div>
 
             <progress
-              className='h-2 w-full overflow-hidden rounded-full bg-surface-2 [&::-webkit-progress-bar]:bg-surface-2 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-gradient-to-r [&::-webkit-progress-value]:from-brand-400 [&::-webkit-progress-value]:to-brand-500 [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-gradient-to-r [&::-moz-progress-bar]:from-brand-400 [&::-moz-progress-bar]:to-brand-500'
+              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-2 [&::-webkit-progress-bar]:bg-surface-2 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-gradient-to-r [&::-webkit-progress-value]:from-brand-400 [&::-webkit-progress-value]:to-brand-500 [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-gradient-to-r [&::-moz-progress-bar]:from-brand-400 [&::-moz-progress-bar]:to-brand-500'
               max={100}
               value={completionPercentage}
               aria-label='Profile completion'

@@ -30,11 +30,7 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
-import { getEntitlements } from '@/lib/entitlements/registry';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { mapSocialLinkExistence } from './social-link-utils';
@@ -650,42 +646,9 @@ async function resolveDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
 
-  let entitlements;
-  try {
-    entitlements = await getCurrentUserEntitlements();
-  } catch (error) {
-    if (error instanceof BillingUnavailableError) {
-      // Billing DB is down — degrade gracefully instead of crashing dashboard.
-      // Admin status is still available from the error since it's fetched independently.
-      // Note: Not reporting to Sentry here — the underlying DB failure is already
-      // captured upstream in fetchUserBillingData. Duplicate reporting was creating
-      // thousands of Sentry events (JOVIE-WEB-AD/AE/AF/AC/9Y/9C).
-      logger.warn('Billing unavailable, degrading to free tier', {
-        userId: error.userId,
-        isAdmin: error.isAdmin,
-      });
-      Sentry.addBreadcrumb({
-        category: 'dashboard.entitlements',
-        level: 'warning',
-        message: 'Billing unavailable — degraded to free tier',
-        data: { userId: error.userId, isAdmin: error.isAdmin },
-      });
-      const freeDefaults = getEntitlements('free');
-      entitlements = {
-        userId: error.userId,
-        isAdmin: error.isAdmin,
-        isAuthenticated: true,
-        email: null,
-        plan: 'free' as const,
-        isPro: false,
-        hasAdvancedFeatures: false,
-        ...freeDefaults.booleans,
-        ...freeDefaults.limits,
-      };
-    } else {
-      throw error;
-    }
-  }
+  // getCurrentUserEntitlements degrades gracefully on billing failure --
+  // it returns free-tier defaults with admin status preserved, never throws.
+  const entitlements = await getCurrentUserEntitlements();
   const isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;
 

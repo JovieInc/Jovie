@@ -15,8 +15,8 @@ async function ensureClerkReady(page: Page) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(
     () => {
-      const clerk = (window as { Clerk?: { isReady?: () => boolean } }).Clerk;
-      return Boolean(clerk?.isReady && clerk.isReady());
+      const clerk = (window as { Clerk?: { loaded?: boolean } }).Clerk;
+      return Boolean(clerk?.loaded);
     },
     { timeout: 10_000 }
   );

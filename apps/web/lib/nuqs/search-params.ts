@@ -138,12 +138,14 @@ export const audienceViewParser =
  * - 'returning': Only show returning visitors (visits > 1)
  * - 'frequent': Only show visitors with 3+ visits
  * - 'recent24h': Only show visitors seen in the last 24 hours
+ * - 'touringCity': Only show visitors from cities with upcoming shows
  */
 export const audienceFilters = [
   'highIntent',
   'returning',
   'frequent',
   'recent24h',
+  'touringCity',
 ] as const;
 
 export type AudienceFilter = (typeof audienceFilters)[number];

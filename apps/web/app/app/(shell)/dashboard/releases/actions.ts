@@ -847,6 +847,11 @@ export async function syncFromSpotify(): Promise<{
       creatorProfileId: profile.id,
       spotifyArtistId: profile.spotifyId,
       targetProviders: ['apple_music'],
+    }).catch(error => {
+      void captureError('DSP artist discovery enqueue failed on sync', error, {
+        action: 'syncFromSpotify',
+        creatorProfileId: profile.id,
+      });
     });
 
     // Re-trigger MusicFetch enrichment to discover cross-platform DSP profiles
@@ -1002,6 +1007,15 @@ export async function connectSpotifyArtist(params: {
       creatorProfileId: profile.id,
       spotifyArtistId: params.spotifyArtistId,
       targetProviders: ['apple_music'],
+    }).catch(error => {
+      void captureError(
+        'DSP artist discovery enqueue failed on connect',
+        error,
+        {
+          action: 'connectSpotifyArtist',
+          creatorProfileId: profile.id,
+        }
+      );
     });
 
     // Auto-trigger MusicFetch enrichment (cross-platform DSP profiles + social links)

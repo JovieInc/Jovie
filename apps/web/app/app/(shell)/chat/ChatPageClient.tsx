@@ -2,7 +2,7 @@
 
 import { SimpleTooltip } from '@jovie/ui';
 import * as Sentry from '@sentry/nextjs';
-import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -17,6 +17,7 @@ import { JovieChat } from '@/components/jovie/JovieChat';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
@@ -106,6 +107,11 @@ export function ChatPageClient({
     });
   }, [selectedProfile, previewLinks, setPreviewData]);
 
+  const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
+    onSuccess: () => notifications.success('Session ID copied'),
+    onError: () => notifications.error('Could not copy session ID'),
+  });
+
   const handleCopyConversationId = useCallback(async () => {
     if (!conversationId) {
       notifications.error(
@@ -113,31 +119,35 @@ export function ChatPageClient({
       );
       return;
     }
-
-    try {
-      await navigator.clipboard.writeText(conversationId);
-      notifications.success('Session ID copied');
-    } catch {
-      notifications.error('Could not copy session ID');
-    }
-  }, [conversationId, notifications]);
+    copySessionId(conversationId);
+  }, [conversationId, notifications, copySessionId]);
 
   const headerActions = useMemo(
     () => (
       <>
         {conversationId && (
-          <SimpleTooltip content='Copy session ID'>
+          <SimpleTooltip
+            content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
+          >
             <DashboardHeaderActionButton
-              ariaLabel='Copy session ID'
+              ariaLabel={
+                sessionIdCopied ? 'Session ID copied' : 'Copy session ID'
+              }
               onClick={handleCopyConversationId}
-              icon={<Copy aria-hidden='true' className='size-4' />}
+              icon={
+                sessionIdCopied ? (
+                  <Check aria-hidden='true' className='size-4' />
+                ) : (
+                  <Copy aria-hidden='true' className='size-4' />
+                )
+              }
             />
           </SimpleTooltip>
         )}
         <PreviewToggleButton />
       </>
     ),
-    [conversationId, handleCopyConversationId]
+    [conversationId, sessionIdCopied, handleCopyConversationId]
   );
 
   const handleConversationCreate = useCallback(
@@ -292,16 +302,37 @@ export function ChatPageClient({
   }
 
   return (
-    <JovieChat
-      profileId={selectedProfile.id}
-      conversationId={conversationId}
-      onConversationCreate={handleConversationCreate}
-      onTitleChange={handleTitleChange}
-      initialQuery={initialQuery ?? undefined}
-      displayName={selectedProfile.displayName ?? undefined}
-      avatarUrl={selectedProfile.avatarUrl}
-      username={selectedProfile.username ?? undefined}
-      isFirstSession={isFirstSession}
-    />
+    <ErrorBoundary
+      fallback={
+        <div className='flex h-full items-center justify-center'>
+          <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            <p className='text-sm text-secondary-token'>
+              Something went wrong loading chat. Please try again.
+            </p>
+            <button
+              type='button'
+              onClick={() => router.refresh()}
+              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <JovieChat
+        profileId={selectedProfile.id}
+        conversationId={conversationId}
+        onConversationCreate={handleConversationCreate}
+        onTitleChange={handleTitleChange}
+        initialQuery={initialQuery ?? undefined}
+        displayName={selectedProfile.displayName ?? undefined}
+        avatarUrl={selectedProfile.avatarUrl}
+        username={selectedProfile.username ?? undefined}
+        isFirstSession={isFirstSession}
+      />
+    </ErrorBoundary>
   );
 }
