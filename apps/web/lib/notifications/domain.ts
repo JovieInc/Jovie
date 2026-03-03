@@ -527,6 +527,44 @@ function buildSubscriptionValues(params: {
   };
 }
 
+async function firePostSubscribeActions({
+  dynamicEnabled,
+  normalizedEmail,
+  normalizedPhone,
+  ipAddress,
+  artist_id,
+  shouldVerifyEmail,
+  headers,
+}: {
+  dynamicEnabled: boolean;
+  normalizedEmail: string | null;
+  normalizedPhone: string | null;
+  ipAddress: string | null | undefined;
+  artist_id: string;
+  shouldVerifyEmail: boolean;
+  headers: Headers | undefined;
+}): Promise<void> {
+  if (dynamicEnabled && normalizedEmail) {
+    const ua = getHeader(headers, 'user-agent') || null;
+    await upsertAudienceMember(
+      artist_id,
+      normalizedEmail,
+      ipAddress ?? null,
+      ua
+    );
+  }
+  if (!shouldVerifyEmail) {
+    void fireSubscribeCAPIEvent({
+      creatorProfileId: artist_id,
+      email: normalizedEmail ?? undefined,
+      phone: normalizedPhone ?? undefined,
+      ipAddress: ipAddress ?? undefined,
+      userAgent: getHeader(headers, 'user-agent') ?? undefined,
+      sourceUrl: getHeader(headers, 'referer') ?? undefined,
+    });
+  }
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -649,24 +687,18 @@ export const subscribeToNotificationsDomain = async (
       dynamic_enabled: dynamicEnabled,
     });
 
-    if (dynamicEnabled && normalizedEmail) {
-      const ua = getHeader(context.headers, 'user-agent') || null;
-      await upsertAudienceMember(artist_id, normalizedEmail, ipAddress, ua);
-    }
-
     // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
     // email subscribers who are already verified from a previous subscription).
     // Email OTP subscribers fire this event in verifyEmailOtpDomain() instead.
-    if (!shouldVerifyEmail) {
-      void fireSubscribeCAPIEvent({
-        creatorProfileId: artist_id,
-        email: normalizedEmail ?? undefined,
-        phone: normalizedPhone ?? undefined,
-        ipAddress: ipAddress ?? undefined,
-        userAgent: getHeader(context.headers, 'user-agent') ?? undefined,
-        sourceUrl: getHeader(context.headers, 'referer') ?? undefined,
-      });
-    }
+    await firePostSubscribeActions({
+      dynamicEnabled,
+      normalizedEmail,
+      normalizedPhone,
+      ipAddress,
+      artist_id,
+      shouldVerifyEmail,
+      headers: context.headers,
+    });
 
     const dispatchResult = await dispatchSubscriptionEmail(
       channel,
