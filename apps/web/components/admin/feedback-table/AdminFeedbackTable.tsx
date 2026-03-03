@@ -32,6 +32,34 @@ interface AdminFeedbackTableProps {
 
 const columnHelper = createColumnHelper<FeedbackRow>();
 
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
+function renderUserCell({ getValue }: { getValue: () => any }) {
+  const user = getValue() as FeedbackRow['user'];
+  return (
+    <span className='font-medium text-primary-token'>
+      {user.name ?? user.email ?? 'Unknown user'}
+    </span>
+  );
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
+function renderMessageCell({ getValue }: { getValue: () => any }) {
+  return (
+    <TruncatedText lines={2} className='text-primary-token'>
+      {getValue() as string}
+    </TruncatedText>
+  );
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
+function renderStatusCell({ getValue }: { getValue: () => any }) {
+  return (
+    <span className='rounded-full border border-subtle px-2.5 py-1 text-xs text-secondary-token'>
+      {getValue() as FeedbackRow['status']}
+    </span>
+  );
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -80,34 +108,19 @@ export function AdminFeedbackTable({
       columnHelper.accessor('user', {
         id: 'user',
         header: 'User',
-        cell: ({ getValue }) => {
-          const user = getValue();
-          return (
-            <span className='font-medium text-primary-token'>
-              {user.name ?? user.email ?? 'Unknown user'}
-            </span>
-          );
-        },
+        cell: renderUserCell,
         size: 200,
       }),
       columnHelper.accessor('message', {
         id: 'message',
         header: 'Feedback',
-        cell: ({ getValue }) => (
-          <TruncatedText lines={2} className='text-primary-token'>
-            {getValue()}
-          </TruncatedText>
-        ),
+        cell: renderMessageCell,
         size: 400,
       }),
       columnHelper.accessor('status', {
         id: 'status',
         header: 'Status',
-        cell: ({ getValue }) => (
-          <span className='rounded-full border border-subtle px-2.5 py-1 text-xs text-secondary-token'>
-            {getValue()}
-          </span>
-        ),
+        cell: renderStatusCell,
         size: 120,
       }),
     ],
