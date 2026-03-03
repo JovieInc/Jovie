@@ -25,7 +25,8 @@ export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
   const { isLoaded } = useUserSafe();
   const hasTrackedImpression = useRef(false);
 
-  const signupUrl = `/signup?redirect_url=${encodeURIComponent(`/${encodeURIComponent(profileHandle)}`)}`;
+  const profilePath = `/${encodeURIComponent(profileHandle)}`;
+  const signupUrl = `/signup?redirect_url=${encodeURIComponent(profilePath)}`;
 
   useEffect(() => {
     if (!isLoaded) return;

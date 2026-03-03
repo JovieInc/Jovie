@@ -66,11 +66,10 @@ export async function GET() {
       })
       .where(eq(creatorProfiles.id, profile.id));
 
-    const status = payoutsEnabled
-      ? 'success'
-      : onboardingComplete
-        ? 'pending'
-        : 'incomplete';
+    let status: string;
+    if (payoutsEnabled) status = 'success';
+    else if (onboardingComplete) status = 'pending';
+    else status = 'incomplete';
 
     return NextResponse.redirect(`${settingsUrl}?stripe_connect=${status}`, {
       headers: NO_STORE_HEADERS,

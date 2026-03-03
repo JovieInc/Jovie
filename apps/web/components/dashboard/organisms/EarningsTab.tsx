@@ -296,7 +296,7 @@ export function EarningsTab() {
       </p>
 
       <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
-        {isEarningsLoading ? (
+        {isEarningsLoading && (
           <div className='space-y-3 p-4'>
             {[1, 2, 3].map(i => (
               <div key={i} className='flex items-center gap-3'>
@@ -309,7 +309,8 @@ export function EarningsTab() {
               </div>
             ))}
           </div>
-        ) : tippers.length === 0 ? (
+        )}
+        {!isEarningsLoading && tippers.length === 0 && (
           <div className='flex flex-col items-center gap-3 px-6 py-12 text-center'>
             <div
               className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2'
@@ -321,7 +322,8 @@ export function EarningsTab() {
               No tips yet. Share your tip link to get started.
             </p>
           </div>
-        ) : (
+        )}
+        {!isEarningsLoading && tippers.length > 0 && (
           <div className='overflow-x-auto'>
             <table className='w-full text-left text-sm'>
               <thead>

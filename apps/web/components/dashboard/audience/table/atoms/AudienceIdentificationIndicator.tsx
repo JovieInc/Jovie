@@ -50,6 +50,12 @@ const LEVEL_CONFIG: Record<
   },
 };
 
+const LEVEL_ICONS: Record<IdentificationLevel, typeof CircleCheck> = {
+  identified: CircleCheck,
+  partial: CircleDot,
+  anonymous: CircleDashed,
+};
+
 export function AudienceIdentificationIndicator({
   type,
   hasEmail,
@@ -65,12 +71,7 @@ export function AudienceIdentificationIndicator({
   );
   const config = LEVEL_CONFIG[level];
 
-  const IconComponent =
-    level === 'identified'
-      ? CircleCheck
-      : level === 'partial'
-        ? CircleDot
-        : CircleDashed;
+  const IconComponent = LEVEL_ICONS[level];
 
   return (
     <div className={cn('flex items-center gap-1.5 text-[13px]', className)}>

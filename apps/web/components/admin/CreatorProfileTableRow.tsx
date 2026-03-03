@@ -224,6 +224,7 @@ function CreatorProfileTableRowComponent({
     >
       <td className='w-14 px-4 py-3 align-middle'>
         <div
+          role='group'
           className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'
           onClick={event => event.stopPropagation()}
           onKeyDown={event =>
