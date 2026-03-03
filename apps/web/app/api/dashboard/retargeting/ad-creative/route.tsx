@@ -61,7 +61,7 @@ function AdCreativeLayout({
   textContent,
   ctaLabel,
   footer,
-}: {
+}: Readonly<{
   size: 'feed' | 'story';
   photoSize: number;
   artistName: string;
@@ -70,7 +70,7 @@ function AdCreativeLayout({
   textContent: React.ReactNode;
   ctaLabel: string;
   footer?: React.ReactNode;
-}) {
+}>) {
   const isStory = size === 'story';
 
   return (
