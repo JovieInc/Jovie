@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -84,6 +84,10 @@ function renderToolbar(
 }
 
 describe('AdminCreatorsToolbar interactions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('shows selected count and bulk actions when rows are selected', () => {
     renderToolbar({ selectedIds: new Set(['creator-1', 'creator-2']) });
 

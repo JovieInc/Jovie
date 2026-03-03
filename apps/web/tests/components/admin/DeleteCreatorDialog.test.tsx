@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -30,6 +30,10 @@ function createProfile(
 }
 
 describe('DeleteCreatorDialog', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('requires confirmation before delete and supports cancellation', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn(async () => ({ success: true }));
