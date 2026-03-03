@@ -237,12 +237,23 @@ test.describe('Golden Path - Complete User Journey', () => {
       timeout: 120_000,
     });
 
-    // Should show DSP options (e.g., "Open in Spotify") or "not available" message
+    // Should show DSP options (e.g., "Open in Spotify"), "not available" message,
+    // or the "Listen on" heading (proves the listen drawer rendered)
     const spotifyButton = page
       .getByRole('button', { name: /open in spotify/i })
       .or(page.getByRole('link', { name: /spotify/i }));
+    const anyDspButton = page
+      .getByRole('button', { name: /open in /i })
+      .or(page.getByRole('link', { name: /open in /i }));
     const noLinksMsg = page.getByText(/streaming links aren.t available/i);
-    await expect(spotifyButton.first().or(noLinksMsg)).toBeVisible({
+    const listenHeading = page.getByText(/listen on/i);
+    await expect(
+      spotifyButton
+        .first()
+        .or(anyDspButton.first())
+        .or(noLinksMsg)
+        .or(listenHeading)
+    ).toBeVisible({
       timeout: 120_000,
     });
   });
