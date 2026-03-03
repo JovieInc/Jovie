@@ -58,7 +58,10 @@ export async function getBatchCreatorEntitlements(
   >();
   for (const row of results) {
     const plan = (row.plan as PlanId) ?? 'free';
-    map.set(row.creatorProfileId, { plan, entitlements: getEntitlements(plan) });
+    map.set(row.creatorProfileId, {
+      plan,
+      entitlements: getEntitlements(plan),
+    });
   }
 
   // Creators not found in the join default to 'free'
