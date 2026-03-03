@@ -76,8 +76,7 @@ describe('/api/clerk/webhook', () => {
       ])
     );
 
-    // Reset webhook verification mock completely and set safe default
-    mockWebhookVerify.mockReset();
+    // Set safe default for webhook verification (vi.clearAllMocks() above resets call history)
     mockWebhookVerify.mockImplementation(() => {
       throw new Error('Webhook verification not mocked for this test');
     });

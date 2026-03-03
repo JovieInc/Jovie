@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateTrackRequest } from '@/app/api/track/validation';
 
 describe('validateTrackRequest', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('normalizes smartlink context metadata', () => {
     const result = validateTrackRequest({
       handle: 'artist123',
