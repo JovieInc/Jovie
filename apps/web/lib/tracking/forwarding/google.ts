@@ -28,6 +28,10 @@ function mapEventToGoogle(eventType: NormalizedEvent['eventType']): string {
       return 'generate_lead';
     case 'scroll_depth':
       return 'scroll';
+    case 'tip_page_view':
+      return 'view_item';
+    case 'tip_intent':
+      return 'begin_checkout';
     default:
       return 'page_view';
   }
@@ -73,6 +77,10 @@ export async function forwardToGoogle(
             ...(event.linkId && { link_id: event.linkId }),
             ...(event.linkUrl && { link_url: event.linkUrl }),
             ...(event.formType && { form_type: event.formType }),
+
+            // Tip parameters
+            ...(event.tipAmount && { value: event.tipAmount, currency: 'USD' }),
+            ...(event.tipMethod && { payment_method: event.tipMethod }),
 
             // UTM parameters (GA4 handles these automatically if present in page_location)
             ...(event.utmSource && { campaign_source: event.utmSource }),

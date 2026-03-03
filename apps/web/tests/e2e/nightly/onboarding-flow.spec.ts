@@ -51,9 +51,8 @@ test.describe('Full onboarding flow @nightly', () => {
         async () => {
           await page.waitForFunction(
             () => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const clerkWindow = window as any;
-              return clerkWindow.Clerk && clerkWindow.Clerk.isReady();
+              return clerkWindow.Clerk && clerkWindow.Clerk.loaded;
             },
             { timeout: SMOKE_TIMEOUTS.VISIBILITY }
           );
@@ -65,7 +64,6 @@ test.describe('Full onboarding flow @nightly', () => {
         process.env.E2E_TEST_EMAIL || `playwright+${Date.now()}@example.com`;
 
       await page.evaluate(async email => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const clerk = (window as unknown as { Clerk: any }).Clerk;
         if (!clerk) throw new Error('Clerk not initialized');
 
@@ -92,7 +90,6 @@ test.describe('Full onboarding flow @nightly', () => {
         async () => {
           await page.waitForFunction(
             () => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               return (window as any).Clerk?.user;
             },
             { timeout: SMOKE_TIMEOUTS.VISIBILITY }

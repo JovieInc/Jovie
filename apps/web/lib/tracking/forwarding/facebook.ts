@@ -31,6 +31,10 @@ function mapEventToFacebook(eventType: NormalizedEvent['eventType']): string {
       return 'Subscribe';
     case 'scroll_depth':
       return 'ViewContent';
+    case 'tip_page_view':
+      return 'ViewContent';
+    case 'tip_intent':
+      return 'InitiateCheckout';
     default:
       return 'PageView';
   }
@@ -81,6 +85,8 @@ export async function forwardToFacebook(
             ...(event.utmSource && { utm_source: event.utmSource }),
             ...(event.utmMedium && { utm_medium: event.utmMedium }),
             ...(event.utmCampaign && { utm_campaign: event.utmCampaign }),
+            ...(event.tipAmount && { value: event.tipAmount, currency: 'USD' }),
+            ...(event.tipMethod && { payment_method: event.tipMethod }),
           },
         },
       ],

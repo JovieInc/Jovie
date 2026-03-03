@@ -3,6 +3,7 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
+  Bell,
   BellRing,
   Copy,
   Download,
@@ -27,6 +28,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
+import {
+  buildTouringCityMap,
+  matchTouringCity,
+} from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 import { AudienceTableProvider } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
@@ -40,10 +45,12 @@ import {
   renderEmailCell,
   renderIntentScoreCell,
   renderLastActionCell,
+  renderLtvCell,
   renderReturningCell,
   renderSourceCell,
   renderUserCell,
   SelectCell,
+  TouringCityCell,
 } from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
@@ -65,7 +72,7 @@ function getSrDescription(
 /**
  * Redesigned column definitions for members mode.
  *
- * Columns: Select | User | Intent Score | Returning | Source | Last Action | Quick Actions
+ * Columns: Select | User | Intent Score | LTV | Returning | Source | Last Action | Quick Actions
  *
  * Cell renderers that need dynamic state (selection, menu, quick actions) read from
  * AudienceTableContext instead of closing over values, keeping these definitions fully stable.
@@ -89,6 +96,12 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     cell: renderIntentScoreCell,
     size: 110,
   }),
+  memberColumnHelper.accessor('tipAmountTotalCents', {
+    id: 'ltv',
+    header: 'LTV',
+    cell: renderLtvCell,
+    size: 80,
+  }),
   memberColumnHelper.accessor('visits', {
     id: 'returning',
     header: 'Returning',
@@ -99,6 +112,12 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     id: 'source',
     header: 'Source',
     cell: renderSourceCell,
+    size: 140,
+  }),
+  memberColumnHelper.display({
+    id: 'touringCity',
+    header: 'Touring',
+    cell: TouringCityCell,
     size: 140,
   }),
   memberColumnHelper.accessor('latestActions', {
@@ -224,6 +243,7 @@ export const DashboardAudienceTableUnified = memo(
     hasNextPage,
     isFetchingNextPage,
     onLoadMore,
+    tourDates,
   }: DashboardAudienceTableProps) {
     const router = useRouter();
     const {
@@ -286,6 +306,39 @@ export const DashboardAudienceTableUnified = memo(
       [handleRemoveMember]
     );
 
+    // Quick action: view member profile (opens sidebar)
+    const handleViewProfile = React.useCallback(
+      (member: AudienceMember) => {
+        setSelectedMember(member);
+      },
+      [setSelectedMember]
+    );
+
+    // Quick action: send notification (copies contact info for now)
+    const handleSendNotification = React.useCallback(
+      (member: AudienceMember) => {
+        if (member.email) {
+          void navigator.clipboard.writeText(member.email);
+          toast.success('Email copied - ready to send notification');
+        } else if (member.phone) {
+          void navigator.clipboard.writeText(member.phone);
+          toast.success('Phone copied - ready to send notification');
+        }
+      },
+      []
+    );
+
+    // Build touring city map for O(1) lookup per member
+    const touringCityMap = useMemo(
+      () => buildTouringCityMap(tourDates ?? []),
+      [tourDates]
+    );
+
+    const getTouringCity = React.useCallback(
+      (member: AudienceMember) => matchTouringCity(member, touringCityMap),
+      [touringCityMap]
+    );
+
     // Context menu items for right-click
     const getContextMenuItems = React.useCallback(
       (member: AudienceMember): ContextMenuItemType[] => {
@@ -319,6 +372,21 @@ export const DashboardAudienceTableUnified = memo(
               }
             },
             disabled: !member.phone,
+          },
+          {
+            id: 'send-notification',
+            label: 'Send notification',
+            icon: <Bell className='h-3.5 w-3.5' />,
+            onClick: () => {
+              if (member.email) {
+                void navigator.clipboard.writeText(member.email);
+                toast.success('Email copied - ready to send notification');
+              } else if (member.phone) {
+                void navigator.clipboard.writeText(member.phone);
+                toast.success('Phone copied - ready to send notification');
+              }
+            },
+            disabled: !member.email && !member.phone,
           },
           { type: 'separator' as const },
           {
@@ -358,6 +426,9 @@ export const DashboardAudienceTableUnified = memo(
         getContextMenuItems,
         onExportMember: handleExportMember,
         onBlockMember: handleBlockMember,
+        onViewProfile: handleViewProfile,
+        onSendNotification: handleSendNotification,
+        getTouringCity,
       }),
       [
         selectedIds,
@@ -367,6 +438,9 @@ export const DashboardAudienceTableUnified = memo(
         getContextMenuItems,
         handleExportMember,
         handleBlockMember,
+        handleViewProfile,
+        handleSendNotification,
+        getTouringCity,
       ]
     );
 

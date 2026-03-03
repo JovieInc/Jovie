@@ -822,6 +822,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Wait for CDN propagation
+        run: |
+          echo "Waiting 30s for Vercel CDN propagation after deploy..."
+          sleep 30
+
       - name: Verify production endpoints are healthy
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -2204,6 +2209,12 @@ jobs:
         run: |
           cd apps/web
           # Start standalone production server (not Turbopack dev) to avoid SWC OOM on CI runners
+          # IMPORTANT: Pass runtime env vars explicitly — the step's env: block only applies to
+          # the shell process, but backgrounded processes inherit from the shell's exported vars.
+          export DATABASE_URL="${{ steps.resolve_neon.outputs.db_url }}"
+          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
+          export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export FLAGS_SECRET="E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -2226,7 +2237,7 @@ jobs:
           # Run smoke tests with BASE_URL set (skips Playwright webServer config)
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/content-gate.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/content-gate.spec.ts tests/e2e/smoke-auth.spec.ts --project=chromium --reporter=line
           EXIT_CODE=$?
           set -e
           exit $EXIT_CODE

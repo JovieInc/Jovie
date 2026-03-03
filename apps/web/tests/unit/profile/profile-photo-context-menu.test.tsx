@@ -29,7 +29,22 @@ vi.mock('lucide-react', () => ({
     React.createElement('svg', { ...props, 'data-testid': 'chevron-icon' }),
 }));
 
-const originalSizes: AvatarSize[] = [
+const multipleSizes: AvatarSize[] = [
+  {
+    key: 'small',
+    label: 'Small (150 x 150)',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=150&q=90',
+  },
+  {
+    key: 'medium',
+    label: 'Medium (400 x 400)',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=400&q=90',
+  },
+  {
+    key: 'large',
+    label: 'Large (800 x 800)',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=800&q=90',
+  },
   {
     key: 'original',
     label: 'Original',
@@ -51,7 +66,7 @@ describe('ProfilePhotoContextMenu', () => {
     );
   });
 
-  it('renders download submenu options', async () => {
+  it('renders download submenu with S/M/L and original options', async () => {
     const user = userEvent.setup({ delay: null });
 
     render(
@@ -59,7 +74,7 @@ describe('ProfilePhotoContextMenu', () => {
         name='Test Artist'
         handle='testartist'
         tagline='Future pop artist'
-        sizes={originalSizes}
+        sizes={multipleSizes}
         allowDownloads={true}
       >
         <div>Avatar</div>
@@ -78,6 +93,15 @@ describe('ProfilePhotoContextMenu', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Download QR Code' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Small (150 x 150)' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Medium (400 x 400)' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: 'Large (800 x 800)' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Original' })

@@ -1,5 +1,5 @@
 import { Skeleton } from '@jovie/ui';
-import { Bell, Mail } from 'lucide-react';
+import { CheckCircle2, Mail } from 'lucide-react';
 import type { CSSProperties } from 'react';
 
 /** Prevents synthetic font weight rendering for better typography */
@@ -33,12 +33,12 @@ export function SubscriptionSuccess({
   return (
     <div className='space-y-1'>
       <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
-        <Bell className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>Notifications on</span>
+        <CheckCircle2 className='w-5 h-5 mr-2' aria-hidden='true' />
+        <span className='font-semibold'>Notifications enabled</span>
       </div>
       <p className='text-xs text-center text-secondary-token'>
         You&apos;ll get a heads-up when {artistName} releases new music,
-        announces tours &amp; more. Tap the bell to manage your alerts.
+        announces tours &amp; more.
       </p>
     </div>
   );

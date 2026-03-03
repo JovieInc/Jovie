@@ -6,6 +6,8 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -25,8 +27,15 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
 
 function ThemeKeyboardShortcut() {
   const { resolvedTheme, setTheme } = useTheme();
+  const isLightModeEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
+    false
+  );
 
   useEffect(() => {
+    // Only register theme keyboard shortcut when light mode feature flag is on
+    if (!isLightModeEnabled) return;
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -41,7 +50,7 @@ function ThemeKeyboardShortcut() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resolvedTheme, setTheme]);
+  }, [resolvedTheme, setTheme, isLightModeEnabled]);
 
   return null;
 }
