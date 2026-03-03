@@ -116,7 +116,9 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
           <Button
             variant='ghost'
             size='sm'
-            onClick={() => void handleRegenerate()}
+            onClick={() => {
+              handleRegenerate();
+            }}
             disabled={regenerating || downloading}
             aria-label={`Regenerate ${variant.label} ad`}
           >
@@ -127,7 +129,9 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
           <Button
             variant='secondary'
             size='sm'
-            onClick={() => void handleDownload()}
+            onClick={() => {
+              handleDownload();
+            }}
             disabled={downloading || regenerating}
           >
             <Download className='mr-1.5 h-3.5 w-3.5' />
