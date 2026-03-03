@@ -14,9 +14,9 @@ name: CodeQL Security Analysis
 on:
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
-  merge_group:
+  # Removed pull_request and merge_group triggers — CodeQL on push-to-main
+  # catches everything that merges, and weekly schedule covers drift.
+  # This eliminates ~570 redundant runs/month.
   schedule:
     - cron: '36 13 * * 1' # Weekly on Monday at 13:36 UTC
 
