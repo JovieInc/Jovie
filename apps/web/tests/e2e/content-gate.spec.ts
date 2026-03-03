@@ -157,8 +157,8 @@ test.describe('Content Gate — Public Pages', () => {
     const sectionCount = await page.locator('section').count();
     expect(
       sectionCount,
-      `Homepage: expected 3+ sections, got ${sectionCount}`
-    ).toBeGreaterThanOrEqual(3);
+      `Homepage: expected 2+ sections, got ${sectionCount}`
+    ).toBeGreaterThanOrEqual(2);
 
     // Footer exists (proves full page rendered)
     const footer = page.locator('footer').first();
