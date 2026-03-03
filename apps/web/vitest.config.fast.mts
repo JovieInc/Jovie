@@ -73,8 +73,8 @@ export default defineConfig({
     maxConcurrency: isCI ? 1 : undefined,
 
     // Timeouts
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    testTimeout: 5000,
+    hookTimeout: 5000,
     teardownTimeout: 5000,
 
     // Coverage disabled by default for speed (enable with --coverage flag)
