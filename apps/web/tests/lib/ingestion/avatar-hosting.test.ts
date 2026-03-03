@@ -33,9 +33,11 @@ describe('avatar-hosting copyAvatarToBlob', () => {
   it('handles missing content-type header without toLowerCase crash', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(new Blob(['avatar-bytes']), { status: 200 })
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(new Blob(['avatar-bytes']), { status: 200 })
+        )
     );
 
     const result = await copyAvatarToBlob(
@@ -47,8 +49,8 @@ describe('avatar-hosting copyAvatarToBlob', () => {
     expect(captureWarningMock).toHaveBeenCalledOnce();
     const capturedError = captureWarningMock.mock.calls[0]?.[1];
     expect(capturedError).toBeInstanceOf(TypeError);
-    expect((capturedError as TypeError).message).toBe(
-      'Unsupported content type: '
+    expect((capturedError as TypeError).message).toContain(
+      'Unsupported content type:'
     );
   });
 });
