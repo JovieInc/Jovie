@@ -140,8 +140,11 @@ export function buildAvatarSizes(
     }
   } else if (avatarUrl) {
     // No pre-computed sizes map -- generate S/M/L from the avatar URL
-    sizes.push(...generateSizeVariants(avatarUrl));
-    sizes.push({ key: 'original', label: 'Original', url: avatarUrl });
+    sizes.push(...generateSizeVariants(avatarUrl), {
+      key: 'original',
+      label: 'Original',
+      url: avatarUrl,
+    });
   }
 
   return sizes;

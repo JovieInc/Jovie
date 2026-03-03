@@ -220,14 +220,14 @@ export async function processTipCompleted(
     });
 
     emailSent = result.success;
-    if (!result.success) {
-      errors.push(`Email send failed: ${result.error}`);
-    } else {
+    if (result.success) {
       logger.info('Tip thank-you email sent', {
         profileId,
         emailDomain: email.split('@')[1],
         messageId: result.messageId,
       });
+    } else {
+      errors.push(`Email send failed: ${result.error}`);
     }
   } catch (error) {
     const message =

@@ -117,11 +117,11 @@ export function TrackSidebar({
 
   const streamingProviders = track?.providers.filter(p => p.url) ?? [];
 
-  const trackLabel = track
-    ? track.discNumber > 1
-      ? `${track.discNumber}-${track.trackNumber}`
-      : String(track.trackNumber)
-    : '';
+  const trackLabel = (() => {
+    if (!track) return '';
+    if (track.discNumber > 1) return `${track.discNumber}-${track.trackNumber}`;
+    return String(track.trackNumber);
+  })();
 
   const overflowActions = useMemo<DrawerHeaderAction[]>(() => {
     if (!track) return [];

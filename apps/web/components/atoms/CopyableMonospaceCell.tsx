@@ -49,6 +49,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
         className
       )}
       title={`Copy ${label}`}
+      aria-label={`Copy ${label}`}
     >
       <span
         className='truncate'
@@ -66,6 +67,9 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
             : 'opacity-0 group-hover/copy:opacity-60'
         )}
       />
+      <span className='sr-only' aria-live='polite'>
+        {copied ? `${label} copied` : ''}
+      </span>
     </button>
   );
 });

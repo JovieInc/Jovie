@@ -193,7 +193,7 @@ export function useProfileShell({
     );
 
     // Detect source platform from referrer or UTM params
-    const referrer = typeof document !== 'undefined' ? document.referrer : '';
+    const referrer = typeof document === 'undefined' ? '' : document.referrer;
     const params = searchParams
       ? new URLSearchParams(searchParams.toString())
       : new URLSearchParams();

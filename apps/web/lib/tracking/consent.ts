@@ -46,7 +46,7 @@ export function getConsentState(): ConsentState {
   // Check localStorage first (more reliable)
   // Guard against null localStorage (private browsing, restricted contexts) (JOV-848)
   try {
-    const stored = window.localStorage?.getItem(CONSENT_STORAGE_KEY);
+    const stored = globalThis.localStorage?.getItem(CONSENT_STORAGE_KEY);
     if (stored === 'accepted' || stored === 'rejected') {
       return stored;
     }
@@ -76,7 +76,7 @@ export function setConsentState(state: 'accepted' | 'rejected'): void {
 
   // Store in localStorage (guard against null in restricted contexts)
   try {
-    window.localStorage?.setItem(CONSENT_STORAGE_KEY, state);
+    globalThis.localStorage?.setItem(CONSENT_STORAGE_KEY, state);
   } catch {
     // localStorage may be unavailable
   }
@@ -107,7 +107,7 @@ export function getOrCreateSessionId(): string {
 
   const SESSION_KEY = 'jv_session_id';
   try {
-    let sessionId = window.sessionStorage?.getItem(SESSION_KEY) ?? null;
+    let sessionId = globalThis.sessionStorage?.getItem(SESSION_KEY) ?? null;
 
     if (!sessionId) {
       // Generate a random session ID using crypto for better randomness
@@ -117,7 +117,7 @@ export function getOrCreateSessionId(): string {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
       sessionId = `${Date.now()}-${randomHex}`;
-      window.sessionStorage?.setItem(SESSION_KEY, sessionId);
+      globalThis.sessionStorage?.setItem(SESSION_KEY, sessionId);
     }
 
     return sessionId;
@@ -134,7 +134,7 @@ export function clearConsentState(): void {
   if (typeof window === 'undefined') return;
 
   try {
-    window.localStorage?.removeItem(CONSENT_STORAGE_KEY);
+    globalThis.localStorage?.removeItem(CONSENT_STORAGE_KEY);
   } catch {
     // localStorage may be unavailable
   }

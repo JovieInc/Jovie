@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
 
-    if (!profile || !profile.isPublic) {
+    if (!profile?.isPublic) {
       return NextResponse.json(
         { error: 'Artist not found' },
         { status: 404, headers: NO_STORE_HEADERS }
