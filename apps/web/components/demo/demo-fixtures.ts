@@ -30,6 +30,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   // ─── Live ───
   {
     id: 'rel-01',
+    displayId: 'REL-131',
     title: 'Night Drive',
     artist: 'Sora Vale',
     type: 'Album',
@@ -51,6 +52,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-02',
+    displayId: 'REL-122',
     title: 'Neon Nights',
     artist: 'Sora Vale',
     type: 'EP',
@@ -72,6 +74,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-03',
+    displayId: 'REL-118',
     title: 'The Sound',
     artist: 'Sora Vale',
     type: 'Single',
@@ -92,6 +95,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-04',
+    displayId: 'REL-105',
     title: 'Quiet Hours',
     artist: 'Sora Vale',
     type: 'EP',
@@ -115,6 +119,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   // ─── Syncing ───
   {
     id: 'rel-05',
+    displayId: 'REL-142',
     title: 'Static Skies',
     artist: 'Sora Vale',
     type: 'Album',
@@ -136,6 +141,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-06',
+    displayId: 'REL-139',
     title: 'Afterglow (Deluxe)',
     artist: 'Sora Vale & Kai Nomura',
     type: 'Album',
@@ -160,6 +166,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   // ─── Scheduled ───
   {
     id: 'rel-07',
+    displayId: 'REL-145',
     title: 'Midnight Express',
     artist: 'Sora Vale',
     type: 'Single',
@@ -181,6 +188,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-08',
+    displayId: 'REL-148',
     title: 'Solar Flare',
     artist: 'Sora Vale ft. Leo Park',
     type: 'Single',
@@ -203,6 +211,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   // ─── Draft ───
   {
     id: 'rel-09',
+    displayId: 'REL-150',
     title: 'Manual Sunset',
     artist: 'Sora Vale',
     type: 'EP',
@@ -224,6 +233,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-10',
+    displayId: 'REL-153',
     title: 'Echoes',
     artist: 'Sora Vale',
     type: 'Album',
@@ -241,6 +251,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-11',
+    displayId: 'REL-155',
     title: 'Somewhere Between',
     artist: 'Sora Vale & Mira Chen',
     type: 'Single',
@@ -260,6 +271,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   // ─── Archived ───
   {
     id: 'rel-12',
+    displayId: 'REL-089',
     title: 'First Light',
     artist: 'Sora Vale',
     type: 'Single',
@@ -279,6 +291,7 @@ export const DEMO_RELEASES: DemoRelease[] = [
   },
   {
     id: 'rel-13',
+    displayId: 'REL-072',
     title: 'Demo Tape Vol. 1',
     artist: 'Sora Vale',
     type: 'EP',

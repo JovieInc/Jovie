@@ -39,6 +39,7 @@ export interface DemoProviderLink {
 
 export interface DemoRelease {
   readonly id: string;
+  readonly displayId: string;
   readonly title: string;
   readonly artist: string;
   readonly type: ReleaseType;
