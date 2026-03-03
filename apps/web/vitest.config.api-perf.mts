@@ -1,6 +1,6 @@
+import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
-import path from 'node:path';
 import { defineConfig } from 'vitest/config';
 
 dotenv.config({ path: '.env.test' });
@@ -19,10 +19,7 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
     include: ['tests/unit/api/**/*.test.{ts,tsx}'],
-    exclude: [
-      'node_modules/**',
-      '.next/**',
-    ],
+    exclude: ['node_modules/**', '.next/**'],
     pool: 'forks',
     minWorkers: 1,
     testTimeout: 10000,
