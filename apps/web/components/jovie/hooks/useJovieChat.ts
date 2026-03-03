@@ -1,7 +1,6 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import * as Sentry from '@sentry/nextjs';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
@@ -15,6 +14,7 @@ import {
   useAddMessagesMutation,
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
+import { captureException } from '@/lib/sentry/client-lite';
 
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH } from '../types';
@@ -150,7 +150,7 @@ export function useJovieChat({
   const { messages, sendMessage, status, setMessages } = useChat({
     transport,
     onError: error => {
-      Sentry.captureException(error, {
+      captureException(error, {
         tags: {
           feature: 'ai-chat',
           source: 'useJovieChat',
@@ -376,7 +376,7 @@ export function useJovieChat({
           }
         },
         onError: err => {
-          Sentry.captureException(err, {
+          captureException(err, {
             tags: {
               feature: 'ai-chat',
               source: 'useJovieChat',
@@ -501,7 +501,7 @@ export function useJovieChat({
             conversationId: result.conversation.id,
           };
         } catch (err) {
-          Sentry.captureException(err, {
+          captureException(err, {
             tags: {
               feature: 'ai-chat',
               source: 'useJovieChat',

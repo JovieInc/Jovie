@@ -1,8 +1,8 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useEffect, useRef } from 'react';
 import { toast } from 'sonner';
+import { captureException } from '@/lib/sentry/client-lite';
 import { fetchBuildInfo } from './useVersionMonitor';
 
 const TOAST_ID = 'chunk-error';
@@ -117,7 +117,7 @@ export function useChunkErrorHandler() {
 
       // Only report chunk load errors to Sentry (deployment reference errors are filtered in beforeSend)
       if (isChunkError) {
-        Sentry.captureException(error, {
+        captureException(error, {
           tags: {
             errorType: 'chunk_load_error',
             context: 'chunk_error_handler',

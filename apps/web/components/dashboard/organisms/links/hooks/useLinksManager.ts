@@ -7,10 +7,10 @@
  * Handles duplicate detection, YouTube cross-category logic, and MAX_SOCIAL_LINKS visibility.
  */
 
-import * as Sentry from '@sentry/nextjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { popularityIndex } from '@/constants/app';
 import { fetchWithTimeout } from '@/lib/queries/fetch';
+import { captureException } from '@/lib/sentry/client-lite';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { findDuplicate, mergeDuplicate } from '../services/duplicate-detection';
 import { enrichLink, getSections } from '../services/link-enrichment';
@@ -360,7 +360,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
         fetchWithTimeout('/api/dashboard/tipping/enable', {
           method: 'POST',
         }).catch(error => {
-          Sentry.captureException(error, {
+          captureException(error, {
             tags: { feature: 'tipping', action: 'enable' },
           });
         });

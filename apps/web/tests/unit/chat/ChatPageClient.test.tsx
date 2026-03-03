@@ -30,7 +30,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/app/chat',
 }));
 
-vi.mock('@sentry/nextjs', () => ({
+vi.mock('@/lib/sentry/client-lite', () => ({
   addBreadcrumb: mockSentryAddBreadcrumb,
   captureMessage: mockSentryCaptureMessage,
 }));

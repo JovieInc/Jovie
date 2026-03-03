@@ -82,6 +82,19 @@ vi.mock('@sentry/nextjs', () => {
   };
 });
 
+// Mock @/lib/sentry/client-lite globally — client components now import Sentry
+// helpers from the lite wrapper instead of `@sentry/nextjs` directly.
+vi.mock('@/lib/sentry/client-lite', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  onRouterTransitionStart: vi.fn(),
+  initLiteSentry: vi.fn(() => false),
+  isLiteSentryInitialized: vi.fn(() => false),
+  getSentryClient: vi.fn(() => undefined),
+  getLiteClientConfig: vi.fn(() => ({})),
+}));
+
 // Mock next/navigation — commonly needed in tests that import components using
 // useRouter, usePathname, or useSearchParams. Missing mocks cause slow dynamic
 // import resolution that degrades p95 performance.
