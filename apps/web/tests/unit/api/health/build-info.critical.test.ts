@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
@@ -16,6 +16,10 @@ vi.mock('node:fs', async importOriginal => {
 vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
 
 describe('@critical GET /api/health/build-info', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('captures warning when build info read fails', async () => {
     const { GET } = await import('@/app/api/health/build-info/route');
     const response = GET();
