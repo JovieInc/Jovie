@@ -30,23 +30,29 @@ function isTechnicalError(message: string): boolean {
  * They are replaced with the caller-provided fallback while the
  * original message is preserved for console + Sentry (JOV-1088).
  */
+const HTTP_STATUS_MESSAGES: Record<number, string> = {
+  401: 'Please sign in to continue.',
+  403: 'You do not have permission to do this.',
+  404: 'The requested resource was not found.',
+  409: 'This was modified elsewhere. Please refresh.',
+  429: 'Too many requests. Please try again later.',
+};
+
+function getFetchErrorMessage(error: FetchError): string | null {
+  if (HTTP_STATUS_MESSAGES[error.status])
+    return HTTP_STATUS_MESSAGES[error.status];
+  if (error.status >= 500) return 'Something went wrong. Please try again.';
+  return null;
+}
+
 export function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof FetchError) {
-    // Use status-specific messages for common errors
-    if (error.status === 401) return 'Please sign in to continue.';
-    if (error.status === 403) return 'You do not have permission to do this.';
-    if (error.status === 404) return 'The requested resource was not found.';
-    if (error.status === 409)
-      return 'This was modified elsewhere. Please refresh.';
-    if (error.status === 429)
-      return 'Too many requests. Please try again later.';
-    if (error.status >= 500) return 'Something went wrong. Please try again.';
+    const statusMessage = getFetchErrorMessage(error);
+    if (statusMessage) return statusMessage;
   }
 
   if (error instanceof Error && error.message) {
-    // Only surface messages that look user-friendly; hide technical noise
     if (isTechnicalError(error.message)) {
-      // Keep the raw detail for debugging
       console.error('[mutation error]', error.message);
       return fallback;
     }
