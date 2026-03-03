@@ -1,10 +1,18 @@
-import { and, sql as drizzleSql, gte, inArray, lte } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  gt,
+  sql as drizzleSql,
+  gte,
+  inArray,
+  lte,
+} from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
-import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -61,23 +69,21 @@ export async function scheduleReleaseNotifications(): Promise<{
     ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
   ];
 
-  // Check which creators can send notifications based on their plan
+  // Check which creators can send notifications based on their plan (single batch query)
   const eligibleCreatorIds = new Set<string>();
-  await Promise.all(
-    creatorProfileIds.map(async profileId => {
-      try {
-        const { entitlements } = await getCreatorEntitlements(profileId);
-        if (entitlements.booleans.canSendNotifications) {
-          eligibleCreatorIds.add(profileId);
-        }
-      } catch {
-        // If plan lookup fails, skip this creator (don't send on error)
-        logger.warn(
-          `[schedule-release-notifications] Failed to check plan for creator ${profileId}, skipping`
-        );
+  try {
+    const entitlementsMap =
+      await getBatchCreatorEntitlements(creatorProfileIds);
+    for (const [profileId, { entitlements }] of entitlementsMap) {
+      if (entitlements.booleans.canSendNotifications) {
+        eligibleCreatorIds.add(profileId);
       }
-    })
-  );
+    }
+  } catch {
+    logger.warn(
+      '[schedule-release-notifications] Batch entitlements lookup failed, skipping all creators'
+    );
+  }
 
   // Filter to only eligible releases
   const eligibleReleases = upcomingReleases.filter(r =>
@@ -101,39 +107,59 @@ export async function scheduleReleaseNotifications(): Promise<{
     ...new Set(eligibleReleases.map(r => r.creatorProfileId)),
   ];
 
-  const allSubscribers = await db
-    .select({
-      id: notificationSubscriptions.id,
-      creatorProfileId: notificationSubscriptions.creatorProfileId,
-      channel: notificationSubscriptions.channel,
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-      preferences: notificationSubscriptions.preferences,
-    })
-    .from(notificationSubscriptions)
-    .where(
-      and(
-        inArray(
-          notificationSubscriptions.creatorProfileId,
-          eligibleCreatorProfileIds
-        ),
-        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
-        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
-      )
-    );
+  // Paginate subscriber fetch using keyset pagination (1000 per batch)
+  const SUBSCRIBER_PAGE_SIZE = 1000;
+  type SubscriberRow = {
+    id: string;
+    creatorProfileId: string;
+    channel: string;
+    email: string | null;
+    phone: string | null;
+    preferences: (typeof notificationSubscriptions.$inferSelect)['preferences'];
+  };
+  const subscribersByCreator = new Map<string, SubscriberRow[]>();
+  let lastId = '';
 
-  const subscribersByCreator = new Map<
-    string,
-    (typeof allSubscribers)[number][]
-  >();
-  for (const subscriber of allSubscribers) {
-    const existing = subscribersByCreator.get(subscriber.creatorProfileId);
-    if (existing) {
-      existing.push(subscriber);
-    } else {
-      subscribersByCreator.set(subscriber.creatorProfileId, [subscriber]);
+  while (true) {
+    const baseConditions = [
+      inArray(
+        notificationSubscriptions.creatorProfileId,
+        eligibleCreatorProfileIds
+      ),
+      drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+      drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
+      drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`,
+    ];
+
+    if (lastId) {
+      baseConditions.push(gt(notificationSubscriptions.id, lastId));
     }
+
+    const batch = await db
+      .select({
+        id: notificationSubscriptions.id,
+        creatorProfileId: notificationSubscriptions.creatorProfileId,
+        channel: notificationSubscriptions.channel,
+        email: notificationSubscriptions.email,
+        phone: notificationSubscriptions.phone,
+        preferences: notificationSubscriptions.preferences,
+      })
+      .from(notificationSubscriptions)
+      .where(and(...baseConditions))
+      .orderBy(asc(notificationSubscriptions.id))
+      .limit(SUBSCRIBER_PAGE_SIZE);
+
+    for (const subscriber of batch) {
+      const existing = subscribersByCreator.get(subscriber.creatorProfileId);
+      if (existing) {
+        existing.push(subscriber);
+      } else {
+        subscribersByCreator.set(subscriber.creatorProfileId, [subscriber]);
+      }
+    }
+
+    if (batch.length < SUBSCRIBER_PAGE_SIZE) break;
+    lastId = batch[batch.length - 1].id;
   }
 
   const notificationValues: Array<{

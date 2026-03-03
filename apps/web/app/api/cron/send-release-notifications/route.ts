@@ -6,7 +6,7 @@ import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
-import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { sendNotification } from '@/lib/notifications/service';
@@ -575,23 +575,21 @@ export async function sendPendingNotifications(): Promise<{
       batchFetchStreamingLinks(releaseIds),
     ]);
 
-  // Check which creators can send notifications based on their plan
+  // Check which creators can send notifications based on their plan (single batch query)
   const eligibleCreatorIds = new Set<string>();
-  await Promise.all(
-    creatorProfileIds.map(async profileId => {
-      try {
-        const { entitlements } = await getCreatorEntitlements(profileId);
-        if (entitlements.booleans.canSendNotifications) {
-          eligibleCreatorIds.add(profileId);
-        }
-      } catch {
-        // If plan lookup fails, skip this creator
-        logger.warn(
-          `[send-release-notifications] Failed to check plan for creator ${profileId}, skipping`
-        );
+  try {
+    const entitlementsMap =
+      await getBatchCreatorEntitlements(creatorProfileIds);
+    for (const [profileId, { entitlements }] of entitlementsMap) {
+      if (entitlements.booleans.canSendNotifications) {
+        eligibleCreatorIds.add(profileId);
       }
-    })
-  );
+    }
+  } catch {
+    logger.warn(
+      '[send-release-notifications] Batch entitlements lookup failed, skipping all creators'
+    );
+  }
 
   // Cancel notifications for ineligible creators
   const ineligibleNotifications = pendingNotifications.filter(
