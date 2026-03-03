@@ -26,6 +26,7 @@ describe('UserJourneyTracker', () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 

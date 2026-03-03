@@ -33,7 +33,7 @@ export default defineConfig({
   // Windows short-name paths like TIMWHI~1 that contain spaces when expanded).
   server: {
     fs: {
-      allow: [realRoot, path.resolve(realRoot, '../..'), '..'],
+      allow: [realRoot, path.resolve(realRoot, '../..'), '..', 'C:/'],
       strict: false,
     },
   },
