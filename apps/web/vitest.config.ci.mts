@@ -49,9 +49,9 @@ export default defineConfig({
         'dist/**',
       ],
     },
-    // Test timeout - reduced from 30s to 10s (most tests should be <200ms)
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    // Test timeout - 5s safety net (tests target <200ms)
+    testTimeout: 5000,
+    hookTimeout: 5000,
     globals: true,
     // Allow concurrent tests within each worker for better throughput
     // CI can handle more concurrency; local stays conservative
