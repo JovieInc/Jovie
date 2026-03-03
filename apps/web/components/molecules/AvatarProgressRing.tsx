@@ -4,7 +4,7 @@ import { Check, Upload, X } from 'lucide-react';
 import type { AvatarUploadStatus } from '@/components/atoms/AvatarUploadAnnouncer';
 import { cn } from '@/lib/utils';
 
-export type { AvatarUploadStatus };
+export type { AvatarUploadStatus } from '@/components/atoms/AvatarUploadAnnouncer';
 
 const STROKE_WIDTH = 3;
 const RADIUS = 50 - STROKE_WIDTH / 2;

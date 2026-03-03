@@ -68,6 +68,7 @@ async function insertJobWithDedup(
   const [winner] = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
+    // NOSONAR - non-null assertion required by Drizzle eq() for partial index queries
     .where(eq(ingestionJobs.dedupKey, dedupKey!))
     .limit(1);
 
