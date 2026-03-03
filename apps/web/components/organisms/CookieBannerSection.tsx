@@ -34,13 +34,14 @@ function isBannerRequiredFromCookie(): boolean {
 export function CookieBannerSection() {
   const pathname = usePathname();
   const isDashboard = Boolean(pathname?.startsWith('/app'));
+  const isDemo = Boolean(pathname?.startsWith('/demo'));
 
   const [visible, setVisible] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [isMobileExpanded, setIsMobileExpanded] = useState(false);
 
   useEffect(() => {
-    if (isDashboard) {
+    if (isDashboard || isDemo) {
       setVisible(false);
       return;
     }
@@ -57,7 +58,7 @@ export function CookieBannerSection() {
     } catch {
       setVisible(true);
     }
-  }, [isDashboard]);
+  }, [isDashboard, isDemo]);
 
   useEffect(() => {
     if (globalThis.window && !globalThis.JVConsent) {

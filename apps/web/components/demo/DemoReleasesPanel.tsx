@@ -1,6 +1,6 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Plus } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DemoAvatar } from './DemoAvatar';
@@ -8,7 +8,7 @@ import { DemoPriorityIcon } from './DemoPriorityIcon';
 import { DemoStatusIcon } from './DemoStatusIcon';
 import type { DemoRelease, ReleaseStatus } from './demo-types';
 
-// ── Status group labels ──
+// ── Status group labels (sentence case) ──
 
 const STATUS_LABEL: Record<ReleaseStatus, string> = {
   syncing: 'In Progress',
@@ -17,6 +17,9 @@ const STATUS_LABEL: Record<ReleaseStatus, string> = {
   draft: 'Draft',
   archived: 'Archived',
 };
+
+// Statuses that show a warning icon (like Linear's ⚠ on "In Review")
+const WARNING_STATUSES = new Set<ReleaseStatus>(['syncing']);
 
 // ── Props ──
 
@@ -108,7 +111,7 @@ export function DemoReleasesPanel({
             <button
               type='button'
               onClick={() => toggleGroup(group.status)}
-              className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-8 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token hover:text-secondary-token'
+              className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-8 text-[13px] font-medium text-tertiary-token hover:text-secondary-token'
               aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
             >
               <ChevronRight
@@ -119,15 +122,28 @@ export function DemoReleasesPanel({
                 aria-hidden='true'
               />
               <DemoStatusIcon status={group.status} />
+              {WARNING_STATUSES.has(group.status) && (
+                <AlertTriangle className='size-3 text-yellow-500/80' />
+              )}
               <span>{STATUS_LABEL[group.status]}</span>
-              <span className='text-quaternary-token'>
+              <span className='text-quaternary-token text-[12px]'>
                 {group.releases.length}
               </span>
+              <span className='flex-1' />
+              <button
+                type='button'
+                className='size-5 flex items-center justify-center rounded text-tertiary-token hover:text-primary-token hover:bg-interactive-hover transition-colors'
+                tabIndex={-1}
+                onClick={e => e.stopPropagation()}
+                aria-label={`Add ${STATUS_LABEL[group.status]} release`}
+              >
+                <Plus className='size-3.5' />
+              </button>
             </button>
 
             {/* Rows */}
             {!isCollapsed &&
-              group.releases.map((release, i) => {
+              group.releases.map(release => {
                 const globalIndex = flatIds.indexOf(release.id);
                 const isFocused = globalIndex === focusIndex;
                 const isSelected = release.id === selectedId;
@@ -151,13 +167,25 @@ export function DemoReleasesPanel({
                       }
                     }}
                     className={cn(
-                      'flex h-[34px] cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--color-border-subtle)]',
+                      'flex h-8 cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--color-border-subtle)]',
                       isSelected &&
                         'bg-accent/10 shadow-[inset_2px_0_0_var(--color-accent),inset_0_-1px_0_var(--color-border-subtle)]',
                       isFocused && !isSelected && 'bg-interactive-hover',
                       !isSelected && !isFocused && 'hover:bg-interactive-hover'
                     )}
                   >
+                    {/* Priority */}
+                    {release.priority !== 'none' ? (
+                      <DemoPriorityIcon priority={release.priority} />
+                    ) : (
+                      <span className='size-4' />
+                    )}
+
+                    {/* Release ID */}
+                    <span className='hidden shrink-0 text-[12px] text-quaternary-token font-mono sm:block w-[54px]'>
+                      {release.displayId}
+                    </span>
+
                     {/* Status icon */}
                     <DemoStatusIcon status={release.status} />
 
@@ -191,11 +219,6 @@ export function DemoReleasesPanel({
                     <span className='hidden shrink-0 text-2xs text-quaternary-token lg:block'>
                       {release.type}
                     </span>
-
-                    {/* Priority */}
-                    {release.priority !== 'none' && (
-                      <DemoPriorityIcon priority={release.priority} />
-                    )}
 
                     {/* Assignee */}
                     <DemoAvatar assignee={release.assignee} size={16} />
