@@ -120,8 +120,8 @@ const COMMANDS: readonly CommandDefinition[] = [
 function normalize(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[^\w\s]/g, '')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/[^\w\s]/g, '')
+    .replaceAll(/\s+/g, ' ')
     .trim();
 }
 
