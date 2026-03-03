@@ -228,15 +228,14 @@ function CreatorProfileTableRowComponent({
       tabIndex={0}
       aria-selected={isSelected}
     >
-      <td className='w-14 px-4 py-3 align-middle'>
-        <div
-          role='group'
-          className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'
-          onClick={event => event.stopPropagation()}
-          onKeyDown={event =>
-            handleActivationKeyDown(event, e => e.stopPropagation())
-          }
-        >
+      <td
+        className='w-14 px-4 py-3 align-middle'
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, e => e.stopPropagation())
+        }
+      >
+        <div className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'>
           <span
             className={cn(
               'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
