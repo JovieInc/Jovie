@@ -182,6 +182,12 @@ test.describe('Content Gate — Public Pages', () => {
     test.setTimeout(60_000);
     if (!(await navigateSafe(page, '/pricing', testInfo))) return;
 
+    // If pricing page redirects (e.g., hidden for founding member launch JOV-1050), skip
+    if (!page.url().includes('/pricing')) {
+      test.skip(true, 'Pricing page redirects — hidden (JOV-1050)');
+      return;
+    }
+
     // Main heading
     const h1 = page.locator('h1').first();
     await expect(h1, 'Pricing: h1 should be visible').toBeVisible({
