@@ -52,6 +52,7 @@ export function useChatConversationQuery({
     enabled: enabled && !!conversationId,
     staleTime: 10_000, // 10 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
     refetchInterval,
   });
 }

@@ -390,7 +390,7 @@ const nextConfig = {
               maxSize: 180000,
             },
             motion: {
-              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
+              test: /[\\/]node_modules[\\/](framer-motion|motion)[\\/]/,
               name: 'motion',
               chunks: 'all',
               priority: 25,

@@ -16,6 +16,14 @@ import {
 } from './constants';
 import type { ApproveStatus, Column } from './types';
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 interface UseWaitlistColumnsProps {
   readonly approveStatuses: Readonly<Record<string, ApproveStatus>>;
   readonly onApprove: (entry: Pick<WaitlistEntryRow, 'id' | 'status'>) => void;
@@ -160,15 +168,7 @@ export function useWaitlistColumns({
         id: 'created',
         header: 'Created',
         cell: entry =>
-          entry.createdAt
-            ? new Intl.DateTimeFormat('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }).format(entry.createdAt)
-            : '—',
+          entry.createdAt ? dateFormatter.format(entry.createdAt) : '—',
         width: 'w-[160px]',
         hideOnMobile: true,
       },

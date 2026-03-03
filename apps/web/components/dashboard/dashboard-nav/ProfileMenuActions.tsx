@@ -3,6 +3,7 @@
 import { CommonDropdown } from '@jovie/ui';
 import { Copy, ExternalLink, ImageDown, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useCallback, useMemo } from 'react';
 import {
   SidebarMenuAction,
   SidebarMenuActions,
@@ -24,7 +25,7 @@ export function ProfileMenuActions({
   const router = useRouter();
   const profileUrl = `${BASE_URL}${publicProfileHref}`;
 
-  async function handleCopyProfileUrl() {
+  const handleCopyProfileUrl = useCallback(async () => {
     const success = await copyToClipboard(profileUrl);
 
     if (success) {
@@ -37,7 +38,42 @@ export function ProfileMenuActions({
       status: success ? 'success' : 'error',
       source: 'dashboard_nav',
     });
-  }
+  }, [profileUrl, notifications]);
+
+  const items = useMemo(
+    () => [
+      {
+        type: 'action' as const,
+        id: 'copy',
+        label: 'Copy Link',
+        icon: Copy,
+        onClick: () => void handleCopyProfileUrl(),
+      },
+      {
+        type: 'action' as const,
+        id: 'open',
+        label: 'Open Profile',
+        icon: ExternalLink,
+        onClick: () => window.open(profileUrl, '_blank'),
+      },
+      {
+        type: 'action' as const,
+        id: 'retargeting-ads',
+        label: 'Download Ads',
+        icon: ImageDown,
+        onClick: () => router.push(APP_ROUTES.SETTINGS_RETARGETING_ADS),
+      },
+      { type: 'separator' as const, id: 'sep' },
+      {
+        type: 'action' as const,
+        id: 'settings',
+        label: 'Settings',
+        icon: Settings,
+        onClick: () => router.push(APP_ROUTES.SETTINGS),
+      },
+    ],
+    [handleCopyProfileUrl, profileUrl, router]
+  );
 
   return (
     <SidebarMenuActions showOnHover>
@@ -47,37 +83,7 @@ export function ProfileMenuActions({
           size='compact'
           align='start'
           side='bottom'
-          items={[
-            {
-              type: 'action',
-              id: 'copy',
-              label: 'Copy Link',
-              icon: Copy,
-              onClick: () => void handleCopyProfileUrl(),
-            },
-            {
-              type: 'action',
-              id: 'open',
-              label: 'Open Profile',
-              icon: ExternalLink,
-              onClick: () => window.open(profileUrl, '_blank'),
-            },
-            {
-              type: 'action',
-              id: 'retargeting-ads',
-              label: 'Download Ads',
-              icon: ImageDown,
-              onClick: () => router.push(APP_ROUTES.SETTINGS_RETARGETING_ADS),
-            },
-            { type: 'separator', id: 'sep' },
-            {
-              type: 'action',
-              id: 'settings',
-              label: 'Settings',
-              icon: Settings,
-              onClick: () => router.push(APP_ROUTES.SETTINGS),
-            },
-          ]}
+          items={items}
         />
       </SidebarMenuAction>
     </SidebarMenuActions>

@@ -258,6 +258,8 @@ function RankedList({
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
+const numberFormatter = new Intl.NumberFormat();
+
 export interface AnalyticsSidebarProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
@@ -272,7 +274,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     enabled: isOpen,
   });
 
-  const fmt = Intl.NumberFormat();
+  const fmt = numberFormatter;
   const loading = isLoading;
 
   // Funnel data

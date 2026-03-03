@@ -6,13 +6,17 @@
 
 import { fetchWithTimeout } from '@/lib/queries/fetch';
 
+const relativeTimeFormatter = new Intl.RelativeTimeFormat('en', {
+  numeric: 'auto',
+});
+
 /**
  * Format a date as a relative time string (e.g., "2 hours ago").
  */
 export function formatRelativeDate(value: Date | null | undefined): string {
   if (!value) return '—';
   const date = value instanceof Date ? value : new Date(value);
-  const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  const formatter = relativeTimeFormatter;
   const diff = date.getTime() - Date.now();
   const minutes = Math.round(diff / 60000);
   if (Math.abs(minutes) < 60) {
