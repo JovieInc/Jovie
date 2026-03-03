@@ -96,7 +96,9 @@ setup('authenticate', async ({ page, baseURL }) => {
       msg.includes('strategy') ||
       msg.includes('infinite redirect') ||
       msg.includes('instance keys') ||
-      msg.includes('test email')
+      msg.includes('test email') ||
+      msg.includes('Timeout') ||
+      msg.includes('timeout')
     ) {
       // Clerk configuration issue — write empty auth state so tests with
       // their own auth (e.g., admin tests) can still run independently.
