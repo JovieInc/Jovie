@@ -1,2 +1,2 @@
 pnpm run next:proxy-guard
-lint-staged
+pnpm exec lint-staged
