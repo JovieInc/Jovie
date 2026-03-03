@@ -175,10 +175,10 @@ export function DemoReleasesPanel({
                     )}
                   >
                     {/* Priority */}
-                    {release.priority !== 'none' ? (
-                      <DemoPriorityIcon priority={release.priority} />
-                    ) : (
+                    {release.priority === 'none' ? (
                       <span className='size-4' />
+                    ) : (
+                      <DemoPriorityIcon priority={release.priority} />
                     )}
 
                     {/* Release ID */}

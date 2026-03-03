@@ -483,6 +483,50 @@ function resolveGeoContext(
   };
 }
 
+function buildSubscriptionValues(params: {
+  artist_id: string;
+  channel: NotificationChannel;
+  normalizedEmail: string | null;
+  normalizedPhone: string | null;
+  countryCode: string | null | undefined;
+  cityValue: string | null | undefined;
+  ipAddress: string | null | undefined;
+  source: string;
+  defaultPreferences: FanNotificationPreferences;
+  shouldVerifyEmail: boolean;
+  emailOtp: EmailOtpResult | null;
+}) {
+  const {
+    artist_id,
+    channel,
+    normalizedEmail,
+    normalizedPhone,
+    countryCode,
+    cityValue,
+    ipAddress,
+    source,
+    defaultPreferences,
+    shouldVerifyEmail,
+    emailOtp,
+  } = params;
+  return {
+    creatorProfileId: artist_id,
+    channel,
+    email: normalizedEmail,
+    phone: channel === 'sms' ? normalizedPhone : null,
+    countryCode,
+    city: cityValue,
+    ipAddress,
+    source,
+    preferences: defaultPreferences,
+    confirmedAt: shouldVerifyEmail ? null : new Date(),
+    emailOtpHash: emailOtp?.otpHash,
+    emailOtpExpiresAt: emailOtp?.otpExpiresAt,
+    emailOtpLastSentAt: emailOtp ? new Date() : null,
+    emailOtpAttempts: 0,
+  };
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -577,22 +621,21 @@ export const subscribeToNotificationsDomain = async (
 
     await db
       .insert(notificationSubscriptions)
-      .values({
-        creatorProfileId: artist_id,
-        channel,
-        email: normalizedEmail,
-        phone: channel === 'sms' ? normalizedPhone : null,
-        countryCode,
-        city: cityValue,
-        ipAddress,
-        source,
-        preferences: defaultPreferences,
-        confirmedAt: shouldVerifyEmail ? null : new Date(),
-        emailOtpHash: emailOtp?.otpHash,
-        emailOtpExpiresAt: emailOtp?.otpExpiresAt,
-        emailOtpLastSentAt: emailOtp ? new Date() : null,
-        emailOtpAttempts: 0,
-      })
+      .values(
+        buildSubscriptionValues({
+          artist_id,
+          channel,
+          normalizedEmail,
+          normalizedPhone,
+          countryCode,
+          cityValue,
+          ipAddress,
+          source,
+          defaultPreferences,
+          shouldVerifyEmail,
+          emailOtp,
+        })
+      )
       .onConflictDoUpdate(upsertConfig);
 
     await trackSubscribeSuccess({

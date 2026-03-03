@@ -412,6 +412,79 @@ export function useJovieChat({
     profileId,
   ]);
 
+  // Extracted helper: create a new conversation and set up pending refs.
+  // Returns true on success, false on failure (error state already set).
+  const handleCreateConversation = useCallback(
+    async (
+      trimmedText: string,
+      payload: { text: string; files?: FileUIPart[] }
+    ): Promise<boolean> => {
+      try {
+        const result = await createConversationMutation.mutateAsync({
+          initialMessage: trimmedText || '(image attachment)',
+        });
+        setActiveConversationId(result.conversation.id);
+
+        // User message already persisted via initialMessage in conversation creation.
+        // Only store pending ref to persist the assistant response.
+        pendingMessagesRef.current = {
+          userMessage: '', // Empty - already persisted via initialMessage
+          assistantMessage: '', // Will be filled when response completes
+        };
+
+        // Defer onConversationCreate until after sendMessage fires in the effect.
+        // Calling it here would trigger router.replace (e.g. /chat → /chat/[id]),
+        // which remounts the component and loses the pending send ref (JOV-1117).
+        pendingInitialSendRef.current = {
+          ...payload,
+          onConversationCreateDeferred: onConversationCreate,
+          conversationId: result.conversation.id,
+        };
+
+        setInput('');
+
+        // Reset textarea height
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+        }
+
+        return true;
+      } catch (err) {
+        captureException(err, {
+          tags: {
+            feature: 'ai-chat',
+            source: 'useJovieChat',
+            errorType: 'conversation-create',
+          },
+          extra: {
+            profileId: profileId ?? null,
+            conversationId: activeConversationId,
+          },
+        });
+        console.error('[useJovieChat] Failed to create conversation:', err);
+        setChatError({
+          type: 'server',
+          message:
+            'We could not start a new conversation right now. Please try again.',
+          errorCode: 'CONVERSATION_CREATE_FAILED',
+          failedMessage: trimmedText,
+        });
+        setIsSubmitting(false);
+        return false;
+      }
+    },
+    [
+      createConversationMutation,
+      onConversationCreate,
+      setActiveConversationId,
+      profileId,
+      activeConversationId,
+      setInput,
+      setChatError,
+      setIsSubmitting,
+    ]
+  );
+
   // Core submit logic
   const doSubmit = useCallback(
     async (text: string, files?: FileUIPart[]) => {
@@ -478,59 +551,10 @@ export function useJovieChat({
           assistantMessage: '', // Will be filled when response completes
         };
       } else {
-        // No active conversation, create one first
-        try {
-          const result = await createConversationMutation.mutateAsync({
-            initialMessage: trimmedText || '(image attachment)',
-          });
-          setActiveConversationId(result.conversation.id);
-
-          // User message already persisted via initialMessage in conversation creation.
-          // Only store pending ref to persist the assistant response.
-          pendingMessagesRef.current = {
-            userMessage: '', // Empty - already persisted via initialMessage
-            assistantMessage: '', // Will be filled when response completes
-          };
-
-          // Defer onConversationCreate until after sendMessage fires in the effect.
-          // Calling it here would trigger router.replace (e.g. /chat → /chat/[id]),
-          // which remounts the component and loses the pending send ref (JOV-1117).
-          pendingInitialSendRef.current = {
-            ...payload,
-            onConversationCreateDeferred: onConversationCreate,
-            conversationId: result.conversation.id,
-          };
-        } catch (err) {
-          captureException(err, {
-            tags: {
-              feature: 'ai-chat',
-              source: 'useJovieChat',
-              errorType: 'conversation-create',
-            },
-            extra: {
-              profileId: profileId ?? null,
-              conversationId: activeConversationId,
-            },
-          });
-          console.error('[useJovieChat] Failed to create conversation:', err);
-          setChatError({
-            type: 'server',
-            message:
-              'We could not start a new conversation right now. Please try again.',
-            errorCode: 'CONVERSATION_CREATE_FAILED',
-            failedMessage: trimmedText,
-          });
-          setIsSubmitting(false);
-          return;
-        }
-
-        setInput('');
-
-        // Reset textarea height
-        if (inputRef.current) {
-          inputRef.current.style.height = 'auto';
-        }
-
+        // No active conversation — create one first, then return
+        // (sendMessage is dispatched by the effect watching activeConversationId)
+        const created = await handleCreateConversation(trimmedText, payload);
+        if (!created) return;
         return;
       }
 
@@ -548,9 +572,7 @@ export function useJovieChat({
       sendMessage,
       setMessages,
       activeConversationId,
-      createConversationMutation,
-      onConversationCreate,
-      profileId,
+      handleCreateConversation,
       username,
       router,
     ]
