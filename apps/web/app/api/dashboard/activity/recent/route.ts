@@ -18,6 +18,9 @@ import {
 } from '@/lib/utils/string-utils';
 import { recentActivityQuerySchema } from '@/lib/validation/schemas';
 
+const CACHE_HEADERS = {
+  'Cache-Control': 'private, max-age=60, stale-while-revalidate=120',
+} as const;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const ACTION_ICONS: Record<string, string> = {
@@ -128,7 +131,7 @@ export async function GET(request: NextRequest) {
       if (!profile) {
         return NextResponse.json(
           { activities: [] },
-          { status: 200, headers: NO_STORE_HEADERS }
+          { status: 200, headers: CACHE_HEADERS }
         );
       }
 
@@ -264,7 +267,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         { activities: merged },
-        { status: 200, headers: NO_STORE_HEADERS }
+        { status: 200, headers: CACHE_HEADERS }
       );
     });
   } catch (error) {

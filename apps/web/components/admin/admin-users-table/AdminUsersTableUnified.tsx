@@ -41,6 +41,12 @@ import {
 
 const columnHelper = createColumnHelper<AdminUserRow>();
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 interface AdminUserMobileCardProps {
   readonly user: AdminUserRow;
   readonly isSelected: boolean;
@@ -96,14 +102,7 @@ function AdminUserMobileCard({
           </Badge>
         )}
         <span className='text-secondary-token'>
-          Joined{' '}
-          {user.createdAt
-            ? new Intl.DateTimeFormat('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              }).format(user.createdAt)
-            : '—'}
+          Joined {user.createdAt ? dateFormatter.format(user.createdAt) : '—'}
         </span>
       </div>
     </article>

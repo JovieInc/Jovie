@@ -10,6 +10,7 @@ import { captureException } from '@/lib/sentry/client-lite';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
+const numberFormatter = new Intl.NumberFormat();
 const LOADING_SKELETON_COUNT = 5;
 const LOADING_SKELETON_KEYS = Array.from(
   { length: LOADING_SKELETON_COUNT },
@@ -166,7 +167,7 @@ export function DashboardAnalytics() {
 
   if (!artist) return null;
 
-  const fmt = Intl.NumberFormat();
+  const fmt = numberFormatter;
 
   return (
     <div className='max-w-5xl space-y-8'>

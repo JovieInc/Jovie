@@ -2,6 +2,8 @@
 
 import { ArrowDown } from 'lucide-react';
 
+const numberFormatter = new Intl.NumberFormat();
+
 interface FunnelStage {
   label: string;
   value: number;
@@ -15,7 +17,7 @@ interface AnalyticsFunnelProps {
 }
 
 function formatNumber(num: number): string {
-  return Intl.NumberFormat().format(num);
+  return numberFormatter.format(num);
 }
 
 function calculateRate(current: number, previous: number): string {

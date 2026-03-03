@@ -30,6 +30,12 @@ import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
+
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
     'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
@@ -296,13 +302,7 @@ function CreatorProfileTableRowComponent({
         </div>
       </td>
       <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
-        {profile.createdAt
-          ? new Intl.DateTimeFormat('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            }).format(profile.createdAt)
-          : '—'}
+        {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td
         className='px-4 py-3 align-middle text-right'
