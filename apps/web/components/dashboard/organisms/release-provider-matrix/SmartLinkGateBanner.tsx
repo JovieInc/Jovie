@@ -58,7 +58,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
             <p className='mt-0.5 text-xs text-secondary-token'>
               Need more than {props.softCap}?{' '}
               <a
-                href='mailto:support@jovie.com?subject=Smart%20link%20limit%20increase%20request'
+                href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'
                 className='font-medium text-primary underline-offset-2 hover:underline'
               >
                 Request a higher limit

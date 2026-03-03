@@ -30,7 +30,7 @@ describe('admin creator toggle routes', () => {
     entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
       isAdmin: true,
       userId: 'admin_1',
-      email: 'admin@jovie.fm',
+      email: 'admin@jov.ie',
       isAuthenticated: true,
     });
 
@@ -65,7 +65,7 @@ describe('admin creator toggle routes', () => {
     entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
       isAdmin: true,
       userId: 'admin_1',
-      email: 'admin@jovie.fm',
+      email: 'admin@jov.ie',
       isAuthenticated: true,
     });
     adminActionsMock.toggleCreatorVerifiedAction.mockResolvedValue(undefined);
@@ -103,7 +103,7 @@ describe('admin creator toggle routes', () => {
     entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
       isAdmin: false,
       userId: 'user_1',
-      email: 'user@jovie.fm',
+      email: 'user@jov.ie',
       isAuthenticated: true,
     });
 
@@ -176,7 +176,7 @@ describe('admin creator toggle routes', () => {
     entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
       isAdmin: true,
       userId: 'admin_1',
-      email: 'admin@jovie.fm',
+      email: 'admin@jov.ie',
       isAuthenticated: true,
     });
     adminActionsMock.toggleCreatorFeaturedAction.mockRejectedValue(
@@ -211,7 +211,7 @@ describe('admin creator toggle routes', () => {
     entitlementsMock.getCurrentUserEntitlements.mockResolvedValue({
       isAdmin: true,
       userId: 'admin_1',
-      email: 'admin@jovie.fm',
+      email: 'admin@jov.ie',
       isAuthenticated: true,
     });
     adminActionsMock.toggleCreatorVerifiedAction.mockResolvedValue(undefined);

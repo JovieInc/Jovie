@@ -450,7 +450,7 @@ export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
     id: 'publish',
     iconType: 'check',
     iconColor: '#4EC98C',
-    label: 'Links published to jovie.fm/novalane/afterglow',
+    label: 'Links published to jov.ie/novalane/afterglow',
     time: '32s ago',
   },
 ];

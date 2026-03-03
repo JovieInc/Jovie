@@ -4,7 +4,7 @@ export const APP_NAME = 'Jovie';
 export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
 
 /**
- * APP_URL - The app/dashboard domain (meetjovie.com)
+ * APP_URL - The app/dashboard domain (jov.ie)
  * Use this for:
  * - Dashboard/app routes
  * - Marketing pages

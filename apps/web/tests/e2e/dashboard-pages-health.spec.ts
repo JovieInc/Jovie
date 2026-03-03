@@ -1,6 +1,6 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { isProductionTarget, signInUser } from '../helpers/clerk-auth';
 import {
   SMOKE_TIMEOUTS,
   waitForHydration,
@@ -214,6 +214,15 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test.setTimeout(360_000);
 
   test.beforeEach(async ({ page }) => {
+    // Skip full health check on production targets — use smoke-prod-auth.spec.ts instead
+    if (isProductionTarget()) {
+      test.skip(
+        true,
+        'Full dashboard health check skipped on production target'
+      );
+      return;
+    }
+
     // Skip if no Clerk credentials configured
     if (!hasClerkCredentials()) {
       console.log('⚠ Skipping dashboard health tests - no Clerk credentials');
@@ -500,6 +509,12 @@ test.describe('Admin Pages Health Check @smoke', () => {
   test.setTimeout(480_000);
 
   test.beforeEach(async ({ page }) => {
+    // Skip full admin health check on production targets
+    if (isProductionTarget()) {
+      test.skip(true, 'Admin health check skipped on production target');
+      return;
+    }
+
     // Skip if no admin credentials configured
     if (!hasAdminCredentials()) {
       console.log('⚠ Skipping admin health tests - no credentials');

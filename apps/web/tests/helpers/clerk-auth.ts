@@ -3,6 +3,25 @@ import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
 /**
+ * Check if the test target is a production deployment (jov.ie).
+ * Used to gate heavy test suites that should only run against testing environments.
+ */
+export function isProductionTarget(): boolean {
+  const baseUrl = process.env.BASE_URL ?? '';
+  return baseUrl.includes('jov.ie');
+}
+
+/**
+ * Check if the test is running in a testing environment.
+ * Testing environments use +clerk_test emails or have Clerk testing tokens.
+ */
+export function isTestingEnvironment(): boolean {
+  const email = process.env.E2E_CLERK_USER_USERNAME ?? '';
+  const clerkSetup = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
+  return email.includes('+clerk_test') || clerkSetup;
+}
+
+/**
  * Custom error types for better test debugging
  */
 export class ClerkTestError extends Error {

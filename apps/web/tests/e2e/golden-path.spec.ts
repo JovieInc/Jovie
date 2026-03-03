@@ -238,7 +238,10 @@ test.describe('Golden Path - Complete User Journey', () => {
     });
 
     // Should show DSP options (e.g., "Open in Spotify"), "not available" message,
-    // or the "Listen on" heading (proves the listen drawer rendered)
+    // the "Listen on" heading, or the "Choose a Service" subtitle.
+    // 30s timeout: page is already hydrated (h1 visible above), so DSP content
+    // should render quickly. In CI with ephemeral DB, DSP data may not exist —
+    // the subtitle or fallback message proves the listen drawer rendered.
     const spotifyButton = page
       .getByRole('button', { name: /open in spotify/i })
       .or(page.getByRole('link', { name: /spotify/i }));
@@ -247,14 +250,16 @@ test.describe('Golden Path - Complete User Journey', () => {
       .or(page.getByRole('link', { name: /open in /i }));
     const noLinksMsg = page.getByText(/streaming links aren.t available/i);
     const listenHeading = page.getByText(/listen on/i);
+    const chooseService = page.getByText(/choose a service/i);
     await expect(
       spotifyButton
         .first()
         .or(anyDspButton.first())
         .or(noLinksMsg)
         .or(listenHeading)
+        .or(chooseService)
     ).toBeVisible({
-      timeout: 120_000,
+      timeout: 30_000,
     });
   });
 

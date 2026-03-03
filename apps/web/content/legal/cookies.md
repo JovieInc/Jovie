@@ -56,4 +56,4 @@ We may update this Cookie Policy periodically. The "Last updated" date at the to
 
 ## Contact Us
 
-Questions about our use of cookies? Contact us at privacy@meetjovie.com.
+Questions about our use of cookies? Contact us at privacy@jov.ie.

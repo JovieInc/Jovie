@@ -391,7 +391,7 @@ export async function sendPendingAnnouncementEmails() {
           releaseTitle: release.releaseTitle,
           releaseDate: release.releaseDate,
           artworkUrl: release.artworkUrl,
-          presaleUrl: `https://jovie.fm/${release.artistHandle}/${release.releaseSlug}`,
+          presaleUrl: `https://jov.ie/${release.artistHandle}/${release.releaseSlug}`,
           customMessage: release.announcementMessage,
         });
       }
@@ -628,7 +628,7 @@ Timeline shown:
 ### Fan Flow: Discover via Profile Takeover
 
 ```
-1. Fan visits jovie.fm/artistname
+1. Fan visits jov.ie/artistname
 2. Instead of normal profile, sees:
    - Big release artwork
    - "New Single" badge

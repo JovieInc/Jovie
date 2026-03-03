@@ -20,8 +20,8 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(
       config.urlTransform?.('javascript:alert(1)', 'href', {} as never)
     ).toBe('');
-    expect(config.urlTransform?.('https://jovie.fm', 'href', {} as never)).toBe(
-      'https://jovie.fm'
+    expect(config.urlTransform?.('https://jov.ie', 'href', {} as never)).toBe(
+      'https://jov.ie'
     );
   });
 });

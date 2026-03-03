@@ -72,7 +72,7 @@ vi.mock('@/hooks/useClipboard', () => ({
 }));
 
 vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://test.jovie.com',
+  getBaseUrl: () => 'https://test.jov.ie',
 }));
 
 // Mock TanStack Query mutations
