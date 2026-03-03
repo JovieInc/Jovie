@@ -11,57 +11,102 @@ import { getDashboardData } from '../actions';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-async function InsightsContent() {
+/* -------------------------------------------------------------------------- */
+/*  Independent async sections — each in its own Suspense boundary so they    */
+/*  stream to the client as they resolve, instead of blocking behind one.     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Lightweight onboarding guard that streams independently.
+ *
+ * getDashboardData() is request-deduped via React cache() and already
+ * pre-fetched by the shell layout, so this resolves near-instantly.
+ * Separated into its own boundary so the redirect fires without
+ * blocking the content skeleton from being displayed.
+ */
+async function InsightsOnboardingGuard() {
   try {
     const dashboardData = await getDashboardData();
-
     if (dashboardData.needsOnboarding) {
       redirect('/onboarding');
     }
+    return null;
+  } catch (error) {
+    throwIfRedirect(error);
+    // Swallow — the layout's ProfileCompletionRedirect is the client-side safety net.
+    return null;
+  }
+}
 
+/**
+ * Insights content: header with generate button, category filter pills,
+ * and priority-grouped insight cards. The InsightsPanel client component
+ * manages its own loading states via TanStack Query, so this section
+ * streams the component shell while client-side data fetching runs in
+ * parallel.
+ */
+async function InsightsContentSection() {
+  try {
+    const dashboardData = await getDashboardData();
+    if (dashboardData.needsOnboarding) return null;
     return <InsightsPanel />;
   } catch (error) {
     throwIfRedirect(error);
     logger.error('[InsightsPage] Failed to load insights', { error });
-
     return (
       <PageErrorState message='Failed to load insights. Please refresh the page.' />
     );
   }
 }
 
-const SKELETON_KEYS = Array.from({ length: 4 }, (_, i) => `insight-${i}`);
-const FILTER_SKELETON_KEYS = Array.from({ length: 5 }, (_, i) => `filter-${i}`);
+/* -------------------------------------------------------------------------- */
+/*  Section-specific skeleton fallbacks                                       */
+/* -------------------------------------------------------------------------- */
 
-function InsightsSkeleton() {
+const FILTER_SKELETON_KEYS = Array.from({ length: 5 }, (_, i) => `filter-${i}`);
+const SKELETON_KEYS = Array.from({ length: 4 }, (_, i) => `insight-${i}`);
+
+function InsightsHeaderSkeleton() {
   return (
-    <div className='max-w-3xl space-y-6'>
-      <div className='flex items-center justify-between'>
-        <div className='space-y-1.5'>
-          <div className='h-5 w-28 skeleton motion-reduce:animate-none rounded' />
-          <div className='h-3 w-48 skeleton motion-reduce:animate-none rounded' />
-        </div>
-        <div className='h-8 w-28 skeleton motion-reduce:animate-none rounded-lg' />
+    <div className='flex items-center justify-between'>
+      <div className='space-y-1.5'>
+        <div className='h-5 w-28 skeleton motion-reduce:animate-none rounded' />
+        <div className='h-3 w-48 skeleton motion-reduce:animate-none rounded' />
       </div>
-      <div className='flex gap-1.5'>
-        {FILTER_SKELETON_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-7 w-20 skeleton motion-reduce:animate-none rounded-full'
-          />
-        ))}
-      </div>
-      <div className='space-y-3'>
-        {SKELETON_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-28 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
-          />
-        ))}
-      </div>
+      <div className='h-8 w-28 skeleton motion-reduce:animate-none rounded-lg' />
     </div>
   );
 }
+
+function InsightsFiltersSkeleton() {
+  return (
+    <div className='flex gap-1.5'>
+      {FILTER_SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className='h-7 w-20 skeleton motion-reduce:animate-none rounded-full'
+        />
+      ))}
+    </div>
+  );
+}
+
+function InsightsCardsSkeleton() {
+  return (
+    <div className='space-y-3'>
+      {SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className='h-28 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
+        />
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page — sync shell with independent Suspense streaming boundaries          */
+/* -------------------------------------------------------------------------- */
 
 export default async function InsightsPage() {
   const { userId } = await getCachedAuth();
@@ -71,8 +116,26 @@ export default async function InsightsPage() {
   }
 
   return (
-    <Suspense fallback={<InsightsSkeleton />}>
-      <InsightsContent />
-    </Suspense>
+    <>
+      {/* Guard: invisible, triggers onboarding redirect independently */}
+      <Suspense fallback={null}>
+        <InsightsOnboardingGuard />
+      </Suspense>
+
+      {/* Content: header, filter pills, priority-grouped insight cards.
+          The skeleton is split into visual sections so the page layout
+          remains stable while streaming. */}
+      <Suspense
+        fallback={
+          <div className='max-w-3xl space-y-6'>
+            <InsightsHeaderSkeleton />
+            <InsightsFiltersSkeleton />
+            <InsightsCardsSkeleton />
+          </div>
+        }
+      >
+        <InsightsContentSection />
+      </Suspense>
+    </>
   );
 }

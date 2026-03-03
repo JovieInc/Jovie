@@ -11,69 +11,130 @@ import { getDashboardData } from '../actions';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-async function AnalyticsContent() {
-  try {
-    // Fetch dashboard data server-side
-    const dashboardData = await getDashboardData();
+/* -------------------------------------------------------------------------- */
+/*  Independent async sections — each in its own Suspense boundary so they    */
+/*  stream to the client as they resolve, instead of blocking behind one.     */
+/* -------------------------------------------------------------------------- */
 
-    // Handle redirects for users who need onboarding
+/**
+ * Lightweight onboarding guard that streams independently.
+ *
+ * getDashboardData() is request-deduped via React cache() and already
+ * pre-fetched by the shell layout, so this resolves near-instantly.
+ * Separated into its own boundary so the redirect fires without
+ * blocking the content skeleton from being displayed.
+ */
+async function AnalyticsOnboardingGuard() {
+  try {
+    const dashboardData = await getDashboardData();
     if (dashboardData.needsOnboarding) {
       redirect('/onboarding');
     }
+    return null;
+  } catch (error) {
+    throwIfRedirect(error);
+    // Swallow — the layout's ProfileCompletionRedirect is the client-side safety net.
+    return null;
+  }
+}
 
-    // Render analytics dashboard
+/**
+ * Analytics dashboard content: header with range controls, stat cards,
+ * secondary metrics, and ranked lists. The DashboardAnalytics client
+ * component manages its own loading states via TanStack Query, so this
+ * section streams the component shell while client-side data fetching
+ * runs in parallel.
+ */
+async function AnalyticsContentSection() {
+  try {
+    const dashboardData = await getDashboardData();
+    if (dashboardData.needsOnboarding) return null;
     return <DashboardAnalytics />;
   } catch (error) {
     throwIfRedirect(error);
     logger.error('[AnalyticsPage] Failed to load analytics', { error });
-
     return (
       <PageErrorState message='Failed to load analytics. Please refresh the page.' />
     );
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Section-specific skeleton fallbacks                                       */
+/* -------------------------------------------------------------------------- */
+
 const SKELETON_STAT_KEYS = Array.from({ length: 3 }, (_, i) => `stat-${i}`);
 const SKELETON_LIST_KEYS = Array.from({ length: 3 }, (_, i) => `list-${i}`);
 
-function AnalyticsSkeleton() {
+function AnalyticsHeaderSkeleton() {
   return (
-    <div className='max-w-5xl space-y-8'>
-      <div className='flex items-center justify-between'>
-        <div className='h-4 w-24 skeleton motion-reduce:animate-none rounded' />
-        <div className='h-8 w-32 skeleton motion-reduce:animate-none rounded-full' />
-      </div>
-      <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
-        {SKELETON_STAT_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-24 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
-          />
-        ))}
-      </div>
-      <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
-        {SKELETON_LIST_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-56 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
-          />
-        ))}
-      </div>
+    <div className='flex items-center justify-between'>
+      <div className='h-4 w-24 skeleton motion-reduce:animate-none rounded' />
+      <div className='h-8 w-32 skeleton motion-reduce:animate-none rounded-full' />
     </div>
   );
 }
 
+function AnalyticsStatsSkeleton() {
+  return (
+    <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+      {SKELETON_STAT_KEYS.map(key => (
+        <div
+          key={key}
+          className='h-24 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
+        />
+      ))}
+    </div>
+  );
+}
+
+function AnalyticsListsSkeleton() {
+  return (
+    <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
+      {SKELETON_LIST_KEYS.map(key => (
+        <div
+          key={key}
+          className='h-56 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
+        />
+      ))}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page — sync shell with independent Suspense streaming boundaries          */
+/* -------------------------------------------------------------------------- */
+
 export default async function AnalyticsPage() {
   const { userId } = await getCachedAuth();
 
-  // Handle unauthenticated users
   if (!userId) {
     redirect('/sign-in?redirect_url=/app/dashboard/analytics');
   }
 
   return (
-    <Suspense fallback={<AnalyticsSkeleton />}>
-      <AnalyticsContent />
-    </Suspense>
+    <>
+      {/* Guard: invisible, triggers onboarding redirect independently */}
+      <Suspense fallback={null}>
+        <AnalyticsOnboardingGuard />
+      </Suspense>
+
+      {/* Content: header, stat cards, secondary metrics, ranked lists.
+          The skeleton is split into visual sections so the page layout
+          remains stable while streaming.  */}
+      <Suspense
+        fallback={
+          <div className='max-w-5xl space-y-8'>
+            <AnalyticsHeaderSkeleton />
+            <div className='space-y-6'>
+              <AnalyticsStatsSkeleton />
+              <AnalyticsListsSkeleton />
+            </div>
+          </div>
+        }
+      >
+        <AnalyticsContentSection />
+      </Suspense>
+    </>
   );
 }
