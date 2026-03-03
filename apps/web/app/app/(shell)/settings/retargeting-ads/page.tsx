@@ -63,7 +63,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
       a.download = `jovie-ad-${variant.type}-${variant.size}.png`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(objectUrl);
     } catch {
       notifications.error('Failed to download ad image');
@@ -87,7 +87,8 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
     }
   }, [variant, notifications]);
 
-  const previewUrl = `${getAdCreativeUrl(variant.type, variant.size)}${cacheKey ? `&v=${cacheKey}` : ''}`;
+  const cacheSuffix = cacheKey ? `&v=${cacheKey}` : '';
+  const previewUrl = `${getAdCreativeUrl(variant.type, variant.size)}${cacheSuffix}`;
 
   return (
     <div className='flex flex-col gap-3 rounded-xl border border-subtle bg-surface-0 p-4'>
