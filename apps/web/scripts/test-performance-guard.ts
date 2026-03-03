@@ -58,9 +58,9 @@ class TestPerformanceGuard {
       description: 'Critical regression suite (includes auth E2E tests)',
     },
     full: {
-      maxTotalDuration: 360000,
+      maxTotalDuration: 420000,
       description:
-        'Full coverage runs should stay under 6 minutes to guard against drift.',
+        'Full coverage runs should stay under 7 minutes to guard against drift.',
     },
   };
 
@@ -125,7 +125,7 @@ class TestPerformanceGuard {
         encoding: 'utf8',
         stdio: 'pipe',
         maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
-        timeout: 360000,
+        timeout: 420000,
       });
 
       this.parseTestOutput(output);

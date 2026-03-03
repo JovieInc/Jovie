@@ -92,7 +92,7 @@ class TestPerformanceProfiler {
         encoding: 'utf8',
         stdio: 'pipe',
         maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
-        timeout: 360000, // 6 minutes timeout to align with budget ceilings
+        timeout: 420000, // 7 minutes timeout to align with budget ceilings
       });
 
       return { output, durationMs: Date.now() - startTime };

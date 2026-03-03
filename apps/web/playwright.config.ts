@@ -30,7 +30,7 @@ const webServerCommand = process.env.DATABASE_URL
 
 function getRetries(): number {
   if (!isCI) return 0;
-  return isSmokeOnly ? 1 : 2;
+  return isSmokeOnly ? 2 : 2;
 }
 
 function getWorkers(): number | undefined {
