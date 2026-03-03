@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Homepage Showcase Tests (formerly "Featured Creators")
@@ -51,6 +52,15 @@ test.describe('Featured Creators on Homepage', () => {
   test('featured creators section loads and displays creators', async ({
     page,
   }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await forceDeferredSections(page);
 
     await page.goto('/', {
@@ -74,6 +84,15 @@ test.describe('Featured Creators on Homepage', () => {
   test('featured creators are clickable and lead to profile pages', async ({
     page,
   }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await forceDeferredSections(page);
 
     await page.goto('/', {
@@ -113,12 +132,21 @@ test.describe('Featured Creators on Homepage', () => {
       }
     });
 
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await forceDeferredSections(page);
 
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Wait for deferred sections to render
-    await page.waitForTimeout(2000);
+    // Wait for deferred sections to render using deterministic hydration check
+    await waitForHydration(page);
 
     // Check for critical errors (ignore harmless ones)
     const criticalErrors = errors.filter(
@@ -139,6 +167,15 @@ test.describe('Featured Creators on Homepage', () => {
   });
 
   test('featured creators display images correctly', async ({ page }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await forceDeferredSections(page);
 
     await page.goto('/', {
@@ -170,6 +207,15 @@ test.describe('Featured Creators on Homepage', () => {
   test('featured creators section is responsive', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await forceDeferredSections(page);
 
     await page.goto('/', {

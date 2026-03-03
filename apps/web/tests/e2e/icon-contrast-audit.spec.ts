@@ -13,6 +13,7 @@
  */
 
 import { expect, type Page, test } from '@playwright/test';
+import { waitForHydration } from './utils/smoke-test-utils';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -56,7 +57,7 @@ async function setTheme(page: Page, theme: 'light' | 'dark') {
       document.documentElement.classList.remove('dark');
     }
   }, theme);
-  await page.waitForTimeout(300);
+  await page.waitForLoadState('domcontentloaded');
 }
 
 /**
@@ -220,7 +221,7 @@ async function auditHoverContrast(
     if (!isVisible) continue;
 
     await link.hover();
-    await page.waitForTimeout(200); // transition duration
+    await page.waitForLoadState('domcontentloaded');
 
     const violation = await link.evaluate(
       (el, { theme, WCAG_AA }) => {
@@ -273,8 +274,17 @@ test.describe('Icon Contrast Audit — WCAG AA Non-Text (3:1)', () => {
       test.setTimeout(120_000);
 
       const url = route.startsWith('http') ? route : `${baseUrl}${route}`;
+      await page.route('**/api/profile/view', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/audience/visit', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
+      await page.route('**/api/track', r =>
+        r.fulfill({ status: 200, body: '{}' })
+      );
       await page.goto(url, { timeout: 60_000 });
-      await page.waitForLoadState('networkidle');
+      await waitForHydration(page);
 
       // Inject contrast-checking utilities once
       await injectContrastHelpers(page);

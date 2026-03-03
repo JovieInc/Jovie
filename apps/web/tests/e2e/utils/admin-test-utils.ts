@@ -8,6 +8,7 @@
  */
 
 import type { Page } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 // ============================================================================
 // Admin Credentials
@@ -88,35 +89,28 @@ export async function waitForTransientErrorToResolve(
   page: Page,
   timeout = 15000
 ): Promise<void> {
-  const startTime = Date.now();
-  const intervals = [500, 1000, 2000, 3000, 5000];
-  let intervalIndex = 0;
-
-  while (Date.now() - startTime < timeout) {
-    const bodyText = await page
-      .locator('body')
-      .innerText()
-      .catch(() => '');
-    const lowerText = bodyText.toLowerCase();
-
-    const hasError =
-      lowerText.includes('application error') ||
-      lowerText.includes('client-side exception');
-
-    if (!hasError) {
-      return; // No error - page is stable
-    }
-
-    // Wait and retry
-    const waitTime = intervals[Math.min(intervalIndex, intervals.length - 1)];
-    await page.waitForTimeout(waitTime);
-    intervalIndex++;
-  }
-
-  // If we get here, the error persisted beyond timeout
-  throw new Error(
-    'Client-side error did not resolve within timeout - page may have a persistent error'
-  );
+  // Use expect.poll() to repeatedly check for error resolution without fixed sleeps
+  await expect
+    .poll(
+      async () => {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        const lowerText = bodyText.toLowerCase();
+        return (
+          !lowerText.includes('application error') &&
+          !lowerText.includes('client-side exception')
+        );
+      },
+      {
+        message:
+          'Client-side error did not resolve within timeout - page may have a persistent error',
+        timeout,
+        intervals: [500, 1000, 2000, 3000, 5000],
+      }
+    )
+    .toBe(true);
 }
 
 interface ClientErrorResult {
@@ -172,14 +166,26 @@ export async function waitForAdminNav(
   const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
 
   await page.waitForLoadState('domcontentloaded').catch(() => {});
-  // Short hydration pause to let client-side JS settle
-  await page.waitForTimeout(500);
+  // Wait for client-side JS to settle by checking document readiness
+  await page
+    .waitForFunction(
+      () =>
+        document.readyState === 'complete' ||
+        document.readyState === 'interactive',
+      { timeout: 5000 }
+    )
+    .catch(() => {});
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    await page.waitForTimeout(delayMs);
-    const isVisible = await adminNavSection.isVisible().catch(() => false);
-    if (isVisible) return true;
+  // Use expect.poll() to check for admin nav visibility without fixed delays
+  try {
+    await expect
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: maxAttempts * delayMs,
+        intervals: Array(maxAttempts).fill(delayMs),
+      })
+      .toBe(true);
+    return true;
+  } catch {
+    return false;
   }
-
-  return false;
 }

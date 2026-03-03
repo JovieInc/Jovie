@@ -15,6 +15,15 @@ test.use({ storageState: { cookies: [], origins: [] } });
 test.describe('Style sanity', () => {
   test('bg-black text-white computes correctly', async ({ page }) => {
     // Use a lightweight route that exists publicly
+    await page.route('**/api/profile/view', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/sandbox');
 
     // Inject a transient element with tailwind classes and measure computed styles

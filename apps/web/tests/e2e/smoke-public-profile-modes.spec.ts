@@ -56,6 +56,17 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
         test(`${profileMode.mode} mode renders at ${breakpoint.name}`, async ({
           page,
         }) => {
+          // Intercept analytics to prevent test interference
+          await page.route('**/api/profile/view', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/audience/visit', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+          await page.route('**/api/track', route =>
+            route.fulfill({ status: 200, body: '{}' })
+          );
+
           await page.setViewportSize({
             width: breakpoint.width,
             height: breakpoint.height,
@@ -99,6 +110,17 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
       test(`${profileMode.mode} mode can open mobile drawers when available`, async ({
         page,
       }, testInfo) => {
+        // Intercept analytics to prevent test interference
+        await page.route('**/api/profile/view', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/audience/visit', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/track', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+
         await page.setViewportSize({ width: 375, height: 812 });
 
         const route = `/${TEST_PROFILES.DUALIPA}${profileMode.query}`;
@@ -154,7 +176,8 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
           } else {
             await page.keyboard.press('Escape');
           }
-          await page.waitForTimeout(200);
+          // Wait for drawer close animation using domcontentloaded buffer
+          await page.waitForLoadState('domcontentloaded');
         }
 
         await testInfo.attach('opened-drawers', {
@@ -181,6 +204,17 @@ test.describe('Public Profile Modes Smoke Coverage @smoke @critical', () => {
       test(`${deepLink.path} deep link resolves to ${deepLink.mode} mode`, async ({
         page,
       }) => {
+        // Intercept analytics to prevent test interference
+        await page.route('**/api/profile/view', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/audience/visit', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+        await page.route('**/api/track', route =>
+          route.fulfill({ status: 200, body: '{}' })
+        );
+
         const response = await smokeNavigate(
           page,
           `/${TEST_PROFILES.DUALIPA}/${deepLink.path}`

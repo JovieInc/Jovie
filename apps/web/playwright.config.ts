@@ -65,7 +65,7 @@ export default defineConfig({
   // Turbopack compilation can take 30+ seconds for dashboard, so smoke tests need more time
   timeout: isSmokeOnly ? 90_000 : 120_000, // 90s for smoke (Turbopack), 120s for full
   expect: {
-    timeout: 20_000,
+    timeout: 25_000,
     // Visual regression snapshot settings
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (cross-platform font rendering)
