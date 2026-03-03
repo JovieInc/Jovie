@@ -1,5 +1,6 @@
 'use client';
 
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -66,7 +67,6 @@ export function JovieChat({
   isFirstSession: isFirstSessionProp = false,
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -197,12 +197,24 @@ export function JovieChat({
     }
   }, [initialQuery, isLoadingConversation, submitMessage]);
 
+  // Virtualizer for chat messages
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => messagesContainerRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+    measureElement: el => el.getBoundingClientRect().height,
+  });
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      virtualizer.scrollToIndex(messages.length - 1, {
+        align: 'end',
+        behavior: 'smooth',
+      });
     }
-  }, [messages]);
+  }, [messages.length, virtualizer]);
 
   // Track scroll position to show/hide scroll-to-bottom button
   const handleScroll = useCallback(() => {
@@ -214,8 +226,13 @@ export function JovieChat({
   }, []);
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+    if (messages.length > 0) {
+      virtualizer.scrollToIndex(messages.length - 1, {
+        align: 'end',
+        behavior: 'smooth',
+      });
+    }
+  }, [messages.length, virtualizer]);
 
   // Find the last assistant message index for streaming cursor
   const lastAssistantIndex = useMemo(() => {
@@ -297,19 +314,51 @@ export function JovieChat({
             className='relative flex-1 overflow-y-auto px-4 py-6'
             onScroll={handleScroll}
           >
-            <div className='mx-auto max-w-[44rem] space-y-7'>
-              {messages.map((message, index) => (
-                <ChatMessage
-                  key={message.id}
-                  id={message.id}
-                  role={message.role}
-                  parts={message.parts}
-                  isStreaming={isStreaming && index === lastAssistantIndex}
-                  avatarUrl={message.role === 'user' ? avatarUrl : undefined}
-                  profileId={profileId}
-                />
-              ))}
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
+            <div
+              className='mx-auto max-w-[44rem]'
+              style={{
+                position: 'relative',
+                height: virtualizer.getTotalSize(),
+              }}
+            >
+              {virtualizer.getVirtualItems().map(virtualItem => {
+                const message = messages[virtualItem.index];
+                const index = virtualItem.index;
+                return (
+                  <div
+                    key={message.id}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <div className='pb-7'>
+                      <ChatMessage
+                        id={message.id}
+                        role={message.role}
+                        parts={message.parts}
+                        isStreaming={
+                          isStreaming && index === lastAssistantIndex
+                        }
+                        avatarUrl={
+                          message.role === 'user' ? avatarUrl : undefined
+                        }
+                        profileId={profileId}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Loading indicator — rendered outside virtualizer since it's not a real message */}
+            {isLoading && messages[messages.length - 1]?.role === 'user' && (
+              <div className='mx-auto max-w-[44rem] pb-7'>
                 <div className='flex gap-3'>
                   <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'>
                     <BrandLogo size={16} tone='auto' />
@@ -335,9 +384,8 @@ export function JovieChat({
                     Jovie is {thinkingLabel.toLowerCase().replace(/\.{3}$/, '')}
                   </span>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+              </div>
+            )}
 
             {/* Scroll to bottom button */}
             <ScrollToBottom
