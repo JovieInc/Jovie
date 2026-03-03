@@ -146,6 +146,7 @@
     "drizzle-orm": "0.45.1",
     "flags": "^4.0.3",
     "heic2any": "^0.0.4",
+    "dompurify": "^3.2.4",
     "isomorphic-dompurify": "2.35.0",
     "jose": "^6.1.3",
     "lucide-react": "^0.562.0",

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DSPButton } from '@/components/atoms/DSPButton';
 import { expectNoA11yViolations } from '../../utils/a11y';
 
-vi.mock('isomorphic-dompurify', () => ({
+vi.mock('dompurify', () => ({
   default: { sanitize: (s: string) => s },
 }));
 
