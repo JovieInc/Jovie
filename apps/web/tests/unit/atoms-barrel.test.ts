@@ -18,16 +18,15 @@ describe('atoms barrel exports', () => {
       .sort();
 
     const indexContent = readFileSync(path.join(atomsDir, 'index.ts'), 'utf8');
-    // Match active exports and commented-out exclusions (client components)
-    const accounted: string[] = [];
-    for (const line of indexContent.split('\n')) {
-      const active = line.match(/^export \* from '\.\/([^']+)';/);
-      const excluded = line.match(/^\/\/\s*export \* from '\.\/([^']+)';/);
-      if (active) accounted.push(active[1]);
-      else if (excluded) accounted.push(excluded[1]);
+    // Style-agnostic: match any `from './Module'` pattern regardless of
+    // export syntax (wildcard, named, type, multiline, commented-out)
+    const moduleRe = /from '\.\/([^']+)'/g;
+    const accounted = new Set<string>();
+    for (const match of indexContent.matchAll(moduleRe)) {
+      accounted.add(match[1]);
     }
-    accounted.sort();
+    const sorted = [...accounted].sort();
 
-    expect(accounted).toEqual(expected);
+    expect(sorted).toEqual(expected);
   });
 });

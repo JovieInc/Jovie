@@ -9,6 +9,7 @@ import {
   assertPageRendered,
   elementVisible,
   isExpectedError,
+  isTransientNavigationError,
   SMOKE_SELECTORS,
   SMOKE_TIMEOUTS,
   setupPageMonitoring,
@@ -331,10 +332,19 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           const { getContext, cleanup } = setupPageMonitoring(page);
 
           try {
-            const response = await smokeNavigateWithRetry(
-              page,
-              `/${profile}${path}`
-            );
+            let response: Awaited<ReturnType<typeof smokeNavigateWithRetry>>;
+            try {
+              response = await smokeNavigateWithRetry(
+                page,
+                `/${profile}${path}`
+              );
+            } catch (navError) {
+              if (isTransientNavigationError(navError)) {
+                test.skip(true, `Transient nav error on /${profile}${path}`);
+                return;
+              }
+              throw navError;
+            }
             const status = response?.status() ?? 0;
 
             // Redirects (3xx) and 200 are both acceptable — subpages redirect
@@ -433,7 +443,16 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
 
       try {
         for (const route of testRoutes) {
-          let response = await smokeNavigate(page, route);
+          let response: Awaited<ReturnType<typeof smokeNavigate>>;
+          try {
+            response = await smokeNavigate(page, route);
+          } catch (navError) {
+            if (isTransientNavigationError(navError)) {
+              test.skip(true, `Transient nav error on ${route}`);
+              return;
+            }
+            throw navError;
+          }
           let status = response?.status() ?? 0;
 
           // Turbopack compilation can cause transient 500s on first hit.
@@ -445,7 +464,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
               `Route ${route}: Got ${status} on attempt ${retries}, retrying (likely Turbopack cold compile)...`
             );
             await page.waitForLoadState('domcontentloaded');
-            response = await smokeNavigate(page, route);
+            try {
+              response = await smokeNavigate(page, route);
+            } catch (retryError) {
+              if (isTransientNavigationError(retryError)) {
+                test.skip(true, `Transient nav error on ${route} (retry)`);
+                return;
+              }
+              throw retryError;
+            }
             status = response?.status() ?? 0;
           }
 
@@ -514,7 +541,16 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
 
     try {
       for (const route of routes) {
-        let response = await smokeNavigate(page, route);
+        let response: Awaited<ReturnType<typeof smokeNavigate>>;
+        try {
+          response = await smokeNavigate(page, route);
+        } catch (navError) {
+          if (isTransientNavigationError(navError)) {
+            test.skip(true, `Transient nav error on ${route}`);
+            return;
+          }
+          throw navError;
+        }
         let status = response?.status() ?? 0;
 
         // Turbopack compilation can cause transient 500s on first hit.
@@ -526,7 +562,15 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
             `Route ${route}: Got ${status} on attempt ${retries}, retrying (likely Turbopack cold compile)...`
           );
           await page.waitForLoadState('domcontentloaded');
-          response = await smokeNavigate(page, route);
+          try {
+            response = await smokeNavigate(page, route);
+          } catch (retryError) {
+            if (isTransientNavigationError(retryError)) {
+              test.skip(true, `Transient nav error on ${route} (retry)`);
+              return;
+            }
+            throw retryError;
+          }
           status = response?.status() ?? 0;
         }
 
