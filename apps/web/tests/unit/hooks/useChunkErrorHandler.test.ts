@@ -14,7 +14,9 @@ const { mockToast, mockCaptureException, mockFetchBuildInfo } = vi.hoisted(
 );
 
 vi.mock('sonner', () => ({ toast: mockToast }));
-vi.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
+vi.mock('@/lib/sentry/client-lite', () => ({
+  captureException: mockCaptureException,
+}));
 vi.mock('@/lib/hooks/useVersionMonitor', () => ({
   fetchBuildInfo: mockFetchBuildInfo,
 }));

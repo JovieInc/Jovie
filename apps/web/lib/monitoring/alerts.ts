@@ -1,7 +1,7 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
+import { addBreadcrumb } from '@/lib/sentry/client-lite';
 
 // Define alert severity levels
 export type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
@@ -253,7 +253,7 @@ export class PerformanceAlerts {
 
     // Log alerts as breadcrumbs for debugging
     if (process.env.NODE_ENV === 'development') {
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'performance-alert',
         message: `${alertData.severity.toUpperCase()}: ${alertData.metric} = ${alertData.value.toFixed(2)} (threshold: ${alertData.threshold})`,
         level:

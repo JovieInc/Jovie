@@ -1,8 +1,8 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { addBreadcrumb } from '@/lib/sentry/client-lite';
 import { queryKeys } from './keys';
 
 export interface BuildInfo {
@@ -39,7 +39,7 @@ export async function fetchBuildInfo({
     if (error instanceof Error && error.name === 'AbortError') {
       throw error; // Let TanStack Query handle cancellation
     }
-    Sentry.addBreadcrumb({
+    addBreadcrumb({
       category: 'version-monitor',
       message: 'Fetch failed',
       level: 'warning',
@@ -143,7 +143,7 @@ export function useVersionMonitor(
       setHasMismatch(true);
       setMismatchInfo(info);
 
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'version-monitor',
         message: `New version detected: ${initialBuildId.current} → ${buildInfo.buildId}`,
         level: 'info',

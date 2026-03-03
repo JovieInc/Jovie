@@ -19,12 +19,12 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import * as Sentry from '@sentry/nextjs';
 import { Download, FileCode2, ImageDown, QrCode } from 'lucide-react';
 import { useCallback } from 'react';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { getProfileUrl } from '@/constants/domains';
 import { track } from '@/lib/analytics';
+import { captureException } from '@/lib/sentry/client-lite';
 
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 
@@ -129,7 +129,7 @@ export function ProfilePhotoContextMenu({
         link.remove();
         URL.revokeObjectURL(url);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           tags: { feature: 'profile_photo_download' },
           extra: { sizeKey: size.key, url: size.url },
         });

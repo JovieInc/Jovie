@@ -1,7 +1,6 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import * as Sentry from '@sentry/nextjs';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +20,7 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
+import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
@@ -207,7 +207,7 @@ export function ChatPageClient({
       searchParams.get('from') === 'onboarding' ||
       searchParams.get('onboarding') === 'complete';
 
-    Sentry.addBreadcrumb({
+    addBreadcrumb({
       category: 'dashboard.chat',
       level: hasDashboardLoadFailure ? 'error' : 'warning',
       message: 'ChatPageClient rendered with null selectedProfile',
@@ -227,7 +227,7 @@ export function ChatPageClient({
     });
 
     if (hasDashboardLoadFailure) {
-      Sentry.captureMessage(
+      captureMessage(
         'Chat selectedProfile missing due to dashboard load failure',
         {
           level: 'error',
