@@ -41,14 +41,14 @@ const startSpanMock = vi.fn(
 // Persistent cache store that survives module resets
 const cacheStore = new Map<Function, { promise: Promise<unknown> | null }>();
 
+// Override global setup's react mock with one that has a persistent cache store
+// for testing deduplication behavior across prefetch calls.
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof import('react')>('react');
 
   return {
     ...actual,
-    // Custom cache implementation that uses a persistent store
     cache: <T>(fn: () => Promise<T>) => {
-      // Each function gets its own cache entry
       if (!cacheStore.has(fn)) {
         cacheStore.set(fn, { promise: null });
       }
@@ -225,7 +225,7 @@ describe('dashboard data prefetch', () => {
 
   it('dedupes dashboard fetches after prefetching', async () => {
     const { getDashboardData, getDashboardDataCached, prefetchDashboardData } =
-      await import('@/app/app/(shell)/dashboard/actions');
+      await import('@/app/app/(shell)/dashboard/actions/dashboard-data');
 
     prefetchDashboardData();
 
@@ -237,7 +237,11 @@ describe('dashboard data prefetch', () => {
     expect(first).toEqual(second);
     expect(setupDbSessionMock).toHaveBeenCalled();
   });
+});
 
+// Separate describe block for pure utility tests — no module reset needed,
+// no mocks required (social-link-utils has zero imports).
+describe('social-link-utils', () => {
   it('maps postgres bool-like existence values correctly', async () => {
     const { mapSocialLinkExistence } = await import(
       '@/app/app/(shell)/dashboard/actions/social-link-utils'
