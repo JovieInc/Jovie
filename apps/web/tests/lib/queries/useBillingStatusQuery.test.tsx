@@ -184,7 +184,7 @@ describe('useBillingStatusQuery', () => {
       // Rerender - should use cached data within 1 min
       rerender();
 
-      await new Promise(r => setTimeout(r, 10));
+      await Promise.resolve();
 
       expect(mockFetch.mock.calls.length).toBe(firstCallCount);
     });

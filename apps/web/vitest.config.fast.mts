@@ -103,6 +103,15 @@ export default defineConfig({
     },
   },
 
+  server: {
+    fs: {
+      // Allow serving files from the workspace root even when the path
+      // contains spaces (Windows short-path TIMWHI~1 expands to "Tim White").
+      allow: [path.resolve(__dirname, '../..'), 'C:/'],
+      strict: false,
+    },
+  },
+
   resolve: {
     alias: [
       {

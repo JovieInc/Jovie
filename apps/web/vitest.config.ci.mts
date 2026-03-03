@@ -57,6 +57,14 @@ export default defineConfig({
     // CI can handle more concurrency; local stays conservative
     maxConcurrency: process.env.CI ? 5 : 1,
   },
+  server: {
+    fs: {
+      // Allow serving files from paths with spaces (Windows short-path expansion).
+      allow: [path.resolve(__dirname, '../..'), 'C:/'],
+      strict: false,
+    },
+  },
+
   resolve: {
     alias: [
       {
