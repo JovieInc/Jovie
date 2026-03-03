@@ -1,6 +1,6 @@
 'use client';
 
-import DOMPurify from 'dompurify';
+import DOMPurify from 'isomorphic-dompurify';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
