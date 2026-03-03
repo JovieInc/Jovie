@@ -224,7 +224,7 @@ vi.mock('sonner', () => ({
 }));
 vi.mock('@/lib/constants/layout', () => ({ SIDEBAR_WIDTH: 360 }));
 vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://jovie.com',
+  getBaseUrl: () => 'https://jov.ie',
 }));
 vi.mock('@/lib/utm', () => ({
   buildUTMContext: () => ({}),

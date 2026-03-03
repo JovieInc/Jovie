@@ -6,7 +6,7 @@ describe('OnboardingCompleteStep', () => {
   const baseProps = {
     title: "You're live.",
     prompt: 'Your profile is published and ready to share.',
-    displayDomain: 'jovie.fm',
+    displayDomain: 'jov.ie',
     handle: 'artist',
     copied: false,
     onGoToDashboard: vi.fn(),

@@ -160,7 +160,7 @@ vi.mock('@/lib/constants/layout', () => ({
 }));
 
 vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://jovie.com',
+  getBaseUrl: () => 'https://jov.ie',
 }));
 
 vi.mock('@/lib/utm', () => ({

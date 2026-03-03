@@ -1,6 +1,10 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, TestInfo, test } from '@playwright/test';
-import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
+import {
+  ClerkTestError,
+  isProductionTarget,
+  signInUser,
+} from '../helpers/clerk-auth';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -409,6 +413,15 @@ test.describe('Content Gate — Authenticated Pages', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(async ({ page }, testInfo) => {
+    // Skip authenticated content gate on production targets — use smoke-prod-auth.spec.ts instead
+    if (isProductionTarget()) {
+      test.skip(
+        true,
+        'Authenticated content gate skipped on production target'
+      );
+      return;
+    }
+
     const username = process.env.E2E_CLERK_USER_USERNAME;
     const hasTestCredentials =
       username &&

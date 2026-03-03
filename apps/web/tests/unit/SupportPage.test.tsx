@@ -14,7 +14,7 @@ vi.mock('@/constants/app', async importOriginal => {
   return {
     ...actual,
     APP_NAME: 'Jovie',
-    APP_URL: 'https://meetjovie.com',
+    APP_URL: 'https://jov.ie',
   };
 });
 
@@ -34,10 +34,7 @@ describe('SupportPage', () => {
       name: /send email to support team/i,
     });
     expect(contactButton).toBeInTheDocument();
-    expect(contactButton).toHaveAttribute(
-      'href',
-      'mailto:support@meetjovie.com'
-    );
+    expect(contactButton).toHaveAttribute('href', 'mailto:support@jov.ie');
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
@@ -49,7 +46,7 @@ describe('SupportPage', () => {
     });
     expect(contactButton).toHaveAttribute(
       'aria-label',
-      'Send email to support team at support@meetjovie.com'
+      'Send email to support team at support@jov.ie'
     );
   });
 
@@ -63,7 +60,7 @@ describe('SupportPage', () => {
     fireEvent.click(contactButton);
 
     expect(track).toHaveBeenCalledWith('Support Email Clicked', {
-      email: 'support@meetjovie.com',
+      email: 'support@jov.ie',
       source: 'support_page',
     });
   });

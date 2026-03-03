@@ -982,6 +982,75 @@ jobs:
           fi
           echo "Post-deploy smoke passed: 4/4 checks OK"
 
+  # Post-deploy authenticated smoke test — lightweight Playwright test against production.
+  # Verifies sign-in + dashboard load with real credentials after deploy.
+  # Non-blocking initially — promote to blocking once stable.
+  ci-post-deploy-auth-smoke:
+    name: Post-Deploy Auth Smoke (Production)
+    needs: [deploy]
+    if: ${{ always() && needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Check for production auth credentials
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.E2E_PROD_USER_EMAIL }}" ] && [ -z "${{ secrets.E2E_CLERK_USER_USERNAME }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No production auth credentials configured — skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check-creds.outputs.skip != 'true'
+
+      - name: Cache Playwright Browsers
+        if: steps.check-creds.outputs.skip != 'true'
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        if: steps.check-creds.outputs.skip != 'true'
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Wait for CDN propagation
+        if: steps.check-creds.outputs.skip != 'true'
+        run: sleep 30
+
+      - name: Run production auth smoke tests
+        if: steps.check-creds.outputs.skip != 'true'
+        run: |
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          CI=true BASE_URL=https://jov.ie pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
+        env:
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure() && steps.check-creds.outputs.skip != 'true'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: post-deploy-auth-smoke-${{ github.run_id }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 3
 
   ci-build:
     name: Build
@@ -2188,10 +2257,25 @@ jobs:
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app for smoke tests
+      - name: Download build artifact from ci-build
+        id: download-build
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-build.outputs.run_full_ci == 'true' }}
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+        continue-on-error: true
+
+      - name: Extract or rebuild for smoke tests
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          pnpm turbo build --filter=@jovie/web
+          if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
+            echo "Reusing build artifact from ci-build (saves ~3-4 min)"
+            tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+          else
+            echo "Build artifact not available, building from scratch"
+            pnpm turbo build --filter=@jovie/web
+          fi
           # Standalone output needs static assets alongside server.js
           cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
           cp -r apps/web/public apps/web/.next/standalone/apps/web/public
@@ -2235,7 +2319,7 @@ jobs:
           # Run smoke tests with BASE_URL set (skips Playwright webServer config)
           cd "$GITHUB_WORKSPACE"
           set +e
-          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/content-gate.spec.ts tests/e2e/smoke-auth.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
           EXIT_CODE=$?
           set -e
           exit $EXIT_CODE

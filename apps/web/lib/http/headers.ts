@@ -92,9 +92,9 @@ export const SECURITY_HEADERS = {
  * In production, this should be restricted to your app's domains.
  */
 const ALLOWED_ORIGINS = [
-  'https://jovie.fm',
-  'https://www.jovie.fm',
-  'https://app.jovie.fm',
+  'https://jov.ie',
+  'https://www.jov.ie',
+  'https://app.jov.ie',
   // Preview deployments - team slug is 'jovie'
   /^https:\/\/jovie(-git-[a-z0-9-]+-jovie)?\.vercel\.app$/,
 ] as const;

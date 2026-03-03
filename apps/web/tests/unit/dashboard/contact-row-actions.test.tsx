@@ -24,7 +24,7 @@ describe('getContactRowContextMenuItems', () => {
     const onCopyToClipboard = vi.fn();
     const contact: EditableContact = {
       ...baseContact,
-      email: 'hello@jovie.com',
+      email: 'hello@jov.ie',
       phone: '+1 555 0100',
     };
 

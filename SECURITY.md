@@ -15,7 +15,7 @@ If you discover a security vulnerability, please **do not** open a public issue.
 
 Instead, report it privately by email:
 
-- **security@jovie.fm**
+- **security@jov.ie**
 
 Include as much detail as possible:
 

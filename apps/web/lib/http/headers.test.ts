@@ -7,10 +7,10 @@ afterEach(() => {
 
 describe('createAuthenticatedCorsHeaders', () => {
   it('returns strict headers for allowed production origin', () => {
-    const headers = createAuthenticatedCorsHeaders('https://app.jovie.fm');
+    const headers = createAuthenticatedCorsHeaders('https://app.jov.ie');
 
     expect(headers).toEqual({
-      'Access-Control-Allow-Origin': 'https://app.jovie.fm',
+      'Access-Control-Allow-Origin': 'https://app.jov.ie',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',

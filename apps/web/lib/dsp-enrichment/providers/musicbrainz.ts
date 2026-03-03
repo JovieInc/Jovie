@@ -9,7 +9,7 @@ import { musicBrainzCircuitBreaker } from '../circuit-breakers';
 import type { MusicBrainzArtist, MusicBrainzRecording } from '../types';
 
 const MUSICBRAINZ_API_BASE = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'Jovie/1.0.0 (https://jovie.fm)';
+const USER_AGENT = 'Jovie/1.0.0 (https://jov.ie)';
 const REQUEST_TIMEOUT_MS = 10_000;
 const RATE_LIMIT_DELAY_MS = 1100;
 

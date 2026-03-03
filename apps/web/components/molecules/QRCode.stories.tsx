@@ -20,14 +20,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    data: 'https://jovie.fm/taylorswift',
+    data: 'https://jov.ie/taylorswift',
     label: 'Scan to view profile',
   },
 };
 
 export const Small: Story = {
   args: {
-    data: 'https://jovie.fm/edsheeran',
+    data: 'https://jov.ie/edsheeran',
     size: 100,
     label: 'Small QR Code',
   },
@@ -35,7 +35,7 @@ export const Small: Story = {
 
 export const Large: Story = {
   args: {
-    data: 'https://jovie.fm/billieeilish',
+    data: 'https://jov.ie/billieeilish',
     size: 200,
     label: 'Large QR Code',
   },
@@ -43,7 +43,7 @@ export const Large: Story = {
 
 export const MobileProfile: Story = {
   args: {
-    data: 'https://jovie.fm/theweeknd?utm_source=qr&utm_medium=mobile',
+    data: 'https://jov.ie/theweeknd?utm_source=qr&utm_medium=mobile',
     size: 150,
     label: 'Scan to view on mobile',
   },
@@ -51,7 +51,7 @@ export const MobileProfile: Story = {
 
 export const TipLink: Story = {
   args: {
-    data: 'https://jovie.fm/drake?mode=tip',
+    data: 'https://jov.ie/drake?mode=tip',
     size: 120,
     label: 'Scan to tip via Apple Pay',
   },
@@ -69,7 +69,7 @@ export const InContainer: Story = {
   render: () => (
     <div className='text-center space-y-4 p-6 bg-white dark:bg-gray-900 rounded-lg shadow-lg'>
       <QRCode
-        data='https://jovie.fm/arianagrande'
+        data='https://jov.ie/arianagrande'
         size={180}
         label='Scan to tip via Apple Pay'
         className='mx-auto'
