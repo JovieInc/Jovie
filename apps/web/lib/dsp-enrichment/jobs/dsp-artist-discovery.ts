@@ -671,6 +671,45 @@ function discoverForProvider(
   }
 }
 
+async function processProviderDiscovery(
+  tx: DbOrTransaction,
+  providerId: DspProviderId,
+  localTracks: Awaited<ReturnType<typeof fetchLocalTracks>>,
+  localArtist: NonNullable<Awaited<ReturnType<typeof fetchLocalArtist>>>,
+  creatorProfileId: string,
+  result: DspArtistDiscoveryResult
+): Promise<void> {
+  try {
+    const discoveryPromise = discoverForProvider(
+      tx,
+      providerId,
+      localTracks,
+      localArtist,
+      creatorProfileId
+    );
+    if (!discoveryPromise) {
+      result.errors.push(`${providerId}: Unsupported provider`);
+      return;
+    }
+    const { match, status, error } = await discoveryPromise;
+    if (match && status) {
+      result.matches.push({
+        providerId,
+        status,
+        externalArtistId: match.externalArtistId,
+        externalArtistName: match.externalArtistName,
+        confidenceScore: match.confidenceScore,
+      });
+    } else if (error) {
+      result.errors.push(`${providerId}: ${error}`);
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    result.errors.push(`${providerId}: ${message}`);
+  }
+}
+
 /**
  * Process a DSP artist discovery job.
  */
@@ -704,37 +743,14 @@ export async function processDspArtistDiscoveryJob(
   }
 
   for (const providerId of targetProviders) {
-    try {
-      const discoveryPromise = discoverForProvider(
-        tx,
-        providerId,
-        localTracks,
-        localArtist,
-        creatorProfileId
-      );
-
-      if (!discoveryPromise) {
-        result.errors.push(`${providerId}: Unsupported provider`);
-        continue;
-      }
-
-      const { match, status, error } = await discoveryPromise;
-      if (match && status) {
-        result.matches.push({
-          providerId,
-          status,
-          externalArtistId: match.externalArtistId,
-          externalArtistName: match.externalArtistName,
-          confidenceScore: match.confidenceScore,
-        });
-      } else if (error) {
-        result.errors.push(`${providerId}: ${error}`);
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      result.errors.push(`${providerId}: ${message}`);
-    }
+    await processProviderDiscovery(
+      tx,
+      providerId,
+      localTracks,
+      localArtist,
+      creatorProfileId,
+      result
+    );
   }
 
   // If no matches were found but errors occurred, capture to Sentry so

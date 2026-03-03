@@ -465,6 +465,24 @@ async function dispatchSubscriptionEmail(
   );
 }
 
+function resolveGeoContext(
+  headers: Headers | undefined,
+  fallbackCountry: string | null | undefined,
+  fallbackCity: string | null | undefined
+) {
+  const ipAddress = getForwardedIp(headers);
+  const geoCountry =
+    getHeader(headers, 'x-vercel-ip-country') ||
+    getHeader(headers, 'cf-ipcountry') ||
+    null;
+  const geoCity = getHeader(headers, 'x-vercel-ip-city');
+  return {
+    ipAddress,
+    countryCode: sanitizeCountryCode(geoCountry ?? fallbackCountry),
+    cityValue: sanitizeCity(fallbackCity ?? geoCity),
+  };
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -498,14 +516,11 @@ export const subscribeToNotificationsDomain = async (
     const { profile: artistProfile, dynamicEnabled } = artistResult;
     const creatorIsPro = artistProfile.creatorIsPro;
 
-    const ipAddress = getForwardedIp(context.headers);
-    const geoCountry =
-      getHeader(context.headers, 'x-vercel-ip-country') ||
-      getHeader(context.headers, 'cf-ipcountry') ||
-      null;
-    const geoCity = getHeader(context.headers, 'x-vercel-ip-city');
-    const countryCode = sanitizeCountryCode(geoCountry ?? country_code);
-    const cityValue = sanitizeCity(city ?? geoCity);
+    const { ipAddress, countryCode, cityValue } = resolveGeoContext(
+      context.headers,
+      country_code,
+      city
+    );
 
     const normalizedEmail =
       channel === 'email' ? (normalizeSubscriptionEmail(email) ?? null) : null;
