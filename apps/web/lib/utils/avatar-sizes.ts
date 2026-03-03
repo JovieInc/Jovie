@@ -88,6 +88,21 @@ function generateSizeVariants(sourceUrl: string): AvatarSize[] {
   return sizes;
 }
 
+const PRECOMPUTED_SIZE_KEYS: { key: string; sizeKey: string; label: string }[] =
+  [
+    { key: 'large', sizeKey: '512', label: 'Large (512 x 512)' },
+    { key: 'medium', sizeKey: '256', label: 'Medium (256 x 256)' },
+    { key: 'small', sizeKey: '128', label: 'Small (128 x 128)' },
+  ];
+
+function collectPrecomputedSizes(
+  sizesMap: Record<string, string>
+): AvatarSize[] {
+  return PRECOMPUTED_SIZE_KEYS.filter(({ sizeKey }) => sizesMap[sizeKey]).map(
+    ({ key, sizeKey, label }) => ({ key, label, url: sizesMap[sizeKey] })
+  );
+}
+
 /** Build avatar sizes from a URL map stored in profile settings */
 export function buildAvatarSizes(
   sizesMap: Record<string, string> | null | undefined,
@@ -99,38 +114,14 @@ export function buildAvatarSizes(
   const originalUrl = sizesMap?.original ?? avatarUrl ?? undefined;
 
   if (sizesMap && Object.keys(sizesMap).length > 0) {
-    const hasPrecomputedSizes =
-      sizesMap['128'] || sizesMap['256'] || sizesMap['512'];
+    const precomputed = collectPrecomputedSizes(sizesMap);
 
-    if (hasPrecomputedSizes) {
-      // Use pre-computed sizes when available (uploaded photos)
-      if (sizesMap['512']) {
-        sizes.push({
-          key: 'large',
-          label: 'Large (512 x 512)',
-          url: sizesMap['512'],
-        });
-      }
-      if (sizesMap['256']) {
-        sizes.push({
-          key: 'medium',
-          label: 'Medium (256 x 256)',
-          url: sizesMap['256'],
-        });
-      }
-      if (sizesMap['128']) {
-        sizes.push({
-          key: 'small',
-          label: 'Small (128 x 128)',
-          url: sizesMap['128'],
-        });
-      }
+    if (precomputed.length > 0) {
+      sizes.push(...precomputed);
     } else if (originalUrl) {
-      // No pre-computed sizes -- generate S/M/L from the original URL
       sizes.push(...generateSizeVariants(originalUrl));
     }
 
-    // Always include original at the end
     if (sizesMap.original) {
       sizes.push({
         key: 'original',
@@ -139,9 +130,11 @@ export function buildAvatarSizes(
       });
     }
   } else if (avatarUrl) {
-    // No pre-computed sizes map -- generate S/M/L from the avatar URL
-    sizes.push(...generateSizeVariants(avatarUrl));
-    sizes.push({ key: 'original', label: 'Original', url: avatarUrl });
+    sizes.push(...generateSizeVariants(avatarUrl), {
+      key: 'original',
+      label: 'Original',
+      url: avatarUrl,
+    });
   }
 
   return sizes;
