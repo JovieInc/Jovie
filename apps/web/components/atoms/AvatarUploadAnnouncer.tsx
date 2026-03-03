@@ -1,6 +1,6 @@
 'use client';
 
-import type { AvatarUploadStatus } from '@/components/molecules/AvatarProgressRing';
+export type AvatarUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 export interface AvatarUploadAnnouncerProps {
   readonly progress: number;
