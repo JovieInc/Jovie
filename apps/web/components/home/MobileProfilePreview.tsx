@@ -17,14 +17,14 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
   return (
     <div
       className='flex h-full flex-col items-center'
-      style={{ backgroundColor: 'rgb(8, 9, 10)' }}
+      style={{ backgroundColor: 'var(--linear-bg-page)' }}
     >
       {/* Profile photo */}
       <div className='pt-12 pb-3'>
         <div
           className='overflow-hidden rounded-full p-[2px]'
           style={{
-            boxShadow: '0 0 0 1px rgba(255,255,255,0.06)',
+            boxShadow: '0 0 0 1px var(--linear-border-subtle)',
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -41,7 +41,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
       <div className='flex items-center gap-1'>
         <p
           className='text-[15px] font-semibold'
-          style={{ color: 'rgb(247, 248, 248)' }}
+          style={{ color: 'var(--linear-text-primary)' }}
         >
           {displayName}
         </p>
@@ -51,10 +51,7 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
       </div>
 
       {/* Subtitle */}
-      <p
-        className='mt-1 text-[11px] font-normal uppercase tracking-[0.2em]'
-        style={{ color: 'rgba(255, 255, 255, 0.4)' }}
-      >
+      <p className='mt-1 text-[11px] font-normal uppercase tracking-[0.2em] text-white/40'>
         {primaryGenre}
       </p>
 
@@ -70,8 +67,8 @@ export function MobileProfilePreview({ creator }: MobileProfilePreviewProps) {
         <div
           className='flex w-full items-center justify-center gap-2.5 rounded-xl py-4 text-[15px] font-semibold'
           style={{
-            backgroundColor: 'rgb(247, 248, 248)',
-            color: 'rgb(8, 9, 10)',
+            backgroundColor: 'var(--linear-text-primary)',
+            color: 'var(--linear-bg-page)',
           }}
         >
           <Bell className='h-[18px] w-[18px]' aria-hidden='true' />
@@ -138,11 +135,7 @@ function PreviewIconButton({
   return (
     <button
       type='button'
-      className='flex h-9 w-9 items-center justify-center rounded-full'
-      style={{
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        color: 'rgba(255, 255, 255, 0.5)',
-      }}
+      className='flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.05] text-white/50'
       title={label}
       tabIndex={-1}
     >

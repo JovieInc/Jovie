@@ -42,17 +42,10 @@ function ListenContent() {
         return (
           <div
             key={dsp.name}
-            className='flex items-center justify-between p-2.5 rounded-xl'
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
+            className='flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]'
           >
             <div className='flex items-center gap-2.5'>
-              <div
-                className='w-7 h-7 rounded-lg flex items-center justify-center'
-                style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-              >
+              <div className='w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.06]'>
                 <Icon className='w-3.5 h-3.5' style={{ color: dsp.color }} />
               </div>
               <span className='text-[13px] font-medium text-white/90'>
@@ -79,23 +72,16 @@ function TipContent() {
         {['$3', '$5', '$10'].map(amt => (
           <div
             key={amt}
-            className='aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5'
-            style={{
-              backgroundColor:
-                amt === '$5' ? 'rgb(247,248,248)' : 'rgba(255,255,255,0.04)',
-              color: amt === '$5' ? 'rgb(8,9,10)' : 'rgb(247,248,248)',
-              border:
-                amt === '$5'
-                  ? '1px solid transparent'
-                  : '1px solid rgba(255,255,255,0.06)',
-            }}
+            className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 ${
+              amt === '$5'
+                ? 'bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] border border-transparent'
+                : 'bg-white/[0.04] text-[var(--linear-text-primary)] border border-white/[0.06]'
+            }`}
           >
             <span
-              className='text-[9px] font-medium uppercase tracking-wider'
-              style={{
-                color:
-                  amt === '$5' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)',
-              }}
+              className={`text-[9px] font-medium uppercase tracking-wider ${
+                amt === '$5' ? 'text-black/50' : 'text-white/40'
+              }`}
             >
               USD
             </span>
@@ -123,11 +109,7 @@ function TourContent() {
       {shows.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between p-2.5 rounded-xl'
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.06)',
-          }}
+          className='flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]'
         >
           <div className='flex flex-col gap-0.5'>
             <span className='text-[13px] font-medium text-white/90'>
@@ -159,16 +141,9 @@ function ContactContent() {
         return (
           <div
             key={c.role}
-            className='flex items-center gap-2.5 p-2.5 rounded-xl'
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
+            className='flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]'
           >
-            <div
-              className='w-7 h-7 rounded-lg flex items-center justify-center'
-              style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-            >
+            <div className='w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.06]'>
               <Icon className='w-3.5 h-3.5 text-white/50' />
             </div>
             <div className='flex flex-col'>
@@ -259,18 +234,14 @@ export function PhoneProfileDemo() {
               </div>
 
               {/* Tab bar */}
-              <div
-                className='relative flex mx-4 rounded-xl overflow-hidden'
-                style={{ backgroundColor: 'rgba(255,255,255,0.04)' }}
-              >
+              <div className='relative flex mx-4 rounded-xl overflow-hidden bg-white/[0.04]'>
                 {/* Sliding indicator */}
                 <span
                   aria-hidden='true'
-                  className='absolute inset-y-0 left-0 rounded-xl'
+                  className='absolute inset-y-0 left-0 rounded-xl bg-white/[0.08]'
                   style={{
                     width: `${100 / TABS.length}%`,
                     transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
-                    backgroundColor: 'rgba(255,255,255,0.08)',
                     transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
                   }}
                 />
@@ -279,13 +250,11 @@ export function PhoneProfileDemo() {
                     key={tab.id}
                     type='button'
                     onClick={() => setActiveTab(tab.id)}
-                    className='relative z-10 flex-1 py-2 text-[11px] font-medium text-center transition-colors'
-                    style={{
-                      color:
-                        tab.id === activeTab
-                          ? 'rgb(247,248,248)'
-                          : 'rgba(255,255,255,0.4)',
-                    }}
+                    className={`relative z-10 flex-1 py-2 text-[11px] font-medium text-center transition-colors ${
+                      tab.id === activeTab
+                        ? 'text-[var(--linear-text-primary)]'
+                        : 'text-white/40'
+                    }`}
                   >
                     {tab.label}
                   </button>

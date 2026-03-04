@@ -29,7 +29,7 @@ function TipMockup() {
                 amt === '$5'
                   ? '1px solid transparent'
                   : '1px solid var(--linear-border-subtle)',
-              boxShadow: amt === '$5' ? '0 2px 4px rgba(0,0,0,0.2)' : 'none',
+              boxShadow: amt === '$5' ? 'var(--linear-shadow-card)' : 'none',
             }}
           >
             <span
@@ -37,7 +37,7 @@ function TipMockup() {
               style={{
                 color:
                   amt === '$5'
-                    ? 'rgba(0,0,0,0.6)'
+                    ? 'var(--linear-text-inverse)'
                     : 'var(--linear-text-tertiary)',
               }}
             >
@@ -52,7 +52,7 @@ function TipMockup() {
       <div
         className='flex items-center justify-center rounded-xl px-4 py-3 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] w-full mt-1 bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)]'
         style={{
-          boxShadow: '0 2px 10px rgba(255,255,255,0.15)',
+          boxShadow: 'var(--linear-shadow-card)',
         }}
       >
         Continue with Venmo

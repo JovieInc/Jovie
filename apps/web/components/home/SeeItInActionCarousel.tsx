@@ -170,7 +170,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
                 {/* Inner border for premium feel */}
                 <div
                   className='absolute inset-0 rounded-[var(--linear-radius-lg)] pointer-events-none'
-                  style={{ border: '1px solid rgba(255,255,255,0.15)' }}
+                  style={{ border: '1px solid var(--linear-border-strong)' }}
                 />
               </div>
             </div>
