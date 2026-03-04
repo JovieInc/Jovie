@@ -94,7 +94,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[272px] overflow-hidden rounded-2xl bg-base text-foreground'
                 style={{
                   boxShadow:
-                    '0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+                    'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-border-subtle)',
                 }}
               >
                 {/* Ambient glow — mirrors ReleaseLandingPage */}

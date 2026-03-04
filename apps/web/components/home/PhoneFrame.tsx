@@ -12,9 +12,9 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
       <div
         className='relative h-full w-full overflow-hidden rounded-[40px] p-[4px]'
         style={{
-          backgroundColor: 'rgb(18, 19, 20)',
+          backgroundColor: 'var(--linear-bg-surface-1)',
           boxShadow: [
-            '0 0 0 1px rgba(255,255,255,0.08)',
+            '0 0 0 1px var(--linear-border-default)',
             '0 4px 32px rgba(8,9,10,0.6)',
             '0 12px 48px rgba(0,0,0,0.4)',
           ].join(', '),
@@ -50,14 +50,14 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
             width: 80,
             height: 24,
             borderRadius: 12,
-            backgroundColor: 'rgb(8, 9, 10)',
+            backgroundColor: 'var(--linear-bg-page)',
           }}
         />
 
         {/* Inner screen */}
         <div
           className='relative h-full w-full overflow-hidden rounded-[36px]'
-          style={{ backgroundColor: 'rgb(8, 9, 10)' }}
+          style={{ backgroundColor: 'var(--linear-bg-page)' }}
         >
           {children}
         </div>
