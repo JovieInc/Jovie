@@ -42,7 +42,7 @@ export function HandleStatusIcon({
     return (
       <X
         className='h-4 w-4'
-        style={{ color: 'oklch(65% 0.18 25)' }}
+        style={{ color: 'var(--linear-error)' }}
         aria-hidden='true'
       />
     );
