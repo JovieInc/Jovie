@@ -28,7 +28,7 @@ export function RedesignedHero() {
         <p className='marketing-lead-linear mx-auto mt-6 max-w-[var(--linear-hero-lead-width)] text-[var(--linear-text-secondary)]'>
           One link. Zero setup. Just sync your Spotify, and let Jovie’s AI{' '}
           <br className='hidden sm:block' />
-          build a beautifully optimized profile designed to convert.
+          build a beautiful profile designed to convert.
         </p>
 
         <div className='mt-6 w-full max-w-[480px] text-left'>

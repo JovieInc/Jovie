@@ -89,22 +89,21 @@ export function AutomaticReleaseSmartlinksSection() {
                 <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
               </div>
 
-              {/* Floating Smart Link Card — overlaps dashboard from the right */}
+              {/* Floating Smart Link Card — matches ReleaseLandingPage exactly */}
               <div
-                className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[320px] overflow-hidden rounded-2xl bg-base text-foreground'
+                className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[272px] overflow-hidden rounded-2xl bg-base text-foreground'
                 style={{
-                  border: '1px solid var(--color-border-default)',
                   boxShadow:
                     '0 25px 50px -12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
                 }}
               >
                 {/* Ambient glow — mirrors ReleaseLandingPage */}
                 <div className='pointer-events-none absolute inset-0'>
-                  <div className='bg-foreground/5 absolute left-1/2 top-[20%] h-[200px] w-[200px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[80px]' />
+                  <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
                 </div>
 
-                <div className='relative p-5 flex flex-col items-center'>
-                  {/* Album artwork — gradient placeholder with disc icon, matching Signals release */}
+                <div className='relative px-6 pt-10 pb-5 flex flex-col items-center'>
+                  {/* Album artwork — matches ReleaseLandingPage: max-w-[17rem], aspect-square */}
                   <div
                     className='bg-surface-1/30 ring-border relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'
                     style={{
@@ -113,19 +112,22 @@ export function AutomaticReleaseSmartlinksSection() {
                   >
                     <div className='flex h-full w-full items-center justify-center'>
                       <Disc3
-                        className='h-16 w-16 text-white/20'
+                        className='h-16 w-16 text-muted-foreground'
                         aria-hidden='true'
                       />
                     </div>
                   </div>
 
-                  {/* Release info — mirrors ReleaseLandingPage typography */}
+                  {/* Release info — matches ReleaseLandingPage typography */}
                   <div className='mt-4 w-full text-center'>
                     <h3 className='text-lg font-semibold leading-snug tracking-tight'>
                       Signals
                     </h3>
                     <p className='text-muted-foreground mt-1 text-sm'>
                       NOVA / LANE
+                    </p>
+                    <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
+                      Feb 2024
                     </p>
                   </div>
 
@@ -148,7 +150,7 @@ export function AutomaticReleaseSmartlinksSection() {
                           {dsp.name}
                         </span>
                         <ChevronRight
-                          className='text-muted-foreground/70 h-4 w-4'
+                          className='text-muted-foreground/70 h-4 w-4 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-foreground/80'
                           aria-hidden='true'
                         />
                       </div>
@@ -156,7 +158,7 @@ export function AutomaticReleaseSmartlinksSection() {
                   </div>
 
                   {/* Powered by Jovie — matches ReleaseLandingPage footer */}
-                  <div className='mt-4 text-center'>
+                  <div className='mt-3 pt-3 text-center'>
                     <span className='text-muted-foreground/70 inline-flex items-center gap-1 text-2xs uppercase tracking-widest'>
                       <span>Powered by</span>
                       <span className='font-semibold'>Jovie</span>
