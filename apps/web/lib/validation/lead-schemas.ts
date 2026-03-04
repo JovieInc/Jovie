@@ -1,0 +1,31 @@
+import { z } from 'zod';
+
+export const manualLeadSubmitSchema = z.object({
+  urls: z.array(z.string().url()).min(1).max(500),
+});
+
+export const leadListQuerySchema = z.object({
+  status: z
+    .enum([
+      'discovered',
+      'qualified',
+      'disqualified',
+      'approved',
+      'ingested',
+      'rejected',
+    ])
+    .optional(),
+  search: z.string().max(200).optional(),
+  sortBy: z.enum(['fitScore', 'createdAt', 'displayName']).default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
+export const leadStatusUpdateSchema = z.object({
+  status: z.enum(['approved', 'rejected']),
+});
+
+export type ManualLeadSubmitInput = z.infer<typeof manualLeadSubmitSchema>;
+export type LeadListQueryInput = z.infer<typeof leadListQuerySchema>;
+export type LeadStatusUpdateInput = z.infer<typeof leadStatusUpdateSchema>;
