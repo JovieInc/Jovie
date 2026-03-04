@@ -3,6 +3,7 @@
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DashboardRefreshButton } from '@/components/dashboard/molecules/DashboardRefreshButton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
@@ -43,7 +44,7 @@ function StatCard({
 }) {
   if (loading) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
+      <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
         <LoadingSkeleton
           height='h-3'
           width='w-20'
@@ -51,12 +52,12 @@ function StatCard({
           className='mb-3'
         />
         <LoadingSkeleton height='h-7' width='w-16' rounded='sm' />
-      </div>
+      </DashboardCard>
     );
   }
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
+    <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
       <p className='text-[13px] text-secondary-token'>{label}</p>
       <p className='mt-1 text-2xl font-semibold tracking-tight text-primary-token tabular-nums'>
         {value}
@@ -66,7 +67,7 @@ function StatCard({
           {meta}
         </p>
       )}
-    </div>
+    </DashboardCard>
   );
 }
 
@@ -94,7 +95,7 @@ function ListSection({
   readonly emptyMessage: string;
 }) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
+    <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
       <div className='mb-3 flex items-center gap-2'>
         <Icon className='h-4 w-4 text-tertiary-token' />
         <h3 className='text-[13px] font-medium text-secondary-token'>
@@ -139,7 +140,7 @@ function ListSection({
           {emptyMessage}
         </p>
       )}
-    </div>
+    </DashboardCard>
   );
 }
 
