@@ -24,7 +24,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AppRootPage() {
   const dashboardData = await getDashboardData();
 
-  if (dashboardData.needsOnboarding) {
+  // Only redirect to onboarding for genuine missing profiles, not DB errors.
+  // When getDashboardData() catches a DB error it sets needsOnboarding: true
+  // as a fallback, but the proxy doesn't agree — causing a redirect loop:
+  // /app → /onboarding → proxy redirects back → /app → repeat.
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect('/onboarding');
   }
 
