@@ -237,6 +237,7 @@ export function ProfileNotificationsMenu({
               hasActiveSubscriptions={hasActiveSubscriptions}
               notificationsState={notificationsState}
               onClick={() => onOpenChange(!open)}
+              subscribedChannels={subscribedChannels}
             />
           </div>
         </DropdownMenuTrigger>
