@@ -36,47 +36,26 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Core logic for scheduling release notifications.
  * Exported for use by the consolidated /api/cron/daily-maintenance handler.
  */
-export async function scheduleReleaseNotifications(): Promise<{
-  scheduled: number;
-  releasesFound: number;
-}> {
-  const now = new Date();
-  const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+type SubscriberRow = {
+  id: string;
+  creatorProfileId: string;
+  channel: string;
+  email: string | null;
+  phone: string | null;
+  preferences: (typeof notificationSubscriptions.$inferSelect)['preferences'];
+};
 
-  const upcomingReleases = await db
-    .select({
-      id: discogReleases.id,
-      creatorProfileId: discogReleases.creatorProfileId,
-      title: discogReleases.title,
-      releaseDate: discogReleases.releaseDate,
-    })
-    .from(discogReleases)
-    .where(
-      and(
-        gte(discogReleases.releaseDate, now),
-        lte(discogReleases.releaseDate, in24Hours)
-      )
-    );
-
-  if (upcomingReleases.length === 0) {
-    logger.info('[schedule-release-notifications] No upcoming releases found');
-    return { scheduled: 0, releasesFound: 0 };
-  }
-
-  let totalScheduled = 0;
-
-  const creatorProfileIds = [
-    ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
-  ];
-
-  // Check which creators can send notifications based on their plan (single batch query)
-  const eligibleCreatorIds = new Set<string>();
+/** Fetch eligible creator IDs based on plan entitlements. */
+async function getEligibleCreatorIds(
+  creatorProfileIds: string[]
+): Promise<Set<string>> {
+  const eligible = new Set<string>();
   try {
     const entitlementsMap =
       await getBatchCreatorEntitlements(creatorProfileIds);
     for (const [profileId, { entitlements }] of entitlementsMap) {
       if (entitlements.booleans.canSendNotifications) {
-        eligibleCreatorIds.add(profileId);
+        eligible.add(profileId);
       }
     }
   } catch {
@@ -84,48 +63,20 @@ export async function scheduleReleaseNotifications(): Promise<{
       '[schedule-release-notifications] Batch entitlements lookup failed, skipping all creators'
     );
   }
+  return eligible;
+}
 
-  // Filter to only eligible releases
-  const eligibleReleases = upcomingReleases.filter(r =>
-    eligibleCreatorIds.has(r.creatorProfileId)
-  );
-  const skippedCount = upcomingReleases.length - eligibleReleases.length;
-  if (skippedCount > 0) {
-    logger.info(
-      `[schedule-release-notifications] Skipped ${skippedCount} releases from free-plan creators`
-    );
-  }
-
-  if (eligibleReleases.length === 0) {
-    logger.info(
-      '[schedule-release-notifications] No eligible releases after plan check'
-    );
-    return { scheduled: 0, releasesFound: upcomingReleases.length };
-  }
-
-  const eligibleCreatorProfileIds = [
-    ...new Set(eligibleReleases.map(r => r.creatorProfileId)),
-  ];
-
-  // Paginate subscriber fetch using keyset pagination (1000 per batch)
+/** Paginate subscriber fetch using keyset pagination. */
+async function fetchSubscribersByCreator(
+  creatorProfileIds: string[]
+): Promise<Map<string, SubscriberRow[]>> {
   const SUBSCRIBER_PAGE_SIZE = 1000;
-  type SubscriberRow = {
-    id: string;
-    creatorProfileId: string;
-    channel: string;
-    email: string | null;
-    phone: string | null;
-    preferences: (typeof notificationSubscriptions.$inferSelect)['preferences'];
-  };
   const subscribersByCreator = new Map<string, SubscriberRow[]>();
   let lastId = '';
 
   while (true) {
     const baseConditions = [
-      inArray(
-        notificationSubscriptions.creatorProfileId,
-        eligibleCreatorProfileIds
-      ),
+      inArray(notificationSubscriptions.creatorProfileId, creatorProfileIds),
       drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
       drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
       drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`,
@@ -162,6 +113,68 @@ export async function scheduleReleaseNotifications(): Promise<{
     lastId = batch[batch.length - 1].id;
   }
 
+  return subscribersByCreator;
+}
+
+export async function scheduleReleaseNotifications(): Promise<{
+  scheduled: number;
+  releasesFound: number;
+}> {
+  const now = new Date();
+  const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  const upcomingReleases = await db
+    .select({
+      id: discogReleases.id,
+      creatorProfileId: discogReleases.creatorProfileId,
+      title: discogReleases.title,
+      releaseDate: discogReleases.releaseDate,
+    })
+    .from(discogReleases)
+    .where(
+      and(
+        gte(discogReleases.releaseDate, now),
+        lte(discogReleases.releaseDate, in24Hours)
+      )
+    );
+
+  if (upcomingReleases.length === 0) {
+    logger.info('[schedule-release-notifications] No upcoming releases found');
+    return { scheduled: 0, releasesFound: 0 };
+  }
+
+  const creatorProfileIds = [
+    ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
+  ];
+
+  const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
+
+  // Filter to only eligible releases
+  const eligibleReleases = upcomingReleases.filter(r =>
+    eligibleCreatorIds.has(r.creatorProfileId)
+  );
+  const skippedCount = upcomingReleases.length - eligibleReleases.length;
+  if (skippedCount > 0) {
+    logger.info(
+      `[schedule-release-notifications] Skipped ${skippedCount} releases from free-plan creators`
+    );
+  }
+
+  if (eligibleReleases.length === 0) {
+    logger.info(
+      '[schedule-release-notifications] No eligible releases after plan check'
+    );
+    return { scheduled: 0, releasesFound: upcomingReleases.length };
+  }
+
+  const eligibleCreatorProfileIds = [
+    ...new Set(eligibleReleases.map(r => r.creatorProfileId)),
+  ];
+
+  const subscribersByCreator = await fetchSubscribersByCreator(
+    eligibleCreatorProfileIds
+  );
+
   const notificationValues: Array<{
     creatorProfileId: string;
     releaseId: string;
@@ -180,8 +193,6 @@ export async function scheduleReleaseNotifications(): Promise<{
       subscribersByCreator.get(release.creatorProfileId) || [];
 
     for (const subscriber of subscribers) {
-      const dedupKey = `release_day:${release.id}:${subscriber.id}`;
-
       notificationValues.push({
         creatorProfileId: release.creatorProfileId,
         releaseId: release.id,
@@ -189,7 +200,7 @@ export async function scheduleReleaseNotifications(): Promise<{
         notificationType: 'release_day',
         scheduledFor: release.releaseDate,
         status: 'pending',
-        dedupKey,
+        dedupKey: `release_day:${release.id}:${subscriber.id}`,
         metadata: {
           releaseTitle: release.title,
           channel: subscriber.channel,
@@ -198,6 +209,7 @@ export async function scheduleReleaseNotifications(): Promise<{
     }
   }
 
+  let totalScheduled = 0;
   const BATCH_SIZE = 500;
   for (let i = 0; i < notificationValues.length; i += BATCH_SIZE) {
     const batch = notificationValues.slice(i, i + BATCH_SIZE);

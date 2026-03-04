@@ -65,11 +65,11 @@ async function insertJobWithDedup(
   }
 
   // Race condition: another concurrent insert won — return the existing job's id
+  if (!dedupKey) return null;
   const [winner] = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    // NOSONAR - non-null assertion required by Drizzle eq() for partial index queries
-    .where(eq(ingestionJobs.dedupKey, dedupKey!))
+    .where(eq(ingestionJobs.dedupKey, dedupKey))
     .limit(1);
 
   if (winner?.id) {

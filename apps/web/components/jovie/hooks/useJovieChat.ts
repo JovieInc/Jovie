@@ -485,6 +485,41 @@ export function useJovieChat({
     ]
   );
 
+  /** Reset textarea height to auto. */
+  const resetTextareaHeight = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, []);
+
+  /** Try to handle text as a deterministic command. Returns true if handled. */
+  const tryHandleCommand = useCallback(
+    (trimmedText: string): boolean => {
+      const commandCtx = { username, router };
+      const command = matchCommand(trimmedText, commandCtx);
+      if (!command) return false;
+
+      const userMsg = {
+        id: `cmd-user-${Date.now()}`,
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: trimmedText }],
+        createdAt: new Date(),
+      };
+      const assistantMsg = {
+        id: `cmd-assistant-${Date.now()}`,
+        role: 'assistant' as const,
+        parts: [{ type: 'text' as const, text: command.confirmationMessage }],
+        createdAt: new Date(),
+      };
+      setMessages(prev => [...prev, userMsg, assistantMsg]);
+      setInput('');
+      resetTextareaHeight();
+      command.execute(commandCtx);
+      return true;
+    },
+    [username, router, setMessages, setInput, resetTextareaHeight]
+  );
+
   // Core submit logic
   const doSubmit = useCallback(
     async (text: string, files?: FileUIPart[]) => {
@@ -504,34 +539,7 @@ export function useJovieChat({
       const trimmedText = text.trim();
 
       // Check for deterministic commands before hitting AI
-      if (!hasFiles) {
-        const commandCtx = { username, router };
-        const command = matchCommand(trimmedText, commandCtx);
-        if (command) {
-          // Add user + assistant messages directly — no AI call needed
-          const userMsg = {
-            id: `cmd-user-${Date.now()}`,
-            role: 'user' as const,
-            parts: [{ type: 'text' as const, text: trimmedText }],
-            createdAt: new Date(),
-          };
-          const assistantMsg = {
-            id: `cmd-assistant-${Date.now()}`,
-            role: 'assistant' as const,
-            parts: [
-              { type: 'text' as const, text: command.confirmationMessage },
-            ],
-            createdAt: new Date(),
-          };
-          setMessages(prev => [...prev, userMsg, assistantMsg]);
-          setInput('');
-          if (inputRef.current) {
-            inputRef.current.style.height = 'auto';
-          }
-          command.execute(commandCtx);
-          return;
-        }
-      }
+      if (!hasFiles && tryHandleCommand(trimmedText)) return;
 
       const payload = {
         text: trimmedText,
@@ -560,21 +568,16 @@ export function useJovieChat({
 
       sendMessage(payload);
       setInput('');
-
-      // Reset textarea height
-      if (inputRef.current) {
-        inputRef.current.style.height = 'auto';
-      }
+      resetTextareaHeight();
     },
     [
       isLoading,
       isSubmitting,
       sendMessage,
-      setMessages,
       activeConversationId,
       handleCreateConversation,
-      username,
-      router,
+      tryHandleCommand,
+      resetTextareaHeight,
     ]
   );
 

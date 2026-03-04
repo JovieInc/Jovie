@@ -17,11 +17,11 @@ import { MAX_MESSAGE_LENGTH } from '../types';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
 
 interface SendButtonProps {
-  canSend: boolean;
-  isLoading: boolean;
-  isSubmitting: boolean;
-  isCompact: boolean;
-  onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly canSend: boolean;
+  readonly isLoading: boolean;
+  readonly isSubmitting: boolean;
+  readonly isCompact: boolean;
+  readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
 function SendButton({
@@ -62,14 +62,14 @@ function SendButton({
 }
 
 interface AttachDropdownProps {
-  isCompact: boolean;
-  isImageProcessing: boolean;
-  isLoading: boolean;
-  isSubmitting: boolean;
-  plusMenuOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
-  onImageAttach: () => void;
+  readonly isCompact: boolean;
+  readonly isImageProcessing: boolean;
+  readonly isLoading: boolean;
+  readonly isSubmitting: boolean;
+  readonly plusMenuOpen: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly onMouseDown: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  readonly onImageAttach: () => void;
 }
 
 function AttachDropdown({
