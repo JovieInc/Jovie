@@ -213,6 +213,10 @@ describe('proxy-state.ts', () => {
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -229,6 +233,37 @@ describe('proxy-state.ts', () => {
       });
     });
 
+    it('returns needsOnboarding when profile has onboardingCompletedAt but missing username', async () => {
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  dbUserId: 'db-user-123',
+                  userStatus: 'active',
+                  profileId: 'profile-123',
+                  profileComplete: new Date(),
+                  profileUsername: null,
+                  profileUsernameNormalized: null,
+                  profileDisplayName: 'Test User',
+                  profileIsPublic: true,
+                },
+              ]),
+            }),
+          }),
+        }),
+      });
+
+      const result = await getUserState('clerk_123');
+
+      expect(result).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
+      });
+    });
+
     it('handles waitlist_approved status as approved', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
@@ -240,6 +275,10 @@ describe('proxy-state.ts', () => {
                   userStatus: 'waitlist_approved',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -263,6 +302,10 @@ describe('proxy-state.ts', () => {
                   userStatus: 'profile_claimed',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -286,6 +329,10 @@ describe('proxy-state.ts', () => {
                   userStatus: 'onboarding_incomplete',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -416,6 +463,10 @@ describe('proxy-state.ts', () => {
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileIsPublic: true,
                 },
               ]),
             }),

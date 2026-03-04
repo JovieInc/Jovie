@@ -141,12 +141,30 @@ const APPROVED_STATUSES = [
   'active',
 ] as const;
 
-/** Whether the user has a complete profile */
+/**
+ * Whether the user has a complete profile.
+ *
+ * IMPORTANT: This MUST match the logic in `profileIsPublishable()` from
+ * `lib/db/server.ts`. If the proxy considers a user "active" but the
+ * dashboard considers them "needs onboarding", an infinite redirect loop
+ * occurs: /app → redirect to /onboarding → proxy redirects back → repeat.
+ */
 function hasCompleteProfile(result: {
   profileId: string | null;
   profileComplete: Date | null;
+  profileUsername: string | null;
+  profileUsernameNormalized: string | null;
+  profileDisplayName: string | null;
+  profileIsPublic: boolean | null;
 }): boolean {
-  return !!result.profileId && !!result.profileComplete;
+  return (
+    !!result.profileId &&
+    !!result.profileComplete &&
+    !!result.profileUsername &&
+    !!result.profileUsernameNormalized &&
+    !!result.profileDisplayName?.trim() &&
+    result.profileIsPublic !== false
+  );
 }
 
 /**
@@ -159,6 +177,10 @@ function determineUserState(
         userStatus: string | null;
         profileId: string | null;
         profileComplete: Date | null;
+        profileUsername: string | null;
+        profileUsernameNormalized: string | null;
+        profileDisplayName: string | null;
+        profileIsPublic: boolean | null;
       }
     | undefined
 ): ProxyUserState {
@@ -245,6 +267,10 @@ async function executeUserStateQuery(clerkUserId: string) {
         userStatus: users.userStatus,
         profileId: creatorProfiles.id,
         profileComplete: creatorProfiles.onboardingCompletedAt,
+        profileUsername: creatorProfiles.username,
+        profileUsernameNormalized: creatorProfiles.usernameNormalized,
+        profileDisplayName: creatorProfiles.displayName,
+        profileIsPublic: creatorProfiles.isPublic,
       })
       .from(users)
       .leftJoin(
