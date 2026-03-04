@@ -47,7 +47,9 @@ export function ProfileMenuActions({
         id: 'copy',
         label: 'Copy Link',
         icon: Copy,
-        onClick: () => void handleCopyProfileUrl(),
+        onClick: () => {
+          handleCopyProfileUrl();
+        },
       },
       {
         type: 'action' as const,

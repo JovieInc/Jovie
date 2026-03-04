@@ -30,12 +30,11 @@ async function InsightsOnboardingGuard() {
     if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect('/onboarding');
     }
-    return null;
   } catch (error) {
     throwIfRedirect(error);
     // Swallow — the layout's ProfileCompletionRedirect is the client-side safety net.
-    return null;
   }
+  return null;
 }
 
 /**
