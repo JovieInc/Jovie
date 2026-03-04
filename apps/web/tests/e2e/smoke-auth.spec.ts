@@ -138,8 +138,11 @@ test.describe('Auth Smoke Tests @smoke', () => {
         // Protected routes may also redirect to dashboard if already authenticated via cookies
         // or show content if mock auth is in place
         const stayedOnRoute = url.includes(route);
+        // Clerk handshake redirect (dev-browser-missing) counts as auth behavior in CI
+        const isClerkHandshake =
+          url.includes('clerk') && url.includes('handshake');
         const isProtectedBehavior =
-          isAuthPage || isUnauthorized || stayedOnRoute;
+          isAuthPage || isUnauthorized || stayedOnRoute || isClerkHandshake;
 
         // Either redirected to auth, got an explicit unauthorized response, or stayed on route
         expect(

@@ -250,9 +250,14 @@ export function setupPageMonitoring(page: Page): {
     statusText: () => string;
   }) => {
     const status = res.status();
-    if (status >= 400) {
+    const resUrl = res.url();
+    // Clerk handshake returns 400 in CI (dev-browser-missing) — this is expected
+    // and not a real failure. Exclude from diagnostics to avoid false positives.
+    const isClerkHandshake =
+      resUrl.includes('clerk') && resUrl.includes('handshake');
+    if (status >= 400 && !isClerkHandshake) {
       failedResponses.push({
-        url: res.url(),
+        url: resUrl,
         status,
         statusText: res.statusText(),
       });
