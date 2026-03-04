@@ -1,6 +1,8 @@
 import {
   index,
+  integer,
   jsonb,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -38,10 +40,40 @@ export const adminAuditLog = pgTable(
   })
 );
 
+// Campaign settings (singleton row, id=1)
+export const campaignSettings = pgTable('campaign_settings', {
+  id: integer('id').primaryKey().default(1),
+  fitScoreThreshold: numeric('fit_score_threshold', {
+    precision: 5,
+    scale: 2,
+  })
+    .default('50')
+    .notNull(),
+  batchLimit: integer('batch_limit').default(20).notNull(),
+  throttlingConfig: jsonb('throttling_config')
+    .$type<{
+      minDelayMs: number;
+      maxDelayMs: number;
+      maxPerHour: number;
+    }>()
+    .default({ minDelayMs: 30000, maxDelayMs: 120000, maxPerHour: 30 })
+    .notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  updatedBy: text('updated_by'),
+});
+
 // Schema validations
 export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog);
 export const selectAdminAuditLogSchema = createSelectSchema(adminAuditLog);
 
+export const insertCampaignSettingsSchema =
+  createInsertSchema(campaignSettings);
+export const selectCampaignSettingsSchema =
+  createSelectSchema(campaignSettings);
+
 // Types
 export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
 export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;
+
+export type CampaignSettings = typeof campaignSettings.$inferSelect;
+export type NewCampaignSettings = typeof campaignSettings.$inferInsert;

@@ -235,6 +235,7 @@ export const queryKeys = {
     overview: () => [...queryKeys.campaign.all, 'overview'] as const,
     invites: (params: { limit: number; offset: number }) =>
       [...queryKeys.campaign.all, 'invites', params] as const,
+    settings: () => [...queryKeys.campaign.all, 'settings'] as const,
   },
 
   // AI Insights
