@@ -8,11 +8,13 @@ import {
 } from '@jovie/ui';
 import { AlertCircle, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CTAButton } from '@/components/atoms/CTAButton';
 import { OtpInput } from '@/components/auth/atoms/otp-input';
 import { CountrySelector } from '@/components/profile/notifications';
 import { track } from '@/lib/analytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
@@ -141,6 +143,27 @@ function useAutoOpen(
   }, [autoOpen, notificationsEnabled, notificationsState, openSubscription]);
 }
 
+/**
+ * Redirect to normal profile when arriving via subscribe mode but already subscribed.
+ */
+function useSubscribeModeRedirect(
+  autoOpen: boolean,
+  isSubscribed: boolean,
+  handle: string,
+  artistName: string
+) {
+  const router = useRouter();
+  const { info: showInfo } = useNotifications();
+  const hasRedirected = useRef(false);
+
+  useEffect(() => {
+    if (!autoOpen || !isSubscribed || hasRedirected.current) return;
+    hasRedirected.current = true;
+    showInfo(`You're already subscribed to ${artistName}`);
+    router.replace(`/${handle}`);
+  }, [autoOpen, isSubscribed, handle, artistName, router, showInfo]);
+}
+
 function useImpressionTracking(
   showsSubscribeForm: boolean,
   handle: string,
@@ -267,6 +290,9 @@ export function ArtistNotificationsCTA({
     subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
+
+  useSubscribeModeRedirect(autoOpen, isSubscribed, artist.handle, artist.name);
+
   const shouldShowCountrySelector =
     otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
 
@@ -284,7 +310,13 @@ export function ArtistNotificationsCTA({
   }
 
   if (isSubscribed) {
-    return <SubscriptionSuccess artistName={artist.name} />;
+    return (
+      <SubscriptionSuccess
+        artistName={artist.name}
+        handle={artist.handle}
+        subscribedChannels={subscribedChannels}
+      />
+    );
   }
 
   const inputConfig = getInputConfig(channel);
