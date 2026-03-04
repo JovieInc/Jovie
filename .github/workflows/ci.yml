@@ -1132,7 +1132,7 @@ jobs:
           fi
 
           # Run Lighthouse CI with build config
-          pnpm exec lhci autorun --config=.lighthouserc.build.json || {
+          pnpm --filter web exec lhci autorun --config=.lighthouserc.build.json || {
             echo "⚠️ Lighthouse checks failed - performance regression detected"
             kill $SERVER_PID 2>/dev/null || true
             exit 1
@@ -2755,4 +2755,4 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: pnpm exec lhci autorun --config=.lighthouserc.json
+        run: pnpm --filter web exec lhci autorun --config=.lighthouserc.json
