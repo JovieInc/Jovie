@@ -16,12 +16,19 @@
  * Schedule: every 15 minutes (configured in vercel.json)
  */
 
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import {
+  discoveryKeywords,
+  leadPipelineSettings,
+  leads,
+} from '@/lib/db/schema/leads';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { runDiscovery } from '@/lib/leads/discovery';
+import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
@@ -104,7 +111,83 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // 5. Warm Spotify alphabet cache — every 6 hours
+  // 5. Lead discovery — every invocation (15 min)
+  results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
+    // Fetch settings (upsert default if missing)
+    let [settings] = await db
+      .select()
+      .from(leadPipelineSettings)
+      .where(eq(leadPipelineSettings.id, 1))
+      .limit(1);
+
+    if (!settings) {
+      [settings] = await db
+        .insert(leadPipelineSettings)
+        .values({ id: 1 })
+        .returning();
+    }
+
+    if (!settings?.enabled || !settings.discoveryEnabled) {
+      return { skipped: true, reason: 'pipeline_disabled' };
+    }
+
+    // Reset daily counters if past reset time
+    const now = new Date();
+    if (settings.queryBudgetResetsAt && now > settings.queryBudgetResetsAt) {
+      await db
+        .update(leadPipelineSettings)
+        .set({
+          queriesUsedToday: 0,
+          queryBudgetResetsAt: new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate() + 1
+          ),
+          updatedAt: now,
+        })
+        .where(eq(leadPipelineSettings.id, 1));
+      settings = {
+        ...settings,
+        queriesUsedToday: 0,
+      };
+    }
+
+    // Initialize reset time if not set
+    if (!settings.queryBudgetResetsAt) {
+      const tomorrow = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1
+      );
+      await db
+        .update(leadPipelineSettings)
+        .set({ queryBudgetResetsAt: tomorrow, updatedAt: now })
+        .where(eq(leadPipelineSettings.id, 1));
+    }
+
+    const keywords = await db.select().from(discoveryKeywords);
+    const discoveryResult = await runDiscovery(settings, keywords);
+
+    // Qualify any newly discovered leads
+    let qualificationResult = null;
+    if (discoveryResult.newLeadsFound > 0) {
+      const newLeads = await db
+        .select({ id: leads.id })
+        .from(leads)
+        .where(eq(leads.status, 'discovered'))
+        .limit(30);
+      if (newLeads.length > 0) {
+        qualificationResult = await processLeadBatch(newLeads.map(l => l.id));
+      }
+    }
+
+    return {
+      discovery: discoveryResult,
+      qualification: qualificationResult,
+    } as unknown as Record<string, unknown>;
+  });
+
+  // 6. Warm Spotify alphabet cache — every 6 hours
   const hour = new Date().getHours();
   if (hour % 6 === 0 && minute < 15) {
     try {
