@@ -6,7 +6,7 @@ import { getDashboardData } from './actions';
 export async function DashboardOverviewSection() {
   const dashboardData = await getDashboardData();
 
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect('/onboarding');
   }
 

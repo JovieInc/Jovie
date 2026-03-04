@@ -23,7 +23,7 @@ export default async function EarningsPage() {
     const dashboardData = await getDashboardData();
 
     // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect('/onboarding');
     }
 
