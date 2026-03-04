@@ -14,7 +14,7 @@ export default async function SettingsAudiencePage() {
   }
 
   const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect('/onboarding');
   }
 

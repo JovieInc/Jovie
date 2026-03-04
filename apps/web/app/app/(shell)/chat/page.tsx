@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ChatPage() {
   const dashboardData = await getDashboardData();
 
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 

@@ -102,7 +102,7 @@ async function requireProfile(profileId?: string): Promise<{
 }> {
   const data = await getDashboardData();
 
-  if (data.needsOnboarding) {
+  if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect('/onboarding');
   }
 

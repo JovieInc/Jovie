@@ -27,7 +27,7 @@ export const runtime = 'nodejs';
 async function AnalyticsOnboardingGuard() {
   try {
     const dashboardData = await getDashboardData();
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect('/onboarding');
     }
     return null;
