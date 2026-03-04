@@ -227,25 +227,9 @@ export function PhoneProfileDemo() {
     >
       <Container size='homepage'>
         <div className='mx-auto max-w-[var(--linear-content-max)]'>
-          {/* Section heading */}
-          <div className='text-center heading-gap-linear'>
-            <p className='inline-flex w-fit items-center rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-[var(--linear-text-secondary)] backdrop-blur mx-auto'>
-              Link in bio
-            </p>
-            <h2 className='mt-4 marketing-h2-linear text-[var(--linear-text-primary)]'>
-              One profile. Adapts to every fan.
-            </h2>
-            <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
-              Opinionated by design. Your link instantly adapts to a fan&apos;s
-              location, preferred music app, and notification status. Jovie
-              handles the optimization and retargeting so you can focus on the
-              music.
-            </p>
-          </div>
-
-          {/* Phone mockup */}
+          {/* Phone mockup — above text */}
           <div
-            className='flex justify-center mt-12 lg:mt-16'
+            className='flex justify-center mb-10 lg:mb-12'
             style={{
               transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
               opacity: isVisible ? 1 : 0,
@@ -325,6 +309,22 @@ export function PhoneProfileDemo() {
                 ))}
               </div>
             </PhoneFrame>
+          </div>
+
+          {/* Section heading — below phone */}
+          <div className='text-center heading-gap-linear'>
+            <p className='inline-flex w-fit items-center rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-[var(--linear-text-secondary)] backdrop-blur mx-auto'>
+              Link in bio
+            </p>
+            <h2 className='mt-4 marketing-h2-linear text-[var(--linear-text-primary)]'>
+              One profile. Adapts to every fan.
+            </h2>
+            <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              Opinionated by design. Your link instantly adapts to a fan&apos;s
+              location, preferred music app, and notification status. Jovie
+              handles the optimization and retargeting so you can focus on the
+              music.
+            </p>
           </div>
         </div>
       </Container>

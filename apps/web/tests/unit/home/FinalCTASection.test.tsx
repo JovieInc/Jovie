@@ -6,7 +6,7 @@ describe('FinalCTASection', () => {
   it('renders urgency headline', () => {
     render(<FinalCTASection />);
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
-      'Claim your piece of the internet.'
+      'Claim your corner of the internet.'
     );
   });
 

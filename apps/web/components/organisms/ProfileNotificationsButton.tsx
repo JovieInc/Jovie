@@ -55,9 +55,12 @@ export function ProfileNotificationsButton({
       {hasActiveSubscriptions ? (
         <span
           aria-hidden
-          className='absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-green-600 dark:bg-green-500'
+          className='absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-white'
         >
-          <Check className='h-2.5 w-2.5 text-white' strokeWidth={3} />
+          <Check
+            className='h-2.5 w-2.5 text-black dark:text-black'
+            strokeWidth={3}
+          />
         </span>
       ) : null}
     </CircleIconButton>

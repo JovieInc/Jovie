@@ -24,7 +24,7 @@ export function FinalCTASection() {
 
         <div className='mx-auto flex max-w-2xl flex-col items-center text-center'>
           <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-            Claim your piece of the internet.
+            Claim your corner of the internet.
           </h2>
           <p className='mt-4 marketing-lead-linear text-[var(--linear-text-secondary)]'>
             Set up in under 60 seconds.

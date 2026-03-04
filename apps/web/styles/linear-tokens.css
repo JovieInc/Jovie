@@ -213,12 +213,12 @@
   --linear-gap-nav: 4px;
   --linear-gap-buttons: 8px;
   --linear-gap-cards: 24px;
-  --linear-section-pt-sm: 40px;
-  --linear-section-pb-sm: 48px;
-  --linear-section-pt-md: 48px;
-  --linear-section-pb-md: 64px;
-  --linear-section-pt-lg: 64px;
-  --linear-section-pb-lg: 80px;
+  --linear-section-pt-sm: 32px;
+  --linear-section-pb-sm: 36px;
+  --linear-section-pt-md: 40px;
+  --linear-section-pb-md: 48px;
+  --linear-section-pt-lg: 48px;
+  --linear-section-pb-lg: 56px;
   --linear-content-gap-sm: 32px;
   --linear-content-gap-md: 40px;
   --linear-content-gap-lg: 48px;
