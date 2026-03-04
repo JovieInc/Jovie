@@ -210,7 +210,6 @@ export {
   selectEmailEngagementSchema,
   type TrackedEmailType,
 } from './email-engagement';
-
 // Enums
 export {
   artistRoleEnum,
@@ -238,6 +237,8 @@ export {
   insightRunStatusEnum,
   insightStatusEnum,
   insightTypeEnum,
+  leadDiscoverySourceEnum,
+  leadStatusEnum,
   linkTypeEnum,
   notificationChannelEnum,
   outreachChannelEnum,
@@ -265,7 +266,6 @@ export {
   waitlistInviteStatusEnum,
   waitlistStatusEnum,
 } from './enums';
-
 // Feedback
 export {
   type FeedbackItem,
@@ -275,7 +275,6 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
-
 // Ingestion
 export {
   type IngestionJob,
@@ -289,7 +288,6 @@ export {
   selectIngestionJobSchema,
   selectScraperConfigSchema,
 } from './ingestion';
-
 // AI Insights (AI-generated analytics insights)
 export {
   aiInsights,
@@ -299,6 +297,24 @@ export {
   selectAiInsightSchema,
   selectInsightGenerationRunSchema,
 } from './insights';
+// Leads (Discovery Pipeline)
+export {
+  type DiscoveryKeyword,
+  discoveryKeywords,
+  insertDiscoveryKeywordSchema,
+  insertLeadPipelineSettingsSchema,
+  insertLeadSchema,
+  type Lead,
+  type LeadPipelineSettings,
+  leadPipelineSettings,
+  leads,
+  type NewDiscoveryKeyword,
+  type NewLead,
+  type NewLeadPipelineSettings,
+  selectDiscoveryKeywordSchema,
+  selectLeadPipelineSettingsSchema,
+  selectLeadSchema,
+} from './leads';
 
 // Links (Social, Wrapped, Signed)
 export {

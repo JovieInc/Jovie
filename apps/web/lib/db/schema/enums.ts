@@ -382,6 +382,21 @@ export const insightRunStatusEnum = pgEnum('insight_run_status', [
   'failed',
 ]);
 
+// Lead Pipeline Enums
+export const leadStatusEnum = pgEnum('lead_status', [
+  'discovered',
+  'qualified',
+  'disqualified',
+  'approved',
+  'ingested',
+  'rejected',
+]);
+
+export const leadDiscoverySourceEnum = pgEnum('lead_discovery_source', [
+  'google_cse',
+  'manual',
+]);
+
 // Tip Status Enum
 export const tipStatusEnum = pgEnum('tip_status', [
   'pending',
