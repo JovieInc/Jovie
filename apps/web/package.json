@@ -4,7 +4,7 @@
   "private": true,
   "sideEffects": false,
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.13.0 <23"
   },
   "scripts": {
     "dev": "doppler run -- next dev",

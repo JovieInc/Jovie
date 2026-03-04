@@ -2468,8 +2468,11 @@ jobs:
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
-          deployment_url=$(vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }})
-          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+          vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }}
+          # Use the known production URL instead of the deploy output.
+          # GitHub Actions masks the Vercel deployment URL as a secret,
+          # causing downstream jobs (canary, sentry) to receive an empty string.
+          echo "deployment_url=https://jov.ie" >> $GITHUB_OUTPUT
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

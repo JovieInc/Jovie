@@ -17,7 +17,7 @@ export default async function SettingsPage() {
   try {
     const dashboardData = await getDashboardData();
 
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect('/onboarding');
     }
 

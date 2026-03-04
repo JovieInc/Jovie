@@ -36,7 +36,7 @@ async function AudienceContent({
     }
 
     // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect('/onboarding');
     }
 

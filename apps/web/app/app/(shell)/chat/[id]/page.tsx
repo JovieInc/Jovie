@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ChatConversationPage({ params }: Props) {
   const dashboardData = await getDashboardData();
 
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
