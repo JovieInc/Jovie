@@ -225,7 +225,6 @@
     "tailwindcss": "^4.1.18",
     "tsx": "^4.20.5",
     "typescript": "^5",
-    "vitest": "^4.0.18",
-    "webpack": "5.105.2"
+    "vitest": "^4.0.18"
   }
 }
