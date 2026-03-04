@@ -1,14 +1,7 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
-const { codecovWebpackPlugin } = require('@codecov/webpack-plugin');
-
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
-
-// Bundle analyzer for performance optimization
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
 
 const nextConfig = {
   // Transpile workspace packages for proper module resolution
@@ -371,100 +364,6 @@ const nextConfig = {
       process.env.NODE_ENV === 'production' &&
       process.env.VERCEL_ENV !== 'preview',
   },
-  // Webpack optimizations
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      // Optimize bundle size with improved cache strategy
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          maxSize: 200000, // Smaller chunks reduce serialized cache payloads.
-          minSize: 20000,
-          cacheGroups: {
-            framework: {
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
-              name: 'framework',
-              chunks: 'all',
-              priority: 40,
-              enforce: true,
-            },
-            icons: {
-              test: /[\\/]node_modules[\\/](simple-icons|lucide-react)[\\/]/,
-              name: 'icons',
-              chunks: 'all',
-              priority: 30,
-              maxSize: 180000,
-            },
-            motion: {
-              test: /[\\/]node_modules[\\/](framer-motion|motion)[\\/]/,
-              name: 'motion',
-              chunks: 'all',
-              priority: 25,
-              maxSize: 180000,
-            },
-            charts: {
-              test: /[\\/]node_modules[\\/]recharts[\\/]/,
-              name: 'charts',
-              chunks: 'all',
-              priority: 25,
-              maxSize: 180000,
-            },
-            vendors: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-              maxSize: 200000,
-            },
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              priority: 5,
-              maxSize: 200000,
-            },
-          },
-        },
-      };
-    }
-
-    // Exclude PostHog Node.js from Edge Runtime bundles
-    if (!isServer) {
-      config.externals = config.externals || [];
-      config.externals.push({
-        'posthog-node': 'commonjs posthog-node',
-      });
-    }
-
-    // Exclude Storybook files from production builds
-    if (!dev) {
-      config.module.rules.push({
-        test: /\.stories\.(js|jsx|ts|tsx|mdx)$/,
-        use: 'ignore-loader',
-      });
-    }
-
-    // Alias '@jovie/ui' to local package sources so imports resolve in dev/build
-    // Note: tsconfig paths handle this for TypeScript, but webpack needs explicit alias
-    config.resolve = config.resolve || {};
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
-      ['@jovie/ui']: path.resolve(__dirname, '../../packages/ui'),
-    };
-
-    // Codecov Bundle Analysis plugin - uploads bundle stats during CI builds
-    config.plugins.push(
-      codecovWebpackPlugin({
-        enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
-        bundleName: 'jovie-web',
-        uploadToken: process.env.CODECOV_TOKEN,
-      })
-    );
-
-    return config;
-  },
 };
 
 // Enable Vercel Toolbar in non-production environments only.
@@ -476,17 +375,14 @@ const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: bundle analyzer -> vercel toolbar
-module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
+// Apply plugins in order: vercel toolbar -> sentry
+module.exports = withVercelToolbar(nextConfig);
 
 // Injected content via Sentry wizard below
 
 const { withSentryConfig } = require('@sentry/nextjs');
 
 module.exports = withSentryConfig(module.exports, {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
-
   org: 'jovie',
   project: 'jovie-web',
 
@@ -504,14 +400,4 @@ module.exports = withSentryConfig(module.exports, {
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
   tunnelRoute: '/monitoring',
-
-  // Webpack-specific options (new location for deprecated top-level options)
-  webpack: {
-    // Automatically tree-shake Sentry logger statements to reduce bundle size
-    treeshake: {
-      removeDebugLogging: true,
-    },
-    // Enables automatic instrumentation of Vercel Cron Monitors
-    automaticVercelMonitors: true,
-  },
 });
