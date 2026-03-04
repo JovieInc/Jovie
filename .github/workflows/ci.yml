@@ -2186,6 +2186,9 @@ jobs:
     name: Smoke Tests (Required)
     needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
     if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
+    # Smoke tests are informational on main pushes — Clerk CDN flakiness should not block deploys.
+    # The canary health gate after deploy verifies production is healthy.
+    continue-on-error: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
@@ -2407,7 +2410,7 @@ jobs:
           echo "✅ Homepage smoke passed"
 
   deploy:
-    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required] # Required smoke must pass before deploy; homepage smoke is informational
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests] # Smoke tests run in parallel but don't block deploy; canary health gate verifies post-deploy
     # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
