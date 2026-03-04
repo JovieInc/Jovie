@@ -8,6 +8,7 @@ import {
 } from '@jovie/ui';
 import { AlertCircle, Mail, Phone } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
 import {
@@ -16,6 +17,7 @@ import {
 } from '@/components/profile/notifications';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Artist } from '@/types/db';
 import {
   noFontSynthesisStyle,
@@ -374,6 +376,17 @@ export function TwoStepNotificationsCTA({
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
 
+  // Redirect to normal profile when already subscribed (subscribe mode)
+  const router = useRouter();
+  const { info: showInfo } = useNotifications();
+  const hasRedirected = useRef(false);
+  useEffect(() => {
+    if (!isSubscribed || hasRedirected.current) return;
+    hasRedirected.current = true;
+    showInfo(`You're already subscribed to ${artist.name}`);
+    router.replace(`/${artist.handle}`);
+  }, [isSubscribed, artist.name, artist.handle, router, showInfo]);
+
   if (hydrationStatus === 'checking') {
     return <SubscriptionFormSkeleton />;
   }
@@ -383,7 +396,13 @@ export function TwoStepNotificationsCTA({
   }
 
   if (isSubscribed) {
-    return <SubscriptionSuccess artistName={artist.name} />;
+    return (
+      <SubscriptionSuccess
+        artistName={artist.name}
+        handle={artist.handle}
+        subscribedChannels={subscribedChannels}
+      />
+    );
   }
 
   if (!notificationsEnabled) {
