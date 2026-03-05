@@ -263,8 +263,28 @@ async function resolveReleaseMatrix(
 /**
  * Cached loader for release matrix.
  * Uses React's cache() for request-level deduplication.
+ *
+ * Suitable for initial page-load reads where deduplication across concurrent
+ * RSC invocations is desirable.
+ *
+ * ⚠️ Do NOT call this after a mutation within the same server request.
+ * React's cache() memoises for the lifetime of the request, so a post-mutation
+ * call will return the pre-mutation result even after revalidateTag().
+ * Use `loadReleaseMatrixUncached` instead for post-mutation reads.
  */
 export const loadReleaseMatrix = cache(resolveReleaseMatrix);
+
+/**
+ * Uncached loader for release matrix.
+ * Bypasses React's request-level cache() memoisation.
+ *
+ * Use this in server actions that mutate data and then need to return fresh
+ * release data in the same request (e.g. after Spotify sync or provider-link
+ * updates). `unstable_cache` (Next.js data cache) is still used internally,
+ * but that layer is properly invalidated via revalidateTag() before this is
+ * called, so it will return up-to-date data.
+ */
+export const loadReleaseMatrixUncached = resolveReleaseMatrix;
 
 export async function saveProviderOverride(params: {
   profileId: string;

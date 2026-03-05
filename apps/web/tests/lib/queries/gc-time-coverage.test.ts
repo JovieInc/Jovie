@@ -15,6 +15,7 @@ vi.mock('@tanstack/react-query', async () => {
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   loadReleaseMatrix: vi.fn(),
+  loadReleaseMatrixUncached: vi.fn(),
 }));
 
 import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';

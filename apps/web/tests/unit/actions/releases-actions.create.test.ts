@@ -336,6 +336,48 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
   });
 
   // =========================================================================
+  // loadReleaseMatrixUncached
+  // =========================================================================
+  describe('loadReleaseMatrixUncached', () => {
+    it('returns same data as loadReleaseMatrix', async () => {
+      const release = makeRelease();
+      mockGetReleasesForProfile.mockResolvedValue([release]);
+
+      const { loadReleaseMatrixUncached } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await loadReleaseMatrixUncached();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('rel_001');
+      expect(result[0].title).toBe('Test Album');
+      expect(result[0].profileId).toBe(MOCK_PROFILE.id);
+    });
+
+    it('redirects to sign-in when not authenticated', async () => {
+      mockGetCachedAuth.mockResolvedValue({ userId: null });
+
+      const { loadReleaseMatrixUncached } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+
+      await expect(loadReleaseMatrixUncached()).rejects.toThrow(
+        'NEXT_REDIRECT'
+      );
+      expect(mockRedirect).toHaveBeenCalledWith(
+        expect.stringContaining('/sign-in')
+      );
+    });
+
+    it('is exported as a named export', async () => {
+      const actions = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      expect(typeof actions.loadReleaseMatrixUncached).toBe('function');
+    });
+  });
+
+  // =========================================================================
   // syncFromSpotify
   // =========================================================================
   describe('syncFromSpotify', () => {
