@@ -55,7 +55,7 @@ export interface UseSignInFlowReturn {
   startEmailFlow: (email: string) => Promise<boolean>;
   verifyCode: (code: string) => Promise<boolean>;
   resendCode: () => Promise<boolean>;
-  startOAuth: (provider: 'google' | 'spotify') => Promise<void>;
+  startOAuth: (provider: 'google') => Promise<void>;
   goBack: () => void;
 }
 
@@ -231,10 +231,10 @@ export function useSignInFlow(): UseSignInFlowReturn {
   }, [signIn, isLoaded, clearError, base]);
 
   /**
-   * Start OAuth flow (Google/Spotify)
+   * Start OAuth flow (Google)
    */
   const startOAuth = useCallback(
-    async (provider: 'google' | 'spotify'): Promise<void> => {
+    async (provider: 'google'): Promise<void> => {
       if (!signIn || !isLoaded) return;
 
       clearError();

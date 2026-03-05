@@ -16,14 +16,13 @@ interface ClerkClientLastAuthStrategyAccess {
 }
 
 function isAuthMethod(value: string | null): value is AuthMethod {
-  return value === 'email' || value === 'google' || value === 'spotify';
+  return value === 'email' || value === 'google';
 }
 
 function authMethodFromClerkLastStrategy(
   lastStrategy: string | null | undefined
 ): AuthMethod | null {
   if (!lastStrategy) return null;
-  if (lastStrategy === 'oauth_spotify') return 'spotify';
   if (lastStrategy === 'oauth_google') return 'google';
   if (lastStrategy.startsWith('oauth_')) return null;
   if (lastStrategy.includes('email')) return 'email';

@@ -14,7 +14,6 @@ export {
   AuthInput,
   AuthLink,
   AuthLinkPreviewCard,
-  AuthSpotifyIcon,
   AuthTextInput,
 } from './atoms';
 export { ButtonSpinner } from './ButtonSpinner';
