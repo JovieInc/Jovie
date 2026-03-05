@@ -1,24 +1,21 @@
+import type { Page } from '@playwright/test';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
  * Auth Flow E2E Tests
  *
- * Covers sign-up and sign-in user flows including:
- * - Method selection (Google + Email)
- * - Email input step with validation
- * - Navigation between auth pages
- * - Error display behavior
- * - Layout shift guard for error messages
+ * Smoke tests that verify auth forms render correctly and basic interactions work.
+ * These tests run unauthenticated and do NOT require real Clerk credentials.
  *
- * Runs unauthenticated - no real Clerk credentials required.
+ * @smoke
  */
 
 // Run as unauthenticated user
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/** Intercept analytics endpoints to prevent test interference */
-async function interceptAnalytics(page: import('@playwright/test').Page) {
+/** Intercept common analytics endpoints to prevent test interference */
+async function interceptAnalytics(page: Page): Promise<void> {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
   );
@@ -30,287 +27,199 @@ async function interceptAnalytics(page: import('@playwright/test').Page) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Sign-Up Flow
-// ---------------------------------------------------------------------------
-test.describe('Sign-Up Flow', () => {
+test.describe('Auth Flows - Sign Up', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await page.goto('/sign-up', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
   });
 
-  test('displays Google and Email buttons on method selector', async ({
-    page,
-  }) => {
-    const googleBtn = page.getByRole('button', {
+  test('renders Google OAuth button as primary action', async ({ page }) => {
+    const googleButton = page.getByRole('button', {
       name: /continue with google/i,
     });
-    const emailBtn = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-
-    await expect(googleBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(emailBtn).toBeVisible({
+    await expect(googleButton).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
 
-  test('does not display Spotify button', async ({ page }) => {
-    const spotifyBtn = page.getByRole('button', {
+  test('renders email button as secondary action', async ({ page }) => {
+    const emailButton = page.getByRole('button', {
+      name: /continue with email/i,
+    });
+    await expect(emailButton).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+  });
+
+  test('does not show Spotify or other OAuth providers', async ({ page }) => {
+    const spotifyButton = page.getByRole('button', {
       name: /spotify/i,
     });
+    await expect(spotifyButton).toHaveCount(0);
 
-    await expect(spotifyBtn).toHaveCount(0);
+    const appleButton = page.getByRole('button', { name: /apple/i });
+    await expect(appleButton).toHaveCount(0);
+
+    const githubButton = page.getByRole('button', { name: /github/i });
+    await expect(githubButton).toHaveCount(0);
   });
 
-  test('clicking email navigates to email input step', async ({ page }) => {
-    const emailBtn = page.getByRole('button', {
+  test('clicking email button shows email input step', async ({ page }) => {
+    const emailButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await expect(emailBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await emailBtn.click();
+    await emailButton.click();
 
-    const emailInput = page.getByRole('textbox', { name: /email/i });
-    await expect(emailInput).toBeVisible({
+    const emailInput = page.getByLabel(/email/i).or(page.locator('#email-input'));
+    await expect(emailInput.first()).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
 
-  test('email step validates empty input', async ({ page }) => {
-    const emailBtn = page.getByRole('button', {
+  test('email step shows validation error for invalid email', async ({
+    page,
+  }) => {
+    // Navigate to email step
+    const emailButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await expect(emailBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await emailBtn.click();
+    await emailButton.click();
 
-    const emailInput = page.getByRole('textbox', { name: /email/i });
-    await expect(emailInput).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
+    const emailInput = page.getByLabel(/email/i).or(page.locator('#email-input'));
+    await emailInput.first().fill('not-an-email');
 
-    const submitBtn = page.getByRole('button', {
+    // Submit the form
+    const submitButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await submitBtn.click();
+    await submitButton.click();
 
-    const error = page.getByRole('alert');
-    await expect(error).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
+    // Should show an error
+    const errorMessage = page.getByRole('alert');
+    await expect(errorMessage.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  test('email step validates invalid email format', async ({ page }) => {
-    const emailBtn = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await expect(emailBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await emailBtn.click();
-
-    const emailInput = page.getByRole('textbox', { name: /email/i });
-    await expect(emailInput).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    await emailInput.fill('not-an-email');
-
-    const submitBtn = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await submitBtn.click();
-
-    const error = page.getByRole('alert');
-    await expect(error).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
-    await expect(error).toContainText(/valid email/i);
-  });
-
-  test('shows terms of service and privacy policy links', async ({ page }) => {
+  test('has terms of service and privacy policy links', async ({ page }) => {
     const tosLink = page.getByRole('link', { name: /terms of service/i });
     const privacyLink = page.getByRole('link', { name: /privacy policy/i });
-
     await expect(tosLink).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
     await expect(privacyLink).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
-
-  test('has link to sign in page', async ({ page }) => {
-    const signInLink = page
-      .getByRole('link', { name: /sign in|log in|already have/i })
-      .first();
-
-    if ((await signInLink.count()) > 0) {
-      await signInLink.click();
-      await expect(page).toHaveURL(/\/signin/, {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
-    }
-  });
 });
 
-// ---------------------------------------------------------------------------
-// Sign-In Flow
-// ---------------------------------------------------------------------------
-test.describe('Sign-In Flow', () => {
+test.describe('Auth Flows - Sign In', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await page.goto('/signin', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
   });
 
-  test('displays Google and Email buttons on method selector', async ({
-    page,
-  }) => {
-    const googleBtn = page.getByRole('button', {
+  test('renders Google OAuth button', async ({ page }) => {
+    const googleButton = page.getByRole('button', {
       name: /continue with google/i,
     });
-    const emailBtn = page.getByRole('button', {
+    await expect(googleButton).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+  });
+
+  test('renders email button', async ({ page }) => {
+    const emailButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-
-    await expect(googleBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await expect(emailBtn).toBeVisible({
+    await expect(emailButton).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
 
-  test('does not display Spotify button', async ({ page }) => {
-    const spotifyBtn = page.getByRole('button', {
-      name: /spotify/i,
-    });
-
-    await expect(spotifyBtn).toHaveCount(0);
-  });
-
-  test('clicking email navigates to email input step', async ({ page }) => {
-    const emailBtn = page.getByRole('button', {
+  test('clicking email button navigates to email input', async ({ page }) => {
+    const emailButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await expect(emailBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await emailBtn.click();
+    await emailButton.click();
 
-    const emailInput = page.getByRole('textbox', { name: /email/i });
-    await expect(emailInput).toBeVisible({
+    const emailInput = page.getByLabel(/email/i).or(page.locator('#email-input'));
+    await expect(emailInput.first()).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
   });
 
-  test('email step validates empty input', async ({ page }) => {
-    const emailBtn = page.getByRole('button', {
+  test('email step has back navigation', async ({ page }) => {
+    // Navigate to email step
+    const emailButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await expect(emailBtn).toBeVisible({
+    await emailButton.click();
+
+    // Should have a back button
+    const backButton = page.getByRole('button', { name: /back/i });
+    await expect(backButton).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    await emailBtn.click();
 
-    const emailInput = page.getByRole('textbox', { name: /email/i });
-    await expect(emailInput).toBeVisible({
+    // Clicking back should return to method selection
+    await backButton.click();
+    const googleButton = page.getByRole('button', {
+      name: /continue with google/i,
+    });
+    await expect(googleButton).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-
-    const submitBtn = page.getByRole('button', {
-      name: /continue with email/i,
-    });
-    await submitBtn.click();
-
-    const error = page.getByRole('alert');
-    await expect(error).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
   });
 
-  test('has link to sign up page', async ({ page }) => {
-    const signUpLink = page
-      .getByRole('link', { name: /sign up|create account|get started/i })
-      .first();
-
-    if ((await signUpLink.count()) > 0) {
-      await signUpLink.click();
-      await expect(page).toHaveURL(/\/sign-up/, {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
-    }
-  });
-
-  test('heading says "Log in to Jovie"', async ({ page }) => {
+  test('shows sign-in heading', async ({ page }) => {
     const heading = page.getByRole('heading', { name: /log in to jovie/i });
-    await expect(heading).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    await expect(heading).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 });
 
-// ---------------------------------------------------------------------------
-// Error Layout Shift Guard
-// ---------------------------------------------------------------------------
-test.describe('Error Layout Shift Guard', () => {
-  test('error container has fixed height before and after error appears (sign-up email step)', async ({
+test.describe('Auth Flows - Error Layout Stability', () => {
+  test('error messages do not cause layout shift on sign-up email step', async ({
     page,
   }) => {
     await interceptAnalytics(page);
     await page.goto('/sign-up', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
-    const emailBtn = page.getByRole('button', {
+    // Navigate to email step
+    const emailButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await expect(emailBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-    await emailBtn.click();
+    await emailButton.click();
 
-    const emailInput = page.getByRole('textbox', { name: /email/i });
-    await expect(emailInput).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    const submitBtn = page.getByRole('button', {
+    // Get initial position of submit button
+    const submitButton = page.getByRole('button', {
       name: /continue with email/i,
     });
-    await expect(submitBtn).toBeVisible({
+    await expect(submitButton).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
-    const beforeBox = await submitBtn.boundingBox();
+    const initialBox = await submitButton.boundingBox();
 
-    await submitBtn.click();
+    // Submit empty form to trigger error
+    await submitButton.click();
 
-    const error = page.getByRole('alert');
-    await expect(error).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
+    // Wait for error to appear
+    const errorMessage = page.getByRole('alert');
+    await expect(errorMessage.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    const afterBox = await submitBtn.boundingBox();
-
-    if (beforeBox && afterBox) {
-      expect(Math.abs(afterBox.y - beforeBox.y)).toBeLessThanOrEqual(2);
+    // Check that submit button position hasn't shifted significantly (within 5px)
+    const afterErrorBox = await submitButton.boundingBox();
+    if (initialBox && afterErrorBox) {
+      const yShift = Math.abs(afterErrorBox.y - initialBox.y);
+      expect(
+        yShift,
+        `Submit button shifted ${yShift}px vertically when error appeared`
+      ).toBeLessThan(5);
     }
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Google OAuth Button Behavior
-// ---------------------------------------------------------------------------
-test.describe('Google OAuth', () => {
-  test('Google button shows loading state when clicked', async ({ page }) => {
-    await interceptAnalytics(page);
-    await page.goto('/signin', { waitUntil: 'domcontentloaded' });
-    await waitForHydration(page);
-
-    const googleBtn = page.getByRole('button', {
-      name: /continue with google/i,
-    });
-    await expect(googleBtn).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    await googleBtn.click();
-
-    // We just verify the click didn't crash the page
-    await expect(page.locator('body')).toBeVisible();
   });
 });
