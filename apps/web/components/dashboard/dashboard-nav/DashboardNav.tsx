@@ -59,7 +59,7 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const profileId = selectedProfile?.id;
   const { data: releasesData } = useReleasesQuery(profileId ?? '');
-  const releaseCount = releasesData?.releases?.length ?? 0;
+  const releaseCount = releasesData?.length ?? 0;
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
