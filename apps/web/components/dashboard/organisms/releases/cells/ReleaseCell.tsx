@@ -1,11 +1,79 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { memo } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { PopularityIcon } from './PopularityIcon';
+
+
+const MAX_VISIBLE_ICONS = 3;
+
+const PROVIDER_KEY_TO_ICON: Record<string, string> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  youtube: 'youtube',
+  soundcloud: 'soundcloud',
+  deezer: 'deezer',
+  tidal: 'tidal',
+  amazon_music: 'amazon_music',
+  bandcamp: 'bandcamp',
+  beatport: 'beatport',
+  pandora: 'pandora',
+  napster: 'napster',
+  audiomack: 'audiomack',
+  qobuz: 'qobuz',
+  anghami: 'anghami',
+  boomplay: 'boomplay',
+  iheartradio: 'iheartradio',
+  tiktok: 'tiktok',
+  youtube_music: 'youtube_music',
+};
+
+function PlatformIcons({ providers }: { readonly providers: ReleaseViewModel['providers'] }) {
+  if (providers.length === 0) return null;
+
+  const visible = providers.slice(0, MAX_VISIBLE_ICONS);
+  const remaining = providers.length - MAX_VISIBLE_ICONS;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className='inline-flex items-center gap-0.5 shrink-0'>
+          {visible.map(p => (
+            <SocialIcon
+              key={p.key}
+              platform={PROVIDER_KEY_TO_ICON[p.key] ?? p.key}
+              className='h-3 w-3 text-tertiary-token'
+              aria-hidden
+            />
+          ))}
+          {remaining > 0 && (
+            <span className='text-[10px] text-tertiary-token'>
+              +{remaining}
+            </span>
+          )}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side='top' className='max-w-[200px]'>
+        <div className='flex flex-col gap-1'>
+          {providers.map(p => (
+            <span key={p.key} className='flex items-center gap-1.5 text-xs'>
+              <SocialIcon
+                platform={PROVIDER_KEY_TO_ICON[p.key] ?? p.key}
+                className='h-3 w-3'
+                aria-hidden
+              />
+              {p.label}
+            </span>
+          ))}
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
@@ -73,6 +141,7 @@ export const ReleaseCell = memo(function ReleaseCell({
               {manualOverrideCount} edited
             </Badge>
           )}
+          <PlatformIcons providers={release.providers} />
         </div>
         {artistName && (
           <TruncatedText
