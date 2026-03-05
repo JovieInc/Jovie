@@ -1,13 +1,12 @@
 'use client';
 
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { memo } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { PopularityIcon } from './PopularityIcon';
-
 
 const MAX_VISIBLE_ICONS = 3;
 
@@ -32,7 +31,11 @@ const PROVIDER_KEY_TO_ICON: Record<string, string> = {
   youtube_music: 'youtube_music',
 };
 
-function PlatformIcons({ providers }: { readonly providers: ReleaseViewModel['providers'] }) {
+function PlatformIcons({
+  providers,
+}: {
+  readonly providers: ReleaseViewModel['providers'];
+}) {
   if (providers.length === 0) return null;
 
   const visible = providers.slice(0, MAX_VISIBLE_ICONS);
