@@ -147,7 +147,7 @@ export function AudienceFilterDropdown({
               )}
             >
               <Filter className='h-3.5 w-3.5' />
-              Filter
+              <span className='hidden sm:inline'>Filter</span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>

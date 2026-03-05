@@ -25,7 +25,7 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   onViewChange,
 }: AudienceHeaderBadgeProps) {
   return (
-    <div className='flex items-center min-w-0 overflow-x-auto'>
+    <div className='flex items-center min-w-0 overflow-x-auto scrollbar-hide'>
       <fieldset className='inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0/80 p-[3px] backdrop-blur-sm'>
         <legend className='sr-only'>Audience view filter</legend>
         {VIEW_OPTIONS.map(({ value, label, Icon }) => (
