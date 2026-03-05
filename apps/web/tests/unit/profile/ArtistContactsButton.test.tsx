@@ -16,6 +16,11 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+// Mock as mobile so drawer behavior is tested (desktop renders a link instead)
+vi.mock('@/hooks/useBreakpoint', () => ({
+  useBreakpointDown: () => true,
+}));
+
 function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {
   return {
     id: 'contact-1',
