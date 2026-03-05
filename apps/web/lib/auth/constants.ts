@@ -33,7 +33,7 @@ export const FORM_LAYOUT = {
   footerHint:
     'min-h-[40px] w-full max-w-full flex flex-wrap items-center justify-center gap-1 text-[13px] font-[450] text-[var(--linear-text-tertiary)] text-center px-2 mt-6',
   /** Reserved space for error messages to prevent layout shift */
-  errorContainer: 'min-h-[24px] flex items-center justify-center mb-4',
+  errorContainer: 'h-[24px] flex items-center justify-center overflow-hidden',
 } as const;
 
 /**
