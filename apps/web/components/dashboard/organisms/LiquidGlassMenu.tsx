@@ -160,7 +160,7 @@ function Badge({
   return (
     <span
       className={cn(
-        'flex items-center justify-center font-semibold rounded-full bg-[#0ea5e9] text-white',
+        'flex items-center justify-center font-semibold rounded-full bg-accent text-white',
         sizeClasses
       )}
     >
