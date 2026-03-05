@@ -22,7 +22,7 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-[var(--linear-text-primary)]'
           >
-            Your fans are visiting. Start converting.
+            Your fans are visiting. Convert them.
           </h2>
           <p
             data-testid='final-cta-subtext'
