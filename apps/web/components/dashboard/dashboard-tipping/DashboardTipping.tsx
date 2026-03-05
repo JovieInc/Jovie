@@ -22,6 +22,12 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { BASE_URL } from '@/constants/domains';
+import {
+  Dialog,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/organisms/Dialog';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
@@ -144,9 +150,8 @@ const VenmoEditForm = memo(function VenmoEditForm({
   isSaving,
 }: VenmoEditFormProps) {
   return (
-    <div className='flex items-center gap-2 rounded-xl border border-subtle bg-surface-1 px-3 py-2 sm:gap-3 sm:px-4'>
-      <Wallet className='hidden h-4 w-4 shrink-0 text-accent-token sm:block' />
-      <div className='flex min-w-0 flex-1 items-center gap-1.5'>
+    <div className='space-y-3'>
+      <div className='flex items-center gap-2'>
         <span className='text-sm text-secondary-token'>@</span>
         <Input
           type='text'
@@ -157,13 +162,12 @@ const VenmoEditForm = memo(function VenmoEditForm({
           className='h-8 min-w-0 flex-1'
         />
       </div>
-      <div className='flex shrink-0 items-center gap-1.5'>
+      <div className='flex items-center gap-2'>
         <Button
           onClick={onSave}
           disabled={isSaving || !venmoHandle.trim()}
           variant='primary'
           size='sm'
-          className='h-7 px-2.5 text-xs sm:h-8 sm:px-3'
         >
           {isSaving ? 'Saving…' : 'Save'}
         </Button>
@@ -172,7 +176,6 @@ const VenmoEditForm = memo(function VenmoEditForm({
           disabled={isSaving}
           variant='ghost'
           size='sm'
-          className='h-7 px-2 text-xs sm:h-8'
         >
           Cancel
         </Button>
@@ -348,6 +351,9 @@ export function DashboardTipping() {
     setVenmoHandle('');
   }, [setVenmoHandle]);
 
+  const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';
     const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
@@ -385,23 +391,43 @@ export function DashboardTipping() {
             <div className='shrink-0'>
               <VenmoConnectedBadge
                 venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
-                onEdit={() => setIsEditing(true)}
+                onEdit={() => {
+                  setIsEditing(true);
+                  setIsEditDialogOpen(true);
+                }}
                 onDisconnect={handleDisconnect}
               />
             </div>
           )}
         </div>
 
-        {/* Inline edit form */}
-        {hasVenmoHandle && isEditing && (
-          <VenmoEditForm
-            venmoHandle={venmoHandle}
-            onVenmoHandleChange={setVenmoHandle}
-            onSave={handleSaveVenmo}
-            onCancel={handleCancel}
-            isSaving={isSaving}
-          />
-        )}
+        {/* Edit Venmo dialog */}
+        <Dialog
+          open={isEditDialogOpen}
+          onClose={() => {
+            handleCancel();
+            setIsEditDialogOpen(false);
+          }}
+          size='sm'
+        >
+          <DialogTitle>Edit Venmo</DialogTitle>
+          <DialogDescription>Update your Venmo username.</DialogDescription>
+          <DialogBody>
+            <VenmoEditForm
+              venmoHandle={venmoHandle}
+              onVenmoHandleChange={setVenmoHandle}
+              onSave={() => {
+                handleSaveVenmo();
+                setIsEditDialogOpen(false);
+              }}
+              onCancel={() => {
+                handleCancel();
+                setIsEditDialogOpen(false);
+              }}
+              isSaving={isSaving}
+            />
+          </DialogBody>
+        </Dialog>
       </div>
 
       {/* ── Connect Venmo (not connected) ──────────────── */}
