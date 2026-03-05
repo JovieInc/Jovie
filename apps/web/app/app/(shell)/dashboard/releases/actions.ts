@@ -8,6 +8,7 @@ import {
   unstable_cache,
 } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
@@ -234,10 +235,10 @@ async function fetchReleaseMatrixCore(
 }
 
 /**
- * Load release matrix with caching (30s TTL)
+ * Core release matrix loading logic (cacheable).
  * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
  */
-export async function loadReleaseMatrix(
+async function resolveReleaseMatrix(
   profileId?: string
 ): Promise<ReleaseViewModel[]> {
   const { userId } = await getCachedAuth();
@@ -258,6 +259,12 @@ export async function loadReleaseMatrix(
     }
   )();
 }
+
+/**
+ * Cached loader for release matrix.
+ * Uses React's cache() for request-level deduplication.
+ */
+export const loadReleaseMatrix = cache(resolveReleaseMatrix);
 
 export async function saveProviderOverride(params: {
   profileId: string;
