@@ -2,10 +2,7 @@
   "ci": {
     "collect": {
       "numberOfRuns": 3,
-      "url": [
-        "https://jov.ie/",
-        "https://jov.ie/tim"
-      ]
+      "url": ["https://jov.ie/", "https://jov.ie/tim"]
     },
     "assert": {
       "assertMatrix": [
