@@ -111,7 +111,7 @@ export function SignUpForm() {
 
             {error && oauthFailureProvider && (
               <div
-                className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3'
+                className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3 animate-in fade-in-0 slide-in-from-top-2 duration-300'
                 role='alert'
               >
                 <p className='text-sm font-medium text-destructive'>
