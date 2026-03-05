@@ -7,7 +7,7 @@ import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
-const mockUsePathname = vi.fn(() => '/app/profile');
+const mockUsePathname = vi.fn(() => '/app/chat');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
   useParams: () => ({}),
@@ -34,7 +34,9 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: false,
-    activeTab: null,
+    open: vi.fn(),
+    close: vi.fn(),
+    toggle: vi.fn(),
   }),
   usePreviewPanelData: () => ({
     data: null,
@@ -92,6 +94,7 @@ const baseDashboardData: DashboardData = {
     completedCount: 0,
     totalCount: 6,
     steps: [],
+    profileIsLive: false,
   },
 };
 
@@ -114,7 +117,7 @@ describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
     const { getByRole } = renderDashboardNav();
 
-    expect(getByRole('link', { name: 'Profile' })).toBeDefined();
+    expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
@@ -130,9 +133,9 @@ describe('DashboardNav', () => {
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    const profileLink = container.querySelector('[href="/app/profile"]');
-    expect(profileLink).toBeTruthy();
-    expect(profileLink?.className).toContain('justify-center');
+    const profileButton = container.querySelector('button[aria-pressed]');
+    expect(profileButton).toBeTruthy();
+    expect(profileButton?.className).toContain('justify-center');
   });
 
   it('differentiates primary and secondary nav styling', () => {
