@@ -242,7 +242,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-9 justify-center gap-0 pl-2 pr-3.5 pt-2 pb-0'>
+      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
