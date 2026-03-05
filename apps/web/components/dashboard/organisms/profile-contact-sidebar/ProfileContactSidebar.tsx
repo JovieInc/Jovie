@@ -10,6 +10,7 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -24,7 +25,7 @@ import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { ProfilePhotoSettings } from './ProfilePhotoSettings';
-import { ProfileSidebarHeader } from './ProfileSidebarHeader';
+import { useProfileHeaderParts } from './ProfileSidebarHeader';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Tab options for the profile sidebar categories */
@@ -244,6 +245,13 @@ export function ProfileContactSidebar() {
     [previewData, selectedProfile, setPreviewData, removeLinkMutation]
   );
 
+  // Header parts hook needs to be called unconditionally
+  const { title: headerTitle, actions: headerActions } = useProfileHeaderParts({
+    username: previewData?.username ?? '',
+    displayName: previewData?.displayName ?? '',
+    profilePath: previewData?.profilePath ?? '',
+  });
+
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
     return (
@@ -259,7 +267,7 @@ export function ProfileContactSidebar() {
             <div className='h-6 w-6 rounded skeleton' />
           </div>
           {/* Avatar + name skeleton */}
-          <div className='shrink-0 border-b border-subtle px-4 py-3'>
+          <div className='shrink-0 px-4 pt-3 pb-3'>
             <div className='flex items-center gap-3'>
               <div className='h-12 w-12 rounded-full skeleton' />
               <div className='space-y-2'>
@@ -277,7 +285,7 @@ export function ProfileContactSidebar() {
             </div>
           </div>
           {/* Link rows skeleton */}
-          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3'>
+          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3'>
             {[1, 2, 3, 4, 5].map(i => (
               <div key={i} className='flex items-center gap-3'>
                 <div className='h-8 w-8 rounded-md skeleton shrink-0' />
@@ -303,23 +311,25 @@ export function ProfileContactSidebar() {
 
   const profileUrl = `${BASE_URL}${profilePath}`;
 
-  return (
-    <RightDrawer
-      isOpen={isOpen}
-      width={SIDEBAR_WIDTH}
-      ariaLabel='Profile Contact'
-    >
-      <div className='flex h-full flex-col'>
-        {/* Header */}
-        <ProfileSidebarHeader
-          username={username}
-          displayName={displayName}
-          profilePath={profilePath}
-          onClose={close}
-        />
+  const photoSettingsFooter =
+    resolvedCategory !== 'about' ? (
+      <ProfilePhotoSettings
+        allowDownloads={
+          (selectedProfile?.settings as Record<string, unknown> | null)
+            ?.allowProfilePhotoDownloads === true
+        }
+      />
+    ) : undefined;
 
-        {/* Contact Header with Avatar, Name + Analytics + Profile URL */}
-        <div className='shrink-0 px-4 pt-3 pb-4 space-y-3'>
+  return (
+    <EntitySidebarShell
+      isOpen={isOpen}
+      ariaLabel='Profile Contact'
+      title={headerTitle}
+      onClose={close}
+      headerActions={headerActions}
+      entityHeader={
+        <div className='space-y-3'>
           <ProfileContactHeader
             displayName={displayName}
             username={username}
@@ -342,67 +352,50 @@ export function ProfileContactSidebar() {
             {profileUrl.replace(/^https?:\/\//, '')}
           </a>
         </div>
-
-        {/* Category tabs */}
-        <div className='border-b border-t border-subtle px-3 py-1.5 shrink-0'>
-          <SegmentControl
-            value={resolvedCategory}
-            onValueChange={setSelectedCategory}
-            options={PROFILE_TAB_OPTIONS}
-            size='sm'
-            aria-label='Profile sidebar view'
+      }
+      tabs={
+        <SegmentControl
+          value={resolvedCategory}
+          onValueChange={setSelectedCategory}
+          options={PROFILE_TAB_OPTIONS}
+          size='sm'
+          aria-label='Profile sidebar view'
+        />
+      }
+      footer={photoSettingsFooter}
+    >
+      {resolvedCategory === 'about' ? (
+        <ProfileAboutTab bio={bio} genres={genres} />
+      ) : (
+        <>
+          <ProfileLinkList
+            links={links}
+            selectedCategory={resolvedCategory as CategoryOption}
+            onAddLink={handleAddLink}
+            onRemoveLink={handleRemoveLink}
+            dspConnections={dspConnections}
           />
-        </div>
 
-        {/* Tab content */}
-        {resolvedCategory === 'about' ? (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain p-4'>
-            <ProfileAboutTab bio={bio} genres={genres} />
-          </div>
-        ) : (
-          <>
-            {/* Links List — with add/remove */}
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
-              <ProfileLinkList
-                links={links}
-                selectedCategory={resolvedCategory as CategoryOption}
-                onAddLink={handleAddLink}
-                onRemoveLink={handleRemoveLink}
-                dspConnections={dspConnections}
-              />
-
-              {/* Smart add link input with platform suggestions */}
-              {isAddingLink && (
-                <div className='mt-3'>
-                  <SidebarLinkInput
-                    categoryFilter={
-                      resolvedCategory === 'social' ||
-                      resolvedCategory === 'dsp' ||
-                      resolvedCategory === 'earnings'
-                        ? resolvedCategory
-                        : 'social'
-                    }
-                    existingPlatforms={existingPlatformIds}
-                    onAdd={handleSmartAddLink}
-                    onCancel={() => setIsAddingLink(false)}
-                    creatorName={previewData?.displayName}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Profile Photo Download Settings */}
-            <div className='shrink-0 border-t border-subtle px-4 py-3'>
-              <ProfilePhotoSettings
-                allowDownloads={
-                  (selectedProfile?.settings as Record<string, unknown> | null)
-                    ?.allowProfilePhotoDownloads === true
+          {/* Smart add link input with platform suggestions */}
+          {isAddingLink && (
+            <div className='mt-3'>
+              <SidebarLinkInput
+                categoryFilter={
+                  resolvedCategory === 'social' ||
+                  resolvedCategory === 'dsp' ||
+                  resolvedCategory === 'earnings'
+                    ? resolvedCategory
+                    : 'social'
                 }
+                existingPlatforms={existingPlatformIds}
+                onAdd={handleSmartAddLink}
+                onCancel={() => setIsAddingLink(false)}
+                creatorName={previewData?.displayName}
               />
             </div>
-          </>
-        )}
-      </div>
-    </RightDrawer>
+          )}
+        </>
+      )}
+    </EntitySidebarShell>
   );
 }
