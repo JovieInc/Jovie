@@ -107,15 +107,31 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
-vi.mock('@/components/organisms/RightDrawer', () => ({
-  RightDrawer: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-}));
-
-// Only DrawerEmptyState, DrawerLinkSection, and SidebarLinkRow are used by
-// ReleaseSidebar and the real ReleaseDspLinks component under test.
+// Mock drawer molecules — EntitySidebarShell renders children with empty state support.
 vi.mock('@/components/molecules/drawer', () => ({
+  EntitySidebarShell: ({
+    children,
+    isEmpty,
+    emptyMessage,
+    entityHeader,
+    tabs,
+  }: {
+    children?: React.ReactNode;
+    isEmpty?: boolean;
+    emptyMessage?: string;
+    entityHeader?: React.ReactNode;
+    tabs?: React.ReactNode;
+    [key: string]: unknown;
+  }) =>
+    isEmpty ? (
+      <p>{emptyMessage}</p>
+    ) : (
+      <div>
+        {entityHeader}
+        {tabs}
+        {children}
+      </div>
+    ),
   EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -167,7 +183,7 @@ vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  ReleaseSidebarHeader: () => <div>Header</div>,
+  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
 }));
 vi.mock('next/image', () => ({
   default: (props: { alt: string }) => <img alt={props.alt} />,
@@ -222,7 +238,6 @@ vi.mock('sonner', () => ({
     info: vi.fn(),
   },
 }));
-vi.mock('@/lib/constants/layout', () => ({ SIDEBAR_WIDTH: 360 }));
 vi.mock('@/lib/utils/platform-detection', () => ({
   getBaseUrl: () => 'https://jov.ie',
 }));

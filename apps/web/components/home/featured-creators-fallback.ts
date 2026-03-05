@@ -1,23 +1,19 @@
 import type { FeaturedCreator } from '@/lib/featured-creators';
 
 const FALLBACK_CREATOR_DATA = [
+  { handle: 'tim-white', name: 'Tim White', tagline: 'Afterglow (Deluxe)' },
+  { handle: 'nova-lane', name: 'Nova Lane', tagline: 'Midnight Frequencies' },
   {
-    handle: 'billie-eilish',
-    name: 'Billie Eilish',
-    tagline: 'HIT ME HARD AND SOFT',
+    handle: 'kai-rivers',
+    name: 'Kai Rivers',
+    tagline: 'Still Waters Run Deep',
   },
-  { handle: 'dua-lipa', name: 'Dua Lipa', tagline: 'Radical Optimism' },
-  { handle: 'taylor-swift', name: 'Taylor Swift', tagline: 'The Eras Tour' },
-  {
-    handle: 'the-1975',
-    name: 'The 1975',
-    tagline: 'Being Funny in a Foreign Language',
-  },
-  { handle: 'ed-sheeran', name: 'Ed Sheeran', tagline: 'Autumn Variations' },
-  { handle: 'lady-gaga', name: 'Lady Gaga', tagline: 'Mayhem' },
-  { handle: 'john-mayer', name: 'John Mayer', tagline: 'Sob Rock' },
-  { handle: 'coldplay', name: 'Coldplay', tagline: 'Moon Music' },
-  { handle: 'maneskin', name: 'Maneskin', tagline: 'RUSH!' },
+  { handle: 'sable-cross', name: 'Sable Cross', tagline: 'Velvet Chains' },
+  { handle: 'maren-echo', name: 'Maren Echo', tagline: 'Half-Light Sessions' },
+  { handle: 'jules-voss', name: 'Jules Voss', tagline: 'Concrete Garden' },
+  { handle: 'rio-santos', name: 'Rio Santos', tagline: 'Sol y Sombra' },
+  { handle: 'eli-wolfe', name: 'Eli Wolfe', tagline: 'Ghost Notes' },
+  { handle: 'dani-park', name: 'Dani Park', tagline: 'Color Theory' },
 ] as const;
 
 export const FALLBACK_HANDLES = FALLBACK_CREATOR_DATA.map(c => c.handle);
