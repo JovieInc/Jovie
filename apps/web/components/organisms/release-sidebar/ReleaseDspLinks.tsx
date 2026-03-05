@@ -79,6 +79,13 @@ const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   tiktok: null,
 };
 
+// Maps ProviderKey to SocialIcon platform name for providers without a DspProviderId
+const PROVIDER_TO_SOCIAL_ICON: Partial<Record<ProviderKey, string>> = {
+  bandcamp: 'bandcamp',
+  beatport: 'beatport',
+  tiktok: 'tiktok',
+};
+
 const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
 
 /**
