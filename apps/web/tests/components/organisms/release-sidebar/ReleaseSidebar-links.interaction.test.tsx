@@ -53,18 +53,31 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
-// Mock RightDrawer
-vi.mock('@/components/organisms/RightDrawer', () => ({
-  RightDrawer: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => <div data-testid='right-drawer'>{children}</div>,
-}));
-
-// Mock drawer molecules — only DrawerEmptyState testid is asserted in tests.
+// Mock drawer molecules — EntitySidebarShell renders children with empty state support.
 vi.mock('@/components/molecules/drawer', () => ({
+  EntitySidebarShell: ({
+    children,
+    isEmpty,
+    emptyMessage,
+    entityHeader,
+    tabs,
+  }: {
+    children?: React.ReactNode;
+    isEmpty?: boolean;
+    emptyMessage?: string;
+    entityHeader?: React.ReactNode;
+    tabs?: React.ReactNode;
+    [key: string]: unknown;
+  }) =>
+    isEmpty ? (
+      <p data-testid='empty-state'>{emptyMessage}</p>
+    ) : (
+      <div data-testid='right-drawer'>
+        {entityHeader}
+        {tabs}
+        {children}
+      </div>
+    ),
   EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -80,9 +93,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   SidebarLinkRow: () => null,
 }));
 
-// Mock sub-components that are not under test
+// Mock sub-components that are not under test — useReleaseHeaderParts hook
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
+  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
 }));
 
 vi.mock('next/image', () => ({
@@ -153,10 +166,6 @@ vi.mock(
 // Utilities
 vi.mock('sonner', () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
-}));
-
-vi.mock('@/lib/constants/layout', () => ({
-  SIDEBAR_WIDTH: 360,
 }));
 
 vi.mock('@/lib/utils/platform-detection', () => ({
