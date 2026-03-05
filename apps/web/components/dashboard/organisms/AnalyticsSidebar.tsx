@@ -4,8 +4,8 @@
  * AnalyticsSidebar Component
  *
  * A right drawer sidebar that displays audience funnel metrics
- * in a vertical visual layout. Matches the existing drawer pattern
- * used by ReleaseSidebar and ProfileContactSidebar.
+ * in a vertical visual layout. Uses EntitySidebarShell for
+ * consistent layout with other entity sidebars.
  */
 
 import {
@@ -17,10 +17,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
-import { DrawerHeader } from '@/components/molecules/drawer';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -195,7 +193,7 @@ interface RankedItem {
 
 function RankedList({
   title,
-  icon: Icon,
+  icon: IconComponent,
   items,
   loading,
   emptyMessage,
@@ -209,7 +207,7 @@ function RankedList({
   return (
     <div>
       <div className='mb-2 flex items-center gap-2'>
-        <Icon className='h-3.5 w-3.5 text-tertiary-token' />
+        <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
         <h3 className='text-[12px] font-medium text-secondary-token'>
           {title}
         </h3>
@@ -310,146 +308,134 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   );
 
   return (
-    <RightDrawer
+    <EntitySidebarShell
       isOpen={isOpen}
-      width={SIDEBAR_WIDTH}
       ariaLabel='Analytics'
       data-testid='analytics-sidebar'
+      title='Analytics'
+      onClose={onClose}
     >
-      <div className='flex h-full flex-col'>
-        {/* Header — matches DrawerHeader pattern */}
-        <DrawerHeader title='Analytics' onClose={onClose} />
-
-        {/* Range toggle + content */}
-        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain'>
-          <div
-            className={cn(
-              'px-5 pt-4 pb-6 space-y-6 transition-opacity duration-150',
-              isFetching && !loading && 'opacity-60'
-            )}
-          >
-            {/* Range selector */}
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center gap-2 text-tertiary-token'>
-                <TrendingUp className='h-3.5 w-3.5' />
-                <span className='text-[12px] font-medium'>
-                  Conversion Funnel
-                </span>
-              </div>
-              <SidebarRangeToggle value={range} onChange={setRange} />
-            </div>
-
-            {/* Vertical Funnel */}
-            <div className='flex flex-col items-center gap-0'>
-              {stages.map((stage, index) => {
-                const widthPercent = Math.max(
-                  (stage.value / maxValue) * 100,
-                  30
-                );
-                const isLast = index === stages.length - 1;
-                const prevStage = index > 0 ? stages[index - 1] : null;
-                const conversionRate = prevStage
-                  ? calculateRate(stage.value, prevStage.value)
-                  : null;
-
-                return (
-                  <FunnelStage
-                    key={stage.label}
-                    label={stage.label}
-                    value={fmt.format(stage.value)}
-                    description={stage.description}
-                    conversionRate={conversionRate}
-                    widthPercent={widthPercent}
-                    isLast={isLast}
-                    loading={loading}
-                  />
-                );
-              })}
-            </div>
-
-            {/* Secondary metrics */}
-            {!loading && data && (
-              <div className='border-t border-subtle pt-4'>
-                <div className='flex items-center gap-2 mb-3'>
-                  <BarChart3 className='h-3.5 w-3.5 text-tertiary-token' />
-                  <h3 className='text-[12px] font-medium text-secondary-token'>
-                    Engagement
-                  </h3>
-                </div>
-                <div className='divide-y divide-subtle'>
-                  {typeof data.capture_rate === 'number' && (
-                    <StatRow
-                      label='Capture Rate'
-                      value={`${data.capture_rate}%`}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.listen_clicks === 'number' && (
-                    <StatRow
-                      label='Listen Clicks'
-                      value={fmt.format(data.listen_clicks)}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.total_clicks === 'number' && (
-                    <StatRow
-                      label='Total Clicks'
-                      value={fmt.format(data.total_clicks)}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.identified_users === 'number' && (
-                    <StatRow
-                      label='Identified Users'
-                      value={fmt.format(data.identified_users)}
-                      loading={false}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Top lists */}
-            {!loading && data && (
-              <div className='space-y-5 border-t border-subtle pt-4'>
-                <RankedList
-                  title='Top Cities'
-                  icon={MapPin}
-                  loading={false}
-                  items={(data.top_cities ?? []).slice(0, 5).map(c => ({
-                    key: c.city,
-                    label: c.city,
-                    value: fmt.format(c.count),
-                  }))}
-                  emptyMessage='No city data yet'
-                />
-                <RankedList
-                  title='Traffic Sources'
-                  icon={Globe}
-                  loading={false}
-                  items={(data.top_referrers ?? []).slice(0, 5).map(r => ({
-                    key: r.referrer || 'direct',
-                    label: r.referrer || 'Direct',
-                    value: fmt.format(r.count),
-                  }))}
-                  emptyMessage='No referrer data yet'
-                />
-                <RankedList
-                  title='Top Links'
-                  icon={Link2}
-                  loading={false}
-                  items={(data.top_links ?? []).slice(0, 5).map(link => ({
-                    key: link.id,
-                    label: link.url,
-                    value: fmt.format(link.clicks),
-                  }))}
-                  emptyMessage='No link data yet'
-                />
-              </div>
-            )}
+      <div
+        className={cn(
+          'space-y-6 transition-opacity duration-150',
+          isFetching && !loading && 'opacity-60'
+        )}
+      >
+        {/* Range selector */}
+        <div className='flex items-center justify-between'>
+          <div className='flex items-center gap-2 text-tertiary-token'>
+            <TrendingUp className='h-3.5 w-3.5' />
+            <span className='text-[12px] font-medium'>Conversion Funnel</span>
           </div>
+          <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
+
+        {/* Vertical Funnel */}
+        <div className='flex flex-col items-center gap-0'>
+          {stages.map((stage, index) => {
+            const widthPercent = Math.max((stage.value / maxValue) * 100, 30);
+            const isLast = index === stages.length - 1;
+            const prevStage = index > 0 ? stages[index - 1] : null;
+            const conversionRate = prevStage
+              ? calculateRate(stage.value, prevStage.value)
+              : null;
+
+            return (
+              <FunnelStage
+                key={stage.label}
+                label={stage.label}
+                value={fmt.format(stage.value)}
+                description={stage.description}
+                conversionRate={conversionRate}
+                widthPercent={widthPercent}
+                isLast={isLast}
+                loading={loading}
+              />
+            );
+          })}
+        </div>
+
+        {/* Secondary metrics */}
+        {!loading && data && (
+          <div className='border-t border-subtle pt-4'>
+            <div className='flex items-center gap-2 mb-3'>
+              <BarChart3 className='h-3.5 w-3.5 text-tertiary-token' />
+              <h3 className='text-[12px] font-medium text-secondary-token'>
+                Engagement
+              </h3>
+            </div>
+            <div className='divide-y divide-subtle'>
+              {typeof data.capture_rate === 'number' && (
+                <StatRow
+                  label='Capture Rate'
+                  value={`${data.capture_rate}%`}
+                  loading={false}
+                />
+              )}
+              {typeof data.listen_clicks === 'number' && (
+                <StatRow
+                  label='Listen Clicks'
+                  value={fmt.format(data.listen_clicks)}
+                  loading={false}
+                />
+              )}
+              {typeof data.total_clicks === 'number' && (
+                <StatRow
+                  label='Total Clicks'
+                  value={fmt.format(data.total_clicks)}
+                  loading={false}
+                />
+              )}
+              {typeof data.identified_users === 'number' && (
+                <StatRow
+                  label='Identified Users'
+                  value={fmt.format(data.identified_users)}
+                  loading={false}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Top lists */}
+        {!loading && data && (
+          <div className='space-y-5 border-t border-subtle pt-4'>
+            <RankedList
+              title='Top Cities'
+              icon={MapPin}
+              loading={false}
+              items={(data.top_cities ?? []).slice(0, 5).map(c => ({
+                key: c.city,
+                label: c.city,
+                value: fmt.format(c.count),
+              }))}
+              emptyMessage='No city data yet'
+            />
+            <RankedList
+              title='Traffic Sources'
+              icon={Globe}
+              loading={false}
+              items={(data.top_referrers ?? []).slice(0, 5).map(r => ({
+                key: r.referrer || 'direct',
+                label: r.referrer || 'Direct',
+                value: fmt.format(r.count),
+              }))}
+              emptyMessage='No referrer data yet'
+            />
+            <RankedList
+              title='Top Links'
+              icon={Link2}
+              loading={false}
+              items={(data.top_links ?? []).slice(0, 5).map(link => ({
+                key: link.id,
+                label: link.url,
+                value: fmt.format(link.clicks),
+              }))}
+              emptyMessage='No link data yet'
+            />
+          </div>
+        )}
       </div>
-    </RightDrawer>
+    </EntitySidebarShell>
   );
 }
