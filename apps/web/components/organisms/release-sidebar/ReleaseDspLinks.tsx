@@ -20,6 +20,7 @@ import {
 import { Loader2, RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import {
   DrawerLinkSection,
@@ -212,10 +213,10 @@ export function ReleaseDspLinks({
           ? () => onSetIsAddingLink(true)
           : undefined
       }
-      addLabel='Add DSP link'
+      addLabel='Add platform link'
       headerActions={rescanButton}
       isEmpty={release.providers.length === 0 && !isAddingLink}
-      emptyMessage='No DSP links yet.'
+      emptyMessage='No platform links yet.'
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
@@ -225,14 +226,26 @@ export function ReleaseDspLinks({
             const dspId = PROVIDER_TO_DSP[provider.key];
             const isManual = provider.source === 'manual';
 
-            const icon = dspId ? (
-              <DspProviderIcon provider={dspId} size='sm' />
-            ) : (
-              <span
-                className='h-4 w-4 rounded-full shrink-0'
-                style={{ backgroundColor: config?.accent }}
-              />
-            );
+            const socialIconPlatform = PROVIDER_TO_SOCIAL_ICON[provider.key];
+            let icon: React.ReactNode;
+            if (dspId) {
+              icon = <DspProviderIcon provider={dspId} size='sm' />;
+            } else if (socialIconPlatform) {
+              icon = (
+                <SocialIcon
+                  platform={socialIconPlatform}
+                  className='h-4 w-4'
+                  aria-label={config?.label || provider.key}
+                />
+              );
+            } else {
+              icon = (
+                <span
+                  className='h-4 w-4 rounded-full shrink-0'
+                  style={{ backgroundColor: config?.accent }}
+                />
+              );
+            }
 
             return (
               <SidebarLinkRow
@@ -272,18 +285,33 @@ export function ReleaseDspLinks({
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
-                {availableProviders.map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className='flex items-center gap-2'>
-                      <span
-                        className='h-2 w-2 rounded-full'
-                        style={{ backgroundColor: config.accent }}
-                        aria-hidden='true'
-                      />
-                      {config.label}
-                    </div>
-                  </SelectItem>
-                ))}
+                {availableProviders.map(([key, config]) => {
+                  const dspId = PROVIDER_TO_DSP[key as ProviderKey];
+                  const socialIcon =
+                    PROVIDER_TO_SOCIAL_ICON[key as ProviderKey];
+                  return (
+                    <SelectItem key={key} value={key}>
+                      <div className='flex items-center gap-2'>
+                        {dspId ? (
+                          <DspProviderIcon provider={dspId} size='sm' />
+                        ) : socialIcon ? (
+                          <SocialIcon
+                            platform={socialIcon}
+                            className='h-4 w-4'
+                            aria-hidden
+                          />
+                        ) : (
+                          <span
+                            className='h-2 w-2 rounded-full'
+                            style={{ backgroundColor: config.accent }}
+                            aria-hidden='true'
+                          />
+                        )}
+                        {config.label}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
