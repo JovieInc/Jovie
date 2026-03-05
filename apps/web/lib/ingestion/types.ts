@@ -33,6 +33,12 @@ export interface ExtractionResult {
    */
   hasPaidTier?: boolean | null;
   /**
+   * Whether the Linktree profile has a verification badge.
+   * Verification requires a paid plan + identity confirmation.
+   * Stronger paid-tier signal than branding removal alone.
+   */
+  isLinktreeVerified?: boolean | null;
+  /**
    * Contact email extracted from bio or content.
    * May be null if no email was found.
    */
