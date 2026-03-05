@@ -15,6 +15,7 @@ export function JovieIcon({ className, size = 24 }: JovieIconProps) {
       className={cn('text-black dark:text-white transition-colors', className)}
       fill='currentColor'
       aria-hidden='true'
+      shapeRendering='geometricPrecision'
     >
       {/* Music note icon */}
       <circle cx='8' cy='24' r='4' />
