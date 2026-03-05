@@ -10,6 +10,7 @@ const EMPTY_PROFILE_COMPLETION: DashboardData['profileCompletion'] = {
   completedCount: 0,
   totalCount: 0,
   steps: [],
+  profileIsLive: false,
 };
 
 function normalizeDashboardData(value: DashboardData): DashboardData {

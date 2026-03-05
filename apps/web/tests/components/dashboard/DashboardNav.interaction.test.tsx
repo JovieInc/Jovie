@@ -92,6 +92,7 @@ const baseDashboardData: DashboardData = {
     completedCount: 0,
     totalCount: 6,
     steps: [],
+    profileIsLive: false,
   },
 };
 
