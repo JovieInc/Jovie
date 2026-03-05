@@ -60,7 +60,9 @@
      --bg-surface-3: Interactive / elevated */
   /* prettier-ignore */ --color-bg-base: #f7f8f9; /* Sidebar bg */
   /* prettier-ignore */ --color-bg-surface-0: #f7f8f9; /* Page bg */
-  /* prettier-ignore */ --color-bg-surface-1: #ffffff; /* Main content */
+  /* prettier-ignore */ --color-bg-surface-1: var(
+    --linear-bg-surface-0
+  ); /* Elevated surfaces — single source of truth via linear token */
   /* prettier-ignore */ --color-bg-surface-2: #f2f3f5; /* Cards */
   /* prettier-ignore */ --color-bg-surface-3: #ebecef; /* Nested / hover */
 
@@ -178,7 +180,9 @@
   /* Dark mode surfaces — matched to Linear's exact Hex values */
   --color-bg-base: #090909; /* sidebar/page bg */
   --color-bg-surface-0: #101012; /* primary app surface */
-  --color-bg-surface-1: #191b1f; /* cards */
+  --color-bg-surface-1: var(
+    --linear-bg-surface-0
+  ); /* cards — single source of truth via linear token */
   --color-bg-surface-2: #23252a; /* inputs, elevated */
   --color-bg-surface-3: #2a2c32; /* modals, tooltips */
 

@@ -52,8 +52,12 @@
      ============================================ */
   --linear-bg-page: oklch(98.5% 0.002 260);
   --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
-  --linear-bg-surface-0: oklch(99.2% 0.002 260);
-  --linear-bg-surface-1: oklch(97% 0.002 260);
+  --linear-bg-surface-0: oklch(
+    100% 0 0
+  ); /* Pure white — elevated surfaces (menus, popovers, cards) */
+  --linear-bg-surface-1: oklch(
+    97% 0.002 260
+  ); /* Item hover / secondary surface */
   --linear-bg-surface-2: oklch(95% 0.003 260);
   --linear-bg-button: oklch(92% 0.005 260);
   --linear-bg-footer: oklch(98.5% 0.002 260);
@@ -119,7 +123,7 @@
      TYPOGRAPHY (mode-independent)
      ============================================ */
   /* Font weights - Linear uses Inter variable font with precise weights */
-  --linear-font-weight-normal: 400;
+  --linear-font-weight-normal: 450; /* Linear "book" weight — matches --font-weight-normal: 450 */
   --linear-font-weight-medium: 510;
   --linear-font-weight-semibold: 538;
   --linear-font-weight-bold: 590;
@@ -192,6 +196,9 @@
   --linear-radius-md: 10px;
   --linear-radius-lg: 12px;
   --linear-radius-full: 9999px;
+  /* App UI tokens (distinct from marketing page tokens) */
+  --linear-app-radius-item: 4px;
+  --linear-app-radius-menu: 8px;
   /* ============================================
      SPACING — mode-independent
      ============================================ */
@@ -252,25 +259,34 @@
    ============================================ */
 
 :root.dark {
-  /* Text */
-  --linear-text-primary: oklch(97% 0.005 260);
-  --linear-text-secondary: oklch(62% 0.015 255);
-  --linear-text-tertiary: oklch(60% 0.01 260);
+  /* Text — extracted from Linear CSS vars (2026-02-17):
+     Primary:   lch(100% 0 272)       = pure white
+     Secondary: lch(90.65% 1.35 272)  = #E3E4E6 (very bright — Linear's actual default text)
+     Tertiary:  lch(62.6% 1.35 272)   = #969799 (icons, shortcuts, meta) */
+  --linear-text-primary: lch(100% 0 272);
+  --linear-text-secondary: lch(90.65% 1.35 272);
+  --linear-text-tertiary: lch(62.6% 1.35 272);
   --linear-text-inverse: oklch(5% 0.005 260);
-  /* Backgrounds — extracted from linear.app via Playwright (2026-02-16) */
-  --linear-bg-page: oklch(14% 0.003 260);
-  --linear-bg-header: oklch(14% 0.003 260 / 0.8);
-  --linear-bg-surface-0: oklch(17.2% 0.003 260);
-  --linear-bg-surface-1: oklch(18.6% 0.003 260);
-  --linear-bg-surface-2: oklch(20.4% 0.003 260);
+  /* Backgrounds — re-extracted from linear.app/demo dark mode (2026-03-05) */
+  /* Linear's exact dark token values: --bg-sidebar-dark:#090909, --bg-base-color:#101012 */
+  /* --color-bg-primary:lch(4.8%), --color-bg-secondary:lch(10.633%), --color-bg-tertiary:lch(14.133%) */
+  --linear-bg-page: #090909; /* Linear exact --bg-sidebar-dark */
+  --linear-bg-header: rgba(9, 9, 9, 0.8);
+  --linear-bg-surface-0: lch(
+    14.133 4.2 272
+  ); /* Linear --color-bg-tertiary — elevated menus/popovers */
+  --linear-bg-surface-1: #2a2c32; /* Linear --color-bg-surface-3 = rgb(42,44,50) — item hover */
+  --linear-bg-surface-2: lch(
+    10.633 3.033 272
+  ); /* Linear --color-bg-secondary — cards/panels */
   --linear-bg-button: oklch(26.5% 0.01 265);
-  --linear-bg-footer: oklch(14% 0.003 260);
+  --linear-bg-footer: #090909;
   --linear-border-footer: oklch(26.5% 0.01 265);
   --linear-bg-hover: rgba(255, 255, 255, 0.08);
-  /* Borders */
-  --linear-border-subtle: rgba(255, 255, 255, 0.05);
-  --linear-border-default: rgba(255, 255, 255, 0.08);
-  --linear-border-strong: rgba(255, 255, 255, 0.1);
+  /* Borders — rebalanced: subtle for separators/dividers, default for container rings */
+  --linear-border-subtle: rgba(255, 255, 255, 0.06);
+  --linear-border-default: rgba(255, 255, 255, 0.1);
+  --linear-border-strong: rgba(255, 255, 255, 0.12);
   --linear-border-focus: oklch(60% 0.12 260);
   /* Buttons */
   --linear-btn-primary-bg: oklch(92% 0 0);
