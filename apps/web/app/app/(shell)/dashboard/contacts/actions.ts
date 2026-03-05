@@ -108,8 +108,10 @@ async function fetchContactsCore(
 /**
  * Core contacts loading logic (cacheable).
  * Cache is invalidated on mutations (save, delete).
+ * Export this uncached variant for use in mutation flows that need fresh data
+ * within the same request (bypasses React request-level memoization).
  */
-async function resolveProfileContactsForOwner(
+export async function resolveProfileContactsForOwner(
   profileId: string
 ): Promise<DashboardContact[]> {
   const { userId } = await getCachedAuth();
@@ -129,8 +131,10 @@ async function resolveProfileContactsForOwner(
 }
 
 /**
- * Cached loader for profile contacts.
- * Uses React's cache() for request-level deduplication.
+ * Request-memoized loader for profile contacts.
+ * Uses React's cache() for request-level deduplication; safe for read-only
+ * call sites. In mutation flows that re-read after a write in the same
+ * request, call resolveProfileContactsForOwner() directly to bypass memoization.
  */
 export const getProfileContactsForOwner = cache(resolveProfileContactsForOwner);
 

@@ -236,9 +236,11 @@ async function fetchReleaseMatrixCore(
 
 /**
  * Core release matrix loading logic (cacheable).
- * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
+ * Cache is invalidated on mutations (save/reset provider links, Spotify sync).
+ * Export this uncached variant for use in mutation flows that need fresh data
+ * within the same request (bypasses React request-level memoization).
  */
-async function resolveReleaseMatrix(
+export async function resolveReleaseMatrix(
   profileId?: string
 ): Promise<ReleaseViewModel[]> {
   const { userId } = await getCachedAuth();
@@ -261,8 +263,10 @@ async function resolveReleaseMatrix(
 }
 
 /**
- * Cached loader for release matrix.
- * Uses React's cache() for request-level deduplication.
+ * Request-memoized loader for release matrix.
+ * Uses React's cache() for request-level deduplication; safe for read-only
+ * call sites. In mutation flows that re-read after a write in the same
+ * request, call resolveReleaseMatrix() directly to bypass memoization.
  */
 export const loadReleaseMatrix = cache(resolveReleaseMatrix);
 

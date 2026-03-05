@@ -214,8 +214,10 @@ async function fetchTourDatesCore(
 /**
  * Core tour dates loading logic (cacheable).
  * Cache is invalidated on mutations (create, update, delete, sync).
+ * Export this uncached variant for use in mutation flows that need fresh data
+ * within the same request (bypasses React request-level memoization).
  */
-async function resolveTourDates(): Promise<TourDateViewModel[]> {
+export async function resolveTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -236,8 +238,10 @@ async function resolveTourDates(): Promise<TourDateViewModel[]> {
 }
 
 /**
- * Cached loader for tour dates.
- * Uses React's cache() for request-level deduplication.
+ * Request-memoized loader for tour dates.
+ * Uses React's cache() for request-level deduplication; safe for read-only
+ * call sites. In mutation flows that re-read after a write in the same
+ * request, call resolveTourDates() directly to bypass memoization.
  */
 export const loadTourDates = cache(resolveTourDates);
 

@@ -1,37 +1,153 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="9" failures="0" errors="0" time="0.19153963">
-    <testsuite name="tests/unit/organisms/TipSection.test.tsx" timestamp="2026-02-23T05:58:00.278Z" hostname="runnervmwffz4" tests="7" failures="0" errors="0" skipped="0" time="0.185314512">
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; shows success toast when Stripe payment succeeds" time="0.055391505">
+<testsuites name="vitest tests" tests="72" failures="0" errors="0" time="1.238624141">
+    <testsuite name="tests/unit/actions/contacts-actions.test.ts" timestamp="2026-03-05T20:42:25.216Z" hostname="runnervm0kj6c" tests="19" failures="0" errors="0" skipped="0" time="0.056526291">
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; getProfileContactsForOwner &gt; returns cached contacts for authenticated owner" time="0.0416499">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; shows error toast when Stripe payment fails" time="0.011712775">
-            <system-err>
-[ERROR] Tip payment failed {
-  &quot;message&quot;: &quot;Payment failed&quot;,
-  &quot;stack&quot;: &quot;Error: Payment failed\n    at /home/runner/work/Jovie/Jovie/apps/web/tests/unit/organisms/TipSection.test.tsx:61:47\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:145:11\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:915:26\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1243:20\n    at new Promise (&lt;anonymous&gt;)\n    at runWithTimeout (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1209:10)\n    at file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:37\n    at Traces.$ (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/vitest@4.0.18_@opentelemetry+api@1.9.0_@types+node@25.0.3_@vitest+browser-playwright@4.0.18_j_fxxl7ayq2proqgahacydracwhm/node_modules/vitest/dist/chunks/traces.CCmnQaNT.js:142:27)\n    at trace (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/vitest@4.0.18_@opentelemetry+api@1.9.0_@types+node@25.0.3_@vitest+browser-playwright@4.0.18_j_fxxl7ayq2proqgahacydracwhm/node_modules/vitest/dist/chunks/test.B8ej_ZHS.js:239:21)\n    at runTest (file:///home/runner/work/Jovie/Jovie/node_modules/.pnpm/@vitest+runner@4.0.18/node_modules/@vitest/runner/dist/index.js:1653:12)&quot;,
-  &quot;type&quot;: &quot;Error&quot;,
-  &quot;handle&quot;: &quot;artist123&quot;,
-  &quot;amount&quot;: 2,
-  &quot;paymentMethod&quot;: &quot;stripe&quot;,
-  &quot;sentryMode&quot;: &quot;none&quot;
-}
-
-            </system-err>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; getProfileContactsForOwner &gt; throws Unauthorized when not authenticated" time="0.001380826">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders payment method selection when both Stripe and Venmo are available" time="0.046648014">
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; getProfileContactsForOwner &gt; passes correct cache key and tags to unstable_cache" time="0.002397261">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; calls onVenmoPayment with a properly constructed URL when Venmo is used" time="0.033678443">
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — create new contact &gt; inserts a new contact when no id is provided" time="0.000915387">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders QR code fallback when no Stripe or Venmo payment methods are available" time="0.007790569">
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — create new contact &gt; calls sanitizeContactInput before saving" time="0.000770847">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; returns to payment method selection when back button is clicked after choosing a payment method" time="0.020595402">
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — create new contact &gt; invalidates caches after successful save" time="0.000643921">
         </testcase>
-        <testcase classname="tests/unit/organisms/TipSection.test.tsx" name="TipSection &gt; renders Venmo payment flow directly when only Venmo is available" time="0.007841326">
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — update existing contact &gt; updates an existing contact when id is provided" time="0.000572197">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — update existing contact &gt; throws when updating a non-existent contact" time="0.000805973">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — plan limit enforcement &gt; throws ContactLimitError when contact limit is reached" time="0.000745501">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — plan limit enforcement &gt; allows insert when under the contact limit" time="0.000574621">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — plan limit enforcement &gt; allows insert when entitlements are unavailable (billing down)" time="0.000561367">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; saveContact — plan limit enforcement &gt; allows insert when contactsLimit is null (pro/unlimited plan)" time="0.000451803">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; deleteContact &gt; deletes an owned contact" time="0.00061666">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; deleteContact &gt; throws when contact does not exist" time="0.000468294">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; deleteContact &gt; throws Unauthorized when not authenticated" time="0.000285943">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; deleteContact &gt; invalidates caches after successful delete" time="0.000542802">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; auth rejection for all actions &gt; saveContact rejects unauthenticated users" time="0.000297315">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; profile ownership verification &gt; saveContact throws when profile is not owned by the user" time="0.000504912">
+        </testcase>
+        <testcase classname="tests/unit/actions/contacts-actions.test.ts" name="contacts/actions.ts &gt; profile ownership verification &gt; deleteContact throws when profile is not owned by the user" time="0.000476258">
         </testcase>
     </testsuite>
-    <testsuite name="tests/unit/lib/db/client/retry.test.ts" timestamp="2026-02-23T05:58:00.280Z" hostname="runnervmwffz4" tests="2" failures="0" errors="0" skipped="0" time="0.006225118">
-        <testcase classname="tests/unit/lib/db/client/retry.test.ts" name="withRetry circuit breaker &gt; fails fast with DbCircuitOpenError when circuit is open" time="0.003738909">
+    <testsuite name="tests/unit/actions/releases-actions.create.test.ts" timestamp="2026-03-05T20:42:25.221Z" hostname="runnervm0kj6c" tests="15" failures="0" errors="0" skipped="0" time="1.069045688">
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; loadReleaseMatrix &gt; returns mapped releases for authenticated user" time="1.056628281">
         </testcase>
-        <testcase classname="tests/unit/lib/db/client/retry.test.ts" name="withRetry circuit breaker &gt; exposes status and retryAfterSeconds on circuit open error" time="0.001288974">
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; loadReleaseMatrix &gt; redirects to sign-in when not authenticated" time="0.003149253">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; loadReleaseMatrix &gt; redirects to onboarding when profile needs onboarding" time="0.000853712">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; loadReleaseMatrix &gt; filters provider links to only those with URLs" time="0.000578338">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; syncFromSpotify &gt; syncs releases and triggers discovery on success" time="0.001312287">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; syncFromSpotify &gt; returns error when no Spotify ID on profile" time="0.0003701">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; syncFromSpotify &gt; rejects unauthenticated calls" time="0.00039682">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; syncFromSpotify &gt; returns failure details on sync error" time="0.000615076">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; checkSpotifyConnection &gt; returns connected when profile has Spotify ID" time="0.000502447">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; checkSpotifyConnection &gt; returns not connected when no user" time="0.000415124">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; checkSpotifyConnection &gt; returns not connected when needs onboarding" time="0.000228717">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; connectSpotifyArtist &gt; connects Spotify artist and syncs releases" time="0.00098709">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; connectSpotifyArtist &gt; rejects unauthenticated calls" time="0.000280583">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; connectSpotifyArtist &gt; returns failure when sync fails" time="0.00029999">
+        </testcase>
+        <testcase classname="tests/unit/actions/releases-actions.create.test.ts" name="@critical releases/actions.ts — create/sync operations &gt; connectSpotifyArtist &gt; handles unique constraint race conflicts gracefully" time="0.000581334">
+        </testcase>
+    </testsuite>
+    <testsuite name="tests/unit/actions/tour-dates-actions.test.ts" timestamp="2026-03-05T20:42:25.224Z" hostname="runnervm0kj6c" tests="38" failures="0" errors="0" skipped="0" time="0.113052162">
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; loadTourDates &gt; returns tour dates for authenticated user" time="0.091956824">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; loadTourDates &gt; redirects unauthenticated users to sign-in" time="0.003060317">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; loadUpcomingTourDates &gt; returns only upcoming dates for a given profile" time="0.000833364">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; loadUpcomingTourDates &gt; does not require authentication" time="0.000429892">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; checkBandsintownConnection &gt; returns connected status when artist is configured" time="0.00072926">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; checkBandsintownConnection &gt; returns disconnected for unauthenticated user" time="0.000299769">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; saveBandsintownApiKey &gt; encrypts and stores the API key" time="0.000834917">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; saveBandsintownApiKey &gt; rejects keys shorter than 10 characters" time="0.000492468">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; saveBandsintownApiKey &gt; throws Unauthorized when not authenticated" time="0.00194671">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; removeBandsintownApiKey &gt; clears both API key and artist name from the profile" time="0.000534727">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; removeBandsintownApiKey &gt; throws Unauthorized when not authenticated" time="0.000301854">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; connectBandsintownArtist &gt; verifies artist, syncs events, and returns tour dates" time="0.001062171">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; connectBandsintownArtist &gt; returns failure when artist is not found on Bandsintown" time="0.000397271">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; syncFromBandsintown &gt; syncs events when rate limit allows" time="0.000344583">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; syncFromBandsintown &gt; rejects sync when rate limited" time="0.000267048">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; syncFromBandsintown &gt; returns failure when no artist is connected" time="0.000249616">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; createTourDate &gt; creates a manual tour date and invalidates cache" time="0.000488701">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; createTourDate &gt; rejects invalid start date" time="0.000301613">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; createTourDate &gt; rejects invalid ticket URL" time="0.000320067">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; updateTourDate &gt; updates an existing tour date with ownership check" time="0.000483762">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; updateTourDate &gt; throws when tour date is not found (ownership check fails)" time="0.000351305">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; updateTourDate &gt; validates ticket URL on update" time="0.000430963">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; deleteTourDate &gt; deletes a tour date owned by the user" time="0.000384887">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; deleteTourDate &gt; throws when tour date is not found (ownership check)" time="0.000302544">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; deleteTourDate &gt; throws Unauthorized when not authenticated" time="0.000257059">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; disconnectBandsintown &gt; clears artist name and removes synced events" time="0.000433468">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; disconnectBandsintown &gt; returns failure and captures error on database failure" time="0.000570454">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; disconnectBandsintown &gt; throws Unauthorized when not authenticated" time="0.000370481">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; saveBandsintownApiKey throws Unauthorized for unauthenticated users" time="0.000381962">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; removeBandsintownApiKey throws Unauthorized for unauthenticated users" time="0.000207748">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; connectBandsintownArtist throws Unauthorized for unauthenticated users" time="0.000192018">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; syncFromBandsintown throws Unauthorized for unauthenticated users" time="0.000245718">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; createTourDate throws Unauthorized for unauthenticated users" time="0.000202096">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; updateTourDate throws Unauthorized for unauthenticated users" time="0.000186788">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; deleteTourDate throws Unauthorized for unauthenticated users" time="0.000176529">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; auth rejection for protected actions &gt; disconnectBandsintown throws Unauthorized for unauthenticated users" time="0.000173965">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; cache invalidation on mutations &gt; revalidates tag and path after createTourDate" time="0.000360021">
+        </testcase>
+        <testcase classname="tests/unit/actions/tour-dates-actions.test.ts" name="tour-dates/actions.ts &gt; cache invalidation on mutations &gt; revalidates tag after deleteTourDate (path skipped to preserve sidebar)" time="0.000310449">
         </testcase>
     </testsuite>
 </testsuites>
