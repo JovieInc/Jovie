@@ -1,7 +1,7 @@
 'use client';
 
 import { Avatar } from '@/components/molecules/Avatar';
-import { cn } from '@/lib/utils';
+import { EntityHeaderCard } from '@/components/molecules/drawer';
 
 export interface AudienceMemberHeaderProps {
   readonly title: string;
@@ -19,19 +19,18 @@ export function AudienceMemberHeader({
   className,
 }: AudienceMemberHeaderProps) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      <Avatar
-        src={avatarSrc}
-        alt={title ? `${title} avatar` : 'Audience member avatar'}
-        name={avatarName}
-        size='lg'
-      />
-      <div className='min-w-0 flex-1'>
-        <div className='truncate text-sm font-semibold text-primary-token'>
-          {title}
-        </div>
-        <div className='truncate text-xs text-secondary-token'>{subtitle}</div>
-      </div>
-    </div>
+    <EntityHeaderCard
+      image={
+        <Avatar
+          src={avatarSrc}
+          alt={title ? `${title} avatar` : 'Audience member avatar'}
+          name={avatarName}
+          size='lg'
+        />
+      }
+      title={title}
+      subtitle={subtitle}
+      className={className}
+    />
   );
 }

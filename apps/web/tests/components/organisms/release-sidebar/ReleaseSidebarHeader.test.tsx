@@ -9,11 +9,9 @@ vi.stubGlobal('open', openSpy);
 vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
   DrawerHeaderActions: ({
     overflowActions,
-    onClose,
   }: {
     primaryActions: { id: string; label: string; onClick: () => void }[];
     overflowActions: { id: string; label: string; onClick: () => void }[];
-    onClose?: () => void;
   }) => (
     <div>
       {overflowActions.map(
@@ -23,16 +21,11 @@ vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
           </button>
         )
       )}
-      {onClose && (
-        <button type='button' onClick={onClose}>
-          Close
-        </button>
-      )}
     </div>
   ),
 }));
 
-const { ReleaseSidebarHeader } = await import(
+const { useReleaseHeaderParts } = await import(
   '@/components/organisms/release-sidebar/ReleaseSidebarHeader'
 );
 
@@ -57,7 +50,18 @@ const release = {
   canvasStatus: 'not_set' as const,
 };
 
-describe('ReleaseSidebarHeader', () => {
+/** Test wrapper that renders the hook output */
+function TestHarness(props: Parameters<typeof useReleaseHeaderParts>[0]) {
+  const { title, actions } = useReleaseHeaderParts(props);
+  return (
+    <div>
+      <div data-testid='title'>{title}</div>
+      <div data-testid='actions'>{actions}</div>
+    </div>
+  );
+}
+
+describe('useReleaseHeaderParts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -66,14 +70,12 @@ describe('ReleaseSidebarHeader', () => {
     const user = userEvent.setup();
 
     render(
-      <ReleaseSidebarHeader
-        release={release}
-        hasRelease
-        onCopySmartLink={vi.fn()}
-      />
+      <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
     );
 
-    const openButton = screen.getByRole('button', { name: /open smart link/i });
+    const openButton = screen.getByRole('button', {
+      name: /open smart link/i,
+    });
     await user.click(openButton);
 
     expect(openSpy).toHaveBeenCalledWith(
@@ -85,11 +87,7 @@ describe('ReleaseSidebarHeader', () => {
 
   it('displays release title in header', () => {
     render(
-      <ReleaseSidebarHeader
-        release={release}
-        hasRelease
-        onCopySmartLink={vi.fn()}
-      />
+      <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
     );
 
     expect(screen.getByText('Test Release')).toBeInTheDocument();
@@ -97,7 +95,7 @@ describe('ReleaseSidebarHeader', () => {
 
   it('displays artist name when provided', () => {
     render(
-      <ReleaseSidebarHeader
+      <TestHarness
         release={release}
         hasRelease
         artistName='Test Artist'
@@ -106,22 +104,5 @@ describe('ReleaseSidebarHeader', () => {
     );
 
     expect(screen.getByText('Test Artist')).toBeInTheDocument();
-  });
-
-  it('close action is available in overflow menu', async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-
-    render(
-      <ReleaseSidebarHeader
-        release={release}
-        hasRelease
-        onClose={onClose}
-        onCopySmartLink={vi.fn()}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: /close/i }));
-    expect(onClose).toHaveBeenCalled();
   });
 });
