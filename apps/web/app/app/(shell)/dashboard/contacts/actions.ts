@@ -6,6 +6,7 @@ import {
   revalidateTag,
   unstable_cache,
 } from 'next/cache';
+import { cache } from 'react';
 
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -105,10 +106,10 @@ async function fetchContactsCore(
 }
 
 /**
- * Get profile contacts with caching (30s TTL)
- * Cache is invalidated on mutations (save, delete)
+ * Core contacts loading logic (cacheable).
+ * Cache is invalidated on mutations (save, delete).
  */
-export async function getProfileContactsForOwner(
+async function resolveProfileContactsForOwner(
   profileId: string
 ): Promise<DashboardContact[]> {
   const { userId } = await getCachedAuth();
@@ -126,6 +127,12 @@ export async function getProfileContactsForOwner(
     }
   )();
 }
+
+/**
+ * Cached loader for profile contacts.
+ * Uses React's cache() for request-level deduplication.
+ */
+export const getProfileContactsForOwner = cache(resolveProfileContactsForOwner);
 
 export async function saveContact(
   input: DashboardContactInput
