@@ -9,8 +9,22 @@ import {
 import { Container } from '@/components/site/Container';
 
 /* ------------------------------------------------------------------ */
-/*  Mock CRM table data                                                */
+/*  Mock CRM table data — matches real audience table patterns          */
 /* ------------------------------------------------------------------ */
+
+type IntentLevel = 'high' | 'medium' | 'low';
+
+const INTENT_DOT_COLORS: Record<IntentLevel, string> = {
+  high: '#22c55e',
+  medium: '#fbbf24',
+  low: '#a1a1aa',
+};
+
+const INTENT_TEXT_COLORS: Record<IntentLevel, string> = {
+  high: '#4ade80',
+  medium: '#fbbf24',
+  low: 'var(--linear-text-tertiary)',
+};
 
 const MOCK_FANS = [
   {
@@ -19,6 +33,8 @@ const MOCK_FANS = [
     email: 'sarah.m***@gmail.com',
     city: 'Los Angeles, CA',
     source: 'Instagram',
+    intent: 'high' as IntentLevel,
+    visits: 12,
     tipAmount: '$5.00',
     joinedAt: '2 days ago',
   },
@@ -28,6 +44,8 @@ const MOCK_FANS = [
     email: 'jake.t***@outlook.com',
     city: 'Nashville, TN',
     source: 'TikTok',
+    intent: 'medium' as IntentLevel,
+    visits: 3,
     tipAmount: null,
     joinedAt: '4 days ago',
   },
@@ -37,6 +55,8 @@ const MOCK_FANS = [
     email: 'priya.k***@yahoo.com',
     city: 'London, UK',
     source: 'Spotify',
+    intent: 'high' as IntentLevel,
+    visits: 8,
     tipAmount: '$10.00',
     joinedAt: '1 week ago',
   },
@@ -46,6 +66,8 @@ const MOCK_FANS = [
     email: 'carlos.r***@gmail.com',
     city: 'Mexico City, MX',
     source: 'Direct link',
+    intent: 'high' as IntentLevel,
+    visits: 15,
     tipAmount: '$3.00',
     joinedAt: '1 week ago',
   },
@@ -55,6 +77,8 @@ const MOCK_FANS = [
     email: 'emma.l***@icloud.com',
     city: 'Berlin, DE',
     source: 'Twitter',
+    intent: 'low' as IntentLevel,
+    visits: 1,
     tipAmount: null,
     joinedAt: '2 weeks ago',
   },
@@ -161,7 +185,7 @@ export function AudienceCRMSection() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Fans Table                                                          */
+/*  Fans Table — matches real DashboardAudienceTableUnified patterns    */
 /* ------------------------------------------------------------------ */
 
 function FansTable() {
@@ -183,19 +207,25 @@ function FansTable() {
         </div>
       </div>
 
-      {/* Column headers */}
-      <div className='grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
+      {/* Column headers — matches real audience table columns */}
+      <div className='grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
         <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
-          Fan
+          Visitor
         </span>
         <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden sm:block'>
-          Location
+          Intent
+        </span>
+        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden md:block'>
+          Returning
         </span>
         <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden md:block'>
           Source
         </span>
+        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden sm:block'>
+          Location
+        </span>
         <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
-          Tip
+          LTV
         </span>
       </div>
 
@@ -203,7 +233,7 @@ function FansTable() {
       {MOCK_FANS.map((fan, i) => (
         <div
           key={fan.id}
-          className='grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-[var(--linear-bg-hover)]'
+          className='grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-[var(--linear-bg-hover)]'
           style={{
             borderBottom:
               i < MOCK_FANS.length - 1
@@ -221,18 +251,46 @@ function FansTable() {
             </p>
           </div>
 
+          {/* Intent — dot + colored label (matches AudienceIntentScoreCell) */}
+          <div className='hidden sm:flex items-center gap-2 text-[13px]'>
+            <span
+              className='inline-block size-1.5 shrink-0 rounded-full'
+              style={{ backgroundColor: INTENT_DOT_COLORS[fan.intent] }}
+              aria-hidden='true'
+            />
+            <span
+              className='text-[var(--linear-label-size)]'
+              style={{
+                color: INTENT_TEXT_COLORS[fan.intent],
+                fontWeight:
+                  fan.intent === 'high'
+                    ? 600
+                    : fan.intent === 'medium'
+                      ? 500
+                      : 400,
+              }}
+            >
+              {fan.intent.charAt(0).toUpperCase() + fan.intent.slice(1)}
+            </span>
+          </div>
+
+          {/* Returning — Yes/No badge (matches AudienceReturningCell) */}
+          <span className='hidden md:inline-flex text-[var(--linear-label-size)] text-[var(--linear-text-secondary)]'>
+            {fan.visits > 1 ? 'Yes' : 'No'}
+          </span>
+
+          {/* Source — pill badge */}
+          <span className='hidden md:inline-flex rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
+            {fan.source}
+          </span>
+
           {/* Location */}
           <span className='hidden sm:inline-flex items-center gap-1 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
             <Globe className='h-3 w-3 shrink-0' aria-hidden='true' />
             {fan.city}
           </span>
 
-          {/* Source */}
-          <span className='hidden md:inline-flex rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
-            {fan.source}
-          </span>
-
-          {/* Tip amount */}
+          {/* LTV / Tip amount */}
           {fan.tipAmount ? (
             <span
               className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)]'
