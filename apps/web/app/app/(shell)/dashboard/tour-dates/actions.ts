@@ -9,6 +9,7 @@ import {
 } from 'next/cache';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
@@ -211,10 +212,10 @@ async function fetchTourDatesCore(
 }
 
 /**
- * Load tour dates for the current profile with caching (30s TTL)
- * Cache is invalidated on mutations (create, update, delete, sync)
+ * Core tour dates loading logic (cacheable).
+ * Cache is invalidated on mutations (create, update, delete, sync).
  */
-export async function loadTourDates(): Promise<TourDateViewModel[]> {
+async function resolveTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -233,6 +234,12 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
     }
   )();
 }
+
+/**
+ * Cached loader for tour dates.
+ * Uses React's cache() for request-level deduplication.
+ */
+export const loadTourDates = cache(resolveTourDates);
 
 /**
  * Load upcoming tour dates only (for public display)
