@@ -8,6 +8,7 @@
  * used by ReleaseSidebar and ProfileContactSidebar.
  */
 
+import { SegmentControl } from '@jovie/ui';
 import {
   ArrowDown,
   BarChart3,
@@ -74,12 +75,15 @@ function SidebarRangeToggle({
 /*  Vertical funnel stage                                              */
 /* ------------------------------------------------------------------ */
 
+/** Fixed funnel widths so layout doesn't shift when data changes */
+const FUNNEL_WIDTHS = ['100%', '75%', '55%'] as const;
+
 function FunnelStage({
   label,
   value,
   description,
   conversionRate,
-  widthPercent,
+  stageIndex,
   isLast,
   loading,
 }: {
@@ -87,16 +91,18 @@ function FunnelStage({
   readonly value: string;
   readonly description: string;
   readonly conversionRate: string | null;
-  readonly widthPercent: number;
+  readonly stageIndex: number;
   readonly isLast: boolean;
   readonly loading: boolean;
 }) {
+  const width = FUNNEL_WIDTHS[stageIndex] ?? '50%';
+
   if (loading) {
     return (
       <div className='flex flex-col items-center w-full'>
         <div
           className='w-full rounded-xl border border-subtle bg-surface-1 px-5 py-4 text-center'
-          style={{ maxWidth: `${widthPercent}%` }}
+          style={{ maxWidth: width }}
         >
           <LoadingSkeleton
             height='h-3'
@@ -120,12 +126,11 @@ function FunnelStage({
       <div
         className={cn(
           'relative w-full overflow-hidden rounded-xl border px-5 py-4 text-center',
-          'transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
           isLast
             ? 'border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--color-bg-surface-1)] ring-1 ring-accent/15'
             : 'border-subtle bg-gradient-to-r from-[var(--color-bg-surface-1)] to-[var(--color-bg-surface-2)]'
         )}
-        style={{ maxWidth: `${widthPercent}%` }}
+        style={{ maxWidth: width }}
       >
         <p className='text-[11px] font-semibold uppercase tracking-[0.15em] text-tertiary-token mb-1.5'>
           {label}
@@ -265,8 +270,17 @@ export interface AnalyticsSidebarProps {
   readonly onClose: () => void;
 }
 
+type RankedTab = 'cities' | 'sources' | 'links';
+
+const RANKED_TAB_OPTIONS = [
+  { value: 'cities' as const, label: 'Cities' },
+  { value: 'sources' as const, label: 'Sources' },
+  { value: 'links' as const, label: 'Links' },
+];
+
 export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const [range, setRange] = useState<AnalyticsRange>('30d');
+  const [rankedTab, setRankedTab] = useState<RankedTab>('cities');
 
   const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
     range,
@@ -281,7 +295,6 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const profileViews = data?.profile_views ?? 0;
   const uniqueVisitors = data?.unique_users ?? 0;
   const subscribers = data?.subscribers ?? 0;
-  const maxValue = Math.max(profileViews, uniqueVisitors, subscribers, 1);
 
   const stages = [
     {
@@ -317,101 +330,107 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data-testid='analytics-sidebar'
     >
       <div className='flex h-full flex-col'>
-        {/* Header — matches DrawerHeader pattern */}
-        <DrawerHeader title='Analytics' onClose={onClose} />
+        {/* Header — sticky so it stays visible while scrolling */}
+        <div className='sticky top-0 z-10 bg-surface-1'>
+          <DrawerHeader title='Analytics' onClose={onClose} />
+        </div>
 
-        {/* Range toggle + content */}
-        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain'>
-          <div
-            className={cn(
-              'px-5 pt-4 pb-6 space-y-6 transition-opacity duration-150',
-              isFetching && !loading && 'opacity-60'
-            )}
-          >
-            {/* Range selector */}
-            <div className='flex items-center justify-between'>
-              <div className='flex items-center gap-2 text-tertiary-token'>
-                <TrendingUp className='h-3.5 w-3.5' />
-                <span className='text-[12px] font-medium'>
-                  Conversion Funnel
-                </span>
-              </div>
-              <SidebarRangeToggle value={range} onChange={setRange} />
+        {/* Content */}
+        <div
+          className={cn(
+            'px-5 pt-4 pb-6 space-y-6 transition-opacity duration-150',
+            isFetching && !loading && 'opacity-60'
+          )}
+        >
+          {/* Range selector */}
+          <div className='flex items-center justify-between'>
+            <div className='flex items-center gap-2 text-tertiary-token'>
+              <TrendingUp className='h-3.5 w-3.5' />
+              <span className='text-[12px] font-medium'>Conversion Funnel</span>
             </div>
+            <SidebarRangeToggle value={range} onChange={setRange} />
+          </div>
 
-            {/* Vertical Funnel */}
-            <div className='flex flex-col items-center gap-0'>
-              {stages.map((stage, index) => {
-                const widthPercent = Math.max(
-                  (stage.value / maxValue) * 100,
-                  30
-                );
-                const isLast = index === stages.length - 1;
-                const prevStage = index > 0 ? stages[index - 1] : null;
-                const conversionRate = prevStage
-                  ? calculateRate(stage.value, prevStage.value)
-                  : null;
+          {/* Vertical Funnel — fixed widths to prevent layout shift */}
+          <div className='flex flex-col items-center gap-0'>
+            {stages.map((stage, index) => {
+              const isLast = index === stages.length - 1;
+              const prevStage = index > 0 ? stages[index - 1] : null;
+              const conversionRate = prevStage
+                ? calculateRate(stage.value, prevStage.value)
+                : null;
 
-                return (
-                  <FunnelStage
-                    key={stage.label}
-                    label={stage.label}
-                    value={fmt.format(stage.value)}
-                    description={stage.description}
-                    conversionRate={conversionRate}
-                    widthPercent={widthPercent}
-                    isLast={isLast}
-                    loading={loading}
+              return (
+                <FunnelStage
+                  key={stage.label}
+                  label={stage.label}
+                  value={fmt.format(stage.value)}
+                  description={stage.description}
+                  conversionRate={conversionRate}
+                  stageIndex={index}
+                  isLast={isLast}
+                  loading={loading}
+                />
+              );
+            })}
+          </div>
+
+          {/* Secondary metrics */}
+          {!loading && data && (
+            <div className='border-t border-subtle pt-4'>
+              <div className='flex items-center gap-2 mb-3'>
+                <BarChart3 className='h-3.5 w-3.5 text-tertiary-token' />
+                <h3 className='text-[12px] font-medium text-secondary-token'>
+                  Engagement
+                </h3>
+              </div>
+              <div className='divide-y divide-subtle'>
+                {typeof data.capture_rate === 'number' && (
+                  <StatRow
+                    label='Capture Rate'
+                    value={`${data.capture_rate}%`}
+                    loading={false}
                   />
-                );
-              })}
-            </div>
-
-            {/* Secondary metrics */}
-            {!loading && data && (
-              <div className='border-t border-subtle pt-4'>
-                <div className='flex items-center gap-2 mb-3'>
-                  <BarChart3 className='h-3.5 w-3.5 text-tertiary-token' />
-                  <h3 className='text-[12px] font-medium text-secondary-token'>
-                    Engagement
-                  </h3>
-                </div>
-                <div className='divide-y divide-subtle'>
-                  {typeof data.capture_rate === 'number' && (
-                    <StatRow
-                      label='Capture Rate'
-                      value={`${data.capture_rate}%`}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.listen_clicks === 'number' && (
-                    <StatRow
-                      label='Listen Clicks'
-                      value={fmt.format(data.listen_clicks)}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.total_clicks === 'number' && (
-                    <StatRow
-                      label='Total Clicks'
-                      value={fmt.format(data.total_clicks)}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.identified_users === 'number' && (
-                    <StatRow
-                      label='Identified Users'
-                      value={fmt.format(data.identified_users)}
-                      loading={false}
-                    />
-                  )}
-                </div>
+                )}
+                {typeof data.listen_clicks === 'number' && (
+                  <StatRow
+                    label='Listen Clicks'
+                    value={fmt.format(data.listen_clicks)}
+                    loading={false}
+                  />
+                )}
+                {typeof data.total_clicks === 'number' && (
+                  <StatRow
+                    label='Total Clicks'
+                    value={fmt.format(data.total_clicks)}
+                    loading={false}
+                  />
+                )}
+                {typeof data.identified_users === 'number' && (
+                  <StatRow
+                    label='Identified Users'
+                    value={fmt.format(data.identified_users)}
+                    loading={false}
+                  />
+                )}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Top lists */}
-            {!loading && data && (
-              <div className='space-y-5 border-t border-subtle pt-4'>
+          {/* Tabbed ranked lists */}
+          {!loading && data && (
+            <div className='border-t border-subtle pt-4 space-y-3'>
+              <SegmentControl
+                value={rankedTab}
+                onValueChange={setRankedTab}
+                options={RANKED_TAB_OPTIONS}
+                size='sm'
+                aria-label='Select data view'
+                className='w-full'
+                triggerClassName='flex-1'
+              />
+
+              {rankedTab === 'cities' && (
                 <RankedList
                   title='Top Cities'
                   icon={MapPin}
@@ -423,6 +442,8 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
                   }))}
                   emptyMessage='No city data yet'
                 />
+              )}
+              {rankedTab === 'sources' && (
                 <RankedList
                   title='Traffic Sources'
                   icon={Globe}
@@ -434,6 +455,8 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
                   }))}
                   emptyMessage='No referrer data yet'
                 />
+              )}
+              {rankedTab === 'links' && (
                 <RankedList
                   title='Top Links'
                   icon={Link2}
@@ -445,9 +468,9 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
                   }))}
                   emptyMessage='No link data yet'
                 />
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </RightDrawer>
