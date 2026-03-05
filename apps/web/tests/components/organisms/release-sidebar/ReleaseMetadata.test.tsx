@@ -15,6 +15,7 @@ function buildRelease(overrides: Partial<Release> = {}): Release {
     spotifyPopularity: 72,
     providers: [],
     releaseType: 'single',
+    isExplicit: false,
     upc: '123456789012',
     label: 'North Star Records',
     totalTracks: 1,

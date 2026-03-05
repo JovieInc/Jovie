@@ -32,6 +32,7 @@ function makeRelease(
     slug: 'test-release',
     smartLinkPath: '/r/test-release',
     releaseType: 'single',
+    isExplicit: false,
     totalTracks: 1,
     providers: [],
     ...overrides,

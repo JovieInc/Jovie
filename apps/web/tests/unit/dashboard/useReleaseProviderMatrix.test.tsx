@@ -108,6 +108,7 @@ function makeRelease(overrides?: Partial<ReleaseOverrides>) {
     slug: 'test-release',
     smartLinkPath: '/r/test-release',
     releaseType: 'single' as const,
+    isExplicit: false,
     totalTracks: 1,
     providers: [
       {

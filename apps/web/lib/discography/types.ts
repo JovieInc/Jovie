@@ -83,12 +83,17 @@ export interface ReleaseViewModel {
   >;
   // Extended fields for table display
   releaseType: ReleaseType;
+  isExplicit: boolean;
   upc?: string | null;
   label?: string | null;
   totalTracks: number;
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];
+  /** ℗ phonographic copyright line */
+  copyrightLine?: string | null;
+  /** © copyright / distributor line */
+  distributor?: string | null;
   /** Spotify Canvas video status for this release */
   canvasStatus?: CanvasStatus;
   /** Original DSP-ingested artwork URL (available when user has uploaded custom art) */

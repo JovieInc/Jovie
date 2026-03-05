@@ -47,6 +47,7 @@ const release = {
   spotifyPopularity: 72,
   providers: [],
   releaseType: 'single' as const,
+  isExplicit: false,
   upc: '123456789012',
   label: 'Test Label',
   totalTracks: 1,

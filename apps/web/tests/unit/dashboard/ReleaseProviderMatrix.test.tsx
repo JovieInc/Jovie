@@ -238,6 +238,7 @@ function makeRelease(id = 'release-1') {
     slug: `test-release-${id}`,
     smartLinkPath: `/r/test-release-${id}`,
     releaseType: 'single' as const,
+    isExplicit: false,
     totalTracks: 1,
     providers: [
       {

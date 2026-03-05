@@ -3,22 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 
 describe('FinalCTASection', () => {
-  it('renders urgency headline', () => {
+  it('renders headline', () => {
     render(<FinalCTASection />);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
-      'Claim your corner of the internet.'
-    );
+    expect(screen.getByTestId('final-cta-headline')).toBeInTheDocument();
   });
 
-  it('renders CTA button', () => {
+  it('renders claim handle form', () => {
     render(<FinalCTASection />);
-    expect(
-      screen.getByRole('link', { name: /claim your handle/i })
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-dock')).toBeInTheDocument();
   });
 
   it('renders subtext', () => {
     render(<FinalCTASection />);
-    expect(screen.getByText(/set up in under 60 seconds/i)).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-subtext')).toBeInTheDocument();
   });
 });

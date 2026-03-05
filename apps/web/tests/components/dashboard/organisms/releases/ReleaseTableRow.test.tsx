@@ -56,6 +56,7 @@ describe('ReleaseTableRow', () => {
       smartLinkPath: '/r/midnight-signal',
       providers: [],
       releaseType: 'single',
+      isExplicit: false,
       totalTracks: 1,
     };
 

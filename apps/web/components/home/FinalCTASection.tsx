@@ -18,10 +18,16 @@ export function FinalCTASection() {
         />
 
         <div className='mx-auto flex max-w-2xl flex-col items-center text-center'>
-          <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+          <h2
+            data-testid='final-cta-headline'
+            className='marketing-h2-linear text-[var(--linear-text-primary)]'
+          >
             Your fans are visiting. Start converting.
           </h2>
-          <p className='mt-4 marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p
+            data-testid='final-cta-subtext'
+            className='mt-4 marketing-lead-linear text-[var(--linear-text-secondary)]'
+          >
             Free forever. No credit card required.
           </p>
 
@@ -29,6 +35,7 @@ export function FinalCTASection() {
           <div className='mt-8 w-full flex justify-center'>
             <div
               id='final-cta-dock'
+              data-testid='final-cta-dock'
               className='w-full max-w-[600px] overflow-hidden rounded-[24px] border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] p-2'
               style={{
                 boxShadow:
