@@ -155,7 +155,14 @@ export function ClientProviders({
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
+    <ClerkProvider
+      publishableKey={publishableKey}
+      appearance={clerkAppearance}
+      signInUrl='/signin'
+      signUpUrl='/signup'
+      signInFallbackRedirectUrl='/app'
+      signUpFallbackRedirectUrl='/onboarding'
+    >
       <ClerkSafeValuesProvider>
         {wrapWithCoreProviders({
           children,
