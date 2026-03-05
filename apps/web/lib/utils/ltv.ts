@@ -45,7 +45,7 @@ export function calculateLtv(params: {
   } else if (tipTotalDollars >= 5) {
     tier = 'medium';
     label = '$$';
-  } else if (tipTotalDollars > 0 || params.visits >= 3) {
+  } else if (tipTotalDollars > 0) {
     tier = 'low';
     label = '$';
   } else {
