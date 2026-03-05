@@ -144,6 +144,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => [a, b]),
   ne: vi.fn((a: unknown, b: unknown) => [a, b]),
+  count: vi.fn((col: unknown) => col),
 }));
 
 vi.mock('@/lib/services/canvas/service', () => ({
@@ -472,27 +473,26 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       artistName: 'Test Artist',
     };
 
-    it('connects Spotify artist and syncs releases', async () => {
+    it('connects Spotify artist and starts background import', async () => {
       setupDbSelectChain([{ settings: {} }]);
       setupDbUpdateChain();
+      // Background fire-and-forget calls sync; set up mock to prevent unhandled rejection
       mockSyncReleasesFromSpotify.mockResolvedValue({
         success: true,
         imported: 3,
-        releases: [makeRelease()],
+        releases: [],
         errors: [],
       });
-      mockEnqueueDspArtistDiscoveryJob.mockResolvedValue(undefined);
-      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue(undefined);
 
       const { connectSpotifyArtist } = await import(
         '@/app/app/(shell)/dashboard/releases/actions'
       );
       const result = await connectSpotifyArtist(connectParams);
       expect(result.success).toBe(true);
-      expect(result.imported).toBe(3);
+      expect(result.importing).toBe(true);
+      expect(result.imported).toBe(0);
       expect(result.artistName).toBe('Test Artist');
       expect(mockDbUpdate).toHaveBeenCalled();
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
     });
 
     it('rejects unauthenticated calls', async () => {
@@ -507,9 +507,10 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       );
     });
 
-    it('returns failure when sync fails', async () => {
+    it('returns importing state even when sync would fail (fire-and-forget)', async () => {
       setupDbSelectChain([{ settings: {} }]);
       setupDbUpdateChain();
+      // Even with a failing sync, connectSpotifyArtist returns immediately
       mockSyncReleasesFromSpotify.mockResolvedValue({
         success: false,
         imported: 0,
@@ -522,7 +523,9 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       );
       const result = await connectSpotifyArtist(connectParams);
 
-      expect(result.success).toBe(false);
+      // Fire-and-forget: always returns success/importing immediately
+      expect(result.success).toBe(true);
+      expect(result.importing).toBe(true);
       expect(result.imported).toBe(0);
     });
 

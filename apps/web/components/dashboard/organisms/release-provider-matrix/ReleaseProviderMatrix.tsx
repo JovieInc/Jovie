@@ -35,7 +35,9 @@ import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
+import { useImportPolling } from './hooks/useImportPolling';
 import { useReleaseTablePreferences } from './hooks/useReleaseTablePreferences';
+import { ImportProgressBanner } from './ImportProgressBanner';
 import { ReleasesEmptyState } from './ReleasesEmptyState';
 import { ReleaseTable } from './ReleaseTable';
 import {
@@ -79,11 +81,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   appleMusicConnected = false,
   appleMusicArtistName = null,
   allowArtworkDownloads = false,
+  initialImporting = false,
 }: ReleaseProviderMatrixProps) {
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
-  const [isImporting, setIsImporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(initialImporting);
   const [spotifySearchOpen, setSpotifySearchOpen] = useState(false);
 
   // Apple Music connection state
@@ -308,8 +311,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     (newReleases: ReleaseViewModel[], newArtistName: string) => {
       setIsConnected(true);
       setArtistName(newArtistName);
-      setRows(newReleases);
-      setIsImporting(false);
+      // Only clear importing if releases were returned (non-fire-and-forget)
+      if (newReleases.length > 0) {
+        setRows(newReleases);
+        setIsImporting(false);
+      }
     },
     [setRows]
   );
@@ -318,6 +324,24 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setIsImporting(true);
     setArtistName(importingArtistName);
   }, []);
+
+  // Polling: update rows as releases are ingested in the background
+  const handleReleasesFromPolling = useCallback(
+    (polledReleases: ReleaseViewModel[]) => {
+      setRows(polledReleases);
+    },
+    [setRows]
+  );
+
+  const handleImportComplete = useCallback(() => {
+    setIsImporting(false);
+  }, []);
+
+  const { importedCount } = useImportPolling({
+    enabled: isImporting,
+    onReleasesUpdate: handleReleasesFromPolling,
+    onImportComplete: handleImportComplete,
+  });
 
   const handleAppleMusicConnect = useCallback(
     async (artist: {
@@ -431,11 +455,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [setRows]
   );
 
-  // Show importing state when we're actively importing
-  const showImportingState = isImporting && rows.length === 0;
+  // Show import progress banner when actively importing
+  const showImportProgress = isImporting;
+  // Show spinner-only state when importing but no releases loaded yet
+  const showImportingState =
+    isImporting && rows.length === 0 && importedCount === 0;
   // Show empty state when not connected and no releases
   const showEmptyState = !isConnected && !isImporting && rows.length === 0;
-  // Show releases table when we have releases or when connected and not importing
+  // Show releases table when we have releases
   const showReleasesTable = rows.length > 0;
 
   const isReleaseSidebarOpen = Boolean(editingRelease);
@@ -756,6 +783,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto pb-4'>
+            {showImportProgress && (
+              <ImportProgressBanner
+                artistName={artistName}
+                importedCount={importedCount}
+              />
+            )}
+
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnectSpotify={() => setSpotifySearchOpen(true)}
