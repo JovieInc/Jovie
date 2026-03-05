@@ -289,76 +289,76 @@ export const RELEASES: DemoRelease[] = [
 export interface DemoLink {
   id: string;
   platform: string;
+  platformKey: string;
   type: 'music' | 'social';
   url: string;
   clicks: number;
   active: boolean;
-  icon: string; // emoji placeholder
 }
 
 export const LINKS: DemoLink[] = [
   {
     id: '1',
     platform: 'Spotify',
+    platformKey: 'spotify',
     type: 'music',
     url: 'open.spotify.com/artist/timwhite',
     clicks: 1_126,
     active: true,
-    icon: '🎵',
   },
   {
     id: '2',
     platform: 'Apple Music',
+    platformKey: 'applemusic',
     type: 'music',
     url: 'music.apple.com/artist/timwhite',
     clicks: 684,
     active: true,
-    icon: '🎵',
   },
   {
     id: '3',
     platform: 'YouTube Music',
+    platformKey: 'youtubemusic',
     type: 'music',
     url: 'music.youtube.com/timwhite',
     clicks: 412,
     active: true,
-    icon: '🎵',
   },
   {
     id: '4',
     platform: 'Instagram',
+    platformKey: 'instagram',
     type: 'social',
     url: 'instagram.com/timwhitemusic',
     clicks: 328,
     active: true,
-    icon: '📸',
   },
   {
     id: '5',
     platform: 'TikTok',
+    platformKey: 'tiktok',
     type: 'social',
     url: 'tiktok.com/@timwhitemusic',
     clicks: 291,
     active: true,
-    icon: '🎬',
   },
   {
     id: '6',
     platform: 'Twitter',
+    platformKey: 'x',
     type: 'social',
     url: 'twitter.com/timwhitemusic',
     clicks: 156,
     active: true,
-    icon: '🐦',
   },
   {
     id: '7',
     platform: 'SoundCloud',
+    platformKey: 'soundcloud',
     type: 'music',
     url: 'soundcloud.com/timwhitemusic',
     clicks: 89,
     active: false,
-    icon: '☁️',
   },
 ];
 

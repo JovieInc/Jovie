@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { DSP_CONFIGS } from '@/lib/dsp';
 import { RELEASES } from './mock-data';
+
+const PROVIDER_KEYS = [
+  'spotify',
+  'apple_music',
+  'youtube_music',
+  'deezer',
+] as const;
 
 /**
  * Releases management demo showing a discography table.
+ * Uses real SocialIcon provider dots matching the ReleaseTable pattern.
  */
 export function DashboardReleasesDemo() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -67,24 +77,46 @@ export function DashboardReleasesDemo() {
                   <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token'>
                     {release.type}
                   </span>
-                  {release.hasSmartLink && (
-                    <span
-                      className='shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium'
-                      style={{
-                        backgroundColor: 'var(--linear-accent)',
-                        color: '#fff',
-                        opacity: 0.9,
-                      }}
-                    >
-                      Smart Link
-                    </span>
-                  )}
                 </div>
                 <p className='mt-0.5 text-[11px] text-tertiary-token'>
                   {release.date} · {release.trackCount}{' '}
-                  {release.trackCount === 1 ? 'track' : 'tracks'} ·{' '}
-                  {release.platforms.length} platforms
+                  {release.trackCount === 1 ? 'track' : 'tracks'}
                 </p>
+              </div>
+
+              {/* Provider dots — matches real ReleaseTable */}
+              <div className='hidden sm:flex items-center gap-1'>
+                {PROVIDER_KEYS.map(key => {
+                  const config = DSP_CONFIGS[key];
+                  const isAvailable = release.platforms.some(
+                    p =>
+                      p.toLowerCase().replace(/\s+/g, '_') === key ||
+                      p.toLowerCase().replace(/\s+/g, '') ===
+                        key.replace(/_/g, '')
+                  );
+                  return (
+                    <span
+                      key={key}
+                      className='inline-flex h-5 w-5 items-center justify-center rounded-full'
+                      style={{
+                        backgroundColor: isAvailable
+                          ? `${config?.color ?? '#888'}20`
+                          : 'var(--color-bg-surface-2)',
+                        color: isAvailable
+                          ? config?.color
+                          : 'var(--color-text-tertiary-token)',
+                        opacity: isAvailable ? 1 : 0.3,
+                      }}
+                      title={config?.name}
+                    >
+                      <SocialIcon
+                        platform={key}
+                        className='h-3 w-3'
+                        aria-hidden
+                      />
+                    </span>
+                  );
+                })}
               </div>
             </div>
           ))}

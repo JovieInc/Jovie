@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { LINKS } from './mock-data';
 
 /**
  * Link management demo showing social & music links with click counts.
+ * Uses real SocialIcon components instead of emoji placeholders.
  */
 export function DashboardLinksDemo() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -62,12 +64,16 @@ export function DashboardLinksDemo() {
                 className='flex flex-col gap-[2px] opacity-30'
                 style={{ color: 'var(--color-text-tertiary-token)' }}
               >
-                <span className='text-[8px] leading-none'>⋮⋮</span>
+                <span className='text-[8px] leading-none'>&#8942;&#8942;</span>
               </div>
 
               {/* Platform icon & name */}
               <div className='flex min-w-0 flex-1 items-center gap-2.5'>
-                <span className='text-sm'>{link.icon}</span>
+                <SocialIcon
+                  platform={link.platformKey}
+                  className='h-4 w-4 shrink-0 text-secondary-token'
+                  aria-hidden
+                />
                 <div className='min-w-0'>
                   <p className='text-xs font-medium text-primary-token'>
                     {link.platform}
