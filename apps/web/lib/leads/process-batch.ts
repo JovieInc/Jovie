@@ -73,6 +73,7 @@ async function processOneLead(
         avatarUrl: qualification.avatarUrl,
         contactEmail: qualification.contactEmail,
         hasPaidTier: qualification.hasPaidTier,
+        isLinktreeVerified: qualification.isLinktreeVerified,
         hasSpotifyLink: qualification.hasSpotifyLink,
         spotifyUrl: qualification.spotifyUrl,
         hasInstagram: qualification.hasInstagram,

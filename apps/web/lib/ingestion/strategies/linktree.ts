@@ -9,6 +9,7 @@
 
 export {
   detectLinktreePaidTier,
+  detectLinktreeVerification,
   ExtractionError,
   extractLinktree,
   extractLinktreeHandle,

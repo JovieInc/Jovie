@@ -31,6 +31,7 @@ export const leads = pgTable(
 
     // Qualification signals
     hasPaidTier: boolean('has_paid_tier'),
+    isLinktreeVerified: boolean('is_linktree_verified'),
     hasSpotifyLink: boolean('has_spotify_link').default(false).notNull(),
     spotifyUrl: text('spotify_url'),
     hasInstagram: boolean('has_instagram').default(false).notNull(),

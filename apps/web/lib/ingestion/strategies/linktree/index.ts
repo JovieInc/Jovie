@@ -17,8 +17,11 @@ export { extractLinktree } from './extraction';
 // Re-export fetch function
 export { fetchLinktreeDocument } from './fetch';
 
-// Re-export paid tier detection
-export { detectLinktreePaidTier } from './paid-tier';
+// Re-export paid tier and verification detection
+export {
+  detectLinktreePaidTier,
+  detectLinktreeVerification,
+} from './paid-tier';
 
 // Re-export validation functions
 export {

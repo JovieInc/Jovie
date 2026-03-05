@@ -2,11 +2,14 @@ import {
   calculateFitScore,
   MUSIC_TOOL_PLATFORMS,
 } from '@/lib/fit-scoring/calculator';
+import { extractScriptJson } from '@/lib/ingestion/strategies/base';
 import {
   detectLinktreePaidTier,
   extractLinktree,
   fetchLinktreeDocument,
 } from '@/lib/ingestion/strategies/linktree';
+import type { LinktreePageProps } from '@/lib/ingestion/strategies/linktree/helpers';
+import { detectLinktreeVerification } from '@/lib/ingestion/strategies/linktree/paid-tier';
 import type { ExtractedLink } from '@/lib/ingestion/types';
 
 export interface QualificationResult {
@@ -16,6 +19,7 @@ export interface QualificationResult {
   avatarUrl: string | null;
   contactEmail: string | null;
   hasPaidTier: boolean | null;
+  isLinktreeVerified: boolean | null;
   hasSpotifyLink: boolean;
   spotifyUrl: string | null;
   hasInstagram: boolean;
@@ -42,6 +46,8 @@ export async function qualifyLead(
   const html = await fetchLinktreeDocument(linktreeUrl);
   const extraction = extractLinktree(html);
   const hasPaidTier = detectLinktreePaidTier(html);
+  const nextData = extractScriptJson<LinktreePageProps>(html, '__NEXT_DATA__');
+  const isLinktreeVerified = detectLinktreeVerification(html, nextData);
 
   const platforms = extraction.links.map(l => l.platformId).filter(Boolean);
   const hasSpotifyLink = platforms.includes('spotify');
@@ -62,12 +68,19 @@ export async function qualifyLead(
   });
 
   // Apply qualification rules
+  // Verified + Spotify → always qualified (strongest signal)
+  // Paid tier + Spotify → qualified
+  // Free tier + Spotify + music tool → qualified
+  // No Spotify → disqualified
+  // Free tier + Spotify only → disqualified
   let status: 'qualified' | 'disqualified';
   let disqualificationReason: string | null = null;
 
   if (!hasSpotifyLink) {
     status = 'disqualified';
     disqualificationReason = 'no_spotify';
+  } else if (isLinktreeVerified) {
+    status = 'qualified';
   } else if (hasPaidTier) {
     status = 'qualified';
   } else if (musicToolsDetected.length > 0) {
@@ -84,6 +97,7 @@ export async function qualifyLead(
     avatarUrl: extraction.avatarUrl ?? null,
     contactEmail: extraction.contactEmail ?? null,
     hasPaidTier,
+    isLinktreeVerified,
     hasSpotifyLink,
     spotifyUrl: spotifyLink?.url ?? null,
     hasInstagram: !!instagramLink,
