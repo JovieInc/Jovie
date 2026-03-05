@@ -6,6 +6,7 @@ import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticRe
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
+import { LogoBar } from '@/components/home/LogoBar';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -248,6 +249,7 @@ export default function HomePage() {
       {/* Hero + logo bar fill the viewport together (minus fixed header) */}
       <div className='flex flex-col'>
         <RedesignedHero />
+        <LogoBar />
       </div>
 
       <AutomaticReleaseSmartlinksSection />
