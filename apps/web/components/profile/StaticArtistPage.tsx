@@ -5,6 +5,7 @@ import {
   ArtistNotificationsCTA,
   TwoStepNotificationsCTA,
 } from '@/components/profile/artist-notifications-cta';
+import { ContactSection } from '@/components/profile/ContactSection';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
@@ -145,6 +146,7 @@ interface RenderContentOptions {
   readonly mode: string;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
   readonly mergedDSPs: AvailableDSP[];
   readonly primaryAction: PrimaryAction;
   readonly enableDynamicEngagement: boolean;
@@ -156,6 +158,7 @@ function renderContent({
   mode,
   artist,
   socialLinks,
+  contacts,
   mergedDSPs,
   primaryAction,
   enableDynamicEngagement,
@@ -217,6 +220,15 @@ function renderContent({
         </div>
       );
 
+    case 'contact':
+      return (
+        <ContactSection
+          contacts={contacts}
+          artistName={artist.name}
+          artistHandle={artist.handle}
+        />
+      );
+
     case 'about':
       return <AboutSection artist={artist} genres={genres} />;
 
@@ -261,7 +273,7 @@ export function StaticArtistPage({
         socialLinks={socialLinks}
         contacts={contacts}
         subtitle={subtitle}
-        showSocialBar={mode !== 'listen'}
+        mode={mode}
         showTipButton={showTipButton}
         isTipModeActive={isTipModeActive}
         showBackButton={showBackButton}
@@ -302,6 +314,7 @@ export function StaticArtistPage({
               mode,
               artist,
               socialLinks,
+              contacts,
               mergedDSPs,
               primaryAction,
               enableDynamicEngagement,

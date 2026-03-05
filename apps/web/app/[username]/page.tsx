@@ -431,7 +431,7 @@ interface Props {
     readonly username: string;
   }>;
   readonly searchParams?: Promise<{
-    mode?: 'profile' | 'listen' | 'tip' | 'subscribe' | 'about';
+    mode?: 'profile' | 'listen' | 'tip' | 'subscribe' | 'about' | 'contact';
   }>;
 }
 

@@ -44,6 +44,7 @@ export function ProfileShell({
   subtitle,
   children,
   showSocialBar = true,
+  mode,
   showTipButton = false,
   isTipModeActive = false,
   showBackButton = false,
@@ -205,8 +206,9 @@ export function ProfileShell({
                         artistHandle={artist.handle}
                         artistName={artist.name}
                       />
-                      {/* Social icons — middle */}
-                      {(showSocialBar || hasActiveSubscriptions) &&
+                      {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
+                      {(!mode || mode === 'profile') &&
+                        showSocialBar &&
                         hasSocialLinks &&
                         socialNetworkLinks.map(link => (
                           <SocialLinkComponent

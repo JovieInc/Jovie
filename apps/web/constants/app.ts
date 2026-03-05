@@ -50,6 +50,7 @@ export const PAGE_SUBTITLES = {
   listen: 'Choose a Service',
   subscribe: 'Get notified',
   about: 'About',
+  contact: 'Contact',
 } as const;
 
 // Legacy FEATURE_FLAGS removed (waitlist deprecated). Use `lib/feature-flags.ts`.
