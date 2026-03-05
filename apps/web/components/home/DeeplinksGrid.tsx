@@ -193,7 +193,7 @@ const cards: CardData[] = [
   },
   {
     slugPath: 'listen',
-    description: 'Skip the profile. Opens their preferred DSP.',
+    description: 'Skip the profile. Opens their preferred platform.',
     mockup: <ListenMockup />,
   },
 ];

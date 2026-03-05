@@ -12,7 +12,7 @@ const EMPTY_STATE_MESSAGES: Record<
   { title: string; description: string; icon: string }
 > = {
   all: {
-    title: 'No DSP matches found',
+    title: 'No platform matches found',
     description:
       "We haven't found any streaming platform matches for your profile yet. Check back soon!",
     icon: 'Music',
