@@ -49,10 +49,10 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Base styles for dropdown/popover content containers
  * Used by: DropdownMenuContent, ContextMenuContent, PopoverContent, SelectContent
  *
- * Border uses design token (--color-border-default) for consistency across themes
+ * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-1.5 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)] backdrop-blur-md';
+  'z-50 min-w-[200px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-1 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]';
 
 /**
  * Shadow effect for elevated appearance
@@ -163,13 +163,13 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-radius-sm) px-2 py-1.5 text-[13px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-1.5 text-[13px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
+  'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-(--linear-text-tertiary) ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
 /**
@@ -185,23 +185,23 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-(--linear-radius-sm) py-1.5 pl-8 pr-2 text-[13px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
+  'relative flex cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1.5 pl-8 pr-2 text-[13px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
+  'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)';
 
 /**
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  'relative flex w-full cursor-default select-none items-center rounded-(--linear-radius-sm) py-1.5 pl-8 pr-2 text-[13px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
+  'relative flex w-full cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1.5 pl-8 pr-2 text-[13px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) ' +
   'focus-visible:bg-(--linear-bg-surface-1) focus-visible:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50';
+  'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46]';
 
 // ============================================================================
 // COMPACT SIZE VARIANT (table actions, context menus, sidebar menus)
@@ -211,13 +211,13 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-radius-sm) px-2 py-1 text-[12.5px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-(--linear-font-weight-normal) leading-[1.2] outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
+  'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-(--linear-text-tertiary) ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
 /**
@@ -233,20 +233,20 @@ export const MENU_ITEM_COMPACT_DESTRUCTIVE = MENU_ITEM_DESTRUCTIVE;
  * Menu label styles (group headers)
  */
 export const MENU_LABEL_BASE =
-  'px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-(--linear-text-tertiary)';
+  'px-2 py-1.5 text-[11px] font-medium text-(--linear-text-tertiary)';
 
 /**
  * Menu separator styles
  * Uses design token for border consistency
  */
 export const MENU_SEPARATOR_BASE =
-  '-mx-0.5 my-1 h-px bg-(--linear-border-subtle)';
+  '-mx-1 my-1 h-px bg-(--linear-border-subtle)';
 
 /**
  * Keyboard shortcut indicator styles
  */
 export const MENU_SHORTCUT_BASE =
-  'ml-auto text-[11px] tracking-wide text-(--linear-text-tertiary)';
+  'ml-auto text-[11px] text-(--linear-text-tertiary)';
 
 // ============================================================================
 // TRIGGER STYLES
@@ -256,7 +256,7 @@ export const MENU_SHORTCUT_BASE =
  * Select trigger button styles
  */
 export const SELECT_TRIGGER_BASE =
-  'flex h-10 w-full items-center justify-between rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 ' +
+  'flex h-10 w-full items-center justify-between rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 ' +
   'text-[13px] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) ' +
@@ -285,7 +285,7 @@ export const subMenuContentClasses = [
  * Compact base — same surface/border/animation but tighter padding
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-[10.5rem] overflow-hidden rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary)';
+  'z-50 min-w-[200px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary)';
 
 /**
  * Complete compact DropdownMenu content classes
