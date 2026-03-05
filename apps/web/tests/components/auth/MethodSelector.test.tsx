@@ -41,14 +41,16 @@ describe('MethodSelector', () => {
 
   it('shows correct heading for signup', () => {
     render(<MethodSelector {...commonProps} mode='signup' />);
-    expect(
-      screen.getByText('Create your Jovie account')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Create your Jovie account')).toBeInTheDocument();
   });
 
   it('displays error when provided', () => {
     render(
-      <MethodSelector {...commonProps} mode='signin' error='Something went wrong' />
+      <MethodSelector
+        {...commonProps}
+        mode='signin'
+        error='Something went wrong'
+      />
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong');
   });
