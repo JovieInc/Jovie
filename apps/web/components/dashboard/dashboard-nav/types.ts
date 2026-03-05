@@ -7,6 +7,8 @@ export interface NavItem {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   description?: string;
   children?: NavItem[];
+  /** Optional count badge shown right-aligned */
+  badge?: number;
 }
 
 export interface DashboardNavProps {

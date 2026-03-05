@@ -93,6 +93,11 @@ export function NavMenuItem({
       <span className='truncate group-data-[collapsible=icon]:hidden'>
         {item.name}
       </span>
+      {item.badge != null && item.badge > 0 && (
+        <span className='ml-auto text-[11px] tabular-nums text-tertiary-token group-data-[collapsible=icon]:hidden'>
+          {item.badge}
+        </span>
+      )}
     </>
   );
 
