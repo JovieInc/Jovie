@@ -27,7 +27,7 @@ describe('clerk-errors.ts', () => {
       const result = parseClerkError(clerkError);
 
       expect(result).toBe(
-        "We couldn't find an account with that email. Would you like to sign up instead?"
+        "We couldn't find an account with that email."
       );
     });
 
