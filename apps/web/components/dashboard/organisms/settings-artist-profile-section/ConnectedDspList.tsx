@@ -159,7 +159,7 @@ export function ConnectedDspList({
   const handleSyncNow = useCallback(
     (provider: DspProviderId) => {
       if (!spotifyId) {
-        toast.error('A Spotify ID is required to sync DSP profiles');
+        toast.error('A Spotify ID is required to sync platform profiles');
         return;
       }
       const label = getProviderLabel(provider);
@@ -241,7 +241,7 @@ export function ConnectedDspList({
         <div className='flex items-center justify-center py-8'>
           <Loader2 className='h-5 w-5 animate-spin text-secondary-token' />
           <span className='ml-2 text-sm text-secondary-token'>
-            Loading DSP connections...
+            Loading platform connections...
           </span>
         </div>
       </DashboardCard>
@@ -253,7 +253,7 @@ export function ConnectedDspList({
       <DashboardCard variant='settings'>
         <div className='text-center py-6'>
           <p className='text-sm text-secondary-token'>
-            Failed to load DSP connections. Please try again.
+            Failed to load platform connections. Please try again.
           </p>
         </div>
       </DashboardCard>

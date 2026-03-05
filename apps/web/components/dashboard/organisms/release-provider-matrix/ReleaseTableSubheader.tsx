@@ -74,7 +74,7 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
-  /** DSP connection badges to display on the left */
+  /** Platform connection badges to display on the left */
   readonly dspBadges?: React.ReactNode;
   /** Whether search is currently active */
   readonly isSearchOpen?: boolean;
@@ -320,7 +320,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: DSP connection badges */}
+      {/* Left: Platform connection badges */}
       <div className='flex items-center gap-2'>{dspBadges}</div>
 
       {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}

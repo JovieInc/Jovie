@@ -14,7 +14,7 @@ import { detectPlatformFromUA } from '@/lib/utils';
 export interface ListenSectionProps {
   /** Artist handle for tracking */
   readonly handle: string;
-  /** Available DSP platforms */
+  /** Available streaming platforms */
   readonly dsps: AvailableDSP[];
   /** Initial preferred URL to auto-open */
   readonly initialPreferredUrl?: string | null;

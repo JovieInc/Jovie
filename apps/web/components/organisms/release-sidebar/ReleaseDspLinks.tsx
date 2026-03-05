@@ -205,10 +205,10 @@ export function ReleaseDspLinks({
           ? () => onSetIsAddingLink(true)
           : undefined
       }
-      addLabel='Add DSP link'
+      addLabel='Add platform link'
       headerActions={rescanButton}
       isEmpty={release.providers.length === 0 && !isAddingLink}
-      emptyMessage='No DSP links yet.'
+      emptyMessage='No platform links yet.'
     >
       {/* Providers list */}
       {release.providers.length > 0 && (

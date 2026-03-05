@@ -64,7 +64,7 @@ export function ReleaseEditDialog({
         Edit release links
       </DialogTitle>
       <DialogDescription className='text-sm text-secondary-token'>
-        Swap in a preferred DSP link or revert back to our detected URL. All
+        Swap in a preferred platform link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
       <DialogBody className='space-y-4'>

@@ -1186,7 +1186,7 @@ export default async function LaunchPage() {
               }}
             >
               Skip the profile, go straight to the music. Detects each
-              listener&apos;s preferred DSP and opens the right app.
+              listener&apos;s preferred platform and opens the right app.
             </p>
             <div
               className='rounded-md p-4'
