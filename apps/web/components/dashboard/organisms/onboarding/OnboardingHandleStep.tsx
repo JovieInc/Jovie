@@ -113,9 +113,11 @@ function ButtonContent({
   readonly isChecking: boolean;
   readonly autoSubmitClaimed: boolean;
 }) {
+  const isLoading = isSubmitting || (isPendingSubmit && isChecking);
+
   if (autoSubmitClaimed) {
     return (
-      <div className='flex items-center justify-center space-x-2'>
+      <span className='inline-flex items-center justify-center gap-2'>
         <svg
           viewBox='0 0 20 20'
           fill='none'
@@ -132,29 +134,22 @@ function ButtonContent({
           />
         </svg>
         <span>Claimed!</span>
-      </div>
+      </span>
     );
   }
 
-  if (isSubmitting) {
-    return (
-      <div className='flex items-center justify-center space-x-2'>
+  return (
+    <span className='inline-flex items-center justify-center gap-2'>
+      <span
+        className={`inline-flex transition-opacity duration-150 ${isLoading ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}
+      >
         <LoadingSpinner size='sm' className='text-current' />
-        <span>Saving…</span>
-      </div>
-    );
-  }
-
-  if (isPendingSubmit && isChecking) {
-    return (
-      <div className='flex items-center justify-center space-x-2'>
-        <LoadingSpinner size='sm' className='text-current' />
-        <span>Checking…</span>
-      </div>
-    );
-  }
-
-  return <>Continue</>;
+      </span>
+      <span>
+        {isSubmitting ? 'Saving…' : isLoading ? 'Checking…' : 'Continue'}
+      </span>
+    </span>
+  );
 }
 
 export function OnboardingHandleStep({

@@ -31,8 +31,8 @@ export interface HandleValidationState {
 export const ONBOARDING_STEPS = [
   {
     id: 'handle',
-    title: 'Claim your handle',
-    prompt: 'Pick a handle your fans can remember in one glance.',
+    title: 'Choose your handle',
+    prompt: 'This is how fans will find and remember you.',
   },
   {
     id: 'done',
