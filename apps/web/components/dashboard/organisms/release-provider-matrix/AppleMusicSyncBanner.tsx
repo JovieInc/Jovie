@@ -16,6 +16,7 @@ import { Button } from '@jovie/ui';
 import { useEffect, useMemo } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
@@ -122,19 +123,16 @@ export function AppleMusicSyncBanner({
 
   if (syncState === 'no_match') {
     return (
-      <div
-        className={cn(
-          'flex items-center gap-3 rounded-lg border border-subtle bg-surface-1 px-4 py-3',
-          className
-        )}
+      <DashboardCard
+        variant='default'
+        padding='none'
+        className={cn('flex items-center gap-3 px-4 py-3', className)}
       >
-        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-surface-2'>
-          <DspProviderIcon provider='apple_music' size='md' />
-        </div>
+        <DspProviderIcon provider='apple_music' size='md' />
         <p className='text-sm text-secondary-token'>
           No matching Apple Music artist found
         </p>
-      </div>
+      </DashboardCard>
     );
   }
 

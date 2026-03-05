@@ -12,7 +12,7 @@ import {
   Button,
   Input,
 } from '@jovie/ui';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -20,7 +20,9 @@ import {
   useCampaignInvitesQuery,
   useCampaignOverviewQuery,
   useCampaignPreviewQuery,
+  useCampaignSettings,
   useCampaignStatsQuery,
+  useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
 } from '@/lib/queries/useCampaignInvites';
 
@@ -57,6 +59,20 @@ export function InviteCampaignManager() {
   const [sendResult, setSendResult] =
     useState<SendCampaignInvitesResponse | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Load persisted settings on mount
+  const { data: savedSettings } = useCampaignSettings();
+  const saveCampaignSettings = useSaveCampaignSettings();
+
+  useEffect(() => {
+    if (savedSettings?.settings) {
+      const s = savedSettings.settings;
+      setFitScoreThreshold(s.fitScoreThreshold);
+      setLimit(s.batchLimit);
+      setThrottling(s.throttlingConfig);
+    }
+  }, [savedSettings]);
 
   // TanStack Query for preview data
   const {
@@ -84,6 +100,17 @@ export function InviteCampaignManager() {
   const handleRefreshClick = useCallback(() => {
     refetchPreview();
   }, [refetchPreview]);
+
+  const handleSaveSettings = useCallback(async () => {
+    setSettingsSaved(false);
+    await saveCampaignSettings.mutateAsync({
+      fitScoreThreshold,
+      batchLimit: limit,
+      throttlingConfig: throttling,
+    });
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 3000);
+  }, [saveCampaignSettings, fitScoreThreshold, limit, throttling]);
 
   const handleConfirmSend = useCallback(async () => {
     setShowConfirmModal(false);
@@ -400,6 +427,41 @@ export function InviteCampaignManager() {
             Delays are randomized between min and max to appear human-like. Stay
             under 50/hour to avoid spam filters.
           </p>
+        </div>
+
+        <div className='mt-4 flex items-center gap-3'>
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={handleSaveSettings}
+            disabled={saveCampaignSettings.isPending}
+          >
+            {saveCampaignSettings.isPending ? (
+              <>
+                <Icon
+                  name='Loader2'
+                  className='mr-2 h-3.5 w-3.5 animate-spin'
+                />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Icon name='Save' className='mr-2 h-3.5 w-3.5' />
+                Save Settings
+              </>
+            )}
+          </Button>
+          {settingsSaved && (
+            <span className='flex items-center gap-1 text-xs text-success'>
+              <Icon name='CheckCircle' className='h-3.5 w-3.5' />
+              Settings saved
+            </span>
+          )}
+          {saveCampaignSettings.error && (
+            <span className='text-xs text-destructive'>
+              {saveCampaignSettings.error.message}
+            </span>
+          )}
         </div>
       </section>
 

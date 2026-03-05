@@ -6,7 +6,6 @@ import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticRe
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
-import { PhoneProfileDemo } from '@/components/home/PhoneProfileDemo';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
 import { DeferredSection } from '@/components/organisms/DeferredSection';
@@ -251,10 +250,6 @@ export default function HomePage() {
       <div className='flex flex-col'>
         <RedesignedHero />
       </div>
-
-      <DeferredSection placeholderHeight={600}>
-        <PhoneProfileDemo />
-      </DeferredSection>
 
       <DeferredSection placeholderHeight={560}>
         <AutomaticReleaseSmartlinksSection />

@@ -9,9 +9,14 @@
 export {
   type AdminAuditLog,
   adminAuditLog,
+  type CampaignSettings,
+  campaignSettings,
   insertAdminAuditLogSchema,
+  insertCampaignSettingsSchema,
   type NewAdminAuditLog,
+  type NewCampaignSettings,
   selectAdminAuditLogSchema,
+  selectCampaignSettingsSchema,
 } from './admin';
 
 // Analytics (Clicks, Audience, Tips)

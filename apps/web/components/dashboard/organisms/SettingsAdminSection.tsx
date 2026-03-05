@@ -17,9 +17,7 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
   return (
     <div className='flex items-center justify-between px-4 py-3'>
       <div className='flex items-center gap-3'>
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-          <Icon className='h-4 w-4 text-secondary-token' />
-        </div>
+        <Icon className='h-4 w-4 shrink-0 text-secondary-token' />
         <div>
           <p className='text-sm font-medium text-primary-token'>{title}</p>
           <p className='text-xs text-secondary-token mt-0.5'>{description}</p>
