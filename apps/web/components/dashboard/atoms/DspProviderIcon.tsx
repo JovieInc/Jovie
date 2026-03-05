@@ -76,11 +76,11 @@ export function DspProviderIcon({
     spotify: 'spotify',
     apple_music: 'apple_music',
     deezer: 'deezer',
-    youtube_music: 'youtube',
+    youtube_music: 'youtube_music',
     tidal: 'tidal',
     soundcloud: 'soundcloud',
-    amazon_music: 'amazon',
-    musicbrainz: 'website', // Fallback icon for MusicBrainz
+    amazon_music: 'amazon_music',
+    musicbrainz: 'musicbrainz',
   };
 
   return (
