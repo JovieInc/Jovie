@@ -26,10 +26,10 @@ const DEMO_DSPS = [
       'M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z',
   },
   {
-    name: 'Amazon Music',
-    color: '#25D1DA',
+    name: 'Deezer',
+    color: '#A238FF',
     iconPath:
-      'M17.964 4.382c-.264-.096-.576-.048-.792.144l-4.56 4.584L8.064 4.574c-.24-.216-.552-.264-.84-.144C6.96 4.55 6.768 4.838 6.768 5.15v13.702c0 .312.192.6.456.72.096.048.192.048.288.048.192 0 .384-.072.552-.24l4.56-4.584 4.548 4.536c.168.168.36.24.552.24.096 0 .192-.024.288-.048.264-.12.456-.408.456-.72V5.102c0-.312-.192-.6-.504-.72z',
+      'M0 18.472h4.138v-1.2H0v1.2zm0-2.4h4.138v-1.2H0v1.2zm0-2.4h4.138v-1.2H0v1.2zm0-2.4h4.138v-1.2H0v1.2zm0-2.4h4.138v-1.2H0v1.2zm5.517 9.6h4.138v-1.2H5.517v1.2zm0-2.4h4.138v-1.2H5.517v1.2zm0-2.4h4.138v-1.2H5.517v1.2zm0-2.4h4.138v-1.2H5.517v1.2zm5.518 7.2h4.138v-1.2h-4.138v1.2zm0-2.4h4.138v-1.2h-4.138v1.2zm0-2.4h4.138v-1.2h-4.138v1.2zm5.517 4.8H20.69v-1.2h-4.138v1.2zm0-2.4H20.69v-1.2h-4.138v1.2zm0-2.4H20.69v-1.2h-4.138v1.2zm0-2.4H20.69v-1.2h-4.138v1.2zm0-2.4H20.69v-1.2h-4.138v1.2zm0-2.4H20.69v-1.2h-4.138v1.2z',
   },
 ];
 
@@ -41,18 +41,18 @@ export function AutomaticReleaseSmartlinksSection() {
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Smart links.
+              New release?
               <br />
-              Automatic releases.
+              Already live.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Sync your Spotify once. When new music drops, Jovie instantly
-                builds a smart link for every release so fans can listen on
-                their preferred platform.
+                Connect Spotify once. Every new release automatically gets a
+                smart link — Spotify, Apple Music, YouTube Music, all in one
+                page your fans actually use.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
-                Smart links · Auto-generated
+                Zero manual work
               </span>
             </div>
           </div>
@@ -121,13 +121,13 @@ export function AutomaticReleaseSmartlinksSection() {
                   {/* Release info — matches ReleaseLandingPage typography */}
                   <div className='mt-4 w-full text-center'>
                     <h3 className='text-lg font-semibold leading-snug tracking-tight'>
-                      Signals
+                      The Deep End
                     </h3>
                     <p className='text-muted-foreground mt-1 text-sm'>
-                      NOVA / LANE
+                      Tim White
                     </p>
                     <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
-                      Feb 2024
+                      Feb 2017
                     </p>
                   </div>
 

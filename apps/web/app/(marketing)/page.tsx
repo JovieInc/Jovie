@@ -8,7 +8,6 @@ import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
-import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
@@ -17,9 +16,9 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The smartest link in bio for musicians.`;
+  const title = `${APP_NAME} — The link in bio that actually converts.`;
   const description =
-    'Capture fan contacts, guide listeners to the right music destination, and grow your owned audience automatically with a conversion-first artist profile.';
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free forever.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -85,7 +84,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The smartest link in bio for musicians`,
+          alt: `${APP_NAME} - The link in bio that actually converts`,
           type: 'image/png',
         },
       ],
@@ -97,7 +96,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The smartest link in bio for musicians`,
+          alt: `${APP_NAME} - The link in bio that actually converts`,
           width: 1200,
           height: 630,
         },
@@ -141,7 +140,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Jovie is the smartest link in bio for music artists. Capture fan contacts and direct every visitor to the right listening destination.',
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free forever.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -208,7 +207,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'Jovie is the smartest link in bio for music artists. Capture fan contacts and direct every visitor to the right listening destination.',
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free forever.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -251,21 +250,13 @@ export default function HomePage() {
         <RedesignedHero />
       </div>
 
-      <DeferredSection placeholderHeight={560}>
-        <AutomaticReleaseSmartlinksSection />
-      </DeferredSection>
+      <AutomaticReleaseSmartlinksSection />
 
-      <DeferredSection placeholderHeight={560}>
-        <AudienceCRMSection />
-      </DeferredSection>
+      <AudienceCRMSection />
 
-      <DeferredSection placeholderHeight={520}>
-        <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
-      </DeferredSection>
+      <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
 
-      <DeferredSection placeholderHeight={480}>
-        <FinalCTASection />
-      </DeferredSection>
+      <FinalCTASection />
 
       <FloatingClaimBar />
     </div>

@@ -2,8 +2,6 @@
 
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 
 // Inline blur placeholder (no network request)
@@ -24,10 +22,6 @@ interface Props
  * - Eager/lazy loading split
  */
 export function SeeItInActionCarousel({ creators }: Props) {
-  const isCarouselEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.SHOW_EXAMPLE_PROFILES_CAROUSEL,
-    false
-  );
   const sectionRef = useRef<HTMLElement>(null);
   const [scrollOffset, setScrollOffset] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
@@ -89,11 +83,6 @@ export function SeeItInActionCarousel({ creators }: Props) {
 
   // Triple creators for seamless scroll
   const extendedCreators = [...creators, ...creators, ...creators];
-
-  // Feature-flagged OFF until seeded with enough profiles
-  if (!isCarouselEnabled) {
-    return null;
-  }
 
   return (
     <section

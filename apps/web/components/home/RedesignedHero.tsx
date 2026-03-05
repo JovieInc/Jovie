@@ -25,14 +25,13 @@ export function RedesignedHero() {
           {/* Left column: text + CTA */}
           <div className='flex flex-col items-center text-center md:items-start md:text-left md:flex-1 heading-gap-linear'>
             <h1 className='marketing-h1-linear text-[var(--linear-text-primary)]'>
-              The smartest link in bio <br className='hidden md:block' />
-              for musicians.
+              The link in bio that <br className='hidden md:block' />
+              actually converts.
             </h1>
 
             <p className='marketing-lead-linear mt-6 max-w-[480px] text-[var(--linear-text-secondary)]'>
-              One link. Zero setup. Just sync your Spotify, and let Jovie&apos;s
-              AI <br className='hidden sm:block md:hidden' />
-              build a beautiful profile designed to convert.
+              Sync Spotify once. Jovie builds a profile that captures emails,
+              directs streams, and earns tips — all on autopilot.
             </p>
 
             <div className='mt-6 w-full max-w-[480px] text-left'>
@@ -44,13 +43,13 @@ export function RedesignedHero() {
                 aria-hidden='true'
                 className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_8px_var(--linear-success)]'
               />{' '}
-              Set up in under 60 seconds.
+              Free forever. Live in 60 seconds.
             </p>
 
             {/* Label logos */}
             <div className='mt-8 flex flex-col items-center md:items-start gap-4'>
               <p className='text-[var(--linear-label-size)] font-medium text-[var(--linear-text-tertiary)] uppercase tracking-[0.1em]'>
-                Trusted by artists on
+                Artists on these labels use Jovie
               </p>
               <div className='flex flex-wrap items-center gap-4 sm:gap-6 sm:flex-nowrap'>
                 <SonyMusicLogo className='h-[14px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-normal hover:opacity-100 sm:h-[16px]' />

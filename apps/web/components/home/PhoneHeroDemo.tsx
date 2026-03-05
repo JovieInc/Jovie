@@ -14,8 +14,8 @@ const TABS: ReadonlyArray<{ id: ProfileTab; label: string }> = [
 ];
 
 const PROFILE = {
-  name: 'Mara Vale',
-  tagline: 'New single out now. Tour announced.',
+  name: 'Tim White',
+  tagline: 'Indie / Alternative · Los Angeles',
 } as const;
 
 function ListenContent() {
@@ -150,8 +150,8 @@ export function PhoneHeroDemo() {
       <div className='flex flex-col items-center pt-10 pb-4 px-5'>
         <div className='w-14 h-14 rounded-full overflow-hidden border border-white/10'>
           <Image
-            src='/images/avatars/dua-lipa.jpg'
-            alt='Mara Vale'
+            src='/images/avatars/tim-white.jpg'
+            alt='Tim White'
             width={112}
             height={112}
             className='w-full h-full object-cover'
