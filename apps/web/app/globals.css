@@ -874,6 +874,18 @@ body {
   }
 }
 
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(200%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 /* Motion preference utility for accessibility */
 
 @media (prefers-reduced-motion: reduce) {
