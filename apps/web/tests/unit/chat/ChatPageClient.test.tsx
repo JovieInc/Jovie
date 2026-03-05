@@ -85,6 +85,12 @@ vi.mock(
         previewData: null,
         setPreviewData: vi.fn(),
       }),
+      usePreviewPanelState: () => ({
+        isOpen: false,
+        open: vi.fn(),
+        close: vi.fn(),
+        toggle: vi.fn(),
+      }),
     };
   }
 );
