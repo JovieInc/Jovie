@@ -277,6 +277,40 @@ describe('tour-dates/actions.ts', () => {
   });
 
   // ========================================================================
+  // resolveTourDates (uncached escape hatch)
+  // ========================================================================
+
+  describe('resolveTourDates', () => {
+    it('returns tour dates for authenticated user without request-level caching', async () => {
+      setupAuthenticatedUser();
+      const row = makeTourDateRow();
+      mockDbSelect.mockReturnValue(chainMock([row]));
+
+      const { resolveTourDates } = await import(
+        '@/app/app/(shell)/dashboard/tour-dates/actions'
+      );
+      const result = await resolveTourDates();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('td_1');
+      expect(result[0].venueName).toBe('The Venue');
+    });
+
+    it('redirects unauthenticated users to sign-in', async () => {
+      mockGetCachedAuth.mockResolvedValue({ userId: null });
+
+      const { resolveTourDates } = await import(
+        '@/app/app/(shell)/dashboard/tour-dates/actions'
+      );
+      await resolveTourDates();
+
+      expect(mockRedirect).toHaveBeenCalledWith(
+        expect.stringContaining('/sign-in')
+      );
+    });
+  });
+
+  // ========================================================================
   // loadTourDates
   // ========================================================================
 
