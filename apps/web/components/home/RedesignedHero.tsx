@@ -1,10 +1,4 @@
 import { ClaimHandleForm } from './claim-handle';
-import {
-  ArmadaMusicLogo,
-  AwalLogo,
-  SonyMusicLogo,
-  UniversalMusicGroupLogo,
-} from './label-logos';
 import { PhoneHeroDemo } from './PhoneHeroDemo';
 
 export function RedesignedHero() {
@@ -45,19 +39,6 @@ export function RedesignedHero() {
               />{' '}
               Free forever. Live in 60 seconds.
             </p>
-
-            {/* Label logos */}
-            <div className='mt-8 flex flex-col items-center md:items-start gap-4'>
-              <p className='text-[var(--linear-label-size)] font-medium text-[var(--linear-text-tertiary)] uppercase tracking-[0.1em]'>
-                Artists on these labels use Jovie
-              </p>
-              <div className='flex flex-wrap items-center gap-4 sm:gap-6 sm:flex-nowrap'>
-                <SonyMusicLogo className='h-[14px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-normal hover:opacity-100 sm:h-[16px]' />
-                <UniversalMusicGroupLogo className='h-[10px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-normal hover:opacity-100 sm:h-[12px]' />
-                <AwalLogo className='h-[16px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-normal hover:opacity-100 sm:h-[18px]' />
-                <ArmadaMusicLogo className='h-[14px] w-auto select-none text-[var(--linear-text-primary)] opacity-40 transition-opacity duration-normal hover:opacity-100 sm:h-[16px]' />
-              </div>
-            </div>
           </div>
 
           {/* Right column: phone mockup */}
