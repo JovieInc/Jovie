@@ -3,13 +3,14 @@
 /**
  * ContactSidebarHeader Component
  *
- * Header section of the contact sidebar with action buttons.
- * Uses the shared DrawerHeader shell for consistent styling.
+ * Provides the header title and action buttons for the contact sidebar.
+ * Can render as a standalone DrawerHeader or provide title/actions
+ * for use within EntitySidebarShell.
  */
 
 import { Check, Copy, ExternalLink, IdCard, RefreshCw } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -61,21 +62,28 @@ function ContactTitle({
   );
 }
 
+interface UseContactHeaderResult {
+  title: ReactNode;
+  actions: ReactNode | undefined;
+}
+
 interface ContactSidebarHeaderProps {
   readonly contact: Contact | null;
   readonly hasContact: boolean;
-  readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   readonly onCopyProfileUrl: () => void;
 }
 
-export function ContactSidebarHeader({
+/**
+ * Hook that returns the title and actions for the contact sidebar header.
+ * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
+ */
+export function useContactHeaderParts({
   contact,
   hasContact,
-  onClose,
   onRefresh,
   onCopyProfileUrl,
-}: ContactSidebarHeaderProps) {
+}: ContactSidebarHeaderProps): UseContactHeaderResult {
   const notifications = useNotifications();
   const showActions = hasContact && contact?.username;
   const [isCopied, setIsCopied] = useState(false);
@@ -117,7 +125,6 @@ export function ContactSidebarHeader({
   const overflowActions: DrawerHeaderAction[] = [];
 
   if (showActions) {
-    // Copy profile link - primary action
     // eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs
     primaryActions.push({
       id: 'copy',
@@ -128,8 +135,6 @@ export function ContactSidebarHeader({
       onClick: handleCopyProfileUrl,
     });
 
-    // Refresh - overflow action
-    // Open profile - overflow action
     overflowActions.push(
       {
         id: 'refresh',
@@ -154,7 +159,7 @@ export function ContactSidebarHeader({
 
   const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
 
-  const titleContent = (
+  const title = (
     <ContactTitle
       hasContact={hasContact}
       clerkId={contact?.clerkId}
@@ -163,19 +168,12 @@ export function ContactSidebarHeader({
     />
   );
 
-  return (
-    <DrawerHeader
-      title={titleContent}
-      onClose={onClose}
-      actions={
-        hasActions ? (
-          <DrawerHeaderActions
-            primaryActions={primaryActions}
-            overflowActions={overflowActions}
-            onClose={onClose}
-          />
-        ) : undefined
-      }
+  const actions = hasActions ? (
+    <DrawerHeaderActions
+      primaryActions={primaryActions}
+      overflowActions={overflowActions}
     />
-  );
+  ) : undefined;
+
+  return { title, actions };
 }

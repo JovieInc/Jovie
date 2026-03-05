@@ -42,7 +42,9 @@ export function EntityHeaderCard({
           {badge}
         </div>
         {subtitle && (
-          <div className='truncate text-xs text-sidebar-muted'>{subtitle}</div>
+          <div className='truncate text-xs text-secondary-token'>
+            {subtitle}
+          </div>
         )}
       </div>
     </div>

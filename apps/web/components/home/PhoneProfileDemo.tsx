@@ -217,7 +217,7 @@ export function PhoneProfileDemo() {
               <div className='flex flex-col items-center pt-10 pb-4 px-5'>
                 <div className='w-14 h-14 rounded-full overflow-hidden border border-white/10'>
                   <Image
-                    src='/images/avatars/dua-lipa.jpg'
+                    src='/images/avatars/nova-lane.jpg'
                     alt='Mara Vale'
                     width={112}
                     height={112}

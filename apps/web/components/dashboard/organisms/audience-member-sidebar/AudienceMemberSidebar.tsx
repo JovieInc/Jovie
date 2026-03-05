@@ -10,12 +10,9 @@
 
 import { AudienceMemberHeader } from '@/components/dashboard/atoms/AudienceMemberHeader';
 import {
-  DrawerEmptyState,
-  DrawerHeader,
   DrawerSection,
+  EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { AudienceMemberActions } from './AudienceMemberActions';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -39,39 +36,37 @@ export function AudienceMemberSidebar({
   const avatarName = computeMemberAvatarName(member, title);
 
   return (
-    <RightDrawer
+    <EntitySidebarShell
       isOpen={isOpen}
-      width={SIDEBAR_WIDTH}
       ariaLabel='Audience member details'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
-    >
-      <DrawerHeader title='Contact' onClose={onClose} />
-
-      <div className='flex-1 min-h-0 overflow-auto px-4 py-4 space-y-4'>
+      title='Contact'
+      onClose={onClose}
+      isEmpty={!member}
+      emptyMessage='Select a row in the table to view contact details.'
+      entityHeader={
         <AudienceMemberHeader
           title={title}
           subtitle={subtitle}
           avatarName={avatarName}
           avatarSrc={avatarSrc}
         />
+      }
+    >
+      {member && (
+        <>
+          <AudienceMemberDetails member={member} />
 
-        {member ? (
-          <div className='space-y-4'>
-            <AudienceMemberDetails member={member} />
+          <DrawerSection title='Recent actions'>
+            <AudienceMemberActions member={member} />
+          </DrawerSection>
 
-            <DrawerSection title='Recent actions'>
-              <AudienceMemberActions member={member} />
-            </DrawerSection>
-
-            <DrawerSection title='Referrers'>
-              <AudienceMemberReferrers member={member} />
-            </DrawerSection>
-          </div>
-        ) : (
-          <DrawerEmptyState message='Select a row in the table to view contact details.' />
-        )}
-      </div>
-    </RightDrawer>
+          <DrawerSection title='Referrers'>
+            <AudienceMemberReferrers member={member} />
+          </DrawerSection>
+        </>
+      )}
+    </EntitySidebarShell>
   );
 }

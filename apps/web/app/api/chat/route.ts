@@ -21,6 +21,11 @@ import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
+import {
+  classifyIntent,
+  isDeterministicIntent,
+  routeIntent,
+} from '@/lib/intent-detection';
 import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import {
   checkAiChatRateLimitForPlan,
@@ -1255,6 +1260,40 @@ export async function POST(req: Request) {
 
   // After validation, we know messages is a valid UIMessage array
   const uiMessages = messages as UIMessage[];
+
+  // --- Deterministic intent routing (skip AI for simple CRUD) ---
+  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
+  if (lastUserMsg) {
+    const userText = lastUserMsg.parts
+      .filter(
+        (p): p is { type: 'text'; text: string } =>
+          p.type === 'text' && typeof p.text === 'string'
+      )
+      .map(p => p.text)
+      .join('')
+      .trim();
+
+    const intent = classifyIntent(userText);
+    if (isDeterministicIntent(intent)) {
+      const resolvedProfileId = toNullableString(profileId);
+      const result = await routeIntent(intent, {
+        clerkUserId: userId,
+        profileId: resolvedProfileId,
+      });
+
+      if (result) {
+        return NextResponse.json(result, {
+          status: result.success ? 200 : 400,
+          headers: {
+            ...corsHeaders,
+            'x-request-id': requestId,
+            'x-intent-routed': 'true',
+            'x-intent-category': intent.category,
+          },
+        });
+      }
+    }
+  }
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(
