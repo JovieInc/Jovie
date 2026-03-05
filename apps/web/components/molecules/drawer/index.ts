@@ -20,4 +20,8 @@ export {
   EntityHeaderCard,
   type EntityHeaderCardProps,
 } from './EntityHeaderCard';
+export {
+  EntitySidebarShell,
+  type EntitySidebarShellProps,
+} from './EntitySidebarShell';
 export { SidebarLinkRow, type SidebarLinkRowProps } from './SidebarLinkRow';

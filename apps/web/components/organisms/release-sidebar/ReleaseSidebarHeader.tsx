@@ -1,38 +1,46 @@
 'use client';
 
 /**
- * ReleaseSidebarHeader Component
+ * ReleaseSidebarHeader
  *
- * Demo-style header: release ID label on left, actions + close on right.
- * Matches the DemoReleaseDetail header pattern.
+ * Provides title and action buttons for the release sidebar header.
+ * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
  */
 
 import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 import type { Release } from './types';
 
-interface ReleaseSidebarHeaderProps {
+interface UseReleaseHeaderResult {
+  title: ReactNode;
+  actions: ReactNode | undefined;
+}
+
+interface UseReleaseHeaderPartsProps {
   readonly release: Release | null;
   readonly hasRelease: boolean;
   readonly artistName?: string;
-  readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
 }
 
-export function ReleaseSidebarHeader({
+/**
+ * Hook that returns the title and actions for the release sidebar header.
+ * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
+ */
+export function useReleaseHeaderParts({
   release,
   hasRelease,
   artistName,
-  onClose,
   onRefresh,
   isRefreshing = false,
   onCopySmartLink,
-}: ReleaseSidebarHeaderProps) {
+}: UseReleaseHeaderPartsProps): UseReleaseHeaderResult {
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,27 +140,24 @@ export function ReleaseSidebarHeader({
   const titleText =
     hasRelease && release?.title ? release.title : 'No release selected';
 
-  return (
-    <div className='flex items-center justify-between border-b border-subtle px-4 py-2 min-h-12 shrink-0'>
-      <div className='min-w-0 flex-1'>
-        <div className='text-[13px] font-medium text-primary-token truncate'>
-          {titleText}
-        </div>
-        {artistName && (
-          <div className='text-[13px] text-secondary-token truncate'>
-            {artistName}
-          </div>
-        )}
-      </div>
-      <div className='flex items-center gap-1'>
-        {(overflowActions.length > 0 || onClose) && (
-          <DrawerHeaderActions
-            primaryActions={[]}
-            overflowActions={overflowActions}
-            onClose={onClose}
-          />
-        )}
-      </div>
-    </div>
+  const title = (
+    <span className='min-w-0'>
+      <span className='block truncate'>{titleText}</span>
+      {artistName && (
+        <span className='block truncate text-[11px] font-normal text-secondary-token'>
+          {artistName}
+        </span>
+      )}
+    </span>
   );
+
+  const actions =
+    overflowActions.length > 0 ? (
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={overflowActions}
+      />
+    ) : undefined;
+
+  return { title, actions };
 }
