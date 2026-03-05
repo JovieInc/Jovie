@@ -393,6 +393,13 @@
       "when": 1741046400000,
       "tag": "0055_add_campaign_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1772689770136,
+      "tag": "0056_first_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

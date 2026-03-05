@@ -89,6 +89,7 @@ export interface SpotifyAlbumFull extends SpotifyAlbum {
   };
   label: string;
   popularity: number;
+  genres?: string[];
   copyrights: Array<{ text: string; type: string }>;
   external_ids?: {
     upc?: string;

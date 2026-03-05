@@ -42,6 +42,7 @@ export function createMockRelease(
     spotifyPopularity: 72,
     providers,
     releaseType: 'single',
+    isExplicit: false,
     upc: '123456789012',
     label: 'Jovie Records',
     totalTracks: 1,
