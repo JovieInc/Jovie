@@ -59,6 +59,9 @@ export interface UpsertReleaseInput {
   upc?: string | null;
   totalTracks?: number;
   isExplicit?: boolean;
+  genres?: string[] | null;
+  copyrightLine?: string | null;
+  distributor?: string | null;
   artworkUrl?: string | null;
   spotifyPopularity?: number | null;
   sourceType?: ReleaseSourceType;
@@ -172,6 +175,9 @@ export async function getLatestReleaseByUsername(
       upc: discogReleases.upc,
       totalTracks: discogReleases.totalTracks,
       isExplicit: discogReleases.isExplicit,
+      genres: discogReleases.genres,
+      copyrightLine: discogReleases.copyrightLine,
+      distributor: discogReleases.distributor,
       artworkUrl: discogReleases.artworkUrl,
       spotifyPopularity: discogReleases.spotifyPopularity,
       sourceType: discogReleases.sourceType,
@@ -402,6 +408,9 @@ export async function upsertRelease(
     upc: input.upc ?? null,
     totalTracks: input.totalTracks ?? 0,
     isExplicit: input.isExplicit ?? false,
+    genres: input.genres ?? null,
+    copyrightLine: input.copyrightLine ?? null,
+    distributor: input.distributor ?? null,
     artworkUrl: input.artworkUrl ?? null,
     spotifyPopularity: input.spotifyPopularity ?? null,
     sourceType: input.sourceType ?? 'ingested',
@@ -424,6 +433,9 @@ export async function upsertRelease(
         upc: input.upc ?? null,
         totalTracks: input.totalTracks ?? 0,
         isExplicit: input.isExplicit ?? false,
+        genres: input.genres ?? null,
+        copyrightLine: input.copyrightLine ?? null,
+        distributor: input.distributor ?? null,
         artworkUrl: input.artworkUrl ?? null,
         spotifyPopularity: input.spotifyPopularity ?? null,
         sourceType: input.sourceType ?? 'ingested',

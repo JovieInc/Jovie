@@ -82,12 +82,23 @@ export function ReleaseMetadata({
         <DrawerPropertyRow
           label='Type'
           value={
-            <Badge
-              variant='secondary'
-              className='bg-surface-2 text-xs font-medium'
-            >
-              {RELEASE_TYPE_LABELS[release.releaseType] ?? release.releaseType}
-            </Badge>
+            <div className='flex items-center gap-1.5'>
+              <Badge
+                variant='secondary'
+                className='bg-surface-2 text-xs font-medium'
+              >
+                {RELEASE_TYPE_LABELS[release.releaseType] ??
+                  release.releaseType}
+              </Badge>
+              {release.isExplicit && (
+                <Badge
+                  variant='secondary'
+                  className='bg-red-500/15 px-1 py-0 text-[10px] font-medium text-red-700 dark:text-red-300'
+                >
+                  E
+                </Badge>
+              )}
+            </div>
           }
         />
 
@@ -128,6 +139,28 @@ export function ReleaseMetadata({
             )
           }
         />
+
+        {release.distributor && (
+          <DrawerPropertyRow
+            label='Distributor'
+            value={
+              <span className='text-xs text-secondary-token truncate max-w-[180px]'>
+                {release.distributor}
+              </span>
+            }
+          />
+        )}
+
+        {release.copyrightLine && (
+          <DrawerPropertyRow
+            label='℗'
+            value={
+              <span className='text-xs text-secondary-token truncate max-w-[180px]'>
+                {release.copyrightLine}
+              </span>
+            }
+          />
+        )}
 
         <DrawerPropertyRow
           label='Tracks'

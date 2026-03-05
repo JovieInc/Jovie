@@ -357,12 +357,33 @@ function sanitizeAlbumMetadata(
       ? Math.min(100, Math.max(0, Math.round(rawPopularity)))
       : null;
 
+  // Extract genres from full album (Spotify returns genres on album objects)
+  const genres =
+    fullAlbum?.genres && fullAlbum.genres.length > 0
+      ? fullAlbum.genres.slice(0, 10).map(g => sanitizeText(g, 100))
+      : null;
+
+  // Extract copyright line (℗ = phonographic copyright, type 'P')
+  const pCopyright = fullAlbum?.copyrights?.find(c => c.type === 'P');
+  const copyrightLine = pCopyright?.text
+    ? sanitizeText(pCopyright.text, 500)
+    : null;
+
+  // Extract distributor from © copyright (type 'C')
+  const cCopyright = fullAlbum?.copyrights?.find(c => c.type === 'C');
+  const distributor = cCopyright?.text
+    ? sanitizeText(cCopyright.text, 500)
+    : null;
+
   return {
     sanitizedTitle,
     artworkUrl,
     sanitizedLabel,
     sanitizedUpc,
     popularity,
+    genres,
+    copyrightLine,
+    distributor,
   };
 }
 
@@ -589,6 +610,9 @@ async function importSingleRelease(
     upc: metadata.sanitizedUpc,
     totalTracks: Math.min(effectiveTotalTracks, MAX_TRACKS_PER_RELEASE),
     isExplicit: false,
+    genres: metadata.genres,
+    copyrightLine: metadata.copyrightLine,
+    distributor: metadata.distributor,
     artworkUrl: metadata.artworkUrl,
     spotifyPopularity: metadata.popularity,
     sourceType: 'ingested',

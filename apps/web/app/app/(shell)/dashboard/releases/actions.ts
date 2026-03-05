@@ -193,12 +193,18 @@ function mapReleaseToViewModel(
       .filter(provider => provider.url !== ''),
     // Extended fields
     releaseType: release.releaseType,
+    isExplicit: release.isExplicit,
     upc: release.upc,
     label: release.label,
     totalTracks: release.totalTracks,
     totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
     primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
-    genres: extractGenres(release.metadata),
+    genres:
+      release.genres && release.genres.length > 0
+        ? release.genres
+        : extractGenres(release.metadata),
+    copyrightLine: release.copyrightLine ?? null,
+    distributor: release.distributor ?? null,
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
     originalArtworkUrl: (release.metadata as Record<string, unknown> | null)
       ?.originalArtworkUrl as string | undefined,
