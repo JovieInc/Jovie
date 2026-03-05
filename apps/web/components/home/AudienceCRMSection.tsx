@@ -1,5 +1,3 @@
-'use client';
-
 import {
   ArrowUpRight,
   DollarSign,
@@ -9,8 +7,6 @@ import {
   Users,
 } from 'lucide-react';
 import { Container } from '@/components/site/Container';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 
 /* ------------------------------------------------------------------ */
 /*  Mock CRM table data                                                */
@@ -80,13 +76,6 @@ const STATS = [
 /* ------------------------------------------------------------------ */
 
 export function AudienceCRMSection() {
-  const isEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.SHOW_AUDIENCE_CRM_SECTION,
-    false
-  );
-
-  if (!isEnabled) return null;
-
   return (
     <section className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'>
       <Container size='homepage'>
@@ -100,12 +89,11 @@ export function AudienceCRMSection() {
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Every profile visit captures fan data — emails, locations,
-                referral sources, and tip amounts — into a built-in CRM you
-                actually own.
+                Every visit captures an email, a city, a referral source. No
+                integrations, no extra tools — just a CRM that fills itself.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
-                Audience CRM · Built in
+                Built-in CRM
               </span>
             </div>
           </div>

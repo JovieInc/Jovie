@@ -234,13 +234,13 @@ export interface DemoRelease {
 export const RELEASES: DemoRelease[] = [
   {
     id: '1',
-    title: 'Signals',
-    type: 'Album',
-    date: 'Feb 2024',
-    trackCount: 12,
+    title: 'The Deep End',
+    type: 'Single',
+    date: 'Feb 2017',
+    trackCount: 1,
     hasSmartLink: true,
     gradient: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
-    platforms: ['Spotify', 'Apple Music', 'YouTube Music', 'Tidal'],
+    platforms: ['Spotify', 'Apple Music', 'YouTube Music', 'Deezer'],
   },
   {
     id: '2',
@@ -384,7 +384,7 @@ export interface ReleaseAutomationActivity {
 
 export const RELEASE_AUTOMATION_RELEASE: ReleaseAutomationRelease = {
   title: 'Afterglow (Deluxe)',
-  artist: 'NOVA / LANE',
+  artist: 'Tim White',
   date: 'Feb 23, 2026',
   gradient: 'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
 };
@@ -471,7 +471,7 @@ export const SMARTLINK_KANBAN_COLUMNS = [
       {
         id: 'k1',
         title: 'Afterglow (Deluxe)',
-        artist: 'NOVA / LANE',
+        artist: 'Tim White',
         gradient:
           'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
         platformCount: 4,
@@ -485,7 +485,7 @@ export const SMARTLINK_KANBAN_COLUMNS = [
       {
         id: 'k2',
         title: 'Signals',
-        artist: 'NOVA / LANE',
+        artist: 'Tim White',
         gradient: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
         platformCount: 4,
         status: 'Live' as const,
@@ -493,7 +493,7 @@ export const SMARTLINK_KANBAN_COLUMNS = [
       {
         id: 'k3',
         title: 'Neon Nights',
-        artist: 'NOVA / LANE',
+        artist: 'Tim White',
         gradient: 'linear-gradient(135deg, #1a2a3a, #2d4a5a)',
         platformCount: 3,
         status: 'Live' as const,
@@ -506,7 +506,7 @@ export const SMARTLINK_KANBAN_COLUMNS = [
       {
         id: 'k4',
         title: 'The Sound',
-        artist: 'NOVA / LANE',
+        artist: 'Tim White',
         gradient: 'linear-gradient(135deg, #3a1a1a, #6b2d2d)',
         platformCount: 2,
         status: 'Archived' as const,
