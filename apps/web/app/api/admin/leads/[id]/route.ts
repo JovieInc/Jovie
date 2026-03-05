@@ -5,6 +5,7 @@ import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { ingestLeadAsCreator } from '@/lib/leads/ingest-lead';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -68,10 +69,33 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json(updated, {
-      status: 200,
-      headers: NO_STORE_HEADERS,
-    });
+    // Auto-ingest on approval: create a creator profile from the Linktree data
+    let ingestion = null;
+    if (validated.data.status === 'approved' && updated.linktreeUrl) {
+      try {
+        ingestion = await ingestLeadAsCreator(updated);
+      } catch (ingestError) {
+        await captureError('Lead auto-ingest failed', ingestError, {
+          route: '/api/admin/leads/[id]',
+          contextData: { leadId: id },
+        });
+        ingestion = {
+          success: false,
+          error:
+            ingestError instanceof Error
+              ? ingestError.message
+              : 'Ingestion failed',
+        };
+      }
+    }
+
+    return NextResponse.json(
+      { ...updated, ingestion },
+      {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      }
+    );
   } catch (error) {
     const { id } = await params;
     await captureError('Failed to update lead', error, {

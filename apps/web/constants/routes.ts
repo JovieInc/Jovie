@@ -56,6 +56,7 @@ export const APP_ROUTES = {
   ADMIN_USERS: '/app/admin/users',
   ADMIN_ACTIVITY: '/app/admin/activity',
   ADMIN_CAMPAIGNS: '/app/admin/campaigns',
+  ADMIN_LEADS: '/app/admin/leads',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing
