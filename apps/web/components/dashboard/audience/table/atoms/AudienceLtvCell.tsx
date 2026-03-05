@@ -83,23 +83,31 @@ export function AudienceLtvCell({
     engagementScore,
   });
 
+  const content = (
+    <div className={cn('flex items-center gap-1.5 text-[13px]', className)}>
+      {breakdown.tier !== 'none' && (
+        <TrendingUp
+          className={cn(
+            'h-3.5 w-3.5 shrink-0',
+            TIER_ICON_STYLES[breakdown.tier]
+          )}
+          aria-hidden='true'
+        />
+      )}
+      <span className={TIER_STYLES[breakdown.tier]}>{breakdown.label}</span>
+    </div>
+  );
+
+  if (breakdown.tier === 'none') {
+    return content;
+  }
+
   return (
     <SimpleTooltip
       content={<LtvTooltipContent breakdown={breakdown} />}
       side='top'
     >
-      <div className={cn('flex items-center gap-1.5 text-[13px]', className)}>
-        {breakdown.tier !== 'none' && (
-          <TrendingUp
-            className={cn(
-              'h-3.5 w-3.5 shrink-0',
-              TIER_ICON_STYLES[breakdown.tier]
-            )}
-            aria-hidden='true'
-          />
-        )}
-        <span className={TIER_STYLES[breakdown.tier]}>{breakdown.label}</span>
-      </div>
+      {content}
     </SimpleTooltip>
   );
 }
