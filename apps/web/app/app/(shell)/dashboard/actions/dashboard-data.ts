@@ -159,6 +159,7 @@ export interface ProfileCompletion {
   completedCount: number;
   totalCount: number;
   steps: ProfileCompletionStep[];
+  profileIsLive: boolean;
 }
 
 function hasText(value: string | null | undefined): boolean {
@@ -191,6 +192,7 @@ function buildProfileCompletion(
       completedCount: 0,
       totalCount,
       steps: [],
+      profileIsLive: false,
     };
   }
 
@@ -254,11 +256,18 @@ function buildProfileCompletion(
     });
   }
 
+  const profileIsLive =
+    checks.name &&
+    checks.avatar &&
+    hasText(selectedProfile.username) &&
+    checks.musicLinks;
+
   return {
     percentage,
     completedCount,
     totalCount,
     steps,
+    profileIsLive,
   };
 }
 

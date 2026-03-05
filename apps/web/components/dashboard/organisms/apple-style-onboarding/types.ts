@@ -35,6 +35,11 @@ export const ONBOARDING_STEPS = [
     prompt: 'Pick a handle your fans can remember in one glance.',
   },
   {
+    id: 'dsp',
+    title: 'Connect your music',
+    prompt: 'Import your releases from Spotify so fans can find your music.',
+  },
+  {
     id: 'done',
     title: "You're live.",
     prompt: 'Your profile is published and ready to share.',

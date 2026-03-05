@@ -53,6 +53,7 @@ const baseDashboardData: DashboardData = {
         href: '/app/dashboard/earnings',
       },
     ],
+    profileIsLive: false,
   },
 };
 
@@ -68,7 +69,7 @@ describe('ProfileCompletionCard', () => {
   it('renders progress and next steps when profile is incomplete', () => {
     const { getByText } = renderCard();
 
-    expect(getByText('Your profile is 67% complete')).toBeDefined();
+    expect(getByText('Your profile is not live yet')).toBeDefined();
     expect(getByText('Add a profile photo')).toBeDefined();
     expect(getByText('Set up your tip jar')).toBeDefined();
   });
@@ -79,7 +80,34 @@ describe('ProfileCompletionCard', () => {
         undefined as unknown as DashboardData['profileCompletion'],
     });
 
-    expect(queryByText(/Your profile is/)).toBeNull();
+    expect(queryByText(/Your profile is|not live yet/)).toBeNull();
+  });
+
+  it('shows percentage messaging when profile is live', () => {
+    const { getByText } = renderCard({
+      profileCompletion: {
+        percentage: 67,
+        completedCount: 4,
+        totalCount: 6,
+        steps: [
+          {
+            id: 'avatar',
+            label: 'Add a profile photo',
+            description: 'A recognizable photo makes your page feel personal.',
+            href: '/app/settings/artist-profile',
+          },
+        ],
+        profileIsLive: true,
+      },
+    });
+
+    expect(getByText('Your profile is 67% complete')).toBeDefined();
+  });
+
+  it('hides dismiss button when profile is not live', () => {
+    const { queryByLabelText } = renderCard();
+
+    expect(queryByLabelText('Dismiss profile completion card')).toBeNull();
   });
 
   it('does not render when profile is fully complete', () => {
@@ -89,6 +117,7 @@ describe('ProfileCompletionCard', () => {
         completedCount: 6,
         totalCount: 6,
         steps: [],
+        profileIsLive: false,
       },
     });
 
