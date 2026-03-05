@@ -56,7 +56,7 @@ export default async function OnboardingPage({
         },
       });
     }
-    redirect('/sign-in?redirect_url=/onboarding');
+    redirect('/signin?redirect_url=/onboarding');
   }
 
   const user = await currentUser();
