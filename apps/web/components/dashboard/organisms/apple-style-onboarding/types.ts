@@ -32,7 +32,7 @@ export const ONBOARDING_STEPS = [
   {
     id: 'handle',
     title: 'Choose your handle',
-    prompt: 'This is how fans will find you.',
+    prompt: 'This is how fans will find and remember you.',
   },
   {
     id: 'dsp',
