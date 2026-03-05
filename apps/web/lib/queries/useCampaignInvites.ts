@@ -4,6 +4,80 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
+// ─── Campaign Settings ────────────────────────────────────────────────────────
+
+export interface ThrottlingConfig {
+  minDelayMs: number;
+  maxDelayMs: number;
+  maxPerHour: number;
+}
+
+export interface CampaignSettingsData {
+  fitScoreThreshold: number;
+  batchLimit: number;
+  throttlingConfig: ThrottlingConfig;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface CampaignSettingsResponse {
+  ok: boolean;
+  settings: CampaignSettingsData;
+}
+
+export interface UpdateCampaignSettingsInput {
+  fitScoreThreshold?: number;
+  batchLimit?: number;
+  throttlingConfig?: ThrottlingConfig;
+}
+
+async function fetchCampaignSettings(
+  signal?: AbortSignal
+): Promise<CampaignSettingsResponse> {
+  return fetchWithTimeout<CampaignSettingsResponse>(
+    '/api/admin/campaigns/settings',
+    { signal }
+  );
+}
+
+async function saveCampaignSettings(
+  input: UpdateCampaignSettingsInput
+): Promise<CampaignSettingsResponse> {
+  return fetchWithTimeout<CampaignSettingsResponse>(
+    '/api/admin/campaigns/settings',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export function useCampaignSettings({
+  enabled = true,
+}: {
+  enabled?: boolean;
+} = {}) {
+  return useQuery({
+    queryKey: queryKeys.campaign.settings(),
+    queryFn: ({ signal }) => fetchCampaignSettings(signal),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useSaveCampaignSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveCampaignSettings,
+    onSuccess: data => {
+      queryClient.setQueryData(queryKeys.campaign.settings(), data);
+    },
+  });
+}
+
 const MINUTE = 60 * 1000;
 const SECONDS = 1000;
 
