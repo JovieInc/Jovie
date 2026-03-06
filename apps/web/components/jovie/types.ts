@@ -167,6 +167,19 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   },
 ] as const;
 
+/**
+ * Special feedback suggestion shown in both suggestion lists.
+ * This triggers a deterministic feedback flow, not the AI.
+ */
+export const FEEDBACK_PROMPT_TRIGGER = '__jovie_feedback__';
+
+export const FEEDBACK_SUGGESTION: ChatSuggestion = {
+  icon: 'MessageSquare',
+  label: 'Share feedback',
+  prompt: FEEDBACK_PROMPT_TRIGGER,
+  accent: 'orange',
+};
+
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
     icon: 'Link2',
