@@ -1,18 +1,15 @@
 'use client';
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  Label,
-  Textarea,
-} from '@jovie/ui';
+import { Button, Label, Textarea } from '@jovie/ui';
 import { CheckCircle, Sparkles } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/organisms/Dialog';
 import { track } from '@/lib/analytics';
 import { useGrowthAccessRequestMutation } from '@/lib/queries';
 
@@ -60,49 +57,43 @@ export function GrowthAccessRequestModal({
   );
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className='sm:max-w-md'>
-        {submitted ? (
-          <>
-            <DialogHeader>
-              <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30'>
-                <CheckCircle className='h-6 w-6 text-emerald-600 dark:text-emerald-400' />
-              </div>
-              <DialogTitle className='text-center'>
-                Request received
-              </DialogTitle>
-              <DialogDescription className='text-center'>
-                We&apos;ll review your request and reach out soon to learn more
-                about your needs.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button
-                variant='secondary'
-                className='w-full'
-                onClick={() => handleClose(false)}
-              >
-                Close
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30'>
-                <Sparkles className='h-6 w-6 text-purple-600 dark:text-purple-400' />
-              </div>
-              <DialogTitle className='text-center'>
-                Growth is in early access
-              </DialogTitle>
-              <DialogDescription className='text-center'>
-                We&apos;re building Growth features based on artist feedback.
-                Tell us what you&apos;re most excited about and we&apos;ll
-                prioritize accordingly.
-              </DialogDescription>
-            </DialogHeader>
+    <Dialog open={open} onClose={() => handleClose(false)} size='md'>
+      {submitted ? (
+        <>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30'>
+            <CheckCircle className='h-6 w-6 text-emerald-600 dark:text-emerald-400' />
+          </div>
+          <DialogTitle className='text-center'>Request received</DialogTitle>
+          <DialogDescription className='text-center'>
+            We&apos;ll review your request and reach out soon to learn more
+            about your needs.
+          </DialogDescription>
+          <DialogActions>
+            <Button
+              variant='secondary'
+              className='w-full'
+              onClick={() => handleClose(false)}
+            >
+              Close
+            </Button>
+          </DialogActions>
+        </>
+      ) : (
+        <>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30'>
+            <Sparkles className='h-6 w-6 text-purple-600 dark:text-purple-400' />
+          </div>
+          <DialogTitle className='text-center'>
+            Growth is in early access
+          </DialogTitle>
+          <DialogDescription className='text-center'>
+            We&apos;re building Growth features based on artist feedback. Tell
+            us what you&apos;re most excited about and we&apos;ll prioritize
+            accordingly.
+          </DialogDescription>
 
-            <div className='space-y-2 px-1'>
+          <DialogBody>
+            <div className='space-y-2'>
               <Label htmlFor='growth-reason'>
                 What feature are you most excited about?
               </Label>
@@ -115,26 +106,26 @@ export function GrowthAccessRequestModal({
                 maxLength={2000}
               />
             </div>
+          </DialogBody>
 
-            <DialogFooter>
-              <Button
-                variant='secondary'
-                onClick={() => handleClose(false)}
-                disabled={mutation.isPending}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant='primary'
-                onClick={handleSubmit}
-                disabled={!reason.trim() || mutation.isPending}
-              >
-                {mutation.isPending ? 'Submitting...' : 'Request Early Access'}
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
+          <DialogActions>
+            <Button
+              variant='secondary'
+              onClick={() => handleClose(false)}
+              disabled={mutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant='primary'
+              onClick={handleSubmit}
+              disabled={!reason.trim() || mutation.isPending}
+            >
+              {mutation.isPending ? 'Submitting...' : 'Request Early Access'}
+            </Button>
+          </DialogActions>
+        </>
+      )}
     </Dialog>
   );
 }
