@@ -104,10 +104,22 @@ interface SpotifyAlbumsResponse {
   next: string | null;
 }
 
-// Get Spotify access token
+// Cached Spotify access token to avoid redundant token requests.
+// Each token lasts ~3600s; we refresh 60s before expiry.
+let cachedSpotifyToken: { token: string; expiresAt: number } | null = null;
+
+// Get Spotify access token (cached until near-expiry)
 async function getSpotifyToken(): Promise<string | null> {
   if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
     return null;
+  }
+
+  // Return cached token if still valid (with 60s buffer)
+  if (
+    cachedSpotifyToken &&
+    Date.now() < cachedSpotifyToken.expiresAt - 60_000
+  ) {
+    return cachedSpotifyToken.token;
   }
 
   try {
@@ -128,6 +140,10 @@ async function getSpotifyToken(): Promise<string | null> {
     }
 
     const data: SpotifyTokenResponse = await response.json();
+    cachedSpotifyToken = {
+      token: data.access_token,
+      expiresAt: Date.now() + data.expires_in * 1000,
+    };
     return data.access_token;
   } catch {
     return null;
@@ -193,6 +209,64 @@ export async function getSpotifyArtist(
     return await response.json();
   } catch {
     return null;
+  }
+}
+
+/**
+ * Get multiple artists in a single request (max 50 per chunk).
+ * Uses the Spotify /artists?ids= batch endpoint.
+ */
+export async function getSpotifyArtistsBatch(
+  artistIds: string[]
+): Promise<SpotifyArtist[]> {
+  const token = await getSpotifyToken();
+  if (!token || artistIds.length === 0) {
+    return [];
+  }
+
+  // Spotify API allows max 50 artists per request
+  const chunks: string[][] = [];
+  for (let i = 0; i < artistIds.length; i += 50) {
+    chunks.push(artistIds.slice(i, i + 50));
+  }
+
+  const artists: SpotifyArtist[] = [];
+
+  try {
+    for (const chunk of chunks) {
+      const response = await fetch(
+        `https://api.spotify.com/v1/artists?ids=${chunk.join(',')}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        await captureError(
+          'Spotify artists batch API error',
+          new Error(`Status ${response.status}`),
+          {
+            artistIds: chunk,
+            status: response.status,
+            operation: 'getSpotifyArtistsBatch',
+          }
+        );
+        continue;
+      }
+
+      const data: { artists: SpotifyArtist[] } = await response.json();
+      artists.push(...data.artists.filter(Boolean));
+    }
+
+    return artists;
+  } catch (error) {
+    await captureError('Failed to fetch Spotify artists batch', error, {
+      artistIdsCount: artistIds.length,
+      operation: 'getSpotifyArtistsBatch',
+    });
+    return [];
   }
 }
 
