@@ -12,9 +12,9 @@ const NAV_ITEMS = [
       { href: '/ui/badges', label: 'Badge', status: 'done' },
       { href: '/ui/checkboxes', label: 'Checkbox', status: 'done' },
       { href: '/ui/selects', label: 'Select', status: 'done' },
-      { href: '/ui/avatars', label: 'Avatar', status: 'next' },
-      { href: '/ui/switches', label: 'Switch', status: 'next' },
-      { href: '/ui/dialogs', label: 'Dialog', status: 'next' },
+      { href: '/ui/avatars', label: 'Avatar', status: 'done' },
+      { href: '/ui/switches', label: 'Switch', status: 'done' },
+      { href: '/ui/dialogs', label: 'Dialog', status: 'done' },
     ],
   },
 ];

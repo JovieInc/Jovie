@@ -6,8 +6,9 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 /**
- * Switch component (toggle switch) with proper accessibility.
- * Supports keyboard navigation, disabled state, and smooth animations.
+ * Switch component matching Linear.app toggle design.
+ * 28×16px track, 12×12px thumb, smooth 150ms slide transition.
+ * Supports keyboard navigation, disabled state, and focus ring.
  */
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
@@ -15,12 +16,12 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      'peer inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full',
-      'border-[1.5px] transition-colors duration-normal ease-interactive',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+      'peer inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full px-0.5',
+      'transition-colors duration-[150ms] ease-in-out',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'data-[state=unchecked]:bg-surface-2 data-[state=unchecked]:border-subtle',
-      'data-[state=checked]:bg-accent data-[state=checked]:border-accent',
+      'data-[state=unchecked]:bg-(--linear-border-strong)',
+      'data-[state=checked]:bg-(--linear-btn-primary-bg)',
       className
     )}
     {...props}
@@ -28,8 +29,8 @@ const Switch = React.forwardRef<
   >
     <SwitchPrimitives.Thumb
       className={cn(
-        'pointer-events-none block h-3 w-3 rounded-full bg-white shadow-lg ring-0',
-        'transition-transform duration-normal ease-interactive',
+        'pointer-events-none block h-3 w-3 rounded-full bg-white shadow-sm ring-0',
+        'transition-transform duration-[150ms] ease-in-out',
         'data-[state=unchecked]:translate-x-0',
         'data-[state=checked]:translate-x-3'
       )}
