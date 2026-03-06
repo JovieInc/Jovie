@@ -6,16 +6,33 @@
 
 import type { OptimizedAvatar, SharpConstructor, SharpModule } from './types';
 
+function isSharpConstructor(value: unknown): value is SharpConstructor {
+  return typeof value === 'function';
+}
+
+function hasDefaultExport(
+  value: unknown
+): value is SharpModule & { default: unknown } {
+  return typeof value === 'object' && value !== null && 'default' in value;
+}
+
 /**
  * Dynamically import sharp module.
  */
 export async function getSharp(): Promise<SharpConstructor> {
-  const sharpModule = (await import('sharp')) as unknown as SharpModule;
-  const factory = (sharpModule as SharpModule & { default?: unknown }).default;
-  if (factory) {
-    return factory as SharpConstructor;
+  const importedModule: unknown = await import('sharp');
+
+  if (hasDefaultExport(importedModule)) {
+    if (isSharpConstructor(importedModule.default)) {
+      return importedModule.default;
+    }
   }
-  return sharpModule as unknown as SharpConstructor;
+
+  if (isSharpConstructor(importedModule)) {
+    return importedModule;
+  }
+
+  throw new Error('Invalid sharp module shape');
 }
 
 /**
