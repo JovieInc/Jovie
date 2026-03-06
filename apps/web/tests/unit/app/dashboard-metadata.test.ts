@@ -16,6 +16,19 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+// Mock heavy transitive imports that page modules pull in
+vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
+  ChatPageClient: () => null,
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
+  getDashboardData: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock('next/navigation', () => ({
+  redirect: vi.fn(),
+}));
+
 describe('dashboard metadata generation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
