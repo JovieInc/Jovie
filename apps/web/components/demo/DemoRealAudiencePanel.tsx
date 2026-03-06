@@ -22,7 +22,8 @@ const columnHelper = createColumnHelper<AudienceMember>();
  * Subset of real audience columns for the demo — excludes Select, QuickActions,
  * and Menu columns that require hooks/API interactions.
  */
-const DEMO_COLUMNS: ColumnDef<AudienceMember, unknown>[] = [
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Table ColumnDef requires `any` for mixed accessor types
+const DEMO_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   columnHelper.accessor('displayName', {
     id: 'user',
     header: 'Visitor',
