@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
@@ -513,22 +513,34 @@ export async function enqueueDspArtistDiscoveryJob(params: {
     dedupKey,
   };
 
-  // Fast-path: check if a job already exists for this profile
+  // Fast-path: check if a pending/processing job already exists for this profile.
+  // Completed or failed jobs are intentionally excluded so the discovery can
+  // re-run when new ISRCs become available (e.g. after a Spotify re-sync).
+  // Uses LIKE to match both legacy keys and timestamped keys (e.g. "dsp_discovery:...:123456").
   const existing = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .where(
+      and(
+        drizzleSql`${ingestionJobs.dedupKey} LIKE ${dedupKey + '%'}`,
+        inArray(ingestionJobs.status, ['pending', 'processing'])
+      )
+    )
     .limit(1);
 
   if (existing.length > 0) {
     return existing[0].id;
   }
 
-  // Atomic insert — unique index on dedup_key prevents concurrent duplicates
+  // Atomic insert — unique index on dedup_key prevents concurrent duplicates.
+  // Previous completed/failed rows may share the same dedup_key, so we need a
+  // fresh key that won't collide with the unique partial index.
+  const timestampedDedupKey = `${dedupKey}:${Date.now()}`;
+
   return insertJobWithDedup({
     jobType: 'dsp_artist_discovery',
-    payload,
-    dedupKey,
+    payload: { ...payload, dedupKey: timestampedDedupKey },
+    dedupKey: timestampedDedupKey,
     status: 'pending',
     runAt: new Date(),
     priority: 1, // Higher priority for user-triggered discovery
@@ -607,22 +619,33 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
     dedupKey,
   };
 
-  // Fast-path: check if a job already exists for this profile
+  // Fast-path: only dedup against pending/processing jobs.
+  // Completed or failed jobs should not block re-enrichment.
+  // Uses LIKE to match both legacy keys and timestamped keys.
   const existing = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
-    .where(eq(ingestionJobs.dedupKey, dedupKey))
+    .where(
+      and(
+        drizzleSql`${ingestionJobs.dedupKey} LIKE ${dedupKey + '%'}`,
+        inArray(ingestionJobs.status, ['pending', 'processing'])
+      )
+    )
     .limit(1);
 
   if (existing.length > 0) {
     return existing[0].id;
   }
 
+  // Previous completed/failed rows may share the same dedup_key, so use a
+  // timestamped key that won't collide with the unique partial index.
+  const timestampedDedupKey = `${dedupKey}:${Date.now()}`;
+
   // Atomic insert — unique index on dedup_key prevents concurrent duplicates
   return insertJobWithDedup({
     jobType: 'musicfetch_enrichment',
-    payload,
-    dedupKey,
+    payload: { ...payload, dedupKey: timestampedDedupKey },
+    dedupKey: timestampedDedupKey,
     status: 'pending',
     runAt: new Date(),
     priority: 1, // Higher priority for user-triggered enrichment
