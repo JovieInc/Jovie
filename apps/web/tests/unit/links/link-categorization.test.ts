@@ -32,7 +32,13 @@ function createMockLink(
 
 describe('link-categorization', () => {
   describe('CROSS_CATEGORY', () => {
-    it('should default to no cross-category platforms', () => {
+    it('should not define YouTube as cross-category (YouTube is social only)', () => {
+      expect(CROSS_CATEGORY.youtube).toBeUndefined();
+    });
+
+    it('should have no platforms defined by default', () => {
+      const keys = Object.keys(CROSS_CATEGORY);
+      expect(keys).toEqual([]);
       expect(CROSS_CATEGORY).toEqual({});
     });
 
@@ -113,6 +119,10 @@ describe('link-categorization', () => {
         expect(sectionOf(link)).toBe('social');
       });
 
+      it('should correctly categorize YouTube Music as dsp', () => {
+        const link = createMockLink('youtube_music', 'dsp');
+        expect(sectionOf(link)).toBe('dsp');
+      });
       it('should correctly categorize Spotify', () => {
         const link = createMockLink('spotify', 'dsp');
         expect(sectionOf(link)).toBe('dsp');
@@ -150,7 +160,9 @@ describe('link-categorization', () => {
         const youtubeLink = createMockLink('youtube', 'social');
         expect(canMoveTo(youtubeLink, 'social')).toBe(true);
       });
+    });
 
+    describe('YouTube is social only (no cross-category)', () => {
       it('should not allow YouTube to move from social to dsp', () => {
         const youtubeLink = createMockLink('youtube', 'social');
         expect(canMoveTo(youtubeLink, 'dsp')).toBe(false);
@@ -552,7 +564,7 @@ describe('link-categorization', () => {
       expect(sectionOf(links[5])).toBe('earnings'); // venmo
       expect(sectionOf(links[6])).toBe('custom'); // website
 
-      // Verify canMoveTo for YouTube
+      // Verify canMoveTo for YouTube (social only, no cross-category)
       const youtube = links[2];
       expect(canMoveTo(youtube, 'dsp')).toBe(false);
       expect(canMoveTo(youtube, 'earnings')).toBe(false);

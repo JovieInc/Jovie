@@ -234,7 +234,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
   { pattern: /music\.apple\.com/i, platformId: 'apple_music' },
   {
-    pattern: /music\.youtube\.com|youtube\.com\/(channel|@)/i,
+    pattern: /music\.youtube\.com/i,
     platformId: 'youtube_music',
   },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
