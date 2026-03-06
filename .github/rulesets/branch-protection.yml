@@ -17,12 +17,12 @@
 #   maintaining a separate GitHub App just for reviews, we rely on the
 #   automated quality gates that already provide stronger coverage:
 #
-#   Pre-merge:  CI (typecheck + lint + tests + a11y + layout guard)
+#   Pre-merge:  CI fast lane (typecheck + lint + server boundaries + guardrails)
 #               + scope-judge (LLM alignment check, agent PRs only)
 #               + sensitive-file detection (blocks auto-merge)
 #               + merge queue (re-runs ci-fast against latest main)
 #
-#   Post-merge: canary health gate + Sentry error gate + auto-rollback
+#   Post-merge: build + smoke/E2E + canary health gate + Sentry error gate + auto-rollback
 #
 # KEY DESIGN DECISIONS:
 #
@@ -40,10 +40,10 @@
 #    are dismissed. This keeps the audit trail accurate.
 #
 # 4. Simplified status checks: only PR Ready + Migration Guard
-#    PR Ready already aggregates: ci-fast (typecheck + lint + knip +
-#    guardrails) + unit tests + a11y + layout guard. Requiring individual
-#    checks AND the aggregate is redundant and causes "pending" stuck
-#    states when path-gated checks skip.
+#    PR Ready aggregates only the fast deterministic lane:
+#    ci-fast (typecheck + lint + server boundaries + guardrails).
+#    Slower checks run post-merge or in nightly/manual lanes, which keeps
+#    PR latency low and avoids "pending" states from optional jobs.
 #
 # 5. scope-judge is NOT a required status check here
 #    It only runs on agent branches. If required here, non-agent PRs
@@ -51,10 +51,9 @@
 #    scope-judge status internally before enabling auto-merge.
 #
 # 6. merge_queue enabled (lightweight)
-#    PRs enter the merge queue after checks pass. The queue runs only
-#    ci-fast (merge_group trigger) to catch integration conflicts.
-#    Unit tests, a11y, and layout guard are skipped in the queue —
-#    they already passed on the PR and post-deploy gates catch regressions.
+#    PRs enter the merge queue after checks pass. The queue reruns only
+#    ci-fast (merge_group trigger) against latest main to catch integration conflicts.
+#    Slower checks are intentionally kept out of the merge queue.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external
@@ -99,12 +98,9 @@ rules:
       # The merge queue handles this automatically.
       strict_required_status_checks_policy: true
       required_status_checks:
-        # PR Ready: The single aggregate gate for all CI checks.
+        # PR Ready: The single aggregate gate for the fast PR lane.
         # Internally aggregates:
-        #   ci-fast (typecheck + biome lint + eslint boundaries + knip + guardrails)
-        #   + unit tests (sharded 2/2)
-        #   + a11y (axe audit)
-        #   + layout guard (overlap/touching detection)
+        #   ci-fast (typecheck + biome lint + eslint boundaries + guardrails)
         - context: 'CI / PR Ready'
 
         # Migration Guard: Separate from PR Ready because it's independently
@@ -138,9 +134,8 @@ rules:
 
       # Status checks that must pass in the merge queue context.
       # The CI workflow triggers on merge_group events but only runs
-      # ci-fast (typecheck + lint + boundaries + knip + guardrails).
-      # Unit tests, a11y, and layout guard are skipped — they already
-      # passed on the PR and post-deploy canary/sentry gates cover regressions.
+      # ci-fast (typecheck + lint + boundaries + guardrails).
+      # Slower checks are intentionally kept out of the merge queue.
       check_response_timeout_minutes: 10
 
   # ── Branch Integrity ───────────────────────────────────────────────────
