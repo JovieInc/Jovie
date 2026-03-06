@@ -40,7 +40,6 @@ function extractNothing(): Record<string, string> {
   return {};
 }
 
-
 export const INTENT_PATTERNS: IntentPattern[] = [
   // --- Priority 10: Profile name changes ---
   {
