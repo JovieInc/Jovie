@@ -16,6 +16,7 @@ vi.mock('@/lib/dsp-enrichment/circuit-breakers', () => ({
       lastStateChange: Date.now(),
       totalFailures: 0,
       totalSuccesses: 10,
+      requestsInWindow: 10,
     })),
   },
 }));
