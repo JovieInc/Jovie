@@ -203,7 +203,7 @@ export function RecentChats() {
           if (!open && !deleteConversation.isPending) setDeleteTarget(null);
         }}
       >
-        <AlertDialogContent className='max-w-sm gap-3 p-5'>
+        <AlertDialogContent className='max-w-sm'>
           <AlertDialogHeader>
             <AlertDialogTitle className='text-sm font-semibold text-primary-token'>
               Delete thread
