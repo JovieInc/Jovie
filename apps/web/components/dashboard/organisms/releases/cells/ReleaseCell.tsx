@@ -88,75 +88,78 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [release.providers]);
 
   return (
-    <div className='flex items-center gap-3'>
-      <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-2'>
+    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[minmax(0,1fr)_minmax(88px,132px)_minmax(72px,120px)_20px_minmax(54px,92px)]'>
+      <div className='min-w-0'>
+        <TruncatedText
+          lines={1}
+          className='text-[13px] font-[510] tracking-[-0.011em] text-(--linear-text-primary)'
+          tooltipSide='top'
+          tooltipAlign='start'
+        >
+          {release.title}
+        </TruncatedText>
+      </div>
+
+      <div className='min-w-0'>
+        {artistName ? (
           <TruncatedText
             lines={1}
-            className='text-sm font-semibold text-primary-token'
-            tooltipSide='top'
-            tooltipAlign='start'
+            className='text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
-            {release.title}
+            {artistName}
           </TruncatedText>
-          {showType && typeStyle && (
-            <Badge
-              size='sm'
-              className={`shrink-0 ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
-            >
-              {typeStyle.label}
-            </Badge>
-          )}
-          <PopularityIcon popularity={release.spotifyPopularity} />
-          {release.releaseDate && (
-            <span className='shrink-0 text-[10px] tabular-nums text-tertiary-token sm:hidden'>
-              {new Date(release.releaseDate).getFullYear()}
-            </span>
-          )}
-          {manualOverrideCount > 0 && (
-            <Badge
-              variant='secondary'
-              className='shrink-0 border border-warning bg-warning-subtle text-[10px] text-warning-foreground'
-            >
-              {manualOverrideCount} edited
-            </Badge>
-          )}
-        </div>
-        {(artistName || platformInfo) && (
-          <div className='mt-0.5 flex items-center gap-2'>
-            {artistName && (
-              <TruncatedText lines={1} className='text-xs text-secondary-token'>
-                {artistName}
-              </TruncatedText>
-            )}
-            {platformInfo && (
-              <SimpleTooltip
-                content={platformInfo.allNames.join(', ')}
-                side='top'
-              >
-                <button
-                  type='button'
-                  className='inline-flex shrink-0 items-center gap-0.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]/30'
-                  aria-label={`Available platforms: ${platformInfo.allNames.join(', ')}`}
-                >
-                  {platformInfo.visible.map(p => (
-                    <SocialIcon
-                      key={p.key}
-                      platform={p.icon}
-                      className='h-3 w-3 text-tertiary-token'
-                      aria-hidden
-                    />
-                  ))}
-                  {platformInfo.remaining > 0 && (
-                    <span className='text-[10px] text-tertiary-token'>
-                      +{platformInfo.remaining}
-                    </span>
-                  )}
-                </button>
-              </SimpleTooltip>
-            )}
-          </div>
+        ) : null}
+      </div>
+
+      <div className='flex min-w-0 items-center gap-1.5'>
+        {showType && typeStyle && (
+          <Badge
+            size='sm'
+            className={`shrink-0 ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+          >
+            {typeStyle.label}
+          </Badge>
         )}
+        {manualOverrideCount > 0 && (
+          <Badge
+            variant='secondary'
+            className='shrink-0 border-amber-500/15 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300'
+          >
+            {manualOverrideCount} edited
+          </Badge>
+        )}
+      </div>
+
+      <div className='flex w-4 items-center justify-start'>
+        <PopularityIcon popularity={release.spotifyPopularity} />
+      </div>
+
+      <div className='flex min-w-0 items-center justify-start'>
+        {platformInfo ? (
+          <SimpleTooltip content={platformInfo.allNames.join(', ')} side='top'>
+            <button
+              type='button'
+              className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 text-[11px] font-[450] tracking-[-0.01em] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+              aria-label={`Available platforms: ${platformInfo.allNames.join(', ')}`}
+            >
+              <span className='flex items-center -space-x-0.5'>
+                {platformInfo.visible.map(p => (
+                  <SocialIcon
+                    key={p.key}
+                    platform={p.icon}
+                    className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
+                    aria-hidden
+                  />
+                ))}
+              </span>
+              {platformInfo.remaining > 0 && (
+                <span className='tabular-nums text-[10px] text-(--linear-text-tertiary)'>
+                  +{platformInfo.remaining}
+                </span>
+              )}
+            </button>
+          </SimpleTooltip>
+        ) : null}
       </div>
     </div>
   );

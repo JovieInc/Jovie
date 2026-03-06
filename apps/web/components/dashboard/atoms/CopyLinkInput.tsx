@@ -29,6 +29,10 @@ export interface CopyLinkInputProps {
   readonly size?: 'sm' | 'md';
   /** Additional CSS classes */
   readonly className?: string;
+  /** Additional CSS classes for the input element */
+  readonly inputClassName?: string;
+  /** Additional CSS classes for the copy button */
+  readonly buttonClassName?: string;
   /**
    * Prevent click bubbling to parents (e.g. table row navigation).
    * Defaults to false.
@@ -45,6 +49,8 @@ export function CopyLinkInput({
   displayValue,
   size = 'md',
   className,
+  inputClassName,
+  buttonClassName,
   stopPropagation = false,
   onCopy,
   testId,
@@ -114,7 +120,8 @@ export function CopyLinkInput({
           size === 'sm' && 'h-7',
           size === 'md' && 'h-8',
           isCopied &&
-            'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700'
+            'bg-green-50 border-green-300 dark:bg-green-900/20 dark:border-green-700',
+          inputClassName
         )}
       />
       <button
@@ -125,7 +132,8 @@ export function CopyLinkInput({
           'absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded',
           'text-tertiary-token hover:text-primary-token hover:bg-surface-2',
           'transition-colors',
-          isCopied && 'text-success'
+          isCopied && 'text-success',
+          buttonClassName
         )}
       >
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
