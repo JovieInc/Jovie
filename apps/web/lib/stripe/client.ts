@@ -5,7 +5,7 @@
 
 import 'server-only';
 import Stripe from 'stripe';
-import { cacheQuery } from '@/lib/db/cache';
+import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -124,6 +124,17 @@ export async function getOrCreateCustomer(
     },
     { ttlSeconds: 3600 } // Cache for 1 hour
   );
+}
+
+/**
+ * Invalidate Stripe customer cache for a specific user.
+ * Call this after creating or updating a customer in Stripe to ensure
+ * fresh data on subsequent lookups.
+ *
+ * @param userId - The user's Clerk ID
+ */
+export async function invalidateStripeCustomerCache(userId: string): Promise<void> {
+  await invalidateCache(`stripe:customer:${userId}`);
 }
 
 /**
