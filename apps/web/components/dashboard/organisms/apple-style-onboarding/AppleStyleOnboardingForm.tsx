@@ -2,16 +2,15 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { AuthBackButton } from '@/components/auth';
 import { getValidationFailureKey } from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
 import {
-  OnboardingCompleteStep,
   OnboardingDspStep,
   OnboardingHandleStep,
+  OnboardingProfileReviewStep,
 } from '@/components/dashboard/organisms/onboarding';
-import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
 import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
@@ -33,20 +32,13 @@ export function AppleStyleOnboardingForm({
   const previousStepIndexRef = useRef<number | null>(null);
   const lastValidationFailureKeyRef = useRef<string | null>(null);
 
-  const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
-  const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
-
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [handleInput, setHandleInput] = useState(normalizedInitialHandle);
   const [fullName] = useState(initialDisplayName);
   const [profileReadyHandle, setProfileReadyHandle] = useState(
     normalizedInitialHandle
   );
-  const { copy, isSuccess: copied } = useClipboard({ resetDelay: 2000 });
-
   const handleInputRef = useRef<HTMLInputElement | null>(null);
-
-  const displayDomain = PRODUCTION_PROFILE_DOMAIN;
 
   const { currentStepIndex, isTransitioning, goToNextStep, goBack } =
     useStepNavigation();
@@ -63,6 +55,8 @@ export function AppleStyleOnboardingForm({
     isPendingSubmit,
     spotifyImportState,
     autoSubmitClaimed,
+    enrichedProfile,
+    setEnrichedProfile,
   } = useOnboardingSubmit({
     userId,
     userEmail,
@@ -176,18 +170,6 @@ export function AppleStyleOnboardingForm({
     validateHandle(handleInput);
   }, [handleInput, setHandleValidation, validateHandle]);
 
-  const copyProfileLink = useCallback(() => {
-    const targetHandle = profileReadyHandle || handle || handleInput;
-    const link = `${PRODUCTION_PROFILE_BASE_URL}/${targetHandle}`;
-    void copy(link);
-  }, [
-    PRODUCTION_PROFILE_BASE_URL,
-    copy,
-    handle,
-    handleInput,
-    profileReadyHandle,
-  ]);
-
   const goToDashboard = useCallback(() => {
     if (globalThis.window === undefined) return;
 
@@ -200,14 +182,33 @@ export function AppleStyleOnboardingForm({
   }, [spotifyImportState.status]);
 
   const handleDspConnected = useCallback(
-    (_releases: unknown, artistName: string) => {
+    async (
+      _releases: unknown,
+      artistName: string,
+      spotifyArtistId?: string,
+      spotifyUrl?: string
+    ) => {
       track('onboarding_dsp_connected', {
         user_id: userId,
         artist_name: artistName,
       });
+
+      // Enrich profile with Spotify + MusicFetch data
+      if (spotifyArtistId && spotifyUrl) {
+        try {
+          const enriched = await enrichProfileFromDsp(
+            spotifyArtistId,
+            spotifyUrl
+          );
+          setEnrichedProfile(enriched);
+        } catch {
+          // Enrichment failure is non-critical
+        }
+      }
+
       goToNextStep();
     },
-    [goToNextStep, userId]
+    [goToNextStep, userId, setEnrichedProfile]
   );
 
   const handleDspSkip = useCallback(() => {
@@ -251,17 +252,12 @@ export function AppleStyleOnboardingForm({
 
       case 2:
         return (
-          <OnboardingCompleteStep
+          <OnboardingProfileReviewStep
             title={ONBOARDING_STEPS[2].title}
             prompt={ONBOARDING_STEPS[2].prompt}
-            displayDomain={displayDomain}
+            enrichedProfile={enrichedProfile}
             handle={profileReadyHandle || handle}
-            copied={copied}
             onGoToDashboard={goToDashboard}
-            onCopyLink={copyProfileLink}
-            spotifyImportStatus={spotifyImportState.status}
-            spotifyImportMessage={spotifyImportState.message}
-            spotifyImportStage={spotifyImportState.stage}
           />
         );
 

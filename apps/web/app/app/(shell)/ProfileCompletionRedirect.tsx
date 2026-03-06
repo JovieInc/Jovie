@@ -34,7 +34,8 @@ export function ProfileCompletionRedirect() {
 
     if (
       isBlank(selectedProfile.username) ||
-      isBlank(selectedProfile.displayName)
+      isBlank(selectedProfile.displayName) ||
+      isBlank(selectedProfile.avatarUrl)
     ) {
       router.replace('/onboarding');
     }
