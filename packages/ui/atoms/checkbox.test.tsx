@@ -23,7 +23,9 @@ describe('Checkbox', () => {
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain('h-4');
       expect(checkbox.className).toContain('w-4');
-      expect(checkbox.className).toContain('rounded-sm');
+      expect(checkbox.className).toContain(
+        'rounded-(--linear-app-radius-item)'
+      );
       expect(checkbox.className).toContain('border');
     });
   });
@@ -126,7 +128,9 @@ describe('Checkbox', () => {
       render(<Checkbox aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain('focus-visible:ring-2');
-      expect(checkbox.className).toContain('focus-visible:ring-focus');
+      expect(checkbox.className).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
     });
 
     it('applies disabled styling', () => {
@@ -141,7 +145,9 @@ describe('Checkbox', () => {
         <Checkbox defaultChecked aria-label='Test' data-testid='checkbox' />
       );
       const checkbox = screen.getByTestId('checkbox');
-      expect(checkbox.className).toContain('data-[state=checked]:bg-accent');
+      expect(checkbox.className).toContain(
+        'data-[state=checked]:bg-(--linear-btn-primary-bg)'
+      );
     });
 
     it('merges custom className', () => {
