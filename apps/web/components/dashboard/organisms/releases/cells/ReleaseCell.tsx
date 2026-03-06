@@ -120,10 +120,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {(artistName || platformInfo) && (
           <div className='mt-0.5 flex items-center gap-2'>
             {artistName && (
-              <TruncatedText
-                lines={1}
-                className='text-xs text-secondary-token'
-              >
+              <TruncatedText lines={1} className='text-xs text-secondary-token'>
                 {artistName}
               </TruncatedText>
             )}

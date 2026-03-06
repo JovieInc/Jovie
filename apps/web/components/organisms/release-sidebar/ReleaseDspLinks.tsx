@@ -287,7 +287,8 @@ export function ReleaseDspLinks({
               <SelectContent>
                 {availableProviders.map(([key, config]) => {
                   const dspId = PROVIDER_TO_DSP[key as ProviderKey];
-                  const socialIcon = PROVIDER_TO_SOCIAL_ICON[key as ProviderKey];
+                  const socialIcon =
+                    PROVIDER_TO_SOCIAL_ICON[key as ProviderKey];
                   return (
                     <SelectItem key={key} value={key}>
                       <div className='flex items-center gap-2'>
