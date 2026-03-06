@@ -5,7 +5,7 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
-    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-36'>
+    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-24'>
       <Container size='homepage'>
         {/* Gradient separator */}
         <div

@@ -64,7 +64,7 @@ describe('TipPromo', () => {
     // Check CTA button styling - CTAButton uses bg-surface-1 base with hover:bg-surface-2
     const ctaButton = screen.getByRole('link', { name: 'See it live' });
     expect(ctaButton).toHaveClass('bg-btn-secondary');
-    expect(ctaButton).toHaveClass('hover:bg-btn-secondary-hover');
+    expect(ctaButton).toHaveClass('hover:bg-(--color-btn-secondary-hover)');
   });
 
   it('contains "Tip, instantly." heading when feature flag is enabled', () => {

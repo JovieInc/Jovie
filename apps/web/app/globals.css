@@ -33,6 +33,33 @@ body {
   overscroll-behavior: none;
 }
 
+/* Cross-platform scrollbar styling -- thin, dark, subtle */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-bg-surface-3) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-bg-surface-3);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-border-default);
+}
+
 /* Smooth scroll for anchor links, respecting reduced motion preference */
 
 html {
@@ -501,39 +528,30 @@ body {
       opacity: 0.9;
     }
   }
-  /* Linear Spacing System - generous vertical rhythm */
+  /* Linear Spacing System - compact vertical rhythm */
   .section-spacing-linear {
     padding-top: var(--linear-section-pt-sm);
-    /* 64px mobile */
     padding-bottom: var(--linear-section-pb-sm);
-    /* 80px */
     @media (min-width: 768px) {
       padding-top: var(--linear-section-pt-md);
-      /* 80px tablet */
       padding-bottom: var(--linear-section-pb-md);
-      /* 96px */
     }
     @media (min-width: 1024px) {
       padding-top: var(--linear-section-pt-lg);
-      /* 96px desktop */
       padding-bottom: var(--linear-section-pb-lg);
-      /* 128px */
     }
   }
   /* Smaller section spacing for tighter groupings */
   .section-spacing-linear-sm {
-    padding-top: var(--linear-space-16);
-    /* 64px */
-    padding-bottom: var(--linear-space-16);
+    padding-top: var(--linear-space-12);
+    padding-bottom: var(--linear-space-12);
     @media (min-width: 768px) {
-      padding-top: var(--linear-space-20);
-      /* 80px */
-      padding-bottom: var(--linear-space-20);
+      padding-top: var(--linear-space-16);
+      padding-bottom: var(--linear-space-16);
     }
     @media (min-width: 1024px) {
-      padding-top: var(--linear-space-24);
-      /* 96px */
-      padding-bottom: var(--linear-space-24);
+      padding-top: var(--linear-space-20);
+      padding-bottom: var(--linear-space-20);
     }
   }
   .section-gap-linear {
