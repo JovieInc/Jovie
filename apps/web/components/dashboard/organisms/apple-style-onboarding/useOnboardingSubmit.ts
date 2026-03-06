@@ -13,6 +13,10 @@ import {
 import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import {
+  type EnrichedProfileData,
+  enrichProfileFromDsp,
+} from '@/app/onboarding/actions/enrich-profile';
+import {
   getOnboardingCompletionMethod,
   toDurationMs,
 } from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
@@ -96,6 +100,7 @@ async function advanceSpotifyImportStages(
 
 async function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
+  setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>,
   signal: AbortSignal,
   userId: string
 ): Promise<void> {
@@ -170,6 +175,21 @@ async function tryAutoConnectSpotify(
             signal,
             importResult.importing ? 0 : importResult.imported
           );
+
+          // Enrich profile with Spotify artist data + MusicFetch
+          if (!signal.aborted) {
+            try {
+              const enriched = await enrichProfileFromDsp(
+                artistMatch[1],
+                normalizedUrl
+              );
+              if (!signal.aborted) {
+                setEnrichedProfile(enriched);
+              }
+            } catch {
+              // Enrichment failure is non-critical — user can fill in manually
+            }
+          }
         } else {
           track('onboarding_spotify_import_failed', {
             user_id: userId,
@@ -229,6 +249,8 @@ interface UseOnboardingSubmitReturn {
   isPendingSubmit: boolean;
   spotifyImportState: SpotifyImportState;
   autoSubmitClaimed: boolean;
+  enrichedProfile: EnrichedProfileData | null;
+  setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>;
 }
 
 const AUTO_SUBMIT_CONFIRMATION_DELAY_MS = 1400;
@@ -265,6 +287,8 @@ export function useOnboardingSubmit({
       message: '',
     });
   const [autoSubmitClaimed, setAutoSubmitClaimed] = useState(false);
+  const [enrichedProfile, setEnrichedProfile] =
+    useState<EnrichedProfileData | null>(null);
 
   // Abort controller to clean up Spotify import interval on unmount
   const spotifyAbortRef = useRef<AbortController | null>(null);
@@ -450,6 +474,7 @@ export function useOnboardingSubmit({
         spotifyAbortRef.current = controller;
         void tryAutoConnectSpotify(
           setSpotifyImportState,
+          setEnrichedProfile,
           controller.signal,
           userId
         );
@@ -531,5 +556,7 @@ export function useOnboardingSubmit({
     isPendingSubmit,
     spotifyImportState,
     autoSubmitClaimed,
+    enrichedProfile,
+    setEnrichedProfile,
   };
 }

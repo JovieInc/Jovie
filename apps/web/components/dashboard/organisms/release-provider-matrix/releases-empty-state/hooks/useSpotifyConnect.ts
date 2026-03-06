@@ -20,7 +20,12 @@ export interface SpotifyArtist {
 export interface UseSpotifyConnectParams {
   dispatch: React.Dispatch<ReleasesEmptyStateAction>;
   searchClear: () => void;
-  onConnected?: (releases: ReleaseViewModel[], artistName: string) => void;
+  onConnected?: (
+    releases: ReleaseViewModel[],
+    artistName: string,
+    spotifyArtistId?: string,
+    spotifyUrl?: string
+  ) => void;
   onImportStart?: (artistName: string) => void;
 }
 
@@ -60,9 +65,14 @@ export function useSpotifyConnect({
           if (result.success) {
             dispatch({ type: 'CLEAR_SEARCH' });
             if (result.importing) {
-              onConnected?.([], result.artistName);
+              onConnected?.([], result.artistName, artistId, artistUrl);
             } else {
-              onConnected?.(result.releases, result.artistName);
+              onConnected?.(
+                result.releases,
+                result.artistName,
+                artistId,
+                artistUrl
+              );
             }
           } else {
             dispatch({ type: 'SET_ERROR', payload: result.message });
@@ -99,9 +109,14 @@ export function useSpotifyConnect({
 
           if (result.success) {
             if (result.importing) {
-              onConnected?.([], result.artistName);
+              onConnected?.([], result.artistName, artist.id, artist.url);
             } else {
-              onConnected?.(result.releases, result.artistName);
+              onConnected?.(
+                result.releases,
+                result.artistName,
+                artist.id,
+                artist.url
+              );
             }
           } else {
             dispatch({ type: 'SET_ERROR', payload: result.message });
