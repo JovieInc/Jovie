@@ -159,12 +159,6 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
     prompt: 'Help me change my profile photo.',
     accent: 'purple',
   },
-  {
-    icon: 'Music',
-    label: 'Format lyrics for Apple Music',
-    prompt: 'Format my lyrics for Apple Music.',
-    accent: 'green',
-  },
 ] as const;
 
 /**
