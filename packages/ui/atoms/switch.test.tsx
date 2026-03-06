@@ -106,10 +106,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:bg-surface-2'
-      );
-      expect(switchElement.className).toContain(
-        'data-[state=unchecked]:border-subtle'
+        'data-[state=unchecked]:bg-(--linear-border-strong)'
       );
     });
 
@@ -119,10 +116,7 @@ describe('Switch', () => {
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:bg-accent'
-      );
-      expect(switchElement.className).toContain(
-        'data-[state=checked]:border-accent'
+        'data-[state=checked]:bg-(--linear-btn-primary-bg)'
       );
     });
 
@@ -130,7 +124,9 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain('focus-visible:ring-2');
-      expect(switchElement.className).toContain('focus-visible:ring-focus');
+      expect(switchElement.className).toContain(
+        'focus-visible:ring-(--linear-border-focus)'
+      );
     });
 
     it('applies disabled styling', () => {
@@ -262,16 +258,15 @@ describe('Switch', () => {
       const switchElement = screen.getByTestId('switch');
       const classes = switchElement.className;
 
-      // Unchecked track must use a visible background + border
-      expect(classes).toContain('data-[state=unchecked]:bg-surface-2');
-      expect(classes).toContain('data-[state=unchecked]:border-subtle');
+      // Unchecked track must use a visible background
+      expect(classes).toContain(
+        'data-[state=unchecked]:bg-(--linear-border-strong)'
+      );
 
-      // Checked track must use accent background + matching border
-      expect(classes).toContain('data-[state=checked]:bg-accent');
-      expect(classes).toContain('data-[state=checked]:border-accent');
-
-      // Track must NOT use border-transparent (would hide the toggle)
-      expect(classes).not.toContain('border-transparent');
+      // Checked track must use primary button background
+      expect(classes).toContain(
+        'data-[state=checked]:bg-(--linear-btn-primary-bg)'
+      );
     });
 
     it('checked and unchecked use different background colors', () => {

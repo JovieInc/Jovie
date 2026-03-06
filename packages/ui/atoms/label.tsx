@@ -36,7 +36,7 @@ export interface LabelProps
  * Automatically associates with form controls via htmlFor prop.
  */
 const Label = React.forwardRef<
-  React.ElementRef<typeof LabelPrimitive.Root>,
+  React.ComponentRef<typeof LabelPrimitive.Root>,
   LabelProps
 >(({ className, variant, required, children, ...props }, ref) => (
   <LabelPrimitive.Root

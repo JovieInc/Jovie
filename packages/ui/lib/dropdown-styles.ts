@@ -256,9 +256,10 @@ export const MENU_SHORTCUT_BASE =
  * Select trigger button styles
  */
 export const SELECT_TRIGGER_BASE =
-  'flex h-10 w-full items-center justify-between rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 ' +
-  'text-[13px] text-(--linear-text-primary) ' +
+  'flex h-8 w-full items-center justify-between rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1.5 ' +
+  'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
+  'transition-colors duration-normal ' +
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';

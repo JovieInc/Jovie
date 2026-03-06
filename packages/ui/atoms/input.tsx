@@ -7,22 +7,20 @@ import { cn } from '../lib/utils';
 
 const inputVariants = cva(
   [
-    'flex w-full rounded-[var(--radius-md)] border border-default bg-surface-input px-3 py-2',
-    'text-[13px] ring-offset-background',
+    'flex w-full rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
+    'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary)',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-    'placeholder:text-tertiary-token',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:border-focus',
+    'placeholder:text-(--linear-text-tertiary)',
+    'focus-visible:outline-none focus-visible:border-(--linear-border-focus)',
     'disabled:cursor-not-allowed disabled:opacity-50',
-    'transition-all duration-normal ease-interactive',
+    'transition-colors duration-normal',
   ],
   {
     variants: {
       variant: {
         default: '',
-        error:
-          'border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
-        success:
-          'border-success focus-visible:ring-success focus-visible:border-success',
+        error: 'border-(--linear-error) focus-visible:border-(--linear-error)',
+        success: 'border-success focus-visible:border-success',
       },
       inputSize: {
         sm: 'h-7 px-2 py-1 text-xs',

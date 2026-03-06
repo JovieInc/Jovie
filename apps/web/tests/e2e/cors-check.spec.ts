@@ -27,8 +27,10 @@ test('No CORS errors on homepage', async ({ page }) => {
   // Use domcontentloaded + hydration instead of networkidle
   await page.goto('/', {
     waitUntil: 'domcontentloaded',
-    timeout: SMOKE_TIMEOUTS.NAVIGATION,
   });
+
+  // Wait for the page to settle, network-wise
+  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
   // Wait for hydration and async requests to complete deterministically
   await waitForHydration(page);

@@ -32,8 +32,8 @@ describe('Badge', () => {
     it('applies secondary variant by default', () => {
       render(<Badge data-testid='badge'>New</Badge>);
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-[var(--color-badge-bg)]');
-      expect(badge.className).toContain('text-[var(--color-badge-text)]');
+      expect(badge.className).toContain('bg-(--linear-bg-surface-2)');
+      expect(badge.className).toContain('text-(--linear-text-secondary)');
     });
 
     it('applies secondary variant explicitly', () => {
@@ -43,8 +43,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-[var(--color-badge-bg)]');
-      expect(badge.className).toContain('text-[var(--color-badge-text)]');
+      expect(badge.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(badge.className).toContain('text-(--linear-text-tertiary)');
     });
 
     it('applies success variant', () => {
@@ -54,8 +54,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-success-subtle');
-      expect(badge.className).toContain('text-success');
+      expect(badge.className).toContain('bg-(--linear-success)/15');
+      expect(badge.className).toContain('text-(--linear-success)');
     });
 
     it('applies warning variant', () => {
@@ -65,8 +65,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-warning-subtle');
-      expect(badge.className).toContain('text-warning');
+      expect(badge.className).toContain('bg-(--linear-warning)/15');
+      expect(badge.className).toContain('text-(--linear-warning)');
     });
 
     it('applies error variant', () => {
@@ -76,8 +76,8 @@ describe('Badge', () => {
         </Badge>
       );
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('bg-error-subtle');
-      expect(badge.className).toContain('text-error');
+      expect(badge.className).toContain('bg-(--linear-error)/15');
+      expect(badge.className).toContain('text-(--linear-error)');
     });
   });
 

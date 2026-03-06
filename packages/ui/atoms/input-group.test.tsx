@@ -87,7 +87,7 @@ describe('InputGroup', () => {
       const group = screen.getByTestId('input-group');
       // md size uses specific padding classes for icons
       expect(group.className).toContain(
-        '[&>[data-slot=icon]:first-child~input]:pl-10'
+        '[&>[data-slot=icon]:first-child~input]:pl-9'
       );
     });
 
@@ -165,7 +165,7 @@ describe('InputGroup', () => {
       );
       const group = screen.getByTestId('input-group');
       expect(group.className).toContain(
-        '[&>[data-slot=icon]]:text-tertiary-token'
+        '[&>[data-slot=icon]]:text-(--linear-text-tertiary)'
       );
     });
 

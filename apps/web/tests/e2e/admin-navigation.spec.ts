@@ -106,7 +106,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // Wait for page to fully stabilize with retry for admin nav visibility
     // There can be race conditions with auth/caching that cause flakiness
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {})
+      .catch(() => {});
 
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
@@ -268,7 +271,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // signInUser in beforeEach already navigated to /app/dashboard
     // and waited for transient React 19 errors to resolve
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {})
+      .catch(() => {});
 
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
@@ -368,7 +374,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // signInUser in beforeEach already navigated to /app/dashboard
     // and waited for transient React 19 errors to resolve
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {})
+      .catch(() => {});
 
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;

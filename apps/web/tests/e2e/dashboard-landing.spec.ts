@@ -158,10 +158,11 @@ test.describe('Dashboard Landing @smoke', () => {
     });
     await waitForLoad(page);
 
-    // Wait for any loading states to complete
-    await page.waitForLoadState('networkidle').catch(() => {
-      // networkidle may timeout, continue anyway
-    });
+    // The wait for networkidle is crucial to let Next.js and React hydration settle
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {});
+    // networkidle may timeout, continue anyway
 
     // Verify dashboard rendered content (not blank)
     const hasContent = await hasPageContent(page);

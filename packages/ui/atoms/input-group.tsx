@@ -24,9 +24,9 @@ const sizeClasses = {
   md: {
     iconLeft: 'left-3',
     iconRight: 'right-3',
-    iconSize: 'size-4',
-    inputPaddingLeft: '[&>[data-slot=icon]:first-child~input]:pl-10',
-    inputPaddingRight: '[&:has(>input~[data-slot=icon])>input]:pr-10',
+    iconSize: 'size-3.5',
+    inputPaddingLeft: '[&>[data-slot=icon]:first-child~input]:pl-9',
+    inputPaddingRight: '[&:has(>input~[data-slot=icon])>input]:pr-9',
   },
   lg: {
     iconLeft: 'left-3.5',
@@ -65,7 +65,7 @@ export function InputGroup({
   className,
   size = 'md',
   ...props
-}: InputGroupProps) {
+}: Readonly<InputGroupProps>) {
   const sizeConfig = sizeClasses[size];
 
   return (
@@ -85,7 +85,7 @@ export function InputGroup({
         // Icon after input goes on right
         `[&>input~[data-slot=icon]]:${sizeConfig.iconRight}`,
         // Icon colors
-        '[&>[data-slot=icon]]:text-tertiary-token',
+        '[&>[data-slot=icon]]:text-(--linear-text-tertiary)',
         className
       )}
       {...props}
