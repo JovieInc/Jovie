@@ -96,9 +96,11 @@
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
      ============================================ */
-  --linear-hero-glow: radial-gradient(ellipse 60% 50% at 50% 40%,
-      oklch(92% 0.02 270 / 0.25),
-      transparent 70%);
+  --linear-hero-glow: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    oklch(92% 0.02 270 / 0.25),
+    transparent 70%
+  );
   --linear-hero-gradient-from: oklch(40% 0.06 270);
   --linear-hero-gradient-to: oklch(55% 0.04 270);
   --linear-separator-from: rgba(0, 0, 0, 0.08);
@@ -107,10 +109,12 @@
      SHADOWS — LIGHT MODE
      ============================================ */
   --linear-shadow-button:
-    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(0,
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(
       0,
       0,
-      0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+      0,
+      0.04
+    ) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
   --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
   /* ============================================
@@ -292,9 +296,11 @@
   --linear-btn-secondary-fg: oklch(97% 0.005 260);
   --linear-btn-secondary-hover: oklch(25% 0.01 260);
   /* Hero-specific */
-  --linear-hero-glow: radial-gradient(ellipse 60% 50% at 50% 40%,
-      oklch(22% 0.025 260 / 0.35),
-      transparent 70%);
+  --linear-hero-glow: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    oklch(22% 0.025 260 / 0.35),
+    transparent 70%
+  );
   --linear-hero-gradient-from: oklch(72% 0.015 260);
   --linear-hero-gradient-to: oklch(58% 0.01 260);
   --linear-separator-from: rgba(255, 255, 255, 0.06);

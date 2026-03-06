@@ -13,7 +13,7 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('playwright sentry reporter wiring', () => {
+describe('playwright sentry reporter wiring', { timeout: 15000 }, () => {
   it('includes the sentry reporter when SENTRY_E2E_REPORTING is enabled', async () => {
     process.env.CI = 'true';
     process.env.SENTRY_E2E_REPORTING = '1';

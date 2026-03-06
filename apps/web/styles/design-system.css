@@ -90,10 +90,18 @@
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
-  --color-text-secondary-token: oklch(40% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-tertiary-token: oklch(50% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-quaternary-token: oklch(60% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-disabled-token: oklch(70% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-secondary-token: oklch(
+    40% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    50% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    60% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(
+    70% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-text-tooltip: #ffffff;
 
   /* Logo muted tokens for label logos bar */
@@ -121,9 +129,13 @@
   --color-btn-primary-hover: oklch(20% 0 0);
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(93% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-bg: oklch(
+    93% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-btn-secondary-fg: oklch(20% 0 0);
-  --color-btn-secondary-hover: oklch(88% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-hover: oklch(
+    88% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Interactive states */
   --color-interactive-hover: oklch(0% 0 0 / 6%);
@@ -162,7 +174,9 @@
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
   /* Skeleton/loading states */
-  --color-skeleton-base: oklch(95% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-base: oklch(
+    95% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
   /* Focus ring — Linear: lch(47.918% 59.303 288.421) = #5e6ad2 */
@@ -258,9 +272,13 @@
   --color-btn-primary-hover: oklch(92% 0 0);
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(19% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-bg: oklch(
+    19% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-btn-secondary-fg: oklch(90% 0 0);
-  --color-btn-secondary-hover: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-hover: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Interactive states - white-based (Linear uses semi-transparent overlays)
      Extracted: hover rows = rgba(255,255,255,0.02-0.03), buttons = 0.05, active = 0.05 */
@@ -305,8 +323,12 @@
     rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
 
   /* Skeleton/loading states */
-  --color-skeleton-base: oklch(18% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-skeleton-shimmer: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-base: oklch(
+    18% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-skeleton-shimmer: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 }
 
 /* ============================================
@@ -324,7 +346,9 @@
 
     /* Increase text contrast */
     --color-text-primary-token: oklch(5% 0 0);
-    --color-text-secondary-token: oklch(25% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      25% var(--theme-base-chroma) var(--theme-base-hue)
+    );
 
     /* Stronger borders */
     --color-border-subtle: oklch(0% 0 0 / 15%);
@@ -334,7 +358,9 @@
 
   :root.dark {
     --color-text-primary-token: oklch(100% 0 0);
-    --color-text-secondary-token: oklch(85% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      85% var(--theme-base-chroma) var(--theme-base-hue)
+    );
 
     --color-border-subtle: oklch(100% 0 0 / 15%);
     --color-border-default: oklch(100% 0 0 / 25%);
@@ -355,10 +381,18 @@
 
   /* Text hierarchy — maximum separation */
   --color-text-primary-token: oklch(5% 0 0);
-  --color-text-secondary-token: oklch(25% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-tertiary-token: oklch(35% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-quaternary-token: oklch(45% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-disabled-token: oklch(55% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-secondary-token: oklch(
+    25% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    35% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    45% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Borders — significantly stronger */
   --color-border-subtle: oklch(0% 0 0 / 15%);
@@ -379,9 +413,13 @@
   --color-badge-text: oklch(5% 0 0);
 
   /* Secondary button — more contrast */
-  --color-btn-secondary-bg: oklch(88% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-bg: oklch(
+    88% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-btn-secondary-fg: oklch(10% 0 0);
-  --color-btn-secondary-hover: oklch(82% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-hover: oklch(
+    82% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Shadows — stronger ring for depth perception */
   --shadow-card:
@@ -395,9 +433,15 @@
 
   /* Text hierarchy — brighter primaries, more steps */
   --color-text-primary-token: oklch(100% 0 0);
-  --color-text-secondary-token: oklch(85% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-tertiary-token: oklch(72% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-quaternary-token: oklch(55% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-secondary-token: oklch(
+    85% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    72% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    55% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-text-disabled-token: oklch(40% 0.006 272);
 
   /* Borders — much stronger */
@@ -419,9 +463,13 @@
   --color-badge-text: rgb(255, 255, 255);
 
   /* Secondary button — more contrast */
-  --color-btn-secondary-bg: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-bg: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-btn-secondary-fg: oklch(95% 0 0);
-  --color-btn-secondary-hover: oklch(30% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-hover: oklch(
+    30% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Shadows — stronger rings */
   --shadow-card:
@@ -435,12 +483,16 @@
 
     /* Softer text contrast */
     --color-text-primary-token: oklch(20% 0 0);
-    --color-text-secondary-token: oklch(45% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      45% var(--theme-base-chroma) var(--theme-base-hue)
+    );
   }
 
   :root.dark {
     --color-text-primary-token: oklch(85% 0 0);
-    --color-text-secondary-token: oklch(65% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      65% var(--theme-base-chroma) var(--theme-base-hue)
+    );
   }
 }
 
@@ -777,7 +829,8 @@
     color var(--duration-normal), opacity var(--duration-normal);
   --transition-bg: background-color var(--duration-normal);
   --transition-opacity: opacity var(--duration-normal);
-  --transition-opacity-fast: opacity var(--duration-instant) var(--ease-interactive);
+  --transition-opacity-fast: opacity var(--duration-instant)
+    var(--ease-interactive);
   --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
   --transition-transform: transform var(--duration-normal);
   --transition-collapse:
@@ -908,10 +961,12 @@
     inset 0 1px 0 oklch(100% 0 0 / 60%);
 
   /* Highlight/specular */
-  --liquid-glass-highlight: linear-gradient(135deg,
-      oklch(100% 0 0 / 40%) 0%,
-      oklch(100% 0 0 / 10%) 50%,
-      oklch(100% 0 0 / 0%) 100%);
+  --liquid-glass-highlight: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 40%) 0%,
+    oklch(100% 0 0 / 10%) 50%,
+    oklch(100% 0 0 / 0%) 100%
+  );
 
   /* Item states */
   --liquid-glass-item-hover: oklch(0% 0 0 / 5%);
@@ -936,10 +991,12 @@
     inset 0 1px 0 oklch(100% 0 0 / 12%);
 
   /* Highlight/specular - subtler in dark mode */
-  --liquid-glass-highlight: linear-gradient(135deg,
-      oklch(100% 0 0 / 12%) 0%,
-      oklch(100% 0 0 / 4%) 50%,
-      oklch(100% 0 0 / 0%) 100%);
+  --liquid-glass-highlight: linear-gradient(
+    135deg,
+    oklch(100% 0 0 / 12%) 0%,
+    oklch(100% 0 0 / 4%) 50%,
+    oklch(100% 0 0 / 0%) 100%
+  );
 
   /* Item states */
   --liquid-glass-item-hover: oklch(100% 0 0 / 6%);

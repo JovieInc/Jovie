@@ -414,8 +414,8 @@ function SearchableMenu() {
 
   const filtered = query.trim()
     ? SEARCHABLE_MENU_ITEMS.filter(i =>
-      i.label.toLowerCase().includes(query.toLowerCase())
-    )
+        i.label.toLowerCase().includes(query.toLowerCase())
+      )
     : SEARCHABLE_MENU_ITEMS;
 
   return (
