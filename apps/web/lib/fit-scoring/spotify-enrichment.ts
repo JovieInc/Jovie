@@ -9,6 +9,7 @@ import { and, sql as drizzleSql, eq, isNotNull, isNull } from 'drizzle-orm';
 
 import type { DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getSpotifyArtists } from '@/lib/dsp-enrichment/providers/spotify';
 import { getSpotifyArtist, isSpotifyAvailable } from '@/lib/spotify/index';
 
 import { calculateAndStoreFitScore } from './service';
@@ -122,6 +123,9 @@ export async function enrichProfileWithSpotify(
 /**
  * Enrich profiles that have Spotify IDs but are missing enrichment data.
  *
+ * Uses the batch /artists?ids= endpoint (up to 50 per request) to
+ * minimize API calls instead of fetching artists individually.
+ *
  * @param db - Database client
  * @param limit - Maximum number of profiles to process
  * @returns Array of enrichment results
@@ -136,7 +140,10 @@ export async function enrichMissingSpotifyData(
 
   // Find profiles with Spotify ID but missing enrichment data
   const profiles = await db
-    .select({ id: creatorProfiles.id })
+    .select({
+      id: creatorProfiles.id,
+      spotifyId: creatorProfiles.spotifyId,
+    })
     .from(creatorProfiles)
     .where(
       and(
@@ -146,15 +153,67 @@ export async function enrichMissingSpotifyData(
     )
     .limit(limit);
 
+  if (profiles.length === 0) {
+    return [];
+  }
+
+  // Collect valid Spotify IDs for batch fetch
+  const profilesWithSpotifyId = profiles.filter(
+    (p): p is { id: string; spotifyId: string } => p.spotifyId !== null
+  );
+  const spotifyIds = profilesWithSpotifyId.map(p => p.spotifyId);
+
+  // Batch fetch all artists in one call (max 50 per request, handled internally)
+  const artists = await getSpotifyArtists(spotifyIds);
+  const artistMap = new Map(artists.map(a => [a.id, a]));
+
   const results: EnrichmentResult[] = [];
 
-  for (const profile of profiles) {
-    const result = await enrichProfileWithSpotify(db, profile.id);
-    results.push(result);
+  for (const profile of profilesWithSpotifyId) {
+    const artist = artistMap.get(profile.spotifyId);
 
-    // Small delay to avoid rate limiting
-    if (results.length < profiles.length) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+    if (!artist) {
+      results.push({
+        profileId: profile.id,
+        success: false,
+        enriched: false,
+        error: 'Artist not found in batch response',
+      });
+      continue;
+    }
+
+    try {
+      // Update the profile with Spotify data
+      await db
+        .update(creatorProfiles)
+        .set({
+          genres: artist.genres,
+          spotifyFollowers: artist.followers.total,
+          spotifyPopularity: artist.popularity,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+
+      // Recalculate fit score with new data
+      await calculateAndStoreFitScore(db, profile.id);
+
+      results.push({
+        profileId: profile.id,
+        success: true,
+        enriched: true,
+        spotifyData: {
+          genres: artist.genres,
+          followers: artist.followers.total,
+          popularity: artist.popularity,
+        },
+      });
+    } catch (error) {
+      results.push({
+        profileId: profile.id,
+        success: false,
+        enriched: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
     }
   }
 

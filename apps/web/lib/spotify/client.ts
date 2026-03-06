@@ -387,6 +387,35 @@ class SpotifyClientManager {
   }
 
   /**
+   * Get multiple artists by Spotify IDs (max 50 per request).
+   * Uses the batch /artists?ids= endpoint.
+   *
+   * @param artistIds - Array of Spotify artist IDs
+   * @returns Array of sanitized artist data (nulls filtered out)
+   */
+  async getArtists(artistIds: string[]): Promise<SanitizedArtist[]> {
+    if (artistIds.length === 0) return [];
+
+    const allArtists: SanitizedArtist[] = [];
+
+    // Spotify allows max 50 artists per request
+    for (let i = 0; i < artistIds.length; i += 50) {
+      const chunk = artistIds.slice(i, i + 50);
+      const response = await this.request<{
+        artists: (RawSpotifyArtist | null)[];
+      }>(`/artists?ids=${chunk.join(',')}`);
+
+      for (const artist of response.artists) {
+        if (artist) {
+          allArtists.push(sanitizeArtistData(artist));
+        }
+      }
+    }
+
+    return allArtists;
+  }
+
+  /**
    * Check if an artist exists on Spotify.
    *
    * @param artistId - Spotify artist ID (already validated)
@@ -483,5 +512,26 @@ export async function getSpotifyArtist(
   } catch (error) {
     captureError('[Spotify] Get artist failed', error);
     return null;
+  }
+}
+
+/**
+ * Get multiple artists from Spotify using the batch endpoint.
+ *
+ * @param artistIds - Array of Spotify artist IDs
+ * @returns Sanitized artist data array (missing artists filtered out)
+ */
+export async function getSpotifyArtistsBatch(
+  artistIds: string[]
+): Promise<SanitizedArtist[]> {
+  if (!spotifyClient.isAvailable() || artistIds.length === 0) {
+    return [];
+  }
+
+  try {
+    return await spotifyClient.getArtists(artistIds);
+  } catch (error) {
+    captureError('[Spotify] Get artists batch failed', error);
+    return [];
   }
 }

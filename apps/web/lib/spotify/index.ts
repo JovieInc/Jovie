@@ -17,6 +17,7 @@ export {
 // Client and API functions
 export {
   getSpotifyArtist,
+  getSpotifyArtistsBatch,
   isSpotifyAvailable,
   type SearchArtistResult,
   searchSpotifyArtists,
