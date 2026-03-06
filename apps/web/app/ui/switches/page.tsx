@@ -1,5 +1,3 @@
-'use client';
-
 import { Switch } from '@jovie/ui';
 
 function Section({
@@ -11,10 +9,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -31,10 +26,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span
-        className='text-[11px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <span className='text-[11px] text-(--linear-text-tertiary)'>
         {title}
       </span>
       {children}
@@ -45,16 +37,10 @@ function Stack({
 export default function SwitchesPage() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Switch
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app toggle — compact 28×16px track, smooth thumb
         transition
       </p>
@@ -84,12 +70,12 @@ export default function SwitchesPage() {
         <Stack title='Enable notifications'>
           <div className='flex items-center gap-3'>
             <Switch id='notifications' aria-label='Enable notifications' />
-            <p
-              className='text-[13px] font-[510]'
-              style={{ color: 'var(--linear-text-primary)' }}
+            <label
+              htmlFor='notifications'
+              className='text-[13px] font-[510] text-(--linear-text-primary)'
             >
               Enable notifications
-            </p>
+            </label>
           </div>
         </Stack>
         <Stack title='Auto-assign issues'>
@@ -99,23 +85,23 @@ export default function SwitchesPage() {
               defaultChecked
               aria-label='Auto-assign issues'
             />
-            <p
-              className='text-[13px] font-[510]'
-              style={{ color: 'var(--linear-text-primary)' }}
+            <label
+              htmlFor='auto-assign'
+              className='text-[13px] font-[510] text-(--linear-text-primary)'
             >
               Auto-assign issues
-            </p>
+            </label>
           </div>
         </Stack>
         <Stack title='disabled with label'>
           <div className='flex items-center gap-3'>
-            <Switch disabled aria-label='Disabled setting' />
-            <p
-              className='text-[13px] font-[510] opacity-50'
-              style={{ color: 'var(--linear-text-primary)' }}
+            <Switch id='disabled-setting' disabled aria-label='Disabled setting' />
+            <label
+              htmlFor='disabled-setting'
+              className='text-[13px] font-[510] text-(--linear-text-primary) opacity-50'
             >
               Disabled setting
-            </p>
+            </label>
           </div>
         </Stack>
       </Section>
@@ -124,10 +110,7 @@ export default function SwitchesPage() {
       <Section title='In Context'>
         <Stack title='settings row'>
           <div
-            className='flex w-64 flex-col divide-y rounded-lg border'
-            style={{
-              borderColor: 'var(--linear-border-subtle)',
-            }}
+            className='flex w-64 flex-col divide-y rounded-lg border border-(--linear-border-subtle)'
           >
             {[
               { label: 'Slack notifications', checked: true },
@@ -138,13 +121,13 @@ export default function SwitchesPage() {
                 key={item.label}
                 className='flex items-center justify-between px-4 py-3'
               >
-                <p
-                  className='text-[13px] font-[450]'
-                  style={{ color: 'var(--linear-text-primary)' }}
+                <label
+                  htmlFor={`setting-${item.label}`}
+                  className='text-[13px] font-[450] text-(--linear-text-primary)'
                 >
                   {item.label}
-                </p>
-                <Switch defaultChecked={item.checked} aria-label={item.label} />
+                </label>
+                <Switch id={`setting-${item.label}`} defaultChecked={item.checked} aria-label={item.label} />
               </div>
             ))}
           </div>
