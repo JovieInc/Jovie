@@ -62,35 +62,35 @@ export function DemoReleaseDetail({
         {/* Properties grid */}
         <div className='space-y-1 mb-8'>
           <PropertyRow label='Status'>
-            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-normal'>
               <DemoStatusIcon status={release.status} />
               <span className='capitalize'>{release.status}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Priority'>
-            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-normal'>
               <DemoPriorityIcon priority={release.priority} />
               <span className='capitalize'>{release.priority}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Assignee'>
-            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+            <div className='flex items-center gap-1.5 px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-normal'>
               <DemoAvatar assignee={release.assignee} size={16} />
               <span>{release.assignee.name}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Type'>
-            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-normal'>
               <span>{release.type}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Tracks'>
-            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-normal'>
               <span>{release.trackCount}</span>
             </div>
           </PropertyRow>
           <PropertyRow label='Release date'>
-            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-0'>
+            <div className='px-2 py-1 -ml-2 rounded-md hover:bg-interactive-hover transition-colors duration-normal'>
               <span>{release.releaseDate}</span>
             </div>
           </PropertyRow>
@@ -99,7 +99,7 @@ export function DemoReleaseDetail({
         {/* Provider connections */}
         {release.links.length > 0 && (
           <div className='mt-4 mb-8'>
-            <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-2'>
+            <h3 className='text-2xs uppercase tracking-wider text-tertiary-token mb-2 [font-weight:var(--font-weight-medium)]'>
               Providers
             </h3>
             <div className='space-y-1'>
@@ -134,14 +134,14 @@ export function DemoReleaseDetail({
         {/* Labels */}
         {release.labels.length > 0 && (
           <div className='mt-4 mb-8'>
-            <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-2'>
+            <h3 className='text-2xs uppercase tracking-wider text-tertiary-token mb-2 [font-weight:var(--font-weight-medium)]'>
               Labels
             </h3>
             <div className='flex flex-wrap gap-1'>
               {release.labels.map(label => (
                 <span
                   key={label.id}
-                  className='flex items-center gap-1.5 rounded-full border border-subtle px-2 py-0.5 text-[11px] font-medium text-secondary-token bg-transparent'
+                  className='flex items-center gap-1.5 rounded-[2px] border border-subtle bg-interactive-hover px-1.5 py-0.5 text-[10px] text-secondary-token [font-weight:var(--font-weight-medium)]'
                 >
                   <span
                     className='size-1.5 rounded-full'
@@ -156,7 +156,7 @@ export function DemoReleaseDetail({
 
         {/* Activity */}
         <div className='mt-4 space-y-2'>
-          <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-3'>
+          <h3 className='text-2xs uppercase tracking-wider text-tertiary-token mb-3 [font-weight:var(--font-weight-medium)]'>
             Activity
           </h3>
           <div className='space-y-3'>
@@ -186,7 +186,7 @@ export function DemoReleaseDetail({
         {/* Note */}
         {release.note && (
           <div className='mt-4 mb-4'>
-            <h3 className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token mb-2'>
+            <h3 className='text-2xs uppercase tracking-wider text-tertiary-token mb-2 [font-weight:var(--font-weight-medium)]'>
               Note
             </h3>
             <p className='text-[13px] text-secondary-token'>{release.note}</p>

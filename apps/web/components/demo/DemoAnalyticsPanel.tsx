@@ -30,7 +30,7 @@ export function DemoAnalyticsPanel() {
 
       {/* Platform breakdown */}
       <div className='p-4'>
-        <h3 className='mb-3 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
           Clicks by Platform
         </h3>
         <div className='space-y-3'>
@@ -64,7 +64,7 @@ export function DemoAnalyticsPanel() {
 
       {/* Top country + meta */}
       <div className='border-t border-subtle p-4'>
-        <h3 className='mb-3 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
           Top Geography
         </h3>
         <div className='flex items-center justify-between text-app'>
