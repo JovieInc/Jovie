@@ -18,11 +18,11 @@ describe('Badge', () => {
       expect(badge).toHaveClass('custom-class');
     });
 
-    it('applies tracking-tight class', () => {
+    it('applies tracking class', () => {
       const { container } = render(<Badge>Text</Badge>);
       const badge = container.querySelector('span');
 
-      expect(badge).toHaveClass('tracking-tight');
+      expect(badge).toHaveClass('tracking-[-0.006em]');
     });
   });
 
@@ -31,24 +31,24 @@ describe('Badge', () => {
       const { container } = render(<Badge>Default</Badge>);
       const badge = container.querySelector('span');
 
-      // Default emphasis doesn't add bg-surface-1 or text-muted-foreground
-      expect(badge).not.toHaveClass('bg-surface-1');
-      expect(badge).not.toHaveClass('text-muted-foreground');
+      // Default emphasis doesn't add subtle linear tokens
+      expect(badge).not.toHaveClass('bg-(--linear-bg-surface-1)');
+      expect(badge).not.toHaveClass('text-(--linear-text-tertiary)');
     });
 
     it('applies subtle emphasis styling', () => {
       const { container } = render(<Badge emphasis='subtle'>Subtle</Badge>);
       const badge = container.querySelector('span');
 
-      expect(badge).toHaveClass('bg-surface-1');
-      expect(badge).toHaveClass('text-muted-foreground');
+      expect(badge).toHaveClass('bg-(--linear-bg-surface-1)');
+      expect(badge).toHaveClass('text-(--linear-text-tertiary)');
     });
 
     it('applies default emphasis explicitly', () => {
       const { container } = render(<Badge emphasis='default'>Default</Badge>);
       const badge = container.querySelector('span');
 
-      expect(badge).not.toHaveClass('bg-surface-1');
+      expect(badge).not.toHaveClass('bg-(--linear-bg-surface-1)');
     });
   });
 
@@ -107,10 +107,10 @@ describe('Badge', () => {
       );
       const badge = container.querySelector('span');
 
-      expect(badge).toHaveClass('bg-surface-1');
-      expect(badge).toHaveClass('text-muted-foreground');
+      expect(badge).toHaveClass('bg-(--linear-bg-surface-1)');
+      expect(badge).toHaveClass('text-(--linear-text-tertiary)');
       expect(badge).toHaveClass('custom');
-      expect(badge).toHaveClass('tracking-tight');
+      expect(badge).toHaveClass('tracking-[-0.006em]');
     });
 
     it('renders with very long text', () => {

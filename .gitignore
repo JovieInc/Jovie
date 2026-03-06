@@ -80,3 +80,10 @@ ideation/screenshots/
 
 # npm lockfiles (pnpm monorepo uses pnpm-lock.yaml)
 package-lock.json
+
+# Auto Claude generated files
+.auto-claude/
+.auto-claude-security.json
+.auto-claude-status
+.security-key
+logs/security/

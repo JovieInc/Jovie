@@ -156,7 +156,7 @@ async function navigateAndSettle(page: Page, path: string): Promise<boolean> {
     });
     await waitForHydration(page);
     await Promise.race([
-      page.waitForLoadState('networkidle'),
+      page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {}),
       page.waitForLoadState('domcontentloaded', { timeout: 8000 }),
     ]).catch(() => {});
     return true;

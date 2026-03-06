@@ -1,3 +1,5 @@
+// Avatar
+
 // Alert Dialog
 export {
   AlertDialog,
@@ -12,6 +14,22 @@ export {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from './atoms/alert-dialog';
+export type {
+  AvatarFallbackProps,
+  AvatarProps,
+  AvatarSize,
+  AvatarStatus,
+  AvatarStatusDotProps,
+  UserAvatarProps,
+} from './atoms/avatar';
+export {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  AvatarStatusDot,
+  getInitials,
+  UserAvatar,
+} from './atoms/avatar';
 // Badge
 export type { BadgeProps } from './atoms/badge';
 export { Badge, badgeVariants } from './atoms/badge';

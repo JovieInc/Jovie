@@ -208,8 +208,15 @@ test.describe('Auth Smoke Tests @smoke', () => {
         waitUntil: 'domcontentloaded',
       });
 
-      // Wait for any redirects to settle
-      await page.waitForTimeout(3000);
+      // Wait for any redirects to settle, up to 3 seconds.
+      // A redirect loop will trigger many navigations quickly.
+      try {
+        await expect
+          .poll(() => redirectUrls.length, { timeout: 3000 })
+          .toBeGreaterThan(2);
+      } catch (_e) {
+        // It's normal if it doesn't redirect many times
+      }
 
       // Check for redirect loop: if /app and /onboarding both appear 2+ times, it's looping
       const appCount = redirectUrls.filter(u => u.startsWith('/app')).length;

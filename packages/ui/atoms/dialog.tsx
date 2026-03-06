@@ -12,7 +12,13 @@ import {
   titleStyles,
 } from '../lib/overlay-styles';
 import { cn } from '../lib/utils';
-import { CloseButtonIcon, closeButtonClassName } from './close-button';
+import { CloseButtonIcon } from './close-button';
+
+const dialogCloseButtonClassName =
+  'absolute right-3 top-3 rounded-(--linear-app-radius-item) p-1 text-(--linear-text-tertiary) opacity-70 transition-colors duration-normal ease-interactive ' +
+  'hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) hover:opacity-100 ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 ' +
+  'disabled:pointer-events-none';
 
 const Dialog = DialogPrimitive.Root;
 
@@ -27,7 +33,7 @@ type DialogOverlayProps = React.ComponentPropsWithoutRef<
 >;
 
 const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentRef<typeof DialogPrimitive.Overlay>,
   DialogOverlayProps
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
@@ -55,7 +61,7 @@ interface DialogContentProps
 }
 
 const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(
   (
@@ -91,7 +97,7 @@ const DialogContent = React.forwardRef<
         {children}
         {!hideClose && (
           <DialogPrimitive.Close
-            className={closeButtonClassName}
+            className={dialogCloseButtonClassName}
             data-testid='dialog-close-button'
           >
             <CloseButtonIcon />
@@ -162,7 +168,7 @@ const DialogFooter = ({
 DialogFooter.displayName = 'DialogFooter';
 
 const DialogTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
+  React.ComponentRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
@@ -175,7 +181,7 @@ const DialogTitle = React.forwardRef<
 DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
 const DialogDescription = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description

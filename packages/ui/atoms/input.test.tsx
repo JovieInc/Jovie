@@ -45,14 +45,14 @@ describe('Input', () => {
     it('applies default variant classes', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-default');
-      expect(input.className).toContain('bg-surface-input');
+      expect(input.className).toContain('border-(--linear-border-subtle)');
+      expect(input.className).toContain('bg-(--linear-bg-surface-1)');
     });
 
     it('applies error variant classes', () => {
       render(<Input variant='error' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-destructive');
+      expect(input.className).toContain('border-(--linear-error)');
     });
 
     it('applies success variant classes', () => {
@@ -92,7 +92,7 @@ describe('Input', () => {
       render(<Input className='custom-class' data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('custom-class');
-      expect(input.className).toContain('border-default');
+      expect(input.className).toContain('border-(--linear-border-subtle)');
     });
   });
 
@@ -154,7 +154,7 @@ describe('Input', () => {
     it('applies error variant when error prop is provided', () => {
       render(<Input error='Invalid email' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-destructive');
+      expect(input.className).toContain('border-(--linear-error)');
     });
 
     it('sets aria-invalid when error is present', () => {
@@ -177,7 +177,7 @@ describe('Input', () => {
     it('applies invalid validation state', () => {
       render(<Input validationState='invalid' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-destructive');
+      expect(input.className).toContain('border-(--linear-error)');
       expect(input).toHaveAttribute('aria-invalid', 'true');
     });
 
