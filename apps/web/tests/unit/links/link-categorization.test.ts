@@ -32,24 +32,17 @@ function createMockLink(
 
 describe('link-categorization', () => {
   describe('CROSS_CATEGORY', () => {
-    it('should define YouTube as cross-category for social and dsp', () => {
-      expect(CROSS_CATEGORY.youtube).toEqual(['social', 'dsp']);
+    it('should not define YouTube as cross-category (YouTube is social only)', () => {
+      expect(CROSS_CATEGORY.youtube).toBeUndefined();
     });
 
-    it('should not have any other platforms defined by default', () => {
+    it('should have no platforms defined by default', () => {
       const keys = Object.keys(CROSS_CATEGORY);
-      expect(keys).toEqual(['youtube']);
+      expect(keys).toEqual([]);
     });
 
     it('should be a Record type with correct structure', () => {
       expect(typeof CROSS_CATEGORY).toBe('object');
-      expect(Array.isArray(CROSS_CATEGORY.youtube)).toBe(true);
-    });
-
-    it('should not include earnings or custom in YouTube cross-category', () => {
-      expect(CROSS_CATEGORY.youtube).not.toContain('earnings');
-      expect(CROSS_CATEGORY.youtube).not.toContain('custom');
-      expect(CROSS_CATEGORY.youtube).not.toContain('websites');
     });
   });
 
@@ -124,8 +117,8 @@ describe('link-categorization', () => {
         expect(sectionOf(link)).toBe('social');
       });
 
-      it('should correctly categorize YouTube as dsp', () => {
-        const link = createMockLink('youtube', 'dsp');
+      it('should correctly categorize YouTube Music as dsp', () => {
+        const link = createMockLink('youtube_music', 'dsp');
         expect(sectionOf(link)).toBe('dsp');
       });
 
@@ -166,22 +159,12 @@ describe('link-categorization', () => {
         const youtubeLink = createMockLink('youtube', 'social');
         expect(canMoveTo(youtubeLink, 'social')).toBe(true);
       });
-
-      it('should allow YouTube to stay in dsp', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
-        expect(canMoveTo(youtubeLink, 'dsp')).toBe(true);
-      });
     });
 
-    describe('cross-category moves for YouTube', () => {
-      it('should allow YouTube to move from social to dsp', () => {
+    describe('YouTube is social only (no cross-category)', () => {
+      it('should not allow YouTube to move from social to dsp', () => {
         const youtubeLink = createMockLink('youtube', 'social');
-        expect(canMoveTo(youtubeLink, 'dsp')).toBe(true);
-      });
-
-      it('should allow YouTube to move from dsp to social', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
-        expect(canMoveTo(youtubeLink, 'social')).toBe(true);
+        expect(canMoveTo(youtubeLink, 'dsp')).toBe(false);
       });
 
       it('should not allow YouTube to move to earnings', () => {
@@ -191,16 +174,6 @@ describe('link-categorization', () => {
 
       it('should not allow YouTube to move to custom', () => {
         const youtubeLink = createMockLink('youtube', 'social');
-        expect(canMoveTo(youtubeLink, 'custom')).toBe(false);
-      });
-
-      it('should not allow YouTube to move from dsp to earnings', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
-        expect(canMoveTo(youtubeLink, 'earnings')).toBe(false);
-      });
-
-      it('should not allow YouTube to move from dsp to custom', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
         expect(canMoveTo(youtubeLink, 'custom')).toBe(false);
       });
     });
@@ -571,7 +544,7 @@ describe('link-categorization', () => {
 
       const results = sections.map(section => canMoveTo(link, section));
 
-      expect(results).toEqual([true, true, false, false]); // YouTube can move to social and dsp
+      expect(results).toEqual([true, false, false, false]); // YouTube is social only
     });
   });
 
@@ -601,9 +574,9 @@ describe('link-categorization', () => {
       expect(sectionOf(links[5])).toBe('earnings'); // venmo
       expect(sectionOf(links[6])).toBe('custom'); // website
 
-      // Verify canMoveTo for YouTube
+      // Verify canMoveTo for YouTube (social only, no cross-category)
       const youtube = links[2];
-      expect(canMoveTo(youtube, 'dsp')).toBe(true);
+      expect(canMoveTo(youtube, 'dsp')).toBe(false);
       expect(canMoveTo(youtube, 'earnings')).toBe(false);
 
       // Verify canMoveTo for non-cross-category

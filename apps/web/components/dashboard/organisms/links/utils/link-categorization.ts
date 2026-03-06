@@ -25,7 +25,7 @@ export const CROSS_CATEGORY: Record<
   string,
   Array<'social' | 'dsp' | 'earnings' | 'websites' | 'custom'>
 > = {
-  youtube: ['social', 'dsp'],
+  // YouTube is social only; YouTube Music (youtube_music) is the DSP variant
   // soundcloud: ['social', 'dsp'],
 };
 

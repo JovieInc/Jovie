@@ -890,11 +890,12 @@ describe('Public profile link visibility', () => {
       const normalized = 'youtube'.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
       expect(normalized).toBe('youtube');
 
-      // Sidebar: getPlatformCategory can classify youtube as DSP
+      // Sidebar: getPlatformCategory classifies youtube as social (not DSP)
+      // Only youtube_music should be classified as DSP
       const { getPlatformCategory } = await import(
         '@/components/dashboard/organisms/links/utils/platform-category'
       );
-      expect(getPlatformCategory('youtube')).toBe('dsp');
+      expect(getPlatformCategory('youtube')).toBe('social');
     });
   });
 });
