@@ -84,7 +84,7 @@ function TourMockup() {
           </div>
           <button
             type='button'
-            className='px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] hover:scale-[1.02] transition-transform'
+            className='px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] hover:opacity-90 transition-opacity'
           >
             Tickets
           </button>

@@ -83,28 +83,34 @@ export function AutomaticReleaseSmartlinksSection() {
 
               {/* Floating Smart Link Card */}
               <div
-                className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[272px] overflow-hidden rounded-2xl bg-base text-foreground'
+                className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[272px] overflow-hidden rounded-2xl'
                 style={{
+                  backgroundColor: 'var(--linear-bg-surface-0)',
+                  color: 'var(--linear-text-primary)',
                   boxShadow:
                     'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-border-subtle)',
                 }}
               >
                 {/* Ambient glow */}
                 <div className='pointer-events-none absolute inset-0'>
-                  <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
+                  <div
+                    className='absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]'
+                    style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
+                  />
                 </div>
 
                 <div className='relative px-6 pt-10 pb-5 flex flex-col items-center'>
                   {/* Album artwork */}
                   <div
-                    className='bg-surface-1/30 ring-border relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'
+                    className='relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40'
                     style={{
+                      border: '1px solid var(--linear-border-subtle)',
                       background: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
                     }}
                   >
                     <div className='flex h-full w-full items-center justify-center'>
                       <Disc3
-                        className='h-16 w-16 text-muted-foreground'
+                        className='h-16 w-16 text-[var(--linear-text-tertiary)]'
                         aria-hidden='true'
                       />
                     </div>
@@ -115,10 +121,10 @@ export function AutomaticReleaseSmartlinksSection() {
                     <h3 className='text-lg font-semibold leading-snug tracking-tight'>
                       The Deep End
                     </h3>
-                    <p className='text-muted-foreground mt-1 text-sm'>
+                    <p className='mt-1 text-sm text-[var(--linear-text-secondary)]'>
                       Tim White
                     </p>
-                    <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
+                    <p className='mt-0.5 text-2xs tracking-wide text-[var(--linear-text-tertiary)]'>
                       Feb 2017
                     </p>
                   </div>
@@ -131,18 +137,21 @@ export function AutomaticReleaseSmartlinksSection() {
                       return (
                         <div
                           key={key}
-                          className='bg-surface-1/70 ring-border group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out cursor-pointer hover:-translate-y-px hover:bg-surface-2/80'
+                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 backdrop-blur-sm transition-colors duration-150 ease-out cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
+                          style={{
+                            border: '1px solid var(--linear-border-subtle)',
+                          }}
                         >
                           <SocialIcon
                             platform={key}
-                            className='h-5 w-5 shrink-0 text-muted-foreground transition-colors duration-150'
+                            className='h-5 w-5 shrink-0 text-[var(--linear-text-tertiary)] transition-colors duration-150'
                             aria-hidden
                           />
-                          <span className='text-foreground flex-1 text-base font-semibold'>
+                          <span className='flex-1 text-base font-semibold text-[var(--linear-text-primary)]'>
                             {config.name}
                           </span>
                           <ChevronRight
-                            className='text-muted-foreground/70 h-4 w-4 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-foreground/80'
+                            className='h-4 w-4 transition-colors duration-150 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-secondary)]'
                             aria-hidden='true'
                           />
                         </div>
@@ -152,7 +161,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                   {/* Powered by Jovie */}
                   <div className='mt-3 pt-3 text-center'>
-                    <span className='text-muted-foreground/70 inline-flex items-center gap-1 text-2xs uppercase tracking-widest'>
+                    <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-[var(--linear-text-tertiary)]'>
                       <span>Powered by</span>
                       <span className='font-semibold'>Jovie</span>
                     </span>
