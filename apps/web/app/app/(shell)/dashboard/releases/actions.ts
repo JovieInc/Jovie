@@ -114,8 +114,9 @@ async function requireProfile(profileId?: string): Promise<{
     profile = data.creatorProfiles.find(p => p.id === profileId) ?? null;
   }
 
+  // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!profile) {
-    throw new TypeError('Missing creator profile');
+    redirect('/onboarding');
   }
 
   return {
