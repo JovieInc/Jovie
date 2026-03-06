@@ -305,7 +305,7 @@ async function createUserWithRetry(
     }
   }
 
-  const dbErrorCode = (lastError as unknown as { code?: string })?.code;
+  const { dbErrorCode } = buildErrorSummary(lastError);
   await captureCriticalError(
     `User creation failed after ${maxRetries} attempts`,
     lastError,
