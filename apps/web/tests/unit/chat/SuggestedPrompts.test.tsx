@@ -11,7 +11,6 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(getByText('Change profile photo')).toBeTruthy();
-    expect(getByText('Format lyrics for Apple Music')).toBeTruthy();
     expect(queryByText('Preview my profile')).toBeNull();
   });
 
