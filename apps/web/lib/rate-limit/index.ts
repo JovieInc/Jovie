@@ -83,6 +83,7 @@ export {
   publicVisitLimiter,
   releaseRefreshFreeLimiter,
   releaseRefreshPaidLimiter,
+  releaseRefreshPlanAwareLimiter,
   spotifyClaimLimiter,
   spotifyPublicSearchLimiter,
   spotifyRefreshLimiter,

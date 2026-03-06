@@ -619,6 +619,9 @@ export async function checkAppleMusicRescanRateLimit(
 /**
  * Rate limiter for release refresh (free plan)
  * Limit: 1 per day per release
+ *
+ * @deprecated Use releaseRefreshPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
  */
 export const releaseRefreshFreeLimiter = createRateLimiter(
   RATE_LIMITERS.releaseRefreshFree
@@ -627,28 +630,43 @@ export const releaseRefreshFreeLimiter = createRateLimiter(
 /**
  * Rate limiter for release refresh (paid plan)
  * Limit: 1 per hour per release
+ *
+ * @deprecated Use releaseRefreshPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
  */
 export const releaseRefreshPaidLimiter = createRateLimiter(
   RATE_LIMITERS.releaseRefreshPaid
 );
 
 /**
+ * Plan-aware release refresh limiter.
+ * Automatically selects the correct limit based on the user's plan tier.
+ * - Free: 1 per day
+ * - Pro/Founding/Growth: 1 per hour
+ */
+export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
+  createPlanAwareRateLimiter({
+    configs: {
+      free: RATE_LIMITERS.releaseRefreshFree,
+      pro: RATE_LIMITERS.releaseRefreshPaid,
+      // founding falls back to pro automatically via the factory
+      growth: RATE_LIMITERS.releaseRefreshPaid,
+    },
+    errorMessage: (plan) =>
+      plan === 'growth' || plan === 'pro' || plan === 'founding'
+        ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
+        : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
+  });
+
+/**
  * Check release refresh rate limit (plan-aware).
- * Free: 1/day, Paid: 1/hour.
+ * Free: 1/day, Paid (pro/founding/growth): 1/hour.
  */
 export async function checkReleaseRefreshRateLimit(
   releaseId: string,
-  isPaidPlan: boolean
+  plan: string | null
 ): Promise<RateLimitResult> {
-  const limiter = isPaidPlan
-    ? releaseRefreshPaidLimiter
-    : releaseRefreshFreeLimiter;
-  const window = isPaidPlan ? '1 hour' : '24 hours';
-  return checkRateLimit(
-    limiter,
-    releaseId,
-    `This release was recently refreshed. Available again in ${window}.`
-  );
+  return releaseRefreshPlanAwareLimiter.limit(releaseId, plan);
 }
 
 /**
