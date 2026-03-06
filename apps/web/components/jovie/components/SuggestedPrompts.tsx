@@ -52,7 +52,7 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex w-fit items-center gap-2 rounded-lg border border-subtle',
+        'chat-pill flex items-center gap-2 rounded-lg border border-subtle',
         'bg-surface-1 px-3.5 py-2.5 text-left',
         'hover:border-default hover:bg-surface-2',
         'active:scale-[0.98]',
@@ -97,7 +97,7 @@ export function SuggestedPrompts({
     : DEFAULT_SUGGESTIONS;
 
   return (
-    <div className='flex flex-col gap-2'>
+    <div className='flex flex-col items-center gap-2 w-full max-w-sm mx-auto'>
       {suggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
