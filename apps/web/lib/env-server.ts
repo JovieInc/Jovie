@@ -170,10 +170,12 @@ export function getEnvironmentInfo() {
 
   if (typeof process !== 'undefined' && !process.env.NEXT_RUNTIME) {
     // Only access these if we are likely in a Node environment (NEXT_RUNTIME is undefined or 'nodejs')
-    // Type-safe access to Node.js-only process properties
-    const p = process as unknown as { platform?: string; version?: string };
-    if (p.platform) platform = p.platform;
-    if (p.version) nodeVersion = p.version;
+    if (typeof process.platform === 'string') {
+      platform = process.platform;
+    }
+    if (typeof process.version === 'string') {
+      nodeVersion = process.version;
+    }
   }
 
   return {
