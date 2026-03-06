@@ -8,15 +8,12 @@
  * to the table row context menu.
  */
 
-import { SegmentControl } from '@jovie/ui';
-import { useState } from 'react';
 import { AudienceMemberHeader } from '@/components/dashboard/atoms/AudienceMemberHeader';
 import {
   DrawerSection,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberActions } from './AudienceMemberActions';
-import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
 import type { AudienceMemberSidebarProps } from './types';
@@ -27,21 +24,12 @@ import {
   computeMemberTitle,
 } from './utils';
 
-type SidebarTab = 'details' | 'activity';
-
-const SIDEBAR_TAB_OPTIONS = [
-  { value: 'details' as const, label: 'Details' },
-  { value: 'activity' as const, label: 'Activity' },
-];
-
 export function AudienceMemberSidebar({
   member,
   isOpen,
   onClose,
   contextMenuItems,
 }: AudienceMemberSidebarProps) {
-  const [activeTab, setActiveTab] = useState<SidebarTab>('details');
-
   const title = computeMemberTitle(member);
   const subtitle = computeMemberSubtitle(member);
   const avatarSrc = computeMemberAvatarSrc(member);
@@ -65,20 +53,8 @@ export function AudienceMemberSidebar({
           avatarSrc={avatarSrc}
         />
       }
-      tabs={
-        member ? (
-          <SegmentControl
-            value={activeTab}
-            onValueChange={setActiveTab}
-            options={SIDEBAR_TAB_OPTIONS}
-            size='sm'
-            className='w-full'
-            aria-label='Contact sidebar view'
-          />
-        ) : undefined
-      }
     >
-      {member && activeTab === 'details' && (
+      {member && (
         <>
           <AudienceMemberDetails member={member} />
 
@@ -90,10 +66,6 @@ export function AudienceMemberSidebar({
             <AudienceMemberReferrers member={member} />
           </DrawerSection>
         </>
-      )}
-
-      {member && activeTab === 'activity' && (
-        <AudienceMemberActivityFeed member={member} />
       )}
     </EntitySidebarShell>
   );
