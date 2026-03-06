@@ -174,9 +174,10 @@ export function ReleaseDspLinks({
   }, [isRescanDisabled, onRescanIsrc]);
 
   // Get list of providers that don't have links yet (for the add dropdown)
-  const availableProviders = Object.entries(providerConfig).filter(
-    ([key]) => !release.providers.some(p => p.key === key)
-  ) as [ProviderKey, { label: string; accent: string }][];
+  const providerKeys = Object.keys(providerConfig) as ProviderKey[];
+  const availableProviders = providerKeys
+    .filter(key => !release.providers.some(p => p.key === key))
+    .map(key => [key, providerConfig[key]] as const);
 
   let rescanTooltip = 'Scan ISRC for links';
   if (isRescanningIsrc) {
@@ -277,36 +278,45 @@ export function ReleaseDspLinks({
             <Label className='text-xs text-tertiary-token'>Provider</Label>
             <Select
               value={selectedProvider ?? ''}
-              onValueChange={(value: string) =>
-                onSetSelectedProvider(value as ProviderKey)
-              }
+              onValueChange={(value: string) => {
+                if (value in providerConfig) {
+                  onSetSelectedProvider(value as ProviderKey);
+                }
+              }}
             >
               <SelectTrigger className='w-full'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
                 {availableProviders.map(([key, config]) => {
-                  const dspId = PROVIDER_TO_DSP[key as ProviderKey];
-                  const socialIcon =
-                    PROVIDER_TO_SOCIAL_ICON[key as ProviderKey];
+                  const dspId = PROVIDER_TO_DSP[key];
+                  const socialIcon = PROVIDER_TO_SOCIAL_ICON[key];
+                  let optionIcon: React.ReactNode;
+
+                  if (dspId) {
+                    optionIcon = <DspProviderIcon provider={dspId} size='sm' />;
+                  } else if (socialIcon) {
+                    optionIcon = (
+                      <SocialIcon
+                        platform={socialIcon}
+                        className='h-4 w-4'
+                        aria-hidden
+                      />
+                    );
+                  } else {
+                    optionIcon = (
+                      <span
+                        className='h-2 w-2 rounded-full'
+                        style={{ backgroundColor: config.accent }}
+                        aria-hidden='true'
+                      />
+                    );
+                  }
+
                   return (
                     <SelectItem key={key} value={key}>
                       <div className='flex items-center gap-2'>
-                        {dspId ? (
-                          <DspProviderIcon provider={dspId} size='sm' />
-                        ) : socialIcon ? (
-                          <SocialIcon
-                            platform={socialIcon}
-                            className='h-4 w-4'
-                            aria-hidden
-                          />
-                        ) : (
-                          <span
-                            className='h-2 w-2 rounded-full'
-                            style={{ backgroundColor: config.accent }}
-                            aria-hidden='true'
-                          />
-                        )}
+                        {optionIcon}
                         {config.label}
                       </div>
                     </SelectItem>

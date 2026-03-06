@@ -43,6 +43,11 @@ const PROVIDER_NAMES: Record<ProviderKey, string> = {
 
 const MAX_VISIBLE_ICONS = 3;
 
+interface IconProviderInfo {
+  readonly key: ProviderKey;
+  readonly icon: string;
+}
+
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
   readonly artistName?: string | null;
@@ -73,10 +78,10 @@ export const ReleaseCell = memo(function ReleaseCell({
         icon: PROVIDER_ICON_MAP[p.key],
         name: PROVIDER_NAMES[p.key] || p.key,
       }))
-      .filter(p => p.icon);
+      .filter((p): p is IconProviderInfo & { name: string } => Boolean(p.icon));
 
     const visible = withIcons.slice(0, MAX_VISIBLE_ICONS);
-    const remaining = providers.length - visible.length;
+    const remaining = withIcons.length - visible.length;
     const allNames = providers.map(p => PROVIDER_NAMES[p.key] || p.key);
 
     return { visible, remaining, allNames };
@@ -129,11 +134,15 @@ export const ReleaseCell = memo(function ReleaseCell({
                 content={platformInfo.allNames.join(', ')}
                 side='top'
               >
-                <span className='inline-flex shrink-0 items-center gap-0.5'>
+                <button
+                  type='button'
+                  className='inline-flex shrink-0 items-center gap-0.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]/30'
+                  aria-label={`Available platforms: ${platformInfo.allNames.join(', ')}`}
+                >
                   {platformInfo.visible.map(p => (
                     <SocialIcon
                       key={p.key}
-                      platform={p.icon!}
+                      platform={p.icon}
                       className='h-3 w-3 text-tertiary-token'
                       aria-hidden
                     />
@@ -143,7 +152,7 @@ export const ReleaseCell = memo(function ReleaseCell({
                       +{platformInfo.remaining}
                     </span>
                   )}
-                </span>
+                </button>
               </SimpleTooltip>
             )}
           </div>
