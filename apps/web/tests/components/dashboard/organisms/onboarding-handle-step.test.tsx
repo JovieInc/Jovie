@@ -27,17 +27,13 @@ describe('OnboardingHandleStep', () => {
     render(<OnboardingHandleStep {...baseProps} isReservedHandle />);
 
     expect(screen.getByText(/@artistname/)).toBeInTheDocument();
-    expect(
-      screen.getByText(/We reserved this for you/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/We reserved this for you/)).toBeInTheDocument();
   });
 
   it('keeps the standard layout for non-reserved handles', () => {
     render(<OnboardingHandleStep {...baseProps} isReservedHandle={false} />);
 
-    expect(
-      screen.queryByText(/@artistname/)
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/@artistname/)).not.toBeInTheDocument();
     expect(
       screen.queryByText(/We reserved this for you/)
     ).not.toBeInTheDocument();
