@@ -18,6 +18,14 @@ import { getRedis } from '@/lib/redis';
 
 const BILLING_STATUS_CACHE_KEY_PREFIX = 'billing:status:v1:';
 
+function hasStringId(value: unknown): value is { id: string } {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  return 'id' in value && typeof value.id === 'string' && value.id.length > 0;
+}
+
 /**
  * Safely extract the Stripe object ID from a webhook event.
  *
@@ -35,15 +43,8 @@ const BILLING_STATUS_CACHE_KEY_PREFIX = 'billing:status:v1:';
  * ```
  */
 export function getStripeObjectId(event: Stripe.Event): string | null {
-  // Stripe webhook events always have data.object with an 'id' field
-  // Cast to unknown first to satisfy TypeScript
-  const object = event.data?.object as unknown as
-    | { id?: string }
-    | null
-    | undefined;
-
-  if (object && typeof object.id === 'string' && object.id.length > 0) {
-    return object.id;
+  if (hasStringId(event.data?.object)) {
+    return event.data.object.id;
   }
 
   return null;

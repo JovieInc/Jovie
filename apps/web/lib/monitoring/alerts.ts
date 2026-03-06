@@ -14,14 +14,8 @@ function toSorted<T>(
   arr: readonly T[],
   compareFn: (a: T, b: T) => number
 ): T[] {
-  const maybeToSorted = (
-    arr as unknown as {
-      toSorted?: (compareFn: (a: T, b: T) => number) => T[];
-    }
-  ).toSorted;
-
-  if (typeof maybeToSorted === 'function') {
-    return maybeToSorted.call(arr, compareFn);
+  if ('toSorted' in arr && typeof arr.toSorted === 'function') {
+    return arr.toSorted(compareFn);
   }
 
   return [...arr].sort(compareFn);

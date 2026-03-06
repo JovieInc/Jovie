@@ -5,7 +5,34 @@
  * Re-exports all utilities for clean imports.
  */
 
-export * from './link-categorization';
-export * from './link-display-utils';
-export * from './link-transformers';
-export * from './platform-category';
+export {
+  CROSS_CATEGORY,
+  canMoveTo,
+  groupLinks,
+  sectionOf,
+} from './link-categorization';
+export type { LinkSection } from './link-display-utils';
+export {
+  buildPrefillUrl,
+  compactUrlDisplay,
+  labelFor,
+  suggestionIdentity,
+} from './link-display-utils';
+
+export {
+  areLinkItemsEqual,
+  areSuggestionListsEqual,
+  buildPlatformMeta,
+  convertDbLinksToLinkItems,
+  convertDbLinksToSuggestions,
+  convertDbLinkToDetected,
+  convertDetectedLinksToLinkItems,
+  convertLinksToDashboardFormat,
+  mapCategoryForPreview,
+} from './link-transformers';
+
+export {
+  getHostnameForUrl,
+  getPlatformCategory,
+  isIngestableUrl,
+} from './platform-category';
