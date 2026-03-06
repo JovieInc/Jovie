@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import { updateOnboardingProfile } from '@/app/onboarding/actions/update-profile';
 import { AuthButton } from '@/components/auth';
@@ -101,6 +102,11 @@ export function OnboardingProfileReviewStep({
             uploadable
             onUpload={handleAvatarUpload}
             onSuccess={handleAvatarSuccess}
+            onError={message => {
+              toast.error(
+                message || 'Failed to upload photo. Please try again.'
+              );
+            }}
             maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
             acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
             showHoverOverlay
