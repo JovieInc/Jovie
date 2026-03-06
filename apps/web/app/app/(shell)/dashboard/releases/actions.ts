@@ -564,17 +564,17 @@ export async function refreshRelease(params: { releaseId: string }): Promise<{
   }
 
   // Check rate limit (plan-aware)
-  let isPaidPlan = false;
+  let plan: string | null = null;
   try {
     const ent = await getCurrentUserEntitlements();
-    isPaidPlan = ent.isPro;
+    plan = ent.plan;
   } catch {
     // Default to free tier on billing errors
   }
 
   const rateLimitResult = await checkReleaseRefreshRateLimit(
     params.releaseId,
-    isPaidPlan
+    plan
   );
 
   if (!rateLimitResult.success) {
@@ -733,17 +733,17 @@ export async function rescanAppleMusicLinks(): Promise<{
   const profile = await requireProfile();
 
   // Check rate limit (plan-aware)
-  let isPaidPlan = false;
+  let plan: string | null = null;
   try {
     const ent = await getCurrentUserEntitlements();
-    isPaidPlan = ent.isPro;
+    plan = ent.plan;
   } catch {
     // Default to free tier on billing errors
   }
 
   const rateLimitResult = await checkAppleMusicRescanRateLimit(
     profile.id,
-    isPaidPlan
+    plan
   );
 
   if (!rateLimitResult.success) {
