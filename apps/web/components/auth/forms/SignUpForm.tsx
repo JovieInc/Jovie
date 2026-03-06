@@ -103,7 +103,7 @@ export function SignUpForm() {
           <>
             <MethodSelector
               onEmailClick={handleEmailClick}
-              onGoogleClick={() => startOAuth('google')}
+              onGoogleClick={startOAuth}
               loadingState={loadingState}
               mode='signup'
               error={step === 'method' && oauthFailureProvider ? null : error}
@@ -123,7 +123,7 @@ export function SignUpForm() {
                 <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
                   <button
                     type='button'
-                    onClick={() => startOAuth('google')}
+                    onClick={startOAuth}
                     className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
                   >
                     Try Google again

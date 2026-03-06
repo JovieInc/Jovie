@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -30,7 +31,7 @@ async function interceptAnalytics(page: Page): Promise<void> {
 test.describe('Auth Flows - Sign Up', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
-    await page.goto('/sign-up', { waitUntil: 'domcontentloaded' });
+    await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
   });
 
@@ -119,7 +120,7 @@ test.describe('Auth Flows - Sign Up', () => {
 test.describe('Auth Flows - Sign In', () => {
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
-    await page.goto('/signin', { waitUntil: 'domcontentloaded' });
+    await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
   });
 
@@ -191,7 +192,7 @@ test.describe('Auth Flows - Error Layout Stability', () => {
     page,
   }) => {
     await interceptAnalytics(page);
-    await page.goto('/sign-up', { waitUntil: 'domcontentloaded' });
+    await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
 
     // Navigate to email step
@@ -208,6 +209,7 @@ test.describe('Auth Flows - Error Layout Stability', () => {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     const initialBox = await submitButton.boundingBox();
+    expect(initialBox).not.toBeNull();
 
     // Submit empty form to trigger error
     await submitButton.click();
@@ -220,12 +222,11 @@ test.describe('Auth Flows - Error Layout Stability', () => {
 
     // Check that submit button position hasn't shifted significantly (within 5px)
     const afterErrorBox = await submitButton.boundingBox();
-    if (initialBox && afterErrorBox) {
-      const yShift = Math.abs(afterErrorBox.y - initialBox.y);
-      expect(
-        yShift,
-        `Submit button shifted ${yShift}px vertically when error appeared`
-      ).toBeLessThan(5);
-    }
+    expect(afterErrorBox).not.toBeNull();
+    const yShift = Math.abs(afterErrorBox!.y - initialBox!.y);
+    expect(
+      yShift,
+      `Submit button shifted ${yShift}px vertically when error appeared`
+    ).toBeLessThan(5);
   });
 });

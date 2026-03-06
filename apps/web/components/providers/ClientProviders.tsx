@@ -6,6 +6,7 @@ import {
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
+import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
@@ -158,10 +159,10 @@ export function ClientProviders({
     <ClerkProvider
       publishableKey={publishableKey}
       appearance={clerkAppearance}
-      signInUrl='/signin'
-      signUpUrl='/signup'
-      signInFallbackRedirectUrl='/app'
-      signUpFallbackRedirectUrl='/onboarding'
+      signInUrl={APP_ROUTES.SIGNIN}
+      signUpUrl={APP_ROUTES.SIGNUP}
+      signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
+      signUpFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
     >
       <ClerkSafeValuesProvider>
         {wrapWithCoreProviders({

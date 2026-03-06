@@ -1,8 +1,9 @@
 'use client';
 
+import { cn } from '@/lib/utils';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { LoadingState } from '@/lib/auth/types';
-import { AuthButton, AuthGoogleIcon, authButtonVariants } from '../atoms';
+import { AuthButton, AuthGoogleIcon } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
 interface MethodSelectorProps {
@@ -67,12 +68,12 @@ export function MethodSelector({
       <div className={FORM_LAYOUT.formInner}>
         {/* Google - primary action */}
         <div>
-          <button
-            type='button'
+          <AuthButton
+            variant='oauthPrimary'
             onClick={onGoogleClick}
             disabled={isAnyLoading}
             aria-busy={isGoogleLoading}
-            className={`${authButtonVariants({ variant: 'oauthPrimary' })} ${AUTH_CLASSES.oauthButtonMobile}`}
+            className={cn(AUTH_CLASSES.oauthButtonMobile)}
           >
             {isGoogleLoading ? (
               <>
@@ -85,7 +86,7 @@ export function MethodSelector({
                 <span>Continue with Google</span>
               </>
             )}
-          </button>
+          </AuthButton>
         </div>
 
         {/* Email - secondary action */}

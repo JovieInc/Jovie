@@ -93,7 +93,7 @@ export interface UseSignUpFlowReturn {
   startEmailFlow: (email: string) => Promise<boolean>;
   verifyCode: (code: string) => Promise<boolean>;
   resendCode: () => Promise<boolean>;
-  startOAuth: (provider: 'google') => Promise<void>;
+  startOAuth: () => Promise<void>;
   goBack: () => void;
 }
 
@@ -281,8 +281,10 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
    * Start OAuth flow (Google)
    */
   const startOAuth = useCallback(
-    async (provider: 'google'): Promise<void> => {
+    async (): Promise<void> => {
       if (!signUp || !isLoaded) return;
+
+      const provider = 'google';
 
       clearError();
       base.setLoadingState({ type: 'oauth', provider });

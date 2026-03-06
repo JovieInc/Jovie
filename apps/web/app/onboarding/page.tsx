@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
+import { APP_ROUTES } from '@/constants/routes';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
@@ -56,7 +57,7 @@ export default async function OnboardingPage({
         },
       });
     }
-    redirect('/signin?redirect_url=/onboarding');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
   }
 
   const user = await currentUser();

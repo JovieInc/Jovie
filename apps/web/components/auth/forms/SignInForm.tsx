@@ -70,7 +70,7 @@ export function SignInForm() {
         {step === 'method' && (
           <MethodSelector
             onEmailClick={handleEmailClick}
-            onGoogleClick={() => startOAuth('google')}
+            onGoogleClick={startOAuth}
             loadingState={loadingState}
             mode='signin'
             error={step === 'method' ? error : null}
