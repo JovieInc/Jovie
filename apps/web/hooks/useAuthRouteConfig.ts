@@ -64,20 +64,28 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   // have persistent navigation on mobile (dashboard, settings, and admin).
   const showMobileTabs = true;
 
-  // Table routes that need different overflow behavior
-  const isTableRoute =
-    pathname.includes('/creators') ||
-    pathname.includes('/audience') ||
-    pathname.includes('/users') ||
-    pathname.includes('/waitlist') ||
-    pathname.includes('/feedback') ||
-    pathname.includes('/campaigns') ||
-    pathname.includes('/releases');
+  // Table routes that need different overflow behavior.
+  // Memoized so downstream consumers don't re-render when navigating
+  // between two non-table (or two table) routes.
+  const isTableRoute = useMemo(
+    () =>
+      pathname.includes('/creators') ||
+      pathname.includes('/audience') ||
+      pathname.includes('/users') ||
+      pathname.includes('/waitlist') ||
+      pathname.includes('/feedback') ||
+      pathname.includes('/campaigns') ||
+      pathname.includes('/releases'),
+    [pathname]
+  );
 
   // Artist profile settings page gets the preview panel sidebar
-  const isArtistProfileSettings =
-    pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
-    pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`);
+  const isArtistProfileSettings = useMemo(
+    () =>
+      pathname === APP_ROUTES.SETTINGS_ARTIST_PROFILE ||
+      pathname.startsWith(`${APP_ROUTES.SETTINGS_ARTIST_PROFILE}/`),
+    [pathname]
+  );
 
   return {
     section,
