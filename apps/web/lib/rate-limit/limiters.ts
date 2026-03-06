@@ -6,8 +6,9 @@
  */
 
 import { RATE_LIMITERS } from './config';
+import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
-import type { RateLimitResult } from './types';
+import type { PlanAwareRateLimiter, RateLimitResult } from './types';
 
 // ============================================================================
 // Authentication & User Operations
@@ -400,6 +401,9 @@ export const aiChatLimiter = createRateLimiter(RATE_LIMITERS.aiChat);
 /**
  * Plan-specific daily AI chat limiters.
  * Each plan has a separate daily quota on top of the hourly burst limiter.
+ *
+ * @deprecated Use aiChatDailyPlanAwareLimiter instead for new code.
+ * These individual limiters are kept for backward compatibility.
  */
 export const aiChatDailyFreeLimiter = createRateLimiter(
   RATE_LIMITERS.aiChatDailyFree
@@ -410,6 +414,27 @@ export const aiChatDailyProLimiter = createRateLimiter(
 export const aiChatDailyGrowthLimiter = createRateLimiter(
   RATE_LIMITERS.aiChatDailyGrowth
 );
+
+/**
+ * Plan-aware AI chat daily limiter.
+ * Automatically selects the correct daily quota based on the user's plan tier.
+ * - Free: 25 messages/day
+ * - Pro/Founding: 100 messages/day
+ * - Growth: 500 messages/day
+ */
+export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
+  createPlanAwareRateLimiter({
+    configs: {
+      free: RATE_LIMITERS.aiChatDailyFree,
+      pro: RATE_LIMITERS.aiChatDailyPro,
+      // founding falls back to pro automatically via the factory
+      growth: RATE_LIMITERS.aiChatDailyGrowth,
+    },
+    errorMessage: (plan) =>
+      plan === 'growth' || plan === 'pro' || plan === 'founding'
+        ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
+        : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
+  });
 
 /**
  * Check AI chat rate limit (burst only, plan-unaware).
@@ -444,26 +469,8 @@ export async function checkAiChatRateLimitForPlan(
     return burstResult;
   }
 
-  // 2. Check daily plan-specific quota
-  let dailyLimiter: RateLimiter;
-  if (plan === 'growth') {
-    dailyLimiter = aiChatDailyGrowthLimiter;
-  } else if (plan === 'pro') {
-    dailyLimiter = aiChatDailyProLimiter;
-  } else {
-    dailyLimiter = aiChatDailyFreeLimiter;
-  }
-
-  const dailyMessage =
-    plan === 'growth' || plan === 'pro'
-      ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
-      : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.';
-
-  const dailyResult = await checkRateLimit(dailyLimiter, userId, dailyMessage);
-  if (!dailyResult.success) {
-    return dailyResult;
-  }
-
+  // 2. Check daily plan-specific quota using the plan-aware limiter
+  const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
   return dailyResult;
 }
 
