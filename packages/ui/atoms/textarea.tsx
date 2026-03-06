@@ -7,10 +7,10 @@ import { cn } from '../lib/utils';
 
 const textareaVariants = cva(
   [
-    'flex w-full rounded-[var(--radius-md)] border border-default bg-surface-input px-3 py-2',
-    'text-[13px] ring-offset-background',
-    'placeholder:text-tertiary-token',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:border-focus',
+    'flex w-full rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2',
+    'text-[13px] text-(--linear-text-primary) font-[450] tracking-[-0.011em]',
+    'placeholder:text-(--linear-text-tertiary)',
+    'focus-visible:outline-none focus-visible:border-(--linear-border-focus)',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-all duration-normal ease-interactive',
     'min-h-[80px]',
@@ -19,10 +19,8 @@ const textareaVariants = cva(
     variants: {
       variant: {
         default: '',
-        error:
-          'border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
-        success:
-          'border-success focus-visible:ring-success focus-visible:border-success',
+        error: 'border-(--linear-error) focus-visible:border-(--linear-error)',
+        success: 'border-success focus-visible:border-success',
       },
       textareaSize: {
         sm: 'px-2 py-1.5 text-xs min-h-[60px]',
@@ -165,11 +163,11 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {label && (
             <label
               htmlFor={id}
-              className='text-sm font-medium text-primary-token'
+              className='text-sm font-medium text-(--linear-text-primary)'
             >
               {label}
               {props.required && (
-                <span className='text-destructive ml-1' aria-hidden='true'>
+                <span className='text-(--linear-error) ml-1' aria-hidden='true'>
                   *
                 </span>
               )}
@@ -178,7 +176,10 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           )}
 
           {helpText && !error && (
-            <p id={helpTextId} className='text-xs text-tertiary-token'>
+            <p
+              id={helpTextId}
+              className='text-xs text-(--linear-text-tertiary)'
+            >
               {helpText}
             </p>
           )}
@@ -188,7 +189,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {error && (
             <p
               id={errorId}
-              className='text-sm text-destructive'
+              className='text-sm text-(--linear-error)'
               role='alert'
               aria-live='polite'
             >

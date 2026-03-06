@@ -15,6 +15,8 @@ const NAV_ITEMS = [
       { href: '/ui/avatars', label: 'Avatar', status: 'done' },
       { href: '/ui/switches', label: 'Switch', status: 'done' },
       { href: '/ui/dialogs', label: 'Dialog', status: 'done' },
+      { href: '/ui/textareas', label: 'Textarea', status: 'done' },
+      { href: '/ui/separators', label: 'Separator', status: 'done' },
     ],
   },
 ];

@@ -7,7 +7,7 @@ import { cn } from '../lib/utils';
 
 const inputVariants = cva(
   [
-    'flex w-full rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
+    'flex w-full rounded-(--linear-app-radius-item) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
     'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary)',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
     'placeholder:text-(--linear-text-tertiary)',
@@ -249,7 +249,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               <span
                 className={cn(
                   'animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent',
-                  'text-secondary-token',
+                  'text-(--linear-text-secondary)',
                   getSpinnerSize(effectiveSize)
                 )}
                 aria-hidden='true'
@@ -258,7 +258,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
             {/* Status icon */}
             {statusIcon && !isPending && (
-              <div className='text-secondary-token'>{statusIcon}</div>
+              <div className='text-(--linear-text-secondary)'>{statusIcon}</div>
             )}
 
             {/* Trailing content */}
@@ -275,11 +275,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {label && (
             <label
               htmlFor={id}
-              className='text-sm font-medium text-primary-token'
+              className='text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary)'
             >
               {label}
               {props.required && (
-                <span className='text-destructive ml-1' aria-hidden='true'>
+                <span className='text-(--linear-error) ml-1' aria-hidden='true'>
                   *
                 </span>
               )}
@@ -288,7 +288,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
 
           {helpText && (
-            <p id={helpTextId} className='text-xs text-tertiary-token'>
+            <p
+              id={helpTextId}
+              className='text-[11px] text-(--linear-text-tertiary)'
+            >
               {helpText}
             </p>
           )}
@@ -298,7 +301,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {error && (
             <p
               id={errorId}
-              className='text-sm text-destructive'
+              className='text-[11px] text-(--linear-error)'
               role='alert'
               aria-live='polite'
             >
