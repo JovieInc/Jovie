@@ -72,6 +72,7 @@ export function AudienceMemberSidebar({
             onValueChange={setActiveTab}
             options={SIDEBAR_TAB_OPTIONS}
             size='sm'
+            className='w-full'
             aria-label='Contact sidebar view'
           />
         ) : undefined

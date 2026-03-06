@@ -56,6 +56,10 @@ vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
 }));
 
+vi.mock('@/lib/queries/useReleasesQuery', () => ({
+  useReleasesQuery: () => ({ data: undefined, isLoading: false }),
+}));
+
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
 

@@ -185,7 +185,7 @@ function SidebarHeaderNav({
               )}
             >
               <BrandLogo
-                size={16}
+                size={14}
                 tone='auto'
                 className='rounded-[4px] shrink-0'
               />

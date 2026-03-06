@@ -133,6 +133,7 @@ export const AvatarUploadable = React.memo(
       );
 
       const avatarSize = avatarProps.size || 'md';
+      const avatarRounded = avatarProps.rounded || 'full';
       const numericSize = SIZE_MAP[avatarSize];
       const acceptedTypeList = useMemo(
         () => acceptedTypes.join(','),
@@ -213,11 +214,18 @@ export const AvatarUploadable = React.memo(
             />
 
             {isInteractive && showHoverOverlay && !isDragOver && (
-              <AvatarUploadOverlay iconSize={numericSize * 0.3} />
+              <AvatarUploadOverlay
+                iconSize={numericSize * 0.3}
+                rounded={avatarRounded}
+              />
             )}
 
             {isDragOver && (
-              <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
+              <AvatarUploadOverlay
+                iconSize={numericSize * 0.3}
+                isDragOver
+                rounded={avatarRounded}
+              />
             )}
 
             {showProgress && (

@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AudiencePanelProvider } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AudienceMember } from '@/types';
 
@@ -77,6 +78,10 @@ vi.mock('@/components/dashboard/organisms/audience-member-sidebar', () => ({
   AudienceMemberSidebar: () => null,
 }));
 
+vi.mock('@/components/dashboard/organisms/AnalyticsSidebar', () => ({
+  AnalyticsSidebar: () => null,
+}));
+
 vi.mock(
   '@/components/dashboard/audience/table/atoms/AudienceMobileCard',
   () => ({ AudienceMobileCard: () => null })
@@ -138,7 +143,9 @@ function renderWithProviders(
   return render(ui, {
     wrapper: ({ children }) => (
       <TooltipProvider>
-        <RightPanelProvider>{children}</RightPanelProvider>
+        <RightPanelProvider>
+          <AudiencePanelProvider>{children}</AudiencePanelProvider>
+        </RightPanelProvider>
       </TooltipProvider>
     ),
     ...options,

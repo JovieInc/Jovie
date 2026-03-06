@@ -111,7 +111,7 @@ export function RightDrawer({
     );
   }
 
-  // Desktop: inline sidebar with transform-based transition (no layout recalculation)
+  // Desktop: inline sidebar with width-based collapse so adjacent content reclaims space
   return (
     <aside
       {...rest}
@@ -122,16 +122,18 @@ export function RightDrawer({
       className={cn(
         'shrink-0 h-full flex flex-col',
         'bg-surface-1 border-l border-subtle',
-        'transition-[transform,opacity] duration-300 ease-out',
-        'overflow-hidden will-change-transform',
+        'transition-[width,opacity] duration-300 ease-out',
+        'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible translate-x-0'
-          : 'opacity-0 pointer-events-none invisible translate-x-full',
+          ? 'opacity-100 visible'
+          : 'opacity-0 pointer-events-none invisible',
         className
       )}
-      style={{ width, maxWidth: '100vw' }}
+      style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
     >
-      {content}
+      <div className='flex flex-col h-full' style={{ minWidth: width }}>
+        {content}
+      </div>
     </aside>
   );
 }

@@ -111,11 +111,7 @@ export function EntitySidebarShell({
             )}
 
             {/* Tabs */}
-            {tabs && (
-              <div className='shrink-0 border-b border-subtle px-3 py-1.5'>
-                {tabs}
-              </div>
-            )}
+            {tabs && <div className='shrink-0 px-4 py-1.5'>{tabs}</div>}
 
             {/* Scrollable content */}
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3 space-y-4'>
@@ -123,11 +119,7 @@ export function EntitySidebarShell({
             </div>
 
             {/* Footer */}
-            {footer && (
-              <div className='shrink-0 border-t border-subtle px-4 py-3'>
-                {footer}
-              </div>
-            )}
+            {footer && <div className='shrink-0 px-4 py-3'>{footer}</div>}
           </>
         )}
       </div>

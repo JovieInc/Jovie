@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { type ReactNode, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
@@ -148,6 +149,9 @@ export function NavMenuItem({
               </Link>
             )}
           </SidebarMenuButton>
+          {item.badge != null && (
+            <SidebarMenuBadge>{item.badge}</SidebarMenuBadge>
+          )}
           {actions}
           {children}
         </SidebarMenuItem>

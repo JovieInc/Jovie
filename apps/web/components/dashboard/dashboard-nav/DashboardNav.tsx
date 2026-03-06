@@ -14,6 +14,7 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
   adminNavigation,
   artistSettingsNavigation,
@@ -71,12 +72,21 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Replace "Profile" label with artist display name when available
   const artistName = selectedProfile?.displayName;
+  const profileId = selectedProfile?.id ?? '';
+  const { data: releases } = useReleasesQuery(profileId);
+  const releaseCount = releases?.length ?? 0;
+
   const primaryItems = useMemo(() => {
-    if (!artistName) return primaryNavigation;
-    return primaryNavigation.map(item =>
-      item.id === 'profile' ? { ...item, name: artistName } : item
-    );
-  }, [artistName]);
+    return primaryNavigation.map(item => {
+      if (item.id === 'profile' && artistName) {
+        return { ...item, name: artistName };
+      }
+      if (item.id === 'releases' && releaseCount > 0) {
+        return { ...item, badge: releaseCount };
+      }
+      return item;
+    });
+  }, [artistName, releaseCount]);
 
   const genres = selectedProfile?.genres ?? [];
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);

@@ -3,19 +3,13 @@
 /**
  * AnalyticsSidebar Component
  *
- * A right drawer sidebar that displays audience funnel metrics
- * in a vertical visual layout. Uses EntitySidebarShell for
- * consistent layout with other entity sidebars.
+ * A right drawer sidebar that displays audience analytics organized
+ * into tabs: Funnel, Engagement, Sources. Uses EntitySidebarShell
+ * for consistent layout with other entity sidebars.
  */
 
-import {
-  ArrowDown,
-  BarChart3,
-  Globe,
-  Link2,
-  MapPin,
-  TrendingUp,
-} from 'lucide-react';
+import { SegmentControl } from '@jovie/ui';
+import { ArrowDown, Globe, Link2, MapPin } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -257,6 +251,17 @@ function RankedList({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Tab content components                                             */
+/* ------------------------------------------------------------------ */
+
+type AnalyticsTab = 'engagement' | 'sources';
+
+const ANALYTICS_TAB_OPTIONS = [
+  { value: 'engagement' as const, label: 'Engagement' },
+  { value: 'sources' as const, label: 'Sources' },
+];
+
+/* ------------------------------------------------------------------ */
 /*  Main component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -269,6 +274,7 @@ export interface AnalyticsSidebarProps {
 
 export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const [range, setRange] = useState<AnalyticsRange>('30d');
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('engagement');
 
   const { data, isLoading, isFetching } = useDashboardAnalyticsQuery({
     range,
@@ -317,23 +323,15 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data-testid='analytics-sidebar'
       title='Analytics'
       onClose={onClose}
+      headerActions={<SidebarRangeToggle value={range} onChange={setRange} />}
     >
       <div
         className={cn(
-          'space-y-6 transition-opacity duration-150',
+          'space-y-5 transition-opacity duration-150',
           isFetching && !loading && 'opacity-60'
         )}
       >
-        {/* Range selector */}
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center gap-2 text-tertiary-token'>
-            <TrendingUp className='h-3.5 w-3.5' />
-            <span className='text-[12px] font-medium'>Conversion Funnel</span>
-          </div>
-          <SidebarRangeToggle value={range} onChange={setRange} />
-        </div>
-
-        {/* Vertical Funnel */}
+        {/* Funnel — always visible at top */}
         <div className='flex flex-col items-center gap-0'>
           {stages.map((stage, index) => {
             const isLast = index === stages.length - 1;
@@ -357,82 +355,109 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           })}
         </div>
 
-        {/* Secondary metrics */}
-        {!loading && data && (
-          <div className='border-t border-subtle pt-4'>
-            <div className='flex items-center gap-2 mb-3'>
-              <BarChart3 className='h-3.5 w-3.5 text-tertiary-token' />
-              <h3 className='text-[12px] font-medium text-secondary-token'>
-                Engagement
-              </h3>
-            </div>
-            <div className='divide-y divide-subtle'>
-              {typeof data.capture_rate === 'number' && (
-                <StatRow
-                  label='Capture Rate'
-                  value={`${data.capture_rate}%`}
-                  loading={false}
-                />
-              )}
-              {typeof data.listen_clicks === 'number' && (
-                <StatRow
-                  label='Listen Clicks'
-                  value={fmt.format(data.listen_clicks)}
-                  loading={false}
-                />
-              )}
-              {typeof data.total_clicks === 'number' && (
-                <StatRow
-                  label='Total Clicks'
-                  value={fmt.format(data.total_clicks)}
-                  loading={false}
-                />
-              )}
-              {typeof data.identified_users === 'number' && (
-                <StatRow
-                  label='Identified Users'
-                  value={fmt.format(data.identified_users)}
-                  loading={false}
-                />
-              )}
-            </div>
+        {/* Tab selector for Engagement / Sources */}
+        <SegmentControl
+          value={activeTab}
+          onValueChange={setActiveTab}
+          options={ANALYTICS_TAB_OPTIONS}
+          size='sm'
+          className='w-full'
+          aria-label='Analytics view'
+        />
+
+        {/* Engagement tab */}
+        {activeTab === 'engagement' && (
+          <div className='divide-y divide-subtle'>
+            {loading ? (
+              <>
+                <StatRow label='Capture Rate' value='' loading />
+                <StatRow label='Listen Clicks' value='' loading />
+                <StatRow label='Total Clicks' value='' loading />
+                <StatRow label='Identified Users' value='' loading />
+              </>
+            ) : (
+              data && (
+                <>
+                  {typeof data.capture_rate === 'number' && (
+                    <StatRow
+                      label='Capture Rate'
+                      value={`${data.capture_rate}%`}
+                      loading={false}
+                    />
+                  )}
+                  {typeof data.listen_clicks === 'number' && (
+                    <StatRow
+                      label='Listen Clicks'
+                      value={fmt.format(data.listen_clicks)}
+                      loading={false}
+                    />
+                  )}
+                  {typeof data.total_clicks === 'number' && (
+                    <StatRow
+                      label='Total Clicks'
+                      value={fmt.format(data.total_clicks)}
+                      loading={false}
+                    />
+                  )}
+                  {typeof data.identified_users === 'number' && (
+                    <StatRow
+                      label='Identified Users'
+                      value={fmt.format(data.identified_users)}
+                      loading={false}
+                    />
+                  )}
+                </>
+              )
+            )}
           </div>
         )}
 
-        {/* Top lists */}
-        {!loading && data && (
-          <div className='space-y-5 border-t border-subtle pt-4'>
+        {/* Sources tab */}
+        {activeTab === 'sources' && (
+          <div className='space-y-5'>
             <RankedList
               title='Top Cities'
               icon={MapPin}
-              loading={false}
-              items={(data.top_cities ?? []).slice(0, 5).map(c => ({
-                key: c.city,
-                label: c.city,
-                value: fmt.format(c.count),
-              }))}
+              loading={loading}
+              items={
+                loading
+                  ? []
+                  : (data?.top_cities ?? []).slice(0, 5).map(c => ({
+                      key: c.city,
+                      label: c.city,
+                      value: fmt.format(c.count),
+                    }))
+              }
               emptyMessage='No city data yet'
             />
             <RankedList
               title='Traffic Sources'
               icon={Globe}
-              loading={false}
-              items={(data.top_referrers ?? []).slice(0, 5).map(r => ({
-                key: r.referrer || 'direct',
-                label: r.referrer || 'Direct',
-                value: fmt.format(r.count),
-              }))}
+              loading={loading}
+              items={
+                loading
+                  ? []
+                  : (data?.top_referrers ?? []).slice(0, 5).map(r => ({
+                      key: r.referrer || 'direct',
+                      label: r.referrer || 'Direct',
+                      value: fmt.format(r.count),
+                    }))
+              }
               emptyMessage='No referrer data yet'
             />
             <RankedList
               title='Top Links'
               icon={Link2}
-              loading={false}
-              items={(data.top_links ?? []).slice(0, 5).map(link => ({
-                key: link.id,
-                label: link.url,
-                value: fmt.format(link.clicks),
-              }))}
+              loading={loading}
+              items={
+                loading
+                  ? []
+                  : (data?.top_links ?? []).slice(0, 5).map(link => ({
+                      key: link.id,
+                      label: link.url,
+                      value: fmt.format(link.clicks),
+                    }))
+              }
               emptyMessage='No link data yet'
             />
           </div>
