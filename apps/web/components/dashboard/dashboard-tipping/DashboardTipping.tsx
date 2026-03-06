@@ -11,7 +11,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/components/dashboard/organisms/EarningsTab';
@@ -346,6 +346,13 @@ export function DashboardTipping() {
   }, [setVenmoHandle]);
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!hasVenmoHandle || !isConnectOpen) return;
+
+    setIsConnectOpen(false);
+    setVenmoHandle('');
+  }, [hasVenmoHandle, isConnectOpen, setVenmoHandle]);
 
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';

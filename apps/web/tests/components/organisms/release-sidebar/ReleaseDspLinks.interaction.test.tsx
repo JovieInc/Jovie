@@ -189,7 +189,7 @@ describe('ReleaseDspLinks interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Add DSP link' }));
+    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
     expect(onSetIsAddingLink).toHaveBeenCalledWith(true);
 
     rerender(

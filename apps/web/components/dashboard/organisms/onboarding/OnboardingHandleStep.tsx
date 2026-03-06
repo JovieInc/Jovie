@@ -114,6 +114,11 @@ function ButtonContent({
   readonly autoSubmitClaimed: boolean;
 }) {
   const isLoading = isSubmitting || (isPendingSubmit && isChecking);
+  const buttonLabel = isSubmitting
+    ? 'Saving…'
+    : isLoading
+      ? 'Checking…'
+      : 'Continue';
 
   if (autoSubmitClaimed) {
     return (
@@ -145,9 +150,7 @@ function ButtonContent({
       >
         <LoadingSpinner size='sm' className='text-current' />
       </span>
-      <span>
-        {isSubmitting ? 'Saving…' : isLoading ? 'Checking…' : 'Continue'}
-      </span>
+      <span>{buttonLabel}</span>
     </span>
   );
 }

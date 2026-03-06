@@ -1,11 +1,52 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
-import { memo } from 'react';
+import { Badge, SimpleTooltip } from '@jovie/ui';
+import { memo, useMemo } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { PopularityIcon } from './PopularityIcon';
+
+/** Maps ProviderKey to SocialIcon platform name (only those with SVG icons) */
+const PROVIDER_ICON_MAP: Partial<Record<ProviderKey, string>> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  youtube: 'youtube',
+  soundcloud: 'soundcloud',
+  tidal: 'tidal',
+  bandcamp: 'bandcamp',
+  beatport: 'beatport',
+  tiktok: 'tiktok',
+};
+
+/** Friendly display names for providers */
+const PROVIDER_NAMES: Record<ProviderKey, string> = {
+  spotify: 'Spotify',
+  apple_music: 'Apple Music',
+  youtube: 'YouTube',
+  soundcloud: 'SoundCloud',
+  deezer: 'Deezer',
+  tidal: 'Tidal',
+  amazon_music: 'Amazon Music',
+  bandcamp: 'Bandcamp',
+  beatport: 'Beatport',
+  pandora: 'Pandora',
+  napster: 'Napster',
+  audiomack: 'Audiomack',
+  qobuz: 'Qobuz',
+  anghami: 'Anghami',
+  boomplay: 'Boomplay',
+  iheartradio: 'iHeartRadio',
+  tiktok: 'TikTok',
+};
+
+const MAX_VISIBLE_ICONS = 3;
+
+interface IconProviderInfo {
+  readonly key: ProviderKey;
+  readonly icon: string;
+}
 
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
@@ -14,16 +55,6 @@ interface ReleaseCellProps {
   readonly showType?: boolean;
 }
 
-/**
- * ReleaseCell - Displays release title and artist name
- *
- * Shows:
- * - Release title with tooltip (only when truncated)
- * - Release type badge (Single, EP, Album, etc.)
- * - Popularity signal-bars icon
- * - Optional "edited" badge if manual overrides exist
- * - Artist name if provided
- */
 export const ReleaseCell = memo(function ReleaseCell({
   release,
   artistName,
@@ -37,9 +68,27 @@ export const ReleaseCell = memo(function ReleaseCell({
     ? getReleaseTypeStyle(release.releaseType)
     : null;
 
+  const platformInfo = useMemo(() => {
+    const providers = release.providers;
+    if (providers.length === 0) return null;
+
+    const withIcons = providers
+      .map(p => ({
+        key: p.key,
+        icon: PROVIDER_ICON_MAP[p.key],
+        name: PROVIDER_NAMES[p.key] || p.key,
+      }))
+      .filter((p): p is IconProviderInfo & { name: string } => Boolean(p.icon));
+
+    const visible = withIcons.slice(0, MAX_VISIBLE_ICONS);
+    const remaining = withIcons.length - visible.length;
+    const allNames = providers.map(p => PROVIDER_NAMES[p.key] || p.key);
+
+    return { visible, remaining, allNames };
+  }, [release.providers]);
+
   return (
     <div className='flex items-center gap-3'>
-      {/* Title and metadata */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
           <TruncatedText
@@ -59,7 +108,6 @@ export const ReleaseCell = memo(function ReleaseCell({
             </Badge>
           )}
           <PopularityIcon popularity={release.spotifyPopularity} />
-          {/* Year - mobile only (meta column is hidden on mobile) */}
           {release.releaseDate && (
             <span className='shrink-0 text-[10px] tabular-nums text-tertiary-token sm:hidden'>
               {new Date(release.releaseDate).getFullYear()}
@@ -74,13 +122,40 @@ export const ReleaseCell = memo(function ReleaseCell({
             </Badge>
           )}
         </div>
-        {artistName && (
-          <TruncatedText
-            lines={1}
-            className='mt-0.5 text-xs text-secondary-token'
-          >
-            {artistName}
-          </TruncatedText>
+        {(artistName || platformInfo) && (
+          <div className='mt-0.5 flex items-center gap-2'>
+            {artistName && (
+              <TruncatedText lines={1} className='text-xs text-secondary-token'>
+                {artistName}
+              </TruncatedText>
+            )}
+            {platformInfo && (
+              <SimpleTooltip
+                content={platformInfo.allNames.join(', ')}
+                side='top'
+              >
+                <button
+                  type='button'
+                  className='inline-flex shrink-0 items-center gap-0.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]/30'
+                  aria-label={`Available platforms: ${platformInfo.allNames.join(', ')}`}
+                >
+                  {platformInfo.visible.map(p => (
+                    <SocialIcon
+                      key={p.key}
+                      platform={p.icon}
+                      className='h-3 w-3 text-tertiary-token'
+                      aria-hidden
+                    />
+                  ))}
+                  {platformInfo.remaining > 0 && (
+                    <span className='text-[10px] text-tertiary-token'>
+                      +{platformInfo.remaining}
+                    </span>
+                  )}
+                </button>
+              </SimpleTooltip>
+            )}
+          </div>
         )}
       </div>
     </div>
