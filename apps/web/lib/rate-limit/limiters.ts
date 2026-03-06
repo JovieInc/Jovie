@@ -430,7 +430,7 @@ export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
       // founding falls back to pro automatically via the factory
       growth: RATE_LIMITERS.aiChatDailyGrowth,
     },
-    errorMessage: (plan) =>
+    errorMessage: plan =>
       plan === 'growth' || plan === 'pro' || plan === 'founding'
         ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
         : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
@@ -595,7 +595,7 @@ export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
       // founding falls back to pro automatically via the factory
       growth: RATE_LIMITERS.appleMusicRescanPaid,
     },
-    errorMessage: (plan) =>
+    errorMessage: plan =>
       plan === 'growth' || plan === 'pro' || plan === 'founding'
         ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
@@ -652,7 +652,7 @@ export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
       // founding falls back to pro automatically via the factory
       growth: RATE_LIMITERS.releaseRefreshPaid,
     },
-    errorMessage: (plan) =>
+    errorMessage: plan =>
       plan === 'growth' || plan === 'pro' || plan === 'founding'
         ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
         : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',

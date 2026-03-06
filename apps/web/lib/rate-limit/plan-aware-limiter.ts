@@ -103,7 +103,11 @@ function defaultErrorMessage(plan: PlanId | null): string {
 export function createPlanAwareRateLimiter(
   options: PlanAwareLimiterOptions
 ): PlanAwareRateLimiter {
-  const { configs, errorMessage = defaultErrorMessage, preferRedis = true } = options;
+  const {
+    configs,
+    errorMessage = defaultErrorMessage,
+    preferRedis = true,
+  } = options;
 
   // Create limiters for each defined plan config (lazy initialization)
   const limiterCache = new Map<PlanId, RateLimiter>();
@@ -175,7 +179,9 @@ export function createPlanAwareRateLimiter(
       return limiter.wouldBeRateLimited(identifier);
     },
 
-    getConfigForPlan(plan: PlanId | string | null | undefined): RateLimitConfig {
+    getConfigForPlan(
+      plan: PlanId | string | null | undefined
+    ): RateLimitConfig {
       const normalizedPlan = normalizePlan(plan);
       return resolveConfigForPlan(configs, normalizedPlan);
     },

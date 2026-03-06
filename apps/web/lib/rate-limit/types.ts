@@ -102,7 +102,10 @@ export interface PlanAwareRateLimiter {
    * @param identifier - The unique identifier for the rate limit (e.g., userId)
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
-  limit(identifier: string, plan: PlanId | string | null | undefined): Promise<RateLimitResult>;
+  limit(
+    identifier: string,
+    plan: PlanId | string | null | undefined
+  ): Promise<RateLimitResult>;
 
   /**
    * Get current status without incrementing the counter.
@@ -111,7 +114,10 @@ export interface PlanAwareRateLimiter {
    * @param identifier - The unique identifier for the rate limit
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
-  getStatus(identifier: string, plan: PlanId | string | null | undefined): RateLimitStatus;
+  getStatus(
+    identifier: string,
+    plan: PlanId | string | null | undefined
+  ): RateLimitStatus;
 
   /**
    * Check if the request would be rate limited (without incrementing).
@@ -119,7 +125,10 @@ export interface PlanAwareRateLimiter {
    * @param identifier - The unique identifier for the rate limit
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
-  wouldBeRateLimited(identifier: string, plan: PlanId | string | null | undefined): Promise<boolean>;
+  wouldBeRateLimited(
+    identifier: string,
+    plan: PlanId | string | null | undefined
+  ): Promise<boolean>;
 
   /**
    * Get the configuration for a specific plan.

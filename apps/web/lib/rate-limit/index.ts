@@ -100,6 +100,8 @@ export {
   getStoreSize,
   MemoryRateLimiter,
 } from './memory-limiter';
+// Plan-Aware Rate Limiter Factory
+export { createPlanAwareRateLimiter } from './plan-aware-limiter';
 export type { RateLimiterBackend, RateLimiterOptions } from './rate-limiter';
 // Rate Limiter Classes
 export {
@@ -112,8 +114,6 @@ export {
   getRedisClient,
   isRedisAvailable,
 } from './redis-limiter';
-// Plan-Aware Rate Limiter Factory
-export { createPlanAwareRateLimiter } from './plan-aware-limiter';
 // Types
 export type {
   PlanAwareLimiterOptions,

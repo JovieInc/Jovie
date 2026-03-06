@@ -417,7 +417,7 @@ describe('plan-aware-limiter.ts', () => {
         '@/lib/rate-limit/plan-aware-limiter'
       );
 
-      const customErrorMessage = vi.fn((plan) =>
+      const customErrorMessage = vi.fn(plan =>
         plan === 'free'
           ? 'Free users: Please upgrade!'
           : `${plan} users: Limit reached.`
