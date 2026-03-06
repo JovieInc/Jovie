@@ -73,7 +73,10 @@ async function applySessionUserId(userId: string): Promise<void> {
     await db.execute(getSessionSetupSql(userId));
   } catch (error) {
     logDbError('setupDbSession_set_config_failed', error, { userId });
-    await db.execute(getSessionSetupFallbackSql(userId));
+    // SET LOCAL only works inside a transaction block — wrap in db.transaction()
+    await db.transaction(async tx => {
+      await tx.execute(getSessionSetupFallbackSql(userId));
+    });
   }
 }
 

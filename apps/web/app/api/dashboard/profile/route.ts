@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
+import { dashboardQuery } from '@/lib/db/query-timeout';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -78,7 +79,10 @@ async function attemptClerkRollback(
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      const userProfile = await getProfileByClerkId(clerkUserId);
+      const userProfile = await dashboardQuery(
+        () => getProfileByClerkId(clerkUserId),
+        'User profile fetch'
+      );
 
       if (!userProfile) {
         return NextResponse.json(
