@@ -287,7 +287,7 @@ describe('ReleaseSidebar links tab interactions', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: 'Links' }));
-    await user.click(screen.getByRole('button', { name: 'Add DSP link' }));
+    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
 
     const urlInput = screen.getByPlaceholderText(
@@ -321,7 +321,7 @@ describe('ReleaseSidebar links tab interactions', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: 'Links' }));
-    await user.click(screen.getByRole('button', { name: 'Add DSP link' }));
+    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
       screen.getByPlaceholderText('https://open.spotify.com/...'),
