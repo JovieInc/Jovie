@@ -324,6 +324,7 @@ describe('resolveProfileState', () => {
     username: 'testuser',
     usernameNormalized: 'testuser',
     displayName: 'Test User',
+    avatarUrl: 'https://example.com/avatar.jpg',
     isPublic: true,
     onboardingCompletedAt: new Date('2025-01-01'),
     isClaimed: true,
@@ -367,6 +368,22 @@ describe('resolveProfileState', () => {
     expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
   });
 
+  it('returns NEEDS_ONBOARDING when profile has no avatar', () => {
+    const result = resolveProfileState({
+      ...completeProfile,
+      avatarUrl: null,
+    });
+    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+  });
+
+  it('returns NEEDS_ONBOARDING when profile has blank avatar', () => {
+    const result = resolveProfileState({
+      ...completeProfile,
+      avatarUrl: '   ',
+    });
+    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+  });
+
   it('returns NEEDS_ONBOARDING when onboarding not completed', () => {
     const result = resolveProfileState({
       ...completeProfile,
@@ -402,6 +419,18 @@ describe('resolveProfileState', () => {
 
     it('returns false when display name is whitespace-only', () => {
       expect(isProfileComplete({ ...completeProfile, displayName: '  ' })).toBe(
+        false
+      );
+    });
+
+    it('returns false when missing avatarUrl', () => {
+      expect(isProfileComplete({ ...completeProfile, avatarUrl: null })).toBe(
+        false
+      );
+    });
+
+    it('returns false when avatarUrl is whitespace-only', () => {
+      expect(isProfileComplete({ ...completeProfile, avatarUrl: '  ' })).toBe(
         false
       );
     });

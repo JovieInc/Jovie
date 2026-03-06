@@ -155,6 +155,7 @@ function hasCompleteProfile(result: {
   profileUsername: string | null;
   profileUsernameNormalized: string | null;
   profileDisplayName: string | null;
+  profileAvatarUrl: string | null;
   profileIsPublic: boolean | null;
 }): boolean {
   return (
@@ -163,6 +164,7 @@ function hasCompleteProfile(result: {
     !!result.profileUsername &&
     !!result.profileUsernameNormalized &&
     !!result.profileDisplayName?.trim() &&
+    !!result.profileAvatarUrl?.trim() &&
     result.profileIsPublic !== false
   );
 }
@@ -180,6 +182,7 @@ function determineUserState(
         profileUsername: string | null;
         profileUsernameNormalized: string | null;
         profileDisplayName: string | null;
+        profileAvatarUrl: string | null;
         profileIsPublic: boolean | null;
       }
     | undefined
@@ -270,6 +273,7 @@ async function executeUserStateQuery(clerkUserId: string) {
         profileUsername: creatorProfiles.username,
         profileUsernameNormalized: creatorProfiles.usernameNormalized,
         profileDisplayName: creatorProfiles.displayName,
+        profileAvatarUrl: creatorProfiles.avatarUrl,
         profileIsPublic: creatorProfiles.isPublic,
       })
       .from(users)
