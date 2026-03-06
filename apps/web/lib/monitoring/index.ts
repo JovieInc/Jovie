@@ -1,7 +1,7 @@
 // Export all monitoring utilities
 
 export { withPerformanceMonitoring as withApiPerformanceMonitoring } from './api';
-export * from './client';
+export { initAllMonitoring } from './client';
 export {
   isSlowQuery,
   trackDatabaseQuery as trackClientDatabaseQuery,
