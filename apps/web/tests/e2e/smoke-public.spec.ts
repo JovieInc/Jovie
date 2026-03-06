@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   measureWebVitals,
   PERFORMANCE_BUDGETS,
@@ -110,7 +111,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
         console.log(
           `⚠ Skipping homepage content checks: Clerk handshake redirect detected (${currentUrl})`
         );
-        return;
+        test.skip(true, `Clerk handshake redirect detected (${currentUrl})`);
       }
 
       await waitForHydration(page);
@@ -138,7 +139,10 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
           console.log(
             '⚠ Skipping homepage content checks: page did not render (likely Clerk middleware intercept in CI)'
           );
-          return;
+          test.skip(
+            true,
+            'Page did not render meaningful homepage content (likely Clerk middleware intercept in CI)'
+          );
         }
       }
 
@@ -581,7 +585,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
     );
 
     const { getContext, cleanup } = setupPageMonitoring(page);
-    const routes = ['/', '/sign-up', '/pricing'];
+    const routes = ['/', APP_ROUTES.SIGNUP, '/pricing'];
 
     try {
       for (const route of routes) {

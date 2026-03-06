@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
-import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
 import { getOAuthErrorMessage } from '@/lib/auth/clerk-errors';
@@ -15,11 +14,6 @@ import { AuthLoadingState } from '../AuthLoadingState';
 import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
 import { VerificationStep } from './VerificationStep';
-
-const OAUTH_PROVIDER_COPY: Record<'google' | 'spotify', string> = {
-  google: 'Google',
-  spotify: 'Spotify',
-};
 
 /**
  * Sign-up form using Clerk Core API.
@@ -48,7 +42,6 @@ export function SignUpForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [lastAuthMethod] = useLastAuthMethod();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClerkStalled = useLoadingStall(isLoaded);
@@ -110,24 +103,19 @@ export function SignUpForm() {
           <>
             <MethodSelector
               onEmailClick={handleEmailClick}
-              onGoogleClick={() => startOAuth('google')}
-              onSpotifyClick={() => startOAuth('spotify')}
+              onGoogleClick={startOAuth}
               loadingState={loadingState}
-              lastMethod={lastAuthMethod}
               mode='signup'
               error={step === 'method' && oauthFailureProvider ? null : error}
             />
 
             {error && oauthFailureProvider && (
               <div
-                className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3'
+                className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3 animate-in fade-in-0 slide-in-from-top-2 duration-300'
                 role='alert'
               >
                 <p className='text-sm font-medium text-destructive'>
-                  {getOAuthErrorMessage(
-                    error,
-                    OAUTH_PROVIDER_COPY[oauthFailureProvider]
-                  )}
+                  {getOAuthErrorMessage(error, 'Google')}
                 </p>
                 <p className='text-sm text-[#4c515a] dark:text-[#a8aaad]'>
                   Try another sign-up method to keep going right away.
@@ -135,20 +123,11 @@ export function SignUpForm() {
                 <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
                   <button
                     type='button'
-                    onClick={() => startOAuth(oauthFailureProvider)}
+                    onClick={() => startOAuth()}
                     className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
                   >
-                    Try {OAUTH_PROVIDER_COPY[oauthFailureProvider]} again
+                    Try Google again
                   </button>
-                  {oauthFailureProvider !== 'google' && (
-                    <button
-                      type='button'
-                      onClick={() => startOAuth('google')}
-                      className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
-                    >
-                      Continue with Google
-                    </button>
-                  )}
                   <button
                     type='button'
                     onClick={handleEmailClick}
@@ -213,7 +192,19 @@ export function SignUpForm() {
         {/* Sign in suggestion when account exists - auto-redirects */}
         {shouldSuggestSignIn && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
-            Account already exists. Redirecting to sign in…
+            {isRedirecting ? (
+              <>Redirecting to sign in&hellip;</>
+            ) : (
+              <>
+                Account already exists.{' '}
+                <Link
+                  href={buildSignInUrl(email)}
+                  className='text-primary-token underline focus-ring-themed rounded-md'
+                >
+                  Sign in instead
+                </Link>
+              </>
+            )}
           </p>
         )}
 

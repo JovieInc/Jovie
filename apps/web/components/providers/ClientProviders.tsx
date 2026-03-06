@@ -2,6 +2,7 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import React from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
@@ -158,10 +159,10 @@ export function ClientProviders({
     <ClerkProvider
       publishableKey={publishableKey}
       appearance={clerkAppearance}
-      signInUrl='/signin'
-      signUpUrl='/signup'
-      signInFallbackRedirectUrl='/app'
-      signUpFallbackRedirectUrl='/onboarding'
+      signInUrl={APP_ROUTES.SIGNIN}
+      signUpUrl={APP_ROUTES.SIGNUP}
+      signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
+      signUpFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
     >
       <ClerkSafeValuesProvider>
         {wrapWithCoreProviders({

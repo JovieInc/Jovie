@@ -5,7 +5,7 @@
 /**
  * Available authentication methods
  */
-export type AuthMethod = 'email' | 'google' | 'spotify';
+export type AuthMethod = 'email' | 'google';
 
 /**
  * Loading state for auth flows
@@ -16,4 +16,4 @@ export type LoadingState =
   | { type: 'verifying' }
   | { type: 'completing' } // Session propagation after OTP verification
   | { type: 'resending' }
-  | { type: 'oauth'; provider: 'google' | 'spotify' };
+  | { type: 'oauth'; provider: 'google' };

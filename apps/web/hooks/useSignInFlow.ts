@@ -55,7 +55,7 @@ export interface UseSignInFlowReturn {
   startEmailFlow: (email: string) => Promise<boolean>;
   verifyCode: (code: string) => Promise<boolean>;
   resendCode: () => Promise<boolean>;
-  startOAuth: (provider: 'google' | 'spotify') => Promise<void>;
+  startOAuth: () => Promise<void>;
   goBack: () => void;
 }
 
@@ -231,42 +231,41 @@ export function useSignInFlow(): UseSignInFlowReturn {
   }, [signIn, isLoaded, clearError, base]);
 
   /**
-   * Start OAuth flow (Google/Spotify)
+   * Start OAuth flow (Google)
    */
-  const startOAuth = useCallback(
-    async (provider: 'google' | 'spotify'): Promise<void> => {
-      if (!signIn || !isLoaded) return;
+  const startOAuth = useCallback(async (): Promise<void> => {
+    if (!signIn || !isLoaded) return;
 
-      clearError();
-      base.setLoadingState({ type: 'oauth', provider });
-      base.persistAuthMethod(provider);
-      base.storeRedirectUrl();
+    const provider = 'google';
 
-      try {
-        // Use current origin for OAuth callbacks so localhost, preview, and
-        // production all redirect correctly after the OAuth round-trip.
-        const oauthBase = getOAuthBaseUrl();
-        const storedRedirect = base.getRedirectUrl();
-        await signIn.authenticateWithRedirect({
-          strategy: `oauth_${provider}`,
-          redirectUrl: `${oauthBase}/signin/sso-callback`,
-          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
-        });
-      } catch (err) {
-        // If user already has a session, redirect to dashboard
-        if (isSessionExists(err)) {
-          const redirectUrl = base.getRedirectUrl();
-          base.router.push(redirectUrl);
-          return;
-        }
+    clearError();
+    base.setLoadingState({ type: 'oauth', provider });
+    base.persistAuthMethod(provider);
+    base.storeRedirectUrl();
 
-        const message = parseClerkError(err);
-        base.setError(getOAuthErrorMessage(message));
-        base.setLoadingState({ type: 'idle' });
+    try {
+      // Use current origin for OAuth callbacks so localhost, preview, and
+      // production all redirect correctly after the OAuth round-trip.
+      const oauthBase = getOAuthBaseUrl();
+      const storedRedirect = base.getRedirectUrl();
+      await signIn.authenticateWithRedirect({
+        strategy: `oauth_${provider}`,
+        redirectUrl: `${oauthBase}/signin/sso-callback`,
+        redirectUrlComplete: `${oauthBase}${storedRedirect}`,
+      });
+    } catch (err) {
+      // If user already has a session, redirect to dashboard
+      if (isSessionExists(err)) {
+        const redirectUrl = base.getRedirectUrl();
+        base.router.push(redirectUrl);
+        return;
       }
-    },
-    [signIn, isLoaded, clearError, base]
-  );
+
+      const message = parseClerkError(err);
+      base.setError(getOAuthErrorMessage(message));
+      base.setLoadingState({ type: 'idle' });
+    }
+  }, [signIn, isLoaded, clearError, base]);
 
   /**
    * Go back to previous step

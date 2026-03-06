@@ -1,24 +1,10 @@
 'use client';
 
-import * as React from 'react';
-import { useMemo } from 'react';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
-import type { AuthMethod, LoadingState } from '@/lib/auth/types';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
-import {
-  AuthButton,
-  AuthGoogleIcon,
-  AuthSpotifyIcon,
-  authButtonVariants,
-} from '../atoms';
+import type { LoadingState } from '@/lib/auth/types';
+import { cn } from '@/lib/utils';
+import { AuthButton, AuthGoogleIcon } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
-
-const METHOD_DISPLAY_NAMES: Record<AuthMethod, string> = {
-  google: 'Google',
-  spotify: 'Spotify',
-  email: 'email',
-};
 
 interface MethodSelectorProps {
   /**
@@ -30,17 +16,9 @@ interface MethodSelectorProps {
    */
   readonly onGoogleClick: () => void;
   /**
-   * Called when Spotify OAuth is selected
-   */
-  readonly onSpotifyClick: () => void;
-  /**
    * Current loading state
    */
   readonly loadingState: LoadingState;
-  /**
-   * Last used auth method for personalization
-   */
-  readonly lastMethod?: AuthMethod | null;
   /**
    * Mode - affects copy and footer link
    */
@@ -53,121 +31,18 @@ interface MethodSelectorProps {
 
 /**
  * Auth method selection component.
- * Displays OAuth providers and email option with smart ordering based on last used method.
+ * Displays Google (primary) and Email (secondary) options.
  */
 export function MethodSelector({
   onEmailClick,
   onGoogleClick,
-  onSpotifyClick,
   loadingState,
-  lastMethod,
   mode,
   error,
 }: MethodSelectorProps) {
-  const spotifyOauthEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.SPOTIFY_OAUTH,
-    false
-  );
-
-  // Order methods with last used first
-  const orderedMethods = useMemo((): AuthMethod[] => {
-    let base: AuthMethod[];
-    if (spotifyOauthEnabled) {
-      base =
-        mode === 'signup'
-          ? ['spotify', 'google', 'email']
-          : ['google', 'email', 'spotify'];
-    } else {
-      base = ['google', 'email'];
-    }
-
-    if (!lastMethod) return base;
-    if (!base.includes(lastMethod)) return base;
-    return [lastMethod, ...base.filter(method => method !== lastMethod)];
-  }, [lastMethod, mode, spotifyOauthEnabled]);
-
   const isGoogleLoading =
     loadingState.type === 'oauth' && loadingState.provider === 'google';
-  const isSpotifyLoading =
-    loadingState.type === 'oauth' && loadingState.provider === 'spotify';
   const isAnyLoading = loadingState.type !== 'idle';
-  const useSignupSpotifyLayout = mode === 'signup' && spotifyOauthEnabled;
-
-  const renderMethodButton = (
-    method: AuthMethod,
-    isPrimary: boolean
-  ): React.ReactNode => {
-    const isGooglePrimary = method === 'google' && isPrimary;
-
-    if (method === 'email') {
-      return (
-        <AuthButton
-          variant={isPrimary ? 'primaryLight' : 'secondary'}
-          onClick={onEmailClick}
-          disabled={isAnyLoading}
-        >
-          Continue with email
-        </AuthButton>
-      );
-    }
-
-    if (method === 'google') {
-      const getGoogleVariant = () => {
-        if (!isPrimary) return 'secondary';
-        return isGooglePrimary ? 'oauthPrimary' : 'primaryLight';
-      };
-      const className = authButtonVariants({ variant: getGoogleVariant() });
-
-      return (
-        <button
-          type='button'
-          onClick={onGoogleClick}
-          disabled={isAnyLoading}
-          aria-busy={isGoogleLoading}
-          className={`${className} ${AUTH_CLASSES.oauthButtonMobile}`}
-        >
-          {isGoogleLoading ? (
-            <>
-              <ButtonSpinner />
-              <span>Opening Google...</span>
-            </>
-          ) : (
-            <>
-              <AuthGoogleIcon />
-              <span>Continue with Google</span>
-            </>
-          )}
-        </button>
-      );
-    }
-
-    // Spotify
-    const className = isPrimary
-      ? authButtonVariants({ variant: 'primaryLight' })
-      : authButtonVariants({ variant: 'secondary' });
-
-    return (
-      <button
-        type='button'
-        onClick={onSpotifyClick}
-        disabled={isAnyLoading}
-        aria-busy={isSpotifyLoading}
-        className={`${className} ${AUTH_CLASSES.oauthButtonMobile}`}
-      >
-        {isSpotifyLoading ? (
-          <>
-            <ButtonSpinner />
-            <span>Opening Spotify...</span>
-          </>
-        ) : (
-          <>
-            <AuthSpotifyIcon />
-            <span>Continue with Spotify</span>
-          </>
-        )}
-      </button>
-    );
-  };
 
   return (
     <div
@@ -191,69 +66,39 @@ export function MethodSelector({
       </div>
 
       <div className={FORM_LAYOUT.formInner}>
-        {useSignupSpotifyLayout ? (
-          <>
-            <button
-              type='button'
-              onClick={onSpotifyClick}
-              disabled={isAnyLoading}
-              aria-busy={isSpotifyLoading}
-              className={`${authButtonVariants({ variant: 'primaryLight' })} ${AUTH_CLASSES.oauthButtonMobile} bg-[#1db954] border-[#1ed760] text-[#041008] hover:bg-[#1aa34a] active:bg-[#179243]`}
-            >
-              {isSpotifyLoading ? (
-                <>
-                  <ButtonSpinner />
-                  <span>Opening Spotify...</span>
-                </>
-              ) : (
-                <>
-                  <AuthSpotifyIcon />
-                  <span>Continue with Spotify</span>
-                </>
-              )}
-            </button>
-
-            <div className='space-y-2 pt-1'>
-              <AuthButton
-                variant='link'
-                onClick={onGoogleClick}
-                disabled={isAnyLoading}
-              >
-                or continue with Google
-              </AuthButton>
-              <AuthButton
-                variant='link'
-                onClick={onEmailClick}
-                disabled={isAnyLoading}
-              >
-                or use email
-              </AuthButton>
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Primary method */}
-            <div>{renderMethodButton(orderedMethods[0], true)}</div>
-
-            {/* Last used indicator - fixed height to prevent layout shift */}
-            <div className='min-h-[20px] flex items-center justify-center'>
-              {lastMethod && orderedMethods.includes(lastMethod) && (
-                <p className='text-[13px] font-[450] text-[#6b6f76] dark:text-[#969799] text-center animate-in fade-in-0 duration-300'>
-                  You used {METHOD_DISPLAY_NAMES[lastMethod]} last time
-                </p>
-              )}
-            </div>
-
-            {/* Secondary methods */}
-            {orderedMethods.length > 1 && (
-              <div className='space-y-3'>
-                {orderedMethods.slice(1).map(method => (
-                  <div key={method}>{renderMethodButton(method, false)}</div>
-                ))}
-              </div>
+        {/* Google - primary action */}
+        <div>
+          <AuthButton
+            variant='oauthPrimary'
+            onClick={onGoogleClick}
+            disabled={isAnyLoading}
+            aria-busy={isGoogleLoading}
+            className={cn(AUTH_CLASSES.oauthButtonMobile)}
+          >
+            {isGoogleLoading ? (
+              <>
+                <ButtonSpinner />
+                <span>Opening Google...</span>
+              </>
+            ) : (
+              <>
+                <AuthGoogleIcon />
+                <span>Continue with Google</span>
+              </>
             )}
-          </>
-        )}
+          </AuthButton>
+        </div>
+
+        {/* Email - secondary action */}
+        <div>
+          <AuthButton
+            variant='secondary'
+            onClick={onEmailClick}
+            disabled={isAnyLoading}
+          >
+            Continue with email
+          </AuthButton>
+        </div>
       </div>
     </div>
   );
