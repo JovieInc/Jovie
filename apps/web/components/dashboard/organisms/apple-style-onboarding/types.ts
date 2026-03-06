@@ -32,7 +32,7 @@ export const ONBOARDING_STEPS = [
   {
     id: 'handle',
     title: 'Choose your handle',
-    prompt: 'This is how fans will find you.',
+    prompt: 'This is how fans will find and remember you.',
   },
   {
     id: 'dsp',
@@ -40,9 +40,9 @@ export const ONBOARDING_STEPS = [
     prompt: 'Import your releases from Spotify so fans can find your music.',
   },
   {
-    id: 'done',
-    title: "You're live.",
-    prompt: 'Your profile is published and ready to share.',
+    id: 'profile-review',
+    title: 'Your profile',
+    prompt: 'Review your profile before going live.',
   },
 ] as const;
 

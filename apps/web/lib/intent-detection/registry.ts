@@ -15,20 +15,45 @@ const PLATFORM_NAMES =
 
 const platformPattern = new RegExp(`(${PLATFORM_NAMES})`, 'i');
 
+function extractValue(match: RegExpMatchArray): Record<string, string> {
+  return { value: match[1].trim() };
+}
+
+function extractPlatformAndUrl(
+  match: RegExpMatchArray
+): Record<string, string> {
+  return {
+    platform: match[1]?.trim() ?? '',
+    url: match[2].trim(),
+  };
+}
+
+function extractPlatform(match: RegExpMatchArray): Record<string, string> {
+  return { platform: match[1].trim().toLowerCase() };
+}
+
+function extractSetting(match: RegExpMatchArray): Record<string, string> {
+  return { setting: match[1].trim().toLowerCase() };
+}
+
+function extractNothing(): Record<string, string> {
+  return {};
+}
+
 export const INTENT_PATTERNS: IntentPattern[] = [
   // --- Priority 10: Profile name changes ---
   {
     category: IntentCategory.PROFILE_UPDATE_NAME,
     pattern:
       /^(?:change|update|set|edit|make|rename)\s+(?:my\s+)?(?:display\s*name|name|artist\s*name)\s+(?:to|:|=)\s*(.+)/i,
-    extract: (match: RegExpMatchArray) => ({ value: match[1].trim() }),
+    extract: extractValue,
     priority: 10,
   },
   {
     category: IntentCategory.PROFILE_UPDATE_NAME,
     pattern:
       /^(?:my\s+)?(?:display\s*name|name|artist\s*name)\s+(?:should\s+be|is)\s+(.+)/i,
-    extract: (match: RegExpMatchArray) => ({ value: match[1].trim() }),
+    extract: extractValue,
     priority: 10,
   },
 
@@ -37,13 +62,13 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     category: IntentCategory.PROFILE_UPDATE_BIO,
     pattern:
       /^(?:change|update|set|edit|make)\s+(?:my\s+)?bio\s+(?:to|:|=)\s*(.+)/is,
-    extract: (match: RegExpMatchArray) => ({ value: match[1].trim() }),
+    extract: extractValue,
     priority: 10,
   },
   {
     category: IntentCategory.PROFILE_UPDATE_BIO,
     pattern: /^(?:my\s+)?bio\s+(?:should\s+be|is)\s+(.+)/is,
-    extract: (match: RegExpMatchArray) => ({ value: match[1].trim() }),
+    extract: extractValue,
     priority: 10,
   },
 
@@ -52,10 +77,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     category: IntentCategory.LINK_ADD,
     pattern:
       /^(?:add|connect|link|set\s+up)\s+(?:my\s+)?(?:(\S+)\s+)?(?:link|url|account)?\s*(?:to|:|=|as)?\s*(https?:\/\/\S+)/i,
-    extract: (match: RegExpMatchArray) => ({
-      platform: match[1]?.trim() ?? '',
-      url: match[2].trim(),
-    }),
+    extract: extractPlatformAndUrl,
     priority: 9,
   },
 
@@ -66,9 +88,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       `^(?:add|connect|link|set\\s+up)\\s+(?:my\\s+)?${platformPattern.source}(?:\\s+(?:link|url|account|page|profile))?`,
       'i'
     ),
-    extract: (match: RegExpMatchArray) => ({
-      platform: match[1].trim().toLowerCase(),
-    }),
+    extract: extractPlatform,
     priority: 8,
   },
 
@@ -79,9 +99,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
       `^(?:remove|delete|disconnect|unlink)\\s+(?:my\\s+)?${platformPattern.source}(?:\\s+(?:link|url|account|page|profile))?`,
       'i'
     ),
-    extract: (match: RegExpMatchArray) => ({
-      platform: match[1].trim().toLowerCase(),
-    }),
+    extract: extractPlatform,
     priority: 8,
   },
 
@@ -90,7 +108,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
     category: IntentCategory.AVATAR_UPLOAD,
     pattern:
       /^(?:upload|change|update|set)\s+(?:my\s+)?(?:photo|avatar|picture|profile\s*pic(?:ture)?|pfp|image|headshot)/i,
-    extract: () => ({}),
+    extract: extractNothing,
     priority: 7,
   },
 
@@ -98,9 +116,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   {
     category: IntentCategory.SETTINGS_TOGGLE,
     pattern: /^(?:enable|disable|turn\s+(?:on|off)|toggle)\s+(?:my\s+)?(.+)/i,
-    extract: (match: RegExpMatchArray) => ({
-      setting: match[1].trim().toLowerCase(),
-    }),
+    extract: extractSetting,
     priority: 5,
   },
 ].sort((a, b) => b.priority - a.priority);

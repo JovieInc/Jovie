@@ -477,6 +477,7 @@ export async function resolveUserState(
       profileUsernameNormalized: creatorProfiles.usernameNormalized,
       profileDisplayName: creatorProfiles.displayName,
       profileIsPublic: creatorProfiles.isPublic,
+      profileAvatarUrl: creatorProfiles.avatarUrl,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
       profileIsClaimed: creatorProfiles.isClaimed,
     })
@@ -556,6 +557,7 @@ export async function resolveUserState(
         username: dbResult.profileUsername,
         usernameNormalized: dbResult.profileUsernameNormalized,
         displayName: dbResult.profileDisplayName,
+        avatarUrl: dbResult.profileAvatarUrl,
         isPublic: dbResult.profileIsPublic,
         onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
         isClaimed: dbResult.profileIsClaimed,

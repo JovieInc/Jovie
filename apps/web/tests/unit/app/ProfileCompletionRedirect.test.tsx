@@ -25,6 +25,7 @@ const baseDashboardData: DashboardData = {
     id: 'profile-1',
     displayName: 'Test Artist',
     username: 'testartist',
+    avatarUrl: 'https://example.com/avatar.jpg',
   } as DashboardData['selectedProfile'],
   needsOnboarding: false,
   sidebarCollapsed: false,
@@ -91,6 +92,19 @@ describe('ProfileCompletionRedirect', () => {
       selectedProfile: {
         ...baseDashboardData.selectedProfile!,
         displayName: '   ',
+      },
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
+  });
+
+  it('redirects when avatar URL is blank', () => {
+    mockReplace.mockClear();
+    renderGuard({
+      ...baseDashboardData,
+      selectedProfile: {
+        ...baseDashboardData.selectedProfile!,
+        avatarUrl: null,
       },
     });
 
