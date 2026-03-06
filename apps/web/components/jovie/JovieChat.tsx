@@ -13,6 +13,7 @@ import {
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
+  FeedbackForm,
   ScrollToBottom,
   SuggestedProfilesCarousel,
   SuggestedPrompts,
@@ -24,7 +25,7 @@ import {
   useSuggestedProfiles,
 } from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
-import { TOOL_LABELS } from './types';
+import { FEEDBACK_PROMPT_TRIGGER, TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
 const SCROLL_THRESHOLD = 200;
@@ -71,6 +72,7 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
 
   // Suggested profiles carousel data — lifted here so we can hide
   // the help text and suggested prompts while the carousel has items.
@@ -121,6 +123,18 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
+
+  // Intercept feedback trigger before it reaches the AI
+  const handleSuggestedPromptWithFeedback = useCallback(
+    (prompt: string) => {
+      if (prompt === FEEDBACK_PROMPT_TRIGGER) {
+        setShowFeedbackForm(true);
+        return;
+      }
+      handleSuggestedPrompt(prompt);
+    },
+    [handleSuggestedPrompt]
+  );
 
   // Image attachments for chat messages
   const {
@@ -455,8 +469,13 @@ export function JovieChat({
                 />
               )}
 
-              {/* Hide help text and prompts while the carousel has items */}
-              {!hasCarouselItems && (
+              {/* Feedback form (deterministic, no AI) */}
+              {showFeedbackForm && (
+                <FeedbackForm onClose={() => setShowFeedbackForm(false)} />
+              )}
+
+              {/* Hide help text and prompts while the carousel has items or feedback form is showing */}
+              {!hasCarouselItems && !showFeedbackForm && (
                 <>
                   {isFirstSession ? (
                     <p className='text-center text-[15px] text-secondary-token'>
@@ -482,7 +501,7 @@ export function JovieChat({
                   )}
 
                   <SuggestedPrompts
-                    onSelect={handleSuggestedPrompt}
+                    onSelect={handleSuggestedPromptWithFeedback}
                     isFirstSession={isFirstSession}
                     latestReleaseTitle={latestReleaseTitle}
                   />

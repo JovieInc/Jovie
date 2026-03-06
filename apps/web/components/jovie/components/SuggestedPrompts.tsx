@@ -1,6 +1,13 @@
 'use client';
 
-import { Camera, DollarSign, Eye, Link2, Music } from 'lucide-react';
+import {
+  Camera,
+  DollarSign,
+  Eye,
+  Link2,
+  MessageSquare,
+  Music,
+} from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -8,6 +15,7 @@ import { cn } from '@/lib/utils';
 import {
   type ChatSuggestion,
   DEFAULT_SUGGESTIONS,
+  FEEDBACK_SUGGESTION,
   FIRST_SESSION_SUGGESTIONS,
 } from '../types';
 
@@ -17,6 +25,7 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   DollarSign,
   Eye,
   Link2,
+  MessageSquare,
   Music,
 };
 
@@ -96,6 +105,7 @@ export function SuggestedPrompts({
           onSelect={onSelect}
         />
       ))}
+      <SuggestionPill suggestion={FEEDBACK_SUGGESTION} onSelect={onSelect} />
     </div>
   );
 }
