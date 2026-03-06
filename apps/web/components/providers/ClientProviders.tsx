@@ -2,11 +2,11 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import React from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
-import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';

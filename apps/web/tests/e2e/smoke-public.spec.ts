@@ -111,10 +111,7 @@ test.describe('Public Smoke Tests @smoke @critical', () => {
         console.log(
           `⚠ Skipping homepage content checks: Clerk handshake redirect detected (${currentUrl})`
         );
-        test.skip(
-          true,
-          `Clerk handshake redirect detected (${currentUrl})`
-        );
+        test.skip(true, `Clerk handshake redirect detected (${currentUrl})`);
       }
 
       await waitForHydration(page);

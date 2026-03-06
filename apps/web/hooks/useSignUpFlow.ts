@@ -280,42 +280,39 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
   /**
    * Start OAuth flow (Google)
    */
-  const startOAuth = useCallback(
-    async (): Promise<void> => {
-      if (!signUp || !isLoaded) return;
+  const startOAuth = useCallback(async (): Promise<void> => {
+    if (!signUp || !isLoaded) return;
 
-      const provider = 'google';
+    const provider = 'google';
 
-      clearError();
-      base.setLoadingState({ type: 'oauth', provider });
-      base.persistAuthMethod(provider);
-      base.storeRedirectUrl();
+    clearError();
+    base.setLoadingState({ type: 'oauth', provider });
+    base.persistAuthMethod(provider);
+    base.storeRedirectUrl();
 
-      try {
-        // Use current origin for OAuth callbacks so localhost, preview, and
-        // production all redirect correctly after the OAuth round-trip.
-        const oauthBase = getOAuthBaseUrl();
-        const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
-        await signUp.authenticateWithRedirect({
-          strategy: `oauth_${provider}`,
-          redirectUrl: `${oauthBase}/signup/sso-callback`,
-          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
-        });
-      } catch (err) {
-        // If user already has a session, redirect to dashboard
-        if (isSessionExists(err)) {
-          base.router.push(APP_ROUTES.DASHBOARD);
-          return;
-        }
-
-        const message = parseClerkError(err);
-        base.setError(getOAuthErrorMessage(message));
-        setOauthFailureProvider(provider);
-        base.setLoadingState({ type: 'idle' });
+    try {
+      // Use current origin for OAuth callbacks so localhost, preview, and
+      // production all redirect correctly after the OAuth round-trip.
+      const oauthBase = getOAuthBaseUrl();
+      const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
+      await signUp.authenticateWithRedirect({
+        strategy: `oauth_${provider}`,
+        redirectUrl: `${oauthBase}/signup/sso-callback`,
+        redirectUrlComplete: `${oauthBase}${storedRedirect}`,
+      });
+    } catch (err) {
+      // If user already has a session, redirect to dashboard
+      if (isSessionExists(err)) {
+        base.router.push(APP_ROUTES.DASHBOARD);
+        return;
       }
-    },
-    [signUp, isLoaded, clearError, base]
-  );
+
+      const message = parseClerkError(err);
+      base.setError(getOAuthErrorMessage(message));
+      setOauthFailureProvider(provider);
+      base.setLoadingState({ type: 'idle' });
+    }
+  }, [signUp, isLoaded, clearError, base]);
 
   /**
    * Go back to previous step

@@ -1,8 +1,8 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import { AUTH_CLASSES, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { LoadingState } from '@/lib/auth/types';
+import { cn } from '@/lib/utils';
 import { AuthButton, AuthGoogleIcon } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
