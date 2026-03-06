@@ -199,16 +199,13 @@ export function OnboardingHandleStep({
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
           {isReservedHandle ? (
-            <div className='flex flex-col items-center gap-3 rounded-2xl border border-subtle bg-surface-1 px-5 py-6 text-center'>
-              <p className='text-sm font-medium uppercase tracking-[0.08em] text-tertiary-token'>
-                Reserved handle
-              </p>
-              <p className='text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'>
-                You&apos;re @{handleInput}
+            <div className='flex flex-col items-center gap-2 rounded-2xl border border-subtle bg-surface-1 px-5 py-5 text-center mt-4'>
+              <p className='text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'>
+                @{handleInput}
               </p>
               <p className='text-sm text-secondary-token'>
-                We&apos;ll save it for you. Prefer a different handle? Edit it
-                below.
+                We reserved this for you. Edit below if you prefer something
+                else.
               </p>
             </div>
           ) : null}
@@ -216,11 +213,6 @@ export function OnboardingHandleStep({
 
         <form className={FORM_LAYOUT.formInner} onSubmit={onSubmit}>
           <div>
-            {isReservedHandle ? (
-              <p className='mb-2 text-xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
-                Edit handle (optional)
-              </p>
-            ) : null}
             <div
               className={[
                 'w-full flex items-center gap-2 rounded-[6px] border bg-surface-0 dark:bg-surface-1 px-4 py-2.5',

@@ -84,7 +84,7 @@ function TourMockup() {
           </div>
           <button
             type='button'
-            className='px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] hover:scale-[1.02] transition-transform'
+            className='px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] hover:opacity-90 transition-opacity'
           >
             Tickets
           </button>
@@ -244,7 +244,7 @@ export function DeeplinksGrid() {
               key={card.slugPath}
               className='group relative flex flex-col bg-[var(--linear-bg-surface-1)]'
             >
-              <div className='flex flex-1 flex-col gap-4 p-6'>
+              <div className='flex flex-1 flex-col gap-3 p-5'>
                 {/* URL slug */}
                 <p className='font-mono text-[var(--linear-caption-size)] font-[450] text-[var(--linear-text-tertiary)]'>
                   {'jov.ie/tim/'}

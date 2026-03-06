@@ -111,7 +111,7 @@ export function RightDrawer({
     );
   }
 
-  // Desktop: inline sidebar with width animation
+  // Desktop: inline sidebar with transform-based transition (no layout recalculation)
   return (
     <aside
       {...rest}
@@ -122,14 +122,14 @@ export function RightDrawer({
       className={cn(
         'shrink-0 h-full flex flex-col',
         'bg-surface-1 border-l border-subtle',
-        'transition-[width,opacity] duration-300 ease-out',
-        'overflow-hidden',
+        'transition-[transform,opacity] duration-300 ease-out',
+        'overflow-hidden will-change-transform',
         isOpen
-          ? 'opacity-100 visible'
-          : 'opacity-0 pointer-events-none invisible w-0 border-l-0',
+          ? 'opacity-100 visible translate-x-0'
+          : 'opacity-0 pointer-events-none invisible translate-x-full',
         className
       )}
-      style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
+      style={{ width, maxWidth: '100vw' }}
     >
       {content}
     </aside>

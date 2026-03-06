@@ -59,7 +59,11 @@ export function useSpotifyConnect({
 
           if (result.success) {
             dispatch({ type: 'CLEAR_SEARCH' });
-            onConnected?.(result.releases, result.artistName);
+            if (result.importing) {
+              onConnected?.([], result.artistName);
+            } else {
+              onConnected?.(result.releases, result.artistName);
+            }
           } else {
             dispatch({ type: 'SET_ERROR', payload: result.message });
           }
@@ -94,7 +98,11 @@ export function useSpotifyConnect({
           });
 
           if (result.success) {
-            onConnected?.(result.releases, result.artistName);
+            if (result.importing) {
+              onConnected?.([], result.artistName);
+            } else {
+              onConnected?.(result.releases, result.artistName);
+            }
           } else {
             dispatch({ type: 'SET_ERROR', payload: result.message });
           }

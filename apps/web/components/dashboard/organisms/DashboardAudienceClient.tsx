@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { BarChart3 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
@@ -11,7 +10,9 @@ import {
   useQueryStates,
 } from 'nuqs';
 import * as React from 'react';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -102,6 +103,26 @@ export function DashboardAudienceClient({
     setIsAnalyticsOpen(false);
   }, []);
 
+  // Register analytics icon button in the dashboard header
+  const { setHeaderActions } = useSetHeaderActions();
+
+  const headerActions = React.useMemo(
+    () => (
+      <DashboardHeaderActionButton
+        ariaLabel={isAnalyticsOpen ? 'Close analytics' : 'Open analytics'}
+        pressed={isAnalyticsOpen}
+        onClick={toggleAnalytics}
+        icon={<BarChart3 className='h-4 w-4' />}
+      />
+    ),
+    [isAnalyticsOpen, toggleAnalytics]
+  );
+
+  React.useEffect(() => {
+    setHeaderActions(headerActions);
+    return () => setHeaderActions(null);
+  }, [setHeaderActions, headerActions]);
+
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
@@ -187,23 +208,6 @@ export function DashboardAudienceClient({
       >
         {/* Main content area */}
         <div className='flex-1 min-w-0 flex flex-col'>
-          {/* Analytics toggle bar */}
-          <div className='shrink-0 flex items-center justify-end px-4 pt-3 pb-1 sm:px-6'>
-            <Button
-              size='sm'
-              variant={isAnalyticsOpen ? 'secondary' : 'ghost'}
-              onClick={toggleAnalytics}
-              className='gap-1.5 text-[13px]'
-              aria-label={
-                isAnalyticsOpen ? 'Close analytics' : 'Open analytics'
-              }
-              aria-expanded={isAnalyticsOpen}
-            >
-              <BarChart3 className='h-3.5 w-3.5' />
-              Analytics
-            </Button>
-          </div>
-
           <div className='flex-1 min-h-0 flex flex-col'>
             <DashboardAudienceTable
               mode={mode}
