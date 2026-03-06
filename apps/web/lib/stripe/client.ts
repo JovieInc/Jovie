@@ -5,6 +5,7 @@
 
 import 'server-only';
 import Stripe from 'stripe';
+import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
@@ -51,71 +52,89 @@ function escapeStripeSearchValue(value: string): string {
 /**
  * Get or create a Stripe customer for a user
  * Idempotent operation - safe to call multiple times
+ * Results are cached for 1 hour to reduce Stripe API calls
  */
 export async function getOrCreateCustomer(
   userId: string,
   email: string,
   name?: string
 ): Promise<Stripe.Customer> {
-  try {
-    const stripeClient = getStripe();
-    // Prefer an explicit metadata match to avoid cross-account collisions.
-    const existingByUserId = await stripeClient.customers.search({
-      query: `metadata['clerk_user_id']:'${escapeStripeSearchValue(userId)}'`,
-      limit: 1,
-    });
+  return cacheQuery(
+    `stripe:customer:${userId}`,
+    async () => {
+      try {
+        const stripeClient = getStripe();
+        // Prefer an explicit metadata match to avoid cross-account collisions.
+        const existingByUserId = await stripeClient.customers.search({
+          query: `metadata['clerk_user_id']:'${escapeStripeSearchValue(userId)}'`,
+          limit: 1,
+        });
 
-    if (existingByUserId.data.length > 0) return existingByUserId.data[0];
+        if (existingByUserId.data.length > 0) return existingByUserId.data[0];
 
-    // Fallback: attempt to claim a legacy customer by email only if it looks like
-    // an unclaimed Jovie-created record.
-    const trimmedEmail = email.trim();
-    if (trimmedEmail.length > 0) {
-      const existingByEmail = await stripeClient.customers.search({
-        query: `email:'${escapeStripeSearchValue(trimmedEmail)}'`,
-        limit: 5,
-      });
+        // Fallback: attempt to claim a legacy customer by email only if it looks like
+        // an unclaimed Jovie-created record.
+        const trimmedEmail = email.trim();
+        if (trimmedEmail.length > 0) {
+          const existingByEmail = await stripeClient.customers.search({
+            query: `email:'${escapeStripeSearchValue(trimmedEmail)}'`,
+            limit: 5,
+          });
 
-      const unclaimed = existingByEmail.data.filter(customer => {
-        const clerkUserId = customer.metadata?.clerk_user_id;
-        if (typeof clerkUserId === 'string' && clerkUserId.length > 0) {
-          return false;
+          const unclaimed = existingByEmail.data.filter(customer => {
+            const clerkUserId = customer.metadata?.clerk_user_id;
+            if (typeof clerkUserId === 'string' && clerkUserId.length > 0) {
+              return false;
+            }
+            const createdVia = customer.metadata?.created_via;
+            return createdVia === 'jovie_app';
+          });
+
+          if (unclaimed.length === 1) {
+            const customer = unclaimed[0];
+            const updated = await stripeClient.customers.update(customer.id, {
+              metadata: {
+                ...customer.metadata,
+                clerk_user_id: userId,
+                created_via: 'jovie_app',
+              },
+            });
+            return updated;
+          }
         }
-        const createdVia = customer.metadata?.created_via;
-        return createdVia === 'jovie_app';
-      });
 
-      if (unclaimed.length === 1) {
-        const customer = unclaimed[0];
-        const updated = await stripeClient.customers.update(customer.id, {
+        // If no customer found, create a new one
+        const customer = await stripeClient.customers.create({
+          email,
+          name,
           metadata: {
-            ...customer.metadata,
             clerk_user_id: userId,
             created_via: 'jovie_app',
           },
         });
-        return updated;
+
+        return customer;
+      } catch (error) {
+        captureError('Error creating/retrieving Stripe customer', error, {
+          userId,
+          email,
+        });
+        throw new Error('Failed to create or retrieve customer');
       }
-    }
+    },
+    { ttlSeconds: 3600 } // Cache for 1 hour
+  );
+}
 
-    // If no customer found, create a new one
-    const customer = await stripeClient.customers.create({
-      email,
-      name,
-      metadata: {
-        clerk_user_id: userId,
-        created_via: 'jovie_app',
-      },
-    });
-
-    return customer;
-  } catch (error) {
-    captureError('Error creating/retrieving Stripe customer', error, {
-      userId,
-      email,
-    });
-    throw new Error('Failed to create or retrieve customer');
-  }
+/**
+ * Invalidate Stripe customer cache for a specific user.
+ * Call this after creating or updating a customer in Stripe to ensure
+ * fresh data on subsequent lookups.
+ *
+ * @param userId - The user's Clerk ID
+ */
+export async function invalidateStripeCustomerCache(userId: string): Promise<void> {
+  await invalidateCache(`stripe:customer:${userId}`);
 }
 
 /**
