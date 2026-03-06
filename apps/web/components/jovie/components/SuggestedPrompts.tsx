@@ -97,7 +97,7 @@ export function SuggestedPrompts({
     : DEFAULT_SUGGESTIONS;
 
   return (
-    <div className='flex flex-col items-center gap-2 w-full max-w-sm mx-auto'>
+    <div className='flex flex-col gap-2 w-full max-w-sm mx-auto'>
       {suggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
