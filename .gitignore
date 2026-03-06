@@ -87,3 +87,4 @@ package-lock.json
 .auto-claude-status
 .security-key
 logs/security/
+output/
