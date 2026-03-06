@@ -80,7 +80,7 @@ describe('SignUpForm OAuth fallback messaging', () => {
       screen.getByRole('button', { name: 'Continue with email' })
     );
 
-    expect(startOAuthMock).toHaveBeenNthCalledWith(1, 'google');
+    expect(startOAuthMock).toHaveBeenNthCalledWith(1);
     expect(clearErrorMock).toHaveBeenCalledTimes(1);
     expect(setStepMock).toHaveBeenCalledWith('email');
   });
