@@ -1,6 +1,7 @@
 'use client';
 
 import { SegmentControl } from '@jovie/ui';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -251,6 +252,7 @@ export function ProfileContactSidebar() {
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
+    onClose: close,
   });
 
   // Show skeleton sidebar until preview data loads (prevents CLS)
@@ -318,7 +320,6 @@ export function ProfileContactSidebar() {
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       title={headerTitle}
-      onClose={close}
       headerActions={headerActions}
       entityHeader={
         <div className='space-y-3'>
@@ -346,13 +347,28 @@ export function ProfileContactSidebar() {
         </div>
       }
       tabs={
-        <SegmentControl
-          value={resolvedCategory}
-          onValueChange={setSelectedCategory}
-          options={PROFILE_TAB_OPTIONS}
-          size='sm'
-          aria-label='Profile sidebar view'
-        />
+        <div className='flex items-center gap-1.5'>
+          <SegmentControl
+            value={resolvedCategory}
+            onValueChange={setSelectedCategory}
+            options={PROFILE_TAB_OPTIONS}
+            size='sm'
+            className='flex-1'
+            aria-label='Profile sidebar view'
+          />
+          {(resolvedCategory === 'social' ||
+            resolvedCategory === 'dsp' ||
+            resolvedCategory === 'earnings') && (
+            <button
+              type='button'
+              onClick={() => handleAddLink(resolvedCategory)}
+              className='shrink-0 p-1 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
+              aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+            >
+              <Plus className='h-4 w-4' />
+            </button>
+          )}
+        </div>
       }
       footer={photoSettingsFooter}
     >

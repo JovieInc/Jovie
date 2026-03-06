@@ -175,48 +175,51 @@ export function ProfileLinkList({
     return groupedLinks[selectedCategory] ?? [];
   }, [selectedCategory, groupedLinks, links]);
 
-  // When viewing a specific category, use shared DrawerLinkSection
+  // When viewing a specific category, render links directly (no section header —
+  // the tab already labels the category, and the + button is inline with tabs)
   if (selectedCategory !== 'all') {
     if (selectedCategory === 'dsp' && dspConnections) {
-      return (
-        <DrawerLinkSection
-          title='Music links'
-          onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
-          addLabel='Add Music link'
-          isEmpty={
-            filteredLinks.length === 0 &&
-            !dspConnections.spotify.connected &&
-            !dspConnections.appleMusic.connected
-          }
-          emptyMessage='No music links yet. Click + to add one.'
-        >
-          <div className='space-y-0.5'>
-            <ConnectedDspRows
-              dspConnections={dspConnections}
-              onDisconnect={onDisconnectDsp}
-            />
-            {filteredLinks.map(link => (
-              <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
-            ))}
-          </div>
-        </DrawerLinkSection>
-      );
-    }
+      const hasDspContent =
+        filteredLinks.length > 0 ||
+        dspConnections.spotify.connected ||
+        dspConnections.appleMusic.connected;
 
-    return (
-      <DrawerLinkSection
-        title={`${SECTION_LABELS[selectedCategory]} links`}
-        onAdd={onAddLink ? () => onAddLink(selectedCategory) : undefined}
-        addLabel={`Add ${SECTION_LABELS[selectedCategory]} link`}
-        isEmpty={filteredLinks.length === 0}
-        emptyMessage={`No ${SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click + to add one.`}
-      >
-        <div className='space-y-2'>
+      if (!hasDspContent) {
+        return (
+          <p className='text-xs text-tertiary-token py-2'>
+            No music links yet. Click + to add one.
+          </p>
+        );
+      }
+
+      return (
+        <div className='space-y-0.5 -mx-3 lg:mx-0'>
+          <ConnectedDspRows
+            dspConnections={dspConnections}
+            onDisconnect={onDisconnectDsp}
+          />
           {filteredLinks.map(link => (
             <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
           ))}
         </div>
-      </DrawerLinkSection>
+      );
+    }
+
+    if (filteredLinks.length === 0) {
+      return (
+        <p className='text-xs text-tertiary-token py-2'>
+          No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click +
+          to add one.
+        </p>
+      );
+    }
+
+    return (
+      <div className='space-y-2 -mx-3 lg:mx-0'>
+        {filteredLinks.map(link => (
+          <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
+        ))}
+      </div>
     );
   }
 
