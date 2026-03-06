@@ -15,6 +15,18 @@ interface UseImportPollingParams {
   onImportComplete: () => void;
 }
 
+/**
+ * Sort releases by release date descending with ID tiebreaker for stable order.
+ */
+function sortReleases(releases: ReleaseViewModel[]): ReleaseViewModel[] {
+  return releases.sort((a, b) => {
+    const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+    const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+    if (dateA !== dateB) return dateB - dateA;
+    return a.id.localeCompare(b.id);
+  });
+}
+
 export function useImportPolling({
   enabled,
   onReleasesUpdate,
@@ -24,9 +36,23 @@ export function useImportPolling({
   const isPollingRef = useRef(false);
   const onReleasesUpdateRef = useRef(onReleasesUpdate);
   const onImportCompleteRef = useRef(onImportComplete);
+  // Accumulate releases across polls so rows never disappear
+  const seenReleasesRef = useRef(new Map<string, ReleaseViewModel>());
 
   onReleasesUpdateRef.current = onReleasesUpdate;
   onImportCompleteRef.current = onImportComplete;
+
+  /**
+   * Merge polled releases into the seen map, update count, and emit sorted list.
+   */
+  const mergeAndEmit = useCallback((releases: ReleaseViewModel[]) => {
+    for (const release of releases) {
+      seenReleasesRef.current.set(release.id, release);
+    }
+    const merged = sortReleases(Array.from(seenReleasesRef.current.values()));
+    setImportedCount(seenReleasesRef.current.size);
+    onReleasesUpdateRef.current(merged);
+  }, []);
 
   const poll = useCallback(async () => {
     if (isPollingRef.current) return;
@@ -38,10 +64,8 @@ export function useImportPolling({
         pollReleasesCount(),
       ]);
 
-      setImportedCount(releasesResult.count);
-
       if (releasesResult.count > 0) {
-        onReleasesUpdateRef.current(releasesResult.releases);
+        mergeAndEmit(releasesResult.releases);
       }
 
       if (
@@ -51,8 +75,7 @@ export function useImportPolling({
         // One final fetch to ensure we have all releases
         if (statusResult.status === 'complete') {
           const final = await pollReleasesCount();
-          onReleasesUpdateRef.current(final.releases);
-          setImportedCount(final.count);
+          mergeAndEmit(final.releases);
         }
         onImportCompleteRef.current();
       }
@@ -61,10 +84,16 @@ export function useImportPolling({
     } finally {
       isPollingRef.current = false;
     }
-  }, []);
+  }, [mergeAndEmit]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      return;
+    }
+
+    // Reset seen releases when a new import starts
+    seenReleasesRef.current.clear();
+    setImportedCount(0);
 
     const id = setInterval(poll, POLL_INTERVAL_MS);
     // Immediately poll on mount

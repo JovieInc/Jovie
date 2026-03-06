@@ -457,9 +457,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Show import progress banner when actively importing
   const showImportProgress = isImporting;
-  // Show spinner-only state when importing but no releases loaded yet
-  const showImportingState =
-    isImporting && rows.length === 0 && importedCount === 0;
   // Show empty state when not connected and no releases
   const showEmptyState = !isConnected && !isImporting && rows.length === 0;
   // Show releases table when we have releases
@@ -805,26 +802,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 className='mx-4 mt-2'
                 onMatchStatusChange={handleMatchStatusChange}
               />
-            )}
-
-            {showImportingState && (
-              <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-full bg-[#1DB954]/10'>
-                  <Icon
-                    name='Loader2'
-                    className='h-8 w-8 text-[#1DB954] animate-spin'
-                    aria-hidden='true'
-                  />
-                </div>
-                <h3 className='mt-4 text-lg font-semibold text-primary-token'>
-                  We&apos;re importing your music
-                </h3>
-                <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                  {artistName
-                    ? `Fetching releases from ${artistName}'s Spotify profile...`
-                    : 'Fetching releases from Spotify...'}
-                </p>
-              </div>
             )}
 
             {/* Soft-cap banner: request higher limit when over 100 smart links */}
