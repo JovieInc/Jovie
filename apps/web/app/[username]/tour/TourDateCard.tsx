@@ -51,17 +51,17 @@ export function TourDateCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-subtle bg-surface-1 p-4 transition-shadow hover:shadow-md',
+        'rounded-lg border border-subtle bg-surface-1 p-4 transition-colors duration-normal hover:bg-interactive-hover',
         isCancelled && 'opacity-60'
       )}
     >
       <div className='flex items-start gap-4'>
         {/* Date block */}
-        <div className='flex w-16 shrink-0 flex-col items-center rounded-lg bg-surface-2 py-2'>
-          <span className='text-xs font-medium uppercase text-tertiary-token'>
+        <div className='flex w-16 shrink-0 flex-col items-center rounded-md bg-surface-2 py-2'>
+          <span className='text-2xs font-[var(--font-weight-medium)] uppercase text-tertiary-token'>
             {monthFormatter.format(date)}
           </span>
-          <span className='text-2xl font-bold text-primary-token'>
+          <span className='text-2xl font-[var(--font-weight-medium)] text-primary-token'>
             {dayFormatter.format(date)}
           </span>
           <span className='text-xs text-tertiary-token'>
@@ -74,11 +74,11 @@ export function TourDateCard({
           <div className='flex items-start justify-between gap-2'>
             <div className='min-w-0'>
               {tourDate.title && (
-                <p className='text-sm font-medium text-accent'>
+                <p className='text-sm font-[var(--font-weight-medium)] text-accent'>
                   {tourDate.title}
                 </p>
               )}
-              <h3 className='truncate font-semibold text-primary-token'>
+              <h3 className='truncate font-[var(--font-weight-medium)] text-primary-token'>
                 {tourDate.venueName}
               </h3>
               <p className='truncate text-sm text-secondary-token'>
@@ -97,7 +97,7 @@ export function TourDateCard({
             {/* Status badges */}
             <div className='flex shrink-0 flex-col items-end gap-1'>
               {isNearYou && (
-                <span className='inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'>
+                <span className='inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs font-[var(--font-weight-medium)] text-secondary-token'>
                   <Icon name='MapPin' className='h-3 w-3' />
                   {distanceKm === null || distanceKm === undefined
                     ? 'Near You'
@@ -105,12 +105,12 @@ export function TourDateCard({
                 </span>
               )}
               {isSoldOut && (
-                <span className='rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'>
+                <span className='rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs font-[var(--font-weight-medium)] text-tertiary-token'>
                   Sold Out
                 </span>
               )}
               {isCancelled && (
-                <span className='rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400'>
+                <span className='rounded-full border border-subtle bg-surface-2 px-2 py-0.5 text-2xs font-[var(--font-weight-medium)] text-tertiary-token'>
                   Cancelled
                 </span>
               )}
@@ -124,14 +124,14 @@ export function TourDateCard({
                 href={tourDate.ticketUrl}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90'
+                className='inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-white transition-colors duration-normal hover:bg-accent/90'
               >
                 <Icon name='Ticket' className='h-4 w-4' />
                 Get Tickets
               </a>
             )}
             {tourDate.ticketUrl && !isCancelled && isSoldOut && (
-              <span className='inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-medium text-tertiary-token'>
+              <span className='inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-tertiary-token'>
                 <Icon name='Ticket' className='h-4 w-4' />
                 Sold Out
               </span>
@@ -139,7 +139,7 @@ export function TourDateCard({
             <button
               type='button'
               onClick={handleAddToCalendar}
-              className='inline-flex items-center gap-1.5 rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-medium text-secondary-token transition-colors hover:bg-surface-3'
+              className='inline-flex items-center gap-1.5 rounded-md bg-surface-2 px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-secondary-token transition-colors duration-normal hover:bg-surface-3'
             >
               <Icon name='CalendarPlus' className='h-4 w-4' />
               Add to Calendar
