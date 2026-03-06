@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import { ClipboardCopy } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -28,6 +29,23 @@ interface FeedbackRow {
 
 interface AdminFeedbackTableProps {
   readonly items: FeedbackRow[];
+}
+
+function formatFeedbackAsMarkdown(item: FeedbackRow): string {
+  const userName = item.user.name ?? item.user.email ?? 'Unknown user';
+  const date = new Date(item.createdAtIso).toLocaleString();
+  const context = (item.context as { pathname?: string })?.pathname;
+
+  let md = `## Feedback from @${userName} — ${date}\n\n`;
+  md += `> ${item.message.replace(/\n/g, '\n> ')}\n\n`;
+  if (context) {
+    md += `**Context:** ${context}\n`;
+  }
+  if (item.user.email) {
+    md += `**User:** ${item.user.email}\n`;
+  }
+  md += `**Source:** ${item.source}\n`;
+  return md;
 }
 
 const columnHelper = createColumnHelper<FeedbackRow>();
@@ -68,6 +86,7 @@ export function AdminFeedbackTable({
   );
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [rows, setRows] = useState(items);
+  const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const selected = useMemo(
     () => rows.find(item => item.id === selectedId) ?? null,
@@ -95,6 +114,25 @@ export function AdminFeedbackTable({
     }
     setDismissingId(null);
   };
+
+  const showCopyToast = useCallback((message: string) => {
+    setCopyToast(message);
+    setTimeout(() => setCopyToast(null), 2000);
+  }, []);
+
+  const copySelectedAsMarkdown = useCallback(async () => {
+    if (!selected) return;
+    await navigator.clipboard.writeText(formatFeedbackAsMarkdown(selected));
+    showCopyToast('Copied to clipboard');
+  }, [selected, showCopyToast]);
+
+  const copyAllAsMarkdown = useCallback(async () => {
+    const markdown = rows
+      .map(item => formatFeedbackAsMarkdown(item))
+      .join('\n---\n\n');
+    await navigator.clipboard.writeText(markdown);
+    showCopyToast(`Copied ${rows.length} items to clipboard`);
+  }, [rows, showCopyToast]);
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
@@ -137,7 +175,29 @@ export function AdminFeedbackTable({
 
   return (
     <div className='flex h-full min-h-[620px] rounded-xl overflow-hidden bg-surface-1'>
+      {/* Toast notification */}
+      {copyToast && (
+        <div className='fixed top-4 right-4 z-50 rounded-lg bg-surface-2 border border-subtle px-4 py-2.5 text-sm text-primary-token shadow-lg'>
+          {copyToast}
+        </div>
+      )}
+
       <div className='w-full lg:w-[58%] border-r border-subtle h-full'>
+        <div className='flex items-center justify-between border-b border-subtle px-4 py-2'>
+          <span className='text-xs text-secondary-token'>
+            {rows.length} item{rows.length !== 1 ? 's' : ''}
+          </span>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={copyAllAsMarkdown}
+            disabled={rows.length === 0}
+          >
+            <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
+            Copy All as Markdown
+          </Button>
+        </div>
         <AdminTableShell testId='admin-feedback-table'>
           {() => (
             <UnifiedTable
@@ -217,6 +277,14 @@ export function AdminFeedbackTable({
                 loading={dismissingId === selected.id}
               >
                 Dismiss
+              </Button>
+              <Button
+                type='button'
+                variant='secondary'
+                onClick={copySelectedAsMarkdown}
+              >
+                <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
+                Copy as Markdown
               </Button>
               <span className='text-xs text-secondary-token'>
                 {(() => {

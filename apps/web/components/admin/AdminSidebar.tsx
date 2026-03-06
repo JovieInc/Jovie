@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  Search,
   ShieldCheck,
   User,
   UserPlus,
@@ -44,6 +45,7 @@ const navItems = [
     href: `${APP_ROUTES.ADMIN}#errors`,
     icon: ShieldCheck,
   },
+  { label: 'Leads', href: APP_ROUTES.ADMIN_LEADS, icon: Search },
   { label: 'Activity', href: APP_ROUTES.ADMIN_ACTIVITY, icon: Activity },
   {
     label: 'Screenshots',

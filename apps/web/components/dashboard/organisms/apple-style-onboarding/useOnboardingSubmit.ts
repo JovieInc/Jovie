@@ -160,13 +160,15 @@ async function tryAutoConnectSpotify(
         if (importResult.success) {
           track('onboarding_spotify_import_completed', {
             user_id: userId,
-            releasesImported: importResult.imported,
+            releasesImported: importResult.importing
+              ? 0
+              : importResult.imported,
             duration: toDurationMs(importStartedAt),
           });
           await advanceSpotifyImportStages(
             safeSetter,
             signal,
-            importResult.imported
+            importResult.importing ? 0 : importResult.imported
           );
         } else {
           track('onboarding_spotify_import_failed', {

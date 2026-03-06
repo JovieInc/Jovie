@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
@@ -113,18 +112,12 @@ export const ContactsTable = memo(function ContactsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
   }, [headerActions]);
 
-  const handleCopyToClipboard = useCallback((text: string, label: string) => {
-    void navigator.clipboard.writeText(text);
-    toast.success(`${label} copied`);
-  }, []);
-
   const columns = useMemo(
     () =>
       createContactColumns({
         onDelete,
-        onCopyToClipboard: handleCopyToClipboard,
       }),
-    [onDelete, handleCopyToClipboard]
+    [onDelete]
   );
 
   const handleRowClick = useCallback((contact: EditableContact) => {
@@ -135,9 +128,8 @@ export const ContactsTable = memo(function ContactsTable({
     (contact: EditableContact) =>
       getContactRowContextMenuItems(contact, {
         onDelete,
-        onCopyToClipboard: handleCopyToClipboard,
       }),
-    [onDelete, handleCopyToClipboard]
+    [onDelete]
   );
 
   const handleClose = useCallback(() => {

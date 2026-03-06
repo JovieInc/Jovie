@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
 import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticReleaseSmartlinksSection';
-
+import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
@@ -255,6 +255,8 @@ export default function HomePage() {
       <AutomaticReleaseSmartlinksSection />
 
       <AudienceCRMSection />
+
+      <DeeplinksGrid />
 
       <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
 

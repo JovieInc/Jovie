@@ -55,6 +55,7 @@ const mockDashboardData: DashboardData = {
         href: APP_ROUTES.DASHBOARD_EARNINGS,
       },
     ],
+    profileIsLive: true,
   },
 };
 

@@ -85,6 +85,12 @@ vi.mock(
         previewData: null,
         setPreviewData: vi.fn(),
       }),
+      usePreviewPanelState: () => ({
+        isOpen: false,
+        open: vi.fn(),
+        close: vi.fn(),
+        toggle: vi.fn(),
+      }),
     };
   }
 );
@@ -134,6 +140,7 @@ const baseDashboardData: DashboardData = {
     completedCount: 4,
     totalCount: 6,
     steps: [],
+    profileIsLive: false,
   },
 };
 

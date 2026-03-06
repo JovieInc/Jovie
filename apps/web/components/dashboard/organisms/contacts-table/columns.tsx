@@ -46,7 +46,6 @@ function handleCopyClick(e: React.MouseEvent<HTMLButtonElement>) {
 
 export interface ContactColumnCallbacks {
   readonly onDelete: (contact: EditableContact) => void;
-  readonly onCopyToClipboard: (text: string, label: string) => void;
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table column defs require any for mixed accessor types
@@ -145,7 +144,6 @@ export function createContactColumns(
         const items: TableActionMenuItem[] = convertContextMenuItems(
           getContactRowContextMenuItems(contact, {
             onDelete: callbacks.onDelete,
-            onCopyToClipboard: callbacks.onCopyToClipboard,
           })
         );
 

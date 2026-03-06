@@ -22,11 +22,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { DrawerEmptyState, DrawerSection } from '@/components/molecules/drawer';
+import {
+  DrawerSection,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -147,175 +148,161 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
+  const headerActions = (
+    <DrawerHeaderActions
+      primaryActions={[]}
+      overflowActions={overflowActions}
+    />
+  );
+
   return (
-    <RightDrawer
+    <EntitySidebarShell
       isOpen={isOpen}
-      width={SIDEBAR_WIDTH}
       ariaLabel='Track details'
       data-testid='track-sidebar'
-    >
-      <div className='flex h-full flex-col'>
-        <div className='flex items-center justify-between border-b border-subtle px-4 py-2 min-h-12 shrink-0'>
-          <div className='min-w-0 flex-1'>
-            <div className='text-[13px] font-medium text-primary-token truncate'>
-              {track?.title ?? 'No track selected'}
+      title={track?.title ?? 'No track selected'}
+      onClose={onClose}
+      headerActions={headerActions}
+      isEmpty={!track}
+      emptyMessage='Select a track to view its details.'
+      entityHeader={
+        track ? (
+          <div className='flex items-start gap-4'>
+            <div className='min-w-0 flex-1 space-y-1'>
+              <div className='flex items-center gap-2'>
+                <span className='text-xs text-tertiary-token tabular-nums'>
+                  {trackLabel}.
+                </span>
+                <h3 className='text-sm font-semibold text-primary-token'>
+                  {track.title}
+                </h3>
+                {track.isExplicit && (
+                  <Badge
+                    variant='secondary'
+                    className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+                  >
+                    E
+                  </Badge>
+                )}
+              </div>
+              <div className='flex items-center gap-3 text-xs text-secondary-token'>
+                {track.durationMs != null && (
+                  <span className='tabular-nums'>
+                    {formatDuration(track.durationMs)}
+                  </span>
+                )}
+                {track.isrc && (
+                  <span className='font-mono text-[10px] text-tertiary-token'>
+                    {track.isrc}
+                  </span>
+                )}
+              </div>
             </div>
-            {track && (
-              <div className='text-[13px] text-secondary-token truncate'>
-                Track {trackLabel}
+            {track.releaseArtworkUrl ? (
+              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+                <Image
+                  src={track.releaseArtworkUrl}
+                  alt={`${track.releaseTitle} artwork`}
+                  fill
+                  className='object-cover'
+                  sizes='64px'
+                />
+              </div>
+            ) : (
+              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+                <div className='flex h-full w-full items-center justify-center'>
+                  <Icon
+                    name='Music'
+                    className='h-6 w-6 text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                </div>
               </div>
             )}
           </div>
-          <div className='flex items-center gap-1'>
-            <DrawerHeaderActions
-              primaryActions={[]}
-              overflowActions={overflowActions}
-              onClose={onClose}
-            />
-          </div>
-        </div>
-
-        <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-5'>
-          {!track && (
-            <DrawerEmptyState message='Select a track to view its details.' />
+        ) : undefined
+      }
+    >
+      {track && (
+        <div className='space-y-5'>
+          {onBackToRelease && (
+            <button
+              type='button'
+              onClick={handleBackToRelease}
+              className='flex items-center gap-1.5 text-xs text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+            >
+              <ArrowLeft className='h-3.5 w-3.5' />
+              <span className='truncate max-w-[200px]'>
+                {track.releaseTitle}
+              </span>
+            </button>
           )}
 
-          {track && (
-            <div className='space-y-5'>
-              {onBackToRelease && (
+          <DrawerSection>
+            <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+              Smart link
+            </p>
+            <button
+              type='button'
+              onClick={handleCopySmartLink}
+              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+            >
+              <Link2 className='h-3.5 w-3.5 shrink-0' />
+              <span className='truncate'>{smartLinkUrl}</span>
+              <Copy className='ml-auto h-3 w-3 shrink-0 text-tertiary-token' />
+            </button>
+          </DrawerSection>
+
+          <DrawerSection>
+            <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+              Actions
+            </p>
+            <div className='space-y-1'>
+              {track.isrc && (
                 <button
                   type='button'
-                  onClick={handleBackToRelease}
-                  className='flex items-center gap-1.5 text-xs text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+                  onClick={handleCopyIsrc}
+                  className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
                 >
-                  <ArrowLeft className='h-3.5 w-3.5' />
-                  <span className='truncate max-w-[200px]'>
-                    {track.releaseTitle}
+                  <Hash className='h-3.5 w-3.5 shrink-0' />
+                  <span>Copy ISRC</span>
+                  <span className='ml-auto font-mono text-[10px] text-tertiary-token'>
+                    {track.isrc}
                   </span>
                 </button>
               )}
-
-              <div className='flex items-start gap-4'>
-                <div className='min-w-0 flex-1 space-y-1'>
-                  <div className='flex items-center gap-2'>
-                    <span className='text-xs text-tertiary-token tabular-nums'>
-                      {trackLabel}.
-                    </span>
-                    <h3 className='text-sm font-semibold text-primary-token'>
-                      {track.title}
-                    </h3>
-                    {track.isExplicit && (
-                      <Badge
-                        variant='secondary'
-                        className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
-                      >
-                        E
-                      </Badge>
-                    )}
-                  </div>
-                  <div className='flex items-center gap-3 text-xs text-secondary-token'>
-                    {track.durationMs != null && (
-                      <span className='tabular-nums'>
-                        {formatDuration(track.durationMs)}
-                      </span>
-                    )}
-                    {track.isrc && (
-                      <span className='font-mono text-[10px] text-tertiary-token'>
-                        {track.isrc}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {track.releaseArtworkUrl ? (
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
-                    <Image
-                      src={track.releaseArtworkUrl}
-                      alt={`${track.releaseTitle} artwork`}
-                      fill
-                      className='object-cover'
-                      sizes='64px'
-                    />
-                  </div>
-                ) : (
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
-                    <div className='flex h-full w-full items-center justify-center'>
-                      <Icon
-                        name='Music'
-                        className='h-6 w-6 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <DrawerSection>
-                <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
-                  Smart link
-                </p>
-                <button
-                  type='button'
-                  onClick={handleCopySmartLink}
-                  className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-                >
-                  <Link2 className='h-3.5 w-3.5 shrink-0' />
-                  <span className='truncate'>{smartLinkUrl}</span>
-                  <Copy className='ml-auto h-3 w-3 shrink-0 text-tertiary-token' />
-                </button>
-              </DrawerSection>
-
-              <DrawerSection>
-                <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
-                  Actions
-                </p>
-                <div className='space-y-1'>
-                  {track.isrc && (
-                    <button
-                      type='button'
-                      onClick={handleCopyIsrc}
-                      className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-                    >
-                      <Hash className='h-3.5 w-3.5 shrink-0' />
-                      <span>Copy ISRC</span>
-                      <span className='ml-auto font-mono text-[10px] text-tertiary-token'>
-                        {track.isrc}
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </DrawerSection>
-
-              {streamingProviders.length > 0 && (
-                <DrawerSection>
-                  <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
-                    Available on
-                  </p>
-                  <div className='space-y-1'>
-                    {streamingProviders.map(provider => (
-                      <a
-                        key={provider.key}
-                        href={provider.url}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-                      >
-                        <SocialIcon
-                          platform={provider.key}
-                          className='h-4 w-4 shrink-0'
-                        />
-                        <span>
-                          {PROVIDER_LABELS[provider.key] ?? provider.label}
-                        </span>
-                        <ExternalLink className='ml-auto h-3 w-3 text-tertiary-token' />
-                      </a>
-                    ))}
-                  </div>
-                </DrawerSection>
-              )}
             </div>
+          </DrawerSection>
+
+          {streamingProviders.length > 0 && (
+            <DrawerSection>
+              <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+                Available on
+              </p>
+              <div className='space-y-1'>
+                {streamingProviders.map(provider => (
+                  <a
+                    key={provider.key}
+                    href={provider.url}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+                  >
+                    <SocialIcon
+                      platform={provider.key}
+                      className='h-4 w-4 shrink-0'
+                    />
+                    <span>
+                      {PROVIDER_LABELS[provider.key] ?? provider.label}
+                    </span>
+                    <ExternalLink className='ml-auto h-3 w-3 text-tertiary-token' />
+                  </a>
+                ))}
+              </div>
+            </DrawerSection>
           )}
         </div>
-      </div>
-    </RightDrawer>
+      )}
+    </EntitySidebarShell>
   );
 }

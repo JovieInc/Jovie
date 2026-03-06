@@ -26,18 +26,16 @@ describe('OnboardingHandleStep', () => {
   it('elevates reserved handles with a primary identity headline', () => {
     render(<OnboardingHandleStep {...baseProps} isReservedHandle />);
 
-    expect(screen.getByText('Reserved handle')).toBeInTheDocument();
-    expect(screen.getByText("You're @artistname")).toBeInTheDocument();
-    expect(screen.getByText('Edit handle (optional)')).toBeInTheDocument();
+    expect(screen.getByText(/@artistname/)).toBeInTheDocument();
+    expect(screen.getByText(/We reserved this for you/)).toBeInTheDocument();
   });
 
   it('keeps the standard layout for non-reserved handles', () => {
     render(<OnboardingHandleStep {...baseProps} isReservedHandle={false} />);
 
-    expect(screen.queryByText('Reserved handle')).not.toBeInTheDocument();
-    expect(screen.queryByText("You're @artistname")).not.toBeInTheDocument();
+    expect(screen.queryByText(/@artistname/)).not.toBeInTheDocument();
     expect(
-      screen.queryByText('Edit handle (optional)')
+      screen.queryByText(/We reserved this for you/)
     ).not.toBeInTheDocument();
   });
 });

@@ -31,8 +31,13 @@ export interface HandleValidationState {
 export const ONBOARDING_STEPS = [
   {
     id: 'handle',
-    title: 'Claim your handle',
-    prompt: 'Pick a handle your fans can remember in one glance.',
+    title: 'Choose your handle',
+    prompt: 'This is how fans will find you.',
+  },
+  {
+    id: 'dsp',
+    title: 'Connect your music',
+    prompt: 'Import your releases from Spotify so fans can find your music.',
   },
   {
     id: 'done',
