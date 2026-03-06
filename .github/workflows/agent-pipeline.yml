@@ -102,7 +102,7 @@ jobs:
             # Find the PR for this branch
             # gh api returns a JSON array — do NOT use jq -s (slurp) which double-wraps it
             PR_DATA=$(gh api repos/${{ github.repository }}/pulls \
-              | jq --arg branch "$HEAD_BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | first | {number: .number, head_ref: .head.ref, head_sha: .head.sha, draft: .draft, labels: [.labels[].name]}')
+              | jq --arg branch "$HEAD_BRANCH" '([.[] | select(.head.ref == $branch and .state == "open")] | first) as $pr | if $pr == null then null else {number: $pr.number, head_ref: $pr.head.ref, head_sha: $pr.head.sha, draft: $pr.draft, labels: [($pr.labels // [])[]?.name]} end')
 
             if [[ -z "$PR_DATA" || "$PR_DATA" == "null" ]]; then
               echo "No open PR found for branch '$HEAD_BRANCH'. Skipping."
@@ -111,10 +111,10 @@ jobs:
             fi
 
             PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
-            PR_HEAD_REF=$(echo "$PR_DATA" | jq -r '.head.ref')
-            PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head.sha')
+            PR_HEAD_REF=$(echo "$PR_DATA" | jq -r '.head_ref')
+            PR_HEAD_SHA=$(echo "$PR_DATA" | jq -r '.head_sha')
             IS_DRAFT=$(echo "$PR_DATA" | jq -r '.draft')
-            HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '[.labels[].name] | map(select(. == "needs-human")) | length > 0')
+            HAS_NEEDS_HUMAN=$(echo "$PR_DATA" | jq -r '(.labels // []) | any(. == "needs-human")')
 
             echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
             echo "pr_head_ref=$PR_HEAD_REF" >> $GITHUB_OUTPUT
