@@ -12,6 +12,12 @@ import type { LinktreePageProps } from '@/lib/ingestion/strategies/linktree/help
 import { detectLinktreeVerification } from '@/lib/ingestion/strategies/linktree/paid-tier';
 import type { ExtractedLink } from '@/lib/ingestion/types';
 
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 export interface QualificationResult {
   status: 'qualified' | 'disqualified';
   displayName: string | null;
@@ -107,10 +113,7 @@ export async function qualifyLead(
     musicToolsDetected,
     allLinks: extraction.links,
     fitScore: fitResult.score,
-    fitScoreBreakdown: fitResult.breakdown as unknown as Record<
-      string,
-      unknown
-    >,
+    fitScoreBreakdown: toRecord(fitResult.breakdown),
     disqualificationReason,
   };
 }
