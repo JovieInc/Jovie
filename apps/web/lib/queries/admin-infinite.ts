@@ -84,8 +84,17 @@ interface InfinitePage<T> {
 
 const DEFAULT_PAGE_SIZE = 20;
 
-const parseDate = (value: string | null | undefined) =>
-  value ? new Date(value) : null;
+const parseDate = (value: Date | string | null | undefined) => {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  return new Date(value);
+};
 
 async function fetchPage<T>(url: string, signal: AbortSignal) {
   const res = await fetch(url, { signal });
@@ -122,7 +131,7 @@ export function useAdminUsersInfiniteQuery({
         rows: page.rows.map(row => ({
           ...row,
           createdAt: new Date(row.createdAt),
-          deletedAt: parseDate(row.deletedAt as unknown as string | null),
+          deletedAt: parseDate(row.deletedAt),
         })),
       };
     },
@@ -166,10 +175,8 @@ export function useAdminCreatorsInfiniteQuery({
         ...page,
         rows: page.rows.map(row => ({
           ...row,
-          createdAt: parseDate(row.createdAt as unknown as string | null),
-          claimTokenExpiresAt: parseDate(
-            row.claimTokenExpiresAt as unknown as string | null
-          ),
+          createdAt: parseDate(row.createdAt),
+          claimTokenExpiresAt: parseDate(row.claimTokenExpiresAt),
         })),
       };
     },
