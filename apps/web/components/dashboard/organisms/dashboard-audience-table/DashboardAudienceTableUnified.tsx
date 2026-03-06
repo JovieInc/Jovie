@@ -606,7 +606,7 @@ export const DashboardAudienceTableUnified = memo(
                       minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
                       className='text-[13px]'
                       getRowClassName={getRowClassName}
-                      onRowClick={row => setSelectedMember(row)}
+                      onRowClick={row => handleViewProfile(row)}
                       getContextMenuItems={getContextMenuItems}
                       hasNextPage={hasNextPage}
                       isFetchingNextPage={isFetchingNextPage}

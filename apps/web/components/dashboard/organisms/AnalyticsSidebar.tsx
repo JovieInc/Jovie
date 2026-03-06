@@ -132,15 +132,18 @@ function FunnelStage({
         <p className='text-[11px] text-secondary-token mt-0.5'>{description}</p>
       </div>
 
-      {/* Arrow connector between stages */}
+      {/* Arrow connector between stages — always reserve space to prevent layout shift */}
       {!isLast && (
-        <div className='flex flex-col items-center py-2'>
+        <div className='flex flex-col items-center py-2 min-h-[40px]'>
           <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
-          {conversionRate && (
-            <span className='text-[11px] font-medium text-accent mt-0.5 tabular-nums'>
-              {conversionRate}
-            </span>
-          )}
+          <span
+            className={cn(
+              'text-[11px] font-medium mt-0.5 tabular-nums min-h-[16px]',
+              conversionRate ? 'text-accent' : 'text-transparent'
+            )}
+          >
+            {conversionRate ?? '—'}
+          </span>
         </div>
       )}
     </div>
