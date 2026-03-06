@@ -17,12 +17,12 @@ const Kbd = React.forwardRef<HTMLSpanElement, KbdProps>(
     <span
       ref={ref}
       className={cn(
-        'inline-flex items-center justify-center rounded-md px-1.5 py-0.5 font-sans text-[11px] font-medium',
+        'inline-flex min-w-[16px] items-center justify-center rounded-(--linear-app-radius-item) px-1 py-0.5 font-mono text-[11px] font-[450] text-center',
         variant === 'tooltip'
-          ? // Tooltip variant: matches the inverted surface background of tooltips
-            'border border-default bg-surface-tooltip text-tooltip-foreground/80'
+          ? // Tooltip variant: elevated surface visible against tooltip bg
+            'border border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
           : // Default variant: for use outside tooltips
-            'border border-subtle bg-surface-1 text-secondary-token shadow-[0_1px_0_rgba(255,255,255,0.08)]',
+            'border border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
         className
       )}
       {...props}

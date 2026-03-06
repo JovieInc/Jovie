@@ -83,22 +83,18 @@ const TooltipContent = React.forwardRef<
         sideOffset={sideOffset}
         data-testid={testId}
         className={cn(
-          // Base layout + spacing (single-line, no wrap)
-          'z-50 inline-flex select-none items-center gap-2 rounded-md px-2 py-1 text-[11px] font-medium leading-tight whitespace-nowrap',
-          // Normalize height so presence of a shortcut badge doesn't shift positioning
-          'min-h-[28px]',
-          // Tokenized surface styling to ensure Tailwind emits the tooltip background
-          'max-w-xs border border-transparent',
-          'bg-surface-tooltip text-tooltip-foreground shadow-lg',
-          // Calm animation: slight fade + drift
-          'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
-          'data-[state=closed]:animate-out data-[state=closed]:duration-100 data-[state=closed]:ease-in',
-          'fade-in-0 data-[state=closed]:fade-out-0',
-          'data-[side=bottom]:slide-in-from-top-1',
-          'data-[side=left]:slide-in-from-right-1',
-          'data-[side=right]:slide-in-from-left-1',
-          'data-[side=top]:slide-in-from-bottom-1',
-          'will-change-[transform,opacity]',
+          // Base layout + spacing
+          'z-50 overflow-hidden rounded-(--linear-app-radius-item) border border-(--linear-border-default)',
+          'bg-(--linear-bg-surface-0) px-2 py-1 text-[12px] font-[450] tracking-[-0.011em]',
+          'text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]',
+          'max-w-[220px]',
+          // Animation: fade-in/out 100ms with subtle zoom + slide
+          'animate-in fade-in-0 zoom-in-95',
+          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
+          'data-[side=bottom]:slide-in-from-top-2',
+          'data-[side=left]:slide-in-from-right-2',
+          'data-[side=right]:slide-in-from-left-2',
+          'data-[side=top]:slide-in-from-bottom-2',
           // Reduced motion override
           'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none',
           'motion-reduce:transition-opacity motion-reduce:duration-150',
@@ -115,7 +111,7 @@ const TooltipContent = React.forwardRef<
         {children}
         {showArrow && (
           <TooltipPrimitive.Arrow
-            className='fill-surface-tooltip'
+            className='fill-(--linear-bg-surface-0)'
             data-testid='tooltip-arrow'
           />
         )}
