@@ -31,8 +31,8 @@ describe('useLinksManager - YouTube + ordering', () => {
     vi.useRealTimers();
   });
 
-  describe('handleAdd - YouTube cross-category', () => {
-    it('should trigger ytPrompt when YouTube already exists in social section', async () => {
+  describe('handleAdd - YouTube classification', () => {
+    it('should merge duplicate YouTube links in the social section without prompting', async () => {
       const existingYouTube = createMockLink(
         'youtube',
         'social',
@@ -52,37 +52,13 @@ describe('useLinksManager - YouTube + ordering', () => {
         await addLinkAndFlushTimers(result, newYouTube);
       });
 
-      expect(result.current.ytPrompt).not.toBeNull();
-      expect(result.current.ytPrompt?.target).toBe('dsp');
-    });
-
-    it('should trigger ytPrompt when YouTube already exists in dsp section', async () => {
-      const existingYouTube = createMockLink(
-        'youtube',
-        'dsp',
-        'https://youtube.com/@existing'
-      );
-      const { result } = renderHook(() =>
-        useLinksManager({ initialLinks: [existingYouTube] })
-      );
-
-      const newYouTube = createMockLink(
-        'youtube',
-        'dsp',
-        'https://youtube.com/@new'
-      );
-
-      await act(async () => {
-        await addLinkAndFlushTimers(result, newYouTube);
-      });
-
-      expect(result.current.ytPrompt).not.toBeNull();
-      expect(result.current.ytPrompt?.target).toBe('social');
+      expect(result.current.ytPrompt).toBeNull();
+      expect(result.current.links).toHaveLength(1);
     });
   });
 
   describe('YouTube prompt flow', () => {
-    it('should cancel ytPrompt', async () => {
+    it('should not open a ytPrompt for duplicate YouTube social links', async () => {
       const existingYouTube = createMockLink(
         'youtube',
         'social',
@@ -102,76 +78,32 @@ describe('useLinksManager - YouTube + ordering', () => {
         await addLinkAndFlushTimers(result, newYouTube);
       });
 
-      expect(result.current.ytPrompt).not.toBeNull();
-
-      act(() => {
-        result.current.cancelYtPrompt();
-      });
-
       expect(result.current.ytPrompt).toBeNull();
     });
 
-    it('should confirm ytPrompt and add link with target category', async () => {
-      const existingYouTube = createMockLink(
-        'youtube',
-        'social',
-        'https://youtube.com/@existing'
-      );
-      const onLinkAdded = vi.fn();
-      const { result } = renderHook(() =>
-        useLinksManager({ initialLinks: [existingYouTube], onLinkAdded })
-      );
-
-      const newYouTube = createMockLink(
-        'youtube',
-        'social',
-        'https://youtube.com/@new'
-      );
-
-      await act(async () => {
-        await addLinkAndFlushTimers(result, newYouTube);
-      });
-
-      expect(result.current.ytPrompt).not.toBeNull();
-      expect(result.current.links).toHaveLength(1);
-
-      act(() => {
-        result.current.confirmYtPrompt();
-      });
-
-      expect(result.current.ytPrompt).toBeNull();
-      expect(result.current.links).toHaveLength(2);
-      expect(result.current.links[1].platform.category).toBe('dsp');
-      expect(onLinkAdded).toHaveBeenCalled();
-    });
-
-    it('should not add when YouTube exists in both sections', async () => {
+    it('should allow a social YouTube link and a YouTube Music DSP link to coexist', async () => {
       const youTubeSocial = createMockLink(
         'youtube',
         'social',
         'https://youtube.com/@social'
       );
-      const youTubeDsp = createMockLink(
-        'youtube',
+      const youTubeMusic = createMockLink(
+        'youtube_music',
         'dsp',
-        'https://youtube.com/@dsp'
+        'https://music.youtube.com/channel/dsp'
       );
       const { result } = renderHook(() =>
-        useLinksManager({ initialLinks: [youTubeSocial, youTubeDsp] })
-      );
-
-      const newYouTube = createMockLink(
-        'youtube',
-        'social',
-        'https://youtube.com/@new'
+        useLinksManager({ initialLinks: [youTubeSocial] })
       );
 
       await act(async () => {
-        await addLinkAndFlushTimers(result, newYouTube);
+        await addLinkAndFlushTimers(result, youTubeMusic);
       });
 
       expect(result.current.links).toHaveLength(2);
       expect(result.current.ytPrompt).toBeNull();
+      expect(result.current.links[1].platform.id).toBe('youtube_music');
+      expect(result.current.links[1].platform.category).toBe('dsp');
     });
   });
 
