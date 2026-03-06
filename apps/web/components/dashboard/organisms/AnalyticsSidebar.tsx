@@ -323,7 +323,6 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data-testid='analytics-sidebar'
       title='Analytics'
       onClose={onClose}
-      headerActions={<SidebarRangeToggle value={range} onChange={setRange} />}
     >
       <div
         className={cn(
@@ -355,15 +354,18 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           })}
         </div>
 
-        {/* Tab selector for Engagement / Sources */}
-        <SegmentControl
-          value={activeTab}
-          onValueChange={setActiveTab}
-          options={ANALYTICS_TAB_OPTIONS}
-          size='sm'
-          className='w-full'
-          aria-label='Analytics view'
-        />
+        {/* Tab selector + range toggle inline */}
+        <div className='flex items-center gap-2'>
+          <SegmentControl
+            value={activeTab}
+            onValueChange={setActiveTab}
+            options={ANALYTICS_TAB_OPTIONS}
+            size='sm'
+            className='flex-1'
+            aria-label='Analytics view'
+          />
+          <SidebarRangeToggle value={range} onChange={setRange} />
+        </div>
 
         {/* Engagement tab */}
         {activeTab === 'engagement' && (
