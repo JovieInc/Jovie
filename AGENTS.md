@@ -618,6 +618,41 @@ Tests are part of the deploy path. Slow tests slow shipping. Test runtime perfor
 
 **Default Bias:** When there's a tradeoff between test thoroughness and iteration speed in gated CI, bias toward speed and move thoroughness to nightly runs.
 
+### Test Coverage Guidelines (When to Write Tests)
+
+Tests must be written **at feature creation time**, not retroactively. Apply coverage selectively — don't slow iteration speed.
+
+**Tests REQUIRED for:**
+- Core logic and data processing (parsers, transformers, validators)
+- API routes and server actions (contract with frontend)
+- Gating systems (waitlist, auth, permissions, entitlements)
+- Deterministic workflows (intent router, feedback submission, CRUD operations)
+- Backend services and data pipelines (ingestion, enrichment, jobs)
+- Database queries and mutations (especially complex joins/filters)
+
+**Tests may be SKIPPED for:**
+- Rapidly changing UI components (layout, styling, copy changes)
+- Prototype/experimental features still in flux
+- Pure presentation components with no logic
+- Marketing page content and static pages
+
+**Coverage philosophy:**
+- No strict coverage % targets — quality over quantity
+- Deterministic workflows must have 100% path coverage
+- AI-dependent workflows should use mocked LLM responses for determinism
+- Focus testing where correctness and reliability are critical
+
+| Area | Tests Required? | Why |
+|------|----------------|-----|
+| Intent router patterns | Yes | Deterministic, must be reliable |
+| Waitlist/auth gating | Yes | Security-critical gating |
+| API route handlers | Yes | Contract with frontend |
+| Server actions (CRUD) | Yes | Data integrity |
+| Ingestion/enrichment pipelines | Yes | Data correctness |
+| Dashboard layout | No | Changes frequently, visual |
+| Homepage copy | No | Marketing, iterates fast |
+| Feedback submission flow | Yes | Deterministic workflow |
+
 ---
 
 ## Infrastructure & Scheduling Guardrails (CRITICAL)
