@@ -11,10 +11,8 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
-import { ActivityFeed } from '@/components/molecules/ActivityFeed';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
-import { SAMPLE_PROFILE_EVENTS } from '@/lib/activity/sample-data';
 import {
   useAvatarMutation,
   useProfileSaveMutation,
@@ -35,7 +33,6 @@ const PROFILE_TAB_OPTIONS = [
   { value: 'dsp' as const, label: 'Music' },
   { value: 'earnings' as const, label: 'Earn' },
   { value: 'about' as const, label: 'About' },
-  { value: 'activity' as const, label: 'Activity' },
 ];
 
 export function ProfileContactSidebar() {
@@ -45,7 +42,7 @@ export function ProfileContactSidebar() {
 
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
-    CategoryOption | 'about' | 'activity'
+    CategoryOption | 'about'
   >('social');
 
   // Mutations for profile editing
@@ -306,7 +303,7 @@ export function ProfileContactSidebar() {
   const profileUrl = `${BASE_URL}${profilePath}`;
 
   const photoSettingsFooter =
-    resolvedCategory !== 'about' && resolvedCategory !== 'activity' ? (
+    resolvedCategory !== 'about' ? (
       <ProfilePhotoSettings
         allowDownloads={
           (selectedProfile?.settings as Record<string, unknown> | null)
@@ -372,9 +369,7 @@ export function ProfileContactSidebar() {
       }
       footer={photoSettingsFooter}
     >
-      {resolvedCategory === 'activity' ? (
-        <ActivityFeed events={SAMPLE_PROFILE_EVENTS} />
-      ) : resolvedCategory === 'about' ? (
+      {resolvedCategory === 'about' ? (
         <ProfileAboutTab bio={bio} genres={genres} />
       ) : (
         <>
