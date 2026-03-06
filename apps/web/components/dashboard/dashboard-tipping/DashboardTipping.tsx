@@ -22,12 +22,6 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { BASE_URL } from '@/constants/domains';
-import {
-  Dialog,
-  DialogBody,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/organisms/Dialog';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
@@ -351,7 +345,6 @@ export function DashboardTipping() {
     setVenmoHandle('');
   }, [setVenmoHandle]);
 
-  const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const tipUrls = useMemo(() => {

@@ -71,7 +71,9 @@ test.describe('Auth Flows - Sign Up', () => {
     });
     await emailButton.click();
 
-    const emailInput = page.getByLabel(/email/i).or(page.locator('#email-input'));
+    const emailInput = page
+      .getByLabel(/email/i)
+      .or(page.locator('#email-input'));
     await expect(emailInput.first()).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
@@ -86,7 +88,9 @@ test.describe('Auth Flows - Sign Up', () => {
     });
     await emailButton.click();
 
-    const emailInput = page.getByLabel(/email/i).or(page.locator('#email-input'));
+    const emailInput = page
+      .getByLabel(/email/i)
+      .or(page.locator('#email-input'));
     await emailInput.first().fill('not-an-email');
 
     // Submit the form
@@ -143,7 +147,9 @@ test.describe('Auth Flows - Sign In', () => {
     });
     await emailButton.click();
 
-    const emailInput = page.getByLabel(/email/i).or(page.locator('#email-input'));
+    const emailInput = page
+      .getByLabel(/email/i)
+      .or(page.locator('#email-input'));
     await expect(emailInput.first()).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
