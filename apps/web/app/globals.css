@@ -33,6 +33,16 @@ body {
   overscroll-behavior: none;
 }
 
+/* Prevent Chrome autofill from bleeding background onto sibling elements */
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-bg-base) inset !important;
+  -webkit-text-fill-color: var(--color-text-primary-token) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* Cross-platform scrollbar styling -- thin, dark, subtle */
 
 * {
