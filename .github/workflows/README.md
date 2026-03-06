@@ -45,6 +45,7 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 - **Post-merge verification** (build, smoke, E2E) - runs on pushes to `main` before deploy
 - **Production deploy** - automatic deployment from the `main` branch to jov.ie after post-merge verification passes
 - **Production environment binding** - the `deploy` job targets GitHub `Production – jovie` and Vercel `production`, so `main` remains the only production deploy path
+- **Build engine** - Next.js builds use Turbopack, while Turborepo remote cache is shared across CI and Vercel via `TURBO_TOKEN` and `TURBO_TEAM`
 - **Canary health gate** - verifies deployment health before declaring success
 - **Smoke tests** - validates critical paths after deploy
 - **Lighthouse CI** - performance metrics on each deploy
