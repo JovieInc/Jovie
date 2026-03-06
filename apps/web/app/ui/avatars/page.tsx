@@ -16,10 +16,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-end gap-6'>{children}</div>
@@ -37,10 +34,7 @@ function Stack({
   return (
     <div className='flex flex-col items-center gap-2'>
       <div>{children}</div>
-      <span
-        className='text-[11px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <span className='text-[11px] text-(--linear-text-tertiary)'>
         {title}
       </span>
     </div>
@@ -50,16 +44,10 @@ function Stack({
 export default function AvatarsPage() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Avatar
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — circular, 5 sizes, image+fallback, status dot
       </p>
 

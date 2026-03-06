@@ -1,5 +1,3 @@
-'use client';
-
 import {
   Select,
   SelectContent,
@@ -19,10 +17,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -39,10 +34,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span
-        className='text-[11px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <span className='text-[11px] text-(--linear-text-tertiary)'>
         {title}
       </span>
       {children}
@@ -53,16 +45,10 @@ function Stack({
 export default function SelectsPage() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Select
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — 32px trigger height, 6px radius, shared dropdown
         content styles
       </p>
@@ -162,13 +148,13 @@ export default function SelectsPage() {
       <Section title='In Context (with labels)'>
         <Stack title='Assignee'>
           <p
-            className='text-[13px] font-[450]'
-            style={{ color: 'var(--linear-text-primary)' }}
+            id='label-assignee'
+            className='text-[13px] font-[450] text-(--linear-text-primary)'
           >
             Assignee
           </p>
           <Select>
-            <SelectTrigger className='w-64'>
+            <SelectTrigger className='w-64' aria-labelledby='label-assignee'>
               <SelectValue placeholder='Select assignee' />
             </SelectTrigger>
             <SelectContent>
@@ -180,13 +166,13 @@ export default function SelectsPage() {
         </Stack>
         <Stack title='Priority'>
           <p
-            className='text-[13px] font-[450]'
-            style={{ color: 'var(--linear-text-primary)' }}
+            id='label-priority'
+            className='text-[13px] font-[450] text-(--linear-text-primary)'
           >
             Priority
           </p>
           <Select defaultValue='medium'>
-            <SelectTrigger className='w-40'>
+            <SelectTrigger className='w-40' aria-labelledby='label-priority'>
               <SelectValue placeholder='Priority' />
             </SelectTrigger>
             <SelectContent>
@@ -199,13 +185,13 @@ export default function SelectsPage() {
         </Stack>
         <Stack title='Status'>
           <p
-            className='text-[13px] font-[450]'
-            style={{ color: 'var(--linear-text-primary)' }}
+            id='label-status'
+            className='text-[13px] font-[450] text-(--linear-text-primary)'
           >
             Status
           </p>
           <Select defaultValue='in-progress'>
-            <SelectTrigger className='w-40'>
+            <SelectTrigger className='w-40' aria-labelledby='label-status'>
               <SelectValue placeholder='Status' />
             </SelectTrigger>
             <SelectContent>
