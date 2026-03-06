@@ -413,8 +413,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
 
     // Legacy fallback: top-level subscription field (pre-v20 SDK / older API versions)
-    const raw = invoice as unknown as Record<string, unknown>;
-    const subField = raw['subscription'];
+    const subField = Reflect.get(invoice, 'subscription');
 
     if (typeof subField === 'string') {
       return subField;

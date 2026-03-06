@@ -6,5 +6,14 @@
  * across all dashboard components.
  */
 
-export * from './card-tokens';
-export * from './mobile-tokens';
+export type {
+  CardBorder,
+  CardPadding,
+  CardRadius,
+  CardShadow,
+  CardStatus,
+  CardVariant,
+} from './card-tokens';
+export { cardTokens } from './card-tokens';
+
+export { mobileReleaseTokens } from './mobile-tokens';

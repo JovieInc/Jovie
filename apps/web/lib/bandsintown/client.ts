@@ -135,7 +135,7 @@ function sanitizeEvent(event: BandsintownEvent): SanitizedEvent | null {
     longitude: parseCoordinate(event.venue?.longitude),
     ticketUrl,
     ticketStatus: isSoldOut ? 'sold_out' : 'available',
-    rawData: event as unknown as Record<string, unknown>,
+    rawData: { ...event },
   };
 }
 
