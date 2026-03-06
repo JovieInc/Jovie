@@ -84,9 +84,16 @@ async function fetchUnlinkedReleases(
 
   const releaseIds = releases.map(r => r.id);
 
-  // Find which releases already have an Apple Music link (any source type)
+  // Find which releases already have a canonical Apple Music link.
+  // Search fallback URLs (e.g. "https://music.apple.com/us/search?term=...")
+  // are NOT considered "linked" — they should be upgraded to canonical URLs
+  // when the release enrichment job discovers a real match via UPC or ISRC.
   const existingLinks = await dbConn
-    .select({ releaseId: providerLinks.releaseId })
+    .select({
+      releaseId: providerLinks.releaseId,
+      metadata: providerLinks.metadata,
+      sourceType: providerLinks.sourceType,
+    })
     .from(providerLinks)
     .where(
       and(
@@ -96,7 +103,18 @@ async function fetchUnlinkedReleases(
       )
     );
 
-  const linkedIds = new Set(existingLinks.map(l => l.releaseId));
+  const linkedIds = new Set(
+    existingLinks
+      .filter(l => {
+        // Manual overrides are always considered linked
+        if (l.sourceType === 'manual') return true;
+        // Search fallbacks should be upgraded — don't count as linked
+        const meta = l.metadata as Record<string, unknown> | null;
+        if (meta?.discoveredFrom === 'search_fallback') return false;
+        return true;
+      })
+      .map(l => l.releaseId)
+  );
 
   return releases.filter(r => !linkedIds.has(r.id));
 }

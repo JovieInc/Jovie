@@ -89,7 +89,14 @@ async function discoverLinksForReleases(
 
   for (const release of importedReleases) {
     try {
-      const existingProviders = release.providerLinks.map(l => l.providerId);
+      // Only count canonical/manual links as existing — search fallback URLs
+      // should be upgraded to canonical links via ISRC/UPC discovery.
+      const existingProviders = release.providerLinks
+        .filter(l => {
+          const meta = l.metadata as Record<string, unknown> | null;
+          return meta?.discoveredFrom !== 'search_fallback';
+        })
+        .map(l => l.providerId);
       await discoverLinksForRelease(release.id, existingProviders, {
         skipExisting: true,
         storefront: market.toLowerCase(),
