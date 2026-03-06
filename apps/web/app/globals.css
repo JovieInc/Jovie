@@ -501,39 +501,30 @@ body {
       opacity: 0.9;
     }
   }
-  /* Linear Spacing System - generous vertical rhythm */
+  /* Linear Spacing System - compact vertical rhythm */
   .section-spacing-linear {
     padding-top: var(--linear-section-pt-sm);
-    /* 64px mobile */
     padding-bottom: var(--linear-section-pb-sm);
-    /* 80px */
     @media (min-width: 768px) {
       padding-top: var(--linear-section-pt-md);
-      /* 80px tablet */
       padding-bottom: var(--linear-section-pb-md);
-      /* 96px */
     }
     @media (min-width: 1024px) {
       padding-top: var(--linear-section-pt-lg);
-      /* 96px desktop */
       padding-bottom: var(--linear-section-pb-lg);
-      /* 128px */
     }
   }
   /* Smaller section spacing for tighter groupings */
   .section-spacing-linear-sm {
-    padding-top: var(--linear-space-16);
-    /* 64px */
-    padding-bottom: var(--linear-space-16);
+    padding-top: var(--linear-space-12);
+    padding-bottom: var(--linear-space-12);
     @media (min-width: 768px) {
-      padding-top: var(--linear-space-20);
-      /* 80px */
-      padding-bottom: var(--linear-space-20);
+      padding-top: var(--linear-space-16);
+      padding-bottom: var(--linear-space-16);
     }
     @media (min-width: 1024px) {
-      padding-top: var(--linear-space-24);
-      /* 96px */
-      padding-bottom: var(--linear-space-24);
+      padding-top: var(--linear-space-20);
+      padding-bottom: var(--linear-space-20);
     }
   }
   .section-gap-linear {

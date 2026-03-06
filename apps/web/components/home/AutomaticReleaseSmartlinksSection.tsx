@@ -50,7 +50,7 @@ export function AutomaticReleaseSmartlinksSection() {
           </div>
 
           {/* Full Width Product Mockup */}
-          <div className='relative mt-12 md:mt-20 mx-auto w-full'>
+          <div className='relative mt-8 md:mt-12 mx-auto w-full'>
             <div className='relative w-full'>
               {/* Dashboard Window — releases table */}
               <div
