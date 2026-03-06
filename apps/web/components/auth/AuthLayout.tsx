@@ -207,8 +207,8 @@ export function AuthLayout({
           `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10`,
           // Smooth scroll target
           'scroll-mt-4',
-          // Prevent horizontal overflow from child elements
-          'overflow-x-clip'
+          // Allow step indicator to render without clipping
+          'overflow-visible'
         )}
       >
         {children}
