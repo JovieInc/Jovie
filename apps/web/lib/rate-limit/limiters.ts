@@ -562,6 +562,9 @@ export async function checkIsrcRescanRateLimit(
 /**
  * Rate limiter for Apple Music rescan (free plan)
  * Limit: 1 per day per profile
+ *
+ * @deprecated Use appleMusicRescanPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
  */
 export const appleMusicRescanFreeLimiter = createRateLimiter(
   RATE_LIMITERS.appleMusicRescanFree
@@ -570,28 +573,43 @@ export const appleMusicRescanFreeLimiter = createRateLimiter(
 /**
  * Rate limiter for Apple Music rescan (paid plan)
  * Limit: 1 per hour per profile
+ *
+ * @deprecated Use appleMusicRescanPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
  */
 export const appleMusicRescanPaidLimiter = createRateLimiter(
   RATE_LIMITERS.appleMusicRescanPaid
 );
 
 /**
+ * Plan-aware Apple Music rescan limiter.
+ * Automatically selects the correct limit based on the user's plan tier.
+ * - Free: 1 per day
+ * - Pro/Founding/Growth: 1 per hour
+ */
+export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
+  createPlanAwareRateLimiter({
+    configs: {
+      free: RATE_LIMITERS.appleMusicRescanFree,
+      pro: RATE_LIMITERS.appleMusicRescanPaid,
+      // founding falls back to pro automatically via the factory
+      growth: RATE_LIMITERS.appleMusicRescanPaid,
+    },
+    errorMessage: (plan) =>
+      plan === 'growth' || plan === 'pro' || plan === 'founding'
+        ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
+        : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
+  });
+
+/**
  * Check Apple Music rescan rate limit (plan-aware).
- * Free: 1/day, Paid: 1/hour.
+ * Free: 1/day, Paid (pro/founding/growth): 1/hour.
  */
 export async function checkAppleMusicRescanRateLimit(
   profileId: string,
-  isPaidPlan: boolean
+  plan: string | null
 ): Promise<RateLimitResult> {
-  const limiter = isPaidPlan
-    ? appleMusicRescanPaidLimiter
-    : appleMusicRescanFreeLimiter;
-  const window = isPaidPlan ? '1 hour' : '24 hours';
-  return checkRateLimit(
-    limiter,
-    profileId,
-    `Apple Music was recently refreshed. Please wait ${window} before refreshing again.`
-  );
+  return appleMusicRescanPlanAwareLimiter.limit(profileId, plan);
 }
 
 // ============================================================================
