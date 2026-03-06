@@ -263,8 +263,8 @@ export function createRightMetaCellRenderer(
       : null;
 
     return (
-      <div className='flex min-w-[180px] md:min-w-[300px] items-center justify-end gap-3 text-[13px] text-secondary-token'>
-        <div className='min-w-0 flex-1'>
+      <div className='grid min-w-[260px] grid-cols-[minmax(0,220px)_48px] items-center justify-end gap-x-4 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
+        <div className='min-w-0'>
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}
@@ -272,9 +272,9 @@ export function createRightMetaCellRenderer(
           />
         </div>
 
-        <div className='hidden sm:flex items-center gap-2 tabular-nums text-secondary-token shrink-0'>
-          <span className='w-10 text-right'>{year ?? '—'}</span>
-        </div>
+        <span className='hidden w-12 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
+          {year ?? '—'}
+        </span>
       </div>
     );
   };

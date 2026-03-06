@@ -135,18 +135,21 @@ export function ReleaseTable({
 
       let baseClassName: string;
       if (isSelected) {
-        baseClassName = 'bg-surface-2/60 hover:bg-surface-2/70';
+        baseClassName =
+          'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-bg-surface-1)';
       } else if (isRowExpanded) {
-        baseClassName = 'bg-surface-2/30 hover:bg-surface-2/50';
+        baseClassName =
+          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1)';
       } else {
-        baseClassName = 'hover:bg-surface-2/50';
+        baseClassName =
+          'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out';
       }
 
       const refreshClassName = isRefreshing
         ? 'relative overflow-hidden skeleton'
         : '';
       const flashClassName = isFlashed
-        ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5 transition-colors duration-700'
+        ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
         : '';
 
       return [baseClassName, refreshClassName, flashClassName]
@@ -207,8 +210,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 300,
-      minSize: 200,
+      size: 280,
+      minSize: 240,
       meta: { className: 'hidden sm:table-cell' },
     });
 
@@ -342,8 +345,8 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
-      className='text-[13px]'
-      containerClassName='h-full'
+      className='bg-(--linear-bg-surface-0) text-[13px] text-(--linear-text-primary)'
+      containerClassName='h-full rounded-[var(--linear-radius-lg)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.03)]'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       groupingConfig={groupingConfig}

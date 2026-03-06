@@ -204,10 +204,10 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show provider availability details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors hover:bg-surface-2'
+          className='inline-flex h-8 items-center gap-2 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
         >
           {/* Compact provider icons */}
-          <div className='flex -space-x-1'>
+          <div className='flex -space-x-1.5'>
             {compactProviders.map(providerKey => {
               const status = getProviderStatus(providerKey);
               const dspId = PROVIDER_TO_DSP[providerKey];
@@ -217,8 +217,8 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 <div
                   key={providerKey}
                   className={cn(
-                    'relative flex h-5 w-5 items-center justify-center rounded-full border border-subtle',
-                    status === 'missing' ? 'bg-surface-2' : 'bg-surface-1'
+                    'relative flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-bg-surface-0) bg-(--linear-bg-surface-0)',
+                    status === 'missing' && 'opacity-70'
                   )}
                 >
                   {dspId ? (
@@ -245,23 +245,26 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           </div>
 
           {/* Summary text */}
-          <span className='text-secondary-token'>
+          <span className='tabular-nums text-(--linear-text-secondary)'>
             {availableCount}/{totalCount}
           </span>
           <Icon
             name='ChevronDown'
-            className='h-3 w-3 text-tertiary-token'
+            className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
             aria-hidden='true'
           />
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align='start' className='w-80'>
-        <div className='border-b border-subtle px-3 py-2'>
-          <p className='text-xs font-medium text-primary-token'>
+      <PopoverContent
+        align='end'
+        className='w-[320px] rounded-[var(--linear-radius-lg)] border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0 shadow-[var(--linear-shadow-card-elevated)]'
+      >
+        <div className='border-b border-(--linear-border-subtle) px-3 py-2.5'>
+          <p className='text-[12px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
             Platform Availability
           </p>
-          <p className='text-xs text-secondary-token'>
+          <p className='text-[12px] text-(--linear-text-secondary)'>
             {availableCount} of {totalCount} platforms linked
           </p>
         </div>
@@ -279,16 +282,16 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             return (
               <div
                 key={providerKey}
-                className='flex items-center justify-between border-b border-subtle px-3 py-2 last:border-b-0'
+                className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2.5 last:border-b-0'
               >
                 <div className='flex items-center gap-2'>
                   {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
                     <span
-                      className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'
+                      className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
                       aria-hidden='true'
                     >
-                      <span className='h-1 w-1 rounded-full bg-tertiary-token' />
+                      <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
                     </span>
                   ) : (
                     <span
@@ -314,7 +317,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                       style={{ backgroundColor: config.accent }}
                     />
                   )}
-                  <span className='text-xs text-primary-token'>
+                  <span className='text-[12px] font-[450] text-(--linear-text-primary)'>
                     {config.label}
                   </span>
                 </div>
@@ -334,11 +337,11 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               'noopener,noreferrer'
                             )
                           }
-                          className='rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+                          className='rounded-md p-1.5 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
                         >
                           <Icon
                             name='ExternalLink'
-                            className='h-4 w-4'
+                            className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
                         </button>
@@ -351,13 +354,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           }
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
-                            'rounded p-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            isCopied && 'text-success'
+                            'rounded-md p-1.5 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)',
+                            isCopied && 'text-emerald-600 dark:text-emerald-400'
                           )}
                         >
                           <Icon
                             name={isCopied ? 'Check' : 'Copy'}
-                            className='h-4 w-4'
+                            className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
                         </button>
@@ -426,14 +429,18 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                       <button
                         type='button'
                         onClick={() => setAddingProvider(providerKey)}
-                        className='text-xs text-tertiary-token hover:text-primary-token'
+                        className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 py-1 text-[11px] font-[450] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
                       >
                         + Add link
                       </button>
                     );
                   }
 
-                  return <span className='text-xs text-tertiary-token'>—</span>;
+                  return (
+                    <span className='text-[11px] text-(--linear-text-tertiary)'>
+                      —
+                    </span>
+                  );
                 })()}
               </div>
             );
@@ -441,8 +448,10 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </div>
 
         {validationError && (
-          <div className='border-t border-subtle px-3 py-2'>
-            <p className='text-xs text-(--color-error)'>{validationError}</p>
+          <div className='border-t border-(--linear-border-subtle) px-3 py-2'>
+            <p className='text-[11px] text-(--linear-error)'>
+              {validationError}
+            </p>
           </div>
         )}
       </PopoverContent>

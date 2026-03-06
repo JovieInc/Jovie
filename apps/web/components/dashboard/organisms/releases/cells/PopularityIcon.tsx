@@ -23,7 +23,7 @@ export const PopularityIcon = memo(function PopularityIcon({
   const isValidPopularity = popularity != null && Number.isFinite(popularity);
 
   if (!isValidPopularity) {
-    return <span className='text-xs text-tertiary-token'>—</span>;
+    return <span className='text-[11px] text-(--linear-text-tertiary)'>—</span>;
   }
 
   const clampedPopularity = Math.min(100, Math.max(0, popularity));
@@ -39,13 +39,13 @@ export const PopularityIcon = memo(function PopularityIcon({
 
   // Color mapping for each level
   const colors = {
-    low: 'bg-tertiary-token',
-    med: 'bg-amber-500 dark:bg-amber-400',
-    high: 'bg-green-500 dark:bg-green-400',
+    low: 'bg-(--linear-text-tertiary)',
+    med: 'bg-amber-400 dark:bg-amber-300',
+    high: 'bg-emerald-500 dark:bg-emerald-400',
   };
 
   const activeColor = colors[level];
-  const inactiveColor = 'bg-surface-3 dark:bg-surface-3';
+  const inactiveColor = 'bg-(--linear-border-subtle)';
 
   // Number of bars to fill based on level
   const barCounts: Record<'low' | 'med' | 'high', number> = {
@@ -60,7 +60,7 @@ export const PopularityIcon = memo(function PopularityIcon({
       <TooltipTrigger asChild>
         <button
           type='button'
-          className='inline-flex items-end gap-px rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
+          className='inline-flex items-end gap-px rounded-sm opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
           aria-label={`Popularity ${displayPopularity} out of 100`}
         >
           {/* Bar 1 - shortest (4px) */}
