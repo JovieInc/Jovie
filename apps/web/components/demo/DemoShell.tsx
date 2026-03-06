@@ -18,6 +18,7 @@ import {
   Repeat,
   SlidersHorizontal,
   Target,
+  Users,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -199,6 +200,16 @@ export function DemoShell({
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            isActive={activeTab === 'audience'}
+                            onClick={() => onTabChange('audience')}
+                            className='h-7'
+                          >
+                            <Users className='size-3.5' />
+                            <span>Audience</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
                           <SidebarMenuSubButton className='h-7'>
                             <Repeat className='size-3.5' />
                             <span>Cycles</span>
@@ -324,7 +335,7 @@ export function DemoShell({
         }
         main={children}
         rightPanel={rightPanel}
-        isTableRoute={activeTab === 'releases'}
+        isTableRoute={activeTab === 'releases' || activeTab === 'audience'}
       />
     </SidebarProvider>
   );

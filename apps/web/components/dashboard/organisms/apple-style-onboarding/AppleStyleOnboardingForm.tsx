@@ -6,6 +6,7 @@ import { AuthBackButton } from '@/components/auth';
 import { getValidationFailureKey } from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
 import {
   OnboardingCompleteStep,
+  OnboardingDspStep,
   OnboardingHandleStep,
 } from '@/components/dashboard/organisms/onboarding';
 import { BASE_URL, HOSTNAME } from '@/constants/domains';
@@ -198,6 +199,22 @@ export function AppleStyleOnboardingForm({
     globalThis.location.href = dashboardUrl;
   }, [spotifyImportState.status]);
 
+  const handleDspConnected = useCallback(
+    (_releases: unknown, artistName: string) => {
+      track('onboarding_dsp_connected', {
+        user_id: userId,
+        artist_name: artistName,
+      });
+      goToNextStep();
+    },
+    [goToNextStep, userId]
+  );
+
+  const handleDspSkip = useCallback(() => {
+    track('onboarding_dsp_skipped', { user_id: userId });
+    goToNextStep();
+  }, [goToNextStep, userId]);
+
   const renderStepContent = () => {
     switch (currentStepIndex) {
       case 0:
@@ -223,9 +240,20 @@ export function AppleStyleOnboardingForm({
 
       case 1:
         return (
-          <OnboardingCompleteStep
+          <OnboardingDspStep
             title={ONBOARDING_STEPS[1].title}
             prompt={ONBOARDING_STEPS[1].prompt}
+            onConnected={handleDspConnected}
+            onSkip={handleDspSkip}
+            isTransitioning={isTransitioning}
+          />
+        );
+
+      case 2:
+        return (
+          <OnboardingCompleteStep
+            title={ONBOARDING_STEPS[2].title}
+            prompt={ONBOARDING_STEPS[2].prompt}
             displayDomain={displayDomain}
             handle={profileReadyHandle || handle}
             copied={copied}

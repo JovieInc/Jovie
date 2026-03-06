@@ -95,7 +95,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
         </h2>
       </div>
 
-      <div className='relative mt-12'>
+      <div className='relative mt-8'>
         {/* Fade edges for premium feel */}
         <div
           className='absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none'

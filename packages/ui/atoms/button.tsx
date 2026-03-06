@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-[var(--radius-default)] text-[13px] font-medium transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-[transform,colors]',
+  'relative inline-flex items-center justify-center rounded-[var(--radius-default)] text-[13px] font-[510] tracking-[-0.011em] transition-colors duration-normal ease-interactive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] transition-[transform,colors]',
   {
     variants: {
       variant: {
@@ -15,7 +15,7 @@ const buttonVariants = cva(
           'bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:bg-btn-primary/90',
         accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
         secondary:
-          'bg-btn-secondary text-btn-secondary-foreground hover:bg-btn-secondary-hover',
+          'border border-subtle bg-btn-secondary text-btn-secondary-foreground hover:bg-(--color-btn-secondary-hover)',
         ghost:
           'hover:bg-interactive-hover active:bg-interactive-active text-secondary-token hover:text-primary-token',
         outline:

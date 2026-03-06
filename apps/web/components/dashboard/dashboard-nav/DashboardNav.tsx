@@ -2,9 +2,10 @@
 
 import { Badge } from '@jovie/ui/atoms/badge';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -51,6 +52,9 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
+  const router = useRouter();
+  const { isOpen: isPreviewOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -86,11 +90,25 @@ export function DashboardNav(_: DashboardNavProps) {
     [primaryItems]
   );
 
+  // Profile nav item opens the preview drawer instead of navigating to a separate page.
+  // If already on a chat route, just opens the drawer; otherwise navigates first.
+  const handleProfileClick = useCallback(() => {
+    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
+    if (isOnChat) {
+      openPreviewPanel();
+    } else {
+      router.push(APP_ROUTES.CHAT);
+      queueMicrotask(() => openPreviewPanel());
+    }
+  }, [pathname, openPreviewPanel, router]);
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
-      const isActive = isItemActive(pathname, item);
+      const isActive = isProfileItem
+        ? isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT)
+        : isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
 
       return (
@@ -100,10 +118,11 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
+          onClick={isProfileItem ? handleProfileClick : undefined}
         />
       );
     },
-    [pathname, profileActions]
+    [pathname, profileActions, handleProfileClick, isPreviewOpen]
   );
 
   // Memoize renderSection to prevent creating new functions on every render

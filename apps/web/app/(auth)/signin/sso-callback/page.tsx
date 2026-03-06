@@ -11,7 +11,7 @@ export default function SignInSsoCallbackPage() {
     <div className='flex items-center justify-center min-h-[200px]'>
       <SsoCallbackHandler
         signInFallbackRedirectUrl='/app'
-        signUpFallbackRedirectUrl='/app'
+        signUpFallbackRedirectUrl='/onboarding'
       />
     </div>
   );

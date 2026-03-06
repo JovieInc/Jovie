@@ -44,6 +44,7 @@ const baseDashboardData: DashboardData = {
     completedCount: 2,
     totalCount: 5,
     steps: [],
+    profileIsLive: false,
   },
 };
 

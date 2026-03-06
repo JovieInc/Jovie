@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight, Sparkles, X } from 'lucide-react';
+import { AlertCircle, ArrowRight, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -18,6 +18,7 @@ export const ProfileCompletionCard = memo(
 
     const completionPercentage = profileCompletion?.percentage ?? 0;
     const completionSteps = profileCompletion?.steps ?? [];
+    const profileIsLive = profileCompletion?.profileIsLive ?? false;
 
     const storageKey = selectedProfile?.id
       ? getStorageKey(selectedProfile.id, completionPercentage)
@@ -52,29 +53,43 @@ export const ProfileCompletionCard = memo(
     if (
       !selectedProfile ||
       completionPercentage >= 100 ||
-      completionSteps.length === 0 ||
-      dismissed
+      completionSteps.length === 0
     ) {
       return null;
     }
 
+    // Only allow dismissal if profile is live (has essentials)
+    if (dismissed && profileIsLive) {
+      return null;
+    }
+
     const primarySteps = completionSteps.slice(0, 3);
+
+    const sectionLabel = profileIsLive ? 'Profile momentum' : 'Finish setup';
+    const heading = profileIsLive
+      ? `Your profile is ${completionPercentage}% complete`
+      : 'Your profile is not live yet';
+    const subtext = profileIsLive
+      ? 'Finish these steps to increase trust and conversion.'
+      : 'Complete these essentials so fans can find you.';
 
     return (
       <DashboardCard variant='analytics' hover={false} className='mb-4 sm:mb-6'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
             <div className='flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-tertiary-token'>
-              <Sparkles className='h-3 w-3' aria-hidden='true' />
-              Profile momentum
+              {profileIsLive ? (
+                <Sparkles className='h-3 w-3' aria-hidden='true' />
+              ) : (
+                <AlertCircle className='h-3 w-3' aria-hidden='true' />
+              )}
+              {sectionLabel}
             </div>
             <div className='space-y-0.5'>
               <p className='text-sm font-semibold text-primary-token'>
-                Your profile is {completionPercentage}% complete
+                {heading}
               </p>
-              <p className='text-[13px] text-secondary-token'>
-                Finish these steps to increase trust and conversion.
-              </p>
+              <p className='text-[13px] text-secondary-token'>{subtext}</p>
             </div>
 
             <progress
@@ -111,14 +126,16 @@ export const ProfileCompletionCard = memo(
             </ul>
           </div>
 
-          <button
-            type='button'
-            onClick={handleDismiss}
-            aria-label='Dismiss profile completion card'
-            className='shrink-0 rounded-full border border-subtle p-1.5 text-tertiary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive'
-          >
-            <X className='h-4 w-4' aria-hidden='true' />
-          </button>
+          {profileIsLive && (
+            <button
+              type='button'
+              onClick={handleDismiss}
+              aria-label='Dismiss profile completion card'
+              className='shrink-0 rounded-full border border-subtle p-1.5 text-tertiary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive'
+            >
+              <X className='h-4 w-4' aria-hidden='true' />
+            </button>
+          )}
         </div>
       </DashboardCard>
     );

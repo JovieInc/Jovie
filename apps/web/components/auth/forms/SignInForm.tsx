@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
@@ -122,13 +121,7 @@ export function SignInForm() {
         {/* Sign up suggestion when account not found */}
         {shouldSuggestSignUp && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
-            No account found.{' '}
-            <Link
-              href='/signup'
-              className='text-primary-token underline focus-ring-themed rounded-md'
-            >
-              Sign up instead
-            </Link>
+            No account found with that email.
           </p>
         )}
       </div>

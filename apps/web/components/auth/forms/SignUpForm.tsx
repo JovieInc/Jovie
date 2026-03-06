@@ -155,19 +155,7 @@ export function SignUpForm() {
         {/* Sign in suggestion when account exists - auto-redirects */}
         {shouldSuggestSignIn && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
-            {isRedirecting ? (
-              <>Redirecting to sign in…</>
-            ) : (
-              <>
-                Account already exists.{' '}
-                <Link
-                  href={buildSignInUrl(email)}
-                  className='text-primary-token underline focus-ring-themed rounded-md'
-                >
-                  Sign in instead
-                </Link>
-              </>
-            )}
+            Account already exists. Redirecting to sign in…
           </p>
         )}
 

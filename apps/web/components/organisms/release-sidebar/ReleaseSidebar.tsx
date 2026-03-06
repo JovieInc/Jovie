@@ -14,12 +14,14 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { ActivityFeed } from '@/components/molecules/ActivityFeed';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
+import { SAMPLE_RELEASE_EVENTS } from '@/lib/activity/sample-data';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
@@ -37,7 +39,7 @@ import type { Release, ReleaseSidebarProps } from './types';
 import { useReleaseSidebar } from './useReleaseSidebar';
 
 /** Tab for organizing sidebar content into focused views */
-type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics';
+type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics' | 'activity';
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
@@ -45,6 +47,7 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'links' as const, label: 'Links' },
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
+  { value: 'activity' as const, label: 'Activity' },
 ];
 
 function buildContextMenuItems(
@@ -400,6 +403,10 @@ export function ReleaseSidebar({
               onSaveLyrics={onSaveLyrics}
               onFormatLyrics={onFormatLyrics}
             />
+          )}
+
+          {activeTab === 'activity' && (
+            <ActivityFeed events={SAMPLE_RELEASE_EVENTS} />
           )}
         </>
       )}

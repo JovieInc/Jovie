@@ -21,7 +21,6 @@ const baseContact: EditableContact = {
 describe('getContactRowContextMenuItems', () => {
   it('returns copy and delete actions when contact has email and phone', () => {
     const onDelete = vi.fn();
-    const onCopyToClipboard = vi.fn();
     const contact: EditableContact = {
       ...baseContact,
       email: 'hello@jov.ie',
@@ -30,7 +29,6 @@ describe('getContactRowContextMenuItems', () => {
 
     const items = getContactRowContextMenuItems(contact, {
       onDelete,
-      onCopyToClipboard,
     });
 
     expect(items.map(item => ('id' in item ? item.id : item.type))).toEqual([
@@ -43,11 +41,9 @@ describe('getContactRowContextMenuItems', () => {
 
   it('returns only delete action when contact has no email or phone', () => {
     const onDelete = vi.fn();
-    const onCopyToClipboard = vi.fn();
 
     const items = getContactRowContextMenuItems(baseContact, {
       onDelete,
-      onCopyToClipboard,
     });
 
     expect(items.map(item => ('id' in item ? item.id : item.type))).toEqual([

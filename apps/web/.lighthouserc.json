@@ -5,42 +5,40 @@
       "url": ["https://jov.ie/", "https://jov.ie/tim"]
     },
     "assert": {
-      "assertions": {
-        "interactive": [
-          "warn",
-          {
-            "maxNumericValue": 5000
-          }
-        ],
-        "first-contentful-paint": [
-          "warn",
-          {
-            "maxNumericValue": 3000
-          }
-        ],
-        "largest-contentful-paint": [
-          "warn",
-          {
-            "maxNumericValue": 4000
-          }
-        ],
-        "cumulative-layout-shift": [
-          "warn",
-          {
-            "maxNumericValue": 0.25
-          }
-        ],
-        "total-blocking-time": [
-          "warn",
-          {
-            "maxNumericValue": 600
-          }
-        ]
-      },
       "assertMatrix": [
         {
           "matchingUrlPattern": "^https://jov\\.ie/$",
           "assertions": {
+            "interactive": [
+              "warn",
+              {
+                "maxNumericValue": 5000
+              }
+            ],
+            "first-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
+            "largest-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 4000
+              }
+            ],
+            "cumulative-layout-shift": [
+              "warn",
+              {
+                "maxNumericValue": 0.25
+              }
+            ],
+            "total-blocking-time": [
+              "warn",
+              {
+                "maxNumericValue": 600
+              }
+            ],
             "categories:performance": [
               "warn",
               {
@@ -58,6 +56,36 @@
         {
           "matchingUrlPattern": "^https://jov\\.ie/tim/?$",
           "assertions": {
+            "interactive": [
+              "warn",
+              {
+                "maxNumericValue": 5000
+              }
+            ],
+            "first-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
+            "largest-contentful-paint": [
+              "warn",
+              {
+                "maxNumericValue": 4000
+              }
+            ],
+            "cumulative-layout-shift": [
+              "warn",
+              {
+                "maxNumericValue": 0.25
+              }
+            ],
+            "total-blocking-time": [
+              "warn",
+              {
+                "maxNumericValue": 600
+              }
+            ],
             "categories:performance": [
               "warn",
               {
