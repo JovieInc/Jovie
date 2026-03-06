@@ -256,7 +256,7 @@ export const MENU_SHORTCUT_BASE =
  * Select trigger button styles
  */
 export const SELECT_TRIGGER_BASE =
-  'flex h-10 w-full items-center justify-between rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 ' +
+  'flex h-10 w-full items-center justify-between rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 ' +
   'text-[13px] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) ' +
@@ -285,7 +285,7 @@ export const subMenuContentClasses = [
  * Compact base — same surface/border/animation but tighter padding
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-50 min-w-[200px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary)';
+  'z-50 min-w-[200px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]';
 
 /**
  * Complete compact DropdownMenu content classes

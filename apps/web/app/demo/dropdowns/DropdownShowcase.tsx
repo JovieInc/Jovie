@@ -29,8 +29,16 @@ import { cn } from '@/lib/utils';
  * the real Radix components use. Playwright reads computed styles against
  * the locked linear-dropdown-spec.json to verify pixel-perfect match.
  *
- * Route: /test/dropdowns  (public, no auth)
+ * Route: /demo/dropdowns  (public, no auth)
  */
+
+const SEARCHABLE_MENU_ITEMS = [
+  { label: 'Profile', icon: <Star /> },
+  { label: 'Settings', icon: <Settings /> },
+  { label: 'Edit', icon: <Edit /> },
+  { label: 'Duplicate', icon: <Copy /> },
+  { label: 'Archive', icon: <Archive /> },
+] as const;
 
 function MenuSection({
   label,
@@ -404,17 +412,11 @@ export function DropdownShowcase() {
 function SearchableMenu() {
   const [query, setQuery] = React.useState('');
 
-  const allItems = [
-    { label: 'Profile', icon: <Star /> },
-    { label: 'Settings', icon: <Settings /> },
-    { label: 'Edit', icon: <Edit /> },
-    { label: 'Duplicate', icon: <Copy /> },
-    { label: 'Archive', icon: <Archive /> },
-  ];
-
   const filtered = query.trim()
-    ? allItems.filter(i => i.label.toLowerCase().includes(query.toLowerCase()))
-    : allItems;
+    ? SEARCHABLE_MENU_ITEMS.filter(i =>
+      i.label.toLowerCase().includes(query.toLowerCase())
+    )
+    : SEARCHABLE_MENU_ITEMS;
 
   return (
     <div
@@ -429,7 +431,7 @@ function SearchableMenu() {
           fill='none'
           viewBox='0 0 24 24'
           stroke='currentColor'
-          strokeWidth={2}
+          strokeWidth={1.5}
           aria-hidden='true'
         >
           <circle cx='11' cy='11' r='8' />
@@ -437,6 +439,7 @@ function SearchableMenu() {
         </svg>
         <input
           type='text'
+          aria-label='Search menu items'
           placeholder='Search...'
           value={query}
           onChange={e => setQuery(e.target.value)}
