@@ -129,7 +129,7 @@ export function SegmentControl<T extends string = string>({
       onValueChange={onValueChange as (value: string) => void}
       className={cn(segmentControlVariants({ variant, size }), className)}
     >
-      <Tabs.List aria-label={ariaLabel} className='flex'>
+      <Tabs.List aria-label={ariaLabel} className='flex w-full'>
         {options.map(option => (
           <Tabs.Trigger
             key={option.value}
@@ -137,6 +137,7 @@ export function SegmentControl<T extends string = string>({
             disabled={option.disabled}
             className={cn(
               segmentTriggerVariants({ size }),
+              'flex-1',
               // Smooth transition for background
               'motion-safe:transition-[background-color,color,box-shadow] motion-safe:duration-150 motion-safe:ease-out',
               triggerClassName
