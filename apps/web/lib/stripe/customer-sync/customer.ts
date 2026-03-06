@@ -16,6 +16,24 @@ import { getOrCreateCustomer, stripe } from '../client';
 import { fetchUserBillingData } from './queries';
 import { BILLING_FIELDS_CUSTOMER } from './types';
 
+function isCustomerWithMetadata(
+  value: unknown
+): value is { id: string; metadata?: Record<string, string> | null } {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  if (!('id' in value) || typeof value.id !== 'string') {
+    return false;
+  }
+
+  if (!('metadata' in value) || value.metadata == null) {
+    return true;
+  }
+
+  return typeof value.metadata === 'object';
+}
+
 /**
  * Ensure a Stripe customer exists for the current user.
  *
@@ -83,10 +101,11 @@ export async function ensureStripeCustomer(): Promise<{
             throw new Error('Stripe customer is deleted');
           }
 
-          const customer = existing as unknown as {
-            id: string;
-            metadata?: Record<string, string> | null;
-          };
+          if (!isCustomerWithMetadata(existing)) {
+            throw new Error('Stripe customer payload is missing id');
+          }
+
+          const customer = existing;
 
           const existingClerkUserId = customer.metadata?.clerk_user_id;
           if (
