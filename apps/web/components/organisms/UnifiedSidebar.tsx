@@ -251,7 +251,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 mt-2'>
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
