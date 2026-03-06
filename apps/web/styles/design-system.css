@@ -675,15 +675,16 @@
   /* Font weights — Linear uses Inter Variable axis with non-standard stops
      Extracted from Linear CSS vars (2026-02-17):
        --font-weight-normal: 450  (book weight — their default!)
-       --font-weight-medium: 500
+       --font-weight-medium: 510
        --font-weight-semibold: 600
        --font-weight-bold: 700 */
   --font-weight-normal: 450;
   /* Linear default — "book" weight, not standard 400 */
   --font-weight-book: 450;
   /* Alias for normal */
-  --font-weight-medium: 500;
-  --font-weight-nav: 500;
+  --font-weight-medium: 510;
+  /* Linear's extracted medium = 510, not standard 500 */
+  --font-weight-nav: 510;
   /* Linear sidebar nav = --font-weight-medium */
   --font-weight-semibold: 600;
   /* Linear: 600, not our old 538 */

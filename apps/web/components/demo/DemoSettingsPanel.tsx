@@ -17,7 +17,7 @@ export function DemoSettingsPanel() {
     <div className='h-full overflow-y-auto'>
       {/* Profile section */}
       <div className='border-b border-subtle p-4'>
-        <h3 className='mb-3 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
           Artist Profile
         </h3>
         <div className='space-y-3'>
@@ -36,7 +36,7 @@ export function DemoSettingsPanel() {
 
       {/* Platform connections */}
       <div className='border-b border-subtle p-4'>
-        <h3 className='mb-3 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
           Platform Connections
         </h3>
         <div className='space-y-2'>
@@ -78,7 +78,7 @@ export function DemoSettingsPanel() {
 
       {/* Preferences */}
       <div className='p-4'>
-        <h3 className='mb-3 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
           Preferences
         </h3>
         <div className='space-y-3'>

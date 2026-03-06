@@ -40,7 +40,7 @@ export function AppShellFrame({
       <div
         id='main-content'
         tabIndex={-1}
-        className='bg-surface-0 lg:border-[0.5px] lg:border-strong lg:rounded-lg lg:m-2 lg:ml-0 flex flex-1 min-h-0 overflow-hidden'
+        className='bg-surface-0 lg:border lg:border-strong lg:rounded-sm lg:m-2 lg:ml-0 flex flex-1 min-h-0 overflow-hidden'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>

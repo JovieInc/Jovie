@@ -59,7 +59,7 @@ const TAB_LABEL: Record<DemoTab, string> = {
 };
 
 const toolbarBtnClass =
-  'flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-0 rounded hover:bg-interactive-hover gap-1.5 text-xs font-medium';
+  'flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-normal rounded-sm hover:bg-interactive-hover gap-1.5 text-[13px] [font-weight:var(--font-weight-medium)]';
 
 const VIEW_TABS = ['All Releases', 'Active', 'Backlog'] as const;
 
@@ -79,7 +79,7 @@ export function DemoShell({
         containerClassName={containerClassName}
         sidebar={
           <Sidebar collapsible='none'>
-            <SidebarHeader className='px-2 pt-2 pb-0 h-9 justify-center'>
+            <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
@@ -88,26 +88,18 @@ export function DemoShell({
                     aria-label='Open workspace selector'
                   >
                     <div className='flex items-center gap-1.5 w-full'>
-                      <BrandLogo
-                        size={16}
-                        className='rounded-[4px]'
-                        tone='auto'
-                      />
-                      <span className='truncate flex-1'>Sora Vale</span>
+                      <BrandLogo size={14} className='rounded-sm' tone='auto' />
+                      <span className='truncate flex-1 text-app tracking-tight [font-weight:var(--font-weight-nav)]'>
+                        Sora Vale
+                      </span>
                       <ChevronDown className='size-3 shrink-0 text-sidebar-item-icon opacity-60' />
                     </div>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
-              <a
-                href={APP_ROUTES.SIGNUP}
-                className='text-[11px] text-tertiary-token hover:text-primary-token transition-colors px-2 mt-0.5'
-              >
-                Sign up
-              </a>
             </SidebarHeader>
 
-            <SidebarContent className='pl-2 pr-3.5 mt-2'>
+            <SidebarContent className='pl-2 pr-3.5'>
               {/* Top nav items */}
               <SidebarGroup>
                 <SidebarGroupContent>
@@ -116,7 +108,7 @@ export function DemoShell({
                       <SidebarMenuButton className='h-7'>
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='text-[11px] text-tertiary-token bg-white/[0.06] rounded px-1.5 py-0.5 leading-none'>
+                        <span className='text-[10px] text-secondary-token bg-interactive-hover rounded-[2px] border border-subtle px-1 py-px leading-none [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -133,7 +125,7 @@ export function DemoShell({
 
               {/* Workspace section */}
               <SidebarGroup>
-                <SidebarGroupLabel className='text-[11px] uppercase tracking-wider text-sidebar-item-icon font-medium px-2'>
+                <SidebarGroupLabel className='text-2xs tracking-tight text-sidebar-item-icon px-2 [font-weight:var(--font-weight-nav)]'>
                   Workspace
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -168,7 +160,7 @@ export function DemoShell({
 
               {/* Your catalogs section — team tree */}
               <SidebarGroup>
-                <SidebarGroupLabel className='text-[11px] uppercase tracking-wider text-sidebar-item-icon font-medium px-2'>
+                <SidebarGroupLabel className='text-2xs tracking-tight text-sidebar-item-icon px-2 [font-weight:var(--font-weight-nav)]'>
                   Your catalogs
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -247,27 +239,25 @@ export function DemoShell({
 
               {/* Collaborators section */}
               <SidebarGroup>
-                <SidebarGroupLabel className='text-[11px] uppercase tracking-wider text-sidebar-item-icon font-medium px-2'>
+                <SidebarGroupLabel className='text-2xs tracking-tight text-sidebar-item-icon px-2 [font-weight:var(--font-weight-nav)]'>
                   <ChevronRight className='size-3 mr-1' />
                   Collaborators
                 </SidebarGroupLabel>
               </SidebarGroup>
             </SidebarContent>
 
-            <SidebarFooter className='p-2'>
-              <div className='rounded-lg border border-subtle bg-white/[0.02] p-3'>
-                <p className='text-[12px] font-medium text-primary-token mb-1'>
-                  What&apos;s new
-                </p>
-                <p className='text-[11px] text-tertiary-token leading-relaxed'>
-                  Smart links, pre-save campaigns, and more.
-                </p>
-              </div>
+            <SidebarFooter className='px-2 pb-3.5 pt-1'>
+              <a
+                href={APP_ROUTES.SIGNUP}
+                className='flex h-7 items-center justify-center rounded-sm bg-interactive-hover border border-subtle text-[13px] text-secondary-token hover:text-primary-token hover:bg-interactive-active transition-colors [font-weight:var(--font-weight-medium)]'
+              >
+                Sign up for Jovie
+              </a>
             </SidebarFooter>
           </Sidebar>
         }
         header={
-          <header className='flex h-12 shrink-0 items-center justify-between px-5 md:px-6'>
+          <header className='flex h-11 shrink-0 items-center justify-between border-b border-subtle px-5 md:px-6'>
             <div className='flex items-center gap-4'>
               {/* Breadcrumb */}
               <div className='flex items-center text-[13px]'>
@@ -286,10 +276,10 @@ export function DemoShell({
                       key={tab}
                       type='button'
                       className={cn(
-                        'px-2 py-1 text-[13px] rounded transition-colors',
+                        'px-2 py-0.5 text-[13px] rounded-sm transition-colors duration-normal',
                         i === 0
-                          ? 'text-primary-token bg-white/[0.06] font-medium'
-                          : 'text-tertiary-token hover:text-secondary-token'
+                          ? 'text-primary-token bg-interactive-hover [font-weight:var(--font-weight-medium)]'
+                          : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
                       )}
                     >
                       {tab}
@@ -297,7 +287,7 @@ export function DemoShell({
                   ))}
                   <button
                     type='button'
-                    className='px-1.5 py-1 text-tertiary-token hover:text-secondary-token rounded transition-colors'
+                    className='px-1 py-0.5 text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover rounded-sm transition-colors duration-normal'
                     aria-label='Add view'
                   >
                     <Plus className='size-3.5' />
