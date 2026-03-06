@@ -25,6 +25,8 @@ const OAUTH_AVATAR_HOSTNAMES = [
   'gravatar.com', // Gravatar
   'www.gravatar.com', // Gravatar
   'cdn.discordapp.com', // Discord
+  'i.scdn.co', // Spotify CDN
+  'mosaic.scdn.co', // Spotify mosaic CDN
 ] as const;
 
 /**
@@ -218,7 +220,7 @@ async function uploadAvatarFile(
  *
  * @returns Upload result or null if all retries fail
  */
-async function uploadRemoteAvatar(params: {
+export async function uploadRemoteAvatar(params: {
   imageUrl: string;
   cookieHeader: string | null;
   maxRetries?: number;

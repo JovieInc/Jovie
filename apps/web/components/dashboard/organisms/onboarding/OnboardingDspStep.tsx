@@ -47,7 +47,9 @@ interface OnboardingDspStepProps {
   readonly prompt?: string;
   readonly onConnected: (
     releases: ReleaseViewModel[],
-    artistName: string
+    artistName: string,
+    spotifyArtistId?: string,
+    spotifyUrl?: string
   ) => void;
   readonly onSkip: () => void;
   readonly isTransitioning: boolean;
