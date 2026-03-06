@@ -9,15 +9,12 @@ function Section({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -25,18 +22,15 @@ function Section({
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children }: { readonly children: React.ReactNode }) {
   return (
-    <span
-      className='text-[11px]'
-      style={{ color: 'var(--linear-text-tertiary)' }}
-    >
+    <span className='text-[11px] text-(--linear-text-tertiary)'>
       {children}
     </span>
   );
 }
 
-function Row({ children }: { children: React.ReactNode }) {
+function Row({ children }: { readonly children: React.ReactNode }) {
   return <div className='flex flex-wrap items-center gap-3'>{children}</div>;
 }
 
@@ -44,8 +38,8 @@ function Stack({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='flex flex-col gap-2'>
@@ -58,16 +52,10 @@ function Stack({
 export default function ButtonsPage() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Button
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — font weight 510, tracking -0.011em, 8px radius,
         32px default height
       </p>
@@ -114,14 +102,14 @@ export default function ButtonsPage() {
       <Section title='With Icons'>
         <Stack title='icon left'>
           <Button variant='primary'>
-            <Plus className='h-3.5 w-3.5' />
+            <Plus className='h-4 w-4' />
             New release
           </Button>
         </Stack>
         <Stack title='icon right'>
           <Button variant='secondary'>
             Export
-            <ChevronDown className='h-3.5 w-3.5' />
+            <ChevronDown className='h-4 w-4' />
           </Button>
         </Stack>
         <Stack title='icon only (square)'>
@@ -173,13 +161,13 @@ export default function ButtonsPage() {
         <Stack title='TableIconButton'>
           <TableIconButton
             icon={<Settings className='h-4 w-4' />}
-            onClick={() => {}}
+            onClick={() => { }}
             ariaLabel='Settings'
             tooltip='Settings'
           />
           <TableIconButton
             icon={<Trash2 className='h-4 w-4' />}
-            onClick={() => {}}
+            onClick={() => { }}
             ariaLabel='Delete'
             variant='danger'
             tooltip='Delete'
@@ -191,7 +179,7 @@ export default function ButtonsPage() {
       <Section title='Secondary Hover (was broken — verify hover works)'>
         <Button variant='secondary'>Hover me</Button>
         <Button variant='secondary'>
-          <Archive className='h-3.5 w-3.5' />
+          <Archive className='h-4 w-4' />
           Archive
         </Button>
       </Section>

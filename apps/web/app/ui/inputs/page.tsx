@@ -8,15 +8,12 @@ function Section({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -24,12 +21,9 @@ function Section({
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children }: { readonly children: React.ReactNode }) {
   return (
-    <span
-      className='text-[11px]'
-      style={{ color: 'var(--linear-text-tertiary)' }}
-    >
+    <span className='text-[11px] text-(--linear-text-tertiary)'>
       {children}
     </span>
   );
@@ -39,8 +33,8 @@ function Stack({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='flex flex-col gap-2'>
@@ -55,16 +49,10 @@ export default function InputsPage() {
 
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Input
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — 32px height, 6px radius, surface-1 bg, border-focus
         on focus
       </p>

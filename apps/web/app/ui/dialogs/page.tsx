@@ -21,10 +21,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -41,10 +38,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span
-        className='text-[11px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <span className='text-[11px] text-(--linear-text-tertiary)'>
         {title}
       </span>
       {children}
@@ -55,16 +49,10 @@ function Stack({
 export default function DialogsPage() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Dialog
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — semi-transparent overlay, elevated surface, 8px
         radius, Linear typography
       </p>
@@ -173,39 +161,31 @@ export default function DialogsPage() {
               </DialogHeader>
               <div className='flex flex-col gap-3 py-2'>
                 <div className='flex flex-col gap-1.5'>
-                  <span
-                    className='text-[13px] font-[450]'
-                    style={{ color: 'var(--linear-text-primary)' }}
+                  <label
+                    htmlFor='issue-title'
+                    className='text-[13px] font-[450] text-(--linear-text-primary)'
                   >
                     Title
-                  </span>
+                  </label>
                   <input
+                    id='issue-title'
                     type='text'
                     placeholder='Issue title'
-                    className='h-8 w-full rounded-(--linear-radius-md) border px-3 text-[13px] outline-none transition-colors focus:border-(--linear-border-focus)'
-                    style={{
-                      borderColor: 'var(--linear-border-subtle)',
-                      backgroundColor: 'var(--linear-bg-surface-1)',
-                      color: 'var(--linear-text-primary)',
-                    }}
+                    className='h-8 w-full rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-primary) outline-none transition-colors focus:border-(--linear-border-focus)'
                   />
                 </div>
                 <div className='flex flex-col gap-1.5'>
-                  <span
-                    className='text-[13px] font-[450]'
-                    style={{ color: 'var(--linear-text-primary)' }}
+                  <label
+                    htmlFor='issue-description'
+                    className='text-[13px] font-[450] text-(--linear-text-primary)'
                   >
                     Description
-                  </span>
+                  </label>
                   <textarea
+                    id='issue-description'
                     placeholder='Add a description...'
                     rows={3}
-                    className='w-full resize-none rounded-(--linear-radius-md) border px-3 py-2 text-[13px] outline-none transition-colors focus:border-(--linear-border-focus)'
-                    style={{
-                      borderColor: 'var(--linear-border-subtle)',
-                      backgroundColor: 'var(--linear-bg-surface-1)',
-                      color: 'var(--linear-text-primary)',
-                    }}
+                    className='w-full resize-none rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 text-[13px] text-(--linear-text-primary) outline-none transition-colors focus:border-(--linear-border-focus)'
                   />
                 </div>
               </div>
@@ -232,12 +212,8 @@ export default function DialogsPage() {
                 <input
                   type='text'
                   defaultValue='My Project'
-                  className='h-8 w-full rounded-(--linear-radius-md) border px-3 text-[13px] outline-none transition-colors focus:border-(--linear-border-focus)'
-                  style={{
-                    borderColor: 'var(--linear-border-subtle)',
-                    backgroundColor: 'var(--linear-bg-surface-1)',
-                    color: 'var(--linear-text-primary)',
-                  }}
+                  aria-label='Project name'
+                  className='h-8 w-full rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-primary) outline-none transition-colors focus:border-(--linear-border-focus)'
                 />
               </div>
               <DialogFooter>

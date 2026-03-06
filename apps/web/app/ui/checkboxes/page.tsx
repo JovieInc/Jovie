@@ -7,15 +7,12 @@ function Section({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -27,15 +24,12 @@ function Stack({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span
-        className='text-[11px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <span className='text-[11px] text-(--linear-text-tertiary)'>
         {title}
       </span>
       <div className='flex items-center gap-3'>{children}</div>
@@ -48,16 +42,10 @@ export default function CheckboxesPage() {
 
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Checkbox
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — 16px, 4px radius, primary-bg when checked, 2.5
         stroke check
       </p>
@@ -65,10 +53,10 @@ export default function CheckboxesPage() {
       {/* States */}
       <Section title='States'>
         <Stack title='unchecked'>
-          <Checkbox />
+          <Checkbox aria-label='Unchecked example' />
         </Stack>
         <Stack title='checked'>
-          <Checkbox defaultChecked />
+          <Checkbox defaultChecked aria-label='Checked example' />
         </Stack>
         <Stack title='indeterminate'>
           <Checkbox
@@ -77,10 +65,10 @@ export default function CheckboxesPage() {
           />
         </Stack>
         <Stack title='disabled unchecked'>
-          <Checkbox disabled />
+          <Checkbox disabled aria-label='Disabled unchecked example' />
         </Stack>
         <Stack title='disabled checked'>
-          <Checkbox disabled defaultChecked />
+          <Checkbox disabled defaultChecked aria-label='Disabled checked example' />
         </Stack>
       </Section>
 
@@ -90,8 +78,7 @@ export default function CheckboxesPage() {
           <Checkbox id='label-demo' />
           <label
             htmlFor='label-demo'
-            className='text-[13px]'
-            style={{ color: 'var(--linear-text-primary)' }}
+            className='text-[13px] text-(--linear-text-primary)'
           >
             Label text
           </label>
@@ -106,8 +93,7 @@ export default function CheckboxesPage() {
               <Checkbox id={`filter-${item}`} />
               <label
                 htmlFor={`filter-${item}`}
-                className='text-[13px]'
-                style={{ color: 'var(--linear-text-primary)' }}
+                className='text-[13px] text-(--linear-text-primary)'
               >
                 {item}
               </label>

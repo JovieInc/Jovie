@@ -6,15 +6,12 @@ function Section({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -22,12 +19,9 @@ function Section({
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children }: { readonly children: React.ReactNode }) {
   return (
-    <span
-      className='text-[11px]'
-      style={{ color: 'var(--linear-text-tertiary)' }}
-    >
+    <span className='text-[11px] text-(--linear-text-tertiary)'>
       {children}
     </span>
   );
@@ -37,8 +31,8 @@ function Stack({
   title,
   children,
 }: {
-  title: string;
-  children: React.ReactNode;
+  readonly title: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='flex flex-col gap-2'>
@@ -51,16 +45,10 @@ function Stack({
 export default function TooltipsPage() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Tooltip
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — 4px radius, surface-0 bg, 12px font, instant 100ms
         animation
       </p>

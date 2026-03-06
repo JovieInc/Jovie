@@ -26,15 +26,12 @@ function MenuSection({
   label,
   children,
 }: {
-  label: string;
-  children: React.ReactNode;
+  readonly label: string;
+  readonly children: React.ReactNode;
 }) {
   return (
     <div className='mb-10'>
-      <p
-        className='mb-3 text-[11px] font-semibold uppercase tracking-wider'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-3 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {label}
       </p>
       {children}
@@ -45,16 +42,10 @@ function MenuSection({
 export function DropdownShowcase() {
   return (
     <div>
-      <h1
-        className='mb-1 text-lg font-semibold'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
         Dropdown Menu
       </h1>
-      <p
-        className='mb-8 text-[13px]'
-        style={{ color: 'var(--linear-text-tertiary)' }}
-      >
+      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
         Matches Linear.app — 8px radius, 4px item radius, font weight 450,
         near-white text in dark mode
       </p>
