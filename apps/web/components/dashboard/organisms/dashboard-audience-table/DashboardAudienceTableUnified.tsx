@@ -17,6 +17,8 @@ import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
+import { AnalyticsSidebar } from '@/components/dashboard/organisms/AnalyticsSidebar';
+import { useAudiencePanel } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
@@ -306,12 +308,26 @@ export const DashboardAudienceTableUnified = memo(
       [handleRemoveMember]
     );
 
-    // Quick action: view member profile (opens sidebar)
+    // Quick action: view member profile (opens contact sidebar)
+    const {
+      mode: panelMode,
+      open: openPanel,
+      close: closePanel,
+    } = useAudiencePanel();
+
+    // Auto-select first row when contact panel opens with no selection
+    React.useEffect(() => {
+      if (panelMode === 'contact' && !selectedMember && rows.length > 0) {
+        setSelectedMember(rows[0]);
+      }
+    }, [panelMode, selectedMember, rows, setSelectedMember]);
+
     const handleViewProfile = React.useCallback(
       (member: AudienceMember) => {
         setSelectedMember(member);
+        openPanel('contact');
       },
-      [setSelectedMember]
+      [setSelectedMember, openPanel]
     );
 
     // Quick action: send notification (copies contact info for now)
@@ -486,24 +502,42 @@ export const DashboardAudienceTableUnified = memo(
       [selectedMember]
     );
 
-    // Register right panel with AuthShell instead of rendering inline
-    const sidebarPanel = useMemo(
-      () => (
+    // Close handler for the right panel
+    const handleClosePanel = React.useCallback(() => {
+      closePanel();
+      setSelectedMember(null);
+    }, [closePanel, setSelectedMember]);
+
+    // Register unified right panel — shows contact or analytics based on mode
+    const sidebarPanel = useMemo(() => {
+      if (panelMode === 'contact') {
+        return (
+          <AudienceMemberSidebar
+            member={selectedMember}
+            isOpen
+            onClose={handleClosePanel}
+            contextMenuItems={
+              selectedMember
+                ? convertToCommonDropdownItems(
+                    getContextMenuItems(selectedMember)
+                  )
+                : undefined
+            }
+          />
+        );
+      }
+      if (panelMode === 'analytics') {
+        return <AnalyticsSidebar isOpen onClose={handleClosePanel} />;
+      }
+      // Panel closed — render closed drawer to animate out
+      return (
         <AudienceMemberSidebar
-          member={selectedMember}
-          isOpen={Boolean(selectedMember)}
-          onClose={() => setSelectedMember(null)}
-          contextMenuItems={
-            selectedMember
-              ? convertToCommonDropdownItems(
-                  getContextMenuItems(selectedMember)
-                )
-              : undefined
-          }
+          member={null}
+          isOpen={false}
+          onClose={handleClosePanel}
         />
-      ),
-      [selectedMember, getContextMenuItems, setSelectedMember]
-    );
+      );
+    }, [panelMode, selectedMember, getContextMenuItems, handleClosePanel]);
 
     useRegisterRightPanel(sidebarPanel);
 
@@ -572,7 +606,7 @@ export const DashboardAudienceTableUnified = memo(
                       minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
                       className='text-[13px]'
                       getRowClassName={getRowClassName}
-                      onRowClick={row => setSelectedMember(row)}
+                      onRowClick={row => handleViewProfile(row)}
                       getContextMenuItems={getContextMenuItems}
                       hasNextPage={hasNextPage}
                       isFetchingNextPage={isFetchingNextPage}

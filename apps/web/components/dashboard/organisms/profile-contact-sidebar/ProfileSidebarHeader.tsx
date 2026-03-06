@@ -25,6 +25,7 @@ interface UseProfileHeaderPartsProps {
   readonly username: string;
   readonly displayName: string;
   readonly profilePath: string;
+  readonly onClose?: () => void;
 }
 
 function generateVCard(
@@ -50,6 +51,7 @@ export function useProfileHeaderParts({
   username,
   displayName,
   profilePath,
+  onClose,
 }: UseProfileHeaderPartsProps): UseProfileHeaderResult {
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -137,6 +139,7 @@ export function useProfileHeaderParts({
     <DrawerHeaderActions
       primaryActions={primaryActions}
       overflowActions={overflowActions}
+      onClose={onClose}
     />
   );
 

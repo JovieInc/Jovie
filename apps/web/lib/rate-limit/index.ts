@@ -43,11 +43,13 @@ export {
   adminImpersonateLimiter,
   aiChatDailyFreeLimiter,
   aiChatDailyGrowthLimiter,
+  aiChatDailyPlanAwareLimiter,
   aiChatDailyProLimiter,
   aiChatLimiter,
   apiLimiter,
   appleMusicRescanFreeLimiter,
   appleMusicRescanPaidLimiter,
+  appleMusicRescanPlanAwareLimiter,
   appleMusicSearchLimiter,
   artworkUploadLimiter,
   avatarUploadLimiter,
@@ -81,6 +83,7 @@ export {
   publicVisitLimiter,
   releaseRefreshFreeLimiter,
   releaseRefreshPaidLimiter,
+  releaseRefreshPlanAwareLimiter,
   spotifyClaimLimiter,
   spotifyPublicSearchLimiter,
   spotifyRefreshLimiter,
@@ -97,6 +100,8 @@ export {
   getStoreSize,
   MemoryRateLimiter,
 } from './memory-limiter';
+// Plan-Aware Rate Limiter Factory
+export { createPlanAwareRateLimiter } from './plan-aware-limiter';
 export type { RateLimiterBackend, RateLimiterOptions } from './rate-limiter';
 // Rate Limiter Classes
 export {
@@ -111,6 +116,9 @@ export {
 } from './redis-limiter';
 // Types
 export type {
+  PlanAwareLimiterOptions,
+  PlanAwareRateLimiter,
+  PlanRateLimitConfig,
   PublicEndpointType,
   RateLimitConfig,
   RateLimitKeyType,

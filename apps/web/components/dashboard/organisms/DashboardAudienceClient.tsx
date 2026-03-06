@@ -1,6 +1,6 @@
 'use client';
 
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, User } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
@@ -18,7 +18,11 @@ import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import { AnalyticsSidebar } from './AnalyticsSidebar';
+import {
+  type AudiencePanelMode,
+  AudiencePanelProvider,
+  useAudiencePanel,
+} from './AudiencePanelContext';
 import type {
   AudienceFilters,
   AudienceView,
@@ -81,6 +85,38 @@ const audienceUrlParsers = {
   direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
 };
 
+/** Header action buttons for toggling right panel between contact and analytics */
+function AudienceHeaderActions({
+  mode,
+  onToggle,
+}: {
+  readonly mode: AudiencePanelMode | null;
+  readonly onToggle: (panel: AudiencePanelMode) => void;
+}) {
+  return (
+    <div className='flex items-center gap-1'>
+      <DashboardHeaderActionButton
+        ariaLabel={
+          mode === 'contact' ? 'Close contact sidebar' : 'Open contact sidebar'
+        }
+        pressed={mode === 'contact'}
+        onClick={() => onToggle('contact')}
+        icon={<User className='h-4 w-4' />}
+      />
+      <DashboardHeaderActionButton
+        ariaLabel={
+          mode === 'analytics'
+            ? 'Close analytics sidebar'
+            : 'Open analytics sidebar'
+        }
+        pressed={mode === 'analytics'}
+        onClick={() => onToggle('analytics')}
+        icon={<BarChart3 className='h-4 w-4' />}
+      />
+    </div>
+  );
+}
+
 export function DashboardAudienceClient({
   mode,
   view,
@@ -94,28 +130,45 @@ export function DashboardAudienceClient({
   filters: initialFilters,
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
-  // Analytics sidebar state
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = React.useState(false);
-  const toggleAnalytics = React.useCallback(() => {
-    setIsAnalyticsOpen(prev => !prev);
-  }, []);
-  const closeAnalytics = React.useCallback(() => {
-    setIsAnalyticsOpen(false);
-  }, []);
+  return (
+    <AudiencePanelProvider>
+      <DashboardAudienceClientInner
+        mode={mode}
+        view={view}
+        initialRows={initialRows}
+        total={total}
+        sort={sort}
+        direction={direction}
+        profileUrl={profileUrl}
+        profileId={profileId}
+        subscriberCount={subscriberCount}
+        filters={initialFilters}
+        tourDates={tourDates}
+      />
+    </AudiencePanelProvider>
+  );
+}
 
-  // Register analytics icon button in the dashboard header
+function DashboardAudienceClientInner({
+  mode,
+  view,
+  initialRows,
+  total,
+  sort,
+  direction,
+  profileUrl,
+  profileId,
+  subscriberCount,
+  filters: initialFilters,
+  tourDates,
+}: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
+  // Register header actions with both panel toggle buttons
   const { setHeaderActions } = useSetHeaderActions();
+  const { mode: panelMode, toggle: togglePanel } = useAudiencePanel();
 
   const headerActions = React.useMemo(
-    () => (
-      <DashboardHeaderActionButton
-        ariaLabel={isAnalyticsOpen ? 'Close analytics' : 'Open analytics'}
-        pressed={isAnalyticsOpen}
-        onClick={toggleAnalytics}
-        icon={<BarChart3 className='h-4 w-4' />}
-      />
-    ),
-    [isAnalyticsOpen, toggleAnalytics]
+    () => <AudienceHeaderActions mode={panelMode} onToggle={togglePanel} />,
+    [panelMode, togglePanel]
   );
 
   React.useEffect(() => {
@@ -204,35 +257,29 @@ export function DashboardAudienceClient({
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
       <div
         data-testid='dashboard-audience-client'
-        className='flex h-full min-h-0 flex-row'
+        className='flex h-full min-h-0 flex-col'
       >
-        {/* Main content area */}
-        <div className='flex-1 min-w-0 flex flex-col'>
-          <div className='flex-1 min-h-0 flex flex-col'>
-            <DashboardAudienceTable
-              mode={mode}
-              view={view}
-              rows={rows}
-              total={totalCount}
-              sort={sort}
-              direction={direction}
-              onSortChange={handleSortChange}
-              onViewChange={handleViewChange}
-              onFiltersChange={handleFiltersChange}
-              profileUrl={profileUrl}
-              profileId={profileId}
-              subscriberCount={subscriberCount}
-              filters={initialFilters}
-              hasNextPage={hasNextPage}
-              isFetchingNextPage={isFetchingNextPage}
-              onLoadMore={handleLoadMore}
-              tourDates={tourDates}
-            />
-          </div>
+        <div className='flex-1 min-h-0 flex flex-col'>
+          <DashboardAudienceTable
+            mode={mode}
+            view={view}
+            rows={rows}
+            total={totalCount}
+            sort={sort}
+            direction={direction}
+            onSortChange={handleSortChange}
+            onViewChange={handleViewChange}
+            onFiltersChange={handleFiltersChange}
+            profileUrl={profileUrl}
+            profileId={profileId}
+            subscriberCount={subscriberCount}
+            filters={initialFilters}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={handleLoadMore}
+            tourDates={tourDates}
+          />
         </div>
-
-        {/* Analytics right drawer */}
-        <AnalyticsSidebar isOpen={isAnalyticsOpen} onClose={closeAnalytics} />
       </div>
     </QueryErrorBoundary>
   );
