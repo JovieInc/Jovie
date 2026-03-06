@@ -1,7 +1,7 @@
 /**
  * YouTube Cross-Category Handler
  *
- * Handles YouTube-specific logic for cross-category placement (social + dsp).
+ * Handles YouTube-specific logic.
  */
 
 import type { LinkSection } from '../utils/link-categorization';
@@ -19,13 +19,9 @@ export interface YouTubeCrossCategoryResult {
 }
 
 /**
- * Determines YouTube cross-category behavior.
+ * Determines YouTube-specific behavior.
  *
- * YouTube links can exist in both social and dsp sections simultaneously.
- * This function decides whether to:
- * - Show a prompt to add to the other section
- * - Skip adding (already in both sections)
- * - Proceed with normal add
+ * YouTube is treated as a social platform. Cross-category prompting is disabled.
  *
  * @param platformId - Platform ID of the link being added
  * @param sameSectionHas - Whether the same section already has this platform
@@ -39,32 +35,15 @@ export function checkYouTubeCrossCategory(
   otherSectionHas: boolean,
   otherSection: 'social' | 'dsp' | null
 ): YouTubeCrossCategoryResult {
-  if (platformId !== 'youtube') {
-    return { shouldPrompt: false, targetSection: null, shouldSkip: false };
-  }
-
-  // YouTube: already in this section, prompt for other section
-  if (sameSectionHas && !otherSectionHas && otherSection) {
-    return {
-      shouldPrompt: true,
-      targetSection: otherSection,
-      shouldSkip: false,
-    };
-  }
-
-  // YouTube: already in both sections - skip
-  if (sameSectionHas && otherSectionHas) {
-    return { shouldPrompt: false, targetSection: null, shouldSkip: true };
-  }
-
+  void platformId;
+  void sameSectionHas;
+  void otherSectionHas;
+  void otherSection;
   return { shouldPrompt: false, targetSection: null, shouldSkip: false };
 }
 
 /**
  * Checks if a duplicate should be merged for YouTube links.
- *
- * YouTube allows cross-section duplicates, but same-section duplicates
- * should be merged.
  *
  * @param platformId - Platform ID of the link
  * @param duplicateIndex - Index of duplicate (-1 if none)
@@ -80,20 +59,10 @@ export function shouldMergeYouTubeDuplicate(
   currentSection: LinkSection,
   hasCrossSectionDuplicate: boolean
 ): boolean {
-  if (platformId !== 'youtube') {
-    return false;
-  }
-
-  // No duplicate found
-  if (duplicateIndex === -1) {
-    return false;
-  }
-
-  // Cross-section duplicate - don't merge (allow both)
-  if (hasCrossSectionDuplicate) {
-    return false;
-  }
-
-  // Same section duplicate - merge
-  return duplicateSection === currentSection;
+  return (
+    platformId === 'youtube' &&
+    duplicateIndex !== -1 &&
+    !hasCrossSectionDuplicate &&
+    duplicateSection === currentSection
+  );
 }

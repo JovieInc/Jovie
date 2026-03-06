@@ -160,14 +160,18 @@ describe.skip('GroupedLinksManager', () => {
     });
     fireEvent.click(screen.getByText('mock-add'));
 
-    nextAddPayload = ytSocial({
+    nextAddPayload = {
+      ...ytSocial({
+        normalizedUrl: 'https://music.youtube.com/channel/a',
+        originalUrl: 'https://music.youtube.com/channel/a',
+      }),
       platform: {
         ...ytSocial().platform,
+        id: 'youtube_music',
+        name: 'YouTube Music',
         category: 'dsp',
       },
-      normalizedUrl: 'https://music.youtube.com/channel/a',
-      originalUrl: 'https://music.youtube.com/channel/a',
-    });
+    };
     fireEvent.click(screen.getByText('mock-add'));
 
     // handleAdd includes a 600ms delay; advance timers so both complete
@@ -195,7 +199,7 @@ describe.skip('GroupedLinksManager', () => {
     expect(onLinksChange.mock.calls[0][0]).toHaveLength(1);
   });
 
-  it('shows YouTube prompt when adding duplicate in same section, and can add to other section', () => {
+  it('does not show a YouTube cross-category prompt for duplicate social links', () => {
     const onLinksChange = vi.fn();
     const onLinkAdded = vi.fn();
 
@@ -211,23 +215,15 @@ describe.skip('GroupedLinksManager', () => {
     nextAddPayload = ytSocial();
     fireEvent.click(screen.getByText('mock-add'));
 
-    // Prompt should appear
     expect(
-      screen.getByText(/Do you also want to add it as a music service/i)
-    ).toBeInTheDocument();
+      screen.queryByText(/Do you also want to add it as a music service/i)
+    ).not.toBeInTheDocument();
 
-    // Accept prompt to add as Music
-    fireEvent.click(screen.getByRole('button', { name: /Add as Music/i }));
-
-    // onLinkAdded called and onLinksChange fired with 2 links (social + dsp)
     expect(onLinkAdded).toHaveBeenCalledTimes(1);
     expect(onLinksChange).toHaveBeenCalled();
     const last = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
-    expect(last).toHaveLength(2);
-    const hasDSP = last.some(
-      l => l.platform.id === 'youtube' && l.platform.category === 'dsp'
-    );
-    expect(hasDSP).toBe(true);
+    expect(last).toHaveLength(1);
+    expect(last[0]?.platform.id).toBe('youtube');
   });
 
   it('toggles visibility and fires onLinksChange', () => {
