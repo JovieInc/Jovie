@@ -9,6 +9,13 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const POLL_INTERVAL_MS = 2000;
 
+function getSortTimestamp(releaseDate: string | null | undefined): number {
+  if (!releaseDate) return Number.NEGATIVE_INFINITY;
+
+  const timestamp = new Date(releaseDate).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+}
+
 interface UseImportPollingParams {
   enabled: boolean;
   onReleasesUpdate: (releases: ReleaseViewModel[]) => void;
@@ -20,12 +27,8 @@ interface UseImportPollingParams {
  */
 function sortReleases(releases: ReleaseViewModel[]): ReleaseViewModel[] {
   return [...releases].sort((a, b) => {
-    const dateA = a.releaseDate
-      ? new Date(a.releaseDate).getTime()
-      : Number.NEGATIVE_INFINITY;
-    const dateB = b.releaseDate
-      ? new Date(b.releaseDate).getTime()
-      : Number.NEGATIVE_INFINITY;
+    const dateA = getSortTimestamp(a.releaseDate);
+    const dateB = getSortTimestamp(b.releaseDate);
     if (dateA !== dateB) return dateB - dateA;
     return a.id.localeCompare(b.id);
   });
