@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import SPEC_FIXTURE from './fixtures/linear-dropdown-spec.json';
 
 /**
  * Dropdown Parity — Linear.app match
@@ -24,50 +25,51 @@ import { expect, test } from '@playwright/test';
 // No auth needed — test page is public
 test.use({ storageState: { cookies: [], origins: [] } });
 
-// Spec values extracted from linear.app/demo via JS execution
+// Locked parity fixture values (source of truth)
+const FIXTURE = SPEC_FIXTURE;
+
+// Runtime tolerances and derived expectations
 const SPEC = {
   container: {
-    borderRadius: '8px',
-    padding: '4px',
-    minWidth: 192,
-    backdropFilter: 'none',
+    borderRadius: FIXTURE.container.borderRadius,
+    padding: FIXTURE.container.padding,
+    minWidth: Number.parseFloat(FIXTURE.container.minWidth),
+    backdropFilter: FIXTURE.container.backdropFilter,
   },
   item: {
-    paddingBlock: '6px',
-    paddingInline: '8px',
-    fontSize: '13px',
-    fontWeight: '450', // Linear uses "book" weight (450), not standard 400
-    borderRadius: '4px',
-    gap: '8px',
+    paddingBlock: FIXTURE.item.padding.split(' ')[0] ?? '6px',
+    paddingInline: FIXTURE.item.padding.split(' ')[1] ?? '8px',
+    fontSize: FIXTURE.item.fontSize,
+    fontWeight: FIXTURE.item.fontWeight,
+    borderRadius: FIXTURE.item.borderRadius,
+    gap: FIXTURE.item.gap,
   },
-  icon: { size: '14px' },
-  disabled: { opacityMin: 0.44, opacityMax: 0.48 },
+  icon: { size: FIXTURE.icon.width },
+  disabled: {
+    opacityMin: Number.parseFloat(FIXTURE.itemDisabled.opacity) - 0.02,
+    opacityMax: Number.parseFloat(FIXTURE.itemDisabled.opacity) + 0.02,
+  },
   // Destructive: strong red (r>180, g<100, b<100)
   destructive: { rMin: 180, gMax: 100, bMax: 100 },
-  label: { fontSize: '11px', weightMin: 490, weightMax: 530 },
-  separator: { height: '1px', marginLeftMax: -2 },
-  shortcut: { fontSize: '11px', letterSpacingMax: 1 },
+  label: {
+    fontSize: FIXTURE.label.fontSize,
+    weightMin: Number.parseFloat(FIXTURE.label.fontWeight) - 10,
+    weightMax: Number.parseFloat(FIXTURE.label.fontWeight) + 10,
+  },
+  separator: {
+    height: FIXTURE.separator.height,
+    marginLeftMax: -2,
+  },
+  shortcut: {
+    fontSize: FIXTURE.shortcut.fontSize,
+    letterSpacingMax: 1,
+  },
   // Light mode: menu must be pure/near-white
   lightBg: { rMin: 250, gMin: 250, bMin: 250 },
   // Dark mode: menu luminance must be ≥ 4× page background luminance
   // (extracted: menu lab(14.133%) ÷ page lab(2.47%) ≈ 4.3×)
   darkElevation: { minLuminanceRatio: 4 },
 } as const;
-
-/** Resolve any CSS color string to sRGB via canvas (handles oklch/lab/lch). */
-const _RESOLVE_COLOR_JS = `
-  (function resolveColor(colorStr) {
-    const canvas = globalThis.document.createElement('canvas');
-    canvas.width = 1;
-    canvas.height = 1;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return { r: 0, g: 0, b: 0 };
-    ctx.fillStyle = colorStr;
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-    return { r, g, b };
-  })
-`;
 
 /** WCAG 2.1 relative luminance (0–1) from sRGB 0–255. */
 function relativeLuminance(r: number, g: number, b: number): number {
@@ -262,7 +264,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
 
   // ─── Item styles ─────────────────────────────────────────────────────────
 
-  test('item: padding, font size 13px, weight 400, radius 4px, gap 8px', async ({
+  test('item: padding, font size 13px, weight 450, radius 4px, gap 8px', async ({
     page,
   }) => {
     const item = page
@@ -538,11 +540,7 @@ test.describe('Dropdown Parity — Linear.app match', () => {
         '[data-testid="menu-shortcuts"] [data-testid="item-shortcut"] [class*="shortcut"]'
       )
       .first();
-    const shortcutCount = await shortcut.count();
-    if (shortcutCount === 0) {
-      test.skip(true, 'Shortcut element not found — adjust selector');
-      return;
-    }
+    await expect(shortcut).toBeVisible();
 
     const styles = await shortcut.evaluate(el => {
       const cs = globalThis.getComputedStyle(el);

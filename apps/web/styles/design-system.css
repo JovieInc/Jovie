@@ -58,36 +58,42 @@
      --bg-surface-1: Main app content area
      --bg-surface-2: Cards and panels
      --bg-surface-3: Interactive / elevated */
-  /* prettier-ignore */ --color-bg-base: #f7f8f9; /* Sidebar bg */
-  /* prettier-ignore */ --color-bg-surface-0: #f7f8f9; /* Page bg */
-  /* prettier-ignore */ --color-bg-surface-1: var(
-    --linear-bg-surface-0
-  ); /* Elevated surfaces — single source of truth via linear token */
-  /* prettier-ignore */ --color-bg-surface-2: #f2f3f5; /* Cards */
-  /* prettier-ignore */ --color-bg-surface-3: #ebecef; /* Nested / hover */
+  /* prettier-ignore */
+  --color-bg-base: #f7f8f9;
+  /* Sidebar bg */
+  /* prettier-ignore */
+  --color-bg-surface-0: #f7f8f9;
+  /* Page bg */
+  /* prettier-ignore */
+  --color-bg-surface-1: var(--linear-bg-surface-0);
+  /* Elevated surfaces — single source of truth via linear token */
+  /* prettier-ignore */
+  --color-bg-surface-2: #f2f3f5;
+  /* Cards */
+  /* prettier-ignore */
+  --color-bg-surface-3: #ebecef;
+  /* Nested / hover */
 
-  --color-bg-page: #f7f8f9; /* Same as base */
-  --color-bg-hover: rgba(0, 0, 0, 0.04); /* Hover overlay */
-  --color-bg-elevated: #f2f3f5; /* Same as surface-2 */
-  --color-bg-input: #ebecef; /* Same as surface-3 */
-  --color-bg-active: #ebecef; /* Same as surface-3 */
+  --color-bg-page: #f7f8f9;
+  /* Same as base */
+  --color-bg-hover: rgba(0, 0, 0, 0.04);
+  /* Hover overlay */
+  --color-bg-elevated: #f2f3f5;
+  /* Same as surface-2 */
+  --color-bg-input: #ebecef;
+  /* Same as surface-3 */
+  --color-bg-active: #ebecef;
+  /* Same as surface-3 */
   --color-bg-button: #e3e5e8;
-  --color-bg-tooltip: #101012; /* Linear dark background for light mode tooltips */
+  --color-bg-tooltip: #101012;
+  /* Linear dark background for light mode tooltips */
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
-  --color-text-secondary-token: oklch(
-    40% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-tertiary-token: oklch(
-    50% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-quaternary-token: oklch(
-    60% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-disabled-token: oklch(
-    70% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-text-secondary-token: oklch(40% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-tertiary-token: oklch(50% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-quaternary-token: oklch(60% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-disabled-token: oklch(70% var(--theme-base-chroma) var(--theme-base-hue));
   --color-text-tooltip: #ffffff;
 
   /* Logo muted tokens for label logos bar */
@@ -98,12 +104,12 @@
   --color-border-subtle: oklch(0% 0 0 / 6%);
   --color-border-default: oklch(0% 0 0 / 10%);
   --color-border-strong: oklch(0% 0 0 / 18%);
-  --color-border-focus: lch(
-    47.918% 59.303 288.421
-  ); /* Linear accent for focus */
+  --color-border-focus: lch(47.918% 59.303 288.421);
+  /* Linear accent for focus */
 
   /* Accent — Linear's exact purple-blue: #5e6ad2 = lch(47.918% 59.303 288.421) */
-  --color-accent: lch(47.918% 59.303 288.421); /* #5e6ad2 — Linear exact */
+  --color-accent: lch(47.918% 59.303 288.421);
+  /* #5e6ad2 — Linear exact */
   --color-accent-hover: lch(42% 59.303 288.421);
   --color-accent-active: lch(37% 59.303 288.421);
   --color-accent-subtle: lch(92% 20 288.421);
@@ -115,13 +121,9 @@
   --color-btn-primary-hover: oklch(20% 0 0);
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(
-    93% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-bg: oklch(93% var(--theme-base-chroma) var(--theme-base-hue));
   --color-btn-secondary-fg: oklch(20% 0 0);
-  --color-btn-secondary-hover: oklch(
-    88% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-hover: oklch(88% var(--theme-base-chroma) var(--theme-base-hue));
 
   /* Interactive states */
   --color-interactive-hover: oklch(0% 0 0 / 6%);
@@ -160,9 +162,7 @@
     0px 4px 4px -1px oklch(0% 0 0 / 6%), 0px 1px 1px 0px oklch(0% 0 0 / 12%);
 
   /* Skeleton/loading states */
-  --color-skeleton-base: oklch(
-    95% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-skeleton-base: oklch(95% var(--theme-base-chroma) var(--theme-base-hue));
   --color-skeleton-shimmer: oklch(100% 0 0);
 
   /* Focus ring — Linear: lch(47.918% 59.303 288.421) = #5e6ad2 */
@@ -178,22 +178,32 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces — matched to Linear's exact Hex values */
-  --color-bg-base: #090909; /* sidebar/page bg */
-  --color-bg-surface-0: #101012; /* primary app surface */
-  --color-bg-surface-1: var(
-    --linear-bg-surface-0
-  ); /* cards — single source of truth via linear token */
-  --color-bg-surface-2: #23252a; /* inputs, elevated */
-  --color-bg-surface-3: #2a2c32; /* modals, tooltips */
+  --color-bg-base: #090909;
+  /* sidebar/page bg */
+  --color-bg-surface-0: #101012;
+  /* primary app surface */
+  --color-bg-surface-1: var(--linear-bg-surface-2);
+  /* cards/panels — single source of truth via linear token */
+  --color-bg-surface-2: #23252a;
+  /* inputs, elevated */
+  --color-bg-surface-3: #2a2c32;
+  /* modals, tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: #090909; /* Same as base */
-  --color-bg-hover: rgba(255, 255, 255, 0.04); /* Row/item hover */
-  --color-bg-elevated: #101012; /* Same as surface-0 */
-  --color-bg-input: #191b1f; /* Same as surface-1 */
-  --color-bg-active: #23252a; /* Same as surface-2 */
-  --color-bg-button: #2a2c32; /* Same as surface-3 */
-  --color-bg-tooltip: #2a2c32; /* Matches surface-3 in dark mode */
+  --color-bg-page: #090909;
+  /* Same as base */
+  --color-bg-hover: rgba(255, 255, 255, 0.04);
+  /* Row/item hover */
+  --color-bg-elevated: #101012;
+  /* Same as surface-0 */
+  --color-bg-input: #191b1f;
+  /* Same as surface-1 */
+  --color-bg-active: #23252a;
+  /* Same as surface-2 */
+  --color-bg-button: #2a2c32;
+  /* Same as surface-3 */
+  --color-bg-tooltip: #2a2c32;
+  /* Matches surface-3 in dark mode */
 
   /* Text hierarchy - inverted for dark mode
      Extracted from Linear.app live (2026-02-15):
@@ -208,16 +218,17 @@
      --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
      --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
      --content-color:         #6b6f76               = content/meta text */
-  --color-text-primary-token: lch(100% 0 272); /* Pure white — Linear exact */
-  --color-text-secondary-token: lch(
-    90.65% 1.35 272
-  ); /* #E3E4E6 — Linear exact */
-  --color-text-tertiary-token: lch(62.6% 1.35 272); /* #969799 — Linear exact */
-  --color-text-quaternary-token: lch(
-    51% 1.35 272
-  ); /* ~#7a7b7d — bumped from 38.29% for WCAG AA 4.5:1 contrast on dark bg */
+  --color-text-primary-token: lch(100% 0 272);
+  /* Pure white — Linear exact */
+  --color-text-secondary-token: lch(90.65% 1.35 272);
+  /* #E3E4E6 — Linear exact */
+  --color-text-tertiary-token: lch(62.6% 1.35 272);
+  /* #969799 — Linear exact */
+  --color-text-quaternary-token: lch(51% 1.35 272);
+  /* ~#7a7b7d — bumped from 38.29% for WCAG AA 4.5:1 contrast on dark bg */
   --color-text-disabled-token: oklch(28% 0.006 272);
-  --color-text-tooltip: lch(100% 0 272); /* White text on dark tooltips */
+  --color-text-tooltip: lch(100% 0 272);
+  /* White text on dark tooltips */
 
   /* Logo muted tokens for label logos bar */
   --color-logo-muted: rgba(255, 255, 255, 0.55);
@@ -230,13 +241,13 @@
   --color-border-subtle: rgba(255, 255, 255, 0.05);
   --color-border-default: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.1);
-  --color-border-focus: lch(
-    47.918% 59.303 288.421
-  ); /* Linear accent for focus */
+  --color-border-focus: lch(47.918% 59.303 288.421);
+  /* Linear accent for focus */
 
   /* Accent — Linear's exact purple-blue: #5e6ad2 = lch(47.918% 59.303 288.421)
      Focus ring uses same accent color */
-  --color-accent: lch(47.918% 59.303 288.421); /* #5e6ad2 — Linear exact */
+  --color-accent: lch(47.918% 59.303 288.421);
+  /* #5e6ad2 — Linear exact */
   --color-accent-hover: lch(55% 59.303 288.421);
   --color-accent-active: lch(42% 59.303 288.421);
   --color-accent-subtle: lch(20% 30 288.421);
@@ -247,13 +258,9 @@
   --color-btn-primary-hover: oklch(92% 0 0);
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(
-    19% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-bg: oklch(19% var(--theme-base-chroma) var(--theme-base-hue));
   --color-btn-secondary-fg: oklch(90% 0 0);
-  --color-btn-secondary-hover: oklch(
-    24% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-hover: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
 
   /* Interactive states - white-based (Linear uses semi-transparent overlays)
      Extracted: hover rows = rgba(255,255,255,0.02-0.03), buttons = 0.05, active = 0.05 */
@@ -298,12 +305,8 @@
     rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
 
   /* Skeleton/loading states */
-  --color-skeleton-base: oklch(
-    18% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-skeleton-shimmer: oklch(
-    24% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-skeleton-base: oklch(18% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-shimmer: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
 }
 
 /* ============================================
@@ -321,9 +324,7 @@
 
     /* Increase text contrast */
     --color-text-primary-token: oklch(5% 0 0);
-    --color-text-secondary-token: oklch(
-      25% var(--theme-base-chroma) var(--theme-base-hue)
-    );
+    --color-text-secondary-token: oklch(25% var(--theme-base-chroma) var(--theme-base-hue));
 
     /* Stronger borders */
     --color-border-subtle: oklch(0% 0 0 / 15%);
@@ -333,9 +334,7 @@
 
   :root.dark {
     --color-text-primary-token: oklch(100% 0 0);
-    --color-text-secondary-token: oklch(
-      85% var(--theme-base-chroma) var(--theme-base-hue)
-    );
+    --color-text-secondary-token: oklch(85% var(--theme-base-chroma) var(--theme-base-hue));
 
     --color-border-subtle: oklch(100% 0 0 / 15%);
     --color-border-default: oklch(100% 0 0 / 25%);
@@ -356,18 +355,10 @@
 
   /* Text hierarchy — maximum separation */
   --color-text-primary-token: oklch(5% 0 0);
-  --color-text-secondary-token: oklch(
-    25% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-tertiary-token: oklch(
-    35% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-quaternary-token: oklch(
-    45% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-disabled-token: oklch(
-    55% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-text-secondary-token: oklch(25% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-tertiary-token: oklch(35% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-quaternary-token: oklch(45% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-disabled-token: oklch(55% var(--theme-base-chroma) var(--theme-base-hue));
 
   /* Borders — significantly stronger */
   --color-border-subtle: oklch(0% 0 0 / 15%);
@@ -388,13 +379,9 @@
   --color-badge-text: oklch(5% 0 0);
 
   /* Secondary button — more contrast */
-  --color-btn-secondary-bg: oklch(
-    88% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-bg: oklch(88% var(--theme-base-chroma) var(--theme-base-hue));
   --color-btn-secondary-fg: oklch(10% 0 0);
-  --color-btn-secondary-hover: oklch(
-    82% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-hover: oklch(82% var(--theme-base-chroma) var(--theme-base-hue));
 
   /* Shadows — stronger ring for depth perception */
   --shadow-card:
@@ -408,15 +395,9 @@
 
   /* Text hierarchy — brighter primaries, more steps */
   --color-text-primary-token: oklch(100% 0 0);
-  --color-text-secondary-token: oklch(
-    85% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-tertiary-token: oklch(
-    72% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-quaternary-token: oklch(
-    55% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-text-secondary-token: oklch(85% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-tertiary-token: oklch(72% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-quaternary-token: oklch(55% var(--theme-base-chroma) var(--theme-base-hue));
   --color-text-disabled-token: oklch(40% 0.006 272);
 
   /* Borders — much stronger */
@@ -438,13 +419,9 @@
   --color-badge-text: rgb(255, 255, 255);
 
   /* Secondary button — more contrast */
-  --color-btn-secondary-bg: oklch(
-    24% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-bg: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
   --color-btn-secondary-fg: oklch(95% 0 0);
-  --color-btn-secondary-hover: oklch(
-    30% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-btn-secondary-hover: oklch(30% var(--theme-base-chroma) var(--theme-base-hue));
 
   /* Shadows — stronger rings */
   --shadow-card:
@@ -458,16 +435,12 @@
 
     /* Softer text contrast */
     --color-text-primary-token: oklch(20% 0 0);
-    --color-text-secondary-token: oklch(
-      45% var(--theme-base-chroma) var(--theme-base-hue)
-    );
+    --color-text-secondary-token: oklch(45% var(--theme-base-chroma) var(--theme-base-hue));
   }
 
   :root.dark {
     --color-text-primary-token: oklch(85% 0 0);
-    --color-text-secondary-token: oklch(
-      65% var(--theme-base-chroma) var(--theme-base-hue)
-    );
+    --color-text-secondary-token: oklch(65% var(--theme-base-chroma) var(--theme-base-hue));
   }
 }
 
@@ -653,12 +626,17 @@
        --font-weight-medium: 500
        --font-weight-semibold: 600
        --font-weight-bold: 700 */
-  --font-weight-normal: 450; /* Linear default — "book" weight, not standard 400 */
-  --font-weight-book: 450; /* Alias for normal */
+  --font-weight-normal: 450;
+  /* Linear default — "book" weight, not standard 400 */
+  --font-weight-book: 450;
+  /* Alias for normal */
   --font-weight-medium: 500;
-  --font-weight-nav: 500; /* Linear sidebar nav = --font-weight-medium */
-  --font-weight-semibold: 600; /* Linear: 600, not our old 538 */
-  --font-weight-bold: 700; /* Linear: 700, not our old 590 */
+  --font-weight-nav: 500;
+  /* Linear sidebar nav = --font-weight-medium */
+  --font-weight-semibold: 600;
+  /* Linear: 600, not our old 538 */
+  --font-weight-bold: 700;
+  /* Linear: 700, not our old 590 */
   --font-weight-heavy: 700;
 
   /* Type scale - based on 16px base
@@ -743,16 +721,26 @@
    ============================================ */
 :root {
   --radius-none: 0;
-  --radius-xs: 2px; /* Tags/badges — extracted: 2px on issue labels */
-  --radius-sm: 4px; /* Sidebar items */
-  --radius-md: 6px; /* Input fields — extracted: 6px on inputs & sidebar buttons */
-  --radius-default: 8px; /* Buttons, dropdowns — extracted: 8px on nav buttons & cards */
-  --radius-lg: 8px; /* Cards — extracted: 8px on marketing cards */
-  --radius-xl: 12px; /* Large cards, panels — extracted: 12px on feature sections */
-  --radius-2xl: 16px; /* Modals, sheets — extracted: 16px on elevated panels */
-  --radius-3xl: 22px; /* Large modals — extracted: 22px on hero sections */
-  --radius-pill: 48px; /* Pill buttons (observed in Linear) */
-  --radius-full: 9999px; /* Circles, tags */
+  --radius-xs: 2px;
+  /* Tags/badges — extracted: 2px on issue labels */
+  --radius-sm: 4px;
+  /* Sidebar items */
+  --radius-md: 6px;
+  /* Input fields — extracted: 6px on inputs & sidebar buttons */
+  --radius-default: 8px;
+  /* Buttons, dropdowns — extracted: 8px on nav buttons & cards */
+  --radius-lg: 8px;
+  /* Cards — extracted: 8px on marketing cards */
+  --radius-xl: 12px;
+  /* Large cards, panels — extracted: 12px on feature sections */
+  --radius-2xl: 16px;
+  /* Modals, sheets — extracted: 16px on elevated panels */
+  --radius-3xl: 22px;
+  /* Large modals — extracted: 22px on hero sections */
+  --radius-pill: 48px;
+  /* Pill buttons (observed in Linear) */
+  --radius-full: 9999px;
+  /* Circles, tags */
 }
 
 /* ============================================
@@ -764,10 +752,14 @@
      --speed-regularTransition: .25s
      --speed-slowTransition: .35s */
   --duration-instant: 50ms;
-  --duration-fast: 100ms; /* Linear: quickTransition */
-  --duration-normal: 160ms; /* Sidebar/nav transition: 0.16s cubic-bezier */
-  --duration-slow: 250ms; /* Linear: regularTransition */
-  --duration-slower: 350ms; /* Linear: slowTransition */
+  --duration-fast: 100ms;
+  /* Linear: quickTransition */
+  --duration-normal: 160ms;
+  /* Sidebar/nav transition: 0.16s cubic-bezier */
+  --duration-slow: 250ms;
+  /* Linear: regularTransition */
+  --duration-slower: 350ms;
+  /* Linear: slowTransition */
   --duration-slowest: 350ms;
 
   /* Easings - Linear uses cubic-bezier for smooth feel */
@@ -775,7 +767,8 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-interactive: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --ease-linear: var(--ease-interactive); /* Legacy alias */
+  --ease-linear: var(--ease-interactive);
+  /* Legacy alias */
 
   /* Pre-composed transition patterns (extracted from Linear)
      Use duration custom properties so prefers-reduced-motion overrides work */
@@ -784,8 +777,7 @@
     color var(--duration-normal), opacity var(--duration-normal);
   --transition-bg: background-color var(--duration-normal);
   --transition-opacity: opacity var(--duration-normal);
-  --transition-opacity-fast: opacity var(--duration-instant)
-    var(--ease-interactive);
+  --transition-opacity-fast: opacity var(--duration-instant) var(--ease-interactive);
   --transition-fill: fill var(--duration-normal), stroke var(--duration-normal);
   --transition-transform: transform var(--duration-normal);
   --transition-collapse:
@@ -813,18 +805,25 @@
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Maps to --color-bg-base: #f5f5f5 = rgb(245,245,245) */
-  --sidebar-background: 245 245 245; /* Matches base */
+  --sidebar-background: 245 245 245;
+  /* Matches base */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
-  --sidebar-accent: 237 237 237; /* Slightly darker neutral for hover */
+  --sidebar-accent: 237 237 237;
+  /* Slightly darker neutral for hover */
   --sidebar-accent-foreground: 12 12 12;
-  --sidebar-border: 229 229 229; /* Neutral border */
+  --sidebar-border: 229 229 229;
+  /* Neutral border */
   --sidebar-ring: 124 58 237;
-  --sidebar-muted: 115 115 115; /* Neutral muted */
-  --sidebar-muted-foreground: 140 140 140; /* Neutral muted text */
-  --sidebar-surface: 245 245 245; /* Matches base */
-  --sidebar-surface-hover: 237 237 237; /* Neutral hover */
+  --sidebar-muted: 115 115 115;
+  /* Neutral muted */
+  --sidebar-muted-foreground: 140 140 140;
+  /* Neutral muted text */
+  --sidebar-surface: 245 245 245;
+  /* Matches base */
+  --sidebar-surface-hover: 237 237 237;
+  /* Neutral hover */
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 229 229 229;
   --sidebar-item-foreground: 90 90 95;
@@ -835,23 +834,32 @@
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Matches new bg-base: rgb(8,9,10) extracted from Linear */
-  --sidebar-background: 8 9 10; /* rgb(8,9,10) - matches bg-base */
-  --sidebar-foreground: 227 228 229; /* Linear: lch(90.421 1 272) = #E3E4E5 */
+  --sidebar-background: 8 9 10;
+  /* rgb(8,9,10) - matches bg-base */
+  --sidebar-foreground: 227 228 229;
+  /* Linear: lch(90.421 1 272) = #E3E4E5 */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.02; /* Hover bg — Linear: rgba(255,255,255,0.02) */
+  --sidebar-accent: 255 255 255 / 0.02;
+  /* Hover bg — Linear: rgba(255,255,255,0.02) */
   --sidebar-accent-foreground: 227 228 229;
   --sidebar-border: 255 255 255 / 0.05;
   --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 98 102 109; /* Section headers — Linear: rgb(98,102,109) */
+  --sidebar-muted: 98 102 109;
+  /* Section headers — Linear: rgb(98,102,109) */
   --sidebar-muted-foreground: 98 102 109;
-  --sidebar-surface: 17 17 17; /* Matches bg-base */
-  --sidebar-surface-hover: 255 255 255 / 0.02; /* Hover — matches sidebar-accent */
+  --sidebar-surface: 17 17 17;
+  /* Matches bg-base */
+  --sidebar-surface-hover: 255 255 255 / 0.02;
+  /* Hover — matches sidebar-accent */
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 208 214 224; /* Nav text — Linear: rgb(208,214,224) */
-  --sidebar-item-icon: 98 102 109; /* Nav icons — Linear: rgb(98,102,109) */
-  --sidebar-accent-active: 255 255 255 / 0.04; /* Active bg — Linear: rgba(255,255,255,0.04) */
+  --sidebar-item-foreground: 208 214 224;
+  /* Nav text — Linear: rgb(208,214,224) */
+  --sidebar-item-icon: 98 102 109;
+  /* Nav icons — Linear: rgb(98,102,109) */
+  --sidebar-accent-active: 255 255 255 / 0.04;
+  /* Active bg — Linear: rgba(255,255,255,0.04) */
 }
 
 /* ============================================
@@ -900,12 +908,10 @@
     inset 0 1px 0 oklch(100% 0 0 / 60%);
 
   /* Highlight/specular */
-  --liquid-glass-highlight: linear-gradient(
-    135deg,
-    oklch(100% 0 0 / 40%) 0%,
-    oklch(100% 0 0 / 10%) 50%,
-    oklch(100% 0 0 / 0%) 100%
-  );
+  --liquid-glass-highlight: linear-gradient(135deg,
+      oklch(100% 0 0 / 40%) 0%,
+      oklch(100% 0 0 / 10%) 50%,
+      oklch(100% 0 0 / 0%) 100%);
 
   /* Item states */
   --liquid-glass-item-hover: oklch(0% 0 0 / 5%);
@@ -930,12 +936,10 @@
     inset 0 1px 0 oklch(100% 0 0 / 12%);
 
   /* Highlight/specular - subtler in dark mode */
-  --liquid-glass-highlight: linear-gradient(
-    135deg,
-    oklch(100% 0 0 / 12%) 0%,
-    oklch(100% 0 0 / 4%) 50%,
-    oklch(100% 0 0 / 0%) 100%
-  );
+  --liquid-glass-highlight: linear-gradient(135deg,
+      oklch(100% 0 0 / 12%) 0%,
+      oklch(100% 0 0 / 4%) 50%,
+      oklch(100% 0 0 / 0%) 100%);
 
   /* Item states */
   --liquid-glass-item-hover: oklch(100% 0 0 / 6%);
