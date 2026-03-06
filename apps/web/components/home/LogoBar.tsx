@@ -7,8 +7,8 @@ import {
 
 export function LogoBar() {
   return (
-    <section className='py-10 px-5 sm:px-6'>
-      <div className='mx-auto flex max-w-[var(--linear-content-max)] flex-col items-center gap-6'>
+    <section className='py-6 px-5 sm:px-6'>
+      <div className='mx-auto flex max-w-[var(--linear-content-max)] flex-col items-center gap-4'>
         <p className='text-[var(--linear-label-size)] font-medium uppercase tracking-[0.1em] text-[var(--linear-text-tertiary)]'>
           Trusted by artists on
         </p>
