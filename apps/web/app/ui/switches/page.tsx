@@ -9,7 +9,9 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2
+        className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
+      >
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -95,7 +97,11 @@ export default function SwitchesPage() {
         </Stack>
         <Stack title='disabled with label'>
           <div className='flex items-center gap-3'>
-            <Switch id='disabled-setting' disabled aria-label='Disabled setting' />
+            <Switch
+              id='disabled-setting'
+              disabled
+              aria-label='Disabled setting'
+            />
             <label
               htmlFor='disabled-setting'
               className='text-[13px] font-[510] text-(--linear-text-primary) opacity-50'
@@ -127,7 +133,11 @@ export default function SwitchesPage() {
                 >
                   {item.label}
                 </label>
-                <Switch id={`setting-${item.label}`} defaultChecked={item.checked} aria-label={item.label} />
+                <Switch
+                  id={`setting-${item.label}`}
+                  defaultChecked={item.checked}
+                  aria-label={item.label}
+                />
               </div>
             ))}
           </div>

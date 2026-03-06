@@ -25,13 +25,17 @@ export default function UILayout({
   readonly children: ReactNode;
 }) {
   return (
-    <div className='flex min-h-screen bg-(--linear-bg-page) text-(--linear-text-primary)'>
+    <div
+      className='flex min-h-screen bg-(--linear-bg-page) text-(--linear-text-primary)'
+    >
       {/* Left nav */}
       <aside
         className='sticky top-0 flex h-screen w-52 shrink-0 flex-col overflow-y-auto border-r border-(--linear-border-subtle) py-6'
       >
         <div className='px-4 pb-4'>
-          <span className='text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+          <span
+            className='text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
+          >
             UI Demo
           </span>
           <p className='mt-0.5 text-[11px] text-(--linear-text-tertiary)'>
@@ -41,7 +45,9 @@ export default function UILayout({
 
         {NAV_ITEMS.map(group => (
           <div key={group.label} className='px-2'>
-            <p className='px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+            <p
+              className='px-2 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
+            >
               {group.label}
             </p>
             {group.items.map(item => (
@@ -53,7 +59,9 @@ export default function UILayout({
               >
                 {item.label}
                 {item.status === 'done' && (
-                  <span className='h-1.5 w-1.5 rounded-full bg-(--linear-success)' />
+                  <span
+                    className='h-1.5 w-1.5 rounded-full bg-(--linear-success)'
+                  />
                 )}
               </Link>
             ))}

@@ -31,7 +31,9 @@ function MenuSection({
 }) {
   return (
     <div className='mb-10'>
-      <p className='mb-3 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <p
+        className='mb-3 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
+      >
         {label}
       </p>
       {children}
@@ -295,7 +297,9 @@ function SearchableMenu() {
         />
       </div>
       {filtered.length === 0 ? (
-        <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
+        <div
+          className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'
+        >
           No results
         </div>
       ) : (
