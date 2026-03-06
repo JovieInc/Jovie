@@ -2748,7 +2748,9 @@ jobs:
     name: Lighthouse CI (Production)
     needs: [deploy]
     # Run after successful deploy (tests homepage + /tim profile)
+    # Informational only -- performance regressions should not block deploys
     if: ${{ always() && needs.deploy.result == 'success' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -936,12 +936,76 @@ export async function checkSpotifyConnection(): Promise<{
 /**
  * Connect a Spotify artist to the profile and sync releases
  */
+/**
+ * Poll current release count and release data (uncached, for real-time import progress).
+ */
+export async function pollReleasesCount(): Promise<{
+  count: number;
+  releases: ReleaseViewModel[];
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const profile = await requireProfile();
+  const providerLabels = buildProviderLabels();
+  const releases = await getReleasesFromDb(profile.id);
+
+  return {
+    count: releases.length,
+    releases: releases.map(r =>
+      mapReleaseToViewModel(r, providerLabels, profile.id, profile.handle)
+    ),
+  };
+}
+
+/**
+ * Get Spotify import status from profile settings (uncached).
+ */
+export async function getSpotifyImportStatus(): Promise<{
+  status: 'idle' | 'importing' | 'complete' | 'failed';
+  releaseCount: number;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const profile = await requireProfile();
+
+  const [row] = await db
+    .select({
+      settings: creatorProfiles.settings,
+      releaseCount: count(discogReleases.id),
+    })
+    .from(creatorProfiles)
+    .leftJoin(
+      discogReleases,
+      eq(discogReleases.creatorProfileId, creatorProfiles.id)
+    )
+    .where(eq(creatorProfiles.id, profile.id))
+    .groupBy(creatorProfiles.id)
+    .limit(1);
+
+  const settings = (row?.settings ?? {}) as Record<string, unknown>;
+  const status =
+    (settings.spotifyImportStatus as string) === 'importing'
+      ? 'importing'
+      : (settings.spotifyImportStatus as string) === 'complete'
+        ? 'complete'
+        : (settings.spotifyImportStatus as string) === 'failed'
+          ? 'failed'
+          : 'idle';
+
+  return { status, releaseCount: Number(row?.releaseCount ?? 0) };
+}
+
 export async function connectSpotifyArtist(params: {
   spotifyArtistId: string;
   spotifyArtistUrl: string;
   artistName: string;
 }): Promise<{
   success: boolean;
+  importing: boolean;
   message: string;
   imported: number;
   releases: ReleaseViewModel[];
@@ -954,7 +1018,6 @@ export async function connectSpotifyArtist(params: {
   }
 
   const profile = await requireProfile();
-  const providerLabels = buildProviderLabels();
 
   // Get current settings to merge with new data
   const [currentProfile] = await db
@@ -968,7 +1031,7 @@ export async function connectSpotifyArtist(params: {
     unknown
   >;
 
-  // Update the profile with the Spotify artist ID, URL, and artist name in settings
+  // Update the profile with Spotify ID and mark import as in-progress
   try {
     await db
       .update(creatorProfiles)
@@ -978,6 +1041,7 @@ export async function connectSpotifyArtist(params: {
         settings: {
           ...currentSettings,
           spotifyArtistName: params.artistName,
+          spotifyImportStatus: 'importing',
         },
         updatedAt: new Date(),
       })
@@ -986,6 +1050,7 @@ export async function connectSpotifyArtist(params: {
     if (isSpotifyIdUniqueViolation(error)) {
       return {
         success: false,
+        importing: false,
         message: SPOTIFY_ALREADY_CLAIMED_MESSAGE,
         imported: 0,
         releases: [],
@@ -996,89 +1061,127 @@ export async function connectSpotifyArtist(params: {
     throw error;
   }
 
-  // Sync releases from the connected artist
-  const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
-
-  revalidatePath(APP_ROUTES.RELEASES);
-
-  // Map releases to view models
-  const releases = result.releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
-  );
-
-  if (result.success) {
-    void trackServerEvent('releases_synced', {
-      profileId: profile.id,
-      imported: result.imported,
-      source: 'spotify',
-      isInitialConnect: true,
-    });
-
-    // Auto-trigger DSP artist discovery (Apple Music matching via ISRCs)
-    // Fire-and-forget: don't block the response on discovery
-    void enqueueDspArtistDiscoveryJob({
-      creatorProfileId: profile.id,
-      spotifyArtistId: params.spotifyArtistId,
-      targetProviders: ['apple_music'],
-    }).catch(error => {
-      void captureError(
-        'DSP artist discovery enqueue failed on connect',
-        error,
-        {
-          action: 'connectSpotifyArtist',
-          creatorProfileId: profile.id,
-        }
+  // Fire-and-forget: start import in background, return immediately
+  void (async () => {
+    try {
+      const result: SpotifyImportResult = await syncReleasesFromSpotify(
+        profile.id
       );
-    });
 
-    // Auto-trigger MusicFetch enrichment (cross-platform DSP profiles + social links)
-    // Fire-and-forget: enrichment runs in background via ingestion job queue
-    // Normalize Spotify URL or construct from artist ID
-    const normalizedSpotifyUrl = (() => {
-      const raw = params.spotifyArtistUrl.trim();
-      try {
-        const parsed = new URL(raw);
-        const hostOk =
-          parsed.hostname === 'open.spotify.com' ||
-          parsed.hostname === 'spotify.com' ||
-          parsed.hostname.endsWith('.spotify.com');
-        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-        if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
-        return parsed.toString();
-      } catch {
-        return null;
+      // Update import status to complete or failed
+      const [latest] = await db
+        .select({ settings: creatorProfiles.settings })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profile.id))
+        .limit(1);
+      const latestSettings = (latest?.settings ?? {}) as Record<
+        string,
+        unknown
+      >;
+
+      await db
+        .update(creatorProfiles)
+        .set({
+          settings: {
+            ...latestSettings,
+            spotifyImportStatus: result.success ? 'complete' : 'failed',
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+
+      revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+      revalidatePath(APP_ROUTES.RELEASES);
+
+      if (result.success) {
+        void trackServerEvent('releases_synced', {
+          profileId: profile.id,
+          imported: result.imported,
+          source: 'spotify',
+          isInitialConnect: true,
+        });
+
+        // Auto-trigger DSP artist discovery
+        void enqueueDspArtistDiscoveryJob({
+          creatorProfileId: profile.id,
+          spotifyArtistId: params.spotifyArtistId,
+          targetProviders: ['apple_music'],
+        }).catch(err => {
+          void captureError(
+            'DSP artist discovery enqueue failed on connect',
+            err,
+            { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
+          );
+        });
+
+        // Auto-trigger MusicFetch enrichment
+        const normalizedSpotifyUrl = (() => {
+          const raw = params.spotifyArtistUrl.trim();
+          try {
+            const parsed = new URL(raw);
+            const hostOk =
+              parsed.hostname === 'open.spotify.com' ||
+              parsed.hostname === 'spotify.com' ||
+              parsed.hostname.endsWith('.spotify.com');
+            if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+            if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
+            return parsed.toString();
+          } catch {
+            return null;
+          }
+        })();
+
+        const spotifyUrlForEnrichment =
+          normalizedSpotifyUrl ??
+          `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
+
+        void enqueueMusicFetchEnrichmentJob({
+          creatorProfileId: profile.id,
+          spotifyUrl: spotifyUrlForEnrichment,
+        }).catch(err => {
+          void captureError('MusicFetch enrichment enqueue failed', err, {
+            action: 'connectSpotifyArtist',
+            creatorProfileId: profile.id,
+          });
+        });
       }
-    })();
+    } catch (error) {
+      // Mark import as failed on unexpected error
+      try {
+        const [latest] = await db
+          .select({ settings: creatorProfiles.settings })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.id, profile.id))
+          .limit(1);
+        const latestSettings = (latest?.settings ?? {}) as Record<
+          string,
+          unknown
+        >;
 
-    const spotifyUrlForEnrichment =
-      normalizedSpotifyUrl ??
-      `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
+        await db
+          .update(creatorProfiles)
+          .set({
+            settings: { ...latestSettings, spotifyImportStatus: 'failed' },
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, profile.id));
+      } catch {
+        // DB update best-effort in error path
+      }
 
-    void enqueueMusicFetchEnrichmentJob({
-      creatorProfileId: profile.id,
-      spotifyUrl: spotifyUrlForEnrichment,
-    }).catch(error => {
-      void captureError('MusicFetch enrichment enqueue failed', error, {
+      void captureError('Background Spotify import failed', error, {
         action: 'connectSpotifyArtist',
         creatorProfileId: profile.id,
       });
-      // Enrichment can be retried later; don't fail the connection
-    });
-
-    return {
-      success: true,
-      message: `Connected and synced ${result.imported} releases from Spotify.`,
-      imported: result.imported,
-      releases,
-      artistName: params.artistName,
-    };
-  }
+    }
+  })();
 
   return {
-    success: false,
-    message: result.errors[0] ?? 'Connected but failed to sync releases.',
+    success: true,
+    importing: true,
+    message: 'Importing releases from Spotify...',
     imported: 0,
-    releases,
+    releases: [],
     artistName: params.artistName,
   };
 }

@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { describe, expect, it, vi } from 'vitest';
 
 const runDemoAction = vi.fn(() => Promise.resolve());
@@ -22,9 +23,11 @@ const { DemoReleasesExperience } = await import(
 
 function renderDemo() {
   return render(
-    <TooltipProvider>
-      <DemoReleasesExperience />
-    </TooltipProvider>
+    <NuqsTestingAdapter>
+      <TooltipProvider>
+        <DemoReleasesExperience />
+      </TooltipProvider>
+    </NuqsTestingAdapter>
   );
 }
 

@@ -7,8 +7,7 @@ import * as Sentry from '@sentry/nextjs';
  */
 const CLERK_ERROR_MESSAGES: Record<string, string> = {
   // Sign-in errors
-  form_identifier_not_found:
-    "We couldn't find an account with that email. Would you like to sign up instead?",
+  form_identifier_not_found: "We couldn't find an account with that email.",
   form_password_incorrect: 'Incorrect password. Please try again.',
   form_code_incorrect: 'That code is incorrect. Please check and try again.',
   verification_expired:

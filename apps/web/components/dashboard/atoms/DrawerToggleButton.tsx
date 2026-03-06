@@ -25,7 +25,7 @@ export function DrawerToggleButton() {
       pressed={isOpen}
       disabled={!tableMeta.toggle}
       onClick={() => tableMeta.toggle?.()}
-      icon={<Icon />}
+      icon={<Icon className='h-4 w-4' />}
     />
   );
 }

@@ -56,7 +56,7 @@ export default async function OnboardingPage({
         },
       });
     }
-    redirect('/sign-in?redirect_url=/onboarding');
+    redirect('/signin?redirect_url=/onboarding');
   }
 
   const user = await currentUser();
@@ -111,7 +111,7 @@ export default async function OnboardingPage({
 
   return (
     <AuthLayout
-      formTitle='Claim your handle'
+      formTitle='Choose your handle'
       showFooterPrompt={false}
       showFormTitle={false}
       logoSpinDelayMs={10000}

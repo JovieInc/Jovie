@@ -26,9 +26,7 @@ describe('clerk-errors.ts', () => {
       const { parseClerkError } = await import('@/lib/auth/clerk-errors');
       const result = parseClerkError(clerkError);
 
-      expect(result).toBe(
-        "We couldn't find an account with that email. Would you like to sign up instead?"
-      );
+      expect(result).toBe("We couldn't find an account with that email.");
     });
 
     it('returns custom message for form_password_incorrect', async () => {
