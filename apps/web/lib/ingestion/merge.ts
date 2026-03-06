@@ -106,7 +106,7 @@ async function insertNewLink(options: InsertNewLinkOptions): Promise<void> {
   const insertPayload: typeof socialLinks.$inferInsert = {
     creatorProfileId: profileId,
     platform: detected.platform.id,
-    platformType: detected.platform.icon,
+    platformType: detected.platform.category,
     url: detected.normalizedUrl,
     displayText: link.title,
     sortOrder,
@@ -149,7 +149,7 @@ export function createInMemorySocialLinkRow({
   sourcePlatform?: string | null;
   evidence?: SocialLinkRow['evidence'];
 }): SocialLinkRow {
-  return {
+  const row: SocialLinkRow = {
     id: '',
     creatorProfileId: profileId,
     platform: platformId,
@@ -159,14 +159,21 @@ export function createInMemorySocialLinkRow({
     sortOrder,
     isActive,
     state,
-    confidence,
+    confidence: confidence.toFixed(2),
     sourcePlatform: sourcePlatform ?? 'linktree',
     sourceType: 'ingested',
     evidence: evidence ?? {},
     clicks: 0,
+    verificationToken: null,
+    verificationStatus: 'unverified',
+    verificationCheckedAt: null,
+    verifiedAt: null,
+    version: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
-  } as unknown as SocialLinkRow;
+  };
+
+  return row;
 }
 
 /**
