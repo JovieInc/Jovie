@@ -196,7 +196,7 @@ export function ReleaseTable({
         : createReleaseCellRenderer(artistName),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
-      enableSorting: true,
+      enableSorting: false,
     });
 
     const rightMetaColumn = columnHelper.display({
