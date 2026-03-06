@@ -16,12 +16,10 @@ const MAX_CLASSIFIABLE_LENGTH = 300;
 export function classifyIntent(message: string): DetectedIntent | null {
   const trimmed = message.trim();
 
-  // Skip empty or overly long messages — they need AI reasoning
   if (!trimmed || trimmed.length > MAX_CLASSIFIABLE_LENGTH) {
     return null;
   }
 
-  // Patterns are pre-sorted by priority
   for (const { category, pattern, extract } of INTENT_PATTERNS) {
     const match = trimmed.match(pattern);
     if (match) {

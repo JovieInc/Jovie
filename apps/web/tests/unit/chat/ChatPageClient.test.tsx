@@ -140,7 +140,7 @@ const baseDashboardData: DashboardData = {
     completedCount: 4,
     totalCount: 6,
     steps: [],
-    profileIsLive: false,
+    profileIsLive: true,
   },
 };
 

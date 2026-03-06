@@ -11,10 +11,16 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/components/dashboard/organisms/EarningsTab';
+import {
+  Dialog,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/organisms/Dialog';
 import { BASE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
@@ -138,9 +144,8 @@ const VenmoEditForm = memo(function VenmoEditForm({
   isSaving,
 }: VenmoEditFormProps) {
   return (
-    <div className='flex items-center gap-2 rounded-xl border border-subtle bg-surface-1 px-3 py-2 sm:gap-3 sm:px-4'>
-      <Wallet className='hidden h-4 w-4 shrink-0 text-accent-token sm:block' />
-      <div className='flex min-w-0 flex-1 items-center gap-1.5'>
+    <div className='space-y-3'>
+      <div className='flex items-center gap-2'>
         <span className='text-sm text-secondary-token'>@</span>
         <Input
           type='text'
@@ -151,13 +156,12 @@ const VenmoEditForm = memo(function VenmoEditForm({
           className='h-8 min-w-0 flex-1'
         />
       </div>
-      <div className='flex shrink-0 items-center gap-1.5'>
+      <div className='flex items-center gap-2'>
         <Button
           onClick={onSave}
           disabled={isSaving || !venmoHandle.trim()}
           variant='primary'
           size='sm'
-          className='h-7 px-2.5 text-xs sm:h-8 sm:px-3'
         >
           {isSaving ? 'Saving…' : 'Save'}
         </Button>
@@ -166,7 +170,6 @@ const VenmoEditForm = memo(function VenmoEditForm({
           disabled={isSaving}
           variant='ghost'
           size='sm'
-          className='h-7 px-2 text-xs sm:h-8'
         >
           Cancel
         </Button>
@@ -177,7 +180,9 @@ const VenmoEditForm = memo(function VenmoEditForm({
 
 // -----------------------------------------------------------------------------
 
-interface VenmoConnectCardProps {
+interface VenmoConnectDialogProps {
+  readonly open: boolean;
+  readonly onClose: () => void;
   readonly venmoHandle: string;
   readonly onVenmoHandleChange: (value: string) => void;
   readonly onSave: () => void;
@@ -185,15 +190,17 @@ interface VenmoConnectCardProps {
   readonly saveSuccess: string | null;
 }
 
-const VenmoConnectCard = memo(function VenmoConnectCard({
+const VenmoConnectDialog = memo(function VenmoConnectDialog({
+  open,
+  onClose,
   venmoHandle,
   onVenmoHandleChange,
   onSave,
   isSaving,
   saveSuccess,
-}: VenmoConnectCardProps) {
+}: VenmoConnectDialogProps) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+    <Dialog open={open} onClose={onClose} size='sm'>
       <div className='flex items-start gap-3'>
         <div
           className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10'
@@ -202,55 +209,67 @@ const VenmoConnectCard = memo(function VenmoConnectCard({
           <Wallet className='h-4.5 w-4.5 text-accent-token' />
         </div>
         <div className='min-w-0 flex-1'>
-          <h3 className='text-[15px] font-semibold tracking-tight text-primary-token'>
+          <DialogTitle className='text-[15px] font-semibold tracking-tight text-primary-token'>
             Connect Venmo
-          </h3>
-          <p className='mt-0.5 text-xs leading-5 text-secondary-token sm:text-[13px]'>
+          </DialogTitle>
+          <DialogDescription className='mt-0.5 text-xs leading-5 text-secondary-token sm:text-[13px]'>
             Link your Venmo to start receiving tips from fans.
-          </p>
+          </DialogDescription>
         </div>
       </div>
 
-      <div className='mt-4 space-y-3'>
-        <div>
-          <label
-            htmlFor='venmo-handle'
-            className='mb-1.5 block text-xs font-medium text-secondary-token'
-          >
-            Venmo Username
-          </label>
-          <div className='flex items-center gap-2'>
-            <span className='text-sm text-tertiary-token'>@</span>
-            <Input
-              type='text'
-              id='venmo-handle'
-              value={venmoHandle}
-              onChange={e => onVenmoHandleChange(e.target.value)}
-              placeholder='your-username'
-              autoFocus
-              className='flex-1'
-            />
+      <DialogBody>
+        <div className='space-y-3'>
+          <div>
+            <label
+              htmlFor='venmo-handle'
+              className='mb-1.5 block text-xs font-medium text-secondary-token'
+            >
+              Venmo Username
+            </label>
+            <div className='flex items-center gap-2'>
+              <span className='text-sm text-tertiary-token'>@</span>
+              <Input
+                type='text'
+                id='venmo-handle'
+                value={venmoHandle}
+                onChange={e => onVenmoHandleChange(e.target.value)}
+                placeholder='your-username'
+                autoFocus
+                className='flex-1'
+              />
+            </div>
           </div>
+          <div className='flex items-center gap-2'>
+            <Button
+              onClick={onSave}
+              disabled={isSaving || !venmoHandle.trim()}
+              variant='primary'
+              size='sm'
+            >
+              {isSaving ? 'Connecting…' : 'Connect'}
+            </Button>
+            <Button
+              onClick={onClose}
+              disabled={isSaving}
+              variant='ghost'
+              size='sm'
+            >
+              Cancel
+            </Button>
+          </div>
+          {saveSuccess && (
+            <output
+              className='flex items-center gap-2 rounded-lg bg-success-subtle px-3 py-2 text-xs font-medium text-success'
+              aria-live='polite'
+            >
+              <Check className='h-3.5 w-3.5' />
+              {saveSuccess}
+            </output>
+          )}
         </div>
-        <Button
-          onClick={onSave}
-          disabled={isSaving || !venmoHandle.trim()}
-          variant='primary'
-          size='sm'
-        >
-          {isSaving ? 'Connecting…' : 'Connect'}
-        </Button>
-        {saveSuccess && (
-          <output
-            className='flex items-center gap-2 rounded-lg bg-success-subtle px-3 py-2 text-xs font-medium text-success'
-            aria-live='polite'
-          >
-            <Check className='h-3.5 w-3.5' />
-            {saveSuccess}
-          </output>
-        )}
-      </div>
-    </div>
+      </DialogBody>
+    </Dialog>
   );
 });
 
@@ -319,6 +338,15 @@ export function DashboardTipping() {
     handleDisconnect,
   } = useDashboardTipping();
 
+  const [isConnectOpen, setIsConnectOpen] = useState(false);
+
+  const handleCloseConnect = useCallback(() => {
+    setIsConnectOpen(false);
+    setVenmoHandle('');
+  }, [setVenmoHandle]);
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   const tipUrls = useMemo(() => {
     const tipHandle = artist?.handle ?? '';
     const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
@@ -356,34 +384,85 @@ export function DashboardTipping() {
             <div className='shrink-0'>
               <VenmoConnectedBadge
                 venmoHandle={artist.venmo_handle?.replace(/^@/, '') ?? ''}
-                onEdit={() => setIsEditing(true)}
+                onEdit={() => {
+                  setIsEditing(true);
+                  setIsEditDialogOpen(true);
+                }}
                 onDisconnect={handleDisconnect}
               />
             </div>
           )}
         </div>
 
-        {/* Inline edit form */}
-        {hasVenmoHandle && isEditing && (
-          <VenmoEditForm
-            venmoHandle={venmoHandle}
-            onVenmoHandleChange={setVenmoHandle}
-            onSave={handleSaveVenmo}
-            onCancel={handleCancel}
-            isSaving={isSaving}
-          />
-        )}
+        {/* Edit Venmo dialog */}
+        <Dialog
+          open={isEditDialogOpen}
+          onClose={() => {
+            handleCancel();
+            setIsEditDialogOpen(false);
+          }}
+          size='sm'
+        >
+          <DialogTitle>Edit Venmo</DialogTitle>
+          <DialogDescription>Update your Venmo username.</DialogDescription>
+          <DialogBody>
+            <VenmoEditForm
+              venmoHandle={venmoHandle}
+              onVenmoHandleChange={setVenmoHandle}
+              onSave={() => {
+                handleSaveVenmo();
+                setIsEditDialogOpen(false);
+              }}
+              onCancel={() => {
+                handleCancel();
+                setIsEditDialogOpen(false);
+              }}
+              isSaving={isSaving}
+            />
+          </DialogBody>
+        </Dialog>
       </div>
 
       {/* ── Connect Venmo (not connected) ──────────────── */}
       {!hasVenmoHandle && (
-        <VenmoConnectCard
-          venmoHandle={venmoHandle}
-          onVenmoHandleChange={setVenmoHandle}
-          onSave={handleSaveVenmo}
-          isSaving={isSaving}
-          saveSuccess={saveSuccess}
-        />
+        <>
+          <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+            <div className='flex items-center justify-between gap-3'>
+              <div className='flex items-start gap-3'>
+                <div
+                  className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10'
+                  aria-hidden='true'
+                >
+                  <Wallet className='h-4.5 w-4.5 text-accent-token' />
+                </div>
+                <div className='min-w-0'>
+                  <h3 className='text-[15px] font-semibold tracking-tight text-primary-token'>
+                    Connect Venmo
+                  </h3>
+                  <p className='mt-0.5 text-xs leading-5 text-secondary-token sm:text-[13px]'>
+                    Link your Venmo to start receiving tips from fans.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => setIsConnectOpen(true)}
+                variant='primary'
+                size='sm'
+              >
+                Connect
+              </Button>
+            </div>
+          </div>
+          <VenmoConnectDialog
+            open={isConnectOpen}
+            onClose={handleCloseConnect}
+            venmoHandle={venmoHandle}
+            onVenmoHandleChange={setVenmoHandle}
+            onSave={handleSaveVenmo}
+            isSaving={isSaving}
+            saveSuccess={saveSuccess}
+          />
+        </>
       )}
 
       {/* ── Activity & Sharing (blurred when not connected) */}
