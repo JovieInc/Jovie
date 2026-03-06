@@ -577,7 +577,9 @@ test.describe('Content Gate — Authenticated Pages', () => {
         await waitForHydration(page);
 
         // Allow page to settle (data fetching)
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+        await page
+          .waitForLoadState('networkidle', { timeout: 5000 })
+          .catch(() => {});
 
         const url = page.url();
 

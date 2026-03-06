@@ -14,9 +14,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -163,13 +161,13 @@ export default function ButtonsPage() {
         <Stack title='TableIconButton'>
           <TableIconButton
             icon={<Settings className='h-4 w-4' />}
-            onClick={() => { }}
+            onClick={() => {}}
             ariaLabel='Settings'
             tooltip='Settings'
           />
           <TableIconButton
             icon={<Trash2 className='h-4 w-4' />}
-            onClick={() => { }}
+            onClick={() => {}}
             ariaLabel='Delete'
             variant='danger'
             tooltip='Delete'

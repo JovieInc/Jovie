@@ -151,7 +151,7 @@ function AvatarStatusDot({
         className
       )}
     >
-      <span className="sr-only">{status}</span>
+      <span className='sr-only'>{status}</span>
     </span>
   );
 }

@@ -12,9 +12,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -31,9 +29,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-(--linear-text-tertiary)'>
-        {title}
-      </span>
+      <span className='text-[11px] text-(--linear-text-tertiary)'>{title}</span>
       <div className='flex items-center gap-3'>{children}</div>
     </div>
   );

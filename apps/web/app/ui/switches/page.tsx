@@ -9,9 +9,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2
-        className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
-      >
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -28,9 +26,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-(--linear-text-tertiary)'>
-        {title}
-      </span>
+      <span className='text-[11px] text-(--linear-text-tertiary)'>{title}</span>
       {children}
     </div>
   );
@@ -115,9 +111,7 @@ export default function SwitchesPage() {
       {/* In Context */}
       <Section title='In Context'>
         <Stack title='settings row'>
-          <div
-            className='flex w-64 flex-col divide-y rounded-lg border border-(--linear-border-subtle)'
-          >
+          <div className='flex w-64 flex-col divide-y rounded-lg border border-(--linear-border-subtle)'>
             {[
               { label: 'Slack notifications', checked: true },
               { label: 'Email digest', checked: false },
