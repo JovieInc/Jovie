@@ -11,9 +11,7 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import {
   useAvatarMutation,
   useProfileSaveMutation,
@@ -255,46 +253,37 @@ export function ProfileContactSidebar() {
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
     return (
-      <RightDrawer
+      <EntitySidebarShell
         isOpen={isOpen}
-        width={SIDEBAR_WIDTH}
         ariaLabel='Profile Contact'
+        title={<div className='h-4 w-24 rounded skeleton' />}
+        onClose={close}
+        entityHeader={
+          <div className='flex items-center gap-3'>
+            <div className='h-12 w-12 rounded-full skeleton' />
+            <div className='space-y-2'>
+              <div className='h-4 w-28 rounded skeleton' />
+              <div className='h-3 w-20 rounded skeleton' />
+            </div>
+          </div>
+        }
+        tabs={
+          <div className='flex gap-2'>
+            <div className='h-7 w-16 rounded-md skeleton' />
+            <div className='h-7 w-16 rounded-md skeleton' />
+            <div className='h-7 w-14 rounded-md skeleton' />
+          </div>
+        }
       >
-        <div className='flex h-full flex-col'>
-          {/* Header skeleton */}
-          <div className='flex h-12 shrink-0 items-center justify-between border-b border-subtle px-4'>
-            <div className='h-4 w-24 rounded skeleton' />
-            <div className='h-6 w-6 rounded skeleton' />
-          </div>
-          {/* Avatar + name skeleton */}
-          <div className='shrink-0 px-4 pt-3 pb-3'>
-            <div className='flex items-center gap-3'>
-              <div className='h-12 w-12 rounded-full skeleton' />
-              <div className='space-y-2'>
-                <div className='h-4 w-28 rounded skeleton' />
-                <div className='h-3 w-20 rounded skeleton' />
-              </div>
+        <div className='space-y-3'>
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className='flex items-center gap-3'>
+              <div className='h-8 w-8 rounded-md skeleton shrink-0' />
+              <div className='flex-1 h-4 rounded skeleton' />
             </div>
-          </div>
-          {/* Tab skeleton */}
-          <div className='border-b border-subtle px-3 py-1.5 shrink-0'>
-            <div className='flex gap-2'>
-              <div className='h-7 w-16 rounded-md skeleton' />
-              <div className='h-7 w-16 rounded-md skeleton' />
-              <div className='h-7 w-14 rounded-md skeleton' />
-            </div>
-          </div>
-          {/* Link rows skeleton */}
-          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3'>
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className='flex items-center gap-3'>
-                <div className='h-8 w-8 rounded-md skeleton shrink-0' />
-                <div className='flex-1 h-4 rounded skeleton' />
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
-      </RightDrawer>
+      </EntitySidebarShell>
     );
   }
 

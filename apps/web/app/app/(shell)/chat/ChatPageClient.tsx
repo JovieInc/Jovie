@@ -8,6 +8,7 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import {
   type PreviewPanelLink,
   usePreviewPanelData,
+  usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
@@ -51,6 +52,7 @@ export function ChatPageClient({
     dashboardLoadError,
   } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
@@ -180,6 +182,13 @@ export function ChatPageClient({
       setHeaderActions(null);
     };
   }, [headerActions, setHeaderBadge, setHeaderActions]);
+
+  // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
+  useEffect(() => {
+    if (searchParams.get('panel') === 'profile') {
+      openPreviewPanel();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- only on mount
 
   // Pick up ?q= param (e.g. from profile page chat fallback) and pre-fill the input.
   // We pass it as initialQuery so JovieChat can auto-submit it.

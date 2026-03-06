@@ -3,7 +3,7 @@ import { PhoneHeroDemo } from './PhoneHeroDemo';
 
 export function RedesignedHero() {
   return (
-    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[var(--linear-section-pt-lg)] pb-[var(--linear-section-pb-md)]'>
+    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[var(--linear-section-pt-md)] pb-[var(--linear-section-pb-sm)]'>
       {/* Ambient glow — centered */}
       <div
         aria-hidden='true'

@@ -41,6 +41,7 @@ const baseDashboardData: DashboardData = {
         href: '/app/settings/artist-profile',
       },
     ],
+    profileIsLive: false,
   },
 };
 

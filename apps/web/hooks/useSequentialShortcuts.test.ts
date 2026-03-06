@@ -61,7 +61,7 @@ describe('useSequentialShortcuts', () => {
       fireKey('p');
     });
 
-    expect(mockPush).toHaveBeenCalledWith('/app/profile');
+    expect(mockPush).toHaveBeenCalledWith('/app/chat');
   });
 
   it('navigates on valid G then O sequence (tour dates)', () => {
