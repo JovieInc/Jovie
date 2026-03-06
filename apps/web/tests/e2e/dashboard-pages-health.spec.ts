@@ -471,7 +471,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
       await waitForHydration(page);
 
       // Wait for page to stabilize
-      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
       // Wait for React to fully hydrate - check for absence of loading states
       await page
         .waitForFunction(

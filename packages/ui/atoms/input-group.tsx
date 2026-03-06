@@ -65,7 +65,7 @@ export function InputGroup({
   className,
   size = 'md',
   ...props
-}: InputGroupProps) {
+}: Readonly<InputGroupProps>) {
   const sizeConfig = sizeClasses[size];
 
   return (

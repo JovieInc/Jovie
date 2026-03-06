@@ -143,8 +143,6 @@ function AvatarStatusDot({
   const { dot, dotOffset } = SIZE_MAP[size];
   return (
     <span
-      role='img'
-      aria-label={status}
       className={cn(
         'absolute rounded-full ring-[1.5px] ring-(--linear-bg-page)',
         dot,
@@ -152,7 +150,9 @@ function AvatarStatusDot({
         STATUS_COLOR[status],
         className
       )}
-    />
+    >
+      <span className="sr-only">{status}</span>
+    </span>
   );
 }
 
@@ -165,7 +165,7 @@ function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length === 0 || parts[0] === '') return '?';
   if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  return (parts[0].charAt(0) + (parts.at(-1) || '').charAt(0)).toUpperCase();
 }
 
 export interface UserAvatarProps {

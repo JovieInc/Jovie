@@ -38,7 +38,7 @@ Tooltip.displayName = TooltipPrimitive.Root.displayName;
  * Tooltip trigger that properly forwards refs and manages accessibility.
  */
 const TooltipTrigger = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Trigger>,
+  React.ComponentRef<typeof TooltipPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Trigger>
 >(({ asChild = true, ...props }, ref) => (
   <TooltipPrimitive.Trigger ref={ref} asChild={asChild} {...props} />
@@ -63,7 +63,7 @@ interface TooltipContentProps
  * Includes reduced motion support and accessibility features.
  */
 const TooltipContent = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentRef<typeof TooltipPrimitive.Content>,
   TooltipContentProps
 >(
   (

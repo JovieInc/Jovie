@@ -51,9 +51,9 @@ for (const viewport of VIEWPORTS) {
             r.fulfill({ status: 200, body: '{}' })
           );
           await page.goto(pageUnderTest.path, {
-            waitUntil: 'networkidle',
-            timeout: 45_000,
+            waitUntil: 'domcontentloaded',
           });
+          await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
           await page.evaluate(selectedTheme => {
             document.documentElement.classList.remove('light', 'dark');

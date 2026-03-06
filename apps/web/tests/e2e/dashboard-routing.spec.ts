@@ -236,7 +236,7 @@ test.describe('Dashboard Routing', () => {
     await page.goto('/app/dashboard/profile', {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {}).catch(() => {});
 
     // Wait for skeleton/loading states to disappear
     await page

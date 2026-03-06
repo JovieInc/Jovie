@@ -17,7 +17,7 @@ export interface CheckboxProps
  * Supports indeterminate state via the indeterminate prop.
  */
 const Checkbox = React.forwardRef<
-  React.ElementRef<typeof CheckboxPrimitive.Root>,
+  React.ComponentRef<typeof CheckboxPrimitive.Root>,
   CheckboxProps
 >(({ className, indeterminate, ...props }, ref) => {
   const internalRef = React.useRef<HTMLButtonElement>(null);
