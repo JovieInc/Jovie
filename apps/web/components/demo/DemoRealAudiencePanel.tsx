@@ -22,7 +22,7 @@ const columnHelper = createColumnHelper<AudienceMember>();
  * Subset of real audience columns for the demo — excludes Select, QuickActions,
  * and Menu columns that require hooks/API interactions.
  */
-const DEMO_COLUMNS: ColumnDef<AudienceMember, any>[] = [
+const DEMO_COLUMNS: ColumnDef<AudienceMember, unknown>[] = [
   columnHelper.accessor('displayName', {
     id: 'user',
     header: 'Visitor',
@@ -71,7 +71,7 @@ export function DemoRealAudiencePanel() {
   const toggleSelect = useCallback(() => {}, []);
   const noop = useCallback(() => {}, []);
   const noopMember = useCallback((_m: AudienceMember) => {}, []);
-  const getContextMenuItems = useCallback(() => [] as any[], []);
+  const getContextMenuItems = useCallback(() => [] as never[], []);
   const getTouringCity = useCallback(() => null, []);
 
   const contextValue = useMemo(
