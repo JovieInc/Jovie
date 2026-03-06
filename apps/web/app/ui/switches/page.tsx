@@ -9,7 +9,9 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2
+        className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'
+      >
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
