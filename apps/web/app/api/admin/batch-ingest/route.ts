@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -10,9 +11,14 @@ import {
   handleExistingUnclaimedProfile,
   type SocialPlatformContext,
 } from '@/lib/ingestion/flows/social-platform-flow';
+import {
+  enqueueDspArtistDiscoveryJob,
+  enqueueMusicFetchEnrichmentJob,
+} from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { spotifyClient } from '@/lib/spotify/client';
+import { logger } from '@/lib/utils/logger';
 import { batchCreatorIngestSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -146,12 +152,23 @@ async function ingestSpotifyArtist(
       };
     }
 
+    // Fire-and-forget: import releases from Spotify and trigger Apple Music
+    // auto-connect via DSP artist discovery + MusicFetch enrichment.
+    const profileId = payload.profile?.id;
+    if (profileId) {
+      void importReleasesAndDiscoverDsps(
+        profileId,
+        spotifyArtistId,
+        normalizedUrl
+      );
+    }
+
     return {
       input: normalizedUrl,
       status: 'success',
       spotifyArtistId,
       followers,
-      profileId: payload.profile?.id,
+      profileId,
       username:
         payload.profile?.username ?? payload.profile?.usernameNormalized,
     };
@@ -165,6 +182,58 @@ async function ingestSpotifyArtist(
     reason:
       payload.details ?? payload.error ?? 'Failed to ingest artist profile.',
   };
+}
+
+/**
+ * Import releases from Spotify and enqueue DSP discovery jobs.
+ * Fire-and-forget — errors are captured but do not fail the ingest.
+ */
+async function importReleasesAndDiscoverDsps(
+  profileId: string,
+  spotifyArtistId: string,
+  spotifyUrl: string
+): Promise<void> {
+  try {
+    const result = await importReleasesFromSpotify(profileId, spotifyArtistId);
+
+    if (result.success && result.imported > 0) {
+      logger.info('Batch ingest: imported releases from Spotify', {
+        profileId,
+        spotifyArtistId,
+        imported: result.imported,
+      });
+
+      // Enqueue Apple Music artist discovery (uses ISRC matching)
+      void enqueueDspArtistDiscoveryJob({
+        creatorProfileId: profileId,
+        spotifyArtistId,
+        targetProviders: ['apple_music'],
+      }).catch(err => {
+        void captureError(
+          'Batch ingest: DSP artist discovery enqueue failed',
+          err,
+          { profileId, spotifyArtistId }
+        );
+      });
+
+      // Enqueue MusicFetch enrichment for broader DSP discovery
+      void enqueueMusicFetchEnrichmentJob({
+        creatorProfileId: profileId,
+        spotifyUrl,
+      }).catch(err => {
+        void captureError(
+          'Batch ingest: MusicFetch enrichment enqueue failed',
+          err,
+          { profileId, spotifyArtistId }
+        );
+      });
+    }
+  } catch (error) {
+    void captureError('Batch ingest: release import failed', error, {
+      profileId,
+      spotifyArtistId,
+    });
+  }
 }
 
 async function resolveAdminEntitlements(
