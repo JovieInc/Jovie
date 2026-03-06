@@ -154,9 +154,9 @@ describe('dropdown-styles', () => {
   });
 
   describe('label, separator, and shortcut styles', () => {
-    it('MENU_LABEL_BASE includes uppercase tracking', () => {
-      expect(MENU_LABEL_BASE).toContain('uppercase');
-      expect(MENU_LABEL_BASE).toContain('tracking-wide');
+    it('MENU_LABEL_BASE uses label typography tokens', () => {
+      expect(MENU_LABEL_BASE).toContain('text-[11px]');
+      expect(MENU_LABEL_BASE).toContain('font-medium');
     });
 
     it('MENU_SEPARATOR_BASE styles a horizontal rule', () => {

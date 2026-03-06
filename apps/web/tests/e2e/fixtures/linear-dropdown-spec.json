@@ -1,0 +1,52 @@
+{
+  "container": {
+    "backgroundColor": "rgb(255, 255, 255)",
+    "border": "1px solid rgba(0, 0, 0, 0.08)",
+    "borderRadius": "8px",
+    "padding": "4px",
+    "minWidth": "192px",
+    "backdropFilter": "none",
+    "fontSize": "13px"
+  },
+  "item": {
+    "padding": "6px 8px",
+    "borderRadius": "4px",
+    "fontSize": "13px",
+    "fontWeight": "450",
+    "lineHeight": "20px",
+    "gap": "8px"
+  },
+  "itemHover": {
+    "backgroundColor": "rgba(0, 0, 0, 0.04)",
+    "color": "rgba(0, 0, 0, 0.9)"
+  },
+  "itemDisabled": {
+    "opacity": "0.46"
+  },
+  "itemDestructive": {
+    "color": "rgb(229, 72, 77)"
+  },
+  "itemDestructiveHover": {
+    "backgroundColor": "rgba(229, 72, 77, 0.08)"
+  },
+  "icon": {
+    "width": "14px",
+    "height": "14px",
+    "strokeWidth": "1.5px"
+  },
+  "label": {
+    "fontSize": "11px",
+    "fontWeight": "500",
+    "textTransform": "none",
+    "letterSpacing": "normal"
+  },
+  "separator": {
+    "height": "1px",
+    "margin": "4px -4px"
+  },
+  "shortcut": {
+    "fontSize": "11px",
+    "marginLeft": "auto",
+    "letterSpacing": "normal"
+  }
+}
