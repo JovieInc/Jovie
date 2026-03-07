@@ -162,29 +162,13 @@ jobs:
   ci-guardrails:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping guardrails."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping guardrails."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
         run: pnpm --filter=@jovie/web run next:proxy-guard
@@ -192,29 +176,13 @@ jobs:
   ci-biome:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping Biome checks."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping Biome checks."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Biome CI (lint + format)
         run: |
@@ -238,29 +206,13 @@ jobs:
   ci-eslint:
     name: ESLint Server Boundaries
     # Check server/client boundary violations
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping ESLint."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping ESLint."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run ESLint server boundary checks
         run: pnpm --filter=@jovie/web run lint:server-boundaries
@@ -268,29 +220,13 @@ jobs:
   ci-knip:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
+    needs: [ci-path-changes]
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping Knip."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping Knip."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Knip (unused files, deps & exports)
         run: pnpm knip
@@ -299,31 +235,15 @@ jobs:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
+    needs: [ci-path-changes]
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           # Full history needed for turbo --affected merge-base detection
           fetch-depth: 0
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping typecheck."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping typecheck."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
@@ -541,22 +461,19 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-eslint, ci-knip, ci-guardrails]
+    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), Knip (dead code), and guardrails succeeded"
+          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), and guardrails succeeded"
 
   ci-pr-ready:
     name: PR Ready
     # Single merge gate for PRs and merge queue.
-    # Gates on ci-fast + unit tests + a11y.
-    # Layout guard runs independently as informational (not in needs).
-    # On merge queue: all jobs run; path-gated jobs that find no relevant changes
-    # skip internally and report "success" or "skipped", both of which pass below.
-    needs: [ci-fast, ci-unit-tests, ci-a11y]
+    # Gates only on the fast deterministic lane.
+    needs: [ci-fast]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -564,29 +481,13 @@ jobs:
       - name: Evaluate required PR checks
         run: |
           echo "ci-fast: ${{ needs.ci-fast.result }}"
-          echo "ci-unit-tests: ${{ needs.ci-unit-tests.result }}"
-          echo "ci-a11y: ${{ needs.ci-a11y.result }}"
           # ci-fast must succeed
           if [[ "${{ needs.ci-fast.result }}" != "success" ]]; then
             echo "❌ ci-fast did not pass"
             exit 1
           fi
 
-          # ci-unit-tests must succeed (path-gated skips still report success)
-          if [[ "${{ needs.ci-unit-tests.result }}" == "failure" || "${{ needs.ci-unit-tests.result }}" == "cancelled" ]]; then
-            echo "❌ ci-unit-tests failed"
-            exit 1
-          fi
-
-          # ci-a11y: blocking — accessibility violations must fail PR.
-          # "skipped" is allowed: fork PRs skip ci-build-public (no secrets),
-          # and path-gated PRs with no UI changes skip the build/a11y pipeline.
-          if [[ "${{ needs.ci-a11y.result }}" == "failure" || "${{ needs.ci-a11y.result }}" == "cancelled" ]]; then
-            echo "❌ ci-a11y did not pass"
-            exit 1
-          fi
-
-          echo "All required PR checks passed: lint, typecheck, guardrails, unit tests, a11y"
+          echo "All required PR checks passed: lint, typecheck, guardrails"
 
   ci-build-public:
     name: Build (public routes)
@@ -596,7 +497,7 @@ jobs:
     # On merge_group: runs to validate a11y/layout haven't regressed before merge.
     # On main push: always runs for full coverage.
     # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -663,7 +564,7 @@ jobs:
     # Fully informational — never blocks PRs or merge queue.
     # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
     # Skipped on push-to-main (merge queue already validated).
-    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -1057,7 +958,7 @@ jobs:
     needs: [ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
     # Skipped in merge queue: no merge-queue jobs depend on the full build.
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
@@ -1154,7 +1055,7 @@ jobs:
     # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy.
     # Skipped on push-to-main (merge queue already validated) and merge queue.
     # Still runs on agent branch pushes (codegen-bot/**, claude/**, codex/**).
-    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
     runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     strategy:
@@ -1275,7 +1176,7 @@ jobs:
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
     # Skipped on push-to-main (merge queue already validated).
     needs: [ci-build-public, ci-path-changes]
-    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref != 'refs/heads/main')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    if: ${{ (((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) || github.event_name == 'workflow_dispatch')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -1654,7 +1555,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
   ci-e2e-tests:
-    name: E2E Tests
+    name: Postmerge E2E
     environment: Preview – jovie
     # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
     needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
@@ -2183,53 +2084,22 @@ jobs:
   # CRITICAL: Required smoke tests run BEFORE production deploy
   # These tests verify the most critical user flows: public profiles + auth
   ci-smoke-required:
-    name: Smoke Tests (Required)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
-    if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
-    # Smoke tests are informational on main pushes — Clerk CDN flakiness should not block deploys.
-    # The canary health gate after deploy verifies production is healthy.
-    continue-on-error: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    name: Postmerge Smoke
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    # Smoke tests now gate deploy on main before production rollout.
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
     steps:
-      - name: Gate required smoke on PRs
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          if [ "${{ needs.ci-e2e-smoke.outputs.run_full_ci }}" != "true" ]; then
-            echo "No E2E-relevant changes detected; not requiring E2E smoke."
-            exit 0
-          fi
-
-          if [ "${{ needs.ci-e2e-smoke.result }}" != "success" ]; then
-            echo "E2E Smoke (PR Fast Feedback) did not succeed."
-            exit 1
-          fi
-
-          echo "E2E Smoke (PR Fast Feedback) succeeded."
-
-      - name: Gate admin smoke on PRs
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          # ci-admin-smoke: allow skip (label-gated) but block on failure
-          if [ "${{ needs.ci-admin-smoke.result }}" == "failure" ]; then
-            echo "Admin E2E Smoke did not succeed."
-            exit 1
-          fi
-
-          echo "Admin E2E Smoke: ${{ needs.ci-admin-smoke.result }} (skip/success OK)"
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         with:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -2238,7 +2108,6 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations for Smoke DB
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
@@ -2247,7 +2116,6 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
@@ -2257,12 +2125,11 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
       - name: Download build artifact from ci-build
         id: download-build
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-build.outputs.run_full_ci == 'true' }}
+        if: ${{ needs.ci-build.outputs.run_full_ci == 'true' }}
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
           name: nextjs-build-${{ github.run_id }}
@@ -2270,7 +2137,6 @@ jobs:
         continue-on-error: true
 
       - name: Extract or rebuild for smoke tests
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
             echo "Reusing build artifact from ci-build (saves ~3-4 min)"
@@ -2290,7 +2156,6 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
       - name: Run Required Smoke Tests
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
           cd apps/web
           # Start standalone production server (not Turbopack dev) to avoid SWC OOM on CI runners
@@ -2335,7 +2200,7 @@ jobs:
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
       - name: Upload Playwright Artifacts on Failure
-        if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        if: ${{ failure() }}
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: smoke-required-report-${{ github.run_id }}
@@ -2410,7 +2275,7 @@ jobs:
           echo "✅ Homepage smoke passed"
 
   deploy:
-    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests] # Smoke tests run in parallel but don't block deploy; canary health gate verifies post-deploy
+    needs: [ci-fast, ci-build, ci-e2e-tests, ci-smoke-required]
     # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest

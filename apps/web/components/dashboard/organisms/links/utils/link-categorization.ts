@@ -16,7 +16,6 @@ export type { LinkSection } from './link-display-utils';
  * Cross-category policy configuration
  *
  * Defines which platforms are allowed to exist in multiple sections.
- * For example, YouTube can appear in both 'social' and 'dsp' (music service) sections.
  *
  * Key: platform ID
  * Value: Array of sections the platform can appear in
@@ -24,10 +23,7 @@ export type { LinkSection } from './link-display-utils';
 export const CROSS_CATEGORY: Record<
   string,
   Array<'social' | 'dsp' | 'earnings' | 'websites' | 'custom'>
-> = {
-  youtube: ['social', 'dsp'],
-  // soundcloud: ['social', 'dsp'],
-};
+> = {};
 
 /**
  * Determine the section a link belongs to based on its platform category
