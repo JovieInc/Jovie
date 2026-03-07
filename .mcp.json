@@ -1,21 +1,21 @@
 {
   "mcpServers": {
     "shadcn": {
-      "command": "/opt/homebrew/bin/npx",
+      "command": "npx",
       "args": ["shadcn@latest", "mcp"]
     },
     "Sentry": {
       "url": "https://mcp.sentry.dev/mcp/jovie/jovie-web"
     },
     "puppeteer": {
-      "command": "/opt/homebrew/bin/npx",
+      "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
     },
     "linear": {
       "url": "https://mcp.linear.app/sse"
     },
     "next-devtools": {
-      "command": "/opt/homebrew/bin/npx",
+      "command": "npx",
       "args": ["-y", "next-devtools-mcp@latest"]
     }
   }
