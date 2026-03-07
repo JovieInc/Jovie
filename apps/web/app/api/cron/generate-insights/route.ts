@@ -108,35 +108,36 @@ export async function GET(request: Request) {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     // Find profiles with enough data that haven't been processed recently.
-    // Uses a CTE to pre-aggregate click stats in a single pass over clickEvents
-    // instead of correlated subqueries per profile row.
+    // Starts from claimed pro/founding/growth profiles (small set), then
+    // checks click counts per-profile using the partial non-bot index,
+    // avoiding a full scan of the click_events table.
     const eligibleProfiles = await db
       .execute<{ profile_id: string }>(
         drizzleSql`
-          WITH click_stats AS (
-            SELECT
-              ce.creator_profile_id,
-              count(*) AS total_clicks,
-              min(ce.created_at) AS first_click
-            FROM ${clickEvents} ce
-            WHERE ce.is_bot = false OR ce.is_bot IS NULL
-            GROUP BY ce.creator_profile_id
-            HAVING count(*) >= ${MIN_TOTAL_CLICKS}
-          )
           SELECT cp.id as profile_id
           FROM ${creatorProfiles} cp
-          INNER JOIN click_stats cs ON cs.creator_profile_id = cp.id
           INNER JOIN ${users} u ON u.id = cp.user_id
           WHERE cp.is_claimed = true
             AND cp.user_id IS NOT NULL
             AND (u.plan IN ('pro', 'founding', 'growth') OR u.is_pro = true)
-            AND cs.first_click <= ${sevenDaysAgo.toISOString()}::timestamp
             AND NOT EXISTS (
               SELECT 1 FROM ${insightGenerationRuns} igr
               WHERE igr.creator_profile_id = cp.id
-                AND igr.created_at >= ${twentyHoursAgo.toISOString()}::timestamp
+                AND igr.created_at >= ${twentyHoursAgo.toISOString()}::timestamptz
                 AND igr.status IN ('completed', 'processing')
             )
+            AND (
+              SELECT count(*)
+              FROM ${clickEvents} ce
+              WHERE ce.creator_profile_id = cp.id
+                AND (ce.is_bot = false OR ce.is_bot IS NULL)
+            ) >= ${MIN_TOTAL_CLICKS}
+            AND (
+              SELECT min(ce2.created_at)
+              FROM ${clickEvents} ce2
+              WHERE ce2.creator_profile_id = cp.id
+                AND (ce2.is_bot = false OR ce2.is_bot IS NULL)
+            ) <= ${sevenDaysAgo.toISOString()}::timestamp
           ORDER BY cp.profile_views DESC
           LIMIT ${MAX_CRON_BATCH_SIZE}
         `
