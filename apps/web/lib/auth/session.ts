@@ -73,10 +73,15 @@ async function applySessionUserId(userId: string): Promise<void> {
     await db.execute(getSessionSetupSql(userId));
   } catch (error) {
     logDbError('setupDbSession_set_config_failed', error, { userId });
-    // SET LOCAL only works inside a transaction block — wrap in db.transaction()
-    await db.transaction(async tx => {
-      await tx.execute(getSessionSetupFallbackSql(userId));
-    });
+    // Fallback: use session-scoped set_config (is_local=false) which doesn't require a transaction
+    try {
+      await db.execute(
+        drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
+      );
+    } catch (fallbackError) {
+      logDbError('setupDbSession_fallback_failed', fallbackError, { userId });
+      throw fallbackError;
+    }
   }
 }
 
@@ -89,7 +94,17 @@ async function applySessionUserId(userId: string): Promise<void> {
  * execute on the same stateful connection.
  */
 export async function setupDbSession(clerkUserId?: string) {
-  const userId = await resolveClerkUserId(clerkUserId);
+  let userId: string;
+  try {
+    userId = await resolveClerkUserId(clerkUserId);
+  } catch (error) {
+    // If no authenticated user, skip RLS setup gracefully
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      logDbInfo('setupDbSession', 'Skipping RLS setup — no authenticated user');
+      return { userId: null };
+    }
+    throw error;
+  }
 
   try {
     // Execute the session setup SQL with retry logic for transient failures
@@ -116,6 +131,9 @@ export async function withDbSession<T>(
   options?: { clerkUserId?: string }
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
   return operation(userId);
 }
 
@@ -148,7 +166,12 @@ export async function withDbSessionTx<T>(
   return db.transaction(
     async tx => {
       // Set the session variable within the transaction
-      await tx.execute(getSessionSetupSql(userId));
+      try {
+        await tx.execute(getSessionSetupSql(userId));
+      } catch (error) {
+        logDbError('withDbSessionTx_set_config_failed', error, { userId });
+        await tx.execute(getSessionSetupFallbackSql(userId));
+      }
       return operation(tx, userId);
     },
     options?.isolationLevel

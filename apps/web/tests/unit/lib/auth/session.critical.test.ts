@@ -127,7 +127,7 @@ describe('@critical session.ts', () => {
       expect(queryText).not.toContain('app.user_id');
     });
 
-    it('falls back to SET when set_config fails', async () => {
+    it('falls back to session-scoped set_config when transaction-scoped fails', async () => {
       const { setupDbSession } = await import('@/lib/auth/session');
 
       mockDbExecute
@@ -143,7 +143,20 @@ describe('@critical session.ts', () => {
       const secondQueryText = JSON.stringify(mockDbExecute.mock.calls[1]?.[0]);
 
       expect(firstQueryText).toContain("set_config('app.clerk_user_id'");
-      expect(secondQueryText).toContain('SET LOCAL app.clerk_user_id');
+      // Fallback uses session-scoped set_config (is_local=false)
+      expect(secondQueryText).toContain("set_config('app.clerk_user_id'");
+    });
+
+    it('returns null userId when no authenticated user and no clerkUserId', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: null });
+
+      const { setupDbSession } = await import('@/lib/auth/session');
+
+      const result = await setupDbSession();
+
+      expect(result.userId).toBeNull();
+      // Should not attempt set_config at all
+      expect(mockDbExecute).not.toHaveBeenCalled();
     });
 
     it('uses getCachedAuth when no clerkUserId provided', async () => {
@@ -157,12 +170,13 @@ describe('@critical session.ts', () => {
       expect(mockCachedAuth).toHaveBeenCalled();
     });
 
-    it('throws when not authenticated and no clerkUserId', async () => {
+    it('returns null userId when not authenticated and no clerkUserId', async () => {
       mockCachedAuth.mockResolvedValue({ userId: null });
 
       const { setupDbSession } = await import('@/lib/auth/session');
 
-      await expect(setupDbSession()).rejects.toThrow('Unauthorized');
+      const result = await setupDbSession();
+      expect(result.userId).toBeNull();
     });
 
     it('validates userId format', async () => {
