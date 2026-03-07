@@ -108,7 +108,7 @@ export const Gallery: Story = {
         icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
         secondaryAction={{
           label: 'View docs',
-          href: '/docs',
+          href: 'https://docs.jov.ie',
         }}
       />
     </div>
