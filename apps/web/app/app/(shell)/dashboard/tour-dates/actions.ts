@@ -78,8 +78,9 @@ async function requireProfile(): Promise<{
     redirect('/onboarding');
   }
 
+  // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!data.selectedProfile) {
-    throw new TypeError('Missing creator profile');
+    redirect('/onboarding');
   }
 
   // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)

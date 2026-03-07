@@ -32,24 +32,13 @@ function createMockLink(
 
 describe('link-categorization', () => {
   describe('CROSS_CATEGORY', () => {
-    it('should define YouTube as cross-category for social and dsp', () => {
-      expect(CROSS_CATEGORY.youtube).toEqual(['social', 'dsp']);
-    });
-
-    it('should not have any other platforms defined by default', () => {
-      const keys = Object.keys(CROSS_CATEGORY);
-      expect(keys).toEqual(['youtube']);
+    it('should default to no cross-category platforms', () => {
+      expect(CROSS_CATEGORY).toEqual({});
     });
 
     it('should be a Record type with correct structure', () => {
       expect(typeof CROSS_CATEGORY).toBe('object');
-      expect(Array.isArray(CROSS_CATEGORY.youtube)).toBe(true);
-    });
-
-    it('should not include earnings or custom in YouTube cross-category', () => {
-      expect(CROSS_CATEGORY.youtube).not.toContain('earnings');
-      expect(CROSS_CATEGORY.youtube).not.toContain('custom');
-      expect(CROSS_CATEGORY.youtube).not.toContain('websites');
+      expect(Array.isArray(Object.keys(CROSS_CATEGORY))).toBe(true);
     });
   });
 
@@ -124,11 +113,6 @@ describe('link-categorization', () => {
         expect(sectionOf(link)).toBe('social');
       });
 
-      it('should correctly categorize YouTube as dsp', () => {
-        const link = createMockLink('youtube', 'dsp');
-        expect(sectionOf(link)).toBe('dsp');
-      });
-
       it('should correctly categorize Spotify', () => {
         const link = createMockLink('spotify', 'dsp');
         expect(sectionOf(link)).toBe('dsp');
@@ -167,21 +151,9 @@ describe('link-categorization', () => {
         expect(canMoveTo(youtubeLink, 'social')).toBe(true);
       });
 
-      it('should allow YouTube to stay in dsp', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
-        expect(canMoveTo(youtubeLink, 'dsp')).toBe(true);
-      });
-    });
-
-    describe('cross-category moves for YouTube', () => {
-      it('should allow YouTube to move from social to dsp', () => {
+      it('should not allow YouTube to move from social to dsp', () => {
         const youtubeLink = createMockLink('youtube', 'social');
-        expect(canMoveTo(youtubeLink, 'dsp')).toBe(true);
-      });
-
-      it('should allow YouTube to move from dsp to social', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
-        expect(canMoveTo(youtubeLink, 'social')).toBe(true);
+        expect(canMoveTo(youtubeLink, 'dsp')).toBe(false);
       });
 
       it('should not allow YouTube to move to earnings', () => {
@@ -191,16 +163,6 @@ describe('link-categorization', () => {
 
       it('should not allow YouTube to move to custom', () => {
         const youtubeLink = createMockLink('youtube', 'social');
-        expect(canMoveTo(youtubeLink, 'custom')).toBe(false);
-      });
-
-      it('should not allow YouTube to move from dsp to earnings', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
-        expect(canMoveTo(youtubeLink, 'earnings')).toBe(false);
-      });
-
-      it('should not allow YouTube to move from dsp to custom', () => {
-        const youtubeLink = createMockLink('youtube', 'dsp');
         expect(canMoveTo(youtubeLink, 'custom')).toBe(false);
       });
     });
@@ -511,39 +473,28 @@ describe('link-categorization', () => {
       });
     });
 
-    describe('YouTube cross-category', () => {
-      it('should group YouTube based on its category, not platform ID', () => {
-        const youtubeAsSocial = createMockLink('youtube', 'social');
-        const youtubeAsDsp = createMockLink('youtube', 'dsp');
-
-        const result1 = groupLinks([youtubeAsSocial]);
-        expect(result1.social).toHaveLength(1);
-        expect(result1.dsp).toHaveLength(0);
-
-        const result2 = groupLinks([youtubeAsDsp]);
-        expect(result2.social).toHaveLength(0);
-        expect(result2.dsp).toHaveLength(1);
-      });
-
-      it('should handle both YouTube links with different categories', () => {
-        const youtubeAsSocial = createMockLink(
+    describe('YouTube classification', () => {
+      it('should group YouTube as social and YouTube Music as dsp', () => {
+        const youtube = createMockLink(
           'youtube',
           'social',
           'https://youtube.com/social'
         );
-        const youtubeAsDsp = createMockLink(
-          'youtube',
+        const youtubeMusic = createMockLink(
+          'youtube_music',
           'dsp',
-          'https://youtube.com/dsp'
+          'https://music.youtube.com/channel/dsp'
         );
 
-        const result = groupLinks([youtubeAsSocial, youtubeAsDsp]);
+        const result = groupLinks([youtube, youtubeMusic]);
         expect(result.social).toHaveLength(1);
         expect(result.dsp).toHaveLength(1);
         expect(result.social[0].normalizedUrl).toBe(
           'https://youtube.com/social'
         );
-        expect(result.dsp[0].normalizedUrl).toBe('https://youtube.com/dsp');
+        expect(result.dsp[0].normalizedUrl).toBe(
+          'https://music.youtube.com/channel/dsp'
+        );
       });
     });
   });
@@ -571,7 +522,7 @@ describe('link-categorization', () => {
 
       const results = sections.map(section => canMoveTo(link, section));
 
-      expect(results).toEqual([true, true, false, false]); // YouTube can move to social and dsp
+      expect(results).toEqual([true, false, false, false]);
     });
   });
 
@@ -603,7 +554,7 @@ describe('link-categorization', () => {
 
       // Verify canMoveTo for YouTube
       const youtube = links[2];
-      expect(canMoveTo(youtube, 'dsp')).toBe(true);
+      expect(canMoveTo(youtube, 'dsp')).toBe(false);
       expect(canMoveTo(youtube, 'earnings')).toBe(false);
 
       // Verify canMoveTo for non-cross-category

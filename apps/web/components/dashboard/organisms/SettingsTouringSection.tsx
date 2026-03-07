@@ -2,12 +2,6 @@
 
 import {
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -38,6 +32,13 @@ import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/organisms/Dialog';
 import { queryKeys } from '@/lib/queries/keys';
 import { useBandsintownConnectionQuery } from '@/lib/queries/useBandsintownConnectionQuery';
 import { cn } from '@/lib/utils';
@@ -360,19 +361,16 @@ function BandsintownConnectDialog({
   }, [apiKey, artistName, onOpenChange, queryClient, profileId]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className='sm:max-w-md'>
-        <DialogHeader>
-          <DialogTitle>
-            {isConnected ? 'Update Bandsintown' : 'Connect Bandsintown'}
-          </DialogTitle>
-          <DialogDescription>
-            Enter your Bandsintown artist name to sync tour dates to your
-            profile.
-          </DialogDescription>
-        </DialogHeader>
+    <Dialog open={open} onClose={() => onOpenChange(false)} size='md'>
+      <DialogTitle>
+        {isConnected ? 'Update Bandsintown' : 'Connect Bandsintown'}
+      </DialogTitle>
+      <DialogDescription>
+        Enter your Bandsintown artist name to sync tour dates to your profile.
+      </DialogDescription>
 
-        <div className='space-y-3 py-2'>
+      <DialogBody>
+        <div className='space-y-3'>
           <div className='space-y-1.5'>
             <Label htmlFor='bandsintown-artist' className='text-xs'>
               Artist name
@@ -403,26 +401,26 @@ function BandsintownConnectDialog({
             />
           </div>
         </div>
+      </DialogBody>
 
-        <DialogFooter>
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={() => onOpenChange(false)}
-            disabled={isSaving}
-          >
-            Cancel
-          </Button>
-          <Button
-            size='sm'
-            onClick={handleSubmit}
-            disabled={isSaving || (!apiKey.trim() && !artistName.trim())}
-            loading={isSaving}
-          >
-            {isConnected ? 'Update' : 'Connect'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+      <DialogActions>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() => onOpenChange(false)}
+          disabled={isSaving}
+        >
+          Cancel
+        </Button>
+        <Button
+          size='sm'
+          onClick={handleSubmit}
+          disabled={isSaving || (!apiKey.trim() && !artistName.trim())}
+          loading={isSaving}
+        >
+          {isConnected ? 'Update' : 'Connect'}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }

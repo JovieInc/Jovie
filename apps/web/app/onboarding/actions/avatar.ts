@@ -136,8 +136,8 @@ export async function getSafeUploadUrl(): Promise<string> {
 async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
   const safeImageUrl = getSafeImageUrl(imageUrl);
   const source = await fetch(safeImageUrl, {
-    redirect: 'error', // Prevent SSRF via redirect to internal services
-    signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
+    redirect: 'follow', // OAuth providers (Google, GitHub) commonly redirect avatar URLs
+    signal: AbortSignal.timeout(15_000), // 15s timeout — cold starts + OAuth CDNs can be slow
   });
 
   if (!source.ok) {
@@ -213,10 +213,22 @@ async function uploadAvatarFile(
 }
 
 /**
+ * Exponential backoff with jitter for retry delays.
+ * Returns a promise that resolves after the computed delay.
+ */
+function backoffDelay(attempt: number): Promise<void> {
+  const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+  const jitter = Math.floor(Math.random() * baseDelay * 0.3);
+  return new Promise(resolve => setTimeout(resolve, baseDelay + jitter));
+}
+
+/**
  * Upload a remote avatar with retry mechanism.
  *
- * Implements exponential backoff retry for reliability.
- * Logs failures for monitoring and debugging.
+ * Separates the fetch and upload steps so that a successful image fetch
+ * is not repeated when only the upload fails. Uses exponential backoff
+ * with jitter for reliability. Intermediate failures are recorded as
+ * breadcrumbs; only final exhaustion is reported as a Sentry event.
  *
  * @returns Upload result or null if all retries fail
  */
@@ -228,49 +240,78 @@ export async function uploadRemoteAvatar(params: {
   const maxRetries = params.maxRetries ?? 3;
   let lastError: Error | null = null;
 
+  // Step 1: Fetch the remote image (retry separately from upload)
+  let fetchResult: AvatarFetchResult | null = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Exponential backoff: 0ms, 1000ms, 2000ms
       if (attempt > 0) {
-        const delay = Math.min(1000 * attempt, 5000);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await backoffDelay(attempt);
       }
 
-      const { buffer, contentType } = await fetchAvatarImage(params.imageUrl);
+      fetchResult = await fetchAvatarImage(params.imageUrl);
+      break;
+    } catch (error) {
+      lastError =
+        error instanceof Error ? error : new Error('Unknown fetch error');
+
+      // Don't retry for invalid content type — it won't change on retry
+      if (lastError.message.includes('Invalid content type')) {
+        Sentry.captureMessage('Avatar upload: invalid content type', {
+          level: 'warning',
+          extra: { errorMessage: lastError.message },
+        });
+        return null;
+      }
+
+      // Record intermediate failures as breadcrumbs (less noisy than events)
+      if (attempt < maxRetries - 1) {
+        Sentry.addBreadcrumb({
+          category: 'avatar',
+          message: `Avatar fetch attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}`,
+          level: 'info',
+        });
+      }
+    }
+  }
+
+  if (!fetchResult) {
+    if (lastError) {
+      Sentry.captureException(lastError, {
+        extra: { maxRetries, context: 'avatar_fetch_retries_exhausted' },
+      });
+    }
+    return null;
+  }
+
+  // Step 2: Upload the fetched image (retry separately — no need to re-fetch)
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        await backoffDelay(attempt);
+      }
+
       const { blobUrl, photoId } = await uploadAvatarFile(
-        buffer,
-        contentType,
+        fetchResult.buffer,
+        fetchResult.contentType,
         params.cookieHeader
       );
 
-      // Success
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
 
-      const errorMessage = lastError.message;
-
-      // Don't retry for invalid content type - it won't change
-      if (errorMessage.includes('Invalid content type')) {
-        Sentry.captureMessage('Avatar upload: invalid content type', {
-          level: 'warning',
-          extra: { errorMessage },
+      if (attempt < maxRetries - 1) {
+        Sentry.addBreadcrumb({
+          category: 'avatar',
+          message: `Avatar upload attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}`,
+          level: 'info',
         });
-        break;
       }
-
-      Sentry.captureMessage(
-        `Avatar upload attempt ${attempt + 1}/${maxRetries} failed`,
-        {
-          level: 'warning',
-          extra: { errorMessage },
-        }
-      );
     }
   }
 
-  // All retries exhausted
+  // All upload retries exhausted
   if (lastError) {
     Sentry.captureException(lastError, {
       extra: { maxRetries, context: 'avatar_upload_retries_exhausted' },

@@ -197,16 +197,16 @@ export function ExportCSVButton<T extends object>({
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <dl className='space-y-2 text-sm text-muted-foreground'>
+          <dl className='space-y-2 text-sm text-secondary-token'>
             <div className='flex items-center justify-between gap-4'>
               <dt>Rows</dt>
-              <dd className='font-medium text-foreground'>
+              <dd className='font-medium text-primary-token'>
                 {pendingData?.length ?? 0}
               </dd>
             </div>
             <div className='flex items-center justify-between gap-4'>
               <dt>Columns</dt>
-              <dd className='font-medium text-foreground'>{columnCount}</dd>
+              <dd className='font-medium text-primary-token'>{columnCount}</dd>
             </div>
           </dl>
 

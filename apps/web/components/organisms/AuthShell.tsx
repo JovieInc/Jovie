@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
@@ -50,9 +51,23 @@ function AuthShellInner({
 
   const isInSettings = section === 'settings';
 
+  // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
+  // The sidebar only depends on `section` — it shouldn't remount when
+  // navigating between pages within the same section.
+  const sidebar = useMemo(
+    () => <UnifiedSidebar section={section} />,
+    [section]
+  );
+
+  // Memoize mobile bottom nav — stable across route changes
+  const mobileBottomNav = useMemo(
+    () => (showMobileTabs ? <DashboardMobileTabs /> : null),
+    [showMobileTabs]
+  );
+
   return (
     <AppShellFrame
-      sidebar={<UnifiedSidebar section={section} />}
+      sidebar={sidebar}
       header={
         isInSettings ? null : (
           <DashboardHeader
@@ -69,7 +84,7 @@ function AuthShellInner({
       }
       main={children}
       rightPanel={rightPanel}
-      mobileBottomNav={showMobileTabs ? <DashboardMobileTabs /> : null}
+      mobileBottomNav={mobileBottomNav}
       contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
       isTableRoute={isTableRoute}
     />

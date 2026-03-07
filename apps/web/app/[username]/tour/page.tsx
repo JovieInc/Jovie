@@ -93,7 +93,7 @@ export default async function TourPage({ params }: Readonly<Props>) {
         <div className='mx-auto max-w-2xl px-4 py-4'>
           <Link
             href={`/${username}`}
-            className='inline-flex items-center gap-2 text-sm text-secondary-token hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 text-sm text-secondary-token transition-colors duration-normal hover:text-primary-token'
           >
             <Icon name='ArrowLeft' className='h-4 w-4' />
             Back to {artistName}
@@ -102,12 +102,12 @@ export default async function TourPage({ params }: Readonly<Props>) {
       </header>
 
       {/* Content */}
-      <main id='main-content' className='mx-auto max-w-2xl px-4 py-8'>
-        <div className='mb-8'>
-          <h1 className='text-2xl font-bold text-primary-token'>
+      <main id='main-content' className='mx-auto max-w-2xl px-4 py-6'>
+        <div className='mb-6'>
+          <h1 className='text-2xl font-[var(--font-weight-medium)] tracking-tight text-primary-token'>
             {artistName} Tour Dates
           </h1>
-          <p className='mt-1 text-secondary-token'>
+          <p className='mt-1 text-sm text-secondary-token'>
             {formatTourDatesCount(tourDates.length)}
           </p>
         </div>
@@ -115,7 +115,7 @@ export default async function TourPage({ params }: Readonly<Props>) {
         {tourDates.length > 0 ? (
           <TourDatesList tourDates={tourDates} />
         ) : (
-          <div className='rounded-xl border border-subtle bg-surface-1 p-8 text-center'>
+          <div className='rounded-lg border border-subtle bg-surface-1 p-8 text-center'>
             <Icon
               name='CalendarX2'
               className='mx-auto h-12 w-12 text-tertiary-token'

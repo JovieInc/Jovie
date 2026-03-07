@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 
 interface AppShellFrameProps {
@@ -15,8 +16,13 @@ interface AppShellFrameProps {
 /**
  * AppShellFrame is a presentational shell primitive shared by authenticated,
  * demo, and loading shell variants.
+ *
+ * Memoized to prevent re-renders when parent components (AuthShellWrapper)
+ * re-render due to pathname changes. The sidebar, header, and main content
+ * are passed as ReactNode props — React will diff them individually without
+ * unmounting the frame itself.
  */
-export function AppShellFrame({
+export const AppShellFrame = memo(function AppShellFrame({
   sidebar,
   header,
   main,
@@ -40,7 +46,7 @@ export function AppShellFrame({
       <div
         id='main-content'
         tabIndex={-1}
-        className='bg-surface-0 lg:border-[0.5px] lg:border-strong lg:rounded-lg lg:m-2 lg:ml-0 flex flex-1 min-h-0 overflow-hidden'
+        className='bg-surface-0 lg:border lg:border-strong lg:rounded-sm lg:m-2 lg:ml-0 flex flex-1 min-h-0 overflow-hidden'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
@@ -64,4 +70,4 @@ export function AppShellFrame({
       {mobileBottomNav}
     </div>
   );
-}
+});

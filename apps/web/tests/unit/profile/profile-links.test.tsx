@@ -250,8 +250,8 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
         },
         {
           id: '3',
-          platform: 'youtube',
-          url: 'https://youtube.com/@testartist',
+          platform: 'youtube-music',
+          url: 'https://music.youtube.com/channel/testartist',
         },
         {
           id: '4',
@@ -633,7 +633,7 @@ describe('Public profile link visibility', () => {
     }> = [
       { keywords: ['spotify'], dspKey: 'spotify' },
       { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-      { keywords: ['youtube'], dspKey: 'youtube' },
+      { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
       { keywords: ['soundcloud'], dspKey: 'soundcloud' },
       { keywords: ['bandcamp'], dspKey: 'bandcamp' },
       { keywords: ['tidal'], dspKey: 'tidal' },
@@ -731,8 +731,8 @@ describe('Public profile link visibility', () => {
         }),
         createSocialLink({
           id: '3',
-          platform: 'youtube',
-          url: 'https://youtube.com/@artist',
+          platform: 'youtube_music',
+          url: 'https://music.youtube.com/channel/artist',
         }),
         createSocialLink({
           id: '4',
@@ -772,7 +772,7 @@ describe('Public profile link visibility', () => {
       const keys = dsps.map(d => d.key);
       expect(keys).toContain('spotify');
       expect(keys).toContain('apple_music');
-      expect(keys).toContain('youtube');
+      expect(keys).toContain('youtube_music');
       expect(keys).toContain('soundcloud');
       expect(keys).toContain('bandcamp');
       expect(keys).toContain('tidal');
@@ -875,7 +875,7 @@ describe('Public profile link visibility', () => {
       expect(match!.dspKey).toBe('spotify');
     });
 
-    it('YouTube link can appear in both social and DSP contexts', async () => {
+    it('YouTube stays social while YouTube Music remains DSP', async () => {
       const youtubeLink = createSocialLink({
         id: '1',
         platform: 'youtube',
@@ -886,15 +886,12 @@ describe('Public profile link visibility', () => {
       const publicVisible = filterSocialNetworkLinks([youtubeLink]);
       expect(publicVisible).toHaveLength(1);
 
-      // Public profile DSP mapping: youtube maps to a DSP
-      const normalized = 'youtube'.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-      expect(normalized).toBe('youtube');
-
-      // Sidebar: getPlatformCategory can classify youtube as DSP
+      // Sidebar: getPlatformCategory classifies youtube as social
       const { getPlatformCategory } = await import(
         '@/components/dashboard/organisms/links/utils/platform-category'
       );
-      expect(getPlatformCategory('youtube')).toBe('dsp');
+      expect(getPlatformCategory('youtube')).toBe('social');
+      expect(getPlatformCategory('youtube_music')).toBe('dsp');
     });
   });
 });

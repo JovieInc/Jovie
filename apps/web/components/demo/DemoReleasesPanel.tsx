@@ -111,7 +111,7 @@ export function DemoReleasesPanel({
             <button
               type='button'
               onClick={() => toggleGroup(group.status)}
-              className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-8 text-[13px] font-medium text-tertiary-token hover:text-secondary-token'
+              className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-[28px] text-[13px] text-tertiary-token hover:text-secondary-token [font-weight:var(--font-weight-medium)]'
               aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
             >
               <ChevronRight
@@ -167,7 +167,7 @@ export function DemoReleasesPanel({
                       }
                     }}
                     className={cn(
-                      'flex h-8 cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--color-border-subtle)]',
+                      'flex h-[34px] cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--color-border-subtle)]',
                       isSelected &&
                         'bg-accent/10 shadow-[inset_2px_0_0_var(--color-accent),inset_0_-1px_0_var(--color-border-subtle)]',
                       isFocused && !isSelected && 'bg-interactive-hover',
@@ -204,7 +204,7 @@ export function DemoReleasesPanel({
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
-                          className='flex items-center gap-1.5 rounded-full border border-subtle px-1.5 py-0.5 text-[11px] font-medium text-secondary-token bg-transparent'
+                          className='flex items-center gap-1.5 rounded-[2px] border border-subtle bg-interactive-hover px-1.5 py-0.5 text-[10px] text-secondary-token [font-weight:var(--font-weight-medium)]'
                         >
                           <span
                             className='size-1.5 rounded-full'

@@ -5,8 +5,9 @@
 This repository uses trunk-based development with a single long-lived branch:
 
 - **`main`** → deploys directly to **jov.ie** (production)
-- PRs run fast checks (typecheck, lint) - ~30 seconds
-- Push to main runs full CI (build, tests, E2E) then deploys to production
+- PRs run only the fast merge gate (typecheck, lint, boundaries, guardrails)
+- Optional heavyweight PR verification is label-gated via `testing`
+- Push to `main` runs post-merge verification (build, smoke, E2E) and then deploys to production
 - Post-deploy: canary health gate + production smoke tests
 
 ## Vercel Preview Deployments
@@ -39,9 +40,12 @@ Vercel preview deployments for pull requests and feature branches are handled by
 
 The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 
-- **Fast checks** (typecheck, lint) - runs on all PRs, required for merge
-- **Full CI** (build, unit tests, E2E) - runs on push to main before deploy
-- **Production deploy** - automatic deployment to jov.ie after CI passes
+- **Fast PR gate** (typecheck, lint, boundaries, guardrails) - runs on all PRs and merge queue, required for merge
+- **Extended verification** (build, a11y, layout, smoke) - runs only for PRs labeled `testing`
+- **Post-merge verification** (build, smoke, E2E) - runs on pushes to `main` before deploy
+- **Production deploy** - automatic deployment from the `main` branch to jov.ie after post-merge verification passes
+- **Production environment binding** - the `deploy` job targets GitHub `Production – jovie` and Vercel `production`, so `main` remains the only production deploy path
+- **Build engine** - Next.js builds use Turbopack, while Turborepo remote cache is shared across CI and Vercel via `TURBO_TOKEN` and `TURBO_TEAM`
 - **Canary health gate** - verifies deployment health before declaring success
 - **Smoke tests** - validates critical paths after deploy
 - **Lighthouse CI** - performance metrics on each deploy
