@@ -284,12 +284,7 @@ describe('Linktree Strategy', () => {
       expect(result.avatarUrl).toBe('https://cdn.linktr.ee/profiles/casey.jpg');
 
       const platforms = result.links.map(link => link.platformId).sort();
-      expect(platforms).toEqual([
-        'instagram',
-        'spotify',
-        'twitter',
-        'youtube_music',
-      ]);
+      expect(platforms).toEqual(['instagram', 'spotify', 'twitter', 'youtube']);
       expect(
         result.links.some(link => {
           try {

@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 
@@ -12,6 +13,15 @@ import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 export async function GET() {
   try {
     const { profile } = await getSessionContext({ requireProfile: true });
+
+    // AI insights are a Pro-only feature
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isPro) {
+      return NextResponse.json(
+        { insights: [], totalActive: 0, lastGeneratedAt: null },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
 
     if (!profile) {
       return NextResponse.json(

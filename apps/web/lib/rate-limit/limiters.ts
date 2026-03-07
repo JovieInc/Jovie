@@ -745,6 +745,43 @@ export async function checkAccountExportRateLimit(
   );
 }
 
+// ============================================================================
+// Link Wrapping
+// ============================================================================
+
+/**
+ * Rate limiter for wrap-link (authenticated)
+ * Limit: 50 requests per hour per user
+ */
+export const wrapLinkLimiter = createRateLimiter(RATE_LIMITERS.wrapLink);
+
+/**
+ * Rate limiter for wrap-link (anonymous)
+ * Limit: 20 requests per hour per IP - stricter for unauthenticated callers
+ */
+export const wrapLinkAnonymousLimiter = createRateLimiter(
+  RATE_LIMITERS.wrapLinkAnonymous
+);
+
+/**
+ * Check wrap-link rate limit.
+ * Uses userId for authenticated callers, IP for anonymous.
+ */
+export async function checkWrapLinkRateLimit(
+  identifier: string,
+  isAuthenticated: boolean
+): Promise<RateLimitResult> {
+  const limiter = isAuthenticated ? wrapLinkLimiter : wrapLinkAnonymousLimiter;
+  const result = await limiter.limit(identifier);
+  if (!result.success) {
+    return {
+      ...result,
+      reason: 'Rate limit exceeded. Please try again later.',
+    };
+  }
+  return result;
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -785,5 +822,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     releaseRefreshPaid: releaseRefreshPaidLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,
+    wrapLink: wrapLinkLimiter,
+    wrapLinkAnonymous: wrapLinkAnonymousLimiter,
   };
 }

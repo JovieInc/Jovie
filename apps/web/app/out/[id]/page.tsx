@@ -7,6 +7,7 @@ import { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { getWrappedLink } from '@/lib/services/link-wrapping';
 import { getCategoryDescription } from '@/lib/utils/domain-categorizer';
+import { createChallengeToken } from '@/lib/utils/url-encryption.server';
 import { InterstitialClient } from './InterstitialClient';
 
 // Force dynamic rendering to ensure headers are applied correctly
@@ -65,6 +66,9 @@ export default async function InterstitialPage({
     wrappedLink.category || 'adult'
   );
 
+  // Generate server-signed challenge token to prevent API bypass
+  const { token: challengeToken } = createChallengeToken(shortId);
+
   return (
     <div className='min-h-screen bg-gray-50 flex items-center justify-center px-4'>
       <div className='max-w-md w-full bg-white rounded-lg shadow-lg p-6'>
@@ -98,6 +102,7 @@ export default async function InterstitialPage({
           {/* Client-side component for human verification */}
           <InterstitialClient
             shortId={shortId}
+            challengeToken={challengeToken}
             titleAlias={wrappedLink.titleAlias || 'External Link'}
             domain={
               wrappedLink.category === 'adult' ||

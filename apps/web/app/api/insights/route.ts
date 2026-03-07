@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getSessionContext } from '@/lib/auth/session';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { getActiveInsights } from '@/lib/services/insights/lifecycle';
 import type { InsightCategory, InsightPriority } from '@/types/insights';
@@ -32,6 +33,16 @@ const VALID_PRIORITIES = new Set<InsightPriority>(['high', 'medium', 'low']);
 export async function GET(request: Request) {
   try {
     const { profile } = await getSessionContext({ requireProfile: true });
+
+    // AI insights are a Pro-only feature
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isPro) {
+      return NextResponse.json(
+        { insights: [], total: 0, hasMore: false },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Parse category filter

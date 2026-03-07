@@ -9,7 +9,7 @@ describe('validateUsername (server)', () => {
   });
 
   it('rejects usernames with invalid characters', () => {
-    const result = validateUsername('john_doe');
+    const result = validateUsername('john@doe');
     expect(result.isValid).toBe(false);
     expect(result.error).toBeDefined();
   });

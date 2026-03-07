@@ -3,6 +3,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
+import { users } from '@/lib/db/schema/auth';
 import { insightGenerationRuns } from '@/lib/db/schema/insights';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
@@ -125,8 +126,10 @@ export async function GET(request: Request) {
           SELECT cp.id as profile_id
           FROM ${creatorProfiles} cp
           INNER JOIN click_stats cs ON cs.creator_profile_id = cp.id
+          INNER JOIN ${users} u ON u.id = cp.user_id
           WHERE cp.is_claimed = true
             AND cp.user_id IS NOT NULL
+            AND (u.plan IN ('pro', 'founding', 'growth') OR u.is_pro = true)
             AND cs.first_click <= ${sevenDaysAgo.toISOString()}::timestamp
             AND NOT EXISTS (
               SELECT 1 FROM ${insightGenerationRuns} igr

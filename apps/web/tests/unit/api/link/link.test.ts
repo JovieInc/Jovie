@@ -29,6 +29,11 @@ vi.mock('@/lib/db/schema', () => ({
 
 vi.mock('@/lib/utils/url-encryption.server', () => ({
   generateSignedToken: vi.fn().mockReturnValue('test-token-123'),
+  verifyChallengeToken: vi
+    .fn()
+    .mockImplementation(
+      (_shortId: string, token: string) => token === 'valid-challenge-token'
+    ),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -79,7 +84,7 @@ describe('POST /api/link/[id]', () => {
     expect(data.error).toBe('Invalid request body');
   });
 
-  it('returns 400 when verification is missing', async () => {
+  it('returns 400 when challenge token is missing', async () => {
     const { POST } = await import('@/app/api/link/[id]/route');
     const request = new NextRequest('http://localhost/api/link/test123', {
       method: 'POST',
@@ -95,13 +100,35 @@ describe('POST /api/link/[id]', () => {
     expect(data.error).toBe('Verification required');
   });
 
+  it('returns 403 when challenge token is invalid', async () => {
+    const { POST } = await import('@/app/api/link/[id]/route');
+    const request = new NextRequest('http://localhost/api/link/test123', {
+      method: 'POST',
+      body: JSON.stringify({
+        challengeToken: 'forged-token',
+        timestamp: Date.now(),
+      }),
+    });
+
+    const response = await POST(request, {
+      params: Promise.resolve({ id: 'test123' }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('Invalid or expired verification');
+  });
+
   it('returns 404 when link not found', async () => {
     mockGetWrappedLink.mockResolvedValue(null);
 
     const { POST } = await import('@/app/api/link/[id]/route');
     const request = new NextRequest('http://localhost/api/link/nonexistent', {
       method: 'POST',
-      body: JSON.stringify({ verified: true, timestamp: Date.now() }),
+      body: JSON.stringify({
+        challengeToken: 'valid-challenge-token',
+        timestamp: Date.now(),
+      }),
     });
 
     const response = await POST(request, {
@@ -122,7 +149,10 @@ describe('POST /api/link/[id]', () => {
     const { POST } = await import('@/app/api/link/[id]/route');
     const request = new NextRequest('http://localhost/api/link/test123', {
       method: 'POST',
-      body: JSON.stringify({ verified: true, timestamp: Date.now() }),
+      body: JSON.stringify({
+        challengeToken: 'valid-challenge-token',
+        timestamp: Date.now(),
+      }),
     });
 
     const response = await POST(request, {

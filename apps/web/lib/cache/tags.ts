@@ -88,6 +88,10 @@ export function createAvatarTag(userId: string): string {
   return `avatar:${userId}`;
 }
 
+export function createSmartLinkContentTag(profileId: string): string {
+  return `smartlink-content:${profileId}`;
+}
+
 /**
  * Cache TTL presets in seconds.
  * Use these for consistent cache durations across the app.
