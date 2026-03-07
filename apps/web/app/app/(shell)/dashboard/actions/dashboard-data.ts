@@ -148,7 +148,7 @@ export interface DashboardData {
 }
 
 export interface ProfileCompletionStep {
-  id: 'avatar' | 'bio' | 'social-links' | 'music-links' | 'tip-jar';
+  id: 'avatar' | 'social-links' | 'music-links' | 'tip-jar';
   label: string;
   description: string;
   href: string;
@@ -181,10 +181,11 @@ function buildProfileCompletion(
   hasSocialLinks: boolean,
   hasMusicLinks: boolean
 ): ProfileCompletion {
-  // Criteria: name, avatar, bio, social links, music links, tip jar.
+  // Criteria: name, avatar, social links, music links, tip jar.
+  // Bio is optional and excluded from completion scoring.
   // Handle (username) is excluded because it is always present for existing profiles
   // and would inflate the score with "free" points.
-  const totalCount = 6;
+  const totalCount = 5;
 
   if (!selectedProfile) {
     return {
@@ -199,7 +200,6 @@ function buildProfileCompletion(
   const checks = {
     name: hasText(selectedProfile.displayName),
     avatar: hasText(selectedProfile.avatarUrl),
-    bio: hasText(selectedProfile.bio),
     socialLinks: hasSocialLinks,
     musicLinks: hasMusicLinks,
     tipJar: hasText(selectedProfile.venmoHandle),
@@ -215,15 +215,6 @@ function buildProfileCompletion(
       id: 'avatar',
       label: 'Add a profile photo',
       description: 'A recognizable photo makes your page feel personal.',
-      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
-    });
-  }
-
-  if (!checks.bio) {
-    steps.push({
-      id: 'bio',
-      label: 'Write a short bio',
-      description: 'Tell new fans who you are in one or two lines.',
       href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
   }
