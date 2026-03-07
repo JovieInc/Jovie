@@ -370,56 +370,59 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
 
-        {/* Engagement tab */}
+        {/* Engagement tab — always render all 4 rows to prevent layout shift */}
         {activeTab === 'engagement' && (
-          <div className='divide-y divide-subtle'>
-            {loading ? (
-              <>
-                <StatRow label='Capture Rate' value='' loading />
-                <StatRow label='Listen Clicks' value='' loading />
-                <StatRow label='Total Clicks' value='' loading />
-                <StatRow label='Identified Users' value='' loading />
-              </>
-            ) : (
-              data && (
-                <>
-                  {typeof data.capture_rate === 'number' && (
-                    <StatRow
-                      label='Capture Rate'
-                      value={`${data.capture_rate}%`}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.listen_clicks === 'number' && (
-                    <StatRow
-                      label='Listen Clicks'
-                      value={fmt.format(data.listen_clicks)}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.total_clicks === 'number' && (
-                    <StatRow
-                      label='Total Clicks'
-                      value={fmt.format(data.total_clicks)}
-                      loading={false}
-                    />
-                  )}
-                  {typeof data.identified_users === 'number' && (
-                    <StatRow
-                      label='Identified Users'
-                      value={fmt.format(data.identified_users)}
-                      loading={false}
-                    />
-                  )}
-                </>
-              )
-            )}
+          <div className='divide-y divide-subtle min-h-[160px]'>
+            <StatRow
+              label='Capture Rate'
+              value={
+                loading
+                  ? ''
+                  : typeof data?.capture_rate === 'number'
+                    ? `${data.capture_rate}%`
+                    : '--'
+              }
+              loading={loading}
+            />
+            <StatRow
+              label='Listen Clicks'
+              value={
+                loading
+                  ? ''
+                  : typeof data?.listen_clicks === 'number'
+                    ? fmt.format(data.listen_clicks)
+                    : '--'
+              }
+              loading={loading}
+            />
+            <StatRow
+              label='Total Clicks'
+              value={
+                loading
+                  ? ''
+                  : typeof data?.total_clicks === 'number'
+                    ? fmt.format(data.total_clicks)
+                    : '--'
+              }
+              loading={loading}
+            />
+            <StatRow
+              label='Identified Users'
+              value={
+                loading
+                  ? ''
+                  : typeof data?.identified_users === 'number'
+                    ? fmt.format(data.identified_users)
+                    : '--'
+              }
+              loading={loading}
+            />
           </div>
         )}
 
-        {/* Sources tab */}
+        {/* Sources tab — min-height prevents layout shift when switching tabs */}
         {activeTab === 'sources' && (
-          <div className='space-y-5'>
+          <div className='space-y-5 min-h-[160px]'>
             <RankedList
               title='Top Cities'
               icon={MapPin}
