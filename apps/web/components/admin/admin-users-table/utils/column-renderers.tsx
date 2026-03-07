@@ -1,6 +1,8 @@
 import { Badge } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
+import { Copy, ExternalLink } from 'lucide-react';
 import type { RefObject } from 'react';
+import { toast } from 'sonner';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -10,6 +12,7 @@ import {
   DateCell,
   TableCheckboxCell,
 } from '@/components/organisms/table';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
 
 /**
@@ -24,20 +27,68 @@ export function renderNameCell({
 
   return (
     <div className='min-w-0'>
-      {name ? (
-        <TruncatedText lines={1} className='font-semibold text-primary-token'>
-          {name}
-        </TruncatedText>
-      ) : (
-        <span className='font-semibold text-primary-token'>User</span>
-      )}
-      {user.email ? (
+      <TruncatedText lines={1} className='font-semibold text-primary-token'>
+        {name || user.email || 'Unknown'}
+      </TruncatedText>
+      {name && user.email ? (
         <TruncatedText lines={1} className='text-xs text-secondary-token'>
           {user.email}
         </TruncatedText>
-      ) : (
+      ) : !name && !user.email ? (
         <EmptyCell />
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Renders the Jovie username cell with hover copy/open actions
+ */
+export function renderUsernameCell({
+  row,
+}: CellContext<AdminUserRow, unknown>) {
+  const username = row.original.profileUsername;
+
+  if (!username) {
+    return <EmptyCell />;
+  }
+
+  const profileUrl = `https://jov.ie/@${username}`;
+
+  return (
+    <div className='group/username flex items-center gap-1.5 min-w-0'>
+      <TruncatedText lines={1} className='text-secondary-token'>
+        {`@${username}`}
+      </TruncatedText>
+      <span className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/username:opacity-100'>
+        <button
+          type='button'
+          className='rounded p-0.5 text-tertiary-token hover:text-primary-token hover:bg-surface-2'
+          aria-label={`Copy link for @${username}`}
+          onClick={e => {
+            e.stopPropagation();
+            copyToClipboard(profileUrl).then(ok => {
+              if (ok) {
+                toast.success('Profile link copied', { duration: 2000 });
+              } else {
+                toast.error('Failed to copy link');
+              }
+            });
+          }}
+        >
+          <Copy className='h-3 w-3' />
+        </button>
+        <a
+          href={profileUrl}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='rounded p-0.5 text-tertiary-token hover:text-primary-token hover:bg-surface-2'
+          aria-label={`Open profile for @${username}`}
+          onClick={e => e.stopPropagation()}
+        >
+          <ExternalLink className='h-3 w-3' />
+        </a>
+      </span>
     </div>
   );
 }

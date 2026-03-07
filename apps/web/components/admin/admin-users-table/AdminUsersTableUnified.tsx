@@ -38,6 +38,7 @@ import {
   renderNameCell,
   renderPlanCell,
   renderStatusCell,
+  renderUsernameCell,
 } from './utils/column-renderers';
 
 const columnHelper = createColumnHelper<AdminUserRow>();
@@ -76,7 +77,7 @@ function AdminUserMobileCard({
           />
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold text-primary-token'>
-              {user.name ?? 'User'}
+              {user.name || user.email || 'Unknown'}
             </p>
             <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
@@ -311,7 +312,15 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         id: 'name',
         header: 'Name',
         cell: renderNameCell,
-        size: 320,
+        size: 260,
+      }),
+
+      // Jovie Username column
+      columnHelper.display({
+        id: 'username',
+        header: 'Jovie Username',
+        cell: renderUsernameCell,
+        size: 180,
       }),
 
       // Sign up (Created) column
