@@ -108,13 +108,20 @@ export function SettingsPolished({
       {
         id: 'artist-profile',
         title: 'Artist Profile',
-        description: 'Photo, display name, and username.',
+        description: 'Photo, display name, username, and branding.',
         render: () => (
-          <SettingsArtistProfileSection
-            artist={artist}
-            onArtistUpdate={onArtistUpdate}
-            onRefresh={() => router.refresh()}
-          />
+          <div className='space-y-6'>
+            <SettingsArtistProfileSection
+              artist={artist}
+              onArtistUpdate={onArtistUpdate}
+              onRefresh={() => router.refresh()}
+            />
+            <SettingsBrandingSection
+              artist={artist}
+              onArtistUpdate={onArtistUpdate}
+              isPro={isPro}
+            />
+          </div>
         ),
       },
       {
@@ -131,24 +138,6 @@ export function SettingsPolished({
         render: () => <SettingsTouringSection profileId={artist.id} />,
       },
       {
-        id: 'branding',
-        title: 'Branding',
-        description: 'Custom branding for your profile page.',
-        render: () => (
-          <SettingsBrandingSection
-            artist={artist}
-            onArtistUpdate={onArtistUpdate}
-            isPro={isPro}
-          />
-        ),
-      },
-      {
-        id: 'ad-pixels',
-        title: 'Ad Pixels',
-        description: 'Facebook, Google, and TikTok conversion tracking.',
-        render: () => <SettingsAdPixelsSection isPro={isPro} />,
-      },
-      {
         id: 'analytics',
         title: 'Analytics',
         description: 'Control how your visits appear in analytics.',
@@ -161,10 +150,16 @@ export function SettingsPolished({
         ),
       },
       {
-        id: 'audience',
-        title: 'Audience',
-        description: 'Fan verification and opt-in preferences.',
-        render: () => <SettingsAudienceSection />,
+        id: 'audience-tracking',
+        title: 'Audience & Tracking',
+        description:
+          'Fan verification, opt-in preferences, and conversion pixel tracking.',
+        render: () => (
+          <div className='space-y-6'>
+            <SettingsAudienceSection />
+            <SettingsAdPixelsSection isPro={isPro} />
+          </div>
+        ),
       },
     ],
     [artist, isPro, onArtistUpdate, router]
