@@ -118,9 +118,9 @@ export function EntitySidebarShell({
           </div>
         ) : (
           <>
-            {/* Entity header — image + name area */}
+            {/* Entity header — image + name area, min-height prevents layout shift when content loads */}
             {entityHeader && (
-              <div className='shrink-0 border-b border-subtle/80 px-4 pt-3 pb-4'>
+              <div className='shrink-0 border-b border-subtle/80 px-4 pt-3 pb-4 min-h-[72px]'>
                 {entityHeader}
               </div>
             )}
