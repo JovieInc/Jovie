@@ -2,25 +2,16 @@
  * Link Wrapping API Route
  * Creates wrapped links with anti-cloaking protection
  *
- * Rate Limiting Status: IMPLEMENTED BUT DISABLED
- * This endpoint calls checkRateLimit() which is currently globally disabled in lib/utils/bot-detection.ts.
- * Following YC principle: "do things that don't scale until you have to"
+ * Rate Limiting:
+ * - Authenticated: 50 requests per hour per user
+ * - Anonymous: 20 requests per hour per IP (stricter)
+ * - Returns HTTP 429 with Retry-After when exceeded
  *
- * Rate limiting will be enabled when:
- * - Wrapped link creation exceeds ~10k/day
- * - Abuse/spam patterns detected in PostHog
- * - Link shortening abuse becomes measurable
- *
- * Current Protection:
- * - Basic URL validation
+ * Protection:
+ * - URL validation
  * - Bot detection (less aggressive)
+ * - Rate limiting via unified rate-limit module
  * - Auth optional (allows anonymous usage for growth)
- *
- * Future Considerations:
- * - Enable rate limiting (50/hour per IP is already configured)
- * - Add CAPTCHA for anonymous users after N links
- * - Implement link expiration cleanup job
- * - Track abuse patterns in PostHog
  */
 
 export const runtime = 'nodejs';
@@ -29,11 +20,16 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import {
+  checkWrapLinkRateLimit,
+  createRateLimitHeaders,
+  getClientIP,
+} from '@/lib/rate-limit';
+import {
   createWrappedLink,
   deleteWrappedLink,
   updateWrappedLink,
 } from '@/lib/services/link-wrapping';
-import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';
+import { detectBot } from '@/lib/utils/bot-detection';
 import { isValidUrl } from '@/lib/utils/url-encryption';
 
 const NO_STORE_HEADERS = {
@@ -52,18 +48,36 @@ interface RequestBody {
 export async function POST(request: NextRequest) {
   try {
     // Basic bot detection (less aggressive for this endpoint)
-    const _botResult = detectBot(request, '/api/wrap-link');
-    const ip =
-      request.headers.get('x-forwarded-for') ||
-      request.headers.get('x-real-ip') ||
-      'unknown';
+    detectBot(request, '/api/wrap-link');
 
-    // Rate limiting
-    const isRateLimited = await checkRateLimit(ip, '/api/wrap-link'); // 50 requests per hour
-    if (isRateLimited) {
+    // Get user ID if authenticated (needed for rate-limit keying)
+    let userId: string | undefined;
+    try {
+      const { userId: authUserId } = await auth();
+      userId = authUserId || undefined;
+    } catch {
+      // Not authenticated, continue without user ID
+    }
+
+    // Rate limiting: authenticated users get 50/hr by userId, anonymous get 20/hr by IP
+    const ip = getClientIP(request);
+    const isAuthenticated = Boolean(userId);
+    const rateLimitIdentifier = userId ?? ip;
+    const rateLimitResult = await checkWrapLinkRateLimit(
+      rateLimitIdentifier,
+      isAuthenticated
+    );
+
+    if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        { status: 429, headers: NO_STORE_HEADERS }
+        { error: 'Rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 
@@ -79,7 +93,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { url, customAlias, expiresInHours } = body;
-    const _platform = body.platform || 'external';
 
     // Validate URL
     if (!url || !isValidUrl(url)) {
@@ -87,15 +100,6 @@ export async function POST(request: NextRequest) {
         { error: 'Invalid URL' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
-    }
-
-    // Get user ID if authenticated
-    let userId: string | undefined;
-    try {
-      const { userId: authUserId } = await auth();
-      userId = authUserId || undefined;
-    } catch {
-      // Not authenticated, continue without user ID
     }
 
     // Create wrapped link
