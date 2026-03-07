@@ -40,6 +40,11 @@ export async function withDb<T>(
  * isolation, wrap in db.transaction() with is_local=true instead.
  */
 export async function setSessionUser(userId: string): Promise<void> {
+  if (!userId) {
+    logDbInfo('setSessionUser', 'Skipping RLS setup — no userId provided');
+    return;
+  }
+
   try {
     await withRetry(async () => {
       let db = getInternalDb();
