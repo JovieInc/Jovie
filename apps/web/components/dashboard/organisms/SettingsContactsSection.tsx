@@ -256,7 +256,7 @@ function ContactRow({
       type='button'
       onClick={onClick}
       className={`flex items-center gap-3 w-full text-left py-3 px-2 -mx-2 rounded-md transition-colors cursor-pointer ${
-        isSelected ? 'bg-surface-2' : 'hover:bg-surface-2/50'
+        isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'
       }`}
     >
       <div className='min-w-0 flex-1'>

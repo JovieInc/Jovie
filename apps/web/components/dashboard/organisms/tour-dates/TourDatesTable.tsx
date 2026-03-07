@@ -383,7 +383,7 @@ export function TourDatesTable({
       getRowId={row => row.id}
       getRowClassName={row => {
         const past = isPastDate(new Date(row.startDate));
-        return cn('group hover:bg-surface-2/50', past && 'opacity-60');
+        return cn('group hover:bg-white/[0.02]', past && 'opacity-60');
       }}
       enableVirtualization={tourDates.length >= 20}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}

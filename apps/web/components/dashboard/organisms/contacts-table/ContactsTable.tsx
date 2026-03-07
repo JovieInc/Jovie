@@ -160,10 +160,8 @@ export const ContactsTable = memo(function ContactsTable({
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
-      // Selected row: solid bg with slightly deeper hover (override base hover:bg-surface-2/50)
-      return selectedContactId === contact.id
-        ? 'bg-surface-2 hover:bg-surface-2'
-        : '';
+      // Selected row: solid bg (override base hover)
+      return selectedContactId === contact.id ? 'bg-white/[0.04]' : '';
     },
     [selectedContactId]
   );

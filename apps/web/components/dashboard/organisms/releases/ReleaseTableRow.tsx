@@ -204,7 +204,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     <>
       <tr
         className={cn(
-          'group transition-colors duration-200 hover:bg-surface-2/50',
+          'group transition-colors duration-150 hover:bg-white/[0.02]',
           index !== totalRows - 1 && 'border-b border-subtle'
         )}
       >

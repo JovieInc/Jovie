@@ -72,7 +72,7 @@ interface ActivityTableUnifiedProps {
 }
 
 /** Standard row class for activity table */
-const getRowClassName = () => 'group hover:bg-surface-2/50';
+const getRowClassName = () => 'group hover:bg-white/[0.02]';
 
 const columnHelper = createColumnHelper<AdminActivityItem>();
 

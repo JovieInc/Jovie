@@ -81,7 +81,7 @@ export const TrackRow = memo(function TrackRow({
 
   return (
     <tr
-      className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-surface-2/60 hover:bg-surface-2/70' : 'hover:bg-surface-2/30'}`}
+      className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
       onClick={onClick}
     >
       {/* 1. Spacer for checkbox column (always visible) */}
