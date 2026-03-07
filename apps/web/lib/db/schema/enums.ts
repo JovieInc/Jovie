@@ -397,6 +397,23 @@ export const leadDiscoverySourceEnum = pgEnum('lead_discovery_source', [
   'manual',
 ]);
 
+export const leadOutreachRouteEnum = pgEnum('lead_outreach_route', [
+  'email',
+  'dm',
+  'both',
+  'manual_review',
+  'skipped',
+]);
+
+export const leadOutreachStatusEnum = pgEnum('lead_outreach_status', [
+  'pending',
+  'queued',
+  'sent',
+  'failed',
+  'dm_sent',
+  'dismissed',
+]);
+
 // Tip Status Enum
 export const tipStatusEnum = pgEnum('tip_status', [
   'pending',
