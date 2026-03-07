@@ -168,12 +168,12 @@ export function TrackSidebar({
       entityHeader={
         track ? (
           <div className='flex items-start gap-4'>
-            <div className='min-w-0 flex-1 space-y-1'>
+            <div className='min-w-0 flex-1 space-y-1.5'>
               <div className='flex items-center gap-2'>
-                <span className='text-xs text-tertiary-token tabular-nums'>
+                <span className='text-[13px] text-tertiary-token tabular-nums'>
                   {trackLabel}.
                 </span>
-                <h3 className='text-sm font-semibold text-primary-token'>
+                <h3 className='text-[15px] font-semibold text-primary-token'>
                   {track.title}
                 </h3>
                 {track.isExplicit && (
@@ -199,21 +199,21 @@ export function TrackSidebar({
               </div>
             </div>
             {track.releaseArtworkUrl ? (
-              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
                 <Image
                   src={track.releaseArtworkUrl}
                   alt={`${track.releaseTitle} artwork`}
                   fill
                   className='object-cover'
-                  sizes='64px'
+                  sizes='80px'
                 />
               </div>
             ) : (
-              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
                 <div className='flex h-full w-full items-center justify-center'>
                   <Icon
                     name='Music'
-                    className='h-6 w-6 text-tertiary-token'
+                    className='h-7 w-7 text-tertiary-token'
                     aria-hidden='true'
                   />
                 </div>

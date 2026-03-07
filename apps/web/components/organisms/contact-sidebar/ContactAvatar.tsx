@@ -35,7 +35,7 @@ export const ContactAvatar = memo(function ContactAvatar({
       src={avatarUrl}
       alt={altText}
       name={displayName}
-      size='lg'
+      size='xl'
       uploadable
       onUpload={onAvatarUpload}
       onError={message => {
@@ -44,7 +44,7 @@ export const ContactAvatar = memo(function ContactAvatar({
       showHoverOverlay
     />
   ) : (
-    <Avatar src={avatarUrl} alt={altText} name={displayName} size='lg' />
+    <Avatar src={avatarUrl} alt={altText} name={displayName} size='xl' />
   );
 
   return (
