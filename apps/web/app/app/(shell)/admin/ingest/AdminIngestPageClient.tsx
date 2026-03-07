@@ -5,9 +5,9 @@ import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { BatchIngestForm } from '@/components/admin/BatchIngestForm';
+import type { IngestHistoryRow } from '@/components/admin/ingest-history.types';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import type { IngestHistoryRow } from '@/lib/admin/ingest-history';
 import { cn } from '@/lib/utils';
 
 interface AdminIngestPageClientProps {

@@ -1,16 +1,7 @@
 import { desc, eq, or } from 'drizzle-orm';
+import type { IngestHistoryRow } from '@/components/admin/ingest-history.types';
 import { getDb } from '@/lib/db';
 import { ingestAuditLogs } from '@/lib/db/schema/audit';
-
-export interface IngestHistoryRow {
-  id: string;
-  type: string;
-  handle: string | null;
-  spotifyId: string | null;
-  result: string | null;
-  failureReason: string | null;
-  createdAt: Date;
-}
 
 /**
  * Fetch recent admin ingest audit log entries.
