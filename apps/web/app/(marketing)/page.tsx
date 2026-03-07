@@ -9,6 +9,7 @@ import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { LogoBar } from '@/components/home/LogoBar';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
+import { SocialProofSection } from '@/components/home/SocialProofSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
@@ -251,6 +252,8 @@ export default function HomePage() {
         <RedesignedHero />
         <LogoBar />
       </div>
+
+      <SocialProofSection />
 
       <AutomaticReleaseSmartlinksSection />
 
