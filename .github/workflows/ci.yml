@@ -1827,7 +1827,7 @@ jobs:
       - name: Install Vercel CLI
         run: pnpm add -g vercel@50.22.1
       - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@v3
+        uses: oNaiPs/secrets-to-env-action@v1.7
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
@@ -2322,7 +2322,7 @@ jobs:
       - name: Upgrade corepack
         run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env
-        uses: oNaiPs/secrets-to-env-action@v3
+        uses: oNaiPs/secrets-to-env-action@v1.7
         with:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
