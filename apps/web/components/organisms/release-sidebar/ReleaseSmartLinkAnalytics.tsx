@@ -101,7 +101,7 @@ export function ReleaseSmartLinkAnalytics({
     <DrawerSection title='Smart link analytics'>
       {isLoading && (
         <div
-          className='grid grid-cols-2 divide-x divide-subtle rounded-md border border-subtle/70 bg-surface/40 p-3'
+          className='grid grid-cols-2 divide-x divide-subtle/80 rounded-lg border border-subtle/60 bg-surface-2/40 p-3.5'
           style={{ minHeight: 72 }}
         >
           <div className='pr-3 space-y-1'>
@@ -125,7 +125,7 @@ export function ReleaseSmartLinkAnalytics({
 
       {!isLoading && !hasError && (
         <>
-          <div className='grid grid-cols-2 divide-x divide-subtle rounded-md border border-subtle/70 bg-surface/40 p-3'>
+          <div className='grid grid-cols-2 divide-x divide-subtle/80 rounded-lg border border-subtle/60 bg-surface-2/40 p-3.5'>
             <div className='pr-3'>
               <StatTile
                 label='Total clicks'
@@ -143,17 +143,17 @@ export function ReleaseSmartLinkAnalytics({
           </div>
 
           {showEmpty && (
-            <p className='text-xs text-tertiary-token'>
+            <p className='text-xs text-secondary-token'>
               Share your smart link to start tracking clicks.
             </p>
           )}
 
           {!showEmpty && topProviders.length > 0 && (
             <div className='space-y-2'>
-              <p className='text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+              <p className='text-[11px] font-semibold uppercase tracking-wide text-secondary-token'>
                 Top platforms
               </p>
-              <div className='divide-y divide-subtle/60 rounded-md border border-subtle/70 bg-surface/30'>
+              <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>
                 {topProviders.map(provider => {
                   const key = provider.provider as ProviderKey;
                   const label =
