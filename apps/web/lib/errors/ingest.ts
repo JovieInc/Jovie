@@ -136,7 +136,7 @@ const ERROR_MESSAGES: Record<IngestErrorCode, string> = {
   INVALID_INPUT: 'Invalid input. Please check your data and try again.',
   INVALID_SPOTIFY_ID: 'Invalid Spotify artist ID.',
   INVALID_HANDLE:
-    'Invalid handle. Use only lowercase letters, numbers, and underscores.',
+    'Invalid handle. Use only lowercase letters, numbers, hyphens, underscores, and dots.',
   INVALID_QUERY: 'Invalid search query.',
   UNAUTHORIZED: 'Please sign in to continue.',
   NOT_ARTIST_OWNER: 'You must be the owner of this Spotify artist account.',

@@ -854,7 +854,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
               <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2'>
                   <Icon
                     name='Disc3'
                     className='h-8 w-8 text-tertiary-token'

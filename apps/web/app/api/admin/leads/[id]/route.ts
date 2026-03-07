@@ -6,6 +6,9 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { ingestLeadAsCreator } from '@/lib/leads/ingest-lead';
+import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { routeLead } from '@/lib/leads/route-lead';
+import { spotifyEnrichLead } from '@/lib/leads/spotify-enrich-lead';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -89,8 +92,73 @@ export async function PATCH(
       }
     }
 
+    // Outreach routing on approval
+    let routing = null;
+    if (validated.data.status === 'approved') {
+      try {
+        // Enrich with Spotify data for priority scoring
+        await spotifyEnrichLead(id);
+
+        // Route the lead (email, dm, both, or manual_review)
+        const routeResult = await routeLead(id);
+        routing = { route: routeResult.route };
+
+        // Push to Instantly if email route and lead has email
+        if (
+          (routeResult.route === 'email' || routeResult.route === 'both') &&
+          updated.contactEmail
+        ) {
+          try {
+            const instantlyLeadId = await pushLeadToInstantly({
+              email: updated.contactEmail,
+              firstName: updated.displayName ?? updated.linktreeHandle,
+              claimLink: routeResult.claimUrl,
+              artistName: updated.displayName ?? updated.linktreeHandle,
+              priorityScore: updated.priorityScore ?? 0,
+            });
+
+            const queuedNow = new Date();
+            await db
+              .update(leads)
+              .set({
+                instantlyLeadId,
+                outreachStatus: 'queued',
+                outreachQueuedAt: queuedNow,
+                updatedAt: queuedNow,
+              })
+              .where(eq(leads.id, id));
+
+            routing = { ...routing, instantlyLeadId, outreachStatus: 'queued' };
+          } catch (instantlyError) {
+            await captureError('Instantly push failed', instantlyError, {
+              route: '/api/admin/leads/[id]',
+              contextData: { leadId: id },
+            });
+            routing = {
+              ...routing,
+              instantlyError:
+                instantlyError instanceof Error
+                  ? instantlyError.message
+                  : 'Instantly push failed',
+            };
+          }
+        }
+      } catch (routingError) {
+        await captureError('Lead routing failed', routingError, {
+          route: '/api/admin/leads/[id]',
+          contextData: { leadId: id },
+        });
+        routing = {
+          error:
+            routingError instanceof Error
+              ? routingError.message
+              : 'Routing failed',
+        };
+      }
+    }
+
     return NextResponse.json(
-      { ...updated, ingestion },
+      { ...updated, ingestion, routing },
       {
         status: 200,
         headers: NO_STORE_HEADERS,

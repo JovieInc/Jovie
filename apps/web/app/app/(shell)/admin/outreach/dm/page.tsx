@@ -1,0 +1,81 @@
+'use client';
+
+import { Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { DmQueueCard } from '@/components/admin/outreach/DmQueueCard';
+
+interface DmQueueLead {
+  id: string;
+  displayName: string | null;
+  instagramHandle: string | null;
+  priorityScore: number | null;
+  dmCopy: string | null;
+  outreachStatus: string;
+}
+
+interface DmQueueResponse {
+  items: DmQueueLead[];
+  total: number;
+}
+
+export default function AdminOutreachDmPage() {
+  const [leads, setLeads] = useState<DmQueueLead[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const fetchQueue = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        queue: 'dm',
+        sort: 'priorityScore',
+        sortOrder: 'desc',
+        limit: '50',
+      });
+      const res = await fetch(`/api/admin/outreach?${params}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error('Failed to load DM queue');
+      const data = (await res.json()) as DmQueueResponse;
+      setLeads(data.items);
+      setTotal(data.total);
+    } catch {
+      toast.error('Failed to load DM queue');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchQueue();
+  }, [fetchQueue]);
+
+  return (
+    <div className='flex flex-col gap-6 p-4 sm:p-6'>
+      <h2 className='text-sm font-semibold text-primary-token'>
+        DM Queue ({total})
+      </h2>
+
+      {loading ? (
+        <div className='flex items-center justify-center py-16'>
+          <Loader2 className='size-6 animate-spin text-secondary-token' />
+        </div>
+      ) : leads.length === 0 ? (
+        <p className='py-8 text-center text-sm text-secondary-token'>
+          No leads in DM queue
+        </p>
+      ) : (
+        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+          {leads.map(lead => (
+            <DmQueueCard
+              key={lead.id}
+              lead={lead}
+              onMarkedSent={() => void fetchQueue()}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

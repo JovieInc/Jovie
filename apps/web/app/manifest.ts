@@ -1,4 +1,4 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
 import { APP_NAME } from '@/constants/app';
 
 export default function manifest(): MetadataRoute.Manifest {
@@ -10,8 +10,8 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     start_url: '/',
     display: 'standalone',
-    background_color: '#0a0a0a', // dark background matching app theme
-    theme_color: '#0a0a0a', // dark theme matching app background
+    background_color: '#0a0a0a',
+    theme_color: '#0a0a0a',
     orientation: 'portrait',
     scope: '/',
     lang: 'en',
@@ -24,17 +24,28 @@ export default function manifest(): MetadataRoute.Manifest {
         purpose: 'any',
       },
       {
+        src: '/web-app-manifest-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
         src: '/android-chrome-192x192.png',
         sizes: '192x192',
         type: 'image/png',
-        // "any maskable" is valid per W3C spec but not in Next.js types
-        purpose: 'any maskable' as 'any',
+        purpose: 'maskable',
+      },
+      {
+        src: '/web-app-manifest-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
       },
       {
         src: '/android-chrome-512x512.png',
         sizes: '512x512',
         type: 'image/png',
-        purpose: 'any maskable' as 'any',
+        purpose: 'maskable',
       },
       {
         src: '/apple-touch-icon.png',
@@ -45,15 +56,15 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
     screenshots: [
       {
-        src: '/og/default.png',
-        sizes: '1200x630',
+        src: '/web-app-manifest-512x512.png',
+        sizes: '512x512',
         type: 'image/png',
         form_factor: 'wide',
         label: `${APP_NAME} - Artist profiles for music artists`,
       },
       {
-        src: '/og/default.png',
-        sizes: '1200x630',
+        src: '/web-app-manifest-512x512.png',
+        sizes: '512x512',
         type: 'image/png',
         form_factor: 'narrow',
         label: `${APP_NAME} - Artist profiles for music artists`,
@@ -67,32 +78,8 @@ export default function manifest(): MetadataRoute.Manifest {
         url: '/',
         icons: [
           {
-            src: '/favicon-32x32.png',
-            sizes: '32x32',
-          },
-        ],
-      },
-      {
-        name: 'Privacy Policy',
-        short_name: 'Privacy',
-        description: 'View our privacy policy',
-        url: '/legal/privacy',
-        icons: [
-          {
-            src: '/favicon-32x32.png',
-            sizes: '32x32',
-          },
-        ],
-      },
-      {
-        name: 'Terms of Service',
-        short_name: 'Terms',
-        description: 'View our terms of service',
-        url: '/legal/terms',
-        icons: [
-          {
-            src: '/favicon-32x32.png',
-            sizes: '32x32',
+            src: '/favicon-96x96.png',
+            sizes: '96x96',
           },
         ],
       },

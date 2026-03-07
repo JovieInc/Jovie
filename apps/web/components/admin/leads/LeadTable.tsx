@@ -139,7 +139,7 @@ export function LeadTable() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <section className='rounded-lg border border-subtle bg-surface-1/90 p-4 sm:p-6'>
+    <section className='border border-subtle bg-surface-1 p-4 sm:p-6'>
       <div className='mb-4'>
         <h2 className='text-sm font-semibold text-primary-token'>
           Leads ({total})

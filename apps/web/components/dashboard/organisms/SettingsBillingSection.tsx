@@ -3,10 +3,9 @@
 import { Button } from '@jovie/ui';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { APP_ROUTES } from '@/constants/routes';
-import { useBillingStatusQuery } from '@/lib/queries';
+import { useBillingStatusQuery, usePortalMutation } from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
@@ -14,11 +13,20 @@ export function SettingsBillingSection() {
   const router = useRouter();
   const { data: billingData, isLoading: billingLoading } =
     useBillingStatusQuery();
-  const [isBillingLoading, setIsBillingLoading] = useState(false);
+  const portalMutation = usePortalMutation();
 
-  const handleBilling = async () => {
-    setIsBillingLoading(true);
-    await router.push(APP_ROUTES.SETTINGS_BILLING);
+  const isPro = billingData?.isPro ?? false;
+
+  const handleBilling = () => {
+    if (isPro) {
+      portalMutation.mutate(undefined, {
+        onSuccess: data => {
+          globalThis.location.href = data.url;
+        },
+      });
+    } else {
+      router.push(APP_ROUTES.PRICING);
+    }
   };
 
   return (
@@ -29,13 +37,20 @@ export function SettingsBillingSection() {
         </p>
         <Button
           onClick={handleBilling}
-          loading={isBillingLoading || billingLoading}
+          loading={portalMutation.isPending || billingLoading}
           className={SETTINGS_BUTTON_CLASS}
           variant='primary'
           size='sm'
         >
-          {billingData?.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
+          {isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
         </Button>
+        {portalMutation.error && (
+          <p className='text-sm text-destructive'>
+            {portalMutation.error instanceof Error
+              ? portalMutation.error.message
+              : 'Failed to open billing portal'}
+          </p>
+        )}
       </div>
     </DashboardCard>
   );
