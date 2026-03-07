@@ -129,7 +129,7 @@ export function renderProfileCell({
   return (
     <div className='min-w-0'>
       <TruncatedText lines={1} className='text-sm text-primary-token'>
-        @{user.profileUsername}
+        {`@${user.profileUsername}`}
       </TruncatedText>
       {user.profileOrigin ? (
         <span className='text-xs text-tertiary-token'>
