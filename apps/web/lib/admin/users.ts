@@ -18,11 +18,21 @@ export type AdminUsersSort =
   | 'email_desc'
   | 'email_asc';
 
+export type AdminUserStatus =
+  | 'waitlist_pending'
+  | 'waitlist_approved'
+  | 'profile_claimed'
+  | 'onboarding_incomplete'
+  | 'active'
+  | 'suspended'
+  | 'banned';
+
 export interface AdminUserRow {
   id: string;
   clerkId: string;
   name: string | null;
   email: string | null;
+  userStatus: AdminUserStatus;
   createdAt: Date;
   deletedAt: Date | null;
   isPro: boolean;
@@ -30,6 +40,10 @@ export interface AdminUserRow {
   stripeSubscriptionId: string | null;
   plan: AdminUserPlan;
   profileUsername: string | null;
+  founderWelcomeSentAt: Date | null;
+  welcomeFailedAt: Date | null;
+  outboundSuppressedAt: Date | null;
+  suppressionFailedAt: Date | null;
 }
 
 export interface GetAdminUsersParams {
@@ -116,12 +130,17 @@ export async function getAdminUsers(
           clerkId: users.clerkId,
           name: users.name,
           email: users.email,
+          userStatus: users.userStatus,
           createdAt: users.createdAt,
           deletedAt: users.deletedAt,
           isPro: users.isPro,
           stripeCustomerId: users.stripeCustomerId,
           stripeSubscriptionId: users.stripeSubscriptionId,
           profileUsername: creatorProfiles.username,
+          founderWelcomeSentAt: users.founderWelcomeSentAt,
+          welcomeFailedAt: users.welcomeFailedAt,
+          outboundSuppressedAt: users.outboundSuppressedAt,
+          suppressionFailedAt: users.suppressionFailedAt,
         })
         .from(users)
         .leftJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
@@ -138,6 +157,7 @@ export async function getAdminUsers(
         clerkId: row.clerkId,
         name: row.name ?? null,
         email: row.email ?? null,
+        userStatus: row.userStatus,
         createdAt: row.createdAt,
         deletedAt: row.deletedAt ?? null,
         isPro: row.isPro ?? false,
@@ -148,6 +168,10 @@ export async function getAdminUsers(
           stripeSubscriptionId: row.stripeSubscriptionId ?? null,
         }),
         profileUsername: row.profileUsername ?? null,
+        founderWelcomeSentAt: row.founderWelcomeSentAt ?? null,
+        welcomeFailedAt: row.welcomeFailedAt ?? null,
+        outboundSuppressedAt: row.outboundSuppressedAt ?? null,
+        suppressionFailedAt: row.suppressionFailedAt ?? null,
       })),
       page,
       pageSize,
