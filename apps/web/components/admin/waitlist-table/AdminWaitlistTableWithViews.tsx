@@ -26,6 +26,7 @@ import {
   waitlistCSVColumns,
 } from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { useAdminWaitlistInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { useUpdateWaitlistStatusMutation } from '@/lib/queries/useWaitlistMutations';
@@ -242,7 +243,10 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                     label='Export'
                   />
                 </ActionBarItem>
-                <ActionBarItem tooltipLabel='Display' shortcut='⇧V'>
+                <ActionBarItem
+                  tooltipLabel='Display'
+                  shortcut={`${GLYPH_SHIFT}V`}
+                >
                   <DisplayMenuDropdown
                     trigger={
                       <ActionBarButton
