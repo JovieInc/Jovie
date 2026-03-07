@@ -66,6 +66,8 @@ export interface UpdateLinkData {
 
 /**
  * List of Digital Streaming Platform (DSP) identifiers.
+ * Note: Regular YouTube is classified as social, not music.
+ * Only YouTube Music (music.youtube.com) is a DSP.
  */
 export const DSP_PLATFORMS = [
   'amazon-music',
