@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -325,6 +326,8 @@ export async function saveProviderOverride(params: {
 
     // Invalidate cache tag so next server fetch returns fresh data
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
     // Skip revalidatePath — the mutation hook handles cache updates via TanStack
     // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -388,6 +391,8 @@ export async function resetProviderOverride(params: {
 
     // Invalidate cache tag so next server fetch returns fresh data
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
     // Skip revalidatePath — the mutation hook handles cache updates via TanStack
     // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -448,6 +453,8 @@ export async function saveReleaseLyrics(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -510,6 +517,8 @@ export async function saveCanvasStatus(params: {
   }
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -691,6 +700,8 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
 
   // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the mutation hook handles cache updates via TanStack
   // Query, and a path revalidation resets client-side state (closing the sidebar).
 
@@ -795,6 +806,8 @@ export async function rescanAppleMusicLinks(): Promise<{
 
   // Invalidate cache
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
   void trackServerEvent('apple_music_rescan', {
@@ -847,6 +860,8 @@ export async function syncFromSpotify(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
@@ -1092,6 +1107,8 @@ export async function connectSpotifyArtist(params: {
         .where(eq(creatorProfiles.id, profile.id));
 
       revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+      revalidateTag(createSmartLinkContentTag(profile.id), 'max');
       revalidatePath(APP_ROUTES.RELEASES);
 
       if (result.success) {
@@ -1497,6 +1514,8 @@ export async function deleteRelease(
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
   void trackServerEvent('release_deleted', {
@@ -1555,6 +1574,8 @@ export async function uploadReleaseArtwork(
 
   // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the client handles cache updates via onReleaseChange,
   // and a path revalidation resets client-side state (closing the sidebar).
 
@@ -1656,6 +1677,8 @@ export async function revertReleaseArtwork(
     .where(eq(discogReleases.id, releaseId));
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   // Skip revalidatePath — the client handles cache updates via onReleaseChange,
   // and a path revalidation resets client-side state (closing the sidebar).
 

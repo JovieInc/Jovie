@@ -6,8 +6,8 @@
  * - Rate limiting via apiLimiter (IP-based)
  * - Bot detection (aggressive for API endpoints)
  * - Time-limited tokens (60 second TTL)
- * - Timestamp verification (5 minute window)
- * - Human verification required
+ * - HMAC-signed challenge token (issued by interstitial page, 5 min TTL)
+ * - Challenge token binds to specific link ID (prevents reuse across links)
  */
 
 export const runtime = 'nodejs';
@@ -27,7 +27,10 @@ import {
   logBotDetection,
 } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-import { generateSignedToken } from '@/lib/utils/url-encryption.server';
+import {
+  generateSignedToken,
+  verifyChallengeToken,
+} from '@/lib/utils/url-encryption.server';
 
 const SECURITY_HEADERS = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -37,7 +40,7 @@ const SECURITY_HEADERS = {
 } as const;
 
 interface RequestBody {
-  verified?: boolean;
+  challengeToken?: string;
   timestamp?: number;
 }
 
@@ -101,20 +104,18 @@ export async function POST(
       );
     }
 
-    // Basic human verification
-    if (!body.verified || !body.timestamp) {
+    // Verify server-signed challenge token (prevents bypass via direct POST)
+    if (!body.challengeToken || typeof body.challengeToken !== 'string') {
       return NextResponse.json(
         { error: 'Verification required' },
         { status: 400, headers: SECURITY_HEADERS }
       );
     }
 
-    // Check timestamp is recent (within 5 minutes)
-    const timeDiff = Date.now() - (body.timestamp || 0);
-    if (timeDiff > 5 * 60 * 1000 || timeDiff < 0) {
+    if (!verifyChallengeToken(shortId, body.challengeToken)) {
       return NextResponse.json(
-        { error: 'Request expired' },
-        { status: 400, headers: SECURITY_HEADERS }
+        { error: 'Invalid or expired verification' },
+        { status: 403, headers: SECURITY_HEADERS }
       );
     }
 

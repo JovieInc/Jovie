@@ -12,6 +12,7 @@
  */
 
 import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -26,6 +27,14 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+// Cache Stripe subscription count to prevent API fan-out on every health check hit
+const STRIPE_CACHE_REVALIDATE_SECONDS = 120;
+const getCachedStripeSubscriptionCount = unstable_cache(
+  async () => getStripeActiveSubscriptionCount(),
+  ['billing-health-stripe-sub-count'],
+  { revalidate: STRIPE_CACHE_REVALIDATE_SECONDS }
+);
 
 // Health check thresholds
 const PRO_COUNT_TOLERANCE_PERCENT = 10; // Allow 10% variance between DB and Stripe
@@ -113,8 +122,8 @@ export async function GET() {
         .from(users)
         .where(and(eq(users.isPro, true), isNull(users.deletedAt))),
 
-      // Get active subscription count from Stripe
-      getStripeActiveSubscriptionCount(),
+      // Get active subscription count from Stripe (cached to prevent API fan-out)
+      getCachedStripeSubscriptionCount(),
 
       // Get most recent billing event timestamp
       db

@@ -459,6 +459,28 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   // ---------------------------------------------------------------------------
+  // Link Wrapping
+  // ---------------------------------------------------------------------------
+
+  /** Wrap-link (authenticated): 50 requests per hour per user */
+  wrapLink: {
+    name: 'Wrap Link',
+    limit: 50,
+    window: '1 h',
+    prefix: 'wrap-link',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Wrap-link (anonymous): 20 requests per hour per IP - stricter for unauthenticated */
+  wrapLinkAnonymous: {
+    name: 'Wrap Link (Anonymous)',
+    limit: 20,
+    window: '1 h',
+    prefix: 'wrap-link:anon',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
   // Account Operations (GDPR)
   // ---------------------------------------------------------------------------
 

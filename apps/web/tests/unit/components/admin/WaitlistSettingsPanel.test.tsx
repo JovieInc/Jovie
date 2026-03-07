@@ -32,13 +32,13 @@ describe('WaitlistSettingsPanel', () => {
 
     render(<WaitlistSettingsPanel />);
 
-    expect(screen.getByText('Loading waitlist settings…')).toBeInTheDocument();
+    expect(screen.getByText('Loading settings…')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('Waitlist gate controls')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Auto-accepted today: 3')).toBeInTheDocument();
+    expect(screen.getByText('Today: 3')).toBeInTheDocument();
   });
 
   it('shows an error state when loading settings fails', async () => {

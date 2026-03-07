@@ -132,3 +132,62 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
 export function generateSignedToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
+
+const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Create an HMAC-signed challenge token for the interstitial page.
+ * The token binds to a specific shortId and has a short TTL,
+ * preventing bypass via direct API calls.
+ */
+export function createChallengeToken(shortId: string): {
+  token: string;
+  issuedAt: number;
+} {
+  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  if (!keyMaterial) {
+    throw new Error(
+      '[url-encryption] Cannot create challenge token: encryption key not configured.'
+    );
+  }
+  const issuedAt = Date.now();
+  const payload = `${shortId}:${issuedAt}`;
+  const hmac = crypto
+    .createHmac('sha256', keyMaterial)
+    .update(payload)
+    .digest('hex');
+  return { token: `${hmac}.${issuedAt}`, issuedAt };
+}
+
+/**
+ * Verify an HMAC-signed challenge token.
+ * Returns true only if the token was signed by this server,
+ * matches the given shortId, and has not expired.
+ */
+export function verifyChallengeToken(shortId: string, token: string): boolean {
+  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  if (!keyMaterial) return false;
+
+  const dotIndex = token.indexOf('.');
+  if (dotIndex === -1) return false;
+
+  const receivedHmac = token.substring(0, dotIndex);
+  const issuedAtStr = token.substring(dotIndex + 1);
+  const issuedAt = Number(issuedAtStr);
+
+  if (!Number.isFinite(issuedAt)) return false;
+
+  const age = Date.now() - issuedAt;
+  if (age < 0 || age > CHALLENGE_TTL_MS) return false;
+
+  const expectedPayload = `${shortId}:${issuedAtStr}`;
+  const expectedHmac = crypto
+    .createHmac('sha256', keyMaterial)
+    .update(expectedPayload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(receivedHmac, 'hex'),
+    Buffer.from(expectedHmac, 'hex')
+  );
+}
