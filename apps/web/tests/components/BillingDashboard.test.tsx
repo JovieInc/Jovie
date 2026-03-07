@@ -391,7 +391,7 @@ describe('BillingDashboard', () => {
     );
   });
 
-  it('respects interval query param from URL', async () => {
+  it('displays monthly pricing regardless of interval query param', async () => {
     mockFetchResponses({
       '/api/billing/status': BILLING_STATUS_FREE,
       '/api/stripe/pricing-options': PRICING_OPTIONS,
@@ -404,7 +404,7 @@ describe('BillingDashboard', () => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
 
-    // The yearly pricing should be displayed ($49/yr for pro)
-    expect(screen.getByText('$49')).toBeInTheDocument();
+    // Billing interval is hardcoded to monthly ($5/mo for pro)
+    expect(screen.getByText('$5')).toBeInTheDocument();
   });
 });

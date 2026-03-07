@@ -2,6 +2,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { fastRender } from '@/tests/utils/fast-render';
 
+vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  useDashboardData: () => ({
+    profileCompletion: {
+      percentage: 100,
+      completedCount: 4,
+      totalCount: 4,
+      steps: [],
+      profileIsLive: true,
+    },
+  }),
+}));
+
 vi.mock('@/components/jovie/hooks', () => ({
   useSuggestedProfiles: () => ({
     isLoading: false,

@@ -96,7 +96,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { SETTINGS_TOURING: '/app/settings/touring' },
+  APP_ROUTES: { SETTINGS_TOURING: '/app/settings/touring', SIGNIN: '/signin' },
 }));
 
 vi.mock('@/lib/bandsintown', () => ({
