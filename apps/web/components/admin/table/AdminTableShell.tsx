@@ -116,7 +116,7 @@ export function AdminTableShell({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col border border-subtle bg-surface-1 contain-layout',
+        'flex h-full min-h-0 flex-col contain-layout',
         className
       )}
       data-testid={testId}
@@ -130,7 +130,7 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-subtle bg-surface-1',
+              'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/60',
               headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
             )}
           >
@@ -142,7 +142,7 @@ export function AdminTableShell({
       </div>
 
       {footer ? (
-        <div className='border-t border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
+        <div className='border-t border-subtle'>
           {footer}
         </div>
       ) : null}

@@ -160,7 +160,7 @@ export function InviteCampaignManager() {
   return (
     <div className='space-y-8' data-testid='admin-campaigns-content'>
       {/* Campaign Results Dashboard */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <div className='flex items-center justify-between mb-4'>
           <h2 className='text-lg font-semibold text-primary-token'>
             Campaign Results
@@ -280,7 +280,7 @@ export function InviteCampaignManager() {
       )}
 
       {/* Targeting Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Targeting
         </h2>
@@ -340,7 +340,7 @@ export function InviteCampaignManager() {
       </section>
 
       {/* Throttling Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Throttling & Anti-Spam
         </h2>
@@ -465,7 +465,7 @@ export function InviteCampaignManager() {
         </div>
       </section>
 
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <div className='flex items-center justify-between mb-4'>
           <h2 className='text-lg font-semibold text-primary-token'>
             Claim Funnel
@@ -504,7 +504,7 @@ export function InviteCampaignManager() {
         </div>
       </section>
 
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <div className='mb-4 flex items-center justify-between'>
           <h2 className='text-lg font-semibold text-primary-token'>
             Recent Invite Activity
@@ -572,7 +572,7 @@ export function InviteCampaignManager() {
       </section>
 
       {/* Preview Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <div className='flex items-center justify-between mb-4'>
           <h2 className='text-lg font-semibold text-primary-token'>Preview</h2>
           <Button
@@ -672,7 +672,7 @@ export function InviteCampaignManager() {
       </section>
 
       {/* Send Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Send Invites
         </h2>

@@ -41,7 +41,7 @@ export function SentryMetricsCard({
 }: Readonly<SentryMetricsCardProps>) {
   if (!metrics.isConfigured || !metrics.isAvailable) {
     return (
-      <Card className='border-subtle bg-surface-1/80'>
+      <Card className='border-subtle bg-transparent'>
         <CardHeader className='p-5 pb-2'>
           <CardTitle className='text-lg tracking-tight'>Sentry</CardTitle>
         </CardHeader>
@@ -62,7 +62,7 @@ export function SentryMetricsCard({
       : 'No unresolved issues in the last 24 hours.';
 
   return (
-    <Card className='border-subtle bg-surface-1/80'>
+    <Card className='border-subtle bg-transparent'>
       <CardHeader className='space-y-1 p-5 pb-3'>
         <CardTitle className='text-lg tracking-tight'>Sentry</CardTitle>
         <p className='text-2xs text-tertiary-token'>

@@ -62,7 +62,7 @@ export default function AdminOutreachEmailPage() {
 
   return (
     <div className='flex flex-col gap-6 p-4 sm:p-6'>
-      <section className='rounded-lg border border-subtle bg-surface-1/90 p-4 sm:p-6'>
+      <section className='rounded-lg border border-subtle p-4 sm:p-6'>
         <div className='mb-4'>
           <h2 className='text-sm font-semibold text-primary-token'>
             Email Queue ({total})
@@ -104,7 +104,7 @@ export default function AdminOutreachEmailPage() {
                 leads.map(lead => (
                   <tr
                     key={lead.id}
-                    className='border-b border-subtle/50 hover:bg-surface-2/50'
+                    className='border-b border-subtle hover:bg-white/[0.03]'
                   >
                     <td className='py-2.5 pr-3'>
                       <span className='font-medium text-primary-token'>

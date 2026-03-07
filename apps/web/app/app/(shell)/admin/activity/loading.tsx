@@ -8,7 +8,7 @@ const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
 export function AdminActivitySkeleton() {
   return (
     <div
-      className='h-full overflow-hidden rounded-xl border border-subtle bg-surface-1/80'
+      className='h-full overflow-hidden rounded-xl border border-subtle'
       aria-busy='true'
     >
       <div className='space-y-2 border-b border-subtle px-6 py-5'>

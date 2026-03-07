@@ -10,14 +10,14 @@ export default function AdminIngestLoading() {
     <PageShell>
       <PageContent>
         <div className='space-y-6' aria-busy='true'>
-          <div className='rounded-xl border border-subtle bg-surface-1/80 px-6 py-5'>
+          <div className='rounded-xl border border-subtle px-6 py-5'>
             <div className='h-5 w-44 rounded skeleton' />
             <div className='mt-2 h-3 w-64 rounded skeleton' />
           </div>
-          <div className='rounded-xl border border-subtle bg-surface-1/80 px-6 py-5'>
+          <div className='rounded-xl border border-subtle px-6 py-5'>
             <div className='h-5 w-36 rounded skeleton' />
           </div>
-          <div className='rounded-xl border border-subtle bg-surface-1/80 px-6 py-5'>
+          <div className='rounded-xl border border-subtle px-6 py-5'>
             <div className='h-5 w-40 rounded skeleton' />
             <div className='mt-4 space-y-3'>
               {SKELETON_ROW_KEYS.map(key => (

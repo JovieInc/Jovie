@@ -180,7 +180,7 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <div className='flex min-w-[320px] max-w-[400px] flex-1 flex-col rounded-lg border border-subtle bg-surface-1'>
+    <div className='flex min-w-[320px] max-w-[400px] flex-1 flex-col rounded-lg border border-subtle'>
       {/* Column Header */}
       <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
         <div className='flex items-center gap-2'>

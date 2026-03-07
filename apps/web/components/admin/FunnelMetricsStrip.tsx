@@ -42,7 +42,7 @@ function MetricCard({
   iconClassName,
 }: MetricCardProps) {
   return (
-    <Card className='border-subtle bg-surface-1/90'>
+    <Card className='border-subtle bg-transparent'>
       <CardContent className='space-y-1.5 p-4'>
         <div className='flex items-center gap-1.5'>
           <Icon

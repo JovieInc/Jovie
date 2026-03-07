@@ -79,7 +79,7 @@ export function DefaultStatusBanner({
 
   return (
     <Card
-      className='border-subtle bg-surface-1'
+      className='border-subtle bg-transparent'
       data-testid='default-status-banner'
     >
       <CardContent className='flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-center md:justify-between'>
