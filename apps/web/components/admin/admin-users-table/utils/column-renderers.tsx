@@ -58,7 +58,7 @@ export function renderUsernameCell({
   return (
     <div className='group/username flex items-center gap-1.5 min-w-0'>
       <TruncatedText lines={1} className='text-secondary-token'>
-        @{username}
+        {`@${username}`}
       </TruncatedText>
       <span className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/username:opacity-100'>
         <button
