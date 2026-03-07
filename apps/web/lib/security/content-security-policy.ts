@@ -82,7 +82,6 @@ const STATIC_CSP_PARTS = {
   imgSrc: [
     "img-src 'self' data: blob:",
     'https://i.scdn.co',
-    'https://res.cloudinary.com',
     'https://images.clerk.dev',
     'https://img.clerk.com',
     'https://images.unsplash.com',

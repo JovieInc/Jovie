@@ -53,7 +53,7 @@ describe('@critical GET /api/health/env', () => {
       hasDatabase: false,
       hasClerk: false,
       hasStripe: false,
-      hasCloudinary: false,
+      hasVercelBlob: false,
     });
     mockIsValidationCompleted.mockReturnValue(true);
   });

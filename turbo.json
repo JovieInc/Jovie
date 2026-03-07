@@ -61,7 +61,6 @@
         "DATABASE_URL",
         "DATABASE_URL_MAIN",
         "SPOTIFY_*",
-        "CLOUDINARY_*",
         "RESEND_*",
         "MERCURY_*",
         "REVENUECAT_*",

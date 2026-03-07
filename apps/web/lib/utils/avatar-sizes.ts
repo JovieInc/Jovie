@@ -19,36 +19,6 @@ const SIZE_PRESETS = [
 ] as const;
 
 /**
- * Insert a Cloudinary resize transformation into an existing Cloudinary URL.
- * Cloudinary URLs follow the pattern:
- *   https://res.cloudinary.com/{cloud}/image/upload/{transforms}/{publicId}
- * We append `w_{size},h_{size},c_fill` to the existing transformation chain.
- */
-function buildCloudinaryResizedUrl(
-  url: string,
-  width: number,
-  height: number
-): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname !== 'res.cloudinary.com') return null;
-
-    // Path: /{cloud}/image/upload/{transforms}/{publicId}
-    const segments = parsed.pathname.split('/');
-    const uploadIndex = segments.indexOf('upload');
-    if (uploadIndex === -1) return null;
-
-    // Insert size transform right after "upload"
-    const sizeTransform = `w_${width},h_${height},c_fill`;
-    segments.splice(uploadIndex + 1, 0, sizeTransform);
-    parsed.pathname = segments.join('/');
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Build a resized image URL using Next.js Image Optimization API.
  * Works for any image URL that Next.js is configured to optimize
  * (e.g. Vercel Blob, configured remote patterns in next.config).
@@ -63,29 +33,15 @@ function buildNextImageUrl(url: string, width: number): string {
 }
 
 /**
- * Generate S/M/L size variants from a single source URL.
- * Uses Cloudinary URL transforms when the image is hosted on Cloudinary,
- * otherwise falls back to Next.js Image Optimization API.
+ * Generate S/M/L size variants from a single source URL
+ * using Next.js Image Optimization API.
  */
 function generateSizeVariants(sourceUrl: string): AvatarSize[] {
-  const sizes: AvatarSize[] = [];
-
-  for (const preset of SIZE_PRESETS) {
-    const cloudinaryUrl = buildCloudinaryResizedUrl(
-      sourceUrl,
-      preset.dimension,
-      preset.dimension
-    );
-    const resizedUrl =
-      cloudinaryUrl ?? buildNextImageUrl(sourceUrl, preset.dimension);
-    sizes.push({
-      key: preset.key,
-      label: preset.label,
-      url: resizedUrl,
-    });
-  }
-
-  return sizes;
+  return SIZE_PRESETS.map(preset => ({
+    key: preset.key,
+    label: preset.label,
+    url: buildNextImageUrl(sourceUrl, preset.dimension),
+  }));
 }
 
 const PRECOMPUTED_SIZE_KEYS: { key: string; sizeKey: string; label: string }[] =

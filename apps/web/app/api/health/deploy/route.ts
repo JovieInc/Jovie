@@ -74,7 +74,7 @@ export async function GET() {
       integrations: {
         auth: envInfo.hasClerk,
         payments: envInfo.hasStripe,
-        images: envInfo.hasCloudinary,
+        images: envInfo.hasVercelBlob,
       },
     },
     ...(issues.length > 0 && { issues }),
