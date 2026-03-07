@@ -73,10 +73,16 @@ export function useUserAvatarMutation(
       const normalizedError =
         error instanceof Error ? error : new Error('Upload failed');
 
-      // Capture in Sentry so upload failures are never silent in production
-      Sentry.captureException(normalizedError, {
-        tags: { category: 'avatar_upload', source: 'useUserAvatarMutation' },
-      });
+      // Don't report abort errors to Sentry — these happen when users navigate away
+      const isAbortError =
+        normalizedError.name === 'AbortError' ||
+        normalizedError.message.includes('aborted');
+
+      if (!isAbortError) {
+        Sentry.captureException(normalizedError, {
+          tags: { category: 'avatar_upload', source: 'useUserAvatarMutation' },
+        });
+      }
 
       onError?.(normalizedError);
     },

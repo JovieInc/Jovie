@@ -278,6 +278,20 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
+    // Don't log or report abort errors — these are normal when users navigate away
+    if (
+      error instanceof Error &&
+      (error.name === 'AbortError' ||
+        error.message.includes('aborted') ||
+        error.message.includes('abort'))
+    ) {
+      return errorResponse(
+        'Upload was cancelled.',
+        UPLOAD_ERROR_CODES.UPLOAD_FAILED,
+        499
+      );
+    }
+
     logger.error('Avatar upload error:', error);
     await captureError('Avatar upload failed', error, {
       route: '/api/images/upload',

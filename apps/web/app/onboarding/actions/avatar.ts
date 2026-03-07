@@ -192,6 +192,9 @@ async function uploadAvatarFile(
   });
 
   if (!upload.ok) {
+    if (upload.status === 401) {
+      throw new Error('Upload failed: 401 UNAUTHORIZED');
+    }
     const errorBody = await upload.text().catch(() => 'Unknown error');
     throw new Error(`Upload failed: ${upload.status} - ${errorBody}`);
   }
@@ -254,6 +257,14 @@ export async function uploadRemoteAvatar(params: {
       lastError =
         error instanceof Error ? error : new Error('Unknown fetch error');
 
+      // Don't retry abort errors — the request was intentionally cancelled
+      if (
+        lastError.name === 'AbortError' ||
+        lastError.message.includes('aborted')
+      ) {
+        return null;
+      }
+
       // Don't retry for invalid content type — it won't change on retry
       if (lastError.message.includes('Invalid content type')) {
         Sentry.captureMessage('Avatar upload: invalid content type', {
@@ -301,6 +312,24 @@ export async function uploadRemoteAvatar(params: {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
 
+      // Don't retry abort errors
+      if (
+        lastError.name === 'AbortError' ||
+        lastError.message.includes('aborted')
+      ) {
+        return null;
+      }
+
+      // Don't retry 401 errors — auth won't fix itself on retry
+      if (lastError.message.includes('401')) {
+        Sentry.addBreadcrumb({
+          category: 'avatar',
+          message: `Avatar upload auth failed: ${lastError.message}`,
+          level: 'warning',
+        });
+        return null;
+      }
+
       if (attempt < maxRetries - 1) {
         Sentry.addBreadcrumb({
           category: 'avatar',
@@ -337,9 +366,12 @@ export async function handleBackgroundAvatarUpload(
     });
 
     if (!uploaded) {
-      Sentry.captureMessage('Avatar upload failed for profile', {
+      // Background avatar upload failures are expected (OAuth CDN issues, expired sessions)
+      // — log as breadcrumb instead of Sentry event to reduce noise
+      Sentry.addBreadcrumb({
+        category: 'avatar',
+        message: `Background avatar upload failed for profile ${profileId}`,
         level: 'warning',
-        extra: { profileId },
       });
       return;
     }
@@ -371,9 +403,17 @@ export async function handleBackgroundAvatarUpload(
         .where(eq(profilePhotos.id, uploaded.photoId));
     });
   } catch (avatarError) {
-    Sentry.captureException(avatarError, {
-      tags: { context: 'onboarding_avatar_upload', profileId },
-      level: 'warning',
-    });
+    // Don't report abort errors to Sentry
+    const isAbortError =
+      avatarError instanceof Error &&
+      (avatarError.name === 'AbortError' ||
+        avatarError.message.includes('aborted'));
+
+    if (!isAbortError) {
+      Sentry.captureException(avatarError, {
+        tags: { context: 'onboarding_avatar_upload', profileId },
+        level: 'warning',
+      });
+    }
   }
 }
