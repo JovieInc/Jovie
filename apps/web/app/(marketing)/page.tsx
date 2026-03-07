@@ -258,7 +258,9 @@ export default function HomePage() {
 
       <DeeplinksGrid />
 
-      <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
+      {publicEnv.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION === 'true' && (
+        <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
+      )}
 
       <FinalCTASection />
 
