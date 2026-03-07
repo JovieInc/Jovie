@@ -258,6 +258,27 @@ For deeper implementation guidance, use `.claude/skills/entitlements.md`.
 
 ---
 
+## Linear Issue Gating
+
+Before working on any Linear issue, check for the `human-review-required` label.
+If present, SKIP the issue entirely. Do not attempt to work on it, close it,
+or add comments. These issues require human decision-making.
+
+Also skip any issue whose description contains:
+"This issue requires human review"
+
+When scanning Linear for issues to work on, always filter with:
+- Exclude label: `human-review-required`
+- Exclude description containing: "This issue requires human review"
+
+### When to apply the `human-review-required` label
+- Automation/infrastructure setup tasks
+- Architectural decisions requiring human judgment
+- Process or workflow changes
+- Issues filed by automated scanners that haven't been triaged
+
+---
+
 ## PR Discipline (Required)
 
 ### Size Limits
