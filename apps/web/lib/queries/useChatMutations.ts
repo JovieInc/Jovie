@@ -1,9 +1,27 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createMutationFn, fetchWithTimeout } from './fetch';
+import { createMutationFn, FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { ChatConversation } from './useChatConversationsQuery';
+
+/**
+ * TanStack Query retry callback for mutations.
+ * Retries up to `maxRetries` times, but only for transient/retryable errors
+ * (5xx, 408 timeout, 429 rate-limit).
+ */
+function retryTransientErrors(maxRetries: number) {
+  return (failureCount: number, error: Error): boolean => {
+    if (failureCount >= maxRetries) return false;
+    if (error instanceof FetchError) return error.isRetryable();
+    return false;
+  };
+}
+
+/** Exponential backoff: 1s, 2s, 4s (capped at 4s). */
+function retryDelay(attemptIndex: number): number {
+  return Math.min(1000 * 2 ** attemptIndex, 4000);
+}
 
 // Types
 export interface ChatMessage {
@@ -65,6 +83,8 @@ export function useCreateConversationMutation() {
       CreateConversationInput,
       CreateConversationResponse
     >('/api/chat/conversations', 'POST'),
+    retry: retryTransientErrors(2),
+    retryDelay,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.conversations(),
@@ -91,6 +111,8 @@ export function useAddMessagesMutation() {
         }
       );
     },
+    retry: retryTransientErrors(2),
+    retryDelay,
     onSuccess: (_, { conversationId }) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.chat.conversation(conversationId),
