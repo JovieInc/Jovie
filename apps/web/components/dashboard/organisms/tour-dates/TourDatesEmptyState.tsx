@@ -77,7 +77,7 @@ export function TourDatesEmptyState({
   if (!hasApiKey) {
     return (
       <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
-        <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+        <div className='flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2'>
           <Icon
             name='Key'
             className='h-8 w-8 text-tertiary-token'
@@ -162,7 +162,7 @@ export function TourDatesEmptyState({
   // Step 2: Artist Connection
   return (
     <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
-      <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+      <div className='flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2'>
         <Icon
           name='CalendarDays'
           className='h-8 w-8 text-tertiary-token'

@@ -82,9 +82,12 @@ export function useJovieChat({
   const pendingInitialSendRef = useRef<{
     text: string;
     files?: FileUIPart[];
-    /** Deferred conversation create callback — called after sendMessage so navigation doesn't cause a remount before the AI request fires. */
-    onConversationCreateDeferred?: (conversationId: string) => void;
-    conversationId?: string;
+  } | null>(null);
+  /** Deferred navigation callback — called only after the AI stream completes
+   *  to prevent component remount from killing the in-flight response (JOV-1233). */
+  const deferredNavigationRef = useRef<{
+    callback: (conversationId: string) => void;
+    conversationId: string;
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -187,6 +190,14 @@ export function useJovieChat({
       // keep trying to find an assistant message that will never arrive
       pendingMessagesRef.current = null;
       setIsSubmitting(false);
+
+      // Fire deferred navigation on error too so the URL updates (JOV-1233)
+      if (deferredNavigationRef.current) {
+        const { callback, conversationId: navId } =
+          deferredNavigationRef.current;
+        deferredNavigationRef.current = null;
+        callback(navId);
+      }
     },
   });
 
@@ -270,8 +281,8 @@ export function useJovieChat({
 
   // Ensure the first message in a new chat is sent only after activeConversationId
   // has been committed, so transport includes conversationId on the request.
-  // Also fires the deferred onConversationCreate callback AFTER sendMessage so that
-  // the resulting navigation/remount doesn't race against the AI request (JOV-1117).
+  // Navigation is deferred until the stream completes to prevent the component
+  // remount from killing the in-flight AI response (JOV-1233).
   useEffect(() => {
     if (!activeConversationId || !pendingInitialSendRef.current) return;
 
@@ -284,17 +295,6 @@ export function useJovieChat({
         ? { files: pendingPayload.files }
         : {}),
     });
-
-    // Notify parent after sendMessage — the route update (e.g. /app/chat → /app/chat/[id])
-    // can now safely happen because the AI stream has been initiated.
-    if (
-      pendingPayload.onConversationCreateDeferred &&
-      pendingPayload.conversationId
-    ) {
-      pendingPayload.onConversationCreateDeferred(
-        pendingPayload.conversationId
-      );
-    }
   }, [activeConversationId, sendMessage]);
 
   // Save messages to database when streaming completes.
@@ -403,6 +403,15 @@ export function useJovieChat({
     // Successfully extracted and dispatched — clear pending
     pendingMessagesRef.current = null;
     setIsSubmitting(false);
+
+    // Fire deferred navigation now that the stream is complete and messages are persisted.
+    // This prevents the route change from killing the in-flight AI response (JOV-1233).
+    if (deferredNavigationRef.current) {
+      const { callback, conversationId: navConversationId } =
+        deferredNavigationRef.current;
+      deferredNavigationRef.current = null;
+      callback(navConversationId);
+    }
   }, [
     status,
     activeConversationId,
@@ -432,14 +441,17 @@ export function useJovieChat({
           assistantMessage: '', // Will be filled when response completes
         };
 
-        // Defer onConversationCreate until after sendMessage fires in the effect.
-        // Calling it here would trigger router.replace (e.g. /chat → /chat/[id]),
-        // which remounts the component and loses the pending send ref (JOV-1117).
-        pendingInitialSendRef.current = {
-          ...payload,
-          onConversationCreateDeferred: onConversationCreate,
-          conversationId: result.conversation.id,
-        };
+        // Store the send payload for the effect that fires after activeConversationId updates.
+        pendingInitialSendRef.current = payload;
+
+        // Defer navigation until the AI stream completes (status === 'ready').
+        // Navigating earlier would remount the component and kill the stream (JOV-1233).
+        if (onConversationCreate) {
+          deferredNavigationRef.current = {
+            callback: onConversationCreate,
+            conversationId: result.conversation.id,
+          };
+        }
 
         setInput('');
 

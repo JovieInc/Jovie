@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
@@ -88,6 +88,10 @@ export function useIngestProfile({
     limit: 6,
   });
 
+  // Use refs for stable access in effects to avoid re-render loops
+  const artistSearchRef = useRef(artistSearch);
+  artistSearchRef.current = artistSearch;
+
   useEffect(() => {
     const detectedNetwork = getNetworkFromPlatform(detectedPlatform);
     if (!detectedNetwork || detectedNetwork === network) return;
@@ -99,76 +103,145 @@ export function useIngestProfile({
   }, [detectedPlatform, inputValue, network]);
 
   useEffect(() => {
+    const { search, clear } = artistSearchRef.current;
     if (network !== 'spotify') {
-      artistSearch.clear();
+      clear();
       return;
     }
 
     if (inputValue.trim().startsWith('http')) {
-      artistSearch.clear();
+      clear();
       return;
     }
 
-    artistSearch.search(inputValue);
-  }, [artistSearch, inputValue, network]);
+    search(inputValue);
+  }, [inputValue, network]);
 
   const ingestProfileMutation = useIngestProfileMutation();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    const normalizedUrl = getNormalizedInputUrl(network, inputValue);
-    if (!normalizedUrl) {
-      notifications.error(
-        network === 'spotify'
-          ? 'Select a Spotify artist or paste a Spotify artist URL'
-          : 'Enter a profile URL or handle'
-      );
-      return;
-    }
+      const trimmed = inputValue.trim();
+      const isSpotifyNameSearch =
+        network === 'spotify' &&
+        !trimmed.startsWith('http') &&
+        !/^[a-zA-Z0-9]{22}$/.test(trimmed);
 
-    try {
-      const result = await ingestProfileMutation.mutateAsync({
-        url: normalizedUrl,
-      });
-
-      const profileId = result.profile?.id;
-      const profileUsername = result.profile?.username;
-      const successMessage = profileUsername
-        ? `Created creator profile @${profileUsername}`
-        : 'Created new creator profile';
-
-      notifications.success(successMessage, {
-        action: profileUsername
-          ? {
-              label: 'View profile',
-              onClick: () => router.push(`/${profileUsername}`),
+      // For Spotify name searches, auto-select the top result
+      if (isSpotifyNameSearch) {
+        const topResult = artistSearchRef.current.results[0];
+        if (!topResult) {
+          notifications.error(
+            'Select a Spotify artist or paste a Spotify artist URL'
+          );
+          return;
+        }
+        // Use the top result's URL for ingestion
+        setInputValue(topResult.url);
+        const normalizedUrl = getNormalizedInputUrl('spotify', topResult.url);
+        try {
+          const result = await ingestProfileMutation.mutateAsync({
+            url: normalizedUrl,
+          });
+          const profileId = result.profile?.id;
+          const profileUsername = result.profile?.username;
+          notifications.success(
+            profileUsername
+              ? `Created creator profile @${profileUsername}`
+              : 'Created new creator profile',
+            {
+              action: profileUsername
+                ? {
+                    label: 'View profile',
+                    onClick: () => router.push(`/${profileUsername}`),
+                  }
+                : undefined,
             }
-          : undefined,
-      });
-
-      if (profileId && profileUsername) {
-        onIngestPending?.({ id: profileId, username: profileUsername });
+          );
+          if (profileId && profileUsername) {
+            onIngestPending?.({ id: profileId, username: profileUsername });
+          }
+          setIsSuccess(true);
+          setInputValue('');
+          artistSearchRef.current.clear();
+          router.refresh();
+          setTimeout(() => {
+            setOpen(false);
+            setIsSuccess(false);
+          }, 900);
+        } catch (error) {
+          console.error('Ingestion error', error);
+          notifications.error(
+            error instanceof Error ? error.message : 'Failed to ingest profile'
+          );
+          setIsSuccess(false);
+        }
+        return;
       }
 
-      setIsSuccess(true);
-      setInputValue('');
-      artistSearch.clear();
+      const normalizedUrl = getNormalizedInputUrl(network, inputValue);
+      if (!normalizedUrl) {
+        notifications.error(
+          network === 'spotify'
+            ? 'Select a Spotify artist or paste a Spotify artist URL'
+            : 'Enter a profile URL or handle'
+        );
+        return;
+      }
 
-      router.refresh();
+      try {
+        const result = await ingestProfileMutation.mutateAsync({
+          url: normalizedUrl,
+        });
 
-      setTimeout(() => {
-        setOpen(false);
+        const profileId = result.profile?.id;
+        const profileUsername = result.profile?.username;
+        const successMessage = profileUsername
+          ? `Created creator profile @${profileUsername}`
+          : 'Created new creator profile';
+
+        notifications.success(successMessage, {
+          action: profileUsername
+            ? {
+                label: 'View profile',
+                onClick: () => router.push(`/${profileUsername}`),
+              }
+            : undefined,
+        });
+
+        if (profileId && profileUsername) {
+          onIngestPending?.({ id: profileId, username: profileUsername });
+        }
+
+        setIsSuccess(true);
+        setInputValue('');
+        artistSearchRef.current.clear();
+
+        router.refresh();
+
+        setTimeout(() => {
+          setOpen(false);
+          setIsSuccess(false);
+        }, 900);
+      } catch (error) {
+        console.error('Ingestion error', error);
+        notifications.error(
+          error instanceof Error ? error.message : 'Failed to ingest profile'
+        );
         setIsSuccess(false);
-      }, 900);
-    } catch (error) {
-      console.error('Ingestion error', error);
-      notifications.error(
-        error instanceof Error ? error.message : 'Failed to ingest profile'
-      );
-      setIsSuccess(false);
-    }
-  };
+      }
+    },
+    [
+      inputValue,
+      network,
+      notifications,
+      ingestProfileMutation,
+      router,
+      onIngestPending,
+    ]
+  );
 
   return {
     open,

@@ -69,6 +69,7 @@ export const ContactSidebar = memo(function ContactSidebar({
     hasContact,
     onRefresh,
     onCopyProfileUrl: handleCopyProfileUrl,
+    onClose,
   });
 
   // Only depend on specific contact fields, not the entire contact object

@@ -452,6 +452,9 @@ jobs:
     if: needs.guard.outputs.should_fix == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: agent-remediation-${{ github.repository }}
+      cancel-in-progress: false
     permissions:
       contents: write
       pull-requests: write
@@ -528,6 +531,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: write
       pull-requests: write
       statuses: read
     steps:
@@ -632,6 +636,44 @@ jobs:
             echo "is_safe=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check merge queue pressure
+        id: queue-pressure
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          READY_THRESHOLD=12
+
+          OPEN_PRS=$(gh pr list --state open --base main --limit 100 --json number,isDraft,mergeStateStatus,autoMergeRequest,headRefName)
+
+          READY_COUNT=$(echo "$OPEN_PRS" | jq '
+            [
+              .[]
+              | select(.isDraft == false)
+              | select(.number != '"$PR_NUMBER"')
+              | select(
+                  (.autoMergeRequest != null) or
+                  (.mergeStateStatus == "CLEAN") or
+                  (.mergeStateStatus == "UNSTABLE")
+                )
+            ] | length
+          ')
+
+          echo "Open merge-ready/automerge PRs ahead of this PR: $READY_COUNT"
+          echo "ready_count=$READY_COUNT" >> $GITHUB_OUTPUT
+          echo "ready_threshold=$READY_THRESHOLD" >> $GITHUB_OUTPUT
+
+          if [ "$READY_COUNT" -ge "$READY_THRESHOLD" ]; then
+            echo "defer_auto_merge=true" >> $GITHUB_OUTPUT
+            echo "Queue pressure is high. Agent PR will be approved but not auto-queued."
+          else
+            echo "defer_auto_merge=false" >> $GITHUB_OUTPUT
+            echo "Queue pressure is acceptable. Agent PR may auto-enter the queue."
+          fi
+
       - name: Auto-approve PR
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
@@ -665,7 +707,8 @@ jobs:
       - name: Enable auto-merge
         if: >-
           steps.check-statuses.outputs.all_passed == 'true' &&
-          steps.sensitive-check.outputs.is_safe == 'true'
+          steps.sensitive-check.outputs.is_safe == 'true' &&
+          steps.queue-pressure.outputs.defer_auto_merge != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -680,6 +723,39 @@ jobs:
             --field "labels[]=auto-approved" || true
 
           echo "Auto-merge enabled for PR #$PR_NUMBER"
+
+      - name: Defer auto-merge under queue pressure
+        if: >-
+          steps.check-statuses.outputs.all_passed == 'true' &&
+          steps.sensitive-check.outputs.is_safe == 'true' &&
+          steps.queue-pressure.outputs.defer_auto_merge == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
+          READY_COUNT="${{ steps.queue-pressure.outputs.ready_count }}"
+          READY_THRESHOLD="${{ steps.queue-pressure.outputs.ready_threshold }}"
+
+          gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
+            --method POST \
+            --field "labels[]=queue-deferred" || true
+
+          gh pr comment "$PR_NUMBER" --body "## Auto-Merge Deferred
+
+          This PR passed the automated quality gates and was auto-approved, but it was **not** added to the merge queue automatically.
+
+          Reason: the merge queue is currently under pressure.
+
+          - Merge-ready or auto-merge PRs ahead: $READY_COUNT
+          - Deferral threshold: $READY_THRESHOLD
+
+          This keeps quick human-driven PRs moving when the queue is saturated with agent traffic.
+
+          Re-enable auto-merge later with:
+
+          \`gh pr merge $PR_NUMBER --auto --squash\`"
+
+          echo "Auto-merge deferred for PR #$PR_NUMBER due to queue pressure"
 
       - name: Skip reason (log only)
         if: >-

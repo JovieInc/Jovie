@@ -7,12 +7,13 @@ import {
   DropdownMenuTrigger,
   SimpleTooltip,
 } from '@jovie/ui';
-import { ArrowUp, ImagePlus, Loader2, Plus } from 'lucide-react';
+import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
 import { forwardRef, useCallback, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
 import type { PendingImage } from '../hooks/useChatImageAttachments';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { MAX_MESSAGE_LENGTH } from '../types';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
 
@@ -177,6 +178,15 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
 
+    // Voice dictation via Web Speech API
+    const {
+      isSupported: hasDictation,
+      isListening,
+      toggle: toggleDictation,
+    } = useSpeechRecognition({
+      onTranscript: text => onChange(text),
+    });
+
     const handleFormSubmit = useCallback(
       (e: React.FormEvent) => {
         e.preventDefault();
@@ -270,6 +280,42 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               aria-label='Chat message input'
               aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
             />
+
+            {/* Mic: Voice dictation toggle (hidden when unsupported) */}
+            {hasDictation && (
+              <SimpleTooltip
+                content={isListening ? 'Stop dictation' : 'Dictate message'}
+              >
+                <button
+                  type='button'
+                  onMouseDown={handleMouseDown}
+                  onClick={toggleDictation}
+                  disabled={isLoading || isSubmitting}
+                  className={cn(
+                    'flex shrink-0 items-center justify-center rounded-full transition-colors',
+                    isListening
+                      ? 'bg-error/10 text-error'
+                      : 'text-secondary-token hover:text-primary-token',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    isCompact ? 'h-8 w-8' : 'h-9 w-9'
+                  )}
+                  aria-label={
+                    isListening ? 'Stop dictation' : 'Dictate message'
+                  }
+                  aria-pressed={isListening}
+                >
+                  {isListening ? (
+                    <MicOff
+                      className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
+                    />
+                  ) : (
+                    <Mic
+                      className={cn(isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4')}
+                    />
+                  )}
+                </button>
+              </SimpleTooltip>
+            )}
 
             {/* Right: Circular send button */}
             <SendButton
