@@ -13,6 +13,7 @@ import * as React from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
@@ -23,6 +24,7 @@ import type {
   AudienceFilters,
   AudienceView,
 } from './dashboard-audience-table/types';
+import { MobileAnalyticsSummary } from './MobileAnalyticsSummary';
 
 const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
   { length: 10 },
@@ -94,8 +96,18 @@ export function DashboardAudienceClient({
   filters: initialFilters,
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
-  // Analytics sidebar state
+  // Open analytics sidebar by default on desktop (md+)
+  const isDesktop = useBreakpoint('md');
   const [isAnalyticsOpen, setIsAnalyticsOpen] = React.useState(false);
+  const hasAutoOpened = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isDesktop && !hasAutoOpened.current) {
+      setIsAnalyticsOpen(true);
+      hasAutoOpened.current = true;
+    }
+  }, [isDesktop]);
+
   const toggleAnalytics = React.useCallback(() => {
     setIsAnalyticsOpen(prev => !prev);
   }, []);
@@ -208,6 +220,9 @@ export function DashboardAudienceClient({
       >
         {/* Main content area */}
         <div className='flex-1 min-w-0 flex flex-col'>
+          {/* Compact analytics stats - mobile only */}
+          <MobileAnalyticsSummary />
+
           <div className='flex-1 min-h-0 flex flex-col'>
             <DashboardAudienceTable
               mode={mode}
