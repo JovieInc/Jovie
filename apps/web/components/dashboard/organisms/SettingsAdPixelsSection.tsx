@@ -159,8 +159,12 @@ export interface SettingsAdPixelsSectionProps {
 export function SettingsAdPixelsSection({
   isPro = true,
 }: SettingsAdPixelsSectionProps) {
-  const { mutate: savePixels, isPending: isPixelSaving } =
-    usePixelSettingsMutation();
+  const {
+    mutate: savePixels,
+    isPending: isPixelSaving,
+    isSuccess: isPixelSaved,
+    isError: isPixelError,
+  } = usePixelSettingsMutation();
 
   // Fetch existing pixel settings on mount
   const {
@@ -239,33 +243,40 @@ export function SettingsAdPixelsSection({
     (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
 
-      const formData = new FormData(e.currentTarget);
+      try {
+        // Only send token values if they were actually modified
+        const getTokenIfModified = (
+          tokenValue: string,
+          platform: keyof typeof tokenModified
+        ): string => {
+          if (!tokenModified[platform] || tokenValue === TOKEN_PLACEHOLDER)
+            return '';
+          return tokenValue;
+        };
 
-      // Only send token values if they were actually modified
-      const getTokenIfModified = (
-        field: string,
-        platform: keyof typeof tokenModified
-      ): string => {
-        const value = formData.get(field) as string;
-        if (!tokenModified[platform] || value === TOKEN_PLACEHOLDER) return '';
-        return value ?? '';
-      };
-
-      savePixels({
-        facebookPixelId: (formData.get('facebookPixelId') as string) ?? '',
-        facebookAccessToken: getTokenIfModified(
-          'facebookAccessToken',
-          'facebook'
-        ),
-        googleMeasurementId:
-          (formData.get('googleMeasurementId') as string) ?? '',
-        googleApiSecret: getTokenIfModified('googleApiSecret', 'google'),
-        tiktokPixelId: (formData.get('tiktokPixelId') as string) ?? '',
-        tiktokAccessToken: getTokenIfModified('tiktokAccessToken', 'tiktok'),
-        enabled: pixelData.enabled,
-      });
+        savePixels({
+          facebookPixelId: pixelData.facebookPixelId,
+          facebookAccessToken: getTokenIfModified(
+            pixelData.facebookAccessToken,
+            'facebook'
+          ),
+          googleMeasurementId: pixelData.googleMeasurementId,
+          googleApiSecret: getTokenIfModified(
+            pixelData.googleApiSecret,
+            'google'
+          ),
+          tiktokPixelId: pixelData.tiktokPixelId,
+          tiktokAccessToken: getTokenIfModified(
+            pixelData.tiktokAccessToken,
+            'tiktok'
+          ),
+          enabled: pixelData.enabled,
+        });
+      } catch (error) {
+        console.error('[SettingsAdPixelsSection] Submit failed:', error);
+      }
     },
-    [savePixels, pixelData.enabled, tokenModified]
+    [savePixels, pixelData, tokenModified]
   );
 
   if (!isPro) {
@@ -429,7 +440,13 @@ export function SettingsAdPixelsSection({
         </div>
       </DashboardCard>
 
-      <div className='flex justify-end pt-2'>
+      <div className='flex items-center justify-end gap-3 pt-2'>
+        {isPixelSaved && <span className='text-xs text-green-500'>Saved</span>}
+        {isPixelError && (
+          <span className='text-xs text-destructive'>
+            Failed to save. Try again.
+          </span>
+        )}
         <Button
           type='submit'
           loading={isPixelSaving}
