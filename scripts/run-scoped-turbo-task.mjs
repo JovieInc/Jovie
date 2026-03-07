@@ -3,7 +3,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 const [, , task, ...extraArgs] = process.argv;
 
 if (!task) {
-  console.error('Usage: node scripts/run-scoped-turbo-task.mjs <task> [...args]');
+  console.error(
+    'Usage: node scripts/run-scoped-turbo-task.mjs <task> [...args]'
+  );
   process.exit(1);
 }
 
@@ -72,7 +74,9 @@ const turboArgs = ['turbo', task, ...extraArgs];
 
 if (!hasPathChanged('apps/should-i-make')) {
   turboArgs.push('--filter=!@jovie/should-i-make');
-  console.log(`Skipping @jovie/should-i-make for turbo ${task}; no changes detected.`);
+  console.log(
+    `Skipping @jovie/should-i-make for turbo ${task}; no changes detected.`
+  );
 }
 
 const result = spawnSync('pnpm', turboArgs, {
