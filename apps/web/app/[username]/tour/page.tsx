@@ -13,18 +13,40 @@ interface Props {
   readonly params: Promise<{ username: string }>;
 }
 
-// Cache profile lookup for 5 minutes
+const TOUR_PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes
+
+// Cache profile lookup — only caches truthy (found) results.
+// Null/not-found results are never cached to prevent sticky 404s.
 const getCachedProfile = cache(async (username: string) => {
   const normalizedUsername = username.toLowerCase().trim();
 
-  return unstable_cache(
-    async () => {
-      const result = await getCreatorProfileWithLinks(normalizedUsername);
-      return result;
-    },
-    [`tour-profile-${normalizedUsername}`],
-    { revalidate: 300 }
-  )();
+  // Skip cache in test/development to avoid stale data
+  if (
+    process.env.NODE_ENV === 'test' ||
+    process.env.NODE_ENV === 'development'
+  ) {
+    return getCreatorProfileWithLinks(normalizedUsername);
+  }
+
+  try {
+    return await unstable_cache(
+      async () => {
+        const result = await getCreatorProfileWithLinks(normalizedUsername);
+        if (!result) {
+          throw new Error('profile_not_found');
+        }
+        return result;
+      },
+      [`tour-profile-${normalizedUsername}`],
+      {
+        tags: ['profiles-all', `profile:${normalizedUsername}`],
+        revalidate: TOUR_PROFILE_CACHE_TTL_SECONDS,
+      }
+    )();
+  } catch {
+    // Cache miss for null result or cache failure — fetch directly
+    return getCreatorProfileWithLinks(normalizedUsername);
+  }
 });
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
