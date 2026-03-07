@@ -18,6 +18,7 @@ import {
   ExportCSVButton,
 } from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
+import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
 import { ReleaseFilterDropdown } from './ReleaseFilterDropdown';
@@ -186,7 +187,11 @@ function LinearStyleDisplayMenu({
 }) {
   return (
     <Popover>
-      <TooltipShortcut label='Display' shortcut='⇧V' side='bottom'>
+      <TooltipShortcut
+        label='Display'
+        shortcut={`${GLYPH_SHIFT}V`}
+        side='bottom'
+      >
         <PopoverTrigger asChild>
           <Button
             variant='ghost'

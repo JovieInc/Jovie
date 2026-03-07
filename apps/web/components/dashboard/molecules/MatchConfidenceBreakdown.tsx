@@ -1,5 +1,6 @@
 'use client';
 
+import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 
 /** Get color class based on contribution score threshold */
@@ -97,7 +98,7 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
         </div>
         <div className='flex items-center gap-2'>
           <span className='text-tertiary-token'>{percentage}%</span>
-          <span className='text-tertiary-token/60'>→</span>
+          <span className='text-tertiary-token/60'>{GLYPH_ARROW_RIGHT}</span>
           <span
             className={cn(
               'font-medium',
