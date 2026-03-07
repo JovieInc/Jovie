@@ -98,7 +98,7 @@ const ACTIVE_PHASES = new Set<EnrichmentPhase>([
 
 async function fetchEnrichmentStatus(
   profileId: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<EnrichmentStatus> {
   const url = `/api/dsp/enrichment/status?profileId=${encodeURIComponent(profileId)}`;
 
@@ -143,7 +143,7 @@ export function useDspEnrichmentStatusQuery({
 
   // Skip refetch on mount when polling is already handling freshness
   const cachedData = queryClient.getQueryData<EnrichmentStatus>(
-    queryKeys.dspEnrichment.status(profileId),
+    queryKeys.dspEnrichment.status(profileId)
   );
   const isPolling =
     cachedData != null && ACTIVE_PHASES.has(cachedData.overallPhase);
@@ -158,7 +158,7 @@ export function useDspEnrichmentStatusQuery({
     refetchOnWindowFocus: false, // Polling handles freshness
 
     // Dynamic polling: only poll when enrichment is active
-    refetchInterval: (query) => {
+    refetchInterval: query => {
       // Use explicit interval if provided
       if (refetchInterval !== undefined) {
         return refetchInterval;
@@ -178,8 +178,7 @@ export function useDspEnrichmentStatusQuery({
     refetchIntervalInBackground: false,
 
     retry: 3,
-    retryDelay: (attemptIndex) =>
-      Math.min(1000 * 2 ** attemptIndex, 30000),
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
 }
 
@@ -191,7 +190,7 @@ export function useDspEnrichmentStatusQuery({
  * Check if enrichment is currently in progress
  */
 export function isEnrichmentInProgress(
-  status: EnrichmentStatus | undefined,
+  status: EnrichmentStatus | undefined
 ): boolean {
   if (!status) return false;
   return ACTIVE_PHASES.has(status.overallPhase);
@@ -201,7 +200,7 @@ export function isEnrichmentInProgress(
  * Check if enrichment has completed successfully
  */
 export function isEnrichmentComplete(
-  status: EnrichmentStatus | undefined,
+  status: EnrichmentStatus | undefined
 ): boolean {
   if (!status) return false;
   return status.overallPhase === 'complete';
@@ -235,6 +234,6 @@ export function getPhaseLabel(phase: EnrichmentPhase): string {
 export function getTotalTracksEnriched(status: EnrichmentStatus): number {
   return status.providers.reduce(
     (total, provider) => total + provider.tracksEnriched,
-    0,
+    0
   );
 }
