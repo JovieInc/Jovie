@@ -119,7 +119,7 @@ export function ActivityTableUnified({
 
   return (
     <Card
-      className='h-full border-subtle bg-surface-1/80'
+      className='h-full border-subtle bg-surface-1'
       data-testid='admin-activity-content'
     >
       <CardHeader className='space-y-1'>

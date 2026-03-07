@@ -31,6 +31,7 @@ export interface AdminUserRow {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   plan: 'free' | 'pro';
+  profileUsername: string | null;
 }
 
 export interface AdminCreatorProfileRow {

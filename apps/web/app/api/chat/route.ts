@@ -1041,14 +1041,68 @@ export async function OPTIONS(req: Request) {
 }
 
 /**
+ * Creates the submitFeedback tool that saves user feedback to the database
+ * and notifies the team via Slack.
+ */
+function createSubmitFeedbackTool(clerkUserId: string) {
+  return tool({
+    description:
+      'Submit product feedback from the artist. Use this when the artist wants to share feedback, report a bug, or request a feature. Collect their feedback message first, then call this tool with the full text.',
+    inputSchema: z.object({
+      message: z
+        .string()
+        .min(5)
+        .max(2000)
+        .describe('The feedback message from the artist'),
+    }),
+    execute: async ({ message }) => {
+      const userRecord = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkUserId),
+        columns: { id: true, name: true, email: true },
+      });
+
+      const { createFeedbackItem } = await import('@/lib/feedback');
+      const { notifySlackFeedbackSubmission } = await import(
+        '@/lib/notifications/providers/slack'
+      );
+
+      await createFeedbackItem({
+        userId: userRecord?.id ?? null,
+        message,
+        source: 'chat',
+        context: {
+          pathname: '/app',
+          userAgent: null,
+          timestampIso: new Date().toISOString(),
+        },
+      });
+
+      await notifySlackFeedbackSubmission({
+        message,
+        name: userRecord?.name ?? 'Jovie user',
+        email: userRecord?.email,
+        source: 'chat',
+        pathname: '/app',
+      });
+
+      return { success: true };
+    },
+  });
+}
+
+/**
  * Build tools available on ALL plans (including Free).
  * These are basic profile management tools that don't require a paid plan.
  */
-function buildFreeChatTools(resolvedProfileId: string | null) {
+function buildFreeChatTools(
+  resolvedProfileId: string | null,
+  clerkUserId: string
+) {
   return {
     proposeAvatarUpload: createAvatarUploadTool(),
     proposeSocialLink: createSocialLinkTool(),
     proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
+    submitFeedback: createSubmitFeedbackTool(clerkUserId),
   };
 }
 
@@ -1327,8 +1381,8 @@ export async function POST(req: Request) {
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Free tools (avatar upload, social links, link removal) available on ALL plans
-    const freeTools = buildFreeChatTools(resolvedProfileId);
+    // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
+    const freeTools = buildFreeChatTools(resolvedProfileId, userId);
     // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
       ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }

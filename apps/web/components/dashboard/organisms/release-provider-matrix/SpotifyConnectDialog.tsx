@@ -3,6 +3,7 @@
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   Dialog,
@@ -83,7 +84,7 @@ function SearchInputTrailing({
         )}
       >
         {(isLoading || isPending) && (
-          <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+          <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
         )}
         Connect Spotify
       </button>
@@ -91,9 +92,7 @@ function SearchInputTrailing({
   }
 
   if (isPending) {
-    return (
-      <div className='w-4 h-4 border-[1.5px] border-tertiary-token border-t-transparent rounded-full animate-spin shrink-0' />
-    );
+    return <LoadingSpinner size='sm' tone='muted' label='Loading' />;
   }
 
   return <Search className='w-4 h-4 shrink-0 text-tertiary-token' />;

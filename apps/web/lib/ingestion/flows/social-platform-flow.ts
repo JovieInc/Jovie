@@ -14,6 +14,7 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureWarning } from '@/lib/error-tracking';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
+import type { SpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 
@@ -46,6 +47,8 @@ export interface SocialPlatformContext {
   platformName: string;
   normalizedUrl: string;
   spotifyArtistName: string | null;
+  /** Full Spotify metadata when available (avatar, genres, followers, etc.) */
+  spotifyData: SpotifyArtistData | null;
 }
 
 /**
@@ -198,8 +201,14 @@ export async function createNewSocialProfile(
   finalHandle: string,
   context: SocialPlatformContext
 ): Promise<NextResponse> {
-  const { handle, platformId, platformName, normalizedUrl, spotifyArtistName } =
-    context;
+  const {
+    handle,
+    platformId,
+    platformName,
+    normalizedUrl,
+    spotifyArtistName,
+    spotifyData,
+  } = context;
 
   const {
     token: claimToken,
@@ -221,7 +230,13 @@ export async function createNewSocialProfile(
       username: finalHandle,
       usernameNormalized: finalHandle,
       displayName,
-      avatarUrl: null,
+      avatarUrl: spotifyData?.imageUrl ?? null,
+      bio: spotifyData?.bio ?? null,
+      spotifyId: spotifyData?.spotifyId ?? null,
+      spotifyUrl: spotifyData?.spotifyUrl ?? null,
+      genres: spotifyData?.genres ?? null,
+      spotifyFollowers: spotifyData?.followerCount ?? null,
+      spotifyPopularity: spotifyData?.popularity ?? null,
       isPublic: true,
       isVerified: false,
       isFeatured: false,

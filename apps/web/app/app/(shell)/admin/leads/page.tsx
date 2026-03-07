@@ -5,6 +5,7 @@ import { LeadKeywordsManager } from '@/components/admin/leads/LeadKeywordsManage
 import { LeadPipelineControls } from '@/components/admin/leads/LeadPipelineControls';
 import { LeadPipelineKpis } from '@/components/admin/leads/LeadPipelineKpis';
 import { LeadTable } from '@/components/admin/leads/LeadTable';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 export const metadata: Metadata = {
   title: 'Leads | Admin',
@@ -27,16 +28,20 @@ function KpisSkeleton() {
 
 export default function AdminLeadsPage() {
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
-      <Suspense fallback={<KpisSkeleton />}>
-        <LeadPipelineKpis />
-      </Suspense>
+    <PageShell>
+      <PageContent noPadding>
+        <div className='flex flex-col gap-6 p-4 sm:p-6'>
+          <Suspense fallback={<KpisSkeleton />}>
+            <LeadPipelineKpis />
+          </Suspense>
 
-      <LeadPipelineControls />
+          <LeadPipelineControls />
 
-      <LeadKeywordsManager />
+          <LeadKeywordsManager />
 
-      <LeadTable />
-    </div>
+          <LeadTable />
+        </div>
+      </PageContent>
+    </PageShell>
   );
 }

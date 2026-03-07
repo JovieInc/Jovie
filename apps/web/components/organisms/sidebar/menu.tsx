@@ -139,7 +139,14 @@ const SidebarMenuButtonInner = React.forwardRef<
     return (
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent side='right' align='center' hidden={isMobile}>
+        <TooltipContent
+          side='right'
+          align='center'
+          hidden={isMobile}
+          className={
+            typeof tooltip !== 'string' ? 'flex items-center' : undefined
+          }
+        >
           {tooltipContent}
         </TooltipContent>
       </Tooltip>

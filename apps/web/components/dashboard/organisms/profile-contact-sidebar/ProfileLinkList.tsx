@@ -118,7 +118,7 @@ function ConnectedDspRows({
   if (connectedProviders.length === 0) {
     return (
       <p className='text-sm text-secondary-token'>
-        No music platforms connected yet
+        No Spotify or Apple Music connected yet
       </p>
     );
   }
