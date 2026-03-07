@@ -61,13 +61,13 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
     // Date formatting is handled by the CSV utility
   },
   {
-    header: 'Jovie Username',
-    accessor: 'profileUsername',
-    formatter: formatOptionalString,
-  },
-  {
     header: 'User Status',
     accessor: 'userStatus',
+  },
+  {
+    header: 'Profile Username',
+    accessor: 'profileUsername',
+    formatter: formatOptionalString,
   },
   {
     header: 'Founder Welcome Sent At',
@@ -84,6 +84,15 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
   {
     header: 'Suppression Failed At',
     accessor: 'suppressionFailedAt',
+  },
+  {
+    header: 'Profile Origin',
+    accessor: 'profileOrigin',
+    formatter: formatOptionalString,
+  },
+  {
+    header: 'Profile Created At',
+    accessor: 'profileCreatedAt',
   },
 ];
 

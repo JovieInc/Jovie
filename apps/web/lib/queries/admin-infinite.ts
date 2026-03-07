@@ -46,6 +46,8 @@ export interface AdminUserRow {
   welcomeFailedAt: Date | null;
   outboundSuppressedAt: Date | null;
   suppressionFailedAt: Date | null;
+  profileCreatedAt: Date | null;
+  profileOrigin: string | null;
 }
 
 export interface AdminCreatorProfileRow {
@@ -151,6 +153,7 @@ export function useAdminUsersInfiniteQuery({
           welcomeFailedAt: parseDate(row.welcomeFailedAt),
           outboundSuppressedAt: parseDate(row.outboundSuppressedAt),
           suppressionFailedAt: parseDate(row.suppressionFailedAt),
+          profileCreatedAt: parseDate(row.profileCreatedAt),
         })),
       };
     },
