@@ -105,6 +105,10 @@ export function IngestProfileDropdown({
             className='text-xs'
           />
 
+          {network === 'spotify' && spotifyState === 'loading' && (
+            <p className='text-xs text-tertiary-token'>Searching Spotify...</p>
+          )}
+
           {network === 'spotify' &&
             spotifyState === 'success' &&
             spotifyResults.length > 0 && (
@@ -122,6 +126,12 @@ export function IngestProfileDropdown({
                 ))}
               </div>
             )}
+
+          {network === 'spotify' && spotifyState === 'empty' && (
+            <p className='text-xs text-tertiary-token'>
+              No artists found. Try a different search.
+            </p>
+          )}
 
           {network === 'spotify' && spotifyState === 'error' && (
             <p className='text-xs text-destructive'>
