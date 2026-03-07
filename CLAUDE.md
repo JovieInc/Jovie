@@ -17,6 +17,12 @@ pnpm --version   # MUST be 9.15.4
 
 ---
 
+## Linear Issue Gating
+
+Skip any Linear issue labeled `human-review-required` or containing "This issue requires human review" in its description. Do not work on, close, or comment on these issues. See `AGENTS.md` for full details.
+
+---
+
 > **Full Guidelines:** See `AGENTS.md` at repo root for complete AI agent rules, engineering guardrails, and architecture guidance.
 
 This file is intentionally kept minimal. The canonical source is `AGENTS.md`.
