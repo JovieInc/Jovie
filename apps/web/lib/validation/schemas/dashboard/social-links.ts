@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { httpUrlSchema } from '../base';
 
 /**
  * Link state enum values for social links.
@@ -63,8 +64,8 @@ export const socialLinkInputSchema = z.object({
   platform: z.string().min(1),
   /** Platform category type */
   platformType: z.string().min(1).optional(),
-  /** Link URL (max 2048 chars) */
-  url: z.string().min(1).max(2048),
+  /** Link URL — must be a valid http(s) URL */
+  url: httpUrlSchema,
   /** Display order */
   sortOrder: z.number().int().min(0).optional(),
   /** Active status flag */
