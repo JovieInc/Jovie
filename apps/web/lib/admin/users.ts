@@ -44,6 +44,8 @@ export interface AdminUserRow {
   welcomeFailedAt: Date | null;
   outboundSuppressedAt: Date | null;
   suppressionFailedAt: Date | null;
+  profileCreatedAt: Date | null;
+  profileOrigin: string | null;
 }
 
 export interface GetAdminUsersParams {
@@ -141,6 +143,8 @@ export async function getAdminUsers(
           welcomeFailedAt: users.welcomeFailedAt,
           outboundSuppressedAt: users.outboundSuppressedAt,
           suppressionFailedAt: users.suppressionFailedAt,
+          profileCreatedAt: creatorProfiles.createdAt,
+          profileOrigin: creatorProfiles.ingestionSourcePlatform,
         })
         .from(users)
         .leftJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
@@ -172,6 +176,8 @@ export async function getAdminUsers(
         welcomeFailedAt: row.welcomeFailedAt ?? null,
         outboundSuppressedAt: row.outboundSuppressedAt ?? null,
         suppressionFailedAt: row.suppressionFailedAt ?? null,
+        profileCreatedAt: row.profileCreatedAt ?? null,
+        profileOrigin: row.profileOrigin ?? null,
       })),
       page,
       pageSize,

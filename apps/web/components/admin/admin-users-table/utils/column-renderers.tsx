@@ -117,6 +117,49 @@ export function renderPlanCell({
 }
 
 /**
+ * Renders the profile status cell (username link or "No profile")
+ */
+export function renderProfileCell({
+  row,
+}: CellContext<AdminUserRow, string | null>) {
+  const user = row.original;
+  if (!user.profileUsername) {
+    return <span className='text-xs text-tertiary-token'>No profile</span>;
+  }
+  return (
+    <div className='min-w-0'>
+      <TruncatedText lines={1} className='text-sm text-primary-token'>
+        {`@${user.profileUsername}`}
+      </TruncatedText>
+      {user.profileOrigin ? (
+        <span className='text-xs text-tertiary-token'>
+          {user.profileOrigin}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Renders the funnel status cell showing user lifecycle state
+ */
+export function renderFunnelCell({ row }: CellContext<AdminUserRow, string>) {
+  const status = row.original.userStatus;
+  const label = status.replace(/_/g, ' ');
+  const variant =
+    status === 'active'
+      ? 'success'
+      : status === 'banned' || status === 'suspended'
+        ? 'warning'
+        : ('secondary' as const);
+  return (
+    <Badge size='sm' variant={variant}>
+      {label}
+    </Badge>
+  );
+}
+
+/**
  * Renders the status badge cell
  */
 export function renderStatusCell({ row }: CellContext<AdminUserRow, unknown>) {
