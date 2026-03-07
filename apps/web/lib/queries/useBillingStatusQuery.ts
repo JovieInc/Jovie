@@ -63,8 +63,8 @@ export const billingStatusQueryOptions = {
     return failureCount < 1;
   },
   retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
-  // Re-fetch on window focus so stale error state clears when user returns
-  refetchOnWindowFocus: true,
+  // Mutations already invalidate this query, so focus-based refetching is noise.
+  refetchOnWindowFocus: false,
 } as const;
 
 /**

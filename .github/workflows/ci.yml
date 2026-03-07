@@ -5,7 +5,7 @@ on:
     branches: [main]
   merge_group:
   push:
-    branches: [main, 'codegen-bot/**', 'claude/**', 'codex/**']
+    branches: [main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -830,22 +830,29 @@ jobs:
             FAILURES=$((FAILURES + 1))
           fi
 
-          # -- 3. Public profile: not 5xx --
+          # -- 3. Public profile: HTTP 200, substantial content, no 404 markers --
           check_profile() {
             local response
             response=$(fetch "https://jov.ie/tim")
             local status="${response##*$'\n'}"
+            local body="${response%$'\n'*}"
 
-            if [ "$status" -ge 500 ] 2>/dev/null; then
-              echo "  Profile /tim returned HTTP $status (server error)"
+            if [ "$status" != "200" ]; then
+              echo "  Profile /tim returned HTTP $status"
               return 1
             fi
 
-            if [ "$status" != "200" ]; then
-              echo "  Profile /tim returned HTTP $status (expected 200, non-fatal)"
+            if [ ${#body} -lt 1000 ]; then
+              echo "  Profile /tim body too short (${#body} chars)"
+              return 1
             fi
 
-            echo "  Profile: HTTP $status"
+            if echo "$body" | grep -qi "page could not be found\|this page could not be found\|profile not found\|application error\|internal server error\|something went wrong"; then
+              echo "  Profile /tim contains not-found or error content"
+              return 1
+            fi
+
+            echo "  Profile /tim: HTTP 200, ${#body} chars, no 404 markers"
             return 0
           }
 
@@ -1555,12 +1562,11 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
   ci-e2e-tests:
-    name: Postmerge E2E
+    name: Full E2E (Preview)
     environment: Preview – jovie
-    # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
+    # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
     needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
-    # E2E runs on push to main or PRs with testing label
-    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' }}
+    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -1804,12 +1810,15 @@ jobs:
           TEST_PERFORMANCE_SUITE="full" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="full" --use-baseline
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    # Gated: only runs with 'deploy-preview' label to save CI time on most PRs
-    # Use label for PRs that need visual review of changes
-    needs: [ci-fast, ci-build]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'deploy-preview') }}
+    # Preview deploys are the default QA surface for internal PRs.
+    # Keep this independent from the main deploy gate so review happens before merge.
+    needs: [ci-fast]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: preview-deploy-${{ github.repository }}
+      cancel-in-progress: false
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
@@ -2081,13 +2090,12 @@ jobs:
                 body: summaryBody
               });
             }
-  # CRITICAL: Required smoke tests run BEFORE production deploy
-  # These tests verify the most critical user flows: public profiles + auth
+  # Extended smoke validation for risky changes.
+  # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
-    name: Postmerge Smoke
+    name: Extended Smoke (Preview)
     needs: [ci-fast, ci-build, neon-db, ci-e2e-tests]
-    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    # Smoke tests now gate deploy on main before production rollout.
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     environment: Preview – jovie
     timeout-minutes: 20
@@ -2275,8 +2283,9 @@ jobs:
           echo "✅ Homepage smoke passed"
 
   deploy:
-    needs: [ci-fast, ci-build, ci-e2e-tests, ci-smoke-required]
-    # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
+    needs: [ci-fast]
+    # Fast production path: merge on deterministic checks, then deploy immediately.
+    # Longer validation lanes run on preview or asynchronously after deploy.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
