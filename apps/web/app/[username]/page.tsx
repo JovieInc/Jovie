@@ -164,13 +164,8 @@ const fetchProfileAndLinks = async (
     // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
     // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
     if (!result || !result.isPublic) {
-      // Log when a profile query returns not_found to aid debugging production 404s
-      void captureWarning('[profile] Public profile not found or not public', {
-        username,
-        profileExists: !!result,
-        isPublicValue: result ? String(result.isPublic) : 'n/a',
-        isPublicType: result ? typeof result.isPublic : 'n/a',
-      });
+      // Expected 404 — profile not found or not public. No Sentry capture needed;
+      // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
       return {
         profile: null,
         links: [],
