@@ -41,7 +41,7 @@ async function fetchSuggestions(
 ): Promise<SuggestionsQueryResult> {
   const response = await fetch(
     `/api/dashboard/social-links?profileId=${profileId}`,
-    { cache: 'no-store', signal }
+    { signal }
   );
 
   if (!response.ok) {
