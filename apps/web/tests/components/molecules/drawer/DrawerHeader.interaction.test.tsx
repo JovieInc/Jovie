@@ -1,60 +1,28 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { DrawerHeader } from '@/components/molecules/drawer/DrawerHeader';
 
-const { mockUseBreakpointDown } = vi.hoisted(() => ({
-  mockUseBreakpointDown: vi.fn(),
-}));
-
-vi.mock('@/hooks/useBreakpoint', () => ({
-  useBreakpointDown: mockUseBreakpointDown,
-}));
-
 describe('DrawerHeader', () => {
-  beforeEach(() => {
-    mockUseBreakpointDown.mockReset();
-    mockUseBreakpointDown.mockReturnValue(false);
-  });
-
   it('renders the provided title', () => {
     render(<DrawerHeader title='Contact details' />);
 
     expect(screen.getByText('Contact details')).toBeInTheDocument();
   });
 
-  it('calls onClose when the close button is clicked', async () => {
-    const user = userEvent.setup();
-    const onClose = vi.fn();
+  it('renders actions when provided', () => {
+    render(
+      <DrawerHeader
+        title='Profile'
+        actions={<button type='button'>Edit</button>}
+      />
+    );
 
-    render(<DrawerHeader title='Profile' onClose={onClose} />);
-
-    await user.click(screen.getByRole('button', { name: 'Close sidebar' }));
-
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
-  it('uses desktop aria-label when breakpoint is desktop', () => {
-    mockUseBreakpointDown.mockReturnValue(false);
+  it('does not render actions container when no actions provided', () => {
+    const { container } = render(<DrawerHeader title='Profile' />);
 
-    render(<DrawerHeader title='Profile' onClose={() => {}} />);
-
-    expect(
-      screen.getByRole('button', { name: 'Close sidebar' })
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Go back' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('uses mobile aria-label when breakpoint is mobile', () => {
-    mockUseBreakpointDown.mockReturnValue(true);
-
-    render(<DrawerHeader title='Profile' onClose={() => {}} />);
-
-    expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Close sidebar' })
-    ).not.toBeInTheDocument();
+    expect(container.querySelectorAll('button')).toHaveLength(0);
   });
 });
