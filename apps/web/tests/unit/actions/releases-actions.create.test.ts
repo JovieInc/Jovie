@@ -133,7 +133,7 @@ vi.mock('@/lib/utils/redirect-error', () => ({
 }));
 
 vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: { RELEASES: '/dashboard/releases' },
+  APP_ROUTES: { RELEASES: '/dashboard/releases', SIGNIN: '/signin' },
 }));
 
 vi.mock('@/lib/env-public', () => ({
