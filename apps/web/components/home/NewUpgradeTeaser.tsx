@@ -32,13 +32,6 @@ export function NewUpgradeTeaser() {
               <span className='text-sm text-secondary-token'>/month</span>
             </div>
 
-            <p className='mt-2 text-center text-sm text-secondary-token'>
-              or $348/year{' '}
-              <span className='text-emerald-600 dark:text-emerald-400 font-medium'>
-                — save 2 months
-              </span>
-            </p>
-
             {/* CTA */}
             <div className='mt-8'>
               <Button
