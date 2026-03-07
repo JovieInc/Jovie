@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { withDbSession } from '@/lib/auth/session';
+import { requireAuth } from '@/lib/auth/session';
 import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -50,59 +50,58 @@ function isView(value: string): value is DashboardAnalyticsView {
 
 export async function GET(request: Request) {
   try {
-    return await withDbSession(async userId => {
-      // Parse query parameters
-      const { searchParams } = new URL(request.url);
-      const rangeParam = searchParams.get('range');
-      const viewParam = searchParams.get('view');
-      const refreshParam = searchParams.get('refresh');
+    // Authenticate the user. RLS session setup is handled inside
+    // getUserDashboardAnalytics via a transaction, so we only need the
+    // Clerk user ID here — no separate withDbSession call required.
+    const userId = await requireAuth();
 
-      const rawRange: TimeRange =
-        rangeParam && isRange(rangeParam) ? rangeParam : '30d';
-      const view: DashboardAnalyticsView =
-        viewParam && isView(viewParam) ? viewParam : 'full';
-      const forceRefresh = refreshParam === '1';
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const rangeParam = searchParams.get('range');
+    const viewParam = searchParams.get('view');
+    const refreshParam = searchParams.get('refresh');
 
-      // Clamp date range to user's plan retention limit.
-      // On entitlements failure, default to 7-day (free) limit.
-      let retentionDays = 7;
-      try {
-        const entitlements = await getCurrentUserEntitlements();
-        retentionDays = entitlements.analyticsRetentionDays;
-      } catch {
-        // Billing unavailable — use free-tier default (7 days)
-      }
-      const range = clampRange(rawRange, retentionDays);
+    const rawRange: TimeRange =
+      rangeParam && isRange(rangeParam) ? rangeParam : '30d';
+    const view: DashboardAnalyticsView =
+      viewParam && isView(viewParam) ? viewParam : 'full';
+    const forceRefresh = refreshParam === '1';
 
-      const key = `dashboard-analytics:${userId}:${view}:${range}`;
+    // Clamp date range to user's plan retention limit.
+    // On entitlements failure, default to 7-day (free) limit.
+    let retentionDays = 7;
+    try {
+      const entitlements = await getCurrentUserEntitlements();
+      retentionDays = entitlements.analyticsRetentionDays;
+    } catch {
+      // Billing unavailable — use free-tier default (7 days)
+    }
+    const range = clampRange(rawRange, retentionDays);
 
-      if (forceRefresh) {
-        await invalidateCache(key);
-      }
+    const key = `dashboard-analytics:${userId}:${view}:${range}`;
 
-      const payload = await cacheQuery(
-        key,
-        async () => {
-          const analytics = await getUserDashboardAnalytics(
-            userId,
-            range,
-            view
-          );
-          return {
-            ...analytics,
-            top_cities: analytics.top_cities ?? [],
-            top_countries: analytics.top_countries ?? [],
-            top_referrers: analytics.top_referrers ?? [],
-            top_links: analytics.top_links ?? [],
-          };
-        },
-        { ttlSeconds: 60 }
-      );
+    if (forceRefresh) {
+      await invalidateCache(key);
+    }
 
-      return NextResponse.json(payload, {
-        status: 200,
-        headers: NO_STORE_HEADERS,
-      });
+    const payload = await cacheQuery(
+      key,
+      async () => {
+        const analytics = await getUserDashboardAnalytics(userId, range, view);
+        return {
+          ...analytics,
+          top_cities: analytics.top_cities ?? [],
+          top_countries: analytics.top_countries ?? [],
+          top_referrers: analytics.top_referrers ?? [],
+          top_links: analytics.top_links ?? [],
+        };
+      },
+      { ttlSeconds: 60 }
+    );
+
+    return NextResponse.json(payload, {
+      status: 200,
+      headers: NO_STORE_HEADERS,
     });
   } catch (error) {
     logger.error('Error in analytics API:', error);

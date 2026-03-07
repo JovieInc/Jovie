@@ -9,6 +9,7 @@ const PROFILE_ID = '123e4567-e89b-12d3-a456-426614174000';
 type QueryRows = Array<Record<string, unknown>>;
 
 // Hoist mocks to avoid module resets
+const mockRequireAuth = vi.fn();
 const mockWithDbSession = vi.fn();
 const mockWithDbSessionTx = vi.fn();
 const mockGetUserDashboardAnalytics = vi.fn();
@@ -60,6 +61,7 @@ function createSelectQueue(responses: QueryRows[]) {
 }
 
 vi.mock('@/lib/auth/session', () => ({
+  requireAuth: (...args: any[]) => mockRequireAuth(...args),
   withDbSession: (...args: any[]) => mockWithDbSession(...args),
   withDbSessionTx: (...args: any[]) => mockWithDbSessionTx(...args),
 }));
@@ -131,6 +133,12 @@ function mockSession({
   unauthorized?: boolean;
   tx?: unknown;
 } = {}) {
+  // Mock requireAuth for routes that authenticate without withDbSession
+  if (unauthorized) {
+    mockRequireAuth.mockRejectedValue(new Error('Unauthorized'));
+  } else {
+    mockRequireAuth.mockResolvedValue(TEST_USER_ID);
+  }
   mockWithDbSession.mockImplementation(
     async (callback: (userId: string) => Promise<unknown>) => {
       if (unauthorized) throw new Error('Unauthorized');
