@@ -21,6 +21,11 @@ interface OnboardingProfileReviewStepProps {
   readonly onGoToDashboard: () => void;
 }
 
+/**
+ * Profile review step in onboarding.
+ * JOV-1340: Photo is no longer required to proceed.
+ * Users can always add/change their photo from the dashboard.
+ */
 export function OnboardingProfileReviewStep({
   title,
   prompt,
@@ -63,9 +68,10 @@ export function OnboardingProfileReviewStep({
     setAvatarUrl(url);
   }, []);
 
-  const hasPhoto = Boolean(avatarUrl);
   const hasName = Boolean(displayName.trim());
-  const canProceed = hasPhoto && hasName;
+  // JOV-1340: Only require a display name to proceed.
+  // Photo is optional — enrichment may still be running in background.
+  const canProceed = hasName;
 
   const handleGoToDashboard = useCallback(async () => {
     setIsSaving(true);
@@ -111,7 +117,7 @@ export function OnboardingProfileReviewStep({
             acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
             showHoverOverlay
           />
-          {!hasPhoto && (
+          {!avatarUrl && (
             <button
               type='button'
               onClick={() => avatarRef.current?.click()}
@@ -172,13 +178,14 @@ export function OnboardingProfileReviewStep({
         </div>
 
         <div className={FORM_LAYOUT.footerHint}>
-          {!canProceed && (
+          {!hasName && (
             <span className='text-[var(--linear-text-tertiary)]'>
-              {!hasPhoto && !hasName
-                ? 'Add a profile photo and name to continue'
-                : !hasPhoto
-                  ? 'Add a profile photo to continue'
-                  : 'Add your name to continue'}
+              Add your name to continue
+            </span>
+          )}
+          {hasName && !avatarUrl && (
+            <span className='text-[var(--linear-text-tertiary)]'>
+              You can add a profile photo now or later from settings.
             </span>
           )}
         </div>

@@ -35,10 +35,6 @@ import {
   isDatabaseError,
   mapErrorToUserMessage,
 } from './errors';
-import {
-  getSpotifyImportStageMessage,
-  getSpotifyImportSuccessMessage,
-} from './spotifyImportCopy';
 import type { HandleValidationState, OnboardingState } from './types';
 import { getResolvedHandle, validateDisplayName } from './validation';
 
@@ -48,67 +44,17 @@ interface SpotifyImportState {
   message: string;
 }
 
-const SPOTIFY_STAGE_TRANSITION_DELAY_MS = 600;
-
-async function waitForStageTransition(
-  signal: AbortSignal,
-  delayMs: number = SPOTIFY_STAGE_TRANSITION_DELAY_MS
-): Promise<void> {
-  await new Promise<void>(resolve => {
-    const timeoutId = setTimeout(resolve, delayMs);
-
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timeoutId);
-        resolve();
-      },
-      { once: true }
-    );
-  });
-}
-
-async function advanceSpotifyImportStages(
-  safeSetter: (value: SetStateAction<SpotifyImportState>) => void,
-  signal: AbortSignal,
-  imported: number
-): Promise<void> {
-  safeSetter({
-    status: 'importing',
-    stage: 1,
-    message: getSpotifyImportStageMessage(1, imported),
-  });
-
-  await waitForStageTransition(signal);
-  if (signal.aborted) return;
-
-  safeSetter({
-    status: 'importing',
-    stage: 2,
-    message: getSpotifyImportStageMessage(2),
-  });
-
-  await waitForStageTransition(signal);
-  if (signal.aborted) return;
-
-  safeSetter({
-    status: 'success',
-    stage: 2,
-    message: getSpotifyImportSuccessMessage(imported),
-  });
-}
-
-async function tryAutoConnectSpotify(
+/**
+ * JOV-1340: Auto-connect Spotify from homepage search claim data.
+ * Now fully non-blocking — fires connect + enrichment in background,
+ * does NOT block step transitions or show staged spinners.
+ */
+function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
   setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>,
   signal: AbortSignal,
   userId: string
-): Promise<void> {
-  const importStartedAt = Date.now();
-  const safeSetter: typeof setSpotifyImportState = value => {
-    if (!signal.aborted) setSpotifyImportState(value);
-  };
-
+): void {
   try {
     const spotifyExpected =
       readSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY) === 'true';
@@ -130,96 +76,50 @@ async function tryAutoConnectSpotify(
       /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
 
     if (artistMatch?.[1]) {
-      track('onboarding_spotify_import_started', {
-        user_id: userId,
-      });
-      safeSetter({
-        status: 'importing',
-        stage: 0,
-        message: getSpotifyImportStageMessage(0),
-      });
-      // Timer stays at stage 0 — stages 1+ use data-aware messages
-      // that are only set after the API call resolves.
-      const stageTimer = setInterval(() => {
-        if (signal.aborted) {
-          clearInterval(stageTimer);
-        }
-      }, 1200);
+      const artistId = artistMatch[1];
+      const normalizedUrl = `https://open.spotify.com/artist/${artistId}`;
 
-      // Clear interval on abort (component unmount)
-      signal.addEventListener('abort', () => clearInterval(stageTimer), {
-        once: true,
-      });
+      track('onboarding_spotify_import_started', { user_id: userId });
 
-      try {
-        const normalizedUrl = `https://open.spotify.com/artist/${artistMatch[1]}`;
-        const importResult = await connectSpotifyArtist({
-          spotifyArtistId: artistMatch[1],
-          spotifyArtistUrl: normalizedUrl,
-          artistName,
-        });
-
-        // Clear timer immediately to prevent it from firing after completion
-        clearInterval(stageTimer);
-
-        if (importResult.success) {
-          track('onboarding_spotify_import_completed', {
-            user_id: userId,
-            releasesImported: importResult.importing
-              ? 0
-              : importResult.imported,
-            duration: toDurationMs(importStartedAt),
-          });
-          await advanceSpotifyImportStages(
-            safeSetter,
-            signal,
-            importResult.importing ? 0 : importResult.imported
-          );
-
-          // Enrich profile with Spotify artist data + MusicFetch
-          if (!signal.aborted) {
-            try {
-              const enriched = await enrichProfileFromDsp(
-                artistMatch[1],
-                normalizedUrl
-              );
-              if (!signal.aborted) {
-                setEnrichedProfile(enriched);
-              }
-            } catch {
-              // Enrichment failure is non-critical — user can fill in manually
-            }
-          }
-        } else {
-          track('onboarding_spotify_import_failed', {
-            user_id: userId,
-            error: importResult.message || 'Spotify import failed',
-            stage: 'connect',
-          });
-          safeSetter({
-            status: 'error',
-            stage: 2,
-            message:
-              importResult.message ||
-              'Unable to connect Spotify. You can retry from your Dashboard.',
-          });
-        }
-      } catch (error) {
-        track('onboarding_spotify_import_failed', {
-          user_id: userId,
-          error: getErrorMessage(error),
-          stage: 'connect',
-        });
-        safeSetter({
-          status: 'error',
+      // Set import state to success immediately — actual import is background
+      if (!signal.aborted) {
+        setSpotifyImportState({
+          status: 'success',
           stage: 2,
-          message:
-            'Spotify import is taking longer than expected. You can continue editing in Dashboard.',
+          message: 'Your music is being imported in the background.',
         });
-      } finally {
-        clearInterval(stageTimer);
       }
+
+      // Fire-and-forget: connect + enrich in background (JOV-1340)
+      void connectSpotifyArtist({
+        spotifyArtistId: artistId,
+        spotifyArtistUrl: normalizedUrl,
+        artistName,
+      })
+        .then(result => {
+          if (result.success) {
+            track('onboarding_spotify_import_completed', {
+              user_id: userId,
+              releasesImported: result.importing ? 0 : result.imported,
+            });
+          }
+        })
+        .catch(() => {
+          // Import failure is non-critical during onboarding
+        });
+
+      // Fire-and-forget: enrich profile data in background
+      void enrichProfileFromDsp(artistId, normalizedUrl)
+        .then(enriched => {
+          if (!signal.aborted) {
+            setEnrichedProfile(enriched);
+          }
+        })
+        .catch(() => {
+          // Enrichment failure is non-critical — user can fill in manually
+        });
     }
+
     clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
     clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
     clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
@@ -290,7 +190,7 @@ export function useOnboardingSubmit({
   const [enrichedProfile, setEnrichedProfile] =
     useState<EnrichedProfileData | null>(null);
 
-  // Abort controller to clean up Spotify import interval on unmount
+  // Abort controller to clean up Spotify import on unmount
   const spotifyAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -468,11 +368,11 @@ export function useOnboardingSubmit({
 
         goToNextStep();
 
-        // Auto-connect Spotify artist from homepage search and report staged progress
+        // Auto-connect Spotify artist from homepage search (JOV-1340: non-blocking)
         spotifyAbortRef.current?.abort();
         const controller = new AbortController();
         spotifyAbortRef.current = controller;
-        void tryAutoConnectSpotify(
+        tryAutoConnectSpotify(
           setSpotifyImportState,
           setEnrichedProfile,
           controller.signal,

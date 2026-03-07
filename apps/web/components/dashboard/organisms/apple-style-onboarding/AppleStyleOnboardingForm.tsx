@@ -139,13 +139,13 @@ export function AppleStyleOnboardingForm({
   }, [handleInput, handleValidation.checking, handleValidation.error, userId]);
 
   const handleStepCtaDisabledReason = useMemo(() => {
-    if (state.isSubmitting) return 'Saving…';
+    if (state.isSubmitting) return 'Saving...';
     if (state.error) return state.error;
     if (!handleInput) return 'Enter a handle to continue';
     if (!handleValidation.clientValid) {
       return handleValidation.error || 'Handle is invalid';
     }
-    if (handleValidation.checking) return 'Checking availability…';
+    if (handleValidation.checking) return 'Checking availability...';
     if (!handleValidation.available) {
       return handleValidation.error || 'Handle is taken';
     }
@@ -181,8 +181,12 @@ export function AppleStyleOnboardingForm({
     globalThis.location.href = dashboardUrl;
   }, [spotifyImportState.status]);
 
+  /**
+   * JOV-1340: DSP connection handler is now non-blocking.
+   * Enrichment runs in the background; user proceeds immediately.
+   */
   const handleDspConnected = useCallback(
-    async (
+    (
       _releases: unknown,
       artistName: string,
       spotifyArtistId?: string,
@@ -193,17 +197,13 @@ export function AppleStyleOnboardingForm({
         artist_name: artistName,
       });
 
-      // Enrich profile with Spotify + MusicFetch data
+      // Fire-and-forget: enrich profile in background (JOV-1340)
       if (spotifyArtistId && spotifyUrl) {
-        try {
-          const enriched = await enrichProfileFromDsp(
-            spotifyArtistId,
-            spotifyUrl
-          );
-          setEnrichedProfile(enriched);
-        } catch {
-          // Enrichment failure is non-critical
-        }
+        void enrichProfileFromDsp(spotifyArtistId, spotifyUrl)
+          .then(enriched => setEnrichedProfile(enriched))
+          .catch(() => {
+            // Enrichment failure is non-critical — user can fill in manually
+          });
       }
 
       goToNextStep();

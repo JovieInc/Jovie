@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useCallback, useReducer, useRef, useState } from 'react';
+import { useCallback, useReducer, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { AuthButton } from '@/components/auth';
 import { useSpotifyConnect } from '@/components/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect';
@@ -55,6 +55,11 @@ interface OnboardingDspStepProps {
   readonly isTransitioning: boolean;
 }
 
+/**
+ * DSP connection step in onboarding.
+ * JOV-1340: Uses fireAndForget mode so artist selection proceeds
+ * immediately; the actual import runs in the background.
+ */
 export function OnboardingDspStep({
   title,
   prompt,
@@ -63,7 +68,6 @@ export function OnboardingDspStep({
   isTransitioning,
 }: OnboardingDspStepProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
-  const [importingArtist, setImportingArtist] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const {
@@ -73,21 +77,13 @@ export function OnboardingDspStep({
     clear: searchClear,
   } = useArtistSearchQuery();
 
-  const handleImportStart = useCallback((artistName: string) => {
-    setImportingArtist(artistName || 'artist');
-  }, []);
-
-  const {
-    isPending,
-    extractSpotifyArtistId,
-    connectFromUrl,
-    handleArtistSelect,
-  } = useSpotifyConnect({
-    dispatch,
-    searchClear,
-    onConnected,
-    onImportStart: handleImportStart,
-  });
+  const { extractSpotifyArtistId, connectFromUrl, handleArtistSelect } =
+    useSpotifyConnect({
+      dispatch,
+      searchClear,
+      onConnected,
+      fireAndForget: true, // JOV-1340: non-blocking import
+    });
 
   const handleInputChange = useCallback(
     (value: string) => {
@@ -115,28 +111,6 @@ export function OnboardingDspStep({
     },
     [handleArtistSelect]
   );
-
-  const isImporting = isPending || importingArtist !== null;
-
-  if (isImporting) {
-    return (
-      <div className='flex flex-col items-center justify-center h-full'>
-        <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
-          <div className={FORM_LAYOUT.headerSection}>
-            <h1 className={FORM_LAYOUT.title}>Importing your music</h1>
-            <p className={FORM_LAYOUT.hint}>
-              Connecting{' '}
-              {importingArtist ? `"${importingArtist}"` : 'your artist'} from
-              Spotify...
-            </p>
-          </div>
-          <div className='flex justify-center py-8'>
-            <LoadingSpinner size='lg' className='text-accent' />
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className='flex flex-col items-center justify-center h-full'>
