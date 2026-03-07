@@ -1,6 +1,7 @@
 import {
   Banknote,
   CalendarDays,
+  Download,
   HandCoins,
   Home,
   IdCard,
@@ -145,6 +146,13 @@ export const adminNavigation: NavItem[] = [
     id: 'admin_creators',
     icon: Users,
     description: 'Manage creator profiles and verification',
+  },
+  {
+    name: 'Ingest',
+    href: APP_ROUTES.ADMIN_INGEST,
+    id: 'admin_ingest',
+    icon: Download,
+    description: 'Manually ingest creator profiles',
   },
   {
     name: 'Users',
