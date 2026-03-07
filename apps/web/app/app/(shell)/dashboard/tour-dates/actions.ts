@@ -220,7 +220,9 @@ async function resolveTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`/sign-in?redirect_url=${APP_ROUTES.SETTINGS_TOURING}`);
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.SETTINGS_TOURING}`
+    );
   }
 
   const profile = await requireProfile();

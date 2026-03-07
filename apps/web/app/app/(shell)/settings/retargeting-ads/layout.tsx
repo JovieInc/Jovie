@@ -15,7 +15,7 @@ export default async function RetargetingAdsLayout({
   const entitlements = await getCurrentUserEntitlements();
 
   if (!entitlements.isAuthenticated || !entitlements.userId) {
-    redirect('/sign-in');
+    redirect(APP_ROUTES.SIGNIN);
   }
 
   if (!entitlements.isAdmin) {

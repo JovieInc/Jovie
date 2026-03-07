@@ -294,7 +294,7 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
 
       await expect(loadReleaseMatrix()).rejects.toThrow('NEXT_REDIRECT');
       expect(mockRedirect).toHaveBeenCalledWith(
-        expect.stringContaining('/sign-in')
+        expect.stringContaining('/signin')
       );
     });
 

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { ClientProviders } from '@/components/providers/ClientProviders';
+import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export default async function BillingLayout({
   // Ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
-    redirect('/sign-in');
+    redirect(APP_ROUTES.SIGNIN);
   }
 
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;

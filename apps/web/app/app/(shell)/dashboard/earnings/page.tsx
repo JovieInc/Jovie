@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { DashboardTippingGate } from '@/components/dashboard/DashboardTippingGate';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
@@ -15,7 +16,7 @@ export default async function EarningsPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/earnings');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/earnings`);
   }
 
   try {

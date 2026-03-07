@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
   getDashboardData,
@@ -19,7 +20,7 @@ export default async function SettingsArtistProfilePage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/artist-profile');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/artist-profile`);
   }
 
   const dashboardData = await getDashboardData();

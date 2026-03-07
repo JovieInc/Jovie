@@ -5,6 +5,7 @@ import { DashboardAudienceClient } from '@/components/dashboard/organisms/Dashbo
 import type { AudienceSegment } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -32,7 +33,7 @@ async function AudienceContent({
 
     // Handle unauthenticated users
     if (!dashboardData.user?.id) {
-      redirect('/sign-in?redirect_url=/app/dashboard/audience');
+      redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/audience`);
     }
 
     // Handle redirects for users who need onboarding

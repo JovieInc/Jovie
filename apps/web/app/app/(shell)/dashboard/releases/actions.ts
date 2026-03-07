@@ -246,7 +246,7 @@ async function resolveReleaseMatrix(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`/sign-in?redirect_url=${APP_ROUTES.RELEASES}`);
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
   }
 
   const profile = await requireProfile(profileId);
