@@ -1856,7 +1856,7 @@ jobs:
           fi
 
           # Deploy preview with DATABASE_URL injected only for this deployment
-          deployment_url=$(vercel deploy --prebuilt \
+          deployment_url=$(vercel deploy --prebuilt --archive=tgz \
             --env DATABASE_URL="$POOLED_URL" \
             --env GIT_BRANCH="${GIT_BRANCH}" \
             --token $VERCEL_TOKEN)
@@ -2335,7 +2335,7 @@ jobs:
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
-          vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --archive=tgz --token ${{ secrets.VERCEL_TOKEN }}
           # Use the known production URL instead of the deploy output.
           # GitHub Actions masks the Vercel deployment URL as a secret,
           # causing downstream jobs (canary, sentry) to receive an empty string.
