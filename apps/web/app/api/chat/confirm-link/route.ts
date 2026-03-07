@@ -14,12 +14,13 @@ import { getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
+import { httpUrlSchema } from '@/lib/validation/schemas/base';
 
 const confirmLinkSchema = z.object({
   profileId: z.string().uuid(),
   platform: z.string().min(1),
-  url: z.string().min(1).max(2048),
-  normalizedUrl: z.string().min(1).max(2048),
+  url: httpUrlSchema,
+  normalizedUrl: httpUrlSchema,
 });
 
 /**
