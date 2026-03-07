@@ -298,6 +298,32 @@ Do NOT push code that fails any of these. Fix first, push once.
 - If a PR fails CI, the agent can fix it while other PRs continue merging
 - Each PR must still pass /verify locally before pushing
 
+### Auto-Merge Path Guardrails
+
+Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual review.
+
+**Auto-merge BLOCKED (require manual review):**
+
+| Path / Area | Why |
+|-------------|-----|
+| `/api/stripe/`, `/api/billing/` | Money — billing bugs cost real revenue |
+| Auth middleware, Clerk sync, `proxy-state` | Identity — broken auth locks out users |
+| Onboarding flow (`app/(onboarding)`) | First impression — broken onboarding kills conversion |
+| Leads/outreach pipeline | Growth engine — silent failures lose prospects |
+| Profile ownership / claim flow | Trust — incorrect ownership = legal + trust risk |
+
+**Auto-merge ALLOWED (CI-gated, no manual review needed):**
+
+| Change Type | Examples |
+|-------------|---------|
+| Docs / copy / README | Markdown files, changelog, legal copy |
+| Tests (unit, integration, e2e) | `*.test.ts`, `*.spec.ts`, test fixtures |
+| Style-only | CSS, design tokens, Tailwind config |
+| Dependency bumps (non-breaking) | Lockfile-only, patch/minor version bumps |
+| Linting / formatting fixes | Biome auto-fixes, whitespace, import sorting |
+
+When in doubt, skip auto-merge and request review.
+
 ---
 
 ## Pre-PR Checklist (required before opening any PR)
