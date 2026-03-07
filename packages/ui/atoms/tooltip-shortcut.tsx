@@ -38,11 +38,9 @@ export function TooltipShortcut({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side}>
-        <div className='inline-flex items-center gap-2'>
-          <span>{label}</span>
-          {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
-        </div>
+      <TooltipContent side={side} className='flex items-center gap-2'>
+        <span>{label}</span>
+        {shortcut && <Kbd variant='tooltip'>{shortcut}</Kbd>}
       </TooltipContent>
     </Tooltip>
   );

@@ -75,5 +75,6 @@ export function useInsightsSummaryQuery(options?: { enabled?: boolean }) {
     queryFn: ({ signal }) => fetchInsightsSummary(signal),
     ...FREQUENT_CACHE,
     enabled: options?.enabled ?? true,
+    refetchOnMount: false,
   });
 }

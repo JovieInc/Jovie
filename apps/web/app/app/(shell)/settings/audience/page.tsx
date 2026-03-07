@@ -18,5 +18,5 @@ export default async function SettingsAudiencePage() {
     redirect('/onboarding');
   }
 
-  return <DashboardSettings focusSection='audience' />;
+  return <DashboardSettings focusSection='audience-tracking' />;
 }

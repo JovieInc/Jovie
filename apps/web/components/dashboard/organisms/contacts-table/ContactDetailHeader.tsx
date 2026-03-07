@@ -14,6 +14,7 @@ interface UseContactDetailHeaderProps {
   readonly customLabel?: string | null;
   readonly email?: string | null;
   readonly onDelete: () => void;
+  readonly onClose?: () => void;
 }
 
 interface UseContactDetailHeaderResult {
@@ -26,6 +27,7 @@ export function useContactDetailHeaderParts({
   customLabel,
   email,
   onDelete,
+  onClose,
 }: UseContactDetailHeaderProps): UseContactDetailHeaderResult {
   const notifications = useNotifications();
   const [isCopied, setIsCopied] = useState(false);
@@ -75,11 +77,13 @@ export function useContactDetailHeaderParts({
 
   return {
     title: roleLabel,
-    actions: hasActions ? (
-      <DrawerHeaderActions
-        primaryActions={primaryActions}
-        overflowActions={overflowActions}
-      />
-    ) : undefined,
+    actions:
+      hasActions || onClose ? (
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
+          onClose={onClose}
+        />
+      ) : undefined,
   };
 }

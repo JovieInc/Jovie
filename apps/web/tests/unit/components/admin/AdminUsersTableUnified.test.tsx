@@ -47,12 +47,16 @@ const userRow = {
   clerkId: 'clerk_1',
   name: 'Ari Lane',
   email: 'ari@example.com',
+  userStatus: 'active',
   createdAt: new Date('2026-01-10T00:00:00.000Z'),
   deletedAt: null,
   isPro: true,
   stripeCustomerId: null,
   stripeSubscriptionId: null,
   plan: 'pro' as const,
+  profileUsername: 'ari-lane',
+  profileCreatedAt: new Date('2026-01-10T00:00:00.000Z'),
+  profileOrigin: 'spotify',
 };
 
 describe('AdminUsersTableUnified', () => {

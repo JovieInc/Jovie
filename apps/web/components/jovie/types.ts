@@ -127,6 +127,7 @@ export const TOOL_LABELS: Record<string, string> = {
   createPromoStrategy: 'Building promo strategy...',
   markCanvasUploaded: 'Updating canvas status...',
   createRelease: 'Creating release...',
+  submitFeedback: 'Submitting feedback...',
 };
 
 /** A chat suggestion card with icon, label, and prompt */
@@ -163,14 +164,12 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
 
 /**
  * Special feedback suggestion shown in both suggestion lists.
- * This triggers a deterministic feedback flow, not the AI.
+ * Sends a real prompt that the AI handles via the submitFeedback tool.
  */
-export const FEEDBACK_PROMPT_TRIGGER = '__jovie_feedback__';
-
 export const FEEDBACK_SUGGESTION: ChatSuggestion = {
   icon: 'MessageSquare',
   label: 'Share feedback',
-  prompt: FEEDBACK_PROMPT_TRIGGER,
+  prompt: "I'd like to share some feedback about Jovie.",
   accent: 'orange',
 };
 
