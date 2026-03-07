@@ -24,7 +24,6 @@ class AdminUnauthorizedError extends Error {
 
 function isAllowedAvatarHost(hostname: string): boolean {
   const allowedHosts = [
-    'res.cloudinary.com',
     'images.clerk.dev',
     'img.clerk.com',
     'images.unsplash.com',

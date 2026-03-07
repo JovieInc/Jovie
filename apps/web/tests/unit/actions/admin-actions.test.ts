@@ -197,7 +197,7 @@ describe('admin/actions.ts', () => {
       );
 
       await expect(
-        updateCreatorAvatarAsAdmin('p1', 'https://res.cloudinary.com/img.jpg')
+        updateCreatorAvatarAsAdmin('p1', 'https://img.clerk.com/avatar.jpg')
       ).rejects.toThrow('Unauthorized');
     });
 
@@ -210,7 +210,7 @@ describe('admin/actions.ts', () => {
       );
 
       await expect(
-        updateCreatorAvatarAsAdmin('p1', 'https://res.cloudinary.com/img.jpg')
+        updateCreatorAvatarAsAdmin('p1', 'https://img.clerk.com/avatar.jpg')
       ).rejects.toThrow('Unauthorized');
     });
   });
@@ -439,7 +439,7 @@ describe('admin/actions.ts', () => {
 
       await updateCreatorAvatarAsAdmin(
         'p1',
-        'https://res.cloudinary.com/demo/image/upload/avatar.jpg'
+        'https://img.clerk.com/avatar.jpg'
       );
 
       expect(mockDbUpdate).toHaveBeenCalled();
@@ -453,7 +453,7 @@ describe('admin/actions.ts', () => {
       );
 
       await expect(
-        updateCreatorAvatarAsAdmin('p1', 'http://res.cloudinary.com/img.jpg')
+        updateCreatorAvatarAsAdmin('p1', 'http://img.clerk.com/img.jpg')
       ).rejects.toThrow('Avatar URL must use https');
     });
 
@@ -483,7 +483,7 @@ describe('admin/actions.ts', () => {
       );
 
       await expect(
-        updateCreatorAvatarAsAdmin('', 'https://res.cloudinary.com/img.jpg')
+        updateCreatorAvatarAsAdmin('', 'https://img.clerk.com/img.jpg')
       ).rejects.toThrow('profileId and avatarUrl are required');
 
       await expect(updateCreatorAvatarAsAdmin('p1', '')).rejects.toThrow(
@@ -493,7 +493,6 @@ describe('admin/actions.ts', () => {
 
     it('accepts all allowed avatar hosts', async () => {
       const allowedUrls = [
-        'https://res.cloudinary.com/demo/img.jpg',
         'https://images.clerk.dev/avatar.png',
         'https://img.clerk.com/avatar.png',
         'https://images.unsplash.com/photo.jpg',

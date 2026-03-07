@@ -31,22 +31,19 @@ describe('buildAvatarSizes', () => {
     );
   });
 
-  it('generates S/M/L via Cloudinary transforms for Cloudinary URLs', () => {
-    const sizes = buildAvatarSizes(
-      null,
-      'https://res.cloudinary.com/demo/image/upload/v1/sample.jpg'
-    );
+  it('generates S/M/L via Next.js image optimization for any URL', () => {
+    const sizes = buildAvatarSizes(null, 'https://img.clerk.com/avatar.jpg');
 
     expect(sizes).toHaveLength(4);
     expect(sizes[0].key).toBe('small');
-    expect(sizes[0].url).toContain('w_150,h_150,c_fill');
-    expect(sizes[0].url).not.toContain('/_next/image');
+    expect(sizes[0].url).toContain('/_next/image?');
+    expect(sizes[0].url).toContain('w=150');
 
     expect(sizes[1].key).toBe('medium');
-    expect(sizes[1].url).toContain('w_400,h_400,c_fill');
+    expect(sizes[1].url).toContain('w=400');
 
     expect(sizes[2].key).toBe('large');
-    expect(sizes[2].url).toContain('w_800,h_800,c_fill');
+    expect(sizes[2].url).toContain('w=800');
 
     expect(sizes[3].key).toBe('original');
   });

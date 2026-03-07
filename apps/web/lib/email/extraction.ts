@@ -68,7 +68,6 @@ const NON_PERSONAL_DOMAINS = [
   'bio.link',
   'beacons.ai',
   // Image/asset hosts
-  'cloudinary.com',
   'imgix.net',
   'vercel-storage.com',
 ];

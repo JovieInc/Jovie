@@ -64,7 +64,7 @@ describe('@critical GET /api/health/comprehensive', () => {
       hasDatabase: false,
       hasClerk: false,
       hasStripe: false,
-      hasCloudinary: false,
+      hasVercelBlob: false,
     });
   });
 

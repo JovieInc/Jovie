@@ -13,7 +13,7 @@ vi.mock('@/lib/env-server', () => ({
     hasDatabase: false,
     hasClerk: false,
     hasStripe: false,
-    hasCloudinary: false,
+    hasVercelBlob: false,
   })),
 }));
 vi.mock('@/lib/db', () => ({ validateDbConnection: vi.fn() }));

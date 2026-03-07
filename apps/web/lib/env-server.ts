@@ -190,11 +190,7 @@ export function getEnvironmentInfo() {
     hasStripe: !!(
       env.STRIPE_SECRET_KEY && publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     ),
-    hasCloudinary: !!(
-      env.CLOUDINARY_API_KEY &&
-      env.CLOUDINARY_API_SECRET &&
-      publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
-    ),
+    hasVercelBlob: !!env.BLOB_READ_WRITE_TOKEN,
   };
 }
 

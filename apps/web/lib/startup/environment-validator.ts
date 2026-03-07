@@ -34,7 +34,7 @@ function logEnvironmentInfo() {
       database: envInfo.hasDatabase,
       auth: envInfo.hasClerk,
       payments: envInfo.hasStripe,
-      images: envInfo.hasCloudinary,
+      images: envInfo.hasVercelBlob,
     },
   });
   return envInfo;

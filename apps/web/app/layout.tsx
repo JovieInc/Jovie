@@ -193,13 +193,6 @@ export default async function RootLayout({
         href='https://img.clerk.com'
         crossOrigin='anonymous'
       />
-      {/* Cloudinary - media assets */}
-      <link rel='dns-prefetch' href='https://res.cloudinary.com' />
-      <link
-        rel='preconnect'
-        href='https://res.cloudinary.com'
-        crossOrigin='anonymous'
-      />
       {/* Clerk Auth API */}
       <link
         rel='preconnect'

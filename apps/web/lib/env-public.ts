@@ -36,9 +36,6 @@ export const publicEnv = {
   get NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY() {
     return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || undefined;
   },
-  get NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME() {
-    return process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || undefined;
-  },
   // Feature flags
   get NEXT_PUBLIC_FEATURE_TIPS() {
     return process.env.NEXT_PUBLIC_FEATURE_TIPS || undefined;

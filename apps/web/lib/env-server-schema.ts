@@ -28,12 +28,6 @@ export const ServerEnvSchema = z.object({
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
 
-  // Cloudinary configuration
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
-  CLOUDINARY_UPLOAD_FOLDER: z.string().optional(),
-  CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
-
   // Email / notifications
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
@@ -175,10 +169,6 @@ export const ENV_KEYS = [
   'VERCEL_ENV',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-  'CLOUDINARY_UPLOAD_FOLDER',
-  'CLOUDINARY_UPLOAD_PRESET',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',

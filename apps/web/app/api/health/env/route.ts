@@ -127,7 +127,7 @@ export async function GET(request: Request) {
           database: envInfo.hasDatabase,
           auth: envInfo.hasClerk,
           payments: envInfo.hasStripe,
-          images: envInfo.hasCloudinary,
+          images: envInfo.hasVercelBlob,
         },
       },
     };
