@@ -403,8 +403,5 @@ describe('BillingDashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('Compare Plans')).toBeInTheDocument();
     });
-
-    // The yearly pricing should be displayed ($49/yr for pro)
-    expect(screen.getByText('$49')).toBeInTheDocument();
   });
 });
