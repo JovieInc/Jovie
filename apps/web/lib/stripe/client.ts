@@ -133,7 +133,9 @@ export async function getOrCreateCustomer(
  *
  * @param userId - The user's Clerk ID
  */
-export async function invalidateStripeCustomerCache(userId: string): Promise<void> {
+export async function invalidateStripeCustomerCache(
+  userId: string
+): Promise<void> {
   await invalidateCache(`stripe:customer:${userId}`);
 }
 

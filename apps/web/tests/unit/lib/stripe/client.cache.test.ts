@@ -1,8 +1,9 @@
 /**
  * Stripe Client Cache Tests - Cache Behavior & Performance
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import type Stripe from 'stripe';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock Stripe customer data
 const createMockCustomer = (
@@ -85,13 +86,13 @@ vi.mock('stripe', () => {
   };
 });
 
+import { cacheQuery, invalidateCache } from '@/lib/db/cache';
+import { captureError } from '@/lib/error-tracking';
 import {
   getOrCreateCustomer,
   invalidateStripeCustomerCache,
   stripe,
 } from '@/lib/stripe/client';
-import { cacheQuery, invalidateCache } from '@/lib/db/cache';
-import { captureError } from '@/lib/error-tracking';
 
 // Get mocked functions
 const mockedCacheQuery = vi.mocked(cacheQuery);
@@ -417,7 +418,11 @@ describe('Stripe Client - Cache Behavior', () => {
 
       mockStripeCustomers.search.mockResolvedValueOnce({
         data: [
-          createMockCustomer('cus_consistent', userId, 'consistent@example.com'),
+          createMockCustomer(
+            'cus_consistent',
+            userId,
+            'consistent@example.com'
+          ),
         ],
         has_more: false,
         object: 'search_result',
@@ -529,7 +534,11 @@ describe('Stripe Client - Cache Behavior', () => {
 
       mockStripeCustomers.search.mockResolvedValueOnce({
         data: [
-          createMockCustomer('cus_redis', 'clerk_user_redis', 'redis@example.com'),
+          createMockCustomer(
+            'cus_redis',
+            'clerk_user_redis',
+            'redis@example.com'
+          ),
         ],
         has_more: false,
         object: 'search_result',
@@ -540,7 +549,7 @@ describe('Stripe Client - Cache Behavior', () => {
 
       // Verify cache options don't disable Redis
       const cacheOptions = mockedCacheQuery.mock.calls[0][2];
-      expect(cacheOptions.useRedis).not.toBe(false);
+      expect(cacheOptions?.useRedis).not.toBe(false);
     });
 
     it('caches full Stripe.Customer object', async () => {
