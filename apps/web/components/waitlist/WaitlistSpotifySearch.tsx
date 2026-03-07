@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
@@ -319,7 +320,7 @@ export function WaitlistSpotifySearch({
           }
         />
         {state === 'loading' && (
-          <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+          <LoadingSpinner size='sm' tone='muted' label='Searching' />
         )}
       </div>
 

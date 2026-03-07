@@ -4,6 +4,7 @@ import { Input } from '@jovie/ui';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -108,7 +109,7 @@ export function UniversalLinkInputArtistSearchMode({
 
         <div className='absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2'>
           {state === 'loading' && (
-            <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+            <LoadingSpinner size='sm' tone='muted' label='Searching' />
           )}
           <button
             type='button'
