@@ -27,6 +27,7 @@ interface UseReleaseHeaderPartsProps {
   readonly onRefresh?: () => void;
   readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
+  readonly onClose?: () => void;
 }
 
 /**
@@ -40,6 +41,7 @@ export function useReleaseHeaderParts({
   onRefresh,
   isRefreshing = false,
   onCopySmartLink,
+  onClose,
 }: UseReleaseHeaderPartsProps): UseReleaseHeaderResult {
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
@@ -152,10 +154,11 @@ export function useReleaseHeaderParts({
   );
 
   const actions =
-    overflowActions.length > 0 ? (
+    overflowActions.length > 0 || onClose ? (
       <DrawerHeaderActions
         primaryActions={[]}
         overflowActions={overflowActions}
+        onClose={onClose}
       />
     ) : undefined;
 

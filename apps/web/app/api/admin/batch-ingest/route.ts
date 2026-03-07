@@ -63,6 +63,16 @@ async function ingestSpotifyArtist(
     platformId: 'spotify',
     platformName: 'Spotify',
     spotifyArtistName: artist.name,
+    spotifyData: {
+      name: artist.name,
+      spotifyId: artist.spotifyId,
+      imageUrl: artist.imageUrl,
+      genres: artist.genres,
+      followerCount: artist.followerCount,
+      popularity: artist.popularity,
+      spotifyUrl: artist.externalUrls?.spotify ?? null,
+      bio: artist.bio,
+    },
   };
 
   const ingestResponse = await withSystemIngestionSession(async tx => {

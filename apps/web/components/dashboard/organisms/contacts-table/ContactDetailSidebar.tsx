@@ -215,6 +215,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       customLabel: contact?.customLabel,
       email: contact?.email,
       onDelete,
+      onClose: handleClose,
     });
 
   const hasContact = Boolean(contact);

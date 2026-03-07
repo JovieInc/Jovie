@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
+import { asc, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
 
@@ -28,6 +29,7 @@ export interface AdminUserRow {
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   plan: AdminUserPlan;
+  profileUsername: string | null;
 }
 
 export interface GetAdminUsersParams {
@@ -119,8 +121,10 @@ export async function getAdminUsers(
           isPro: users.isPro,
           stripeCustomerId: users.stripeCustomerId,
           stripeSubscriptionId: users.stripeSubscriptionId,
+          profileUsername: creatorProfiles.username,
         })
         .from(users)
+        .leftJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
         .where(whereClause)
         .orderBy(orderByClause)
         .limit(pageSize)
@@ -143,6 +147,7 @@ export async function getAdminUsers(
           isPro: row.isPro ?? false,
           stripeSubscriptionId: row.stripeSubscriptionId ?? null,
         }),
+        profileUsername: row.profileUsername ?? null,
       })),
       page,
       pageSize,

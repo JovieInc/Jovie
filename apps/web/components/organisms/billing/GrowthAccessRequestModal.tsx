@@ -60,7 +60,7 @@ export function GrowthAccessRequestModal({
     <Dialog open={open} onClose={() => handleClose(false)} size='md'>
       {submitted ? (
         <>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30'>
             <CheckCircle className='h-6 w-6 text-emerald-600 dark:text-emerald-400' />
           </div>
           <DialogTitle className='text-center'>Request received</DialogTitle>
@@ -80,7 +80,7 @@ export function GrowthAccessRequestModal({
         </>
       ) : (
         <>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/30'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30'>
             <Sparkles className='h-6 w-6 text-purple-600 dark:text-purple-400' />
           </div>
           <DialogTitle className='text-center'>

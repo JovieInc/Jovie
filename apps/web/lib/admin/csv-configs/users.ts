@@ -60,6 +60,11 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
     accessor: 'deletedAt',
     // Date formatting is handled by the CSV utility
   },
+  {
+    header: 'Jovie Username',
+    accessor: 'profileUsername',
+    formatter: formatOptionalString,
+  },
 ];
 
 /**

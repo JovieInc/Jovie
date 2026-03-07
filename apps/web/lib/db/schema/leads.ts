@@ -4,13 +4,19 @@ import {
   integer,
   jsonb,
   pgTable,
+  real,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { leadDiscoverySourceEnum, leadStatusEnum } from './enums';
+import {
+  leadDiscoverySourceEnum,
+  leadOutreachRouteEnum,
+  leadOutreachStatusEnum,
+  leadStatusEnum,
+} from './enums';
 import { creatorProfiles } from './profiles';
 
 // Lead discovery pipeline — discovered Linktree profiles
@@ -61,6 +67,33 @@ export const leads = pgTable(
       { onDelete: 'set null' }
     ),
 
+    // Enrichment data
+    spotifyPopularity: integer('spotify_popularity'),
+    spotifyFollowers: integer('spotify_followers'),
+    releaseCount: integer('release_count'),
+    latestReleaseDate: timestamp('latest_release_date'),
+    priorityScore: real('priority_score'),
+
+    // Email validation
+    emailInvalid: boolean('email_invalid').default(false).notNull(),
+    emailSuspicious: boolean('email_suspicious').default(false).notNull(),
+    emailInvalidReason: text('email_invalid_reason'),
+
+    // Representation detection
+    hasRepresentation: boolean('has_representation').default(false).notNull(),
+    representationSignal: text('representation_signal'),
+
+    // Outreach pipeline
+    outreachRoute: leadOutreachRouteEnum('outreach_route'),
+    outreachStatus: leadOutreachStatusEnum('outreach_status'),
+    claimToken: text('claim_token'),
+    claimTokenHash: text('claim_token_hash'),
+    claimTokenExpiresAt: timestamp('claim_token_expires_at'),
+    instantlyLeadId: text('instantly_lead_id'),
+    outreachQueuedAt: timestamp('outreach_queued_at'),
+    dmSentAt: timestamp('dm_sent_at'),
+    dmCopy: text('dm_copy'),
+
     scrapedAt: timestamp('scraped_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -75,6 +108,13 @@ export const leads = pgTable(
     ),
     creatorProfileIdIndex: index('idx_leads_creator_profile_id').on(
       table.creatorProfileId
+    ),
+    outreachRoutePriorityIndex: index('idx_leads_outreach_route_priority').on(
+      table.outreachRoute,
+      table.priorityScore
+    ),
+    outreachStatusIndex: index('idx_leads_outreach_status').on(
+      table.outreachStatus
     ),
   })
 );

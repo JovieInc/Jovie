@@ -154,7 +154,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative w-full h-dvh overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
+        className='relative w-full h-dvh overflow-hidden bg-base text-primary-token font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
