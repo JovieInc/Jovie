@@ -6,6 +6,7 @@
 
 import type { SQLWrapper } from 'drizzle-orm';
 import { and, count, desc, eq, gte, ilike, inArray } from 'drizzle-orm';
+import { unstable_cache } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
 import { db } from '@/lib/db';
@@ -85,48 +86,71 @@ function buildInviteConditions({
   return conditions.filter((clause): clause is SQLWrapper => Boolean(clause));
 }
 
+const getCachedInviteCount = unstable_cache(
+  async (
+    status: string | undefined,
+    search: string | undefined,
+    dateFilterISO: string
+  ) => {
+    const conditions = buildInviteConditions({
+      status,
+      search,
+      limit: 0,
+      offset: 0,
+      dateFilter: new Date(dateFilterISO),
+    });
+    const [countResult] = await db
+      .select({ count: count() })
+      .from(creatorClaimInvites)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
+      )
+      .where(and(...conditions));
+    return Number(countResult?.count ?? 0);
+  },
+  ['admin-campaign-invites-count'],
+  { revalidate: 60 }
+);
+
 async function fetchInvitesWithProfiles(
   conditions: SQLWrapper[],
+  query: QueryParams,
   limit: number,
   offset: number
 ) {
-  const invites = await db
-    .select({
-      id: creatorClaimInvites.id,
-      email: creatorClaimInvites.email,
-      status: creatorClaimInvites.status,
-      createdAt: creatorClaimInvites.createdAt,
-      sentAt: creatorClaimInvites.sentAt,
-      profileId: creatorProfiles.id,
-      username: creatorProfiles.username,
-      displayName: creatorProfiles.displayName,
-      avatarUrl: creatorProfiles.avatarUrl,
-      fitScore: creatorProfiles.fitScore,
-      isClaimed: creatorProfiles.isClaimed,
-    })
-    .from(creatorClaimInvites)
-    .innerJoin(
-      creatorProfiles,
-      eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
-    )
-    .where(and(...conditions))
-    .orderBy(desc(creatorClaimInvites.createdAt))
-    .limit(limit)
-    .offset(offset);
+  const [invites, total] = await Promise.all([
+    db
+      .select({
+        id: creatorClaimInvites.id,
+        email: creatorClaimInvites.email,
+        status: creatorClaimInvites.status,
+        createdAt: creatorClaimInvites.createdAt,
+        sentAt: creatorClaimInvites.sentAt,
+        profileId: creatorProfiles.id,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        avatarUrl: creatorProfiles.avatarUrl,
+        fitScore: creatorProfiles.fitScore,
+        isClaimed: creatorProfiles.isClaimed,
+      })
+      .from(creatorClaimInvites)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
+      )
+      .where(and(...conditions))
+      .orderBy(desc(creatorClaimInvites.createdAt))
+      .limit(limit)
+      .offset(offset),
+    getCachedInviteCount(
+      query.status,
+      query.search,
+      query.dateFilter.toISOString()
+    ),
+  ]);
 
-  const [countResult] = await db
-    .select({ count: count() })
-    .from(creatorClaimInvites)
-    .innerJoin(
-      creatorProfiles,
-      eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
-    )
-    .where(and(...conditions));
-
-  return {
-    invites,
-    total: Number(countResult?.count ?? 0),
-  };
+  return { invites, total };
 }
 
 async function fetchEngagementData(inviteIds: string[]) {
@@ -243,6 +267,7 @@ export async function GET(request: NextRequest) {
     const conditions = buildInviteConditions(query);
     const { invites, total } = await fetchInvitesWithProfiles(
       conditions,
+      query,
       query.limit,
       query.offset
     );
