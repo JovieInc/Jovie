@@ -5,7 +5,7 @@
  * - generateProfileStructuredData (JSON-LD for SEO)
  * - fetchProfileAndLinks (data fetching with error handling)
  * - generateMetadata (SEO metadata generation)
- * - NoCacheError (cache bypass for non-ok results)
+ * - getCachedProfileAndLinks (only caches successful results)
  *
  * These are pure logic tests that don't render React components.
  */
@@ -507,24 +507,14 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('cache strategy', () => {
-    function shouldStoreInNegativeCache(status: 'ok' | 'not_found' | 'error') {
-      return status === 'not_found';
-    }
-
-    function shouldStoreInLongLivedCache(status: 'ok' | 'not_found' | 'error') {
+    function shouldCache(status: 'ok' | 'not_found' | 'error') {
       return status === 'ok';
     }
 
-    it('stores only not_found responses in short-lived negative cache', () => {
-      expect(shouldStoreInNegativeCache('not_found')).toBe(true);
-      expect(shouldStoreInNegativeCache('ok')).toBe(false);
-      expect(shouldStoreInNegativeCache('error')).toBe(false);
-    });
-
-    it('stores only successful payloads in long-lived cache', () => {
-      expect(shouldStoreInLongLivedCache('ok')).toBe(true);
-      expect(shouldStoreInLongLivedCache('not_found')).toBe(false);
-      expect(shouldStoreInLongLivedCache('error')).toBe(false);
+    it('caches only successful results, not_found and error are always fresh', () => {
+      expect(shouldCache('ok')).toBe(true);
+      expect(shouldCache('not_found')).toBe(false);
+      expect(shouldCache('error')).toBe(false);
     });
   });
 });
