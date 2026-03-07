@@ -16,7 +16,7 @@ import {
 } from './connection';
 import { isActiveConnectionsRow, isTableExistsRow } from './guards';
 import { logDbError, logDbInfo } from './logging';
-import { DB_CONFIG, withRetry } from './retry';
+import { DB_CONFIG, isRetryableError, withRetry } from './retry';
 import type {
   ConnectionValidationResult,
   HealthCheckResult,
@@ -34,10 +34,17 @@ let lastTableExistenceDatabaseUrl: string | null = null;
 // 60 seconds TTL for table existence cache
 const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
 
+// Timeout for tableExists queries (prevents hanging on cold starts / connection issues)
+const TABLE_EXISTS_TIMEOUT_MS = 5_000;
+
 /**
  * Check if a table exists in the database.
  * Uses a TTL-based cache for both positive and negative results to avoid
  * repeated database round-trips on cold start.
+ *
+ * Includes retry logic for transient connection errors (e.g., "Connection
+ * terminated unexpectedly") and a 5s timeout to prevent hanging on public
+ * profile routes. See JOV-1218.
  */
 export async function doesTableExist(tableName: string): Promise<boolean> {
   // Clear cache if database URL changes
@@ -59,15 +66,35 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
   try {
     const db = getDb();
 
-    const result = await db.execute(
-      drizzleSql<TableExistsRow>`
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.tables
-          WHERE table_schema = 'public'
-            AND table_name = ${tableName}
-        ) AS table_exists
-      `
+    // Wrap in withRetry + timeout to handle transient connection errors
+    // that previously caused "Connection terminated unexpectedly" on public
+    // profile routes (JOV-1218).
+    const result = await withRetry(
+      () =>
+        Promise.race([
+          db.execute(
+            drizzleSql<TableExistsRow>`
+              SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = ${tableName}
+              ) AS table_exists
+            `
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `tableExists timeout after ${TABLE_EXISTS_TIMEOUT_MS}ms`
+                  )
+                ),
+              TABLE_EXISTS_TIMEOUT_MS
+            )
+          ),
+        ]),
+      `tableExists(${tableName})`
     );
 
     // result.rows is TableExistsRow[] - rows is always defined, first element may be undefined
@@ -80,6 +107,14 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     return exists;
   } catch (error) {
     logDbError('tableExists', error, { tableName });
+    // For retryable errors, don't cache the negative result — the table
+    // likely exists but the connection failed transiently.
+    if (!isRetryableError(error)) {
+      tableExistenceCache.set(tableName, {
+        exists: false,
+        timestamp: Date.now(),
+      });
+    }
     return false;
   }
 }
