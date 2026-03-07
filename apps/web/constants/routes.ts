@@ -58,6 +58,7 @@ export const APP_ROUTES = {
   ADMIN_OUTREACH_EMAIL: '/app/admin/outreach/email',
   ADMIN_OUTREACH_DM: '/app/admin/outreach/dm',
   ADMIN_OUTREACH_REVIEW: '/app/admin/outreach/review',
+  ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing

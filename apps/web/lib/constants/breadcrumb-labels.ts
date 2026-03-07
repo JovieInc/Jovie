@@ -29,6 +29,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   users: 'Users',
   activity: 'Activity',
   campaigns: 'Campaigns',
+  ingest: 'Ingest',
 
   // Root routes
   app: 'Dashboard',
