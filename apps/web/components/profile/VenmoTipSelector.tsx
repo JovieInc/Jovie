@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback } from 'react';
+import { toast } from 'sonner';
 import { TipSelector } from '@/components/molecules/TipSelector';
+import { track } from '@/lib/analytics';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 
@@ -34,7 +36,14 @@ export default function VenmoTipSelector({
 }: VenmoTipSelectorProps) {
   const handleAmountSelected = useCallback(
     (amount: number) => {
-      if (!isAllowedVenmoUrl(venmoLink)) return;
+      if (!isAllowedVenmoUrl(venmoLink)) {
+        track('tip_handoff_failed', {
+          reason: 'invalid_venmo_url',
+          venmoLink,
+        });
+        toast.error('Unable to open Venmo. The payment link is not valid.');
+        return;
+      }
 
       const sep = venmoLink.includes('?') ? '&' : '?';
       const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
@@ -42,7 +51,17 @@ export default function VenmoTipSelector({
       )}`;
 
       onContinue?.(url);
-      globalThis.open(url, '_blank', 'noopener,noreferrer');
+      const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        track('tip_handoff_failed', {
+          reason: 'popup_blocked',
+          venmoLink,
+          amount,
+        });
+        toast.error(
+          'Venmo could not be opened. Please allow pop-ups and try again.'
+        );
+      }
     },
     [venmoLink, venmoUsername, onContinue]
   );

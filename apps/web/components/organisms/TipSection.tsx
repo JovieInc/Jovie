@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
+import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { cn } from '@/lib/utils';
 
@@ -122,7 +123,15 @@ export function TipSection({
 
   const handleVenmoPayment = (amount: number) => {
     if (!venmoLink || !onVenmoPayment) return;
-    if (!isAllowedVenmoUrl(venmoLink)) return;
+    if (!isAllowedVenmoUrl(venmoLink)) {
+      track('tip_handoff_failed', {
+        reason: 'invalid_venmo_url',
+        handle,
+        venmoLink,
+      });
+      toast.error('Unable to open Venmo. The payment link is not valid.');
+      return;
+    }
 
     const sep = venmoLink.includes('?') ? '&' : '?';
     const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
@@ -140,7 +149,17 @@ export function TipSection({
     }
 
     onVenmoPayment(url);
-    globalThis.open(url, '_blank', 'noopener,noreferrer');
+    const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
+    if (!win) {
+      track('tip_handoff_failed', {
+        reason: 'popup_blocked',
+        handle,
+        amount,
+      });
+      toast.error(
+        'Venmo could not be opened. Please allow pop-ups and try again.'
+      );
+    }
   };
 
   const goBack = () => setPaymentMethod(null);
