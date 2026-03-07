@@ -630,7 +630,9 @@ export function UnifiedTable<TData>({
     >
       <table className={tableClassName} style={{ minWidth }}>
         <caption className='sr-only'>Data table</caption>
-        <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+        {!hideHeader && (
+          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+        )}
         <VirtualizedTableBody
           rows={rows}
           shouldVirtualize={shouldVirtualize}
