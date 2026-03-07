@@ -154,7 +154,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative w-full h-dvh overflow-hidden bg-base text-primary-token font-medium tracking-tight'
+        className='relative w-full min-h-dvh bg-base text-primary-token font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
@@ -181,8 +181,8 @@ export function ProfileShell({
             {renderNotificationControls()}
           </div>
 
-          <div className='relative z-10 flex h-full flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
-            <div className='flex flex-1 min-h-0 flex-col items-center justify-center px-4'>
+          <div className='relative z-10 flex min-h-dvh flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
+            <div className='flex flex-1 flex-col items-center justify-center px-4'>
               <div
                 className={`${maxWidthClass} space-y-4 sm:space-y-5 md:space-y-6`}
               >
