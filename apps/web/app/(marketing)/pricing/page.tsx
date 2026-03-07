@@ -90,7 +90,6 @@ interface PricingTierProps {
   readonly billingLabel: string;
   readonly price: string;
   readonly priceSuffix?: string;
-  readonly yearlyPrice?: string;
   readonly buttonLabel: string;
   readonly buttonHref: string;
   readonly buttonVariant: 'primary' | 'secondary';
@@ -104,7 +103,6 @@ function PricingTier({
   billingLabel,
   price,
   priceSuffix,
-  yearlyPrice,
   buttonLabel,
   buttonHref,
   buttonVariant,
@@ -179,18 +177,6 @@ function PricingTier({
               {priceSuffix}
             </span>
           )}
-        </div>
-
-        {/* Yearly price - always render container for consistent spacing */}
-        <div
-          className='mt-2'
-          style={{
-            fontSize: 'var(--linear-label-size)',
-            color: 'var(--linear-text-tertiary)',
-            minHeight: '20px',
-          }}
-        >
-          {yearlyPrice || '\u00A0'}
         </div>
       </div>
 
@@ -314,7 +300,6 @@ export default function PricingPage() {
                 billingLabel='Billed monthly'
                 price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
                 priceSuffix='/month'
-                yearlyPrice={`or $${ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly!}/year (save $${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly!})`}
                 buttonLabel='Get started'
                 buttonHref='/signup?plan=pro'
                 buttonVariant='primary'
@@ -330,7 +315,6 @@ export default function PricingPage() {
                     billingLabel='Billed monthly'
                     price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
                     priceSuffix='/month'
-                    yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly!}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly!})`}
                     buttonLabel='Request Early Access'
                     buttonHref='/signup?plan=growth'
                     buttonVariant='secondary'

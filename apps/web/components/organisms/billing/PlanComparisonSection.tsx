@@ -1,16 +1,8 @@
 'use client';
 
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  SegmentControl,
-  Separator,
-} from '@jovie/ui';
+import { Badge, Button, Card, CardContent, Separator } from '@jovie/ui';
 import { Check, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
-import { parseAsStringLiteral, useQueryState } from 'nuqs';
 import { useState } from 'react';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import type { PricingOption } from '@/lib/queries';
@@ -101,10 +93,7 @@ export function PlanComparisonSection({
   readonly currentPlan: string | null;
   readonly defaultPriceId: string | undefined;
 }) {
-  const [billingInterval, setBillingInterval] = useQueryState(
-    'interval',
-    parseAsStringLiteral(['month', 'year'] as const).withDefault('month')
-  );
+  const billingInterval = 'month' as const;
   const [growthModalOpen, setGrowthModalOpen] = useState(false);
   const activePlan = currentPlan ?? 'free';
 
@@ -124,26 +113,6 @@ export function PlanComparisonSection({
             Choose the plan that fits your needs
           </p>
         </div>
-        <SegmentControl
-          value={billingInterval}
-          onValueChange={setBillingInterval}
-          options={[
-            { value: 'month' as const, label: 'Monthly' },
-            {
-              value: 'year' as const,
-              label: (
-                <span className='flex items-center gap-1.5'>
-                  Yearly
-                  <Badge variant='success' size='sm'>
-                    Save 17%
-                  </Badge>
-                </span>
-              ),
-            },
-          ]}
-          aria-label='Billing interval'
-          size='md'
-        />
       </div>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
