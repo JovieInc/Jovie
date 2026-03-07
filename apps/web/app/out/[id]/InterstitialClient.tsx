@@ -10,12 +10,14 @@ import { useLinkVerificationMutation } from '@/lib/queries';
 
 interface InterstitialClientProps {
   readonly shortId: string;
+  readonly challengeToken: string;
   readonly titleAlias: string;
   readonly domain: string;
 }
 
 export function InterstitialClient({
   shortId,
+  challengeToken,
   titleAlias,
   domain,
 }: Readonly<InterstitialClientProps>) {
@@ -42,10 +44,10 @@ export function InterstitialClient({
 
     verifyLink({
       shortId,
-      verified: true,
+      challengeToken,
       timestamp: Date.now(),
     });
-  }, [shortId, isVerifying, verifyLink]);
+  }, [shortId, challengeToken, isVerifying, verifyLink]);
 
   if (isVerified) {
     return (
