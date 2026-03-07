@@ -134,7 +134,7 @@ export function ReleaseLandingPage({
               sizes={sizes}
               allowDownloads={allowDownloads}
             >
-              <div className='bg-surface-1/30 ring-border relative aspect-square w-full overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'>
+              <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
                 {release.artworkUrl ? (
                   <Image
                     src={release.artworkUrl}
@@ -197,7 +197,7 @@ export function ReleaseLandingPage({
                     target='_blank'
                     rel='noopener noreferrer'
                     onClick={() => handleProviderClick(provider.key)}
-                    className='bg-surface-1/70 ring-border group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:bg-surface-2/80'
+                    className='group flex w-full items-center gap-3.5 rounded-xl bg-surface-1/70 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:bg-white/[0.06]'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties
                     }
@@ -206,7 +206,7 @@ export function ReleaseLandingPage({
                       <svg
                         viewBox='0 0 24 24'
                         fill='currentColor'
-                        className='text-muted-foreground h-5 w-5 shrink-0 transition-colors duration-150 group-hover:text-[var(--brand-hover)]'
+                        className='h-5 w-5 shrink-0 text-muted-foreground transition-colors duration-100 group-hover:text-[var(--brand-hover)]'
                         aria-hidden='true'
                       >
                         <path d={logoConfig.iconPath} />
@@ -217,7 +217,7 @@ export function ReleaseLandingPage({
                     </span>
                     <Icon
                       name='ChevronRight'
-                      className='text-muted-foreground/70 h-4 w-4 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-foreground/80'
+                      className='h-4 w-4 text-muted-foreground/70 transition-colors duration-100 group-hover:text-foreground/80'
                       aria-hidden='true'
                     />
                   </a>
@@ -230,7 +230,7 @@ export function ReleaseLandingPage({
               <div className='pt-1'>
                 <Link
                   href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-                  className='ring-border group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/20 hover:to-violet-500/20'
+                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
                 >
                   <Icon
                     name='Sparkles'
@@ -246,7 +246,7 @@ export function ReleaseLandingPage({
 
             {/* Empty state if no providers */}
             {clickableProviders.length === 0 && (
-              <div className='bg-surface-1/40 ring-border rounded-xl p-5 text-center ring-1 ring-inset'>
+              <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
                 <Icon
                   name='Music'
                   className='text-muted-foreground mx-auto h-8 w-8'

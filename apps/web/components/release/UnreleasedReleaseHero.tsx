@@ -74,7 +74,7 @@ export function UnreleasedReleaseHero({
 
           <div className='w-full max-w-[17rem]'>
             {/* Release Artwork */}
-            <div className='bg-surface-1/30 ring-border relative aspect-square w-full overflow-hidden rounded-lg shadow-2xl shadow-black/40 ring-1'>
+            <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
               <ImageWithFallback
                 src={release.artworkUrl}
                 alt={`${release.title} artwork`}
@@ -100,7 +100,7 @@ export function UnreleasedReleaseHero({
             </div>
 
             {/* Countdown Timer */}
-            <div className='bg-surface-1/50 ring-border mt-5 rounded-xl p-4 ring-1 ring-inset'>
+            <div className='mt-5 rounded-xl bg-surface-1/50 p-4 ring-1 ring-inset ring-white/[0.05]'>
               <ReleaseCountdown releaseDate={release.releaseDate} />
             </div>
 

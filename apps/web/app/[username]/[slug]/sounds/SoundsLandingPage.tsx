@@ -118,7 +118,7 @@ export function SoundsLandingPage({
                     href={appendUTMParamsToUrl(provider.url, utmParams)}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='group flex w-full items-center gap-3.5 rounded-xl bg-gradient-to-r from-pink-500/[0.08] to-violet-500/[0.08] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:from-pink-500/[0.14] hover:to-violet-500/[0.14] hover:ring-white/[0.16]'
+                    className='group flex w-full items-center gap-3.5 rounded-xl bg-gradient-to-r from-pink-500/[0.08] to-violet-500/[0.08] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/[0.14] hover:to-violet-500/[0.14]'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties
                     }
@@ -138,7 +138,7 @@ export function SoundsLandingPage({
                     </span>
                     <Icon
                       name='ExternalLink'
-                      className='h-4 w-4 text-white/25 transition-all duration-150 group-hover:text-white/40'
+                      className='h-4 w-4 text-white/25 transition-colors duration-100 group-hover:text-white/40'
                       aria-hidden='true'
                     />
                   </a>
