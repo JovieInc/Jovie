@@ -35,10 +35,13 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderCreatedDateCell,
+  renderLifecycleCell,
   renderNameCell,
   renderPlanCell,
   renderStatusCell,
+  renderSuppressionCell,
   renderUsernameCell,
+  renderWelcomeCell,
 } from './utils/column-renderers';
 
 const columnHelper = createColumnHelper<AdminUserRow>();
@@ -345,6 +348,30 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         header: 'Status',
         cell: renderStatusCell,
         size: 120,
+      }),
+
+      // Lifecycle column
+      columnHelper.display({
+        id: 'lifecycle',
+        header: 'Lifecycle',
+        cell: renderLifecycleCell,
+        size: 120,
+      }),
+
+      // Suppression column
+      columnHelper.display({
+        id: 'suppression',
+        header: 'Suppressed',
+        cell: renderSuppressionCell,
+        size: 130,
+      }),
+
+      // Welcome email column
+      columnHelper.display({
+        id: 'welcome',
+        header: 'Welcome',
+        cell: renderWelcomeCell,
+        size: 130,
       }),
 
       // Actions column - shows ellipsis menu with SAME items as right-click context menu
