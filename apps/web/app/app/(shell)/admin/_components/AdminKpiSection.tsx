@@ -1,49 +1,27 @@
 import { Skeleton } from '@jovie/ui';
-import { DefaultStatusBanner } from '@/components/admin/DefaultStatusBanner';
-import { KpiCards } from '@/components/admin/KpiCards';
-import { getAdminOverviewMetrics } from '@/lib/admin/overview';
+import { FunnelMetricsStrip } from '@/components/admin/FunnelMetricsStrip';
+import { getAdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
-const KPI_SKELETON_KEYS = Array.from({ length: 4 }, (_, i) => `kpi-${i + 1}`);
+const KPI_SKELETON_KEYS = Array.from({ length: 5 }, (_, i) => `kpi-${i + 1}`);
 
 export async function AdminKpiSection() {
-  const metrics = await getAdminOverviewMetrics();
+  const metrics = await getAdminFunnelMetrics();
 
   return (
-    <>
-      <DefaultStatusBanner
-        status={metrics.defaultStatus}
-        detail={metrics.defaultStatusDetail}
-        runwayMonths={metrics.runwayMonths}
-        mrrGrowth30dUsd={metrics.mrrGrowth30dUsd}
-        stripeAvailability={metrics.stripeAvailability}
-        mercuryAvailability={metrics.mercuryAvailability}
-      />
-
-      <section id='users' className='space-y-6' data-testid='admin-kpi-section'>
-        <KpiCards
-          mrrUsd={metrics.mrrUsd}
-          balanceUsd={metrics.balanceUsd}
-          burnRateUsd={metrics.burnRateUsd}
-          claimedCreators={metrics.claimedCreators}
-          stripeAvailability={metrics.stripeAvailability}
-          mercuryAvailability={metrics.mercuryAvailability}
-        />
-      </section>
-    </>
+    <section id='funnel' className='space-y-6' data-testid='admin-kpi-section'>
+      <FunnelMetricsStrip metrics={metrics} />
+    </section>
   );
 }
 
 export function AdminKpiSectionSkeleton() {
   return (
-    <>
-      <Skeleton className='h-16 rounded-xl' />
-      <section id='users' className='space-y-6'>
-        <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-          {KPI_SKELETON_KEYS.map(key => (
-            <Skeleton key={key} className='h-28 rounded-xl' />
-          ))}
-        </div>
-      </section>
-    </>
+    <section id='funnel' className='space-y-6'>
+      <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-5'>
+        {KPI_SKELETON_KEYS.map(key => (
+          <Skeleton key={key} className='h-28 rounded-xl' />
+        ))}
+      </div>
+    </section>
   );
 }
