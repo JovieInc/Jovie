@@ -1,4 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -140,13 +141,18 @@ function renderWithProviders(
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>
 ) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(ui, {
     wrapper: ({ children }) => (
-      <TooltipProvider>
-        <RightPanelProvider>
-          <AudiencePanelProvider>{children}</AudiencePanelProvider>
-        </RightPanelProvider>
-      </TooltipProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <RightPanelProvider>
+            <AudiencePanelProvider>{children}</AudiencePanelProvider>
+          </RightPanelProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
     ),
     ...options,
   });
