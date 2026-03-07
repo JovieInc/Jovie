@@ -4,6 +4,7 @@ import { TooltipShortcut } from '@jovie/ui';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { useSidebar } from '@/components/organisms/Sidebar';
 import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
+import { GLYPH_CMD } from '@/lib/keyboard-shortcuts';
 
 interface SidebarCollapseButtonProps {
   readonly className?: string;
@@ -15,7 +16,7 @@ export function SidebarCollapseButton({
   const { toggleSidebar, state } = useSidebar();
   const isCollapsed = state === 'closed';
   const label = isCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
-  const shortcut = `⌘/Ctrl ${SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}`;
+  const shortcut = `${GLYPH_CMD}/Ctrl ${SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}`;
 
   return (
     <TooltipShortcut label={label} shortcut={shortcut} side='right'>

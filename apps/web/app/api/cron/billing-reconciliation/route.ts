@@ -14,10 +14,8 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import type Stripe from 'stripe';
 import {
   BATCH_SIZE,
-  fetchAllSubscriptionsMap,
   fetchUserBatch,
   processSingleUser,
   type ReconciliationStats,
@@ -34,10 +32,6 @@ import { logger } from '@/lib/utils/logger';
 
 // Safety limit: process max 5000 users per run
 const MAX_BATCHES = 50;
-
-// Populated by reconcileUsersWithSubscriptions(), consumed by
-// reconcileProUsersWithoutSubscription() within the same request.
-let _customerSubscriptionsMap: Map<string, Stripe.Subscription[]> | null = null;
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
@@ -127,45 +121,16 @@ export async function GET(request: Request) {
 }
 
 /**
- * Build a secondary index from the subscriptions map keyed by customer ID.
- * Each customer may have multiple subscriptions.
- */
-function buildCustomerSubscriptionsMap(
-  subscriptionsMap: Map<string, Stripe.Subscription>
-): Map<string, Stripe.Subscription[]> {
-  const customerMap = new Map<string, Stripe.Subscription[]>();
-
-  for (const subscription of subscriptionsMap.values()) {
-    const customerId =
-      typeof subscription.customer === 'string'
-        ? subscription.customer
-        : subscription.customer.id;
-
-    const existing = customerMap.get(customerId);
-    if (existing) {
-      existing.push(subscription);
-    } else {
-      customerMap.set(customerId, [subscription]);
-    }
-  }
-
-  return customerMap;
-}
-
-/**
  * Reconcile users who have a subscription ID stored in DB
  * Uses cursor-based pagination to handle >100 users.
  *
- * A single bulk Stripe API call fetches all subscriptions up-front so that
- * individual user processing only requires an in-memory map lookup.
+ * Each user's subscription is looked up individually via Stripe's retrieve
+ * API rather than fetching the entire subscription corpus.
  */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
   errors: string[]
 ): Promise<void> {
-  // Fetch ALL subscriptions from Stripe once
-  const subscriptionsMap = await fetchAllSubscriptionsMap(stripe);
-
   let lastUserId: string | null = null;
   let batchCount = 0;
 
@@ -180,12 +145,7 @@ async function reconcileUsersWithSubscriptions(
       lastUserId = user.id;
 
       try {
-        const result = await processSingleUser(
-          db,
-          stripe,
-          user,
-          subscriptionsMap
-        );
+        const result = await processSingleUser(db, stripe, user);
         updateStatsFromResult(stats, errors, user.id, result);
       } catch (error) {
         stats.errors++;
@@ -203,18 +163,14 @@ async function reconcileUsersWithSubscriptions(
       usersChecked: stats.usersChecked,
     });
   }
-
-  // Build customer-keyed index and attach to module-level variable so that
-  // reconcileProUsersWithoutSubscription() can reuse the same data.
-  _customerSubscriptionsMap = buildCustomerSubscriptionsMap(subscriptionsMap);
 }
 
 /**
  * Reconcile users marked as Pro but without a subscription ID
  * This shouldn't happen normally but could due to bugs or manual edits.
  *
- * Uses the customer-keyed subscriptions map built during
- * reconcileUsersWithSubscriptions() to avoid per-user Stripe API calls.
+ * For each user with a Stripe customer ID, fetches their subscriptions
+ * directly from Stripe rather than scanning the full corpus.
  */
 async function reconcileProUsersWithoutSubscription(
   stats: ReconciliationStats,
@@ -234,17 +190,19 @@ async function reconcileProUsersWithoutSubscription(
     )
     .limit(50);
 
-  const customerMap = _customerSubscriptionsMap;
-
   for (const user of proUsersWithoutSub) {
     stats.usersChecked++;
 
     try {
       // If they have a customer ID, check for active subscriptions
       if (user.stripeCustomerId) {
-        // Look up subscriptions from the pre-fetched customer map
-        const customerSubs = customerMap?.get(user.stripeCustomerId);
-        const activeSubscription = customerSubs?.find(subscription =>
+        // Targeted lookup: fetch only this customer's subscriptions
+        const customerSubs = await stripe.subscriptions.list({
+          customer: user.stripeCustomerId,
+          status: 'all',
+          limit: 10,
+        });
+        const activeSubscription = customerSubs.data.find(subscription =>
           isActiveSubscription(subscription.status)
         );
 

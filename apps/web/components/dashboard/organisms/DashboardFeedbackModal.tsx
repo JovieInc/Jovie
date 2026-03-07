@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { GLYPH_CMD } from '@/lib/keyboard-shortcuts';
 
 interface DashboardFeedbackModalProps {
   readonly isOpen: boolean;
@@ -123,7 +124,7 @@ export function DashboardFeedbackModal({
             <FormField
               label='What should we improve next?'
               required
-              helpText='Press ⌘ + Enter to send instantly'
+              helpText={`Press ${GLYPH_CMD} + Enter to send instantly`}
             >
               <Textarea
                 value={feedback}

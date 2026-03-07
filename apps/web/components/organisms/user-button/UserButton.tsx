@@ -8,6 +8,7 @@ import { Badge } from '@/components/atoms/Badge';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
+import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
@@ -122,7 +123,7 @@ function buildDropdownItems({
       id: 'keyboard-shortcuts',
       label: 'Keyboard shortcuts',
       onClick: handleOpenShortcuts,
-      shortcut: '⌘ /',
+      shortcut: `${GLYPH_CMD} /`,
     });
   }
 
@@ -209,7 +210,7 @@ function buildDropdownItems({
       onClick: handleSignOut,
       disabled: loading.signOut,
       className: 'disabled:cursor-not-allowed disabled:opacity-60',
-      shortcut: '⌥ ⇧ Q',
+      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
     }
   );
 

@@ -4,6 +4,7 @@ import { Button, Kbd } from '@jovie/ui';
 import { PanelLeft } from 'lucide-react';
 import React from 'react';
 import { SIDEBAR_KEYBOARD_SHORTCUT } from '@/hooks/useSidebarKeyboardShortcut';
+import { GLYPH_CMD } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import { useSidebar } from './context';
 
@@ -49,7 +50,7 @@ type SidebarShortcutHintProps = Readonly<{
 export function SidebarShortcutHint({ className }: SidebarShortcutHintProps) {
   return (
     <Kbd variant='tooltip' className={className}>
-      ⌘/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}
+      {GLYPH_CMD}/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}
     </Kbd>
   );
 }

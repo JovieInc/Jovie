@@ -18,6 +18,7 @@ import {
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import {
   trimLeadingSlashes,
   trimTrailingSlashes,
@@ -84,7 +85,7 @@ function SetupTaskItem({
           href={actionHref}
           className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
         >
-          {actionLabel} →
+          {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
       )}
     </li>
