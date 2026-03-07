@@ -8,13 +8,14 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import { FetchError } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
 import {
   useAddMessagesMutation,
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
-import { captureException } from '@/lib/sentry/client-lite';
+import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
 
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH } from '../types';
@@ -376,18 +377,33 @@ export function useJovieChat({
           }
         },
         onError: err => {
-          captureException(err, {
-            tags: {
-              feature: 'ai-chat',
-              source: 'useJovieChat',
-              errorType: 'message-persistence',
-            },
-            extra: {
-              profileId: profileId ?? null,
-              conversationId: activeConversationId,
-              messageCount: messagesToPersist.length,
-            },
-          });
+          const isTransient = err instanceof FetchError && err.isRetryable();
+
+          if (isTransient) {
+            addBreadcrumb({
+              category: 'ai-chat',
+              message: `Message persistence failed after retries: ${err.message}`,
+              level: 'warning',
+              data: {
+                status: (err as FetchError).status,
+                profileId: profileId ?? null,
+                conversationId: activeConversationId,
+              },
+            });
+          } else {
+            captureException(err, {
+              tags: {
+                feature: 'ai-chat',
+                source: 'useJovieChat',
+                errorType: 'message-persistence',
+              },
+              extra: {
+                profileId: profileId ?? null,
+                conversationId: activeConversationId,
+                messageCount: messagesToPersist.length,
+              },
+            });
+          }
           console.error('[useJovieChat] Failed to save messages:', err);
           setChatError({
             type: 'server',
@@ -462,17 +478,34 @@ export function useJovieChat({
 
         return true;
       } catch (err) {
-        captureException(err, {
-          tags: {
-            feature: 'ai-chat',
-            source: 'useJovieChat',
-            errorType: 'conversation-create',
-          },
-          extra: {
-            profileId: profileId ?? null,
-            conversationId: activeConversationId,
-          },
-        });
+        // Transient server errors (5xx, timeout, rate-limit) were already
+        // retried by TanStack Query. Only log a breadcrumb to reduce Sentry
+        // noise for temporary outages (JOV-1352).
+        const isTransient = err instanceof FetchError && err.isRetryable();
+
+        if (isTransient) {
+          addBreadcrumb({
+            category: 'ai-chat',
+            message: `Conversation create failed after retries: ${err.message}`,
+            level: 'warning',
+            data: {
+              status: (err as FetchError).status,
+              profileId: profileId ?? null,
+            },
+          });
+        } else {
+          captureException(err, {
+            tags: {
+              feature: 'ai-chat',
+              source: 'useJovieChat',
+              errorType: 'conversation-create',
+            },
+            extra: {
+              profileId: profileId ?? null,
+              conversationId: activeConversationId,
+            },
+          });
+        }
         console.error('[useJovieChat] Failed to create conversation:', err);
         setChatError({
           type: 'server',
