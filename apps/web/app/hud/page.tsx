@@ -38,13 +38,10 @@ async function getHudAbsoluteUrl(kioskToken: string | null): Promise<string> {
 
   // Use validated env for fallback URL (includes protocol)
   const base = publicEnv.NEXT_PUBLIC_APP_URL;
-  Sentry.captureMessage(
-    'HUD: host header invalid or missing, using fallback',
-    {
-      level: 'warning',
-      extra: { host, fallback: base },
-    },
-  );
+  Sentry.captureMessage('HUD: host header invalid or missing, using fallback', {
+    level: 'warning',
+    extra: { host, fallback: base },
+  });
   const url = new URL('/hud', base);
   if (kioskToken) {
     url.searchParams.set('kiosk', kioskToken);
@@ -64,17 +61,17 @@ export default async function HudPage({
 
   if (!auth.ok) {
     return (
-      <main className="min-h-screen bg-black text-white flex items-center justify-center p-10">
-        <div className="max-w-2xl w-full space-y-4">
-          <div className="text-3xl font-semibold tracking-tight">
+      <main className='min-h-screen bg-black text-white flex items-center justify-center p-10'>
+        <div className='max-w-2xl w-full space-y-4'>
+          <div className='text-3xl font-semibold tracking-tight'>
             HUD access
           </div>
-          <div className="text-white/70 text-lg">
+          <div className='text-white/70 text-lg'>
             {auth.reason === 'not_configured'
               ? 'This HUD is not configured for kiosk access. Sign in as an admin to view it, or set HUD_KIOSK_TOKEN to enable kiosk mode.'
               : 'Unauthorized. Sign in as an admin, or provide a valid kiosk token.'}
           </div>
-          <div className="text-white/50 text-sm">
+          <div className='text-white/50 text-sm'>
             Tip: load this page as /hud?kiosk=YOUR_TOKEN on the TV.
           </div>
         </div>
@@ -86,7 +83,7 @@ export default async function HudPage({
   const hudUrl = await getHudAbsoluteUrl(kioskToken);
 
   return (
-    <main className="min-h-screen bg-black text-white">
+    <main className='min-h-screen bg-black text-white'>
       <HudDashboardClient
         initialMetrics={metrics}
         hudUrl={hudUrl}
