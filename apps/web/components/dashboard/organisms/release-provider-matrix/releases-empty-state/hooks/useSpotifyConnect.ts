@@ -4,6 +4,7 @@
  * Spotify Connect Hook
  *
  * Handles connecting to Spotify artists via search or URL.
+ * JOV-1340: Added `fireAndForget` option for non-blocking onboarding flow.
  */
 
 import { useCallback, useTransition } from 'react';
@@ -27,6 +28,12 @@ export interface UseSpotifyConnectParams {
     spotifyUrl?: string
   ) => void;
   onImportStart?: (artistName: string) => void;
+  /**
+   * JOV-1340: When true, proceeds immediately without waiting for
+   * the connect API call. The import runs in the background.
+   * Used by onboarding to avoid blocking the user.
+   */
+  fireAndForget?: boolean;
 }
 
 export function useSpotifyConnect({
@@ -34,6 +41,7 @@ export function useSpotifyConnect({
   searchClear,
   onConnected,
   onImportStart,
+  fireAndForget = false,
 }: UseSpotifyConnectParams) {
   const [isPending, startTransition] = useTransition();
 
@@ -52,8 +60,21 @@ export function useSpotifyConnect({
       dispatch({ type: 'SET_ERROR', payload: null });
       dispatch({ type: 'CLEAR_SEARCH' });
       searchClear();
-      onImportStart?.('');
 
+      if (fireAndForget) {
+        // JOV-1340: Proceed immediately, connect in background
+        onConnected?.([], '', artistId, artistUrl);
+        void connectSpotifyArtist({
+          spotifyArtistId: artistId,
+          spotifyArtistUrl: artistUrl,
+          artistName: '',
+        }).catch(() => {
+          // Import failure is non-critical during onboarding
+        });
+        return;
+      }
+
+      onImportStart?.('');
       startTransition(async () => {
         try {
           const result = await connectSpotifyArtist({
@@ -86,19 +107,30 @@ export function useSpotifyConnect({
         }
       });
     },
-    [dispatch, searchClear, onConnected, onImportStart]
+    [dispatch, searchClear, onConnected, onImportStart, fireAndForget]
   );
 
   // Handle selection from search results
   const handleArtistSelect = useCallback(
     (artist: SpotifyArtist) => {
       dispatch({ type: 'SET_ERROR', payload: null });
-
-      // Clear the search UI and show importing state immediately
       dispatch({ type: 'CLEAR_SEARCH' });
       searchClear();
-      onImportStart?.(artist.name);
 
+      if (fireAndForget) {
+        // JOV-1340: Proceed immediately, connect in background
+        onConnected?.([], artist.name, artist.id, artist.url);
+        void connectSpotifyArtist({
+          spotifyArtistId: artist.id,
+          spotifyArtistUrl: artist.url,
+          artistName: artist.name,
+        }).catch(() => {
+          // Import failure is non-critical during onboarding
+        });
+        return;
+      }
+
+      onImportStart?.(artist.name);
       startTransition(async () => {
         try {
           const result = await connectSpotifyArtist({
@@ -130,11 +162,11 @@ export function useSpotifyConnect({
         }
       });
     },
-    [searchClear, dispatch, onConnected, onImportStart]
+    [searchClear, dispatch, onConnected, onImportStart, fireAndForget]
   );
 
   return {
-    isPending,
+    isPending: fireAndForget ? false : isPending,
     extractSpotifyArtistId,
     connectFromUrl,
     handleArtistSelect,
