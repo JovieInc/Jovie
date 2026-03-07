@@ -36,9 +36,9 @@ const baseDashboardData: DashboardData = {
     monthReceivedCents: 0,
   },
   profileCompletion: {
-    percentage: 67,
-    completedCount: 4,
-    totalCount: 6,
+    percentage: 60,
+    completedCount: 3,
+    totalCount: 5,
     steps: [
       {
         id: 'avatar',
@@ -86,9 +86,9 @@ describe('ProfileCompletionCard', () => {
   it('shows percentage messaging when profile is live', () => {
     const { getByText } = renderCard({
       profileCompletion: {
-        percentage: 67,
+        percentage: 80,
         completedCount: 4,
-        totalCount: 6,
+        totalCount: 5,
         steps: [
           {
             id: 'avatar',
@@ -101,7 +101,7 @@ describe('ProfileCompletionCard', () => {
       },
     });
 
-    expect(getByText('Your profile is 67% complete')).toBeDefined();
+    expect(getByText('Your profile is 80% complete')).toBeDefined();
   });
 
   it('hides dismiss button when profile is not live', () => {
@@ -114,8 +114,8 @@ describe('ProfileCompletionCard', () => {
     const { queryByText } = renderCard({
       profileCompletion: {
         percentage: 100,
-        completedCount: 6,
-        totalCount: 6,
+        completedCount: 5,
+        totalCount: 5,
         steps: [],
         profileIsLive: false,
       },

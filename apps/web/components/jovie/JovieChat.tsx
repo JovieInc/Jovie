@@ -5,6 +5,7 @@ import { ImagePlus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
@@ -68,6 +69,7 @@ export function JovieChat({
   isFirstSession: isFirstSessionProp = false,
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
+  const { profileCompletion } = useDashboardData();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -456,42 +458,48 @@ export function JovieChat({
                 />
               )}
 
-              {/* Profile completion card — always visible in empty state when incomplete */}
-              {!hasCarouselItems && <ProfileCompletionCard />}
+              {/* Momentum card and help prompts are mutually exclusive:
+                 incomplete profile = show momentum card, complete = show help prompts */}
+              {!hasCarouselItems &&
+                (profileCompletion?.percentage ?? 0) < 100 && (
+                  <ProfileCompletionCard />
+                )}
 
-              {/* Hide help text and prompts while the carousel has items */}
-              {!hasCarouselItems && (
-                <>
-                  {isFirstSession ? (
-                    <p className='text-center text-[15px] text-secondary-token'>
-                      Welcome, {displayName ?? 'there'}. Your profile is live at{' '}
-                      <a
-                        href={
-                          username
-                            ? `https://jov.ie/${username}`
-                            : 'https://jov.ie'
-                        }
-                        target='_blank'
-                        rel='noreferrer'
-                        className='font-medium text-primary-token underline-offset-2 hover:underline'
-                      >
-                        {username ? `jov.ie/${username}` : 'jov.ie'}
-                      </a>{' '}
-                      .
-                    </p>
-                  ) : (
-                    <p className='text-center text-[15px] text-secondary-token'>
-                      What can I help you with?
-                    </p>
-                  )}
+              {/* Show help text and prompts only when profile is complete */}
+              {!hasCarouselItems &&
+                (profileCompletion?.percentage ?? 0) >= 100 && (
+                  <>
+                    {isFirstSession ? (
+                      <p className='text-center text-[15px] text-secondary-token'>
+                        Welcome, {displayName ?? 'there'}. Your profile is live
+                        at{' '}
+                        <a
+                          href={
+                            username
+                              ? `https://jov.ie/${username}`
+                              : 'https://jov.ie'
+                          }
+                          target='_blank'
+                          rel='noreferrer'
+                          className='font-medium text-primary-token underline-offset-2 hover:underline'
+                        >
+                          {username ? `jov.ie/${username}` : 'jov.ie'}
+                        </a>{' '}
+                        .
+                      </p>
+                    ) : (
+                      <p className='text-center text-[15px] text-secondary-token'>
+                        What can I help you with?
+                      </p>
+                    )}
 
-                  <SuggestedPrompts
-                    onSelect={handleSuggestedPrompt}
-                    isFirstSession={isFirstSession}
-                    latestReleaseTitle={latestReleaseTitle}
-                  />
-                </>
-              )}
+                    <SuggestedPrompts
+                      onSelect={handleSuggestedPrompt}
+                      isFirstSession={isFirstSession}
+                      latestReleaseTitle={latestReleaseTitle}
+                    />
+                  </>
+                )}
             </div>
           </div>
 
