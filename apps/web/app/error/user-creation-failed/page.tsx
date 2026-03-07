@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +10,7 @@ export default async function UserCreationFailedPage() {
 
   // If somehow resolved, redirect to dashboard
   if (!userId) {
-    redirect('/sign-in');
+    redirect(APP_ROUTES.SIGNIN);
   }
 
   return (

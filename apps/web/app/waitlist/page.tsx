@@ -461,7 +461,7 @@ export default function WaitlistPage() {
       showFooterPrompt={false}
       showLogo={false}
       showLogoutButton
-      logoutRedirectUrl='/sign-in'
+      logoutRedirectUrl={APP_ROUTES.SIGNIN}
     >
       <div className='w-full'>
         <form onSubmit={handleSubmit} className='space-y-4'>

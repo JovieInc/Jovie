@@ -20,7 +20,7 @@ export default async function ReleasesPage() {
 
   // Handle unauthenticated users
   if (!dashboardData.user?.id) {
-    redirect('/sign-in?redirect_url=/app/dashboard/releases');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/releases`);
   }
 
   // Handle redirects for users who need onboarding

@@ -305,7 +305,7 @@ describe('tour-dates/actions.ts', () => {
       await loadTourDates();
 
       expect(mockRedirect).toHaveBeenCalledWith(
-        expect.stringContaining('/sign-in')
+        expect.stringContaining('/signin')
       );
     });
   });

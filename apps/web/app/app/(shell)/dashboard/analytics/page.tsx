@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardAnalytics } from '@/components/dashboard/dashboard-analytics';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -108,7 +109,7 @@ export default async function AnalyticsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/analytics');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/analytics`);
   }
 
   return (

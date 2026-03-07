@@ -117,7 +117,7 @@ export default async function OnboardingPage({
       showFormTitle={false}
       logoSpinDelayMs={10000}
       showLogoutButton
-      logoutRedirectUrl='/sign-in'
+      logoutRedirectUrl={APP_ROUTES.SIGNIN}
     >
       <div className='relative min-h-[500px]'>
         {/* Unified onboarding form */}
