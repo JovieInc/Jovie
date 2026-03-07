@@ -7,7 +7,7 @@
  * Shows status of discovery, track matching, and profile enrichment.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
@@ -139,13 +139,22 @@ export function useDspEnrichmentStatusQuery({
   enabled = true,
   refetchInterval,
 }: UseDspEnrichmentStatusQueryOptions) {
+  const queryClient = useQueryClient();
+
+  // Skip refetch on mount when polling is already handling freshness
+  const cachedData = queryClient.getQueryData<EnrichmentStatus>(
+    queryKeys.dspEnrichment.status(profileId)
+  );
+  const isPolling =
+    cachedData != null && ACTIVE_PHASES.has(cachedData.overallPhase);
+
   return useQuery<EnrichmentStatus>({
     queryKey: queryKeys.dspEnrichment.status(profileId),
     queryFn: ({ signal }) => fetchEnrichmentStatus(profileId, signal),
     enabled: enabled && !!profileId,
     staleTime: 5000, // Match polling interval to avoid refetching between polls
     gcTime: 10 * 60 * 1000, // 10 minutes
-    refetchOnMount: true,
+    refetchOnMount: !isPolling,
     refetchOnWindowFocus: false, // Polling handles freshness
 
     // Dynamic polling: only poll when enrichment is active
