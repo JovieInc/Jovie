@@ -52,6 +52,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_FEATURE_GROWTH_PLAN() {
     return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN || undefined;
   },
+  get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
+    return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION || undefined;
+  },
   // SEO verification
   get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() {
     return process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined;
