@@ -24,12 +24,12 @@ export const alignment = {
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
-// Row Selection Colors
+// Row Selection Colors — aligned with Linear design tokens
 export const selection = {
-  unchecked: 'hover:bg-surface-2/40 transition-colors',
-  checked: 'bg-surface-2/60 hover:bg-surface-2/80',
-  selected: 'bg-accent/5 dark:bg-accent/10 border-l-[1.5px] border-accent',
-  hover: 'hover:bg-surface-2/40',
+  unchecked: 'hover:bg-white/[0.02] transition-colors duration-150',
+  checked: 'bg-white/[0.04] hover:bg-white/[0.06]',
+  selected: 'bg-white/[0.04]',
+  hover: 'hover:bg-white/[0.02]',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
@@ -46,11 +46,11 @@ export const zIndex = {
   rows: 'z-10',
 } as const;
 
-// Transition Timings (ease-out only)
+// Transition Timings — Linear uses 160ms cubic-bezier for bg
 export const transitions = {
-  fast: 'transition-all duration-100 ease-out',
-  standard: 'transition-all duration-200 ease-out',
-  slow: 'transition-all duration-300 ease-out',
+  fast: 'transition-colors duration-100 ease-out',
+  standard: 'transition-colors duration-150 ease-out',
+  slow: 'transition-colors duration-300 ease-out',
 } as const;
 
 // Column Widths (Standard)

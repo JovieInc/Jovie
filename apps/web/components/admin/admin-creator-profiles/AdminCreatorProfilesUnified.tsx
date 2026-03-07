@@ -337,9 +337,9 @@ export function AdminCreatorProfilesUnified({
     const isSelected = profile.id === selectedIdRef.current;
 
     const getSelectionClass = () => {
-      if (isChecked) return 'bg-surface-2/70 hover:bg-surface-2';
-      if (isSelected) return 'bg-surface-2';
-      return 'hover:bg-surface-2/50';
+      if (isChecked) return 'bg-white/[0.04]';
+      if (isSelected) return 'bg-white/[0.04]';
+      return 'hover:bg-white/[0.02]';
     };
 
     return cn('group', getSelectionClass());

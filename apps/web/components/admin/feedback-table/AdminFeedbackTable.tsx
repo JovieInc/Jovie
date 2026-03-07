@@ -168,8 +168,8 @@ export function AdminFeedbackTable({
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'bg-brand-primary/5 cursor-pointer'
-        : 'hover:bg-surface-2/50 cursor-pointer group',
+        ? 'bg-white/[0.04] cursor-pointer'
+        : 'hover:bg-white/[0.02] cursor-pointer group',
     [selectedId]
   );
 

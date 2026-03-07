@@ -38,10 +38,10 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
-  if (isChecked) return cn(baseClasses, 'bg-accent-subtle');
-  if (isSelected) return cn(baseClasses, 'bg-base dark:bg-surface-2');
-  return cn(baseClasses, 'hover:bg-base dark:hover:bg-surface-2');
+    'group cursor-pointer border-b border-subtle transition-colors duration-150 last:border-b-0';
+  if (isChecked) return cn(baseClasses, 'bg-white/[0.04]');
+  if (isSelected) return cn(baseClasses, 'bg-white/[0.04]');
+  return cn(baseClasses, 'hover:bg-white/[0.02]');
 };
 
 const renderContextMenuItem = ({

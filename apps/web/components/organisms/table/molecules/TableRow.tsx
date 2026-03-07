@@ -23,13 +23,13 @@ export function TableRow({
     <tr
       className={cn(
         // Base styles
-        'group transition-colors',
+        'group transition-colors duration-150',
         // Fixed height to prevent layout shift
         'h-[60px]',
-        // Hover state - uses design token for consistent dark/light mode
-        'hover:bg-(--color-cell-hover)',
-        // Selected state
-        selected && 'bg-surface-2/50',
+        // Hover state — Linear: rgba(255,255,255,0.02)
+        'hover:bg-white/[0.02]',
+        // Selected state — Linear: rgba(255,255,255,0.04)
+        selected && 'bg-white/[0.04]',
         // Clickable cursor
         onClick && 'cursor-pointer',
         // Remove focus outline for clickable rows

@@ -407,8 +407,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
       row.id === selectedUser?.id
-        ? 'bg-brand-primary/5 cursor-pointer'
-        : 'group hover:bg-surface-2/50 cursor-pointer',
+        ? 'bg-white/[0.04] cursor-pointer'
+        : 'group hover:bg-white/[0.02] cursor-pointer',
     [selectedUser?.id]
   );
 

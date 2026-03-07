@@ -223,7 +223,7 @@ export function LeadTable() {
               leads.map(lead => (
                 <tr
                   key={lead.id}
-                  className='border-b border-subtle/50 hover:bg-surface-2/50'
+                  className='border-b border-subtle/50 hover:bg-white/[0.02]'
                 >
                   <td className='py-2.5 pr-3'>
                     <div className='flex flex-col'>

@@ -236,7 +236,7 @@ export function AdminWaitlistTableUnified({
 
   // Get row className - uses unified hover token
   const getRowClassName = useCallback(() => {
-    return 'group hover:bg-surface-2/50';
+    return 'group hover:bg-white/[0.02]';
   }, []);
 
   // Render unified table with optional grouping
