@@ -1,3 +1,5 @@
+'use client';
+
 import { useQuery } from '@tanstack/react-query';
 import type { HudMetrics } from '@/types/hud';
 
@@ -19,7 +21,7 @@ async function fetchHudMetrics(kioskToken: string | null): Promise<HudMetrics> {
 
 export function useHudMetricsQuery(
   initialData: HudMetrics,
-  kioskToken: string | null,
+  kioskToken: string | null
 ) {
   return useQuery<HudMetrics>({
     queryKey: [...HUD_METRICS_KEY, kioskToken],

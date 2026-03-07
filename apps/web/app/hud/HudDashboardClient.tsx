@@ -2,12 +2,12 @@
 
 import Image from 'next/image';
 import { QRCode } from '@/components/molecules/QRCode';
-import type { HudMetrics } from '@/types/hud';
 import {
   getDefaultStatusTone,
   getDeploymentLabel,
   getDeploymentTone,
 } from '@/lib/hud/tone-determination';
+import type { HudMetrics } from '@/types/hud';
 import { HudClockClient } from './HudClockClient';
 import { HudStatusPill } from './HudStatusPill';
 import { useHudMetricsQuery } from './useHudMetricsQuery';
@@ -45,56 +45,53 @@ export function HudDashboardClient({
   const deploymentLabel = getDeploymentLabel(metrics.deployments);
 
   return (
-    <div className="mx-auto max-w-[1800px] px-10 py-10">
-      <header className="flex items-center justify-between gap-8">
-        <div className="flex items-center gap-4">
-          <div className="relative h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-white/5">
+    <div className='mx-auto max-w-[1800px] px-10 py-10'>
+      <header className='flex items-center justify-between gap-8'>
+        <div className='flex items-center gap-4'>
+          <div className='relative h-12 w-12 overflow-hidden rounded-xl border border-white/10 bg-white/5'>
             <Image
-              src="/brand/Jovie-Logo-Icon-White.svg"
-              alt="Jovie"
+              src='/brand/Jovie-Logo-Icon-White.svg'
+              alt='Jovie'
               fill
-              sizes="48px"
-              className="object-contain p-2"
+              sizes='48px'
+              className='object-contain p-2'
               priority
             />
           </div>
-          <h1 className="text-4xl font-semibold tracking-tight">
+          <h1 className='text-4xl font-semibold tracking-tight'>
             {metrics.branding.startupName}
           </h1>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="text-3xl font-semibold tracking-tight">
+        <div className='flex flex-col items-end gap-2'>
+          <div className='text-3xl font-semibold tracking-tight'>
             <HudClockClient />
           </div>
-          <div className="text-sm text-white/50">
+          <div className='text-sm text-white/50'>
             Updated{' '}
             {new Date(metrics.generatedAtIso).toLocaleTimeString('en-US')}
           </div>
         </div>
       </header>
 
-      <section className="mt-10">
-        <div className="grid grid-cols-12 gap-10">
-          <div className="col-span-12 xl:col-span-8">
-            <div className="flex items-start justify-between gap-10">
+      <section className='mt-10'>
+        <div className='grid grid-cols-12 gap-10'>
+          <div className='col-span-12 xl:col-span-8'>
+            <div className='flex items-start justify-between gap-10'>
               <div>
-                <div className="text-sm uppercase tracking-[0.25em] text-white/50">
+                <div className='text-sm uppercase tracking-[0.25em] text-white/50'>
                   MRR
                 </div>
-                <div className="mt-3 text-7xl font-semibold tracking-tight">
+                <div className='mt-3 text-7xl font-semibold tracking-tight'>
                   {formatUsd(metrics.overview.mrrUsd)}
                 </div>
-                <div className="mt-3 text-2xl text-white/70">
+                <div className='mt-3 text-2xl text-white/70'>
                   {metrics.overview.activeSubscribers.toLocaleString('en-US')}{' '}
                   subscribers
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-4">
-                <HudStatusPill
-                  label={deploymentLabel}
-                  tone={deploymentsTone}
-                />
-                <div className="text-right text-lg text-white/50">
+              <div className='flex flex-col items-end gap-4'>
+                <HudStatusPill label={deploymentLabel} tone={deploymentsTone} />
+                <div className='text-right text-lg text-white/50'>
                   {(() => {
                     if (metrics.deployments.current?.branch) {
                       return `Branch ${metrics.deployments.current.branch}`;
@@ -108,41 +105,41 @@ export function HudDashboardClient({
               </div>
             </div>
 
-            <div className="mt-10 grid grid-cols-12 gap-10 border-t border-white/10 pt-10">
-              <div className="col-span-12 xl:col-span-5">
-                <div className="text-sm uppercase tracking-[0.25em] text-white/50">
+            <div className='mt-10 grid grid-cols-12 gap-10 border-t border-white/10 pt-10'>
+              <div className='col-span-12 xl:col-span-5'>
+                <div className='text-sm uppercase tracking-[0.25em] text-white/50'>
                   Runway
                 </div>
-                <div className="mt-3 text-5xl font-semibold tracking-tight">
+                <div className='mt-3 text-5xl font-semibold tracking-tight'>
                   {formatRunway(metrics.overview.runwayMonths)}
                 </div>
-                <div className="mt-8 grid gap-5 text-xl">
-                  <div className="flex items-baseline justify-between gap-8">
-                    <div className="text-white/60">Cash</div>
-                    <div className="font-semibold tracking-tight">
+                <div className='mt-8 grid gap-5 text-xl'>
+                  <div className='flex items-baseline justify-between gap-8'>
+                    <div className='text-white/60'>Cash</div>
+                    <div className='font-semibold tracking-tight'>
                       {formatUsd(metrics.overview.balanceUsd)}
                     </div>
                   </div>
-                  <div className="flex items-baseline justify-between gap-8">
-                    <div className="text-white/60">Burn (30d)</div>
-                    <div className="font-semibold tracking-tight">
+                  <div className='flex items-baseline justify-between gap-8'>
+                    <div className='text-white/60'>Burn (30d)</div>
+                    <div className='font-semibold tracking-tight'>
                       {formatUsd(metrics.overview.burnRateUsd)}
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="col-span-12 xl:col-span-7">
-                <div className="grid grid-cols-2 gap-10">
+              <div className='col-span-12 xl:col-span-7'>
+                <div className='grid grid-cols-2 gap-10'>
                   <div>
-                    <div className="text-sm uppercase tracking-[0.25em] text-white/50">
+                    <div className='text-sm uppercase tracking-[0.25em] text-white/50'>
                       Operations
                     </div>
-                    <div className="mt-3 text-4xl font-semibold tracking-tight">
+                    <div className='mt-3 text-4xl font-semibold tracking-tight'>
                       {metrics.operations.status === 'ok'
                         ? 'Healthy'
                         : 'Degraded'}
                     </div>
-                    <div className="mt-3 text-xl text-white/70">
+                    <div className='mt-3 text-xl text-white/70'>
                       DB latency{' '}
                       {metrics.operations.dbLatencyMs === null
                         ? '\u2014'
@@ -150,13 +147,13 @@ export function HudDashboardClient({
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm uppercase tracking-[0.25em] text-white/50">
+                    <div className='text-sm uppercase tracking-[0.25em] text-white/50'>
                       Reliability
                     </div>
-                    <div className="mt-3 text-4xl font-semibold tracking-tight">
+                    <div className='mt-3 text-4xl font-semibold tracking-tight'>
                       {metrics.reliability.errorRatePercent.toFixed(2)}%
                     </div>
-                    <div className="mt-3 text-xl text-white/70">
+                    <div className='mt-3 text-xl text-white/70'>
                       p95{' '}
                       {metrics.reliability.p95LatencyMs === null
                         ? '\u2014'
@@ -168,48 +165,48 @@ export function HudDashboardClient({
             </div>
           </div>
 
-          <div className="col-span-12 xl:col-span-4 xl:col-start-9">
-            <div className="flex items-start justify-between gap-8 border-b border-white/10 pb-8">
+          <div className='col-span-12 xl:col-span-4 xl:col-start-9'>
+            <div className='flex items-start justify-between gap-8 border-b border-white/10 pb-8'>
               <div>
-                <div className="text-sm uppercase tracking-[0.25em] text-white/50">
+                <div className='text-sm uppercase tracking-[0.25em] text-white/50'>
                   Open on phone
                 </div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight">
+                <div className='mt-3 text-2xl font-semibold tracking-tight'>
                   Scan to view
                 </div>
               </div>
               <QRCode
                 data={hudUrl}
                 size={220}
-                label="HUD link"
-                className="rounded-xl bg-white p-3"
+                label='HUD link'
+                className='rounded-xl bg-white p-3'
               />
             </div>
-            <div className="mt-8">
-              <div className="text-sm uppercase tracking-[0.25em] text-white/50">
+            <div className='mt-8'>
+              <div className='text-sm uppercase tracking-[0.25em] text-white/50'>
                 Deployments
               </div>
               {metrics.deployments.recent.length > 0 ? (
-                <div className="mt-5 grid gap-4">
-                  {metrics.deployments.recent.slice(0, 5).map((run) => (
+                <div className='mt-5 grid gap-4'>
+                  {metrics.deployments.recent.slice(0, 5).map(run => (
                     <div
                       key={run.id}
-                      className="flex items-center justify-between gap-6"
+                      className='flex items-center justify-between gap-6'
                     >
-                      <div className="text-xl font-semibold tracking-tight">
+                      <div className='text-xl font-semibold tracking-tight'>
                         #{run.runNumber}
-                        <span className="ml-3 text-white/60 font-normal">
+                        <span className='ml-3 text-white/60 font-normal'>
                           {run.branch ?? '\u2014'}
                         </span>
                       </div>
-                      <div className="text-white/60 text-sm">
+                      <div className='text-white/60 text-sm'>
                         {new Date(run.createdAtIso).toLocaleString('en-US', {
                           month: 'short',
                           day: '2-digit',
                           hour: '2-digit',
                           minute: '2-digit',
                         })}
-                        <span className="ml-3 text-white/80 font-semibold">
+                        <span className='ml-3 text-white/80 font-semibold'>
                           {run.status}
                         </span>
                       </div>
@@ -217,19 +214,19 @@ export function HudDashboardClient({
                   ))}
                 </div>
               ) : (
-                <div className="mt-4 text-xl text-white/60">{'\u2014'}</div>
+                <div className='mt-4 text-xl text-white/60'>{'\u2014'}</div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-10">
-          <div className="flex items-start justify-between gap-10">
+        <div className='mt-10 rounded-3xl border border-white/10 bg-white/5 p-10'>
+          <div className='flex items-start justify-between gap-10'>
             <div>
-              <div className="text-sm uppercase tracking-[0.25em] text-white/60">
+              <div className='text-sm uppercase tracking-[0.25em] text-white/60'>
                 Default status
               </div>
-              <div className="mt-3 text-6xl font-semibold tracking-tight">
+              <div className='mt-3 text-6xl font-semibold tracking-tight'>
                 {metrics.overview.defaultStatus.toUpperCase()}
               </div>
             </div>
@@ -240,7 +237,7 @@ export function HudDashboardClient({
               tone={defaultTone}
             />
           </div>
-          <div className="mt-5 text-2xl text-white/70 leading-snug">
+          <div className='mt-5 text-2xl text-white/70 leading-snug'>
             {metrics.overview.defaultStatusDetail}
           </div>
         </div>

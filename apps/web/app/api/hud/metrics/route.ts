@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (!auth.ok) {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS },
+        { status: 401, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     logger.error('Error in HUD metrics API:', error);
     return NextResponse.json(
       { error: 'Failed to load HUD metrics' },
-      { status: 500, headers: NO_STORE_HEADERS },
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
