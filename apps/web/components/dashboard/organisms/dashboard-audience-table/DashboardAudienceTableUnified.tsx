@@ -1,5 +1,6 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
@@ -12,7 +13,6 @@ import {
   UserMinus,
   Users,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
@@ -29,6 +29,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { queryKeys } from '@/lib/queries/keys';
 import { cn } from '@/lib/utils';
 import {
   buildTouringCityMap,
@@ -247,7 +248,7 @@ export const DashboardAudienceTableUnified = memo(
     onLoadMore,
     tourDates,
   }: DashboardAudienceTableProps) {
-    const router = useRouter();
+    const queryClient = useQueryClient();
     const {
       openMenuRowId,
       setOpenMenuRowId,
@@ -286,12 +287,14 @@ export const DashboardAudienceTableUnified = memo(
           if (selectedMember?.id === member.id) {
             setSelectedMember(null);
           }
-          router.refresh();
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.audience.all,
+          });
         } catch {
           toast.error('Failed to remove member');
         }
       },
-      [profileId, selectedMember, setSelectedMember, router]
+      [profileId, selectedMember, setSelectedMember, queryClient]
     );
 
     // Quick action: export member as vCard
