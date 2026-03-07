@@ -33,8 +33,6 @@ export const APP_ROUTES = {
   SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
-  SETTINGS_BRANDING: '/app/settings/branding',
-  SETTINGS_AD_PIXELS: '/app/settings/ad-pixels',
   SETTINGS_BILLING: '/app/settings/billing',
   SETTINGS_SOCIAL_LINKS: '/app/settings/social-links',
   SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
