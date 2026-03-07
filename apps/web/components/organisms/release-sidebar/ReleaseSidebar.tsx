@@ -255,6 +255,7 @@ export function ReleaseSidebar({
     onRefresh,
     isRefreshing,
     onCopySmartLink: handleCopySmartLink,
+    onClose,
   });
 
   const artworkAlt = release?.title

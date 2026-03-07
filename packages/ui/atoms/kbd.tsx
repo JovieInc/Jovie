@@ -17,7 +17,7 @@ const Kbd = React.forwardRef<HTMLSpanElement, KbdProps>(
     <span
       ref={ref}
       className={cn(
-        'inline-flex min-w-[16px] items-center justify-center rounded-(--linear-app-radius-item) px-1 py-0.5 font-mono text-[11px] font-[450] text-center',
+        'inline-flex min-w-[16px] items-center justify-center rounded-(--linear-app-radius-item) px-1 py-px font-mono text-[11px] leading-none font-[450] text-center',
         variant === 'tooltip'
           ? // Tooltip variant: elevated surface visible against tooltip bg
             'border border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'

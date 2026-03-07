@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, X } from 'lucide-react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface HandleStatusIconProps {
   readonly showChecking: boolean;
@@ -19,13 +20,7 @@ export function HandleStatusIcon({
 }: HandleStatusIconProps) {
   if (showChecking) {
     return (
-      <div
-        className='h-4 w-4 animate-spin rounded-full border-[1.5px] border-t-transparent motion-reduce:animate-none'
-        style={{
-          borderColor: 'var(--linear-text-tertiary)',
-          borderTopColor: 'transparent',
-        }}
-      />
+      <LoadingSpinner size='sm' tone='muted' label='Checking availability' />
     );
   }
   if (!handle) return null;

@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { BASE_URL } from '@/constants/app';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
@@ -104,7 +105,7 @@ export function ClaimHandleForm({
     if (navigating) {
       return (
         <>
-          <div className='h-3 w-3 animate-spin rounded-full border-[1.5px] border-current border-t-transparent motion-reduce:animate-none' />
+          <LoadingSpinner size='sm' tone='inverse' label='Creating' />
           <span>Creating…</span>
         </>
       );

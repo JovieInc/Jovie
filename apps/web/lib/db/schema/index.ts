@@ -243,6 +243,8 @@ export {
   insightStatusEnum,
   insightTypeEnum,
   leadDiscoverySourceEnum,
+  leadOutreachRouteEnum,
+  leadOutreachStatusEnum,
   leadStatusEnum,
   linkTypeEnum,
   notificationChannelEnum,

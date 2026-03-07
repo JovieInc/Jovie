@@ -99,7 +99,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
             className='flex items-center justify-between px-4 py-3'
           >
             <div className='flex items-center gap-3'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/10'>
+              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10'>
                 <Link2 className='h-4 w-4 text-accent' />
               </div>
               <div>
