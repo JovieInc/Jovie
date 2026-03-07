@@ -3,9 +3,11 @@
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   Dialog,
+  DialogBody,
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
@@ -82,7 +84,7 @@ function SearchInputTrailing({
         )}
       >
         {(isLoading || isPending) && (
-          <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+          <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
         )}
         Connect Spotify
       </button>
@@ -90,9 +92,7 @@ function SearchInputTrailing({
   }
 
   if (isPending) {
-    return (
-      <div className='w-4 h-4 border-[1.5px] border-tertiary-token border-t-transparent rounded-full animate-spin shrink-0' />
-    );
+    return <LoadingSpinner size='sm' tone='muted' label='Loading' />;
   }
 
   return <Search className='w-4 h-4 shrink-0 text-tertiary-token' />;
@@ -353,14 +353,19 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <div className='space-y-4 p-6'>
+      <DialogTitle className='text-lg font-semibold text-primary-token'>
+        Connect Spotify
+      </DialogTitle>
+      <DialogDescription className='text-sm text-secondary-token'>
+        Search for your artist profile to import releases.
+      </DialogDescription>
+
+      <DialogBody className='space-y-4'>
         <div className='space-y-1'>
-          <DialogTitle className='text-lg font-semibold text-primary-token'>
-            Connect Spotify
-          </DialogTitle>
-          <DialogDescription className='text-sm text-secondary-token'>
-            Search for your artist profile to import releases.
-          </DialogDescription>
+          <p className='text-sm text-secondary-token'>
+            Search by artist name or paste your Spotify artist URL to connect
+            instantly.
+          </p>
         </div>
 
         <div ref={containerRef} className='relative'>
@@ -429,7 +434,7 @@ export function SpotifyConnectDialog({
           </div>
 
           {formState.error && (
-            <p className='mt-2 text-sm text-red-400' role='alert'>
+            <p className='mt-2 text-sm text-error' role='alert'>
               {formState.error}
             </p>
           )}
@@ -622,7 +627,7 @@ export function SpotifyConnectDialog({
             </div>
           )}
         </div>
-      </div>
+      </DialogBody>
     </Dialog>
   );
 }

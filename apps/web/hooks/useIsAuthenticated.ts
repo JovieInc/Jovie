@@ -15,15 +15,27 @@ export function useIsAuthenticated(): boolean {
   const [isAuthed, setIsAuthed] = useState(false);
 
   useEffect(() => {
-    const cookies = document.cookie.split(';');
-    const clientUat = cookies.find(c => c.trim().startsWith('__client_uat='));
+    const syncAuthState = () => {
+      const cookies = document.cookie.split(';');
+      const clientUat = cookies.find(c => c.trim().startsWith('__client_uat='));
+      const value = clientUat?.slice(clientUat.indexOf('=') + 1)?.trim();
+      setIsAuthed(Boolean(value && value !== '0'));
+    };
 
-    if (clientUat) {
-      const value = clientUat.split('=')[1]?.trim();
-      if (value && value !== '0') {
-        setIsAuthed(true);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncAuthState();
       }
-    }
+    };
+
+    syncAuthState();
+    globalThis.addEventListener('focus', syncAuthState);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      globalThis.removeEventListener('focus', syncAuthState);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, []);
 
   return isAuthed;

@@ -33,11 +33,7 @@ export const APP_ROUTES = {
   SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
-  SETTINGS_BRANDING: '/app/settings/branding',
-  SETTINGS_AD_PIXELS: '/app/settings/ad-pixels',
   SETTINGS_BILLING: '/app/settings/billing',
-  SETTINGS_SOCIAL_LINKS: '/app/settings/social-links',
-  SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
   SETTINGS_AUDIENCE: '/app/settings/audience',
@@ -58,6 +54,11 @@ export const APP_ROUTES = {
   ADMIN_ACTIVITY: '/app/admin/activity',
   ADMIN_CAMPAIGNS: '/app/admin/campaigns',
   ADMIN_LEADS: '/app/admin/leads',
+  ADMIN_OUTREACH: '/app/admin/outreach',
+  ADMIN_OUTREACH_EMAIL: '/app/admin/outreach/email',
+  ADMIN_OUTREACH_DM: '/app/admin/outreach/dm',
+  ADMIN_OUTREACH_REVIEW: '/app/admin/outreach/review',
+  ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing

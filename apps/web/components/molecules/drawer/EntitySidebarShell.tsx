@@ -2,6 +2,7 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { DrawerEmptyState } from './DrawerEmptyState';
@@ -95,8 +96,20 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full flex-col'>
-        {/* Header bar */}
-        <DrawerHeader title={title} onClose={onClose} actions={headerActions} />
+        {/* Header bar — close is in the overflow dropdown */}
+        <DrawerHeader
+          title={title}
+          actions={
+            headerActions ??
+            (onClose ? (
+              <DrawerHeaderActions
+                primaryActions={[]}
+                overflowActions={[]}
+                onClose={onClose}
+              />
+            ) : undefined)
+          }
+        />
 
         {isEmpty ? (
           /* Empty state */
@@ -107,16 +120,20 @@ export function EntitySidebarShell({
           <>
             {/* Entity header — image + name area */}
             {entityHeader && (
-              <div className='shrink-0 px-4 pt-3 pb-3'>{entityHeader}</div>
+              <div className='shrink-0 border-b border-subtle/80 px-4 pt-3 pb-4'>
+                {entityHeader}
+              </div>
             )}
 
             {/* Tabs */}
             {tabs && (
-              <div className='shrink-0 px-4 py-1.5 [&>*]:w-full'>{tabs}</div>
+              <div className='shrink-0 border-b border-subtle/80 px-4 py-2 [&>*]:w-full'>
+                {tabs}
+              </div>
             )}
 
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3 space-y-4'>
+            <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
               {children}
             </div>
 

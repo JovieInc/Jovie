@@ -174,7 +174,7 @@ export function AdminFeedbackTable({
   );
 
   return (
-    <div className='flex h-full min-h-[620px] rounded-xl overflow-hidden bg-surface-1'>
+    <div className='flex h-full min-h-[620px] overflow-hidden'>
       {/* Toast notification */}
       {copyToast && (
         <div className='fixed top-4 right-4 z-50 rounded-lg bg-surface-2 border border-subtle px-4 py-2.5 text-sm text-primary-token shadow-lg'>

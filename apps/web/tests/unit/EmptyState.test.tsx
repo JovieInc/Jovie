@@ -80,13 +80,13 @@ describe('EmptyState', () => {
     render(
       <EmptyState
         heading='Learn more'
-        secondaryAction={{ label: 'Open docs', href: '/docs' }}
+        secondaryAction={{ label: 'Open docs', href: 'https://docs.jov.ie' }}
       />
     );
 
     expect(screen.getByRole('link', { name: /open docs/i })).toHaveAttribute(
       'href',
-      '/docs'
+      'https://docs.jov.ie'
     );
   });
 

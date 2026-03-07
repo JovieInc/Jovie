@@ -407,6 +407,20 @@
       "when": 1772870400000,
       "tag": "0057_add_leads_linktree_verified",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1772854725435,
+      "tag": "0058_chubby_jocasta",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1772956800000,
+      "tag": "0059_add_user_lifecycle_email_columns",
+      "breakpoints": true
     }
   ]
 }

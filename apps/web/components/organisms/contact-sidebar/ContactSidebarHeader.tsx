@@ -72,6 +72,7 @@ interface ContactSidebarHeaderProps {
   readonly hasContact: boolean;
   readonly onRefresh?: () => void;
   readonly onCopyProfileUrl: () => void;
+  readonly onClose?: () => void;
 }
 
 /**
@@ -83,6 +84,7 @@ export function useContactHeaderParts({
   hasContact,
   onRefresh,
   onCopyProfileUrl,
+  onClose,
 }: ContactSidebarHeaderProps): UseContactHeaderResult {
   const notifications = useNotifications();
   const showActions = hasContact && contact?.username;
@@ -168,12 +170,14 @@ export function useContactHeaderParts({
     />
   );
 
-  const actions = hasActions ? (
-    <DrawerHeaderActions
-      primaryActions={primaryActions}
-      overflowActions={overflowActions}
-    />
-  ) : undefined;
+  const actions =
+    hasActions || onClose ? (
+      <DrawerHeaderActions
+        primaryActions={primaryActions}
+        overflowActions={overflowActions}
+        onClose={onClose}
+      />
+    ) : undefined;
 
   return { title, actions };
 }

@@ -262,7 +262,7 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 hover:bg-surface-2/50 transition-colors'>
+    <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-surface-2/50'>
       {/* Track number */}
       <span className='w-6 shrink-0 pt-0.5 text-right text-xs tabular-nums text-tertiary-token'>
         {trackLabel}.
@@ -374,7 +374,7 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          className='shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          className='shrink-0 rounded p-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
           aria-label={`Actions for ${track.title}`}
         >
           <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />

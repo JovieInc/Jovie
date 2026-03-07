@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import {
@@ -13,7 +14,6 @@ import {
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
-  FeedbackForm,
   ScrollToBottom,
   SuggestedProfilesCarousel,
   SuggestedPrompts,
@@ -25,7 +25,7 @@ import {
   useSuggestedProfiles,
 } from './hooks';
 import type { JovieChatProps, MessagePart } from './types';
-import { FEEDBACK_PROMPT_TRIGGER, TOOL_LABELS } from './types';
+import { TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
 const SCROLL_THRESHOLD = 200;
@@ -72,7 +72,6 @@ export function JovieChat({
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
 
   // Suggested profiles carousel data — lifted here so we can hide
   // the help text and suggested prompts while the carousel has items.
@@ -123,18 +122,6 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
-
-  // Intercept feedback trigger before it reaches the AI
-  const handleSuggestedPromptWithFeedback = useCallback(
-    (prompt: string) => {
-      if (prompt === FEEDBACK_PROMPT_TRIGGER) {
-        setShowFeedbackForm(true);
-        return;
-      }
-      handleSuggestedPrompt(prompt);
-    },
-    [handleSuggestedPrompt]
-  );
 
   // Image attachments for chat messages
   const {
@@ -469,13 +456,11 @@ export function JovieChat({
                 />
               )}
 
-              {/* Feedback form (deterministic, no AI) */}
-              {showFeedbackForm && (
-                <FeedbackForm onClose={() => setShowFeedbackForm(false)} />
-              )}
+              {/* Profile completion card — always visible in empty state when incomplete */}
+              {!hasCarouselItems && <ProfileCompletionCard />}
 
-              {/* Hide help text and prompts while the carousel has items or feedback form is showing */}
-              {!hasCarouselItems && !showFeedbackForm && (
+              {/* Hide help text and prompts while the carousel has items */}
+              {!hasCarouselItems && (
                 <>
                   {isFirstSession ? (
                     <p className='text-center text-[15px] text-secondary-token'>
@@ -501,7 +486,7 @@ export function JovieChat({
                   )}
 
                   <SuggestedPrompts
-                    onSelect={handleSuggestedPromptWithFeedback}
+                    onSelect={handleSuggestedPrompt}
                     isFirstSession={isFirstSession}
                     latestReleaseTitle={latestReleaseTitle}
                   />

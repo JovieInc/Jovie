@@ -289,28 +289,19 @@ const fetchProfileAndLinks = async (
 // error responses are never cached.
 
 const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
-const PROFILE_NOT_FOUND_CACHE_TTL_SECONDS = 60; // 1 minute
 
-/** Custom error to pass non-cacheable results without embedding PII in error message. */
-class NoCacheError extends Error {
-  readonly data: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
-  constructor(data: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
-    super('NoCacheError');
-    this.name = 'NoCacheError';
-    this.data = data;
-  }
-}
-
-/** Custom error for values that should not be stored in not_found negative cache. */
-class NoNegativeCacheError extends Error {
-  readonly data: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
-  constructor(data: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
-    super('NoNegativeCacheError');
-    this.name = 'NoNegativeCacheError';
-    this.data = data;
-  }
-}
-
+/**
+ * Cached profile fetcher. Only caches successful (status: 'ok') results.
+ *
+ * IMPORTANT: We intentionally do NOT use a negative cache (caching not_found
+ * results). The previous negative cache pattern used thrown errors to signal
+ * "don't cache this" to unstable_cache, but unstable_cache treats background
+ * revalidation failures by serving the stale value — causing not_found results
+ * to become permanently sticky even after the profile becomes available.
+ *
+ * Instead, not_found and error results are always fetched fresh. The Redis
+ * cache in getProfileWithLinks already provides request-level deduplication.
+ */
 const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
   if (
@@ -320,76 +311,37 @@ const getCachedProfileAndLinks = async (username: string) => {
     return fetchProfileAndLinks(username);
   }
 
-  let seededResult: Awaited<ReturnType<typeof fetchProfileAndLinks>> | null =
-    null;
+  // Fetch the profile data
+  const data = await fetchProfileAndLinks(username);
 
-  try {
-    // First: short-lived negative cache to absorb repeated misses for bad usernames.
-    const negativeCachedResult = await unstable_cache(
-      async () => {
-        const data = await fetchProfileAndLinks(username);
-        if (data.status !== 'not_found') {
-          throw new NoNegativeCacheError(data);
-        }
-        return data;
-      },
-      [`public-profile-not-found-${username}`],
-      {
-        tags: ['profiles-all', `profile:${username}`],
-        revalidate: PROFILE_NOT_FOUND_CACHE_TTL_SECONDS,
-      }
-    )();
-
-    return negativeCachedResult;
-  } catch (error) {
-    if (error instanceof NoNegativeCacheError) {
-      seededResult = error.data;
-      if (seededResult.status === 'error') {
-        return seededResult;
-      }
-    } else {
-      // Negative-cache layer failure - fall back to direct fetch
-      void captureWarning(
-        '[profile] Negative cache layer failed, using direct fetch',
-        {
-          error,
-          username,
-        }
-      );
-      return fetchProfileAndLinks(username);
-    }
+  // Only cache successful results — not_found and error are always fresh
+  if (data.status !== 'ok') {
+    return data;
   }
 
+  // Cache the successful result with unstable_cache for 1 hour
   try {
-    const result = await unstable_cache(
+    const cachedFetch = unstable_cache(
       async () => {
-        const data = seededResult ?? (await fetchProfileAndLinks(username));
-        seededResult = null;
-        // Only cache successful results to avoid stale 404s
-        // Non-ok results are passed through NoCacheError to avoid double-fetch
-        if (data.status !== 'ok') {
-          throw new NoCacheError(data);
+        // Re-fetch on revalidation
+        const freshData = await fetchProfileAndLinks(username);
+        if (freshData.status !== 'ok') {
+          // Profile was removed or errored — don't cache, throw to prevent
+          // stale success from being served
+          throw new Error(`Profile ${username} no longer available`);
         }
-        return data;
+        return freshData;
       },
       [`public-profile-${username}`],
       {
         tags: ['profiles-all', `profile:${username}`],
         revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
       }
-    )();
-    return result;
-  } catch (error) {
-    // If the error is our custom error for non-cacheable results, return embedded data
-    if (error instanceof NoCacheError) {
-      return error.data;
-    }
-    // Cache layer failure - fall back to direct fetch
-    void captureWarning('[profile] Cache layer failed, using direct fetch', {
-      error,
-      username,
-    });
-    return fetchProfileAndLinks(username);
+    );
+    return await cachedFetch();
+  } catch {
+    // Cache layer failure — return the fresh data we already have
+    return data;
   }
 };
 

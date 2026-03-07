@@ -319,12 +319,12 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
+    <div className='flex items-center justify-between border-b border-subtle/80 bg-surface/20 px-4 py-1.5'>
       {/* Left: DSP connection badges */}
       <div className='flex items-center gap-2'>{dspBadges}</div>
 
       {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
-      <ActionBar className='hidden md:flex'>
+      <ActionBar className='hidden items-center md:flex'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
@@ -348,6 +348,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           counts={counts}
           buttonClassName={ACTION_BAR_BUTTON_CLASS}
         />
+        <div className='h-4 w-px bg-subtle/80' aria-hidden='true' />
         <LinearStyleDisplayMenu
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={onColumnVisibilityChange}

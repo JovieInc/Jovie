@@ -4,7 +4,7 @@ import { Badge, Button, Input } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
@@ -28,15 +28,20 @@ import type { AdminUserRow } from '@/lib/admin/users';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminUsersInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import type { AdminUsersTableProps } from './types';
 import {
   createActionsCellRenderer,
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderCreatedDateCell,
+  renderLifecycleCell,
   renderNameCell,
   renderPlanCell,
   renderStatusCell,
+  renderSuppressionCell,
+  renderUsernameCell,
+  renderWelcomeCell,
 } from './utils/column-renderers';
 
 const columnHelper = createColumnHelper<AdminUserRow>();
@@ -75,7 +80,7 @@ function AdminUserMobileCard({
           />
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold text-primary-token'>
-              {user.name ?? 'User'}
+              {user.name || user.email || 'Unknown'}
             </p>
             <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
@@ -128,6 +133,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const from = users.length > 0 ? 1 : 0;
   const to = users.length;
   const isMobile = useBreakpointDown('md');
+
+  // Detail drawer state
+  const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
+
+  const handleRowClick = useCallback((user: AdminUserRow) => {
+    setSelectedUser(prev => (prev?.id === user.id ? null : user));
+  }, []);
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -303,7 +315,15 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         id: 'name',
         header: 'Name',
         cell: renderNameCell,
-        size: 320,
+        size: 260,
+      }),
+
+      // Jovie Username column
+      columnHelper.display({
+        id: 'username',
+        header: 'Jovie Username',
+        cell: renderUsernameCell,
+        size: 180,
       }),
 
       // Sign up (Created) column
@@ -330,6 +350,30 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 120,
       }),
 
+      // Lifecycle column
+      columnHelper.display({
+        id: 'lifecycle',
+        header: 'Lifecycle',
+        cell: renderLifecycleCell,
+        size: 120,
+      }),
+
+      // Suppression column
+      columnHelper.display({
+        id: 'suppression',
+        header: 'Suppressed',
+        cell: renderSuppressionCell,
+        size: 130,
+      }),
+
+      // Welcome email column
+      columnHelper.display({
+        id: 'welcome',
+        header: 'Welcome',
+        cell: renderWelcomeCell,
+        size: 130,
+      }),
+
       // Actions column - shows ellipsis menu with SAME items as right-click context menu
       columnHelper.display({
         id: 'actions',
@@ -341,142 +385,155 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     [SelectHeader, SelectCell, ActionsCell]
   );
 
-  // Get row className - uses unified hover token
-  const getRowClassName = useCallback(() => {
-    return 'group hover:bg-surface-2/50';
-  }, []);
+  // Get row className - highlight selected row, hover for others
+  const getRowClassName = useCallback(
+    (row: AdminUserRow) =>
+      row.id === selectedUser?.id
+        ? 'bg-brand-primary/5 cursor-pointer'
+        : 'group hover:bg-surface-2/50 cursor-pointer',
+    [selectedUser?.id]
+  );
 
   return (
     <QueryErrorBoundary fallback={TableErrorFallback}>
-      <AdminTableShell
-        testId='admin-users-content'
-        toolbar={
-          <>
-            {/* Bulk actions toolbar (shows when rows selected) */}
-            <TableBulkActionsToolbar
-              selectedCount={selectedCount}
-              onClearSelection={clearSelection}
-              actions={bulkActions}
-            />
+      <div className='flex h-full'>
+        <div className='flex-1 min-w-0'>
+          <AdminTableShell
+            testId='admin-users-content'
+            toolbar={
+              <>
+                {/* Bulk actions toolbar (shows when rows selected) */}
+                <TableBulkActionsToolbar
+                  selectedCount={selectedCount}
+                  onClearSelection={clearSelection}
+                  actions={bulkActions}
+                />
 
-            {/* Main toolbar (always visible) */}
-            <div className='flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3'>
-              <div className='text-xs text-secondary-token tabular-nums'>
-                <span className='hidden sm:inline'>Showing </span>
-                {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()}
-                <span className='hidden sm:inline'> users</span>
-              </div>
-              <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
-                <form
-                  action={APP_ROUTES.ADMIN_USERS}
-                  method='get'
-                  className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
-                >
-                  <input type='hidden' name='sort' value={sort} />
-                  <Input
-                    name='q'
-                    defaultValue={search}
-                    placeholder='Search by email or name'
-                    className='w-full sm:w-[240px]'
-                  />
-                  <Button type='submit' size='sm' variant='secondary'>
-                    Search
-                  </Button>
-                  {search ? (
-                    <Button asChild size='sm' variant='ghost'>
-                      <Link href='?'>Clear</Link>
+                {/* Main toolbar (always visible) */}
+                <div className='flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3'>
+                  <div className='text-xs text-secondary-token tabular-nums'>
+                    <span className='hidden sm:inline'>Showing </span>
+                    {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                    {total.toLocaleString()}
+                    <span className='hidden sm:inline'> users</span>
+                  </div>
+                  <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
+                    <form
+                      action={APP_ROUTES.ADMIN_USERS}
+                      method='get'
+                      className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
+                    >
+                      <input type='hidden' name='sort' value={sort} />
+                      <Input
+                        name='q'
+                        defaultValue={search}
+                        placeholder='Search by email or name'
+                        className='w-full sm:w-[240px]'
+                      />
+                      <Button type='submit' size='sm' variant='secondary'>
+                        Search
+                      </Button>
+                      {search ? (
+                        <Button asChild size='sm' variant='ghost'>
+                          <Link href='?'>Clear</Link>
+                        </Button>
+                      ) : null}
+                    </form>
+                    <ExportCSVButton<AdminUserRow>
+                      getData={() => users}
+                      columns={usersCSVColumns}
+                      filename={USERS_CSV_FILENAME_PREFIX}
+                      disabled={users.length === 0}
+                      ariaLabel='Export users to CSV file'
+                    />
+                  </div>
+                </div>
+              </>
+            }
+          >
+            {() =>
+              isMobile ? (
+                <div className='space-y-3 p-3'>
+                  {users.length === 0 ? (
+                    <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                      <Users className='h-6 w-6' />
+                      <div>
+                        <div className='font-medium'>No users found</div>
+                        <div className='text-xs'>
+                          {search
+                            ? 'Try adjusting your search terms or clearing the filter.'
+                            : 'Users will appear here once they sign up.'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    users.map(user => (
+                      <AdminUserMobileCard
+                        key={user.id}
+                        user={user}
+                        isSelected={selectedIds.has(user.id)}
+                        onToggleSelect={toggleSelect}
+                        contextMenuItems={getContextMenuItems(user)}
+                      />
+                    ))
+                  )}
+
+                  {hasNextPage ? (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      size='sm'
+                      className='w-full'
+                      loading={isFetchingNextPage}
+                      onClick={() => {
+                        fetchNextPage().catch(() => {});
+                      }}
+                    >
+                      Load more users
                     </Button>
                   ) : null}
-                </form>
-                <ExportCSVButton<AdminUserRow>
-                  getData={() => users}
-                  columns={usersCSVColumns}
-                  filename={USERS_CSV_FILENAME_PREFIX}
-                  disabled={users.length === 0}
-                  ariaLabel='Export users to CSV file'
-                />
-              </div>
-            </div>
-          </>
-        }
-      >
-        {() =>
-          isMobile ? (
-            <div className='space-y-3 p-3'>
-              {users.length === 0 ? (
-                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                  <Users className='h-6 w-6' />
-                  <div>
-                    <div className='font-medium'>No users found</div>
-                    <div className='text-xs'>
-                      {search
-                        ? 'Try adjusting your search terms or clearing the filter.'
-                        : 'Users will appear here once they sign up.'}
-                    </div>
-                  </div>
                 </div>
               ) : (
-                users.map(user => (
-                  <AdminUserMobileCard
-                    key={user.id}
-                    user={user}
-                    isSelected={selectedIds.has(user.id)}
-                    onToggleSelect={toggleSelect}
-                    contextMenuItems={getContextMenuItems(user)}
-                  />
-                ))
-              )}
-
-              {hasNextPage ? (
-                <Button
-                  type='button'
-                  variant='secondary'
-                  size='sm'
-                  className='w-full'
-                  loading={isFetchingNextPage}
-                  onClick={() => {
+                <UnifiedTable
+                  data={users}
+                  columns={columns}
+                  rowSelection={rowSelection}
+                  isLoading={false}
+                  emptyState={
+                    <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                      <Users className='h-6 w-6' />
+                      <div>
+                        <div className='font-medium'>No users found</div>
+                        <div className='text-xs'>
+                          {search
+                            ? 'Try adjusting your search terms or clearing the filter.'
+                            : 'Users will appear here once they sign up.'}
+                        </div>
+                      </div>
+                    </div>
+                  }
+                  getRowId={row => row.id}
+                  getRowClassName={getRowClassName}
+                  onRowClick={handleRowClick}
+                  getContextMenuItems={getContextMenuItems}
+                  enableVirtualization={true}
+                  minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                  className='text-[13px]'
+                  hasNextPage={hasNextPage}
+                  isFetchingNextPage={isFetchingNextPage}
+                  onLoadMore={() => {
                     fetchNextPage().catch(() => {});
                   }}
-                >
-                  Load more users
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <UnifiedTable
-              data={users}
-              columns={columns}
-              rowSelection={rowSelection}
-              isLoading={false}
-              emptyState={
-                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                  <Users className='h-6 w-6' />
-                  <div>
-                    <div className='font-medium'>No users found</div>
-                    <div className='text-xs'>
-                      {search
-                        ? 'Try adjusting your search terms or clearing the filter.'
-                        : 'Users will appear here once they sign up.'}
-                    </div>
-                  </div>
-                </div>
-              }
-              getRowId={row => row.id}
-              getRowClassName={getRowClassName}
-              getContextMenuItems={getContextMenuItems}
-              enableVirtualization={true}
-              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[13px]'
-              hasNextPage={hasNextPage}
-              isFetchingNextPage={isFetchingNextPage}
-              onLoadMore={() => {
-                fetchNextPage().catch(() => {});
-              }}
-            />
-          )
-        }
-      </AdminTableShell>
+                />
+              )
+            }
+          </AdminTableShell>
+        </div>
+        <AdminUserDetailDrawer
+          user={selectedUser}
+          onClose={() => setSelectedUser(null)}
+        />
+      </div>
     </QueryErrorBoundary>
   );
 }

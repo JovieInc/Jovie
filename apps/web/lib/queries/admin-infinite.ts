@@ -20,17 +20,32 @@ export type AdminCreatorProfilesSort =
   | 'claimed_desc'
   | 'claimed_asc';
 
+export type AdminUserStatus =
+  | 'waitlist_pending'
+  | 'waitlist_approved'
+  | 'profile_claimed'
+  | 'onboarding_incomplete'
+  | 'active'
+  | 'suspended'
+  | 'banned';
+
 export interface AdminUserRow {
   id: string;
   clerkId: string;
   name: string | null;
   email: string | null;
+  userStatus: AdminUserStatus;
   createdAt: Date;
   deletedAt: Date | null;
   isPro: boolean;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
   plan: 'free' | 'pro';
+  profileUsername: string | null;
+  founderWelcomeSentAt: Date | null;
+  welcomeFailedAt: Date | null;
+  outboundSuppressedAt: Date | null;
+  suppressionFailedAt: Date | null;
 }
 
 export interface AdminCreatorProfileRow {
@@ -132,6 +147,10 @@ export function useAdminUsersInfiniteQuery({
           ...row,
           createdAt: new Date(row.createdAt),
           deletedAt: parseDate(row.deletedAt),
+          founderWelcomeSentAt: parseDate(row.founderWelcomeSentAt),
+          welcomeFailedAt: parseDate(row.welcomeFailedAt),
+          outboundSuppressedAt: parseDate(row.outboundSuppressedAt),
+          suppressionFailedAt: parseDate(row.suppressionFailedAt),
         })),
       };
     },
