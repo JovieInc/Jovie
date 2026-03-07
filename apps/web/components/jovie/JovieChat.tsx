@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 
 import {
@@ -454,6 +455,9 @@ export function JovieChat({
                   avatarUrl={avatarUrl}
                 />
               )}
+
+              {/* Profile completion card — always visible in empty state when incomplete */}
+              {!hasCarouselItems && <ProfileCompletionCard />}
 
               {/* Hide help text and prompts while the carousel has items */}
               {!hasCarouselItems && (
