@@ -39,19 +39,16 @@ describe('validateUsernameFormat', () => {
   });
 
   it('should reject usernames with invalid characters', () => {
-    expect(validateUsernameFormat('user_name')).toEqual({
-      valid: false,
-      error: 'Handle can only contain letters, numbers, and hyphens',
-    });
-
     expect(validateUsernameFormat('user@name')).toEqual({
       valid: false,
-      error: 'Handle can only contain letters, numbers, and hyphens',
+      error:
+        'Handle can only contain letters, numbers, hyphens, underscores, and dots',
     });
 
     expect(validateUsernameFormat('user name')).toEqual({
       valid: false,
-      error: 'Handle can only contain letters, numbers, and hyphens',
+      error:
+        'Handle can only contain letters, numbers, hyphens, underscores, and dots',
     });
   });
 
@@ -65,7 +62,7 @@ describe('validateUsernameFormat', () => {
   it('should reject usernames ending with hyphens', () => {
     expect(validateUsernameFormat('username-')).toEqual({
       valid: false,
-      error: 'Handle cannot end with a hyphen',
+      error: 'Handle cannot end with a hyphen, underscore, or dot',
     });
   });
 
