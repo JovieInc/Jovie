@@ -25,7 +25,7 @@ import {
   handleExistingUnclaimedProfile,
   type SocialPlatformContext,
 } from '@/lib/ingestion/flows/social-platform-flow';
-import { fetchSpotifyArtistName } from '@/lib/ingestion/flows/spotify-integration';
+import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   isValidHandle,
@@ -196,7 +196,7 @@ async function processSocialPlatformIngestion(
 
   const { handle, normalizedHandle } = handleResult;
   const platformId = detected.platform.id;
-  const spotifyArtistName = await fetchSpotifyArtistName(handle, platformId);
+  const spotifyData = await fetchSpotifyArtistData(handle, platformId);
 
   const socialContext: SocialPlatformContext = {
     handle,
@@ -204,7 +204,8 @@ async function processSocialPlatformIngestion(
     platformId,
     platformName: detected.platform.name,
     normalizedUrl: detected.normalizedUrl,
-    spotifyArtistName,
+    spotifyArtistName: spotifyData?.name ?? null,
+    spotifyData,
   };
 
   return withSystemIngestionSession(async tx => {

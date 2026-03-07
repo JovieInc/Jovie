@@ -111,7 +111,10 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 - Do not add or remove links without showing the confirmation preview first.
 - All link changes instantly update the sidebar profile preview.
 
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.${buildPlanLimitationsSection(options)}`;
+When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
+
+## Feedback
+When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildPlanLimitationsSection(options)}`;
 }
 
 function buildPlanLimitationsSection(options?: {

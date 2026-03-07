@@ -35,11 +35,13 @@ on:
   # (CodeRabbit, Copilot) create action_required runs that clog the CI
   # queue. Fork PR approval is still enforced on PR open/sync events.
   # Human approval for fork PRs re-triggers via the PR synchronize event.
+  merge_group:
+    types: [checks_requested]
 
 permissions: {}
 
 concurrency:
-  group: fork-pr-gate-${{ github.event.pull_request.number }}
+  group: fork-pr-gate-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 jobs:
@@ -60,7 +62,22 @@ jobs:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
 
+      - name: Auto-pass for merge queue
+        if: github.event_name == 'merge_group'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # PRs entering the merge queue already passed the gate at PR time.
+          # Set success on the merge group HEAD SHA so the required check is satisfied.
+          echo "Merge group event — auto-passing Fork PR Gate."
+          gh api repos/${{ github.repository }}/statuses/${{ github.event.merge_group.head_sha }} \
+            -f state="success" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Merge queue — fork gate already cleared at PR time" \
+            -f context="Fork PR Gate"
+
       - name: Resolve PR metadata
+        if: github.event_name != 'merge_group'
         id: pr-meta
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -84,7 +101,7 @@ jobs:
           echo "PR #$PR_NUMBER | fork=$IS_FORK | sha=$HEAD_SHA"
 
       - name: Auto-pass for non-fork PRs
-        if: steps.pr-meta.outputs.is_fork != 'true'
+        if: github.event_name != 'merge_group' && steps.pr-meta.outputs.is_fork != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -97,7 +114,7 @@ jobs:
 
       - name: Check sensitive files (fork PRs only)
         id: sensitive-check
-        if: steps.pr-meta.outputs.is_fork == 'true'
+        if: github.event_name != 'merge_group' && steps.pr-meta.outputs.is_fork == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -141,7 +158,7 @@ jobs:
           fi
 
       - name: Comment on sensitive file changes
-        if: steps.pr-meta.outputs.is_fork == 'true' && steps.sensitive-check.outputs.has_sensitive == 'true'
+        if: github.event_name != 'merge_group' && steps.pr-meta.outputs.is_fork == 'true' && steps.sensitive-check.outputs.has_sensitive == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         # Only comment once — check for existing comment marker first
@@ -173,7 +190,7 @@ jobs:
 
       - name: Check for human approval (fork PRs only)
         id: approval-check
-        if: steps.pr-meta.outputs.is_fork == 'true'
+        if: github.event_name != 'merge_group' && steps.pr-meta.outputs.is_fork == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -194,7 +211,7 @@ jobs:
           fi
 
       - name: Set gate status (fork PRs)
-        if: steps.pr-meta.outputs.is_fork == 'true'
+        if: github.event_name != 'merge_group' && steps.pr-meta.outputs.is_fork == 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |

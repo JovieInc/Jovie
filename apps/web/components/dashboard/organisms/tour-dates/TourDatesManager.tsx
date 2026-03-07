@@ -139,7 +139,7 @@ export function TourDatesManager({
         {isConnected && connectionStatus.artistName && (
           <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-2'>
             <div className='flex items-center gap-2'>
-              <div className='flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30'>
+              <div className='flex h-6 w-6 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30'>
                 <Icon
                   name='Check'
                   className='h-4 w-4 text-teal-600 dark:text-teal-400'

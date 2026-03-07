@@ -50,7 +50,7 @@ export function DspMatchEmptyState({ status }: DspMatchEmptyStateProps) {
 
   return (
     <div className='flex flex-col items-center justify-center gap-4 py-12 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-secondary-token'>
+      <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-surface-2 text-secondary-token'>
         <Icon name={icon} className='h-6 w-6' />
       </div>
 
