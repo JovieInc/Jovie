@@ -35,9 +35,11 @@ import {
   createSelectCellRenderer,
   createSelectHeaderRenderer,
   renderCreatedDateCell,
+  renderFunnelCell,
   renderLifecycleCell,
   renderNameCell,
   renderPlanCell,
+  renderProfileCell,
   renderStatusCell,
   renderSuppressionCell,
   renderUsernameCell,
@@ -334,12 +336,28 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 160,
       }),
 
+      // Profile column
+      columnHelper.accessor('profileUsername', {
+        id: 'profile',
+        header: 'Profile',
+        cell: renderProfileCell,
+        size: 160,
+      }),
+
+      // Funnel status column
+      columnHelper.accessor('userStatus', {
+        id: 'funnel',
+        header: 'Funnel',
+        cell: renderFunnelCell,
+        size: 140,
+      }),
+
       // Plan column
       columnHelper.accessor('plan', {
         id: 'plan',
         header: 'Plan',
         cell: renderPlanCell,
-        size: 140,
+        size: 120,
       }),
 
       // Status column
@@ -347,7 +365,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         id: 'status',
         header: 'Status',
         cell: renderStatusCell,
-        size: 120,
+        size: 100,
       }),
 
       // Lifecycle column
