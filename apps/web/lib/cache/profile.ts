@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath, revalidateTag } from 'next/cache';
-import { APP_ROUTES } from '@/constants/routes';
 import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import {
   CACHE_TAGS,
@@ -21,18 +20,15 @@ export async function invalidateProfileCache(
   usernameNormalized: string | null | undefined,
   oldUsernameNormalized?: string | null
 ): Promise<void> {
-  // Invalidate dashboard data cache
+  // Invalidate dashboard data cache (tag-based — no full page refresh)
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
 
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
     revalidatePath(`/${usernameNormalized}`);
+    revalidateTag(createProfileTag(usernameNormalized), 'max');
     // Invalidate Redis edge cache
     await invalidateProfileEdgeCache(usernameNormalized);
-  }
-
-  if (usernameNormalized) {
-    revalidateTag(createProfileTag(usernameNormalized), 'max');
   }
 
   // If username changed, also invalidate the old path
@@ -43,9 +39,11 @@ export async function invalidateProfileCache(
     await invalidateProfileEdgeCache(oldUsernameNormalized);
   }
 
-  // Invalidate dashboard pages that display profile data
-  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
-  revalidatePath(APP_ROUTES.SETTINGS);
+  // NOTE: We intentionally do NOT call revalidatePath on dashboard/settings
+  // pages here. revalidatePath triggers a full server re-render which causes
+  // a visible full-page refresh. The dashboard uses TanStack Query for data
+  // fetching, which handles refetching via its own cache invalidation.
+  // The revalidateTag('dashboard-data') above is sufficient.
 }
 
 /**
@@ -83,10 +81,8 @@ export async function invalidateSocialLinksCache(
     revalidatePath(`/${usernameNormalized}`);
   }
 
-  // Also invalidate dashboard where links are managed
+  // Invalidate dashboard data cache (tag-only, no full page refresh)
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
-  revalidatePath(APP_ROUTES.DASHBOARD_LINKS);
 }
 
 /**
@@ -110,8 +106,6 @@ export async function invalidateAvatarCache(
     revalidatePath(`/${usernameNormalized}`);
   }
 
-  // Dashboard also shows avatar
+  // Invalidate dashboard data cache (tag-only, no full page refresh)
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
-  revalidatePath(APP_ROUTES.SETTINGS);
 }

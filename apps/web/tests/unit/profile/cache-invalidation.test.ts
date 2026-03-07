@@ -76,12 +76,12 @@ describe('Profile Cache Invalidation', () => {
       expect(mockRevalidatePath).not.toHaveBeenCalledWith('/null');
     });
 
-    it('invalidates dashboard paths', async () => {
+    it('does not revalidatePath on dashboard pages (avoids full page refresh)', async () => {
       const { invalidateProfileCache } = await import('@/lib/cache/profile');
       await invalidateProfileCache('testartist');
 
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard');
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings');
+      expect(mockRevalidatePath).not.toHaveBeenCalledWith('/app/dashboard');
+      expect(mockRevalidatePath).not.toHaveBeenCalledWith('/app/settings');
     });
   });
 
@@ -118,14 +118,16 @@ describe('Profile Cache Invalidation', () => {
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
     });
 
-    it('invalidates dashboard link pages', async () => {
+    it('does not revalidatePath on dashboard pages (avoids full page refresh)', async () => {
       const { invalidateSocialLinksCache } = await import(
         '@/lib/cache/profile'
       );
       await invalidateSocialLinksCache('profile-123', 'testartist');
 
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard');
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard/links');
+      expect(mockRevalidatePath).not.toHaveBeenCalledWith('/app/dashboard');
+      expect(mockRevalidatePath).not.toHaveBeenCalledWith(
+        '/app/dashboard/links'
+      );
     });
   });
 
