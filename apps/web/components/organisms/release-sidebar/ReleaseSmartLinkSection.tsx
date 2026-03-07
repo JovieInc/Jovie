@@ -14,8 +14,10 @@ export function ReleaseSmartLinkSection({
   const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
 
   return (
-    <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-      <Label className='text-xs text-tertiary-token'>Smart link</Label>
+    <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
+      <Label className='text-xs font-medium text-secondary-token'>
+        Smart link
+      </Label>
       <CopyLinkInput url={smartLinkUrl} size='sm' />
     </div>
   );

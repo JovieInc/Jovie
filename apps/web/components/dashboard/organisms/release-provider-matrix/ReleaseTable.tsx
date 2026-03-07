@@ -136,7 +136,7 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-bg-surface-1)';
+          'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1)';
@@ -346,7 +346,7 @@ export function ReleaseTable({
       minWidth={minWidth}
       hideHeader
       className='bg-(--linear-bg-surface-0) text-[13px] text-(--linear-text-primary)'
-      containerClassName='h-full rounded-[var(--linear-radius-lg)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.03)]'
+      containerClassName='h-full rounded-[var(--linear-radius-lg)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.03)] ring-1 ring-black/5'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       groupingConfig={groupingConfig}
