@@ -89,7 +89,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
   memberColumnHelper.accessor('displayName', {
     id: 'user',
-    header: 'Visitor',
+    header: 'User',
     cell: renderUserCell,
     size: 220,
   }),
