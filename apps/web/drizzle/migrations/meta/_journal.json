@@ -421,6 +421,13 @@
       "when": 1772956800000,
       "tag": "0059_add_user_lifecycle_email_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1772938561227,
+      "tag": "0060_daily_profile_views_rollup",
+      "breakpoints": true
     }
   ]
 }

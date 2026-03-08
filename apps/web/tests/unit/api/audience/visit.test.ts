@@ -188,6 +188,17 @@ describe('POST /api/audience/visit', () => {
       }),
     });
     mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi
+        .fn()
+        .mockReturnValueOnce({
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          }),
+        })
+        .mockReturnValueOnce({
+          values: vi.fn().mockResolvedValue(undefined),
+        });
+
       await callback({
         select: vi.fn().mockReturnValue({
           from: vi.fn().mockReturnValue({
@@ -196,9 +207,7 @@ describe('POST /api/audience/visit', () => {
             }),
           }),
         }),
-        insert: vi.fn().mockReturnValue({
-          values: vi.fn().mockResolvedValue(undefined),
-        }),
+        insert: mockInsert,
       });
     });
 

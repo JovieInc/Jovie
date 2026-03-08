@@ -2,6 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -152,6 +153,28 @@ export const clickEvents = pgTable(
     nonBotClicksIdx: index('idx_click_events_non_bot')
       .on(table.creatorProfileId, table.createdAt)
       .where(drizzleSql`is_bot = false OR is_bot IS NULL`),
+  })
+);
+
+export const dailyProfileViews = pgTable(
+  'daily_profile_views',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    viewDate: date('view_date', { mode: 'string' }).notNull(),
+    viewCount: integer('view_count').default(0).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileViewDateUnique: uniqueIndex(
+      'daily_profile_views_creator_profile_id_view_date_unique'
+    ).on(table.creatorProfileId, table.viewDate),
+    creatorProfileViewDateIdx: index(
+      'daily_profile_views_creator_profile_id_view_date_idx'
+    ).on(table.creatorProfileId, table.viewDate),
   })
 );
 
@@ -324,6 +347,9 @@ export type NewAudienceMember = typeof audienceMembers.$inferInsert;
 
 export type ClickEvent = typeof clickEvents.$inferSelect;
 export type NewClickEvent = typeof clickEvents.$inferInsert;
+
+export type DailyProfileView = typeof dailyProfileViews.$inferSelect;
+export type NewDailyProfileView = typeof dailyProfileViews.$inferInsert;
 
 export type NotificationSubscription =
   typeof notificationSubscriptions.$inferSelect;
