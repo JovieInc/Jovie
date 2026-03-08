@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
@@ -32,8 +32,6 @@ export function ContactDrawer({
   primaryChannel,
   buildTerritoryLabel,
 }: ContactDrawerProps) {
-  const historyPushedRef = useRef(false);
-
   useEffect(() => {
     if (!open) return;
 
@@ -42,28 +40,11 @@ export function ContactDrawer({
       contacts_count: contacts.length,
     });
 
-    if (!historyPushedRef.current) {
-      globalThis.history.pushState({ contactDrawer: true }, '');
-      historyPushedRef.current = true;
-    }
-
-    const handlePopState = () => {
-      if (historyPushedRef.current) {
-        historyPushedRef.current = false;
-        onOpenChange(false);
-      }
-    };
-
-    globalThis.addEventListener('popstate', handlePopState);
-    return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [open, artistHandle, contacts.length, onOpenChange]);
+    return undefined;
+  }, [open, artistHandle, contacts.length]);
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen && historyPushedRef.current) {
-        historyPushedRef.current = false;
-        globalThis.history.back();
-      }
       onOpenChange(isOpen);
     },
     [onOpenChange]
