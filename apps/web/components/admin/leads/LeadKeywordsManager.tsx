@@ -123,14 +123,14 @@ export function LeadKeywordsManager() {
 
   if (loading) {
     return (
-      <div className='rounded-lg border border-subtle bg-surface-1/90 p-4 text-sm text-secondary-token'>
+      <div className='rounded-lg border border-subtle p-4 text-sm text-secondary-token'>
         Loading keywords...
       </div>
     );
   }
 
   return (
-    <section className='rounded-lg border border-subtle bg-surface-1/90 p-4 sm:p-6'>
+    <section className='rounded-lg border border-subtle p-4 sm:p-6'>
       <div className='mb-4 flex items-center justify-between'>
         <div>
           <h2 className='text-sm font-semibold text-primary-token'>

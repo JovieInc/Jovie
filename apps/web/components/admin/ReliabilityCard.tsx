@@ -49,7 +49,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
     : '—';
 
   return (
-    <Card className='h-full border-subtle bg-surface-1/80'>
+    <Card className='h-full border-subtle bg-transparent'>
       <CardHeader className='space-y-1 p-5 pb-3'>
         <div className='flex items-start justify-between gap-2'>
           <div>

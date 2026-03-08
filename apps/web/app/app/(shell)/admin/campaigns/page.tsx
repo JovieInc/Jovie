@@ -11,9 +11,9 @@ const InviteCampaignManager = dynamic(
   {
     loading: () => (
       <div className='space-y-4 animate-pulse'>
-        <div className='h-10 w-48 rounded-md bg-surface-1' />
-        <div className='h-64 w-full rounded-md bg-surface-1' />
-        <div className='h-10 w-32 rounded-md bg-surface-1' />
+        <div className='h-10 w-48 rounded-md skeleton' />
+        <div className='h-64 w-full rounded-md skeleton' />
+        <div className='h-10 w-32 rounded-md skeleton' />
       </div>
     ),
   }

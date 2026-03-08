@@ -43,7 +43,7 @@ export function WaitlistKanbanCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-subtle bg-surface-1 p-3',
+        'rounded-lg border border-subtle p-3',
         'transition-shadow duration-200 hover:shadow-md',
         'cursor-grab active:cursor-grabbing'
       )}

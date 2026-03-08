@@ -77,7 +77,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 return (
                   <div
                     key={ss.id}
-                    className='group rounded-xl border border-subtle bg-surface-1 overflow-hidden'
+                    className='group rounded-xl border border-subtle overflow-hidden'
                   >
                     <button
                       type='button'

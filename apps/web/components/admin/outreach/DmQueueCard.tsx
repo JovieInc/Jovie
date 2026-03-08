@@ -55,7 +55,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
 
   return (
     <div
-      className={`rounded-lg border border-subtle bg-surface-1/90 p-4 space-y-3 ${
+      className={`rounded-lg border border-subtle p-4 space-y-3 ${
         markedDone ? 'opacity-50' : ''
       }`}
     >
