@@ -62,7 +62,35 @@ When querying Linear, always apply both filters:
   - Description: issue body + Linear URL + acceptance criteria
   - Include dedupe key = Linear issue ID
 
-### 2) Dispatch + Task Execution
+### 2) Batch Analysis
+
+After intake, group small related issues into batches before dispatch. This avoids PR sprawl when multiple trivial issues target the same area.
+
+**Batching eligibility** — ALL must be true for each issue in a candidate batch:
+
+- **Trivial scope**: UI tweak, copy/text change, style fix, config change, or similar — no new features, no logic changes, no schema changes
+- **Same target area**: Issues touch the same component, page, or module (e.g., all target `apps/web/components/dashboard/` or `apps/web/app/(app)/settings/`)
+- **Same change type**: All UI fixes, all copy updates, all style tweaks, etc. — don't mix types
+- **Within PR size limits**: Combined estimated diff ≤ 400 lines and ≤ 10 files (per AGENTS.md)
+- **Max 5 issues per batch**: Keeps PRs reviewable
+
+**Grouping algorithm:**
+
+1. From the intake queue, identify issues that look trivial (based on title, description, labels, and estimated scope)
+2. Group by `(target area, change type)` — e.g., `(dashboard components, UI fix)` or `(settings page, copy change)`
+3. For each group, greedily pack issues into batches of up to 5, ensuring combined scope stays within PR limits
+4. Issues that don't fit any batch remain as solo tasks (dispatched individually per existing behavior)
+
+**Batch rules:**
+
+- One batch = one branch = one PR
+- Branch name: `fix/batch-<area>-<issue-ids>` (e.g., `fix/batch-dashboard-JOV-101-102-103`)
+- If a batch fails validation, retry the **entire batch** — do not split mid-flight
+- If a batch repeatedly fails (≥2 retries), break it into solo issues and redispatch individually
+
+### 3) Dispatch + Task Execution
+
+#### Solo issues (default path)
 
 - Assign unclaimed tasks (or allow self-claim)
 - Each task handler must:
@@ -71,7 +99,16 @@ When querying Linear, always apply both filters:
   3. Run `/ship` to commit, push branch, and open PR
   4. Link PR back to the Linear issue
 
-### 3) Validation Gates (minimum)
+#### Batched issues
+
+- Single task handler implements **all issues in the batch** on one branch
+- Work through issues sequentially, committing after each (or as logical units)
+- Commit messages reference the specific issue: `fix(dashboard): update button spacing (JOV-101)`
+- Final PR encompasses all commits for the batch
+- PR title uses batch format: `fix(<area>): batch <type> fixes (<issue-ids>)`
+- All Linear issues in the batch get linked to the same PR
+
+### 4) Validation Gates (minimum)
 
 - `pnpm turbo typecheck`
 - `pnpm turbo lint`
@@ -80,7 +117,7 @@ When querying Linear, always apply both filters:
 
 If task touches app/web runtime/db flows, run relevant scoped checks too.
 
-### 4) Background PR Orchestration (parallel)
+### 5) Background PR Orchestration (parallel)
 
 Continuously monitor teammate PRs and run `/orchestrate` behavior:
 
@@ -90,14 +127,23 @@ Continuously monitor teammate PRs and run `/orchestrate` behavior:
 - Push follow-up fixes
 - Sync PR status and summary back to Linear
 
-### 5) Linear Status Sync Rules
+### 6) Linear Status Sync Rules
+
+#### Solo issues
 
 - Merged/completed -> set `done` with PR link + merge SHA
 - Open PR / awaiting review -> set `review` with PR link
 - Blocked -> set `blocked` with explicit blocker + next action
 - Retrying after failure -> comment attempt number + failure summary
 
-### 6) Retry + Escalation
+#### Batched issues
+
+- All issues in a merged batch -> set `done` on **every** issue with shared PR link + merge SHA
+- All issues in an open batch PR -> set `review` on **every** issue with shared PR link
+- If batch is blocked -> set `blocked` on all issues with blocker details
+- If batch is broken into solo issues after repeated failure -> update each issue independently from that point
+
+### 7) Retry + Escalation
 
 - On failure, requeue with:
   - reason
@@ -106,7 +152,7 @@ Continuously monitor teammate PRs and run `/orchestrate` behavior:
   - elevated priority when repeated
 - Escalate to lead channel when retry threshold is exceeded
 
-### 7) Efficiency Defaults
+### 8) Efficiency Defaults
 
 - Batch short tool calls
 - Parallelize independent workstreams
@@ -115,12 +161,49 @@ Continuously monitor teammate PRs and run `/orchestrate` behavior:
 
 ## PR Output Requirements
 
-Every shipped PR should include:
+### Solo PRs
 
 - Linear issue link
-- concise change summary
-- validation evidence (typecheck/lint/test)
-- rollback notes for risky changes
+- Concise change summary
+- Validation evidence (typecheck/lint/test)
+- Rollback notes for risky changes
+
+### Batch PRs
+
+Title format: `fix(<area>): batch <type> fixes (<issue-ids>)`
+
+Example: `fix(dashboard): batch UI fixes (JOV-101, JOV-102, JOV-103)`
+
+Body template:
+
+```markdown
+## Summary
+
+Batch of <N> related <type> fixes in `<target area>`.
+
+## Changes
+
+### JOV-101: <issue title>
+<1-2 sentence summary of what changed>
+
+### JOV-102: <issue title>
+<1-2 sentence summary of what changed>
+
+### JOV-103: <issue title>
+<1-2 sentence summary of what changed>
+
+## Validation
+- [x] typecheck
+- [x] lint
+- [x] tests
+
+## Linear Issues
+- JOV-101
+- JOV-102
+- JOV-103
+```
+
+### General
 
 When required by team process, add PR comment:
 
