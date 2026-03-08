@@ -45,7 +45,7 @@
         "@radix-ui/react-toggle-group",
         "@radix-ui/react-tooltip",
         "@sentry/node",
-        "glob"
+        "recharts"
       ],
       "playwright": {
         "config": [
