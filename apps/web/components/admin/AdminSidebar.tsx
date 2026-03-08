@@ -113,10 +113,7 @@ export function AdminSidebar({ className }: Readonly<AdminSidebarProps>) {
       </SidebarHeader>
 
       <SidebarContent>
-        <nav
-          aria-label='Admin navigation'
-          className='flex flex-1 flex-col overflow-hidden'
-        >
+        <nav aria-label='Admin navigation' className='flex flex-1 flex-col'>
           <SidebarMenu>
             {navItems.map(item => {
               const isActive = item.href === activeHref;
