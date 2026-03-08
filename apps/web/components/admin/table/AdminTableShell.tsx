@@ -115,10 +115,7 @@ export function AdminTableShell({
 
   return (
     <div
-      className={cn(
-        'flex h-full min-h-0 flex-col contain-layout',
-        className
-      )}
+      className={cn('flex h-full min-h-0 flex-col contain-layout', className)}
       data-testid={testId}
     >
       <div
@@ -141,11 +138,7 @@ export function AdminTableShell({
         {children({ headerElevated, stickyTopPx })}
       </div>
 
-      {footer ? (
-        <div className='border-t border-subtle'>
-          {footer}
-        </div>
-      ) : null}
+      {footer ? <div className='border-t border-subtle'>{footer}</div> : null}
     </div>
   );
 }
