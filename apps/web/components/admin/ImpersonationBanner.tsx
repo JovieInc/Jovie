@@ -56,29 +56,23 @@ export function ImpersonationBanner({
     });
   }, [refetchStatus]);
 
-  // Countdown timer tick handler - extracted to reduce nesting depth
-  const handleCountdownTick = useCallback(
-    (prev: number): number => {
-      const newTime = prev - 1000;
-      if (newTime <= 0) {
-        handleSessionExpiry();
-        return 0;
-      }
-      return newTime;
-    },
-    [handleSessionExpiry]
-  );
-
   // Countdown timer
   useEffect(() => {
-    if (!state?.isImpersonating || timeRemaining <= 0) return;
+    if (!state?.isImpersonating) return;
 
     const interval = setInterval(() => {
-      setTimeRemaining(handleCountdownTick);
+      setTimeRemaining(prev => {
+        if (prev <= 1000) {
+          handleSessionExpiry();
+          return 0;
+        }
+
+        return prev - 1000;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state?.isImpersonating, timeRemaining, handleCountdownTick]);
+  }, [state?.isImpersonating, handleSessionExpiry]);
 
   // End impersonation handler
   const handleEndImpersonation = () => {
