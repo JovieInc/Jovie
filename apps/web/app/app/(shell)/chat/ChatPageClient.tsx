@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
+import { AlertCircle, Check, Copy, Loader2, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -284,27 +284,36 @@ export function ChatPageClient({
 
   if (!selectedProfile) {
     const profileMessage = isProfileSetupRace
-      ? 'Looks like your profile is still being set up. This usually takes a few seconds.'
+      ? 'Finishing your dashboard setup…'
       : 'We hit a problem loading your profile. Please retry in a moment.';
 
     return (
       <div className='flex h-full items-center justify-center'>
         <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
-          <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          {isProfileSetupRace ? (
+            <Loader2
+              className='h-8 w-8 text-tertiary-token animate-spin'
+              aria-hidden='true'
+            />
+          ) : (
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          )}
           <p className='text-sm text-secondary-token'>{profileMessage}</p>
           {isProfileSetupRace && canAutoRetry && (
             <p className='text-xs text-tertiary-token'>
               Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
             </p>
           )}
-          <button
-            type='button'
-            onClick={() => router.refresh()}
-            className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
-          >
-            <RefreshCw className='h-4 w-4' />
-            Retry
-          </button>
+          {!isProfileSetupRace && (
+            <button
+              type='button'
+              onClick={() => router.refresh()}
+              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </button>
+          )}
         </div>
       </div>
     );
