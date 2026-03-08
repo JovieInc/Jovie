@@ -25,7 +25,7 @@ export function AudienceMemberHeader({
           src={avatarSrc}
           alt={title ? `${title} avatar` : 'Audience member avatar'}
           name={avatarName}
-          size='lg'
+          size='xl'
         />
       }
       title={title}

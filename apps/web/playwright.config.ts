@@ -109,7 +109,7 @@ export default defineConfig({
       dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
-    // Only run Firefox in full-matrix workflow (weekly comprehensive testing)
+    // Firefox and WebKit run in nightly full-matrix workflow only
     ...(isFullMatrix
       ? [
           {
@@ -117,11 +117,6 @@ export default defineConfig({
             dependencies: ['auth-setup'],
             use: { ...devices['Desktop Firefox'] },
           },
-        ]
-      : []),
-    // Keep WebKit for local testing only (skip in CI)
-    ...(!isCI
-      ? [
           {
             name: 'webkit',
             dependencies: ['auth-setup'],

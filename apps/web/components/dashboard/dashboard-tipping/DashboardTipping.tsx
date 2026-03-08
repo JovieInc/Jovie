@@ -1,15 +1,25 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Input,
+} from '@jovie/ui';
 import {
   BarChart3,
   Check,
   Copy,
   Link2,
+  Link2Off,
+  MoreHorizontal,
   MousePointerClick,
+  Pencil,
   ScanLine,
   Wallet,
-  X,
 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -90,39 +100,48 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
   onEdit,
   onDisconnect,
 }: VenmoConnectedBadgeProps) {
+  const [isOpen, setIsOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div className='flex items-center gap-2'>
-      <button
-        type='button'
-        onClick={onEdit}
-        className='inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent-token transition-colors hover:bg-accent/20 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm'
-      >
-        <Wallet className='h-3.5 w-3.5 sm:h-4 sm:w-4' />
-        <span className='truncate'>@{venmoHandle}</span>
-      </button>
-
-      <button
-        type='button'
-        onClick={onDisconnect}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className='inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-1 px-2 py-1 text-[11px] font-medium transition-colors hover:border-error/50 hover:bg-error/10 hover:text-error sm:gap-1.5 sm:px-2.5 sm:text-xs'
-      >
-        {isHovered ? (
-          <>
-            <X className='h-3 w-3' />
-            <span>Disconnect</span>
-          </>
-        ) : (
-          <>
-            <Check className='h-3 w-3 text-success' />
-            <span className='text-secondary-token'>Connected</span>
-          </>
-        )}
-      </button>
-    </div>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type='button'
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          className='inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent-token transition-colors hover:bg-accent/20 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm'
+        >
+          <Wallet className='h-3.5 w-3.5 sm:h-4 sm:w-4' />
+          <span className='truncate'>@{venmoHandle}</span>
+          {isHovered || isOpen ? (
+            <MoreHorizontal className='h-3.5 w-3.5 sm:h-4 sm:w-4' />
+          ) : (
+            <Check className='h-3.5 w-3.5 text-success sm:h-4 sm:w-4' />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end' sideOffset={6}>
+        <DropdownMenuItem
+          onSelect={() => {
+            onEdit();
+          }}
+        >
+          <Pencil className='mr-2 h-3.5 w-3.5' />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant='destructive'
+          onSelect={() => {
+            onDisconnect();
+          }}
+        >
+          <Link2Off className='mr-2 h-3.5 w-3.5' />
+          Disconnect
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 });
 

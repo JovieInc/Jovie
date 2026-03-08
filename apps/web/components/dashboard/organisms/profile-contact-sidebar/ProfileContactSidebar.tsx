@@ -261,11 +261,11 @@ export function ProfileContactSidebar() {
         title={<div className='h-4 w-24 rounded skeleton' />}
         onClose={close}
         entityHeader={
-          <div className='flex items-center gap-3'>
-            <div className='h-12 w-12 rounded-full skeleton' />
+          <div className='flex items-center gap-4'>
+            <div className='h-20 w-20 rounded-full skeleton' />
             <div className='space-y-2'>
-              <div className='h-4 w-28 rounded skeleton' />
-              <div className='h-3 w-20 rounded skeleton' />
+              <div className='h-5 w-28 rounded skeleton' />
+              <div className='h-3.5 w-20 rounded skeleton' />
             </div>
           </div>
         }
@@ -319,7 +319,7 @@ export function ProfileContactSidebar() {
       title={headerTitle}
       headerActions={headerActions}
       entityHeader={
-        <div className='space-y-3'>
+        <div className='space-y-4'>
           <ProfileContactHeader
             displayName={displayName}
             username={username}
@@ -337,7 +337,7 @@ export function ProfileContactSidebar() {
             href={profileUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='block text-[12px] text-secondary-token hover:text-primary-token transition-colors truncate'
+            className='block text-[13px] text-secondary-token hover:text-primary-token transition-colors truncate'
           >
             {profileUrl.replace(/^https?:\/\//, '')}
           </a>
