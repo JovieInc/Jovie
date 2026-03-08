@@ -23,7 +23,7 @@ export interface DrawerSettingsToggleProps {
  *
  * Renders label on the left and toggle on the right, all on a single line.
  *
- * Used by: ReleaseSettings, ProfilePhotoSettings, and any future drawer toggles.
+ * Used by: DrawerAsyncToggle and any future drawer toggles.
  */
 export function DrawerSettingsToggle({
   label,

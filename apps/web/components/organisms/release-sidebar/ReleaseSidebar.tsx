@@ -13,15 +13,17 @@ import { Copy, ExternalLink, RefreshCw, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
-
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerAsyncToggle,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
-
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
@@ -29,7 +31,6 @@ import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleaseMetadata } from './ReleaseMetadata';
-import { ReleaseSettings } from './ReleaseSettings';
 import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
@@ -389,7 +390,17 @@ export function ReleaseSidebar({
                 }
               />
               {isEditable && (
-                <ReleaseSettings allowDownloads={allowDownloads} />
+                <DrawerAsyncToggle
+                  label='Art downloads'
+                  ariaLabel='Allow artwork downloads on public pages'
+                  checked={allowDownloads}
+                  onToggle={updateAllowArtworkDownloads}
+                  successMessage={on =>
+                    on
+                      ? 'Artwork downloads enabled'
+                      : 'Artwork downloads disabled'
+                  }
+                />
               )}
             </>
           )}
