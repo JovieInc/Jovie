@@ -22,7 +22,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
-
 import {
   DrawerAsyncToggle,
   EntitySidebarShell,
@@ -32,7 +31,6 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
-
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -477,12 +475,27 @@ export function ReleaseSidebar({
           )}
 
           {activeTab === 'details' && (
-            <ReleaseMetadata
-              release={release}
-              onCanvasStatusChange={
-                canEditCanvasStatus ? handleCanvasStatusChange : undefined
-              }
-            />
+            <>
+              <ReleaseMetadata
+                release={release}
+                onCanvasStatusChange={
+                  canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                }
+              />
+              {isEditable && (
+                <DrawerAsyncToggle
+                  label='Art downloads'
+                  ariaLabel='Allow artwork downloads on public pages'
+                  checked={allowDownloads}
+                  onToggle={updateAllowArtworkDownloads}
+                  successMessage={on =>
+                    on
+                      ? 'Artwork downloads enabled'
+                      : 'Artwork downloads disabled'
+                  }
+                />
+              )}
+            </>
           )}
 
           {activeTab === 'lyrics' && (

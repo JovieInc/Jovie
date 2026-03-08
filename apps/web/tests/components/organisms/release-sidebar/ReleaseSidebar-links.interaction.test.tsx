@@ -245,6 +245,7 @@ describe('ReleaseSidebar Links tab', () => {
     await user.click(screen.getByRole('tab', { name: /details/i }));
     expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 

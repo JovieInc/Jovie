@@ -23,7 +23,7 @@ export interface DrawerSettingsToggleProps {
  *
  * Renders label on the left and toggle on the right, all on a single line.
  *
- * Presentational primitive — wrap with DrawerAsyncToggle for async state management.
+ * Used by: DrawerAsyncToggle and any future drawer toggles.
  */
 export function DrawerSettingsToggle({
   label,
@@ -37,14 +37,11 @@ export function DrawerSettingsToggle({
 
   return (
     <div
-      className={cn(
-        'flex items-center justify-between gap-3 py-1.5',
-        className
-      )}
+      className={cn('flex items-center justify-between gap-3 py-1', className)}
     >
       <label
         htmlFor={id}
-        className='text-[13px] font-[450] text-secondary-token select-none cursor-pointer'
+        className='text-xs text-secondary-token select-none cursor-pointer'
       >
         {label}
       </label>

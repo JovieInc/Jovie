@@ -1,6 +1,6 @@
 'use client';
 
-import { SegmentControl } from '@jovie/ui';
+import { Label, SegmentControl } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import {
   DrawerAsyncToggle,
@@ -344,14 +345,12 @@ export function ProfileContactSidebar() {
           <ProfileAnalyticsSummary />
 
           {/* Profile URL */}
-          <a
-            href={profileUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='block text-[13px] text-secondary-token hover:text-primary-token transition-colors truncate'
-          >
-            {profileUrl.replace(/^https?:\/\//, '')}
-          </a>
+          <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
+            <Label className='text-xs font-medium text-secondary-token'>
+              Profile link
+            </Label>
+            <CopyLinkInput url={profileUrl} size='sm' />
+          </div>
         </div>
       }
       tabs={

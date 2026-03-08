@@ -29,3 +29,4 @@ export {
   type EntitySidebarShellProps,
 } from './EntitySidebarShell';
 export { SidebarLinkRow, type SidebarLinkRowProps } from './SidebarLinkRow';
+export { StatTile, type StatTileProps } from './StatTile';

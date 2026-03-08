@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { StatTile } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import type { Release } from './types';
@@ -35,30 +36,6 @@ interface ReleaseSmartLinkAnalyticsProps {
     ProviderKey,
     { label: string; accent: string }
   >;
-}
-
-function StatTile({
-  label,
-  value,
-  hint,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly hint?: string;
-}) {
-  return (
-    <div className='space-y-0.5'>
-      <p className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='text-xl font-[510] leading-none tracking-tight text-primary-token tabular-nums'>
-        {value}
-      </p>
-      {hint && (
-        <p className='text-[11px] leading-tight text-tertiary-token'>{hint}</p>
-      )}
-    </div>
-  );
 }
 
 export function ReleaseSmartLinkAnalytics({
@@ -161,34 +138,38 @@ export function ReleaseSmartLinkAnalytics({
             )}
 
             {!showEmpty && topProviders.length > 0 && (
-              <div className='mt-1.5'>
-                {topProviders.map((provider, i) => {
-                  const key = provider.provider as ProviderKey;
-                  const label =
-                    providerConfig[key]?.label ?? provider.provider ?? 'Other';
-                  const accent = providerConfig[key]?.accent ?? '#64748B';
-                  return (
-                    <div
-                      key={provider.provider}
-                      className={cn(
-                        'flex items-center justify-between py-1.5 text-[13px]',
-                        i > 0 && 'border-t border-white/[0.03]'
-                      )}
-                    >
-                      <span className='flex items-center gap-2 text-tertiary-token'>
-                        <span
-                          className='h-1.5 w-1.5 rounded-full'
-                          style={{ backgroundColor: accent }}
-                          aria-hidden='true'
-                        />
-                        {label}
-                      </span>
-                      <span className='tabular-nums text-secondary-token'>
-                        {numberFormatter.format(provider.clicks)}
-                      </span>
-                    </div>
-                  );
-                })}
+              <div className='mt-2 space-y-2'>
+                <p className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+                  Top platforms
+                </p>
+                <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>
+                  {topProviders.map(provider => {
+                    const key = provider.provider as ProviderKey;
+                    const label =
+                      providerConfig[key]?.label ??
+                      provider.provider ??
+                      'Other';
+                    const accent = providerConfig[key]?.accent ?? '#64748B';
+                    return (
+                      <div
+                        key={provider.provider}
+                        className='flex items-center justify-between px-3 py-2 text-xs'
+                      >
+                        <div className='flex items-center gap-2 text-secondary-token'>
+                          <span
+                            className='h-2 w-2 rounded-full'
+                            style={{ backgroundColor: accent }}
+                            aria-hidden='true'
+                          />
+                          <span>{label}</span>
+                        </div>
+                        <span className='tabular-nums text-primary-token'>
+                          {numberFormatter.format(provider.clicks)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

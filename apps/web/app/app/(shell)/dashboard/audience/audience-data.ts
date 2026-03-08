@@ -2,11 +2,7 @@ import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import {
-  audienceMembers,
-  clickEvents,
-  notificationSubscriptions,
-} from '@/lib/db/schema/analytics';
+import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
@@ -77,13 +73,6 @@ const MEMBER_SORT_COLUMNS = {
   type: audienceMembers.type,
   engagement: audienceMembers.engagementScore,
   createdAt: audienceMembers.firstSeenAt,
-} as const;
-
-const SUBSCRIBER_SORT_COLUMNS = {
-  email: notificationSubscriptions.email,
-  phone: notificationSubscriptions.phone,
-  country: notificationSubscriptions.countryCode,
-  createdAt: notificationSubscriptions.createdAt,
 } as const;
 
 /**
@@ -441,59 +430,78 @@ async function fetchSubscribersData(
         sort: DEFAULT_SUBSCRIBER_SORT,
         direction: 'desc' as const,
       };
+  const SUBSCRIBER_SORT_COLUMN_SQL = {
+    email: 'ns.email',
+    phone: 'ns.phone',
+    country: 'ns.country_code',
+    createdAt: 'ns.created_at',
+  } as const;
 
-  const sortColumn = SUBSCRIBER_SORT_COLUMNS[safe.sort];
-  const orderFn = safe.direction === 'asc' ? asc : desc;
+  const sortColSql =
+    SUBSCRIBER_SORT_COLUMN_SQL[
+      safe.sort as keyof typeof SUBSCRIBER_SORT_COLUMN_SQL
+    ] ?? 'ns.created_at';
+  const dir = safe.direction === 'asc' ? drizzleSql`ASC` : drizzleSql`DESC`;
   const offset = (safe.page - 1) * safe.pageSize;
 
-  const ownershipFilter = clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
+  // Ownership JOIN condition: when clerkUserId is available, verify the profile
+  // belongs to the authenticated user via the users → creatorProfiles chain.
+  const ownershipJoinFetch = clerkUserId
+    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
+    : drizzleSql``;
 
-  const baseQuery = tx
-    .select({
-      id: notificationSubscriptions.id,
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-      countryCode: notificationSubscriptions.countryCode,
-      createdAt: notificationSubscriptions.createdAt,
-      channel: notificationSubscriptions.channel,
-    })
-    .from(notificationSubscriptions)
-    .innerJoin(
-      creatorProfiles,
-      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
-      )
-    );
+  // Deduplicate by contact: keep the most recent subscription per unique
+  // phone/email using DISTINCT ON. The inner query must ORDER BY the distinct
+  // key first; the outer query then applies the user-requested sort + pagination.
+  const rowsResult = await tx.execute(drizzleSql`
+    SELECT ns.id, ns.email, ns.phone,
+           ns.country_code AS "countryCode",
+           ns.created_at  AS "createdAt",
+           ns.channel
+    FROM (
+      SELECT DISTINCT ON (COALESCE(ns_inner.phone, ns_inner.email))
+        ns_inner.id,
+        ns_inner.email,
+        ns_inner.phone,
+        ns_inner.country_code,
+        ns_inner.created_at,
+        ns_inner.channel
+      FROM notification_subscriptions ns_inner
+      INNER JOIN creator_profiles cp ON ns_inner.creator_profile_id = cp.id
+      INNER JOIN users u             ON cp.user_id = u.id
+      WHERE ns_inner.creator_profile_id = ${selectedProfileId}
+      ${ownershipJoinFetch}
+      ORDER BY COALESCE(ns_inner.phone, ns_inner.email), ns_inner.created_at DESC
+    ) ns
+    ORDER BY ${drizzleSql.raw(sortColSql)} ${dir}
+    LIMIT ${safe.pageSize} OFFSET ${offset}
+  `);
 
-  const totalQuery = tx
-    .select({
-      total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-    })
-    .from(notificationSubscriptions)
-    .innerJoin(
-      creatorProfiles,
-      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
-      )
-    );
+  const fetchCountResult = await tx.execute(drizzleSql`
+    SELECT COUNT(*) AS total
+    FROM (
+      SELECT DISTINCT ON (COALESCE(ns_inner.phone, ns_inner.email)) ns_inner.id
+      FROM notification_subscriptions ns_inner
+      INNER JOIN creator_profiles cp ON ns_inner.creator_profile_id = cp.id
+      INNER JOIN users u             ON cp.user_id = u.id
+      WHERE ns_inner.creator_profile_id = ${selectedProfileId}
+      ${ownershipJoinFetch}
+      ORDER BY COALESCE(ns_inner.phone, ns_inner.email), ns_inner.created_at DESC
+    ) deduped
+  `);
 
-  const [rows, [{ total }]] = await Promise.all([
-    baseQuery.orderBy(orderFn(sortColumn)).limit(safe.pageSize).offset(offset),
-    totalQuery,
-  ]);
-
+  const rows = rowsResult.rows as Array<{
+    id: string;
+    email: string | null;
+    phone: string | null;
+    countryCode: string | null;
+    createdAt: Date | string;
+    channel: string;
+  }>;
+  const total = Number(
+    (fetchCountResult.rows[0] as { total: string | number } | undefined)
+      ?.total ?? 0
+  );
   const normalizedRows: AudienceServerRow[] = rows.map(subscriber => {
     const country = subscriber.countryCode;
     const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
@@ -550,30 +558,29 @@ async function countSubscribers(
   clerkUserId: string | null,
   selectedProfileId: string
 ): Promise<number> {
-  const ownershipFilter = clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
+  // Ownership JOIN condition for counting
+  const ownershipJoin = clerkUserId
+    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
+    : drizzleSql``;
 
-  const [{ total }] = await tx
-    .select({
-      total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-    })
-    .from(notificationSubscriptions)
-    .innerJoin(
-      creatorProfiles,
-      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
-      )
-    );
+  // Deduplicate by contact identifier when counting subscribers
+  const countResult = await tx.execute(drizzleSql`
+    SELECT COUNT(*) AS total
+    FROM (
+      SELECT DISTINCT ON (COALESCE(ns.phone, ns.email)) ns.id
+      FROM notification_subscriptions ns
+      INNER JOIN creator_profiles cp ON ns.creator_profile_id = cp.id
+      INNER JOIN users u             ON cp.user_id = u.id
+      WHERE ns.creator_profile_id = ${selectedProfileId}
+      ${ownershipJoin}
+      ORDER BY COALESCE(ns.phone, ns.email), ns.created_at DESC
+    ) deduped
+  `);
 
-  return Number(total ?? 0);
+  return Number(
+    (countResult.rows[0] as { total: string | number } | undefined)?.total ?? 0
+  );
 }
-
 function buildEmptyAudienceData(
   mode: AudienceMode,
   view: AudienceView
