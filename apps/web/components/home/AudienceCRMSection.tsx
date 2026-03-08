@@ -136,7 +136,7 @@ export function AudienceCRMSection() {
           </div>
 
           {/* Product demo */}
-          <div className='relative mt-12 md:mt-16 mx-auto w-full'>
+          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
             {/* Dashboard window */}
             <div
               className='relative overflow-hidden rounded-xl md:rounded-2xl'
