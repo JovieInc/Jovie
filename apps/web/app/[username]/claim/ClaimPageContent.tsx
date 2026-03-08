@@ -3,16 +3,13 @@
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback } from 'react';
 import { JoviePixel } from '@/components/tracking';
-import { useUserSafe } from '@/hooks/useClerkSafe';
 
 interface ClaimPageContentProps {
   readonly profileId: string;
   readonly username: string;
   readonly displayName: string;
   readonly avatarUrl: string | null;
-  readonly claimToken: string;
 }
 
 export function ClaimPageContent({
@@ -20,18 +17,8 @@ export function ClaimPageContent({
   username,
   displayName,
   avatarUrl,
-  claimToken,
 }: ClaimPageContentProps) {
-  const { isSignedIn, isLoaded } = useUserSafe();
-
-  const claimPath = `/${encodeURIComponent(username)}/claim?token=${encodeURIComponent(claimToken)}`;
-
-  const getClaimUrl = useCallback(() => {
-    if (!isLoaded || !isSignedIn) {
-      return `/signup?redirect_url=${encodeURIComponent(claimPath)}`;
-    }
-    return claimPath;
-  }, [isLoaded, isSignedIn, claimPath]);
+  const signupUrl = `/signup?handle=${encodeURIComponent(username)}&redirect_url=${encodeURIComponent(`/${username}`)}`;
 
   return (
     <>
@@ -61,11 +48,11 @@ export function ClaimPageContent({
           </p>
 
           <Link
-            href={getClaimUrl()}
+            href={signupUrl}
             className='inline-flex items-center gap-2 rounded-full bg-btn-primary px-6 py-2.5 text-sm font-semibold text-btn-primary-foreground shadow-sm ring-1 ring-subtle transition-opacity hover:opacity-95 focus-ring-transparent-offset'
             data-testid='claim-page-cta'
           >
-            {isLoaded && isSignedIn ? 'Claim Profile' : 'Sign Up to Claim'}
+            Sign Up to Claim
             <ArrowRight className='h-4 w-4' aria-hidden='true' />
           </Link>
 

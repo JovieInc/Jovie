@@ -17,16 +17,15 @@ export interface ClaimBannerProps {
  * ClaimBanner displays a prominent banner on unclaimed profiles,
  * directing the profile owner to sign up and claim their profile.
  *
- * Note: The actual claim flow requires a claim token sent via email.
- * This banner directs users to sign up; token-based claiming happens
- * through the dedicated /[username]/claim?token=... route.
+ * This banner always sends users to sign up and pre-fills their desired
+ * handle from the profile they are viewing.
  */
 export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
   const { isLoaded } = useUserSafe();
   const hasTrackedImpression = useRef(false);
 
   const profilePath = `/${encodeURIComponent(profileHandle)}`;
-  const signupUrl = `/signup?redirect_url=${encodeURIComponent(profilePath)}`;
+  const signupUrl = `/signup?handle=${encodeURIComponent(profileHandle)}&redirect_url=${encodeURIComponent(profilePath)}`;
 
   useEffect(() => {
     if (!isLoaded) return;

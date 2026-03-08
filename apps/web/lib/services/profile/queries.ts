@@ -133,6 +133,7 @@ export async function getProfileWithUser(
       ...profileSelectColumns,
       userIsPro: users.isPro,
       userClerkId: users.clerkId,
+      userEmail: users.email,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -397,6 +398,7 @@ async function fetchProfileFromDatabase(
       ...profileSelectColumns,
       userIsPro: users.isPro,
       userClerkId: users.clerkId,
+      userEmail: users.email,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))

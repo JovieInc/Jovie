@@ -21,8 +21,10 @@ import {
   FEATURE_FLAG_KEYS,
   getSubscribeCTAVariant,
 } from '@/lib/feature-flags/server';
+import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
+import { isDspPlatform } from '@/lib/services/social-links/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -114,35 +116,36 @@ function generateProfileStructuredData(
   return { musicGroupSchema, breadcrumbSchema };
 }
 
-/**
- * Calculate profile completion percentage based on filled fields.
- *
- * Criteria (6 total): displayName, bio, avatarUrl, any DSP/music link,
- * at least one social link, and venmoHandle (tip jar).
- *
- * This mirrors the dashboard's buildProfileCompletion() criteria so that
- * the public profile page and the dashboard show consistent scores.
- */
 function calculateProfileCompletion(result: {
   displayName?: string | null;
-  bio?: string | null;
   avatarUrl?: string | null;
+  userEmail?: string | null;
   spotifyUrl?: string | null;
   appleMusicUrl?: string | null;
   youtubeUrl?: string | null;
-  socialLinks?: unknown[] | null;
-  venmoHandle?: string | null;
+  socialLinks?: Array<{
+    platform?: string | null;
+    platformType?: string | null;
+  }> | null;
 }): number {
-  const fields = [
-    result.displayName,
-    result.bio,
-    result.avatarUrl,
-    result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl, // any DSP link
-    result.socialLinks && result.socialLinks.length > 0 ? true : null,
-    result.venmoHandle, // tip jar
-  ];
-  const filled = fields.filter(Boolean).length;
-  return Math.round((filled / fields.length) * 100);
+  const hasMusicLinks =
+    Boolean(result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl) ||
+    Boolean(
+      result.socialLinks?.some(link => {
+        const platform = link.platform?.toLowerCase();
+        return (
+          link.platformType === 'dsp' ||
+          (typeof platform === 'string' && isDspPlatform(platform))
+        );
+      })
+    );
+
+  return calculateRequiredProfileCompletion({
+    displayName: result.displayName,
+    avatarUrl: result.avatarUrl,
+    email: result.userEmail,
+    hasMusicLinks,
+  }).percentage;
 }
 
 /** Fetches profile and social links in a single database call. */

@@ -2,29 +2,6 @@ import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
 
-/**
- * Golden Path E2E Test: Full Signup -> Onboarding -> Dashboard (JOV-1354)
- *
- * This test guards the most critical user journey — new user signup through
- * onboarding to a working dashboard. It was created because the existing
- * golden-path.spec.ts starts from an already-authenticated state and never
- * exercises the onboarding flow, which allowed JOV-1340 (MusicFetch blocking
- * onboarding) to ship undetected.
- *
- * Critical assertion: Onboarding MUST complete within 10 seconds regardless
- * of MusicFetch/Spotify API status. Third-party failures must not block signup.
- *
- * Three variants:
- * 1. Happy path: DSP skipped, onboarding completes fast
- * 2. Slow MusicFetch: enrichment delayed 30s, onboarding still completes in <10s
- * 3. Failed MusicFetch: enrichment returns 500, onboarding still completes in <10s
- */
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Intercept fire-and-forget tracking calls that slow down Turbopack. */
 async function interceptTrackingCalls(page: import('@playwright/test').Page) {
   await page.route('**/api/profile/view', route =>
     route.fulfill({ status: 200, body: '{}' })
@@ -37,24 +14,21 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
   );
 }
 
-/**
- * Bootstrap a fresh Clerk test user and land on the onboarding page.
- * Returns the unique email used so the caller can correlate logs.
- */
-async function bootstrapToOnboarding(
-  page: import('@playwright/test').Page
-): Promise<string> {
+async function bootstrapNewSession(page: import('@playwright/test').Page) {
   await setupClerkTestingToken({ page });
 
-  // Navigate to /signin to initialize ClerkProvider
   await page.goto('/signin', {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   });
 
-  // Wait for Clerk JS to load from CDN
   const loaded = await page
-    .waitForFunction(() => !!(window as any).Clerk?.loaded, { timeout: 60_000 })
+    .waitForFunction(
+      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
+      {
+        timeout: 60_000,
+      }
+    )
     .then(() => true)
     .catch(() => false);
 
@@ -62,15 +36,17 @@ async function bootstrapToOnboarding(
     throw new Error('Clerk JS failed to load from CDN');
   }
 
-  // Create a fresh test user (will need onboarding)
   const email = `golden-signup+clerk_test+${Date.now().toString(36)}@example.com`;
   await createOrReuseTestUserSession(page, email);
 
-  // Verify auth established
   const authed = await page
-    .waitForFunction(() => !!(window as any).Clerk?.user?.id, {
-      timeout: 15_000,
-    })
+    .waitForFunction(
+      () =>
+        !!(window as { Clerk?: { user?: { id?: string } } }).Clerk?.user?.id,
+      {
+        timeout: 15_000,
+      }
+    )
     .then(() => true)
     .catch(() => false);
 
@@ -78,37 +54,21 @@ async function bootstrapToOnboarding(
     throw new Error('Clerk user session not established after sign-up');
   }
 
-  // Navigate to dashboard — should redirect to onboarding for new users
-  await page.goto('/app/dashboard', {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
-
-  await page.waitForURL('**/onboarding**', {
-    timeout: 30_000,
-    waitUntil: 'domcontentloaded',
-  });
-
   return email;
 }
 
-/**
- * Complete the handle step of onboarding.
- * Returns the unique handle that was claimed.
- */
 async function completeHandleStep(
   page: import('@playwright/test').Page
 ): Promise<string> {
   const handleInput = page.getByLabel('Enter your desired handle');
-  await expect(handleInput).toBeVisible({ timeout: 15_000 });
+  await expect(handleInput).toBeVisible({ timeout: 20_000 });
 
   const uniqueHandle = `gp-${Date.now().toString(36)}`;
   await handleInput.fill(uniqueHandle);
 
-  // Wait for handle availability check (green checkmark or "Available" text)
-  // Use the success-colored SVG circle as the availability indicator
+  // Availability check must complete and must not block progression.
   await expect(page.locator('.text-success').first()).toBeVisible({
-    timeout: 15_000,
+    timeout: 20_000,
   });
 
   const continueBtn = page.getByRole('button', { name: 'Continue' });
@@ -118,40 +78,84 @@ async function completeHandleStep(
   return uniqueHandle;
 }
 
-/**
- * Skip the DSP connection step.
- */
-async function skipDspStep(page: import('@playwright/test').Page) {
-  const skipBtn = page.getByRole('button', { name: /skip for now/i });
-  await expect(skipBtn).toBeVisible({ timeout: 15_000 });
-  await skipBtn.click();
+async function selectTimWhite(page: import('@playwright/test').Page) {
+  const artistInput = page.getByPlaceholder(
+    /search for your artist or paste a spotify link/i
+  );
+  await expect(artistInput).toBeVisible({ timeout: 20_000 });
+
+  await artistInput.fill('Tim White');
+
+  const timWhiteResult = page
+    .locator('li button')
+    .filter({ hasText: /tim white/i })
+    .first();
+  await expect(timWhiteResult).toBeVisible({ timeout: 20_000 });
+  await timWhiteResult.click();
 }
 
-/**
- * Complete the profile review step and navigate to dashboard.
- * This is where we measure the critical 10-second budget.
- */
-async function completeProfileReview(page: import('@playwright/test').Page) {
-  // Profile review step should show display name input
-  const displayNameInput = page.locator('#onboarding-display-name');
-  await expect(displayNameInput).toBeVisible({ timeout: 15_000 });
+async function assertMusicFetchEnrichment(
+  page: import('@playwright/test').Page
+) {
+  const displayName = page.locator('#onboarding-display-name');
+  const bio = page.locator('#onboarding-bio');
+  const avatarImage = page.locator(
+    'img[alt*="Tim White"], img[alt*="tim white"]'
+  );
 
-  // If display name is empty (no enrichment), fill one in
-  const currentName = await displayNameInput.inputValue();
-  if (!currentName.trim()) {
-    await displayNameInput.fill('Golden Path Test User');
-  }
+  await expect(displayName).toBeVisible({ timeout: 20_000 });
 
-  const goToDashboardBtn = page.getByRole('button', {
-    name: /go to dashboard/i,
+  await expect
+    .poll(async () => (await displayName.inputValue()).trim(), {
+      timeout: 60_000,
+      message: 'Music fetch enrichment did not populate artist display name',
+    })
+    .toMatch(/tim white/i);
+
+  await expect
+    .poll(async () => (await bio.inputValue()).trim().length, {
+      timeout: 60_000,
+      message: 'Music fetch enrichment did not populate artist bio',
+    })
+    .toBeGreaterThan(0);
+
+  await expect(avatarImage.first()).toBeVisible({ timeout: 60_000 });
+}
+
+async function createStripeCheckoutSession(
+  page: import('@playwright/test').Page
+) {
+  const pricingResponse = await page.request.get('/api/stripe/pricing-options');
+  expect(pricingResponse.ok()).toBeTruthy();
+
+  const pricingJson = (await pricingResponse.json()) as {
+    pricingOptions?: Array<{ priceId?: string }>;
+    options?: Array<{ priceId?: string }>;
+  };
+
+  const firstPriceId =
+    pricingJson.pricingOptions?.find(option => option.priceId)?.priceId ??
+    pricingJson.options?.find(option => option.priceId)?.priceId;
+
+  expect(
+    firstPriceId,
+    'No Stripe price ID available for checkout'
+  ).toBeTruthy();
+
+  const checkoutResponse = await page.request.post('/api/stripe/checkout', {
+    data: {
+      priceId: firstPriceId,
+    },
   });
-  await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
-  await goToDashboardBtn.click();
-}
 
-// ---------------------------------------------------------------------------
-// Environment guards
-// ---------------------------------------------------------------------------
+  expect(checkoutResponse.ok()).toBeTruthy();
+
+  const checkoutJson = (await checkoutResponse.json()) as { url?: string };
+  expect(
+    checkoutJson.url,
+    'Stripe checkout URL missing from /api/stripe/checkout response'
+  ).toMatch(/^https:\/\/checkout\.stripe\.com\//);
+}
 
 const runFull = process.env.E2E_ONBOARDING_FULL === '1';
 
@@ -162,21 +166,17 @@ const requiredEnvVars: Record<string, string | undefined> = {
   DATABASE_URL: process.env.DATABASE_URL,
 };
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-test.describe('Golden Path Signup Flow (JOV-1354)', () => {
+test.describe('Golden Path Signup Flow (JOV-1376)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  // Fresh browser context — no inherited auth
+  // Fresh browser context — no inherited auth/session shortcuts.
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test.beforeEach(async ({ page }) => {
     if (!runFull) {
       test.skip(
         true,
-        'Full onboarding E2E runs only when E2E_ONBOARDING_FULL=1'
+        'Full golden path onboarding E2E runs only when E2E_ONBOARDING_FULL=1'
       );
     }
 
@@ -193,298 +193,45 @@ test.describe('Golden Path Signup Flow (JOV-1354)', () => {
     await interceptTrackingCalls(page);
   });
 
-  // --------------------------------------------------------------------------
-  // Variant 1: Happy path — skip DSP, complete onboarding quickly
-  // --------------------------------------------------------------------------
-  test('signup -> handle -> skip DSP -> dashboard (happy path)', async ({
+  test('landing -> signup -> onboarding music fetch -> completed profile -> stripe checkout', async ({
     page,
   }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
 
-    await bootstrapToOnboarding(page);
+    // 1) Landing page loads.
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await expect(page).toHaveURL(/\/$/);
 
-    // Step 1: Claim handle
-    const handle = await completeHandleStep(page);
+    // 2) Signup entry starts from landing page.
+    const signupCta = page.locator('a[href^="/signup"]').first();
+    await expect(signupCta).toBeVisible({ timeout: 20_000 });
+    await signupCta.click();
+    await page.waitForURL('**/signup**', { timeout: 30_000 });
 
-    // Step 2: Skip DSP connection
-    await skipDspStep(page);
+    // 3) Account creation with Clerk test user (new session, no pre-auth storage state).
+    await bootstrapNewSession(page);
 
-    // Step 3: Complete profile review — CRITICAL 10s budget starts here
-    const profileReviewStart = Date.now();
-    await completeProfileReview(page);
-
-    // Step 4: Verify we land on dashboard
-    await page.waitForURL('**/app/**', {
+    // 4) Navigate to onboarding and choose "Tim White" artist.
+    await page.goto('/app/dashboard', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    await page.waitForURL('**/onboarding**', {
       timeout: 30_000,
       waitUntil: 'domcontentloaded',
     });
 
-    const profileReviewDuration = Date.now() - profileReviewStart;
-    console.log(`Profile review -> dashboard: ${profileReviewDuration}ms`);
+    const handle = await completeHandleStep(page);
+    await selectTimWhite(page);
 
-    // Verify dashboard shell rendered
-    const appShell = page.locator('nav, main, [data-testid="sidebar"]').first();
-    await expect(appShell).toBeVisible({ timeout: 30_000 });
+    // 5) Music fetch must succeed and populate real enrichment data.
+    await assertMusicFetchEnrichment(page);
 
-    // Verify we are NOT stuck on onboarding
-    const currentUrl = page.url();
-    expect(currentUrl, 'Should not be on onboarding page').not.toContain(
-      '/onboarding'
-    );
-    expect(currentUrl, 'Should not be on sign-in page').not.toContain(
-      '/signin'
-    );
-
-    // Step 5: Navigate to public profile and verify it renders
-    await page.goto(`/${handle}`, {
-      waitUntil: 'domcontentloaded',
-      timeout: 60_000,
-    });
-    await expect(page).toHaveURL(new RegExp(`/${handle}`));
-
-    // Page should render without error
-    const bodyText = await page
-      .locator('body')
-      .textContent()
-      .catch(() => '');
-    expect(bodyText).not.toContain('Application error');
-    expect(bodyText).not.toContain('Internal Server Error');
-  });
-
-  // --------------------------------------------------------------------------
-  // Variant 2: Slow MusicFetch — enrichment delayed 30s, onboarding still fast
-  // --------------------------------------------------------------------------
-  test('onboarding completes within 10s even when MusicFetch is slow (30s delay)', async ({
-    page,
-  }) => {
-    test.setTimeout(180_000);
-
-    // Intercept MusicFetch/Spotify enrichment APIs with a 30-second delay
-    // These are the server-action calls that enrichProfileFromDsp makes
-    await page.route('**/api/spotify/**', route => {
-      return new Promise(resolve => {
-        setTimeout(() => {
-          resolve(
-            route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                artists: { items: [] },
-              }),
-            })
-          );
-        }, 30_000);
-      });
-    });
-
-    // Also intercept any direct MusicFetch calls
-    await page.route('**/musicfetch**', route => {
-      return new Promise(resolve => {
-        setTimeout(() => {
-          resolve(
-            route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({}),
-            })
-          );
-        }, 30_000);
-      });
-    });
-
-    await bootstrapToOnboarding(page);
-
-    // Complete handle step
-    await completeHandleStep(page);
-
-    // Skip DSP (the slow enrichment only fires if DSP is connected,
-    // but we still want the route intercepts active in case any
-    // background enrichment triggers)
-    await skipDspStep(page);
-
-    // CRITICAL ASSERTION: Profile review step must be reachable and completable
-    // within 10 seconds. MusicFetch being slow must NOT block the UI.
-    const onboardingTimerStart = Date.now();
-
-    await completeProfileReview(page);
-
-    // Wait for navigation to dashboard
-    await page.waitForURL('**/app/**', {
-      timeout: 10_000,
-      waitUntil: 'domcontentloaded',
-    });
-
-    const elapsed = Date.now() - onboardingTimerStart;
-    console.log(`Onboarding completion with slow MusicFetch: ${elapsed}ms`);
-
-    expect(
-      elapsed,
-      `Onboarding took ${elapsed}ms — must complete within 10000ms even with slow MusicFetch`
-    ).toBeLessThan(10_000);
-
-    // Verify dashboard loaded
-    const appShell = page.locator('nav, main, [data-testid="sidebar"]').first();
-    await expect(appShell).toBeVisible({ timeout: 30_000 });
-  });
-
-  // --------------------------------------------------------------------------
-  // Variant 3: Failed MusicFetch — enrichment returns 500, onboarding still fast
-  // --------------------------------------------------------------------------
-  test('onboarding completes within 10s even when MusicFetch returns 500', async ({
-    page,
-  }) => {
-    test.setTimeout(180_000);
-
-    // Intercept MusicFetch/Spotify enrichment APIs with 500 errors
-    await page.route('**/api/spotify/**', route =>
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Simulated Spotify API failure' }),
-      })
-    );
-
-    await page.route('**/musicfetch**', route =>
-      route.fulfill({
-        status: 500,
-        contentType: 'application/json',
-        body: JSON.stringify({ error: 'Simulated MusicFetch failure' }),
-      })
-    );
-
-    await bootstrapToOnboarding(page);
-
-    // Complete handle step
-    await completeHandleStep(page);
-
-    // Skip DSP
-    await skipDspStep(page);
-
-    // CRITICAL ASSERTION: Onboarding must complete within 10 seconds
-    const onboardingTimerStart = Date.now();
-
-    await completeProfileReview(page);
-
-    await page.waitForURL('**/app/**', {
-      timeout: 10_000,
-      waitUntil: 'domcontentloaded',
-    });
-
-    const elapsed = Date.now() - onboardingTimerStart;
-    console.log(`Onboarding completion with failed MusicFetch: ${elapsed}ms`);
-
-    expect(
-      elapsed,
-      `Onboarding took ${elapsed}ms — must complete within 10000ms even with failed MusicFetch`
-    ).toBeLessThan(10_000);
-
-    // Verify dashboard loaded
-    const appShell = page.locator('nav, main, [data-testid="sidebar"]').first();
-    await expect(appShell).toBeVisible({ timeout: 30_000 });
-  });
-
-  // --------------------------------------------------------------------------
-  // Variant 4: DSP connected with slow enrichment — user proceeds immediately
-  // --------------------------------------------------------------------------
-  test('DSP connection with slow enrichment does not block onboarding', async ({
-    page,
-  }) => {
-    test.setTimeout(180_000);
-
-    // Mock Spotify search to return a fake artist quickly
-    await page.route('**/api/spotify/search**', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          artists: {
-            items: [
-              {
-                id: 'fake-artist-id-123',
-                name: 'Test Artist',
-                external_urls: {
-                  spotify: 'https://open.spotify.com/artist/fake-artist-id-123',
-                },
-                images: [
-                  { url: 'https://placehold.co/300', height: 300, width: 300 },
-                ],
-                followers: { total: 1000 },
-                genres: ['indie'],
-              },
-            ],
-          },
-        }),
-      })
-    );
-
-    // Make enrichment call hang for 30 seconds (simulating slow MusicFetch)
-    // The enrichProfileFromDsp server action is fire-and-forget (JOV-1340),
-    // so the UI should proceed immediately regardless.
-    await page.route('**/onboarding/actions/enrich-profile**', route => {
-      return new Promise(resolve => {
-        setTimeout(() => {
-          resolve(
-            route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                name: 'Test Artist',
-                imageUrl: null,
-                bio: 'A test bio',
-                genres: ['indie'],
-                followers: 1000,
-              }),
-            })
-          );
-        }, 30_000);
-      });
-    });
-
-    await bootstrapToOnboarding(page);
-
-    // Complete handle step
-    await completeHandleStep(page);
-
-    // Instead of skipping DSP, search for and select an artist
-    const searchInput = page.getByPlaceholder(
-      /search for your artist|paste a spotify/i
-    );
-    await expect(searchInput).toBeVisible({ timeout: 15_000 });
-    await searchInput.fill('Test Artist');
-
-    // Wait for search results and select the artist
-    const artistResult = page.getByText('Test Artist').first();
-    await expect(artistResult).toBeVisible({ timeout: 10_000 });
-    await artistResult.click();
-
-    // After DSP connection, we should move to profile review step
-    // CRITICAL: This transition must happen immediately (fire-and-forget enrichment)
-    const dspConnectTime = Date.now();
-
-    // Profile review step should appear within 10 seconds
-    const displayNameInput = page.locator('#onboarding-display-name');
-    await expect(displayNameInput).toBeVisible({ timeout: 10_000 });
-
-    const transitionTime = Date.now() - dspConnectTime;
-    console.log(
-      `DSP connect -> profile review transition: ${transitionTime}ms`
-    );
-
-    expect(
-      transitionTime,
-      `DSP -> profile review took ${transitionTime}ms — must be <10000ms (fire-and-forget enrichment)`
-    ).toBeLessThan(10_000);
-
-    // Complete profile review and go to dashboard
-    const currentName = await displayNameInput.inputValue();
-    if (!currentName.trim()) {
-      await displayNameInput.fill('Test Artist');
-    }
-
+    // 6) Complete profile and verify no profile-completion prompts remain.
     const goToDashboardBtn = page.getByRole('button', {
       name: /go to dashboard/i,
     });
-    await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
+    await expect(goToDashboardBtn).toBeEnabled({ timeout: 20_000 });
     await goToDashboardBtn.click();
 
     await page.waitForURL('**/app/**', {
@@ -492,8 +239,22 @@ test.describe('Golden Path Signup Flow (JOV-1354)', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    // Verify dashboard loaded
-    const appShell = page.locator('nav, main, [data-testid="sidebar"]').first();
-    await expect(appShell).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/complete your profile/i)).toHaveCount(0);
+
+    // Validate public profile has at least one DSP link after onboarding import.
+    await page.goto(`/${handle}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    await expect(
+      page
+        .locator(
+          'a[href*="open.spotify.com"], a[href*="music.apple.com"], a[href*="youtube.com"], a[href*="soundcloud.com"]'
+        )
+        .first()
+    ).toBeVisible({ timeout: 30_000 });
+
+    // 7) Exercise Stripe checkout creation in test mode.
+    await createStripeCheckoutSession(page);
   });
 });

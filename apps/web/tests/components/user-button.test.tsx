@@ -182,7 +182,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown menu to render
-    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -238,7 +238,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -286,7 +286,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();

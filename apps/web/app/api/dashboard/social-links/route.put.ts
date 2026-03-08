@@ -5,6 +5,7 @@ import { invalidateSocialLinksCache } from '@/lib/cache';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { getSocialLinksVerificationColumnSupport } from '@/lib/db/queries/social-links-verification';
 import { socialLinks } from '@/lib/db/schema/links';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -184,6 +185,7 @@ export async function PUT(req: Request) {
         200,
         successResponse
       );
+      await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
       await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
       const enrichmentPromise = enqueueProfileEnrichment({
         links: insertPayloadResult.linkUrls,

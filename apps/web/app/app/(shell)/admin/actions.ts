@@ -11,6 +11,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
+import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
 class AdminUnauthorizedError extends Error {
   constructor(message: string = 'Unauthorized') {
@@ -86,7 +87,28 @@ export async function toggleCreatorVerifiedAction(
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profileId))
-    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+    .returning({
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      displayName: creatorProfiles.displayName,
+      userId: creatorProfiles.userId,
+    });
+
+  if (isVerified && updatedProfile?.userId) {
+    const [creatorUser] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, updatedProfile.userId))
+      .limit(1);
+
+    if (creatorUser?.email) {
+      const firstName =
+        updatedProfile.displayName?.trim().split(' ')[0] ?? 'Hey there';
+      await sendVerificationApprovedEmail({
+        to: creatorUser.email,
+        firstName,
+      });
+    }
+  }
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath(APP_ROUTES.ADMIN);

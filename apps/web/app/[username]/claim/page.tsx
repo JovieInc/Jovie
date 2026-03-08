@@ -1,11 +1,7 @@
 import { type Metadata } from 'next';
-import { unstable_noStore as noStore } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
-import {
-  getProfileByUsername,
-  isClaimTokenValid,
-} from '@/lib/services/profile';
+import { getProfileByUsername } from '@/lib/services/profile';
 import {
   USERNAME_MAX_LENGTH,
   USERNAME_PATTERN,
@@ -14,18 +10,11 @@ import { ClaimPageContent } from './ClaimPageContent';
 
 interface Props {
   readonly params: Promise<{ readonly username: string }>;
-  readonly searchParams?: Promise<{ token?: string }>;
 }
 
-export default async function ClaimPage({ params, searchParams }: Props) {
-  // Claim flows are token-specific and should always bypass ISR/full-route cache.
-  noStore();
-
+export default async function ClaimPage({ params }: Props) {
   const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const token = resolvedSearchParams?.token;
 
-  // Validate username format
   if (
     username.length > USERNAME_MAX_LENGTH ||
     !USERNAME_PATTERN.test(username)
@@ -33,20 +22,9 @@ export default async function ClaimPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  // Token is required
-  if (!token || token.length === 0) {
-    notFound();
-  }
+  const profile = await getProfileByUsername(username.toLowerCase());
 
-  const normalizedUsername = username.toLowerCase();
-
-  // Validate claim token and fetch profile in parallel
-  const [isValid, profile] = await Promise.all([
-    isClaimTokenValid(normalizedUsername, token),
-    getProfileByUsername(normalizedUsername),
-  ]);
-
-  if (!isValid || !profile) {
+  if (!profile) {
     notFound();
   }
 
@@ -55,7 +33,6 @@ export default async function ClaimPage({ params, searchParams }: Props) {
       username={profile.username}
       displayName={profile.displayName ?? profile.username}
       avatarUrl={profile.avatarUrl}
-      claimToken={token}
       profileId={profile.id}
     />
   );

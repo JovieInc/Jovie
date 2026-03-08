@@ -32,7 +32,7 @@ const baseDashboardData: DashboardData = {
   profileCompletion: {
     percentage: 80,
     completedCount: 4,
-    totalCount: 5,
+    totalCount: 4,
     steps: [
       {
         id: 'avatar',

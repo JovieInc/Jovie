@@ -20,6 +20,7 @@ import {
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
 import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
+import { SidebarUpgradeBanner } from '@/components/feedback/SidebarUpgradeBanner';
 import {
   Sidebar,
   SidebarContent,
@@ -263,6 +264,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
+      <SidebarUpgradeBanner />
       <SidebarInstallBanner />
 
       <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
