@@ -21,7 +21,7 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
         className
       )}
     >
-      <p className='text-xs font-medium text-secondary-token truncate'>
+      <p className='text-[13px] font-[510] text-secondary-token truncate'>
         {title}
       </p>
       {actions && <div className='flex items-center gap-1'>{actions}</div>}

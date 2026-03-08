@@ -44,7 +44,7 @@ function ToggleSwitch({
       >
         <span
           className={cn(
-            'h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
+            'h-3 w-3 rounded-full bg-white shadow-card transition-transform',
             checked && 'translate-x-3'
           )}
         />
@@ -77,7 +77,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
       className={cn(
-        'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
+        'rounded-md px-2 py-0.5 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
         isVisible
           ? 'bg-interactive-active text-secondary-token'
           : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
@@ -140,7 +140,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[13px] font-medium text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
     >
       <Settings2 className='h-3.5 w-3.5' />
       Display
@@ -153,7 +153,7 @@ export function DisplayMenuDropdown({
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-          <span className='text-[13px] font-semibold text-primary-token'>
+          <span className='text-[13px] font-[590] text-primary-token'>
             Display
           </span>
           <PopoverPrimitive.Close
@@ -174,7 +174,7 @@ export function DisplayMenuDropdown({
               {/* Sliding background indicator */}
               <div
                 className={cn(
-                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded-md bg-surface-2 shadow-sm transition-all duration-200 ease-out',
+                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded-md bg-surface-2 shadow-card transition-all duration-200 ease-out',
                   viewMode === 'list' ? 'left-0.5' : 'left-[calc(50%+0.5px)]'
                 )}
                 aria-hidden='true'
@@ -184,7 +184,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('list')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'list'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -200,7 +200,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('board')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-medium transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'board'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -234,7 +234,7 @@ export function DisplayMenuDropdown({
               hasDensityOptions && 'border-b border-subtle'
             )}
           >
-            <p className='px-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               Display properties
             </p>
             <div className='flex flex-wrap gap-1 px-0.5'>
@@ -254,7 +254,7 @@ export function DisplayMenuDropdown({
         {/* ── Density ────────────────────────────────────────────── */}
         {hasDensityOptions && (
           <div className='px-3 py-2'>
-            <p className='px-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               Density
             </p>
             <div className='grid grid-cols-3 gap-1'>
@@ -265,7 +265,7 @@ export function DisplayMenuDropdown({
                   onClick={() => onDensityChange?.(option.value)}
                   aria-pressed={density === option.value}
                   className={cn(
-                    'rounded-md px-2 py-1 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                    'rounded-md px-2 py-1 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
                     density === option.value
                       ? 'bg-surface-2 text-primary-token border border-subtle'
                       : 'text-tertiary-token hover:text-secondary-token border border-transparent hover:bg-interactive-hover'

@@ -95,7 +95,7 @@ export function SessionManagementCard({
   if (sessionsError) {
     return (
       <DashboardCard variant='settings'>
-        <p className='text-sm text-destructive'>{sessionsError}</p>
+        <p className='text-[13px] text-destructive'>{sessionsError}</p>
       </DashboardCard>
     );
   }
@@ -120,17 +120,17 @@ export function SessionManagementCard({
             className='flex items-center justify-between px-4 py-3'
           >
             <div>
-              <p className='text-sm text-primary-token flex items-center gap-2'>
+              <p className='text-[13px] text-primary-token flex items-center gap-2'>
                 {isCurrent
                   ? 'This device'
                   : activity?.browserName || 'Unknown device'}
                 {isCurrent && (
-                  <span className='text-xs text-secondary-token'>
+                  <span className='text-[11px] text-secondary-token'>
                     Current session
                   </span>
                 )}
               </p>
-              <p className='text-xs text-secondary-token mt-0.5'>
+              <p className='text-[11px] text-secondary-token mt-0.5'>
                 Last active {formatRelativeDate(session.lastActiveAt)}
                 {activity?.city && activity?.country
                   ? ` · ${activity.city}, ${activity.country}`

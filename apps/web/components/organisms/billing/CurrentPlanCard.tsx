@@ -38,7 +38,7 @@ export function CurrentPlanCard({
             <div className='flex items-start gap-4'>
               <div
                 className={cn(
-                  'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl shadow-lg',
+                  'flex h-12 w-12 shrink-0 items-center justify-center rounded-xl shadow-card-elevated',
                   isPro
                     ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white'
                     : 'bg-gradient-to-br from-amber-400 to-orange-500 text-white'
@@ -52,14 +52,14 @@ export function CurrentPlanCard({
               </div>
               <div>
                 <div className='flex items-center gap-2.5'>
-                  <h2 className='text-xl font-semibold text-primary-token'>
+                  <h2 className='text-xl font-[590] text-primary-token'>
                     {planName} Plan
                   </h2>
                   <Badge variant={isPro ? 'success' : 'warning'} size='sm'>
                     {isPro ? 'Active' : 'Limited'}
                   </Badge>
                 </div>
-                <p className='mt-1 text-sm text-secondary-token'>
+                <p className='mt-1 text-[13px] text-secondary-token'>
                   {isPro
                     ? 'Full access to all features. Branding removed from your profile.'
                     : 'Upgrade to unlock branding removal, extended analytics, and more.'}

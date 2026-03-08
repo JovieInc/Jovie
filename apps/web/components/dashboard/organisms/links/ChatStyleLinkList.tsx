@@ -129,7 +129,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    <h3 className='px-1 text-xs font-medium uppercase tracking-wide text-tertiary-token'>
+                    <h3 className='px-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                       {labelFor(row.section)}
                     </h3>
                   </div>
@@ -151,7 +151,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                       <div className='h-4 w-4' />
                       <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg skeleton' />
                       <div className='flex-1'>
-                        <div className='text-sm text-secondary-token'>
+                        <div className='text-[13px] text-secondary-token'>
                           Adding...
                         </div>
                       </div>

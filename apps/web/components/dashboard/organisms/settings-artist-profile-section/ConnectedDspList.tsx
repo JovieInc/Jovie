@@ -240,7 +240,7 @@ export function ConnectedDspList({
       <DashboardCard variant='settings'>
         <div className='flex items-center justify-center py-8'>
           <Loader2 className='h-5 w-5 animate-spin text-secondary-token' />
-          <span className='ml-2 text-sm text-secondary-token'>
+          <span className='ml-2 text-[13px] text-secondary-token'>
             Loading platform connections...
           </span>
         </div>
@@ -252,7 +252,7 @@ export function ConnectedDspList({
     return (
       <DashboardCard variant='settings'>
         <div className='text-center py-6'>
-          <p className='text-sm text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Failed to load platform connections. Please try again.
           </p>
         </div>
@@ -376,7 +376,7 @@ function ConnectedDspListContent({
   return (
     <DashboardCard variant='settings'>
       <div className='space-y-4'>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] text-secondary-token'>
           Connect your Spotify and Apple Music artist profiles.
         </p>
 
@@ -388,7 +388,7 @@ function ConnectedDspListContent({
         {hasNoConnections && (
           <div className='text-center py-4'>
             <Music className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
-            <p className='text-sm text-secondary-token'>
+            <p className='text-[13px] text-secondary-token'>
               Click a pill above to connect your streaming profiles.
             </p>
           </div>
@@ -397,7 +397,7 @@ function ConnectedDspListContent({
         {/* Non-primary DSP connections */}
         {nonPrimaryMatches.length > 0 && (
           <div className='border-t border-subtle pt-4'>
-            <p className='text-xs font-medium text-secondary-token mb-2'>
+            <p className='text-[11px] font-[510] text-secondary-token mb-2'>
               Other platforms
             </p>
             <div className='flex flex-wrap items-center gap-2'>

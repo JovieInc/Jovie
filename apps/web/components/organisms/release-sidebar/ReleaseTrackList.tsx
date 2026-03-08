@@ -139,7 +139,7 @@ export function ReleaseTrackList({
         }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token hover:text-secondary-token transition-colors'
+        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token hover:text-secondary-token transition-colors'
       >
         <span>Tracklist ({release.totalTracks})</span>
         {isExpanded ? (
@@ -176,13 +176,13 @@ export function ReleaseTrackList({
           )}
 
           {!isLoading && hasError && (
-            <p className='py-2 text-xs text-error'>
+            <p className='py-2 text-[13px] text-error'>
               Failed to load tracks. Collapse and expand to retry.
             </p>
           )}
 
           {!isLoading && !hasError && tracks?.length === 0 && (
-            <p className='py-2 text-xs text-tertiary-token'>
+            <p className='py-2 text-[13px] text-tertiary-token'>
               No track data available.
             </p>
           )}
@@ -281,7 +281,7 @@ function TrackItem({
   return (
     <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-surface-2/50'>
       {/* Track number */}
-      <span className='w-6 shrink-0 pt-0.5 text-right text-xs tabular-nums text-tertiary-token'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[11px] tabular-nums text-tertiary-token'>
         {trackLabel}.
       </span>
 
@@ -295,7 +295,7 @@ function TrackItem({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-xs text-primary-token hover:underline'
+              className='text-[13px] text-primary-token hover:underline'
               tooltipSide='top'
             >
               {track.title}

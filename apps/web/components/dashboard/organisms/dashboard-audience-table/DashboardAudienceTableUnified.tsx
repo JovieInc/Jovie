@@ -515,7 +515,7 @@ export const DashboardAudienceTableUnified = memo(
         const isHighIntent = row.intentLevel === 'high';
         return cn(
           isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]',
-          isHighIntent && 'font-medium'
+          isHighIntent && 'font-[510]'
         );
       },
       [selectedMember]

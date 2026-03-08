@@ -156,7 +156,7 @@ export function TourDateSidebar({
           <div className='space-y-4'>
             {/* Source indicator */}
             {tourDate.provider === 'bandsintown' && (
-              <div className='flex items-center gap-2 rounded-md bg-teal-50 px-3 py-2 text-sm text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'>
+              <div className='flex items-center gap-2 rounded-md bg-teal-50 px-3 py-2 text-[13px] text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'>
                 <Icon name='Link' className='h-4 w-4' />
                 <span>Synced from Bandsintown</span>
               </div>
@@ -322,7 +322,7 @@ export function TourDateSidebar({
                       }
                       disabled={isPending}
                       className={cn(
-                        'flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors',
+                        'flex-1 rounded-md border px-3 py-2 text-[13px] font-[510] transition-colors',
                         formData.ticketStatus === status
                           ? 'border-accent bg-accent/10 text-accent'
                           : 'border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2'

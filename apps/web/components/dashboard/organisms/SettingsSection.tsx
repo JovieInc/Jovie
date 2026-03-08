@@ -38,7 +38,7 @@ export function SettingsSection({
         <h2
           id={headingId}
           className={cn(
-            'dashboard-heading text-[17px] font-semibold text-primary-token tracking-tight',
+            'dashboard-heading text-[17px] font-[590] text-primary-token tracking-[-0.022em]',
             titleClassName
           )}
         >

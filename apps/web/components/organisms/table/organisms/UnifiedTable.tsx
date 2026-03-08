@@ -678,7 +678,7 @@ export function UnifiedTable<TData>({
               <tr>
                 <td
                   colSpan={columnCount}
-                  className='py-3 text-center text-xs text-tertiary-token'
+                  className='py-3 text-center text-[11px] text-tertiary-token'
                 >
                   <span className='inline-flex items-center gap-1.5'>
                     <LoadingSpinner

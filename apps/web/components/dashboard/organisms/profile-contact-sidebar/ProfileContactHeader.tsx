@@ -227,7 +227,7 @@ function EditableDisplayName({
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-7 text-sm font-medium px-1'
+        className='h-7 text-[13px] font-[510] px-1'
       />
     );
   }
@@ -236,7 +236,7 @@ function EditableDisplayName({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-sm font-medium text-primary-token',
+        'block w-full truncate text-left text-[13px] font-[510] text-primary-token',
         editable &&
           'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
       )}

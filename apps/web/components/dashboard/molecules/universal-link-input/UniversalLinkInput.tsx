@@ -60,7 +60,7 @@ function HighlightedName({
   readonly matchIndices: number[];
 }) {
   if (matchIndices.length === 0) {
-    return <span className='font-medium'>{name}</span>;
+    return <span className='font-[510]'>{name}</span>;
   }
 
   const matchSet = new Set(matchIndices);
@@ -71,7 +71,7 @@ function HighlightedName({
   }));
 
   return (
-    <span className='font-medium'>
+    <span className='font-[510]'>
       {characters.map(character => (
         <span
           key={character.id}
@@ -108,7 +108,7 @@ function PlatformSuggestionItem({
       data-option-id={optionId}
       type='button'
       className={cn(
-        'flex w-full min-h-[44px] items-center justify-between gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
+        'flex w-full min-h-[44px] items-center justify-between gap-2.5 px-3 py-2.5 text-left text-[13px] text-primary-token transition',
         active ? 'bg-surface-2' : 'hover:bg-surface-2',
         'active:scale-[0.99]'
       )}
@@ -135,11 +135,11 @@ function PlatformSuggestionItem({
           matchIndices={option.matchIndices}
         />
         {/* Simplified hint */}
-        <span className='text-xs text-tertiary-token'>{option.hint}</span>
+        <span className='text-[13px] text-tertiary-token'>{option.hint}</span>
       </span>
       {/* Only show Enter hint on active item */}
       {active && (
-        <span className='hidden text-xs text-tertiary-token sm:inline'>
+        <span className='hidden text-[13px] text-tertiary-token sm:inline'>
           Enter
         </span>
       )}
@@ -435,7 +435,7 @@ export const UniversalLinkInput = forwardRef<
               <div
                 ref={refs.setFloating}
                 style={floatingStyles}
-                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
+                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-card-elevated'
                 onMouseDown={event => {
                   event.preventDefault();
                 }}
@@ -453,7 +453,7 @@ export const UniversalLinkInput = forwardRef<
                           {groupIndex > 0 && (
                             <div className='mx-3 my-1 border-t border-default' />
                           )}
-                          <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                          <div className='px-3 pb-1 pt-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                             {group.label}
                           </div>
                           {group.options.map((option, indexInGroup) => {

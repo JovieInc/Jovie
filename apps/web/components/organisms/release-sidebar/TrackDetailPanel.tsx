@@ -63,7 +63,7 @@ export function TrackDetailPanel({
       <button
         type='button'
         onClick={onBack}
-        className='flex items-center gap-1.5 text-xs text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+        className='flex items-center gap-1.5 text-[13px] text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
       >
         <ArrowLeft className='h-3.5 w-3.5' />
         <span className='truncate max-w-[200px]'>{releaseTitle}</span>
@@ -72,10 +72,10 @@ export function TrackDetailPanel({
       {/* Track title + metadata */}
       <div>
         <div className='flex items-center gap-2'>
-          <span className='text-xs text-tertiary-token tabular-nums'>
+          <span className='text-[11px] text-tertiary-token tabular-nums'>
             {trackLabel}.
           </span>
-          <h3 className='text-sm font-semibold text-primary-token'>
+          <h3 className='text-[13px] font-[590] text-primary-token'>
             {track.title}
           </h3>
           {track.isExplicit && (
@@ -88,7 +88,7 @@ export function TrackDetailPanel({
           )}
         </div>
 
-        <div className='mt-1 flex items-center gap-3 text-xs text-secondary-token'>
+        <div className='mt-1 flex items-center gap-3 text-[11px] text-secondary-token'>
           {track.durationMs != null && (
             <span className='tabular-nums'>
               {formatDuration(track.durationMs)}
@@ -99,7 +99,7 @@ export function TrackDetailPanel({
 
       {/* Quick actions */}
       <DrawerSection>
-        <p className='py-1 text-xs font-semibold uppercase tracking-wide text-secondary-token'>
+        <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-secondary-token'>
           Actions
         </p>
         <div className='space-y-1'>
@@ -107,7 +107,7 @@ export function TrackDetailPanel({
             <button
               type='button'
               onClick={handleCopyIsrc}
-              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
             >
               <Copy className='h-3.5 w-3.5 shrink-0' />
               <span>Copy ISRC</span>
@@ -119,7 +119,7 @@ export function TrackDetailPanel({
           <button
             type='button'
             onClick={handleCopySmartLink}
-            className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+            className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
           >
             <Link2 className='h-3.5 w-3.5 shrink-0' />
             <span>Copy smart link</span>
@@ -130,7 +130,7 @@ export function TrackDetailPanel({
       {/* Streaming links */}
       {streamingProviders.length > 0 && (
         <DrawerSection>
-          <p className='py-1 text-xs font-semibold uppercase tracking-wide text-secondary-token'>
+          <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-secondary-token'>
             Available on
           </p>
           <div className='space-y-1'>
@@ -140,7 +140,7 @@ export function TrackDetailPanel({
                 href={provider.url}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+                className='flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
               >
                 <SocialIcon
                   platform={provider.key}

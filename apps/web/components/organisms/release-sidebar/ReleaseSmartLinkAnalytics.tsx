@@ -153,7 +153,7 @@ export function ReleaseSmartLinkAnalytics({
                     return (
                       <div
                         key={provider.provider}
-                        className='flex items-center justify-between px-3 py-2 text-xs'
+                        className='flex items-center justify-between px-3 py-2 text-[13px]'
                       >
                         <div className='flex items-center gap-2 text-secondary-token'>
                           <span

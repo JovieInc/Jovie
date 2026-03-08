@@ -89,10 +89,10 @@ export function DashboardFeedbackModal({
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
-          <DialogTitle className='mt-4 text-balance text-lg font-semibold text-primary-token'>
+          <DialogTitle className='mt-4 text-balance text-lg font-[590] text-primary-token'>
             Thank you!
           </DialogTitle>
-          <DialogDescription className='mt-2 text-sm text-secondary-token'>
+          <DialogDescription className='mt-2 text-[13px] text-secondary-token'>
             Your note has been delivered to the team. Thank you for helping us
             make Jovie feel effortlessly better.
           </DialogDescription>
@@ -102,7 +102,7 @@ export function DashboardFeedbackModal({
           <div className='flex items-start justify-between gap-4'>
             <div>
               <DialogTitle className='text-balance'>Send feedback</DialogTitle>
-              <DialogDescription className='mt-1 text-sm text-secondary-token'>
+              <DialogDescription className='mt-1 text-[13px] text-secondary-token'>
                 Tell us where the experience feels delightful, where it falls
                 short, or what you'd love us to build next.
               </DialogDescription>
@@ -152,7 +152,7 @@ export function DashboardFeedbackModal({
               onClick={handleSubmit}
               disabled={!feedback.trim() || isSubmitting}
               loading={isSubmitting}
-              className='font-medium'
+              className='font-[510]'
             >
               Send feedback
             </Button>

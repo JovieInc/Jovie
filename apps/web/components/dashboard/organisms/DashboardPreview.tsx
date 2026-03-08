@@ -55,15 +55,15 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   return (
     <div data-testid='dashboard-preview'>
       <div className='mb-4'>
-        <h3 className='text-lg font-medium text-primary-token'>Live Preview</h3>
-        <p className='text-sm text-secondary-token mt-1'>
+        <h3 className='text-lg font-[510] text-primary-token'>Live Preview</h3>
+        <p className='text-[13px] text-secondary-token mt-1'>
           This is how your profile will appear to visitors
         </p>
       </div>
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center'>
-        <div className='relative w-[280px] rounded-4xl bg-surface-2 p-2 shadow-2xl ring-1 ring-subtle transform transition-transform hover:scale-[1.02] duration-300'>
+        <div className='relative w-[280px] rounded-4xl bg-surface-2 p-2 shadow-card-elevated ring-1 ring-subtle transform transition-transform hover:scale-[1.02] duration-300'>
           {/* Top notch */}
           <div className='absolute w-20 h-3 bg-surface-2 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
 
@@ -100,7 +100,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       {/* Profile URL and Actions */}
       <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
-          <code className='text-xs bg-surface-2 px-2 py-1 rounded text-secondary-token'>
+          <code className='text-[11px] bg-surface-2 px-2 py-1 rounded text-secondary-token'>
             {BASE_URL}/{artist.handle || 'username'}
           </code>
           <CopyToClipboardButton
@@ -114,7 +114,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
           href={`/${artist.handle}`}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent/80 transition-colors'
+          className='inline-flex items-center gap-1.5 text-[13px] font-[510] text-accent hover:text-accent/80 transition-colors'
         >
           View Profile
           <svg

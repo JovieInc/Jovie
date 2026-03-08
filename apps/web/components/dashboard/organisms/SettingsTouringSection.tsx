@@ -129,7 +129,7 @@ export function SettingsTouringSection({
   return (
     <DashboardCard variant='settings'>
       <div className='space-y-4'>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] text-secondary-token'>
           Tour dates will appear on your public profile when connected.
         </p>
 
@@ -203,7 +203,7 @@ function BandsintownConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
+              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-[13px] font-[510] transition-colors cursor-pointer',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             )}
             style={
@@ -262,7 +262,7 @@ function BandsintownConnectionPill({
       type='button'
       onClick={onConnect}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-xs font-medium text-secondary-token transition-colors',
+        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-secondary-token transition-colors',
         'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
       )}
       style={
@@ -372,7 +372,7 @@ function BandsintownConnectDialog({
       <DialogBody>
         <div className='space-y-3'>
           <div className='space-y-1.5'>
-            <Label htmlFor='bandsintown-artist' className='text-xs'>
+            <Label htmlFor='bandsintown-artist' className='text-[11px]'>
               Artist name
             </Label>
             <Input
@@ -385,7 +385,7 @@ function BandsintownConnectDialog({
           </div>
 
           <div className='space-y-1.5'>
-            <Label htmlFor='bandsintown-api-key' className='text-xs'>
+            <Label htmlFor='bandsintown-api-key' className='text-[11px]'>
               API key{' '}
               <span className='text-tertiary-token font-normal'>
                 (optional)

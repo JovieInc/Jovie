@@ -15,7 +15,7 @@ export function SettingsPlanGateLabel({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className='inline-flex items-center gap-1 text-sm text-tertiary-token'>
+        <span className='inline-flex items-center gap-1 text-[13px] text-tertiary-token'>
           <Lock className='h-3.5 w-3.5' aria-hidden='true' />
           {planName}
         </span>
@@ -25,7 +25,7 @@ export function SettingsPlanGateLabel({
         <span aria-hidden='true'>·</span>
         <Link
           href={APP_ROUTES.PRICING}
-          className='font-medium text-accent-token underline underline-offset-2'
+          className='font-[510] text-accent-token underline underline-offset-2'
         >
           Upgrade
         </Link>

@@ -39,7 +39,7 @@ export function BillingActionsSection({
     >
       <Card>
         <CardContent className='p-6'>
-          <h2 className='mb-4 text-lg font-semibold text-primary-token'>
+          <h2 className='mb-4 text-lg font-[590] text-primary-token'>
             Manage Subscription
           </h2>
           <div className='flex flex-col gap-3 sm:flex-row'>
@@ -76,8 +76,8 @@ export function BillingActionsSection({
                         If you cancel, you will immediately lose access to these
                         features:
                       </p>
-                      <ul className='space-y-2 text-sm'>
-                        <li className='flex items-start gap-2'>
+                      <ul className='space-y-2'>
+                        <li className='flex items-start gap-2 text-[13px]'>
                           <XCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
                           <span>
                             <strong>Branding removal</strong> &mdash; Jovie

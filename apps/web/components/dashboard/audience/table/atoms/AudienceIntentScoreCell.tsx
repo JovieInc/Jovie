@@ -15,8 +15,8 @@ const INTENT_DOT_STYLES: Record<AudienceIntentLevel, string> = {
 };
 
 const INTENT_LABEL_STYLES: Record<AudienceIntentLevel, string> = {
-  high: 'text-emerald-600 dark:text-emerald-400 font-semibold',
-  medium: 'text-amber-600 dark:text-amber-400 font-medium',
+  high: 'text-emerald-600 dark:text-emerald-400 font-[590]',
+  medium: 'text-amber-600 dark:text-amber-400 font-[510]',
   low: 'text-tertiary-token',
 };
 

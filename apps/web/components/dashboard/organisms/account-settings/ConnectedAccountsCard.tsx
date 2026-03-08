@@ -103,13 +103,15 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                 <Link2 className='h-4 w-4 text-accent' />
               </div>
               <div>
-                <p className='text-sm text-primary-token flex items-center gap-2'>
+                <p className='text-[13px] text-primary-token flex items-center gap-2'>
                   {label}
                   {isVerified && (
-                    <span className='text-xs text-emerald-600'>Verified</span>
+                    <span className='text-[11px] text-emerald-600'>
+                      Verified
+                    </span>
                   )}
                 </p>
-                <p className='text-xs text-secondary-token mt-0.5'>
+                <p className='text-[11px] text-secondary-token mt-0.5'>
                   {identifier}
                 </p>
               </div>

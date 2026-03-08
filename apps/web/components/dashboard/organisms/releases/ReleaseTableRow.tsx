@@ -272,7 +272,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                   )
                 }
                 className={cn(
-                  'inline-flex items-center text-xs transition-colors',
+                  'inline-flex items-center text-[13px] transition-colors',
                   isCopied && 'bg-success/10 text-success hover:bg-success/10'
                 )}
               >

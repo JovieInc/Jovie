@@ -533,7 +533,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           type='button'
           onClick={handleSync}
           disabled={isSyncing}
-          className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-xs font-medium text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
+          className='group relative inline-flex items-center gap-1.5 rounded-full border border-[#1DB954]/30 bg-[#1DB954]/10 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-[#1DB954] transition-colors hover:bg-[#1DB954]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/50 focus-visible:ring-offset-2 disabled:opacity-60'
           aria-label={
             isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
           }
@@ -854,17 +854,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
               <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-lg bg-surface-2'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-xl bg-surface-2'>
                   <Icon
                     name='Disc3'
                     className='h-8 w-8 text-tertiary-token'
                     aria-hidden='true'
                   />
                 </div>
-                <h3 className='mt-4 text-lg font-semibold text-primary-token'>
+                <h3 className='mt-4 text-lg font-[590] text-primary-token'>
                   No releases yet
                 </h3>
-                <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+                <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
                   {canCreateManualReleases
                     ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
                     : 'Sync your releases from Spotify to start generating smart links.'}

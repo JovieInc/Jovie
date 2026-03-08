@@ -32,7 +32,10 @@ export function AudienceActionsCell({
 }: AudienceActionsCellProps) {
   return (
     <div
-      className={cn('flex items-center justify-end gap-1.5 text-xs', className)}
+      className={cn(
+        'flex items-center justify-end gap-1.5 text-[11px]',
+        className
+      )}
     >
       {actions.slice(0, maxActions).map((action, idx) => {
         const iconName = resolveAudienceActionIcon(action.label);

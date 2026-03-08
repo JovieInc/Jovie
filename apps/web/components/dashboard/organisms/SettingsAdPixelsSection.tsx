@@ -22,7 +22,7 @@ import { queryKeys } from '@/lib/queries/keys';
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 const INPUT_CLASS =
-  'block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors';
+  'block w-full px-3 py-2 border border-subtle rounded-md bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-[13px] shadow-card transition-colors';
 
 interface PlatformSectionProps {
   readonly platform: string;
@@ -65,10 +65,10 @@ function PlatformSection({
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
         <div>
-          <h4 className='text-sm font-medium text-primary'>{platform}</h4>
-          <p className='mt-1 text-xs text-secondary-token'>{description}</p>
+          <h4 className='text-[13px] font-[510] text-primary'>{platform}</h4>
+          <p className='mt-1 text-[13px] text-secondary-token'>{description}</p>
         </div>
-        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-secondary-token'>
+        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-secondary-token'>
           {isConfigured ? 'Configured' : 'Not configured'}
         </span>
       </div>
@@ -78,7 +78,7 @@ function PlatformSection({
           href={helpUrl}
           target='_blank'
           rel='noopener noreferrer'
-          className='text-xs text-interactive hover:text-interactive/80 flex items-center gap-1'
+          className='text-[13px] text-interactive hover:text-interactive/80 flex items-center gap-1'
         >
           {helpText}
           <ExternalLink className='h-4 w-4' />
@@ -89,7 +89,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='block text-xs font-medium text-primary-token mb-2'
+            className='block text-[11px] font-[510] text-primary-token mb-2'
           >
             {pixelIdLabel}
           </label>
@@ -107,7 +107,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={tokenName}
-            className='block text-xs font-medium text-primary-token mb-2'
+            className='block text-[11px] font-[510] text-primary-token mb-2'
           >
             {tokenLabel}
           </label>
@@ -370,9 +370,9 @@ export function SettingsAdPixelsSection({
         className='divide-y divide-subtle'
       >
         <div className='flex items-center justify-between px-4 py-3'>
-          <span className='text-sm text-primary-token'>Pixel tracking</span>
+          <span className='text-[13px] text-primary-token'>Pixel tracking</span>
           <div className='flex items-center gap-2'>
-            <span className='text-xs text-secondary-token'>
+            <span className='text-[11px] text-secondary-token'>
               {pixelData.enabled ? 'Enabled' : 'Disabled'}
             </span>
             <Switch
@@ -385,7 +385,7 @@ export function SettingsAdPixelsSection({
 
         {!hasAnyPixels && (
           <div className='px-4 py-4 text-center'>
-            <p className='text-sm text-secondary-token'>
+            <p className='text-[13px] text-secondary-token'>
               No tracking pixels configured. Add your first pixel to start
               tracking conversions.
             </p>
@@ -393,7 +393,7 @@ export function SettingsAdPixelsSection({
         )}
 
         <div className='space-y-2 px-4 pt-3'>
-          <p className='text-xs text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Configure each retargeting destination independently.
           </p>
         </div>
@@ -478,7 +478,7 @@ export function SettingsAdPixelsSection({
         </div>
 
         <div className='px-4 py-3'>
-          <p className='text-xs text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Events are sent server-side for better accuracy. No third-party
             JavaScript on your profile. Credentials are encrypted.
           </p>

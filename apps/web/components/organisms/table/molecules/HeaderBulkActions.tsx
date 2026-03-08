@@ -61,7 +61,7 @@ export function HeaderBulkActions({
 
   return (
     <div className={cn('flex items-center gap-2 h-7', className)}>
-      <span className='text-xs font-medium text-secondary-token tabular-nums whitespace-nowrap'>
+      <span className='text-[11px] font-[510] text-secondary-token tabular-nums whitespace-nowrap'>
         {selectedCount} selected
       </span>
       {bulkActions.length > 0 && (

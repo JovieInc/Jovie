@@ -22,7 +22,7 @@ export function SocialLinkSuggestionRows({
 
   return (
     <div className='space-y-2'>
-      <p className='text-xs font-medium text-secondary-token'>
+      <p className='text-[13px] font-[510] text-secondary-token'>
         Detected profiles
       </p>
       <div className='rounded-lg border border-accent/20 bg-accent/5 divide-y divide-accent/10'>
@@ -40,7 +40,7 @@ export function SocialLinkSuggestionRows({
                 aria-hidden
               />
               <div className='min-w-0 flex-1'>
-                <p className='text-sm font-medium text-primary-token truncate'>
+                <p className='text-[13px] font-[510] text-primary-token truncate'>
                   {suggestion.platformLabel}
                 </p>
                 <p className='text-xs text-tertiary-token truncate'>
@@ -55,7 +55,7 @@ export function SocialLinkSuggestionRows({
                   onClick={() => onConfirm(suggestion)}
                   disabled={isActioning}
                   className={cn(
-                    'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md',
+                    'inline-flex items-center gap-1 px-2 py-1 text-[13px] font-[510] rounded-md',
                     'bg-accent text-accent-foreground hover:bg-accent/90',
                     'disabled:opacity-50 transition-colors'
                   )}
@@ -72,7 +72,7 @@ export function SocialLinkSuggestionRows({
                   onClick={() => onDismiss(suggestion)}
                   disabled={isActioning}
                   className={cn(
-                    'inline-flex items-center gap-1 p-1 text-xs rounded-md',
+                    'inline-flex items-center gap-1 p-1 text-[13px] rounded-md',
                     'text-secondary-token hover:bg-interactive-hover hover:text-primary-token',
                     'disabled:opacity-50 transition-colors'
                   )}

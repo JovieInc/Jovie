@@ -19,8 +19,10 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
       <div className='flex items-center gap-3'>
         <Icon className='h-4 w-4 shrink-0 text-secondary-token' />
         <div>
-          <p className='text-sm font-medium text-primary-token'>{title}</p>
-          <p className='text-xs text-secondary-token mt-0.5'>{description}</p>
+          <p className='text-[13px] font-[510] text-primary-token'>{title}</p>
+          <p className='text-[13px] text-secondary-token mt-0.5'>
+            {description}
+          </p>
         </div>
       </div>
       <Button variant='outline' size='sm' asChild>
@@ -49,7 +51,7 @@ export function SettingsAdminSection() {
       <div className='px-4 py-3'>
         <div className='flex items-center gap-2'>
           <ShieldCheck className='h-4 w-4 text-secondary-token' />
-          <p className='text-xs text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             These settings are only visible to admin accounts. Manage platform
             operations from the dedicated admin pages.
           </p>

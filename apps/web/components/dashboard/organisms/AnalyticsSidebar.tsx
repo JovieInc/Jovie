@@ -48,7 +48,7 @@ function SidebarRangeToggle({
             type='button'
             onClick={() => onChange(opt.value)}
             className={cn(
-              'rounded-full px-3 py-1 text-[12px] font-medium transition-all duration-150',
+              'rounded-full px-3 py-1 text-[13px] font-[510] transition-all duration-150',
               active
                 ? 'bg-surface-3 text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
@@ -123,10 +123,10 @@ function FunnelStage({
         )}
         style={{ maxWidth: width }}
       >
-        <p className='text-[11px] font-semibold uppercase tracking-[0.15em] text-tertiary-token mb-1.5'>
+        <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token mb-1.5'>
           {label}
         </p>
-        <p className='text-2xl font-bold tracking-tight text-primary-token tabular-nums'>
+        <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
           {value}
         </p>
         <p className='text-[11px] text-secondary-token mt-0.5'>{description}</p>
@@ -138,7 +138,7 @@ function FunnelStage({
           <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
           <span
             className={cn(
-              'text-[11px] font-medium mt-0.5 tabular-nums min-h-[16px]',
+              'text-[11px] font-[510] mt-0.5 tabular-nums min-h-[16px]',
               conversionRate ? 'text-accent' : 'text-transparent'
             )}
           >
@@ -175,7 +175,7 @@ function StatRow({
   return (
     <div className='flex items-center justify-between py-2'>
       <span className='text-[13px] text-secondary-token'>{label}</span>
-      <span className='text-[13px] font-medium text-primary-token tabular-nums'>
+      <span className='text-[13px] font-[510] text-primary-token tabular-nums'>
         {value}
       </span>
     </div>
@@ -209,9 +209,7 @@ function RankedList({
     <div>
       <div className='mb-2 flex items-center gap-2'>
         <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-        <h3 className='text-[12px] font-medium text-secondary-token'>
-          {title}
-        </h3>
+        <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
       </div>
 
       {loading && (
@@ -232,14 +230,14 @@ function RankedList({
               className='flex items-center justify-between group'
             >
               <div className='flex items-center gap-2 min-w-0 flex-1'>
-                <span className='text-[11px] font-medium text-tertiary-token w-3 tabular-nums'>
+                <span className='text-[11px] font-[510] text-tertiary-token w-3 tabular-nums'>
                   {index + 1}
                 </span>
-                <span className='text-[12px] text-secondary-token group-hover:text-primary-token transition-colors truncate'>
+                <span className='text-[13px] text-secondary-token group-hover:text-primary-token transition-colors truncate'>
                   {item.label}
                 </span>
               </div>
-              <span className='text-[12px] font-medium text-primary-token tabular-nums ml-2'>
+              <span className='text-[13px] font-[510] text-primary-token tabular-nums ml-2'>
                 {item.value}
               </span>
             </li>
@@ -247,7 +245,7 @@ function RankedList({
         </ul>
       )}
       {!loading && items.length === 0 && (
-        <p className='text-[12px] text-tertiary-token py-2'>{emptyMessage}</p>
+        <p className='text-[13px] text-tertiary-token py-2'>{emptyMessage}</p>
       )}
     </div>
   );

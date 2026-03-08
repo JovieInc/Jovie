@@ -15,7 +15,7 @@ export interface AudienceRowSelectionCellProps {
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES = cn(
   alignment.checkboxSize,
-  'border border-subtle rounded-[3px] data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-white data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-white transition-all duration-100 ease-out shadow-sm'
+  'border border-subtle rounded-[3px] data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=checked]:text-white data-[state=indeterminate]:border-accent data-[state=indeterminate]:bg-accent data-[state=indeterminate]:text-white transition-all duration-100 ease-out shadow-card'
 );
 
 export function AudienceRowSelectionCell({

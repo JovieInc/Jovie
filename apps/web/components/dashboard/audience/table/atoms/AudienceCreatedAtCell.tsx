@@ -24,7 +24,7 @@ export function AudienceCreatedAtCell({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-2 text-sm',
+        'flex items-center justify-between gap-2 text-[13px]',
         className
       )}
     >

@@ -32,7 +32,7 @@ export function SettingsBillingSection() {
   return (
     <DashboardCard variant='settings' padding='none'>
       <div className='flex items-center justify-between px-4 py-3'>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] text-secondary-token'>
           Update payment details, change plans, or view invoices.
         </p>
         <Button
@@ -45,7 +45,7 @@ export function SettingsBillingSection() {
           {isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
         </Button>
         {portalMutation.error && (
-          <p className='text-sm text-destructive'>
+          <p className='text-[13px] text-destructive'>
             {portalMutation.error instanceof Error
               ? portalMutation.error.message
               : 'Failed to open billing portal'}

@@ -34,8 +34,8 @@ export function DashboardOverviewToolbar({
                 aria-pressed={active}
                 className={
                   active
-                    ? 'h-6 rounded-full bg-surface-1 px-2.5 text-xs font-semibold text-primary-token shadow-sm shadow-black/10 dark:shadow-black/40'
-                    : 'h-6 rounded-full px-2.5 text-xs font-medium text-secondary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token'
+                    ? 'h-6 rounded-full bg-surface-1 px-2.5 text-[13px] font-[510] text-primary-token shadow-card shadow-black/10 dark:shadow-black/40'
+                    : 'h-6 rounded-full px-2.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token'
                 }
               >
                 {value}
@@ -49,14 +49,14 @@ export function DashboardOverviewToolbar({
         type='button'
         aria-label='Refresh dashboard'
         onClick={onRefresh}
-        className='inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-subtle bg-surface-1/40 px-2.5 text-xs font-semibold text-primary-token ring-1 ring-inset ring-white/3 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page dark:ring-white/5'
+        className='inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-subtle bg-surface-1/40 px-2.5 text-[13px] font-[510] text-primary-token ring-1 ring-inset ring-white/3 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page dark:ring-white/5'
       >
         <Icon name='RefreshCw' className='h-3.5 w-3.5' />
-        <span className='text-[11px] font-semibold'>Refresh</span>
+        <span className='text-[11px] font-[510]'>Refresh</span>
       </button>
 
       {rangeLabel ? (
-        <p className='hidden min-w-26 whitespace-nowrap text-right text-xs text-tertiary-token sm:block'>
+        <p className='hidden min-w-26 whitespace-nowrap text-right text-[13px] text-tertiary-token sm:block'>
           {rangeLabel}
         </p>
       ) : null}

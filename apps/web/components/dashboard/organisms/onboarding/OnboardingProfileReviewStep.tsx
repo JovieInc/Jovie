@@ -121,7 +121,7 @@ export function OnboardingProfileReviewStep({
             <button
               type='button'
               onClick={() => avatarRef.current?.click()}
-              className='text-sm font-medium text-accent hover:text-accent/80 transition-colors'
+              className='text-[13px] font-[510] text-accent hover:text-accent/80 transition-colors'
             >
               Upload a profile photo
             </button>
@@ -133,7 +133,7 @@ export function OnboardingProfileReviewStep({
           <div>
             <label
               htmlFor='onboarding-display-name'
-              className='block text-sm font-medium text-secondary-token mb-1.5'
+              className='block text-[13px] font-[510] text-secondary-token mb-1.5'
             >
               Display name
             </label>
@@ -143,7 +143,7 @@ export function OnboardingProfileReviewStep({
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
               placeholder='Your name'
-              className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-2.5 text-sm text-primary-token placeholder:text-tertiary-token focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent'
+              className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-2.5 text-[13px] text-primary-token placeholder:text-tertiary-token focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent'
             />
           </div>
 
@@ -151,7 +151,7 @@ export function OnboardingProfileReviewStep({
           <div>
             <label
               htmlFor='onboarding-bio'
-              className='block text-sm font-medium text-secondary-token mb-1.5'
+              className='block text-[13px] font-[510] text-secondary-token mb-1.5'
             >
               Bio
             </label>
@@ -161,7 +161,7 @@ export function OnboardingProfileReviewStep({
               onChange={e => setBio(e.target.value)}
               placeholder='Tell fans about yourself'
               rows={3}
-              className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-2.5 text-sm text-primary-token placeholder:text-tertiary-token focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none'
+              className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-2.5 text-[13px] text-primary-token placeholder:text-tertiary-token focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none'
             />
           </div>
         </div>

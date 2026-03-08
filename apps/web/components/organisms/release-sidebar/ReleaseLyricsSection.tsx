@@ -224,7 +224,7 @@ export function ReleaseLyricsSection({
 
         {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[var(--radius-default)] shadow-sm'>
+          <div className='inline-flex items-center rounded-[var(--radius-default)] shadow-card'>
             {/* Primary format action — uses the most recently selected format */}
             <Button
               type='button'

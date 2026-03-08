@@ -30,7 +30,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
     <button
       type='button'
       className={cn(
-        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors',
+        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] transition-colors',
         isCopied
           ? 'bg-success/10 text-success'
           : 'text-tertiary-token hover:bg-surface-2 hover:text-primary-token'

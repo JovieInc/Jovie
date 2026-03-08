@@ -35,9 +35,9 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
             onClick={() => onViewChange(value)}
             aria-pressed={view === value}
             className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tracking-[-0.01em] transition-all duration-150 whitespace-nowrap',
+              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-[510] tracking-[-0.01em] transition-all duration-150 whitespace-nowrap',
               view === value
-                ? 'border-default bg-surface-2 text-primary-token shadow-sm'
+                ? 'border-default bg-surface-2 text-primary-token shadow-card'
                 : 'border-transparent text-tertiary-token hover:text-secondary-token hover:bg-surface-1'
             )}
           >

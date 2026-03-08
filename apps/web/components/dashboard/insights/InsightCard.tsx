@@ -31,18 +31,18 @@ export function InsightCard({ insight }: InsightCardProps) {
 
         <div className='min-w-0 flex-1'>
           {/* Title */}
-          <h3 className='text-sm font-semibold text-primary-token leading-snug'>
+          <h3 className='text-[13px] font-[590] text-primary-token leading-snug'>
             {insight.title}
           </h3>
 
           {/* Description */}
-          <p className='mt-1 text-xs text-secondary-token leading-relaxed'>
+          <p className='mt-1 text-[13px] text-secondary-token leading-relaxed'>
             {insight.description}
           </p>
 
           {/* Action suggestion */}
           {insight.actionSuggestion ? (
-            <p className='mt-2 text-xs font-medium text-accent-token'>
+            <p className='mt-2 text-[13px] font-[510] text-accent-token'>
               &rarr; {insight.actionSuggestion}
             </p>
           ) : null}
@@ -50,7 +50,7 @@ export function InsightCard({ insight }: InsightCardProps) {
           {/* Footer: metadata + actions */}
           <div className='mt-3 flex flex-wrap items-center justify-between gap-2'>
             <div className='flex items-center gap-3'>
-              <span className='text-[10px] font-medium uppercase tracking-wider text-tertiary-token'>
+              <span className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                 {insight.category}
               </span>
               <span className='text-[10px] text-tertiary-token'>

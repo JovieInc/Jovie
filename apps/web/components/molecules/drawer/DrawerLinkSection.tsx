@@ -46,8 +46,8 @@ export function DrawerLinkSection({
       <div className='flex items-center justify-between'>
         <h4
           className={[
-            'text-[11px] font-semibold uppercase',
-            'tracking-wide text-tertiary-token',
+            'text-[11px] font-[510] uppercase',
+            'tracking-[0.08em] text-tertiary-token',
           ].join(' ')}
         >
           {title}
