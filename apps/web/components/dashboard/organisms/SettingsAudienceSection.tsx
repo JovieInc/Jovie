@@ -2,6 +2,7 @@
 
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
@@ -12,6 +13,7 @@ export function SettingsAudienceSection() {
     checked: doubleOptIn,
     handleToggle,
     isPending,
+    saveStatus,
   } = useOptimisticToggle({
     initialValue: true,
     mutateAsync: (enabled: boolean) =>
@@ -21,6 +23,7 @@ export function SettingsAudienceSection() {
 
   return (
     <DashboardCard variant='settings' padding='none'>
+      <SettingsStatusPill status={saveStatus} className='px-4 pt-3' />
       <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Require Email Verification'

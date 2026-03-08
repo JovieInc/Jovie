@@ -3,9 +3,17 @@
 import { Button, Input, Switch } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useSaveStatus } from '@/components/dashboard/hooks/useSaveStatus';
 import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { usePixelSettingsMutation } from '@/lib/queries';
@@ -159,12 +167,15 @@ export interface SettingsAdPixelsSectionProps {
 export function SettingsAdPixelsSection({
   isPro = true,
 }: SettingsAdPixelsSectionProps) {
+  const { mutateAsync: savePixels, isPending: isPixelSaving } =
+    usePixelSettingsMutation();
   const {
-    mutate: savePixels,
-    isPending: isPixelSaving,
-    isSuccess: isPixelSaved,
-    isError: isPixelError,
-  } = usePixelSettingsMutation();
+    status: saveStatus,
+    markSaving,
+    markSuccess,
+    markError,
+    resetStatus,
+  } = useSaveStatus();
 
   // Fetch existing pixel settings on mount
   const {
@@ -201,6 +212,25 @@ export function SettingsAdPixelsSection({
     tiktok: false,
   });
 
+  const baselineValues = useMemo(
+    () => ({
+      facebookPixelId: existingSettings?.pixels.facebookPixelId ?? '',
+      googleMeasurementId: existingSettings?.pixels.googleMeasurementId ?? '',
+      tiktokPixelId: existingSettings?.pixels.tiktokPixelId ?? '',
+      enabled: existingSettings?.pixels.enabled ?? true,
+    }),
+    [existingSettings]
+  );
+
+  const hasUnsavedChanges =
+    pixelData.facebookPixelId !== baselineValues.facebookPixelId ||
+    pixelData.googleMeasurementId !== baselineValues.googleMeasurementId ||
+    pixelData.tiktokPixelId !== baselineValues.tiktokPixelId ||
+    pixelData.enabled !== baselineValues.enabled ||
+    tokenModified.facebook ||
+    tokenModified.google ||
+    tokenModified.tiktok;
+
   // Populate form with existing settings when fetched
   useEffect(() => {
     if (!isPro) return;
@@ -224,11 +254,13 @@ export function SettingsAdPixelsSection({
       }));
       // Reset token modified flags when settings are loaded
       setTokenModified({ facebook: false, google: false, tiktok: false });
+      resetStatus();
     }
-  }, [existingSettings, isPro]);
+  }, [existingSettings, isPro, resetStatus]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setPixelData(prev => ({ ...prev, [field]: value }));
+    resetStatus();
     // Track when token fields are modified
     if (field === 'facebookAccessToken') {
       setTokenModified(prev => ({ ...prev, facebook: true }));
@@ -240,21 +272,24 @@ export function SettingsAdPixelsSection({
   };
 
   const handlePixelSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
+    async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
+      if (!hasUnsavedChanges) return;
+
+      // Only send token values if they were actually modified
+      const getTokenIfModified = (
+        tokenValue: string,
+        platform: keyof typeof tokenModified
+      ): string => {
+        if (!tokenModified[platform] || tokenValue === TOKEN_PLACEHOLDER) {
+          return '';
+        }
+        return tokenValue;
+      };
 
       try {
-        // Only send token values if they were actually modified
-        const getTokenIfModified = (
-          tokenValue: string,
-          platform: keyof typeof tokenModified
-        ): string => {
-          if (!tokenModified[platform] || tokenValue === TOKEN_PLACEHOLDER)
-            return '';
-          return tokenValue;
-        };
-
-        savePixels({
+        markSaving();
+        await savePixels({
           facebookPixelId: pixelData.facebookPixelId,
           facebookAccessToken: getTokenIfModified(
             pixelData.facebookAccessToken,
@@ -272,11 +307,21 @@ export function SettingsAdPixelsSection({
           ),
           enabled: pixelData.enabled,
         });
-      } catch (error) {
-        console.error('[SettingsAdPixelsSection] Submit failed:', error);
+        markSuccess();
+        setTokenModified({ facebook: false, google: false, tiktok: false });
+      } catch {
+        markError('Failed to save. Try again.');
       }
     },
-    [savePixels, pixelData, tokenModified]
+    [
+      hasUnsavedChanges,
+      markError,
+      markSaving,
+      markSuccess,
+      pixelData,
+      savePixels,
+      tokenModified,
+    ]
   );
 
   if (!isPro) {
@@ -441,15 +486,11 @@ export function SettingsAdPixelsSection({
       </DashboardCard>
 
       <div className='flex items-center justify-end gap-3 pt-2'>
-        {isPixelSaved && <span className='text-xs text-green-500'>Saved</span>}
-        {isPixelError && (
-          <span className='text-xs text-destructive'>
-            Failed to save. Try again.
-          </span>
-        )}
+        <SettingsStatusPill status={saveStatus} />
         <Button
           type='submit'
           loading={isPixelSaving}
+          disabled={isPixelSaving || !hasUnsavedChanges}
           className={SETTINGS_BUTTON_CLASS}
         >
           Save pixel settings

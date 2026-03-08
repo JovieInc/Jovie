@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   checkVisitRateLimit,
@@ -9,7 +9,7 @@ import {
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
-import { audienceMembers } from '@/lib/db/schema/analytics';
+import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -195,6 +195,28 @@ export async function POST(request: NextRequest) {
       : [];
 
     await withSystemIngestionSession(async tx => {
+      const viewDate = now.toISOString().slice(0, 10);
+
+      await tx
+        .insert(dailyProfileViews)
+        .values({
+          creatorProfileId: profileId,
+          viewDate,
+          viewCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            dailyProfileViews.creatorProfileId,
+            dailyProfileViews.viewDate,
+          ],
+          set: {
+            viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+            updatedAt: now,
+          },
+        });
+
       const [existing] = await tx
         .select({
           id: audienceMembers.id,
