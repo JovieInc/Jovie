@@ -110,6 +110,14 @@ export interface UnifiedTableProps<TData> {
   readonly onRowClick?: (row: TData) => void;
 
   /**
+   * Called when the row is shift-clicked (for range selection).
+   * The consumer should call rangeSelect from useRowSelection.
+   * @param rowIndex - The index of the clicked row
+   * @param rowData  - The row data
+   */
+  readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
+
+  /**
    * Context menu handler for row
    */
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
@@ -307,6 +315,7 @@ export function UnifiedTable<TData>({
   renderRow,
   getRowId,
   onRowClick,
+  onRowShiftClick,
   onRowContextMenu,
   getContextMenuItems,
   getRowClassName,
@@ -580,6 +589,7 @@ export function UnifiedTable<TData>({
                   onKeyDown={handleKeyDown}
                   onFocusChange={setFocusedIndex}
                   getRowClassName={getRowClassName}
+                  onRowShiftClick={onRowShiftClick}
                 />
               );
 
@@ -649,6 +659,7 @@ export function UnifiedTable<TData>({
           onRowContextMenu={onRowContextMenu}
           onKeyDown={handleKeyDown}
           getContextMenuItems={getContextMenuItems}
+          onRowShiftClick={onRowShiftClick}
           getRowClassName={getRowClassName}
           renderRow={renderRow}
           getRowId={getRowId}
