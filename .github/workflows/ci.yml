@@ -837,6 +837,12 @@ jobs:
           fi
 
           # -- 3. Public profile: HTTP 200, substantial content, no 404 markers --
+          # Warm up the database connection before checking the profile page.
+          # The health check (step 1) may use a lightweight query that doesn't
+          # fully warm Neon, so hit the profile once and discard the result.
+          fetch "https://jov.ie/tim" > /dev/null 2>&1
+          sleep 5
+
           check_profile() {
             local response
             response=$(fetch "https://jov.ie/tim")
