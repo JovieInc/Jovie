@@ -28,6 +28,10 @@ export function ImpersonationBanner({
   onEnd,
   className = '',
 }: Readonly<ImpersonationBannerProps>) {
+  // Store the absolute end timestamp instead of remaining milliseconds so the
+  // interval does not depend on the state it updates, avoiding per-tick
+  // teardown and recreation of the interval.
+  const [sessionEndTime, setSessionEndTime] = useState<number>(0);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [minimized, setMinimized] = useState(false);
 
@@ -42,9 +46,11 @@ export function ImpersonationBanner({
   const { mutate: endImpersonation, isPending: ending } =
     useEndImpersonationMutation();
 
-  // Initialize time remaining from query data
+  // Derive a stable end timestamp from query data
   useEffect(() => {
     if (state?.timeRemainingMs) {
+      const endTime = Date.now() + state.timeRemainingMs;
+      setSessionEndTime(endTime);
       setTimeRemaining(state.timeRemainingMs);
     }
   }, [state?.timeRemainingMs]);
@@ -56,29 +62,24 @@ export function ImpersonationBanner({
     });
   }, [refetchStatus]);
 
-  // Countdown timer tick handler - extracted to reduce nesting depth
-  const handleCountdownTick = useCallback(
-    (prev: number): number => {
-      const newTime = prev - 1000;
-      if (newTime <= 0) {
-        handleSessionExpiry();
-        return 0;
-      }
-      return newTime;
-    },
-    [handleSessionExpiry]
-  );
-
-  // Countdown timer
+  // Countdown timer — depends only on sessionEndTime (stable per session), not
+  // on timeRemaining, so the interval is created once and never recreated on
+  // each tick.
   useEffect(() => {
-    if (!state?.isImpersonating || timeRemaining <= 0) return;
+    if (!state?.isImpersonating || sessionEndTime <= 0) return;
 
     const interval = setInterval(() => {
-      setTimeRemaining(handleCountdownTick);
+      const remaining = sessionEndTime - Date.now();
+      if (remaining <= 0) {
+        setTimeRemaining(0);
+        handleSessionExpiry();
+      } else {
+        setTimeRemaining(remaining);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [state?.isImpersonating, timeRemaining, handleCountdownTick]);
+  }, [state?.isImpersonating, sessionEndTime, handleSessionExpiry]);
 
   // End impersonation handler
   const handleEndImpersonation = () => {
