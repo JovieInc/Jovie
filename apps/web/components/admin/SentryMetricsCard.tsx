@@ -48,7 +48,8 @@ export function SentryMetricsCard({
         <CardContent className='p-5 pt-0'>
           <p className='text-app text-secondary-token'>
             {metrics.isConfigured
-              ? 'Sentry metrics are temporarily unavailable. Please try again shortly.'
+              ? (metrics.errorMessage ??
+                'Sentry metrics are temporarily unavailable. Please try again shortly.')
               : 'Sentry integration not configured. Add SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG to enable error tracking.'}
           </p>
         </CardContent>

@@ -91,7 +91,14 @@ async function fetchSentryIssues(
   );
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    let detail = '';
+    try {
+      const body = (await response.json()) as Record<string, unknown>;
+      if (typeof body.detail === 'string') detail = ` — ${body.detail}`;
+    } catch {
+      // response body is not JSON; ignore
+    }
+    throw new Error(`${response.status} ${response.statusText}${detail}`);
   }
 
   const payload = (await response.json()) as unknown;
