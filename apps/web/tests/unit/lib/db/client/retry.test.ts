@@ -14,6 +14,12 @@ describe('isRetryableError', () => {
     expect(isRetryableError(new Error('timeout exceeded'))).toBe(true);
   });
 
+  it('returns true for plain object errors with retryable message text', () => {
+    expect(
+      isRetryableError({ message: 'server conn crashed?', name: 'DbError' })
+    ).toBe(true);
+  });
+
   it('returns false for non-retryable errors', () => {
     expect(isRetryableError(new Error('syntax error in SQL'))).toBe(false);
   });
