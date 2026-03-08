@@ -498,8 +498,9 @@ async function fetchSubscribersData(
     const country = subscriber.countryCode;
     const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
     const createdAt = toISOStringOrNull(subscriber.createdAt);
-    const displayName = subscriber.email || subscriber.phone || 'Contact';
     const type = subscriber.channel === 'email' ? 'email' : 'sms';
+    const displayName =
+      type === 'email' ? 'Email Subscriber' : 'SMS Subscriber';
 
     return {
       id: subscriber.id,
