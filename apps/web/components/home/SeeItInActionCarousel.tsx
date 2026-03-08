@@ -89,23 +89,33 @@ export function SeeItInActionCarousel({ creators }: Props) {
       ref={sectionRef}
       className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'
     >
+      {/* Gradient separator */}
+      <div
+        aria-hidden='true'
+        className='mb-16 h-px max-w-lg mx-auto'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
+        }}
+      />
+
       <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-container-max)] mx-auto heading-gap-linear'>
         <h2 className='text-center marketing-h2-linear text-[var(--linear-text-primary)]'>
           See it in action
         </h2>
       </div>
 
-      <div className='relative mt-8'>
+      <div className='relative mt-12'>
         {/* Fade edges for premium feel */}
         <div
-          className='absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
+          className='absolute left-0 top-0 bottom-0 w-32 z-10 pointer-events-none'
           style={{
             background:
               'linear-gradient(to right, var(--linear-bg-page), transparent)',
           }}
         />
         <div
-          className='absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none'
+          className='absolute right-0 top-0 bottom-0 w-32 z-10 pointer-events-none'
           style={{
             background:
               'linear-gradient(to left, var(--linear-bg-page), transparent)',
@@ -128,8 +138,11 @@ export function SeeItInActionCarousel({ creators }: Props) {
               className='relative flex flex-col gap-3 group'
             >
               <div
-                className='relative w-[200px] h-[280px] shrink-0 overflow-hidden rounded-[var(--linear-radius-lg)]'
-                style={{ boxShadow: 'var(--linear-shadow-card)' }}
+                className='relative w-[220px] h-[300px] shrink-0 overflow-hidden rounded-2xl'
+                style={{
+                  boxShadow:
+                    'var(--linear-shadow-card-elevated), 0 0 40px rgba(0,0,0,0.2)',
+                }}
               >
                 <Image
                   src={creator.src}
@@ -142,7 +155,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
                   className='object-cover transition-transform duration-500 group-hover:scale-105'
                 />
                 {/* Gradient overlay to make text readable */}
-                <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80' />
+                <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/10 to-transparent opacity-50 transition-opacity duration-300 group-hover:opacity-75' />
 
                 {/* Profile info overlay */}
                 <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-1'>
@@ -158,8 +171,8 @@ export function SeeItInActionCarousel({ creators }: Props) {
 
                 {/* Inner border for premium feel */}
                 <div
-                  className='absolute inset-0 rounded-[var(--linear-radius-lg)] pointer-events-none'
-                  style={{ border: '1px solid var(--linear-border-strong)' }}
+                  className='absolute inset-0 rounded-2xl pointer-events-none'
+                  style={{ border: '1px solid rgba(255,255,255,0.08)' }}
                 />
               </div>
             </div>

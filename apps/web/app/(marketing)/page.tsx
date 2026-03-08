@@ -262,6 +262,16 @@ export default function HomePage() {
         <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
       )}
 
+      {/* Gradient separator before final CTA */}
+      <div
+        aria-hidden='true'
+        className='h-px max-w-lg mx-auto'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
+        }}
+      />
+
       <FinalCTASection />
 
       <FloatingClaimBar />

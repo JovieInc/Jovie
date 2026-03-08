@@ -205,19 +205,30 @@ const cards: CardData[] = [
 export function DeeplinksGrid() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
-      {/* Ambient glow behind grid — matches Linear's 400x400 radial glow pattern */}
+      {/* Ambient glow behind grid */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
         style={{
-          width: '400px',
-          height: '400px',
-          borderRadius: '400px',
-          background: 'var(--linear-hero-glow)',
+          width: '600px',
+          height: '600px',
+          borderRadius: '50%',
+          background:
+            'radial-gradient(ellipse at center, oklch(20% 0.025 270 / 0.2), transparent 65%)',
         }}
       />
 
       <Container size='homepage'>
+        {/* Gradient separator */}
+        <div
+          aria-hidden='true'
+          className='mb-16 h-px max-w-lg mx-auto'
+          style={{
+            background:
+              'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
+          }}
+        />
+
         {/* Heading */}
         <div className='text-center heading-gap-linear'>
           <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
@@ -226,7 +237,7 @@ export function DeeplinksGrid() {
               Infinite outcomes.
             </span>
           </h2>
-          <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p className='mx-auto mt-5 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
             Jovie automatically routes fans to the right action — or override
             with a direct link to tips, tours, contacts, and every release.
           </p>
@@ -234,17 +245,18 @@ export function DeeplinksGrid() {
 
         {/* Card grid — 1px border-gap technique */}
         <div
-          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-[var(--linear-radius-lg)] border border-[var(--linear-border-subtle)]'
+          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-2xl border border-[var(--linear-border-subtle)]'
           style={{
-            boxShadow: 'var(--linear-shadow-card)',
+            boxShadow:
+              'var(--linear-shadow-card-elevated), 0 0 60px rgba(0,0,0,0.2)',
           }}
         >
           {cards.map(card => (
             <div
               key={card.slugPath}
-              className='group relative flex flex-col bg-[var(--linear-bg-surface-1)]'
+              className='group relative flex flex-col bg-[var(--linear-bg-surface-1)] transition-colors duration-200 hover:bg-[color-mix(in_oklch,var(--linear-bg-surface-1),white_2%)]'
             >
-              <div className='flex flex-1 flex-col gap-3 p-5'>
+              <div className='flex flex-1 flex-col gap-3 p-6'>
                 {/* URL slug */}
                 <p className='font-mono text-[var(--linear-caption-size)] font-[450] text-[var(--linear-text-tertiary)]'>
                   {'jov.ie/tim/'}
@@ -259,12 +271,12 @@ export function DeeplinksGrid() {
                 </p>
 
                 {/* Mockup UI */}
-                <div className='mt-auto pt-2'>{card.mockup}</div>
+                <div className='mt-auto pt-3'>{card.mockup}</div>
               </div>
 
               {/* Bottom accent line on hover */}
               <div
-                className='absolute bottom-0 left-[15%] h-px w-[70%] opacity-0 transition-opacity duration-200 group-hover:opacity-30'
+                className='absolute bottom-0 left-[10%] h-px w-[80%] opacity-0 transition-opacity duration-300 group-hover:opacity-40'
                 style={{
                   background:
                     'linear-gradient(90deg, transparent, var(--linear-text-primary), transparent)',

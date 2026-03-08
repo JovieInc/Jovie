@@ -387,18 +387,18 @@ body {
       var(--linear-h2-size-lg)
     );
     font-weight: var(--linear-font-weight-semibold);
-    letter-spacing: var(--linear-tracking-subheadline);
-    line-height: 1.2;
+    letter-spacing: var(--linear-tracking-headline);
+    line-height: 1.1;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
-  /* Hero radial glow — subtle depth cue behind heading */
+  /* Hero radial glow — dramatic depth cue behind heading */
   .hero-glow {
     background: radial-gradient(
-      ellipse 80% 50% at 50% 40%,
-      oklch(30% 0.03 260 / 0.15),
-      transparent 70%
+      ellipse 80% 50% at 50% 35%,
+      oklch(25% 0.04 265 / 0.3),
+      transparent 65%
     );
   }
   @media (prefers-contrast: more) {
