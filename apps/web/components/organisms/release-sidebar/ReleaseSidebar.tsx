@@ -287,27 +287,27 @@ export function ReleaseSidebar({
               src={release.artworkUrl}
               alt={artworkAlt}
               name={release.title}
-              size='lg'
+              size='2xl'
               rounded='md'
               uploadable={canUploadArtwork}
               onUpload={handleArtworkUpload}
               showHoverOverlay
             />
           ) : (
-            <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+            <div className='relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
               {release.artworkUrl ? (
                 <Image
                   src={release.artworkUrl}
                   alt={artworkAlt}
                   fill
                   className='object-cover'
-                  sizes='64px'
+                  sizes='96px'
                 />
               ) : (
                 <div className='flex h-full w-full items-center justify-center'>
                   <Icon
                     name='Disc3'
-                    className='h-6 w-6 text-tertiary-token'
+                    className='h-8 w-8 text-tertiary-token'
                     aria-hidden='true'
                   />
                 </div>
