@@ -15,14 +15,13 @@ export interface DrawerPropertyRowProps {
 export function DrawerPropertyRow({
   label,
   value,
-  labelWidth = 96,
+  labelWidth = 88,
   interactive = false,
   onClick,
   className,
 }: DrawerPropertyRowProps) {
   const Wrapper = interactive ? 'button' : 'div';
 
-  // Memoize dynamic style object to avoid creating new object on each render
   const gridStyle = useMemo(
     () => ({ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }),
     [labelWidth]
@@ -33,15 +32,19 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid items-start gap-2 w-full text-left',
+        'grid items-center gap-1 w-full min-h-[28px] text-left',
         interactive &&
-          'rounded-md -mx-2 px-2 py-1.5 hover:bg-surface-2 transition-colors cursor-pointer',
+          'rounded -mx-1.5 px-1.5 hover:bg-white/[0.02] transition-colors duration-100 cursor-pointer',
         className
       )}
       style={gridStyle}
     >
-      <div className='pt-0.5 text-xs text-tertiary-token'>{label}</div>
-      <div className='min-w-0 text-xs text-secondary-token'>{value}</div>
+      <span className='text-[13px] font-[450] leading-tight text-tertiary-token'>
+        {label}
+      </span>
+      <span className='min-w-0 text-[13px] leading-tight text-secondary-token'>
+        {value}
+      </span>
     </Wrapper>
   );
 }
