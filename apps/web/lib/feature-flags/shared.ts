@@ -27,3 +27,15 @@ export type SubscribeCTAVariant = 'two_step' | 'inline';
 export interface FeatureFlagsBootstrap {
   gates: Record<string, boolean>;
 }
+
+/**
+ * Code-level feature flags — toggle here to re-enable when ready.
+ * These are not Statsig-backed; they are shipped with the build.
+ */
+export const FEATURE_FLAGS = {
+  /**
+   * JOV-1357: Threads in sidebar chat history.
+   * Set to true when thread UX is ready for production.
+   */
+  THREADS_ENABLED: false,
+} as const;
