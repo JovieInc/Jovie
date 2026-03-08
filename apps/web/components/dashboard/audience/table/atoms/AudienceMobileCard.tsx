@@ -47,7 +47,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       className={cn(
         'w-full text-left flex items-start gap-3 px-4 py-3.5 transition-colors duration-150',
         isSelected ? 'bg-surface-2/70' : 'active:bg-surface-2/40',
-        isHighIntent && 'font-medium'
+        isHighIntent && 'font-[510]'
       )}
       onClick={() => onTap(member)}
       aria-label={`View details for ${displayName}`}
@@ -75,12 +75,12 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         <div className='flex items-baseline justify-between gap-2'>
           <TruncatedText
             lines={1}
-            className='font-semibold text-[15px] leading-tight text-primary-token'
+            className='font-[590] text-[15px] leading-tight text-primary-token'
           >
             {displayName}
           </TruncatedText>
           {mode === 'members' && member.lastSeenAt && (
-            <span className='flex-shrink-0 text-xs text-tertiary-token tabular-nums'>
+            <span className='flex-shrink-0 text-[11px] text-tertiary-token tabular-nums'>
               {formatTimeAgo(member.lastSeenAt)}
             </span>
           )}
@@ -121,7 +121,7 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
   return (
     <div className='mt-0.5 space-y-0.5'>
       {/* Intent + Returning badge row */}
-      <p className='text-xs flex items-center gap-1.5'>
+      <p className='text-[11px] flex items-center gap-1.5'>
         <span
           className={cn(
             'inline-block size-1.5 rounded-full',
@@ -129,13 +129,13 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
           )}
           aria-hidden='true'
         />
-        <span className={cn('font-medium', INTENT_STYLES[member.intentLevel])}>
+        <span className={cn('font-[510]', INTENT_STYLES[member.intentLevel])}>
           {member.intentLevel.charAt(0).toUpperCase() +
             member.intentLevel.slice(1)}
         </span>
         <DotSeparator />
         {isReturning ? (
-          <span className='text-secondary-token font-medium'>Returning</span>
+          <span className='text-secondary-token font-[510]'>Returning</span>
         ) : (
           <span className='text-tertiary-token/70'>New</span>
         )}
@@ -182,7 +182,7 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
         </p>
       )}
       {member.lastSeenAt && (
-        <p className='text-xs text-tertiary-token'>
+        <p className='text-[11px] text-tertiary-token'>
           Subscribed {formatTimeAgo(member.lastSeenAt)}
         </p>
       )}

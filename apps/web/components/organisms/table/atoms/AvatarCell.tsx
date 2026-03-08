@@ -110,7 +110,7 @@ export const AvatarCell = React.memo(function AvatarCell({
       {/* Name and username */}
       <div className='min-w-0 flex-1'>
         {displayName && (
-          <div className='font-medium text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-[13px]'>
+          <div className='font-[510] text-primary-token line-clamp-1 overflow-hidden text-ellipsis text-[13px]'>
             {displayName}
           </div>
         )}
@@ -119,8 +119,8 @@ export const AvatarCell = React.memo(function AvatarCell({
           className={cn(
             'text-secondary-token transition-colors hover:text-primary-token line-clamp-1 overflow-hidden text-ellipsis',
             displayName
-              ? 'text-xs'
-              : 'font-medium text-primary-token text-[13px]'
+              ? 'text-[11px]'
+              : 'font-[510] text-primary-token text-[13px]'
           )}
           onClick={event => event.stopPropagation()}
         >

@@ -69,13 +69,13 @@ export function AudienceSubscriberRow({
         onToggle={onToggleSelect}
       />
 
-      <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+      <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
         {row.displayName && row.displayName !== row.phone
           ? row.displayName
           : 'Subscriber'}
       </td>
 
-      <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+      <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
         {row.phone ?? '—'}
       </td>
 

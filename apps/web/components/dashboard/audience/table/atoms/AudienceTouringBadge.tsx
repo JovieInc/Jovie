@@ -29,7 +29,7 @@ export function AudienceTouringBadge({
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400',
+        'inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[11px] font-[510] text-amber-600 dark:text-amber-400',
         className
       )}
       title={title}

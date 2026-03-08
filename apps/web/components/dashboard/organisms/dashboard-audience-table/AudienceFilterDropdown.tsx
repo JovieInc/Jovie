@@ -82,7 +82,7 @@ function ActiveFilterPill({
       <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
         <span className='text-tertiary-token'>{groupLabel}</span>
         <span className='text-tertiary-token'>is</span>
-        <span className='font-medium text-primary-token'>{displayValue}</span>
+        <span className='font-[510] text-primary-token'>{displayValue}</span>
       </div>
       <button
         type='button'

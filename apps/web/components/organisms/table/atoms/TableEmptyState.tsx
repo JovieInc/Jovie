@@ -63,7 +63,7 @@ export function TableEmptyState({
         </div>
       )}
       <div className='space-y-1'>
-        <p className='text-sm font-medium text-secondary-token'>{title}</p>
+        <p className='text-[13px] font-[510] text-secondary-token'>{title}</p>
         {description && (
           <p className='text-[13px] text-tertiary-token max-w-md'>
             {description}
