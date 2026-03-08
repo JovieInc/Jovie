@@ -9,6 +9,7 @@ import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
@@ -142,6 +143,8 @@ export async function POST(req: Request) {
         version: 1,
       });
     }
+
+    await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
 
     // Audit log
     const ipAddress = getClientIP(req);

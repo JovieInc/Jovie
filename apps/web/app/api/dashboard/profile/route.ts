@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
+import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
+import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -191,6 +193,15 @@ export async function PUT(req: Request) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_response');
         return updatedProfile;
       }
+
+      await syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
+        spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
+        appleMusicUrl: dbProfileUpdates.appleMusicUrl as
+          | string
+          | null
+          | undefined,
+        youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
+      });
 
       await finalizeProfileResponse({
         updatedProfile,

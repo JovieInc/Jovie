@@ -173,6 +173,30 @@ export function AdminUserDetailDrawer({
             {/* Profile completeness */}
             <ProfileCompletenessBar score={score} fields={fields} />
 
+            {user.socialLinks && user.socialLinks.length > 0 ? (
+              <div className='space-y-3'>
+                <p className='text-xs font-medium text-secondary-token uppercase tracking-wide'>
+                  Social & music links
+                </p>
+                <div className='space-y-2'>
+                  {user.socialLinks.slice(0, 8).map(link => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-sm hover:bg-surface-2 transition-colors'
+                    >
+                      <span className='text-primary-token capitalize'>
+                        {link.displayText ?? link.platform.replaceAll('_', ' ')}
+                      </span>
+                      <ExternalLink className='h-3.5 w-3.5 text-secondary-token' />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             {/* Details section */}
             <div className='space-y-3'>
               <p className='text-xs font-medium text-secondary-token uppercase tracking-wide'>
