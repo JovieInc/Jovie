@@ -15,7 +15,7 @@ export function ReleaseSmartLinkSection({
 
   return (
     <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
-      <Label className='text-xs font-medium text-secondary-token'>
+      <Label className='text-[13px] font-[510] text-secondary-token'>
         Smart link
       </Label>
       <CopyLinkInput url={smartLinkUrl} size='sm' />

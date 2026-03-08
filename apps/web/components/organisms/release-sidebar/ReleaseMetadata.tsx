@@ -53,7 +53,7 @@ const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-xs tabular-nums text-secondary-token'>
+    <span className='text-[11px] tabular-nums text-secondary-token'>
       {clamped} / 100
     </span>
   );
@@ -85,7 +85,7 @@ export function ReleaseMetadata({
             <div className='flex items-center gap-1.5'>
               <Badge
                 variant='secondary'
-                className='bg-surface-2 text-xs font-medium'
+                className='bg-surface-2 text-[13px] font-[510]'
               >
                 {RELEASE_TYPE_LABELS[release.releaseType] ??
                   release.releaseType}
@@ -93,7 +93,7 @@ export function ReleaseMetadata({
               {release.isExplicit && (
                 <Badge
                   variant='secondary'
-                  className='bg-red-500/15 px-1 py-0 text-[10px] font-medium text-red-700 dark:text-red-300'
+                  className='bg-red-500/15 px-1 py-0 text-[10px] font-[510] text-red-700 dark:text-red-300'
                 >
                   E
                 </Badge>
@@ -135,7 +135,7 @@ export function ReleaseMetadata({
                 className='font-sans'
               />
             ) : (
-              <span className='text-xs text-tertiary-token'>Unknown</span>
+              <span className='text-[11px] text-tertiary-token'>Unknown</span>
             )
           }
         />
@@ -144,7 +144,7 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             label='Distributor'
             value={
-              <span className='text-xs text-secondary-token truncate max-w-[180px]'>
+              <span className='text-[11px] text-secondary-token truncate max-w-[180px]'>
                 {release.distributor}
               </span>
             }
@@ -155,7 +155,7 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             label='℗'
             value={
-              <span className='text-xs text-secondary-token truncate max-w-[180px]'>
+              <span className='text-[11px] text-secondary-token truncate max-w-[180px]'>
                 {release.copyrightLine}
               </span>
             }
@@ -165,7 +165,7 @@ export function ReleaseMetadata({
         <DrawerPropertyRow
           label='Tracks'
           value={
-            <span className='text-xs tabular-nums'>
+            <span className='text-[11px] tabular-nums'>
               {release.totalTracks}{' '}
               {release.totalTracks === 1 ? 'track' : 'tracks'}
             </span>
@@ -180,7 +180,7 @@ export function ReleaseMetadata({
                 <DropdownMenuTrigger asChild>
                   <button
                     type='button'
-                    className='inline-flex items-center gap-1 rounded-md px-1 -mx-1 py-0.5 text-xs text-secondary-token transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
+                    className='inline-flex items-center gap-1 rounded-md px-1 -mx-1 py-0.5 text-[11px] text-secondary-token transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
                   >
                     <span>{canvasStatusDisplayLabel}</span>
                     <ChevronDown
@@ -198,12 +198,12 @@ export function ReleaseMetadata({
                       <DropdownMenuItem
                         key={status}
                         onClick={() => onCanvasStatusChange(status)}
-                        className={cn(isActive && 'font-medium')}
+                        className={cn(isActive && 'font-[510]')}
                       >
                         <span className='flex items-center gap-2 w-full'>
                           <Badge
                             variant='secondary'
-                            className={`text-[10px] font-medium ${config.className}`}
+                            className={`text-[10px] font-[510] ${config.className}`}
                           >
                             {config.label}
                           </Badge>
@@ -223,7 +223,7 @@ export function ReleaseMetadata({
             ) : (
               <Badge
                 variant='secondary'
-                className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
+                className={`text-[10px] font-[510] ${canvasStatusConfig.className}`}
               >
                 {canvasStatusDisplayLabel}
               </Badge>
@@ -235,7 +235,7 @@ export function ReleaseMetadata({
           <DrawerPropertyRow
             label='Duration'
             value={
-              <span className='text-xs tabular-nums'>
+              <span className='text-[11px] tabular-nums'>
                 {formatDuration(release.totalDurationMs)}
               </span>
             }

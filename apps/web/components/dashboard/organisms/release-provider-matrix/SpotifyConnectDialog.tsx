@@ -77,7 +77,7 @@ function SearchInputTrailing({
         disabled={claimButtonDisabled}
         onClick={onClaimArtist}
         className={cn(
-          'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
+          'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-[510] transition-colors focus-ring-themed',
           claimButtonDisabled
             ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
             : 'bg-btn-primary text-btn-primary-foreground'
@@ -353,16 +353,16 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-lg font-semibold text-primary-token'>
+      <DialogTitle className='text-lg font-[590] text-primary-token'>
         Connect Spotify
       </DialogTitle>
-      <DialogDescription className='text-sm text-secondary-token'>
+      <DialogDescription className='text-[13px] text-secondary-token'>
         Search for your artist profile to import releases.
       </DialogDescription>
 
       <DialogBody className='space-y-4'>
         <div className='space-y-1'>
-          <p className='text-sm text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Search by artist name or paste your Spotify artist URL to connect
             instantly.
           </p>
@@ -414,7 +414,7 @@ export function SpotifyConnectDialog({
               autoCorrect='off'
               autoComplete='off'
               disabled={isPending}
-              className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none'
+              className='min-w-0 flex-1 bg-transparent text-[13px] text-primary-token focus-visible:outline-none'
               role='combobox'
               aria-expanded={shouldShowDropdown}
               aria-controls='spotify-connect-results'
@@ -434,13 +434,13 @@ export function SpotifyConnectDialog({
           </div>
 
           {formState.error && (
-            <p className='mt-2 text-sm text-error' role='alert'>
+            <p className='mt-2 text-[13px] text-error' role='alert'>
               {formState.error}
             </p>
           )}
 
           {shouldShowDropdown && (
-            <div className='absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg'>
+            <div className='absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-card-elevated'>
               <select
                 id='spotify-connect-results'
                 className='sr-only'
@@ -506,7 +506,7 @@ export function SpotifyConnectDialog({
 
               {searchState === 'empty' && (
                 <div className='p-4 text-center'>
-                  <p className='text-sm text-secondary-token'>
+                  <p className='text-[13px] text-secondary-token'>
                     No artists found
                   </p>
                 </div>
@@ -514,7 +514,7 @@ export function SpotifyConnectDialog({
 
               {searchState === 'error' && (
                 <div className='p-4 text-center'>
-                  <p className='text-sm text-error'>
+                  <p className='text-[13px] text-error'>
                     {searchError || 'Search failed. Try again.'}
                   </p>
                 </div>
@@ -568,11 +568,11 @@ export function SpotifyConnectDialog({
                         )}
                       </div>
                       <div className='flex-1 min-w-0'>
-                        <div className='font-medium truncate text-sm text-primary-token'>
+                        <div className='font-[510] truncate text-[13px] text-primary-token'>
                           {artist.name}
                         </div>
                         {artist.followers && (
-                          <div className='text-xs text-tertiary-token'>
+                          <div className='text-[11px] text-tertiary-token'>
                             {formatFollowers(artist.followers)}
                           </div>
                         )}
@@ -616,10 +616,10 @@ export function SpotifyConnectDialog({
                   />
                 </div>
                 <div className='flex-1'>
-                  <div className='font-medium text-sm text-primary-token'>
+                  <div className='font-[510] text-[13px] text-primary-token'>
                     Paste a Spotify URL instead
                   </div>
-                  <div className='text-xs text-tertiary-token'>
+                  <div className='text-[11px] text-tertiary-token'>
                     open.spotify.com/artist/...
                   </div>
                 </div>

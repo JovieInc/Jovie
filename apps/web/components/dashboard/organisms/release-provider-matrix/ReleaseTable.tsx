@@ -305,11 +305,11 @@ export function ReleaseTable({
   if (isMobile) {
     if (releases.length === 0) {
       return (
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
           <Icon name='Disc3' className='h-6 w-6' />
           <div>
-            <div className='font-medium'>No releases</div>
-            <div className='text-xs'>
+            <div className='font-[510]'>No releases</div>
+            <div className='text-[11px]'>
               Your releases will appear here once synced.
             </div>
           </div>
@@ -354,11 +354,11 @@ export function ReleaseTable({
       renderExpandedContent={showTracks ? renderExpandedContent : undefined}
       getExpandableRowId={getExpandableRowId}
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
           <Icon name='Disc3' className='h-6 w-6' />
           <div>
-            <div className='font-medium'>No releases</div>
-            <div className='text-xs'>
+            <div className='font-[510]'>No releases</div>
+            <div className='text-[11px]'>
               Your releases will appear here once synced.
             </div>
           </div>

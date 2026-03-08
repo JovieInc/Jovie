@@ -385,7 +385,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-6 w-32 text-xs'
+                          className='h-6 w-32 text-[13px]'
                           autoFocus
                         />
                         <Button

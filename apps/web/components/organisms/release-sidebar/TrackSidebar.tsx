@@ -173,7 +173,7 @@ export function TrackSidebar({
                 <span className='text-[13px] text-tertiary-token tabular-nums'>
                   {trackLabel}.
                 </span>
-                <h3 className='text-[15px] font-semibold text-primary-token'>
+                <h3 className='text-[15px] font-[590] text-primary-token'>
                   {track.title}
                 </h3>
                 {track.isExplicit && (
@@ -185,7 +185,7 @@ export function TrackSidebar({
                   </Badge>
                 )}
               </div>
-              <div className='flex items-center gap-3 text-xs text-secondary-token'>
+              <div className='flex items-center gap-3 text-[11px] text-secondary-token'>
                 {track.durationMs != null && (
                   <span className='tabular-nums'>
                     {formatDuration(track.durationMs)}
@@ -199,7 +199,7 @@ export function TrackSidebar({
               </div>
             </div>
             {track.releaseArtworkUrl ? (
-              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
                 <Image
                   src={track.releaseArtworkUrl}
                   alt={`${track.releaseTitle} artwork`}
@@ -209,7 +209,7 @@ export function TrackSidebar({
                 />
               </div>
             ) : (
-              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
                 <div className='flex h-full w-full items-center justify-center'>
                   <Icon
                     name='Music'
@@ -229,7 +229,7 @@ export function TrackSidebar({
             <button
               type='button'
               onClick={handleBackToRelease}
-              className='flex items-center gap-1.5 text-xs text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+              className='flex items-center gap-1.5 text-[13px] text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
             >
               <ArrowLeft className='h-3.5 w-3.5' />
               <span className='truncate max-w-[200px]'>
@@ -239,13 +239,13 @@ export function TrackSidebar({
           )}
 
           <DrawerSection>
-            <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+            <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               Smart link
             </p>
             <button
               type='button'
               onClick={handleCopySmartLink}
-              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
             >
               <Link2 className='h-3.5 w-3.5 shrink-0' />
               <span className='truncate'>{smartLinkUrl}</span>
@@ -254,7 +254,7 @@ export function TrackSidebar({
           </DrawerSection>
 
           <DrawerSection>
-            <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+            <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               Actions
             </p>
             <div className='space-y-1'>
@@ -262,7 +262,7 @@ export function TrackSidebar({
                 <button
                   type='button'
                   onClick={handleCopyIsrc}
-                  className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+                  className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
                 >
                   <Hash className='h-3.5 w-3.5 shrink-0' />
                   <span>Copy ISRC</span>
@@ -276,7 +276,7 @@ export function TrackSidebar({
 
           {streamingProviders.length > 0 && (
             <DrawerSection>
-              <p className='py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                 Available on
               </p>
               <div className='space-y-1'>
@@ -286,7 +286,7 @@ export function TrackSidebar({
                     href={provider.url}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+                    className='flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
                   >
                     <SocialIcon
                       platform={provider.key}

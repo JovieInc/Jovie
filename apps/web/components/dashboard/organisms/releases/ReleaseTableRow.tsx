@@ -219,7 +219,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
             {/* Title and metadata */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
+                <span className='line-clamp-1 text-[13px] font-[510] text-primary-token'>
                   {release.title}
                 </span>
                 {manualOverrideCount > 0 && (
@@ -232,7 +232,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                 )}
               </div>
               {artistName && (
-                <div className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
+                <div className='mt-0.5 line-clamp-1 text-[11px] text-secondary-token'>
                   {artistName}
                 </div>
               )}
@@ -242,7 +242,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
         {/* Release date cell */}
         <td className='px-4 py-4 align-middle'>
-          <span className='line-clamp-1 text-xs text-secondary-token'>
+          <span className='line-clamp-1 text-[11px] text-secondary-token'>
             {release.releaseDate
               ? new Date(release.releaseDate).toLocaleDateString('en-US', {
                   month: 'short',
@@ -272,7 +272,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                   )
                 }
                 className={cn(
-                  'inline-flex items-center text-xs transition-colors',
+                  'inline-flex items-center text-[13px] transition-colors',
                   isCopied && 'bg-success/10 text-success hover:bg-success/10'
                 )}
               >

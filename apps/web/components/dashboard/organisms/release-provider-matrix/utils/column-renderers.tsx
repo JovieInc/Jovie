@@ -145,7 +145,7 @@ export function createActionsHeaderRenderer(
             variant='ghost'
             size='sm'
             onClick={onClearSelection}
-            className='h-7 gap-1 text-xs'
+            className='h-7 gap-1 text-[13px]'
           >
             <Icon name='X' className='h-3.5 w-3.5' />
             Clear
@@ -359,7 +359,7 @@ export function renderLabelCell({
   if (!label) return <EmptyCell />;
 
   return (
-    <TruncatedText lines={1} className='text-xs text-secondary-token'>
+    <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
       {label}
     </TruncatedText>
   );

@@ -129,7 +129,7 @@ export function AppleMusicSyncBanner({
         className={cn('flex items-center gap-3 px-4 py-3', className)}
       >
         <DspProviderIcon provider='apple_music' size='md' />
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] text-secondary-token'>
           No matching Apple Music artist found
         </p>
       </DashboardCard>
@@ -152,7 +152,7 @@ export function AppleMusicSyncBanner({
 
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2'>
-          <span className='min-w-0 truncate text-sm font-medium text-primary-token'>
+          <span className='min-w-0 truncate text-[13px] font-[510] text-primary-token'>
             {match.externalArtistName}
           </span>
           {match.externalArtistUrl && (
@@ -167,7 +167,7 @@ export function AppleMusicSyncBanner({
             </a>
           )}
         </div>
-        <p className='mt-0.5 text-xs text-secondary-token'>
+        <p className='mt-0.5 text-[11px] text-secondary-token'>
           Confirm to link your Apple Music releases.
         </p>
       </div>
@@ -180,7 +180,7 @@ export function AppleMusicSyncBanner({
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='text-xs'
+          className='text-[13px]'
         >
           {rejectMutation.isPending &&
           rejectMutation.variables?.matchId === match.id
@@ -194,7 +194,7 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='text-xs bg-[#FA243C] hover:bg-[#FA243C]/90'
+          className='text-[13px] bg-[#FA243C] hover:bg-[#FA243C]/90'
         >
           {confirmMutation.isPending &&
           confirmMutation.variables?.matchId === match.id ? (

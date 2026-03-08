@@ -52,14 +52,14 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='min-w-0 flex-1'>
         {mode === 'soft-cap' ? (
           <>
-            <p className='text-sm font-medium text-primary-token'>
+            <p className='text-[13px] font-[510] text-primary-token'>
               You have {props.releasedCount} smart links
             </p>
-            <p className='mt-0.5 text-xs text-secondary-token'>
+            <p className='mt-0.5 text-[11px] text-secondary-token'>
               Need more than {props.softCap}?{' '}
               <a
                 href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'
-                className='font-medium text-primary underline-offset-2 hover:underline'
+                className='font-[510] text-primary underline-offset-2 hover:underline'
               >
                 Request a higher limit
               </a>
@@ -67,14 +67,14 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
           </>
         ) : (
           <>
-            <p className='text-sm font-medium text-primary-token'>
+            <p className='text-[13px] font-[510] text-primary-token'>
               You have {props.unreleasedCount} upcoming{' '}
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>
-            <p className='mt-0.5 text-xs text-secondary-token'>
+            <p className='mt-0.5 text-[11px] text-secondary-token'>
               <Link
                 href='/launch/pricing'
-                className='font-medium text-primary underline-offset-2 hover:underline'
+                className='font-[510] text-primary underline-offset-2 hover:underline'
               >
                 Upgrade to Pro
               </Link>{' '}

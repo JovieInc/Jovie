@@ -92,7 +92,7 @@ export const TrackRow = memo(function TrackRow({
         <td className='py-2 pr-4'>
           <div className='flex items-center gap-3 pl-8'>
             {/* Track number */}
-            <span className='w-8 shrink-0 text-right text-xs tabular-nums text-tertiary-token'>
+            <span className='w-8 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
               {trackLabel}.
             </span>
 
@@ -101,7 +101,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-sm text-primary-token'
+                  className='text-[13px] text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -153,12 +153,12 @@ export const TrackRow = memo(function TrackRow({
                     );
                   })}
                 </div>
-                <span className='text-xs text-tertiary-token'>
+                <span className='text-[11px] text-tertiary-token'>
                   {availableCount}/{allProviders.length}
                 </span>
               </>
             ) : (
-              <span className='text-xs text-tertiary-token'>—</span>
+              <span className='text-[11px] text-tertiary-token'>—</span>
             )}
           </div>
         </td>
@@ -174,11 +174,11 @@ export const TrackRow = memo(function TrackRow({
       {isVisible('metrics') && (
         <td className='py-2'>
           {track.durationMs ? (
-            <span className='text-xs text-secondary-token tabular-nums'>
+            <span className='text-[11px] text-secondary-token tabular-nums'>
               {formatDuration(track.durationMs)}
             </span>
           ) : (
-            <span className='text-xs text-tertiary-token'>—</span>
+            <span className='text-[11px] text-tertiary-token'>—</span>
           )}
         </td>
       )}
@@ -256,7 +256,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
       <tr className='bg-surface-1/50'>
         <td
           colSpan={columnCount}
-          className='py-3 pl-20 text-xs text-tertiary-token'
+          className='py-3 pl-20 text-[11px] text-tertiary-token'
         >
           <div className='flex items-center gap-2'>
             <Icon name='AlertCircle' className='h-3.5 w-3.5' />

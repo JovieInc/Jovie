@@ -11,10 +11,10 @@ export function ReleasesEmptyState({
 }: ReleasesEmptyStateProps) {
   return (
     <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
-      <h3 className='text-sm font-medium text-primary-token'>
+      <h3 className='text-[13px] font-[510] text-primary-token'>
         Connect Spotify
       </h3>
-      <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+      <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
         Search your artist profile to import releases.
       </p>
       <Button

@@ -275,7 +275,7 @@ export function ReleaseDspLinks({
           ].join(' ')}
         >
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-xs text-tertiary-token'>Provider</Label>
+            <Label className='text-[11px] text-tertiary-token'>Provider</Label>
             <Select
               value={selectedProvider ?? ''}
               onValueChange={(value: string) => {
@@ -326,7 +326,7 @@ export function ReleaseDspLinks({
             </Select>
           </div>
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-xs text-tertiary-token'>URL</Label>
+            <Label className='text-[11px] text-tertiary-token'>URL</Label>
             <Input
               type='url'
               value={newLinkUrl}

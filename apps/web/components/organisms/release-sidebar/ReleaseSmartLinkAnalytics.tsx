@@ -126,7 +126,7 @@ export function ReleaseSmartLinkAnalytics({
         )}
 
         {!showSkeleton && hasError && (
-          <p className='text-xs text-error'>
+          <p className='text-[13px] text-error'>
             Analytics are temporarily unavailable.
           </p>
         )}
@@ -156,7 +156,7 @@ export function ReleaseSmartLinkAnalytics({
             </div>
 
             {showEmpty && (
-              <p className='mt-2 text-xs text-secondary-token'>
+              <p className='mt-2 text-[11px] text-secondary-token'>
                 Share your smart link to start tracking clicks.
               </p>
             )}
@@ -177,7 +177,7 @@ export function ReleaseSmartLinkAnalytics({
                     return (
                       <div
                         key={provider.provider}
-                        className='flex items-center justify-between px-3 py-2 text-xs'
+                        className='flex items-center justify-between px-3 py-2 text-[13px]'
                       >
                         <div className='flex items-center gap-2 text-secondary-token'>
                           <span

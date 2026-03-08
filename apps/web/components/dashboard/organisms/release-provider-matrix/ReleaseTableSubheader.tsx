@@ -107,7 +107,7 @@ function ReleaseViewSegmentedControl({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={cn(
-            'flex flex-col items-center gap-1 rounded-lg py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+            'flex flex-col items-center gap-1 rounded-lg py-3 text-[13px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
             value === option.value
               ? 'bg-surface-2 text-primary-token border border-subtle'
               : 'text-tertiary-token hover:text-secondary-token border border-transparent'
@@ -209,7 +209,7 @@ function LinearStyleDisplayMenu({
       <PopoverContent align='end' className='w-[260px]'>
         {/* Header */}
         <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-          <span className='text-[13px] font-semibold text-primary-token'>
+          <span className='text-[13px] font-[510] text-primary-token'>
             Display
           </span>
           <PopoverPrimitive.Close
@@ -233,7 +233,7 @@ function LinearStyleDisplayMenu({
         {/* List options */}
         {onGroupByYearChange && (
           <div className='border-b border-subtle px-3 py-1.5'>
-            <p className='px-1 pb-1 text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               List options
             </p>
             <ToggleSwitch
@@ -252,7 +252,7 @@ function LinearStyleDisplayMenu({
               onResetToDefaults && 'border-b border-subtle'
             )}
           >
-            <p className='px-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-tertiary-token'>
+            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               Display properties
             </p>
             <div className='flex flex-wrap gap-1 px-0.5'>
@@ -266,7 +266,7 @@ function LinearStyleDisplayMenu({
                     aria-pressed={isVisible}
                     aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
                     className={cn(
-                      'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
+                      'rounded-md px-2 py-0.5 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
                       isVisible
                         ? 'bg-interactive-active text-secondary-token'
                         : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'

@@ -58,7 +58,7 @@ export function ReleaseArtwork({
   }, [artworkUrl]);
 
   const staticImage = (
-    <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-sm'>
+    <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-card'>
       {artworkUrl && !imgError ? (
         <Image
           src={artworkUrl}

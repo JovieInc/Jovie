@@ -294,7 +294,7 @@ export function ReleaseSidebar({
               showHoverOverlay
             />
           ) : (
-            <div className='relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+            <div className='relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
               {release.artworkUrl ? (
                 <Image
                   src={release.artworkUrl}
