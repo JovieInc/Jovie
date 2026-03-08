@@ -61,6 +61,14 @@ import {
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
+// Module-level icon constants — allocated once, reused across all rows and renders.
+const ICON_EYE = <Eye className='h-3.5 w-3.5' />;
+const ICON_COPY = <Copy className='h-3.5 w-3.5' />;
+const ICON_PHONE = <Phone className='h-3.5 w-3.5' />;
+const ICON_BELL = <Bell className='h-3.5 w-3.5' />;
+const ICON_DOWNLOAD = <Download className='h-3.5 w-3.5' />;
+const ICON_USER_MINUS = <UserMinus className='h-3.5 w-3.5' />;
+
 function getSrDescription(
   isEmpty: boolean,
   mode: 'members' | 'subscribers'
@@ -368,13 +376,13 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'view-details',
             label: 'View details',
-            icon: <Eye className='h-3.5 w-3.5' />,
+            icon: ICON_EYE,
             onClick: () => setSelectedMember(member),
           },
           {
             id: 'copy-email',
             label: 'Copy email',
-            icon: <Copy className='h-3.5 w-3.5' />,
+            icon: ICON_COPY,
             onClick: () => {
               if (member.email) {
                 void navigator.clipboard.writeText(member.email);
@@ -386,7 +394,7 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'copy-phone',
             label: 'Copy phone',
-            icon: <Phone className='h-3.5 w-3.5' />,
+            icon: ICON_PHONE,
             onClick: () => {
               if (member.phone) {
                 void navigator.clipboard.writeText(member.phone);
@@ -398,7 +406,7 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'send-notification',
             label: 'Send notification',
-            icon: <Bell className='h-3.5 w-3.5' />,
+            icon: ICON_BELL,
             onClick: () => {
               if (member.email) {
                 void navigator.clipboard.writeText(member.email);
@@ -414,7 +422,7 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'export-contact',
             label: 'Export as vCard',
-            icon: <Download className='h-3.5 w-3.5' />,
+            icon: ICON_DOWNLOAD,
             onClick: () => {
               downloadVCard(member);
               toast.success('Contact exported as vCard');
@@ -424,7 +432,7 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'remove-member',
             label: 'Block',
-            icon: <UserMinus className='h-3.5 w-3.5' />,
+            icon: ICON_USER_MINUS,
             onClick: () => {
               handleRemoveMember(member).catch(() => {});
             },
