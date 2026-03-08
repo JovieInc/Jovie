@@ -153,7 +153,8 @@ export function SidebarLinkRow({
       <div
         className={cn(
           'group flex items-center justify-between lg:rounded-md',
-          'px-3 py-1.5 hover:bg-interactive-hover',
+          'px-4 py-3 lg:px-3 lg:py-1.5',
+          'active:bg-surface-2/50 lg:active:bg-transparent lg:hover:bg-interactive-hover',
           'transition-colors',
           !isVisible && 'opacity-60',
           className
@@ -161,7 +162,7 @@ export function SidebarLinkRow({
         data-testid={testId}
       >
         {/* Left: Icon + Label */}
-        <div className='flex items-center gap-2.5 min-w-0 flex-1'>
+        <div className='flex items-center gap-3 lg:gap-2.5 min-w-0 flex-1'>
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
