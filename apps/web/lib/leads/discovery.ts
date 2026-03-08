@@ -16,6 +16,7 @@ import { searchGoogleCSE } from './google-cse';
 
 export interface DiscoveryResult {
   queriesUsed: number;
+  candidatesProcessed: number;
   newLeadsFound: number;
   duplicatesSkipped: number;
 }
@@ -30,6 +31,7 @@ export async function runDiscovery(
 ): Promise<DiscoveryResult> {
   const result: DiscoveryResult = {
     queriesUsed: 0,
+    candidatesProcessed: 0,
     newLeadsFound: 0,
     duplicatesSkipped: 0,
   };
@@ -53,6 +55,15 @@ export async function runDiscovery(
 
     try {
       const results = await searchGoogleCSE(keyword.query);
+      const candidatesByHandle = new Map<
+        string,
+        {
+          linktreeHandle: string;
+          linktreeUrl: string;
+          discoverySource: 'google_cse';
+          discoveryQuery: string;
+        }
+      >();
 
       for (const item of results) {
         if (!isLinktreeUrl(item.link)) continue;
@@ -60,23 +71,26 @@ export async function runDiscovery(
         const handle = extractLinktreeHandle(item.link);
         if (!handle) continue;
 
-        // Attempt insert, skip if duplicate (unique constraint on linktree_handle)
-        try {
-          await db.insert(leads).values({
-            linktreeHandle: handle,
-            linktreeUrl: `https://linktr.ee/${handle}`,
-            discoverySource: 'google_cse',
-            discoveryQuery: keyword.query,
-          });
-          result.newLeadsFound++;
-        } catch (error) {
-          // Unique constraint violation = duplicate
-          if (error instanceof Error && error.message.includes('unique')) {
-            result.duplicatesSkipped++;
-          } else {
-            throw error;
-          }
-        }
+        candidatesByHandle.set(handle, {
+          linktreeHandle: handle,
+          linktreeUrl: `https://linktr.ee/${handle}`,
+          discoverySource: 'google_cse',
+          discoveryQuery: keyword.query,
+        });
+      }
+
+      const candidates = Array.from(candidatesByHandle.values());
+      result.candidatesProcessed += candidates.length;
+
+      if (candidates.length > 0) {
+        const insertedRows = await db
+          .insert(leads)
+          .values(candidates)
+          .onConflictDoNothing({ target: leads.linktreeHandle })
+          .returning({ id: leads.id });
+
+        result.newLeadsFound += insertedRows.length;
+        result.duplicatesSkipped += candidates.length - insertedRows.length;
       }
 
       // Update keyword stats
