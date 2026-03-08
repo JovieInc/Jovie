@@ -226,7 +226,7 @@ export function useSuggestionsQuery({
     refetchOnWindowFocus: false,
     staleTime: 1 * 60 * 1000, // 1 min
     gcTime: 10 * 60 * 1000, // 10 min
-    refetchOnMount: true,
+    refetchOnMount: false,
     structuralSharing: true,
   });
 }
