@@ -21,6 +21,7 @@ import {
   FEATURE_FLAG_KEYS,
   getSubscribeCTAVariant,
 } from '@/lib/feature-flags/server';
+import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -605,7 +606,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       locale: 'en_US',
       images: [
         {
-          url: `${BASE_URL}/${profile.username}/opengraph-image`,
+          url: getProfileOgImageUrl(profile.username),
           width: 1200,
           height: 630,
           alt: `${artistName} profile card`,
@@ -620,7 +621,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       site: '@jovieapp',
       images: [
         {
-          url: `${BASE_URL}/${profile.username}/opengraph-image`,
+          url: getProfileOgImageUrl(profile.username),
           alt: `${artistName} profile card`,
         },
       ],
