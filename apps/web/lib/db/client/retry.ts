@@ -22,7 +22,7 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection.*reset/i,
   /connection.*terminated/i,
   /connection.*closed/i,
-  /server conn crashed\??/i,
+  /server\s+conn\s+crashed\??/i,
   /connection.*unexpectedly/i,
   /timeout/i,
   /network/i,
@@ -39,14 +39,38 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /terminating connection due to administrator command/i,
 ] as const;
 
+type RetryableErrorCandidate = {
+  message?: unknown;
+  name?: unknown;
+};
+
+function getErrorText(error: unknown): string[] {
+  if (error instanceof Error) {
+    return [error.message, error.name];
+  }
+
+  if (typeof error !== 'object' || error === null) {
+    return [];
+  }
+
+  const candidate = error as RetryableErrorCandidate;
+  return [candidate.message, candidate.name].flatMap(value =>
+    typeof value === 'string' ? [value] : []
+  );
+}
+
 /**
  * Check if an error is retryable (transient)
  */
 export function isRetryableError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
+  const errorText = getErrorText(error);
 
-  return RETRYABLE_ERROR_PATTERNS.some(
-    pattern => pattern.test(error.message) || pattern.test(error.name)
+  if (errorText.length === 0) {
+    return false;
+  }
+
+  return RETRYABLE_ERROR_PATTERNS.some(pattern =>
+    errorText.some(value => pattern.test(value))
   );
 }
 

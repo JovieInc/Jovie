@@ -109,6 +109,17 @@ describe('onboardingErrorToError', () => {
     expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
   });
 
+  it('extracts PostgreSQL details from JSON embedded in a failed query message', () => {
+    const dbError = {
+      message:
+        'Failed query: insert into users -- params: [] -- cause: {"code":"23505","constraint":"users_email_unique","detail":"Key (email)=(test@example.com) already exists."}',
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
+  });
+
   it('extracts PostgreSQL details from a JSON-encoded string cause', () => {
     const dbError = {
       message: 'Failed query: SELECT create_profile_with_user(...)',

@@ -1,9 +1,11 @@
 'use client';
 
 import { Badge, SimpleTooltip } from '@jovie/ui';
-import { memo, useMemo } from 'react';
+import { Pause, Play } from 'lucide-react';
+import { memo, useCallback, useMemo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { PopularityIcon } from './PopularityIcon';
@@ -60,6 +62,24 @@ export const ReleaseCell = memo(function ReleaseCell({
   artistName,
   showType = true,
 }: ReleaseCellProps) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const isActiveTrack = playbackState.activeTrackId === release.id;
+  const isPlaying = isActiveTrack && playbackState.isPlaying;
+  const hasPreview = Boolean(release.previewUrl);
+
+  const handleTogglePlayback = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!release.previewUrl) return;
+      toggleTrack({
+        id: release.id,
+        title: release.title,
+        audioUrl: release.previewUrl,
+      }).catch(() => {});
+    },
+    [toggleTrack, release.id, release.title, release.previewUrl]
+  );
+
   const manualOverrideCount = release.providers.filter(
     provider => provider.source === 'manual'
   ).length;
@@ -88,7 +108,28 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [release.providers]);
 
   return (
-    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[minmax(0,1fr)_minmax(88px,132px)_minmax(72px,120px)_20px_minmax(54px,92px)]'>
+    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[24px_minmax(0,1fr)_minmax(88px,132px)_minmax(72px,120px)_20px_minmax(54px,92px)]'>
+      <div className='flex w-6 items-center justify-center'>
+        {hasPreview ? (
+          <button
+            type='button'
+            onClick={handleTogglePlayback}
+            className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-white/[0.06]'
+            aria-label={
+              isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
+            }
+          >
+            {isPlaying ? (
+              <Pause className='h-3 w-3' />
+            ) : (
+              <Play className='h-3 w-3' />
+            )}
+          </button>
+        ) : (
+          <span className='h-6 w-6' />
+        )}
+      </div>
+
       <div className='min-w-0'>
         <TruncatedText
           lines={1}

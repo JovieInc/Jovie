@@ -209,7 +209,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         )}
       >
         {/* Release info cell */}
-        <td className='px-4 py-4 align-middle'>
+        <td className='px-4 py-2.5 align-middle'>
           <div className='flex items-center gap-3'>
             {/* Artwork thumbnail */}
             <ReleaseArtworkThumb
@@ -219,7 +219,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
             {/* Title and metadata */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='line-clamp-1 text-[13px] font-[510] text-primary-token'>
+                <span className='line-clamp-1 text-[13px] font-[510] tracking-[-0.011em] text-primary-token'>
                   {release.title}
                 </span>
                 {manualOverrideCount > 0 && (
@@ -232,7 +232,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                 )}
               </div>
               {artistName && (
-                <div className='mt-0.5 line-clamp-1 text-[11px] text-secondary-token'>
+                <div className='mt-0.5 line-clamp-1 text-[12px] font-[450] text-secondary-token'>
                   {artistName}
                 </div>
               )}
@@ -241,8 +241,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         </td>
 
         {/* Release date cell */}
-        <td className='px-4 py-4 align-middle'>
-          <span className='line-clamp-1 text-[11px] text-secondary-token'>
+        <td className='px-4 py-2.5 align-middle'>
+          <span className='line-clamp-1 text-[12px] font-[450] tabular-nums text-secondary-token'>
             {release.releaseDate
               ? new Date(release.releaseDate).toLocaleDateString('en-US', {
                   month: 'short',
@@ -254,7 +254,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         </td>
 
         {/* Smart link cell */}
-        <td className='px-4 py-4 align-middle'>
+        <td className='px-4 py-2.5 align-middle'>
           {(() => {
             const smartLinkTestId = `smart-link-copy-${release.id}`;
             const isCopied = copiedId === smartLinkTestId;
@@ -324,7 +324,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
           }
 
           return (
-            <td key={providerKey} className='px-4 py-4 align-middle'>
+            <td key={providerKey} className='px-4 py-2.5 align-middle'>
               <div className='flex items-center gap-3'>
                 <ProviderStatusDot
                   status={status}
@@ -364,7 +364,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         })}
 
         {/* Actions cell */}
-        <td className='px-4 py-4 align-middle text-right'>
+        <td className='px-4 py-2.5 align-middle text-right'>
           <div className='flex justify-end'>
             <TableActionMenu items={menuItems} />
           </div>

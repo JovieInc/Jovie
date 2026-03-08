@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DrawerSection, StatTile } from '@/components/molecules/drawer';
+import { StatTile } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import type { Release } from './types';
@@ -52,7 +52,6 @@ export function ReleaseSmartLinkAnalytics({
     setIsLoading(prev => (data === null ? true : prev));
     setIsSwitching(data !== null);
     setHasError(false);
-    // Keep previous data visible while loading new data to prevent layout shift
 
     fetchReleaseAnalytics(release.id, controller.signal)
       .then(response => {
@@ -82,59 +81,58 @@ export function ReleaseSmartLinkAnalytics({
 
   const topProviders = providerClicks.slice(0, 4);
 
-  // Show loading skeleton only on first load (no previous data)
   const showSkeleton = isLoading && !data;
 
   return (
-    <DrawerSection title='Smart link analytics'>
-      <div className='min-h-[72px]'>
+    <div>
+      <div className='min-h-[60px]'>
         {showSkeleton && (
-          <div className='grid grid-cols-2 divide-x divide-subtle/80 rounded-lg border border-subtle/60 bg-surface-2/40 p-3.5'>
-            <div className='pr-3 space-y-1'>
-              <div className='h-[10px] w-16 rounded skeleton' />
-              <div className='h-7 w-14 rounded skeleton' />
-              <div className='h-[11px] w-12 rounded skeleton' />
+          <div className='grid grid-cols-2 rounded-md bg-white/[0.02] p-3'>
+            <div className='space-y-1'>
+              <div className='h-[10px] w-14 rounded skeleton' />
+              <div className='h-5 w-10 rounded skeleton' />
+              <div className='h-[11px] w-10 rounded skeleton' />
             </div>
-            <div className='pl-3 space-y-1'>
-              <div className='h-[10px] w-16 rounded skeleton' />
-              <div className='h-7 w-14 rounded skeleton' />
-              <div className='h-[11px] w-12 rounded skeleton' />
+            <div className='space-y-1 border-l border-white/[0.05] pl-3'>
+              <div className='h-[10px] w-14 rounded skeleton' />
+              <div className='h-5 w-10 rounded skeleton' />
+              <div className='h-[11px] w-10 rounded skeleton' />
             </div>
           </div>
         )}
 
         {!showSkeleton && hasError && (
-          <p className='text-[13px] text-error'>
-            Analytics are temporarily unavailable.
+          <p className='text-[13px] text-tertiary-token'>
+            Analytics unavailable
           </p>
         )}
 
         {!showSkeleton && !hasError && (
           <div
             className={cn(
-              'transition-opacity duration-150',
+              'transition-opacity duration-100',
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 divide-x divide-subtle/80 rounded-lg border border-subtle/60 bg-surface-2/40 p-3.5'>
-              <div className='pr-3'>
+            <div className='grid grid-cols-2 rounded-md bg-white/[0.02] p-3'>
+              <div>
                 <StatTile
                   label='Total clicks'
                   value={numberFormatter.format(totalClicks)}
                   hint='All time'
                 />
               </div>
-              <div className='pl-3'>
+              <div className='border-l border-white/[0.05] pl-3'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
-                  hint='Recent activity'
+                  hint='Recent'
                 />
               </div>
             </div>
 
             {showEmpty && (
-              <p className='mt-2 text-[11px] text-secondary-token'>
+              <p className='mt-1.5 text-[11px] text-tertiary-token'>
                 Share your smart link to start tracking clicks.
               </p>
             )}
@@ -177,6 +175,6 @@ export function ReleaseSmartLinkAnalytics({
           </div>
         )}
       </div>
-    </DrawerSection>
+    </div>
   );
 }

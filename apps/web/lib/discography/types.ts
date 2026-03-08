@@ -102,6 +102,8 @@ export interface ReleaseViewModel {
   hasVideoLinks?: boolean;
   /** Editable lyrics text stored in release metadata */
   lyrics?: string;
+  /** Preview audio URL (typically from the primary track) */
+  previewUrl?: string | null;
 }
 
 /** Track view model for display in expandable release rows */

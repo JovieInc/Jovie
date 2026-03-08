@@ -140,6 +140,26 @@ describe('handleMigrationErrors', () => {
     );
   });
 
+  it('returns fallback for unquoted failed query user_settings errors', async () => {
+    const { handleMigrationErrors } = await import(
+      '@/lib/migrations/handleMigrationErrors'
+    );
+
+    const result = handleMigrationErrors(
+      {
+        message:
+          'Failed query: select user_id, theme_mode from user_settings where user_settings.user_id = $1 limit $2',
+      },
+      { userId: 'user_123', operation: 'user_settings' }
+    );
+
+    expect(result).toEqual({ shouldRetry: false, fallbackData: undefined });
+    expect(mockWarn).toHaveBeenCalledWith(
+      '[Dashboard] user_settings migration in progress',
+      { userId: 'user_123', operation: 'user_settings' }
+    );
+  });
+
   it('returns fallback for uppercase failed query user_settings errors', async () => {
     const { handleMigrationErrors } = await import(
       '@/lib/migrations/handleMigrationErrors'

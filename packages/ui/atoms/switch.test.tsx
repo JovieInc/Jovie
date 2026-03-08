@@ -106,7 +106,7 @@ describe('Switch', () => {
       render(<Switch aria-label='Toggle' data-testid='switch' />);
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=unchecked]:bg-(--linear-border-strong)'
+        'data-[state=unchecked]:bg-white/[0.08]'
       );
     });
 
@@ -116,7 +116,7 @@ describe('Switch', () => {
       );
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain(
-        'data-[state=checked]:bg-(--linear-btn-primary-bg)'
+        'data-[state=checked]:bg-indigo-500'
       );
     });
 
@@ -259,14 +259,10 @@ describe('Switch', () => {
       const classes = switchElement.className;
 
       // Unchecked track must use a visible background
-      expect(classes).toContain(
-        'data-[state=unchecked]:bg-(--linear-border-strong)'
-      );
+      expect(classes).toContain('data-[state=unchecked]:bg-white/[0.08]');
 
-      // Checked track must use primary button background
-      expect(classes).toContain(
-        'data-[state=checked]:bg-(--linear-btn-primary-bg)'
-      );
+      // Checked track must use indigo background
+      expect(classes).toContain('data-[state=checked]:bg-indigo-500');
     });
 
     it('checked and unchecked use different background colors', () => {

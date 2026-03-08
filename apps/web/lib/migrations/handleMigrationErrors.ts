@@ -60,13 +60,17 @@ function isSocialLinksColumnMissing(message: string): boolean {
 
 function isUserSettingsSchemaIssue(message: string): boolean {
   const normalizedMessage = message.toLowerCase();
+  const referencesUserSettingsTable =
+    normalizedMessage.includes('from "user_settings"') ||
+    normalizedMessage.includes('from user_settings') ||
+    normalizedMessage.includes('relation "user_settings"') ||
+    normalizedMessage.includes('relation user_settings');
 
   return (
     normalizedMessage.includes('relation "user_settings" does not exist') ||
     (normalizedMessage.includes('column') &&
       normalizedMessage.includes('user_settings')) ||
-    (normalizedMessage.includes('failed query:') &&
-      normalizedMessage.includes('from "user_settings"'))
+    (normalizedMessage.includes('failed query:') && referencesUserSettingsTable)
   );
 }
 

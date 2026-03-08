@@ -85,24 +85,25 @@ describe('useReleaseHeaderParts', () => {
     );
   });
 
-  it('displays release title in header', () => {
+  it('displays primary ISRC in header', () => {
     render(
       <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
     );
 
-    expect(screen.getByText('Test Release')).toBeInTheDocument();
+    expect(screen.getByText('USRC17607839')).toBeInTheDocument();
   });
 
-  it('displays artist name when provided', () => {
+  it('falls back to release title when no ISRC', () => {
+    const releaseNoIsrc = { ...release, primaryIsrc: undefined };
     render(
       <TestHarness
-        release={release}
+        release={releaseNoIsrc}
         hasRelease
         artistName='Test Artist'
         onCopySmartLink={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Test Artist')).toBeInTheDocument();
+    expect(screen.getByText('Test Release')).toBeInTheDocument();
   });
 });

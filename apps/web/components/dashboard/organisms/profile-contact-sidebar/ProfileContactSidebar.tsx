@@ -317,7 +317,9 @@ export function ProfileContactSidebar() {
         }
         onToggle={updateAllowProfilePhotoDownloads}
         successMessage={on =>
-          on ? 'Photo downloads enabled' : 'Photo downloads disabled'
+          on
+            ? 'Photo downloads enabled for visitors'
+            : 'Photo downloads disabled'
         }
       />
     ) : undefined;
