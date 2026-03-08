@@ -52,7 +52,7 @@ export async function GET(request: Request) {
       const orderFn = direction === 'asc' ? asc : desc;
       const offset = (page - 1) * pageSize;
 
-      const baseQuery = tx
+      const rowsQuery = tx
         .select({
           id: notificationSubscriptions.id,
           email: notificationSubscriptions.email,
@@ -62,20 +62,34 @@ export async function GET(request: Request) {
           channel: notificationSubscriptions.channel,
         })
         .from(notificationSubscriptions)
-        .where(eq(notificationSubscriptions.creatorProfileId, profileId));
+        .where(eq(notificationSubscriptions.creatorProfileId, profileId))
+        .orderBy(orderFn(sortColumn))
+        .limit(pageSize)
+        .offset(offset);
 
-      const [rows, [{ total }]] = await Promise.all([
-        baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
-        tx
-          .select({
-            total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-          })
-          .from(notificationSubscriptions)
-          .where(eq(notificationSubscriptions.creatorProfileId, profileId)),
-      ]);
+      // Only run the exact COUNT on the first page to avoid per-page overhead.
+      // Subsequent pages receive total: null; the client uses rows.length < pageSize
+      // as the "no more pages" signal instead.
+      if (page === 1) {
+        const [rows, [{ total }]] = await Promise.all([
+          rowsQuery,
+          tx
+            .select({
+              total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
+            })
+            .from(notificationSubscriptions)
+            .where(eq(notificationSubscriptions.creatorProfileId, profileId)),
+        ]);
 
+        return NextResponse.json(
+          { rows, total: Number(total ?? 0) },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const rows = await rowsQuery;
       return NextResponse.json(
-        { rows, total: Number(total ?? 0) },
+        { rows, total: null },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
