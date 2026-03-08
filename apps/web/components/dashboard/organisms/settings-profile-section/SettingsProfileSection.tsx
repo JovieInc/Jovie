@@ -13,17 +13,6 @@ import {
 import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
-type StatusPillState = 'saving' | 'saved' | null;
-
-function getStatusPillState(
-  saving: boolean,
-  success: boolean | null
-): StatusPillState {
-  if (saving) return 'saving';
-  if (success) return 'saved';
-  return null;
-}
-
 export function SettingsProfileSection({
   artist,
   onArtistUpdate,
@@ -46,11 +35,6 @@ export function SettingsProfileSection({
     onRefresh,
   });
 
-  const statusPillState = getStatusPillState(
-    profileSaveStatus.saving,
-    profileSaveStatus.success
-  );
-
   /** Handle field changes with debounced save */
   const handleFieldChange = (
     field: 'username' | 'displayName',
@@ -70,12 +54,10 @@ export function SettingsProfileSection({
       padding='none'
       className='relative divide-y divide-subtle'
     >
-      {statusPillState && (
-        <SettingsStatusPill
-          state={statusPillState}
-          className='absolute right-5 top-4'
-        />
-      )}
+      <SettingsStatusPill
+        status={profileSaveStatus}
+        className='absolute right-5 top-4'
+      />
 
       {/* Profile picture row */}
       <div className='flex items-center justify-between px-4 py-3'>
