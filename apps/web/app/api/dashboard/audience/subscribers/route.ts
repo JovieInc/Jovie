@@ -1,8 +1,7 @@
-import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { subscribersQuerySchema } from '@/lib/validation/schemas';
@@ -11,12 +10,15 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const SORTABLE_COLUMNS = {
-  email: notificationSubscriptions.email,
-  phone: notificationSubscriptions.phone,
-  country: notificationSubscriptions.countryCode,
-  createdAt: notificationSubscriptions.createdAt,
-} as const;
+/**
+ * Maps validated sort key to the SQL column name used in the deduped subquery.
+ */
+const SORT_COLUMN_SQL: Record<string, string> = {
+  email: 'email',
+  phone: 'phone',
+  country: 'country_code',
+  createdAt: 'created_at',
+};
 
 export async function GET(request: Request) {
   try {
@@ -48,46 +50,61 @@ export async function GET(request: Request) {
         );
       }
 
-      const sortColumn = SORTABLE_COLUMNS[sort];
-      const orderFn = direction === 'asc' ? asc : desc;
+      const sortCol = SORT_COLUMN_SQL[sort] ?? 'created_at';
+      const dir = direction === 'asc' ? drizzleSql`ASC` : drizzleSql`DESC`;
       const offset = (page - 1) * pageSize;
 
-      const rowsQuery = tx
-        .select({
-          id: notificationSubscriptions.id,
-          email: notificationSubscriptions.email,
-          phone: notificationSubscriptions.phone,
-          countryCode: notificationSubscriptions.countryCode,
-          createdAt: notificationSubscriptions.createdAt,
-          channel: notificationSubscriptions.channel,
-        })
-        .from(notificationSubscriptions)
-        .where(eq(notificationSubscriptions.creatorProfileId, profileId))
-        .orderBy(orderFn(sortColumn))
-        .limit(pageSize)
-        .offset(offset);
+      // Deduplicate by contact identifier: keep the most recent subscription per
+      // unique phone/email using DISTINCT ON. A subquery is required because
+      // DISTINCT ON forces the first ORDER BY key to match the distinct key;
+      // the outer query then applies the user-requested sort and pagination.
+      const rowsResult = await tx.execute(drizzleSql`
+        SELECT id, email, phone, country_code AS "countryCode", created_at AS "createdAt", channel
+        FROM (
+          SELECT DISTINCT ON (COALESCE(phone, email))
+            id, email, phone, country_code, created_at, channel
+          FROM notification_subscriptions
+          WHERE creator_profile_id = ${profileId}
+          ORDER BY COALESCE(phone, email), created_at DESC
+        ) deduped
+        ORDER BY ${drizzleSql.raw(sortCol)} ${dir}
+        LIMIT ${pageSize} OFFSET ${offset}
+      `);
+
+      const rows = rowsResult.rows as Array<{
+        id: string;
+        email: string | null;
+        phone: string | null;
+        countryCode: string | null;
+        createdAt: Date | string;
+        channel: string;
+      }>;
 
       // Only run the exact COUNT on the first page to avoid per-page overhead.
       // Subsequent pages receive total: null; the client uses rows.length < pageSize
       // as the "no more pages" signal instead.
       if (page === 1) {
-        const [rows, [{ total }]] = await Promise.all([
-          rowsQuery,
-          tx
-            .select({
-              total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-            })
-            .from(notificationSubscriptions)
-            .where(eq(notificationSubscriptions.creatorProfileId, profileId)),
-        ]);
+        const countResult = await tx.execute(drizzleSql`
+          SELECT COUNT(*) AS total
+          FROM (
+            SELECT DISTINCT ON (COALESCE(phone, email)) id
+            FROM notification_subscriptions
+            WHERE creator_profile_id = ${profileId}
+            ORDER BY COALESCE(phone, email), created_at DESC
+          ) deduped
+        `);
+
+        const total = Number(
+          (countResult.rows[0] as { total: string | number } | undefined)
+            ?.total ?? 0
+        );
 
         return NextResponse.json(
-          { rows, total: Number(total ?? 0) },
+          { rows, total },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
-      const rows = await rowsQuery;
       return NextResponse.json(
         { rows, total: null },
         { status: 200, headers: NO_STORE_HEADERS }
