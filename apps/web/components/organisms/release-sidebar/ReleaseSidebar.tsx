@@ -475,27 +475,12 @@ export function ReleaseSidebar({
           )}
 
           {activeTab === 'details' && (
-            <>
-              <ReleaseMetadata
-                release={release}
-                onCanvasStatusChange={
-                  canEditCanvasStatus ? handleCanvasStatusChange : undefined
-                }
-              />
-              {isEditable && (
-                <DrawerAsyncToggle
-                  label='Art downloads'
-                  ariaLabel='Allow artwork downloads on public pages'
-                  checked={allowDownloads}
-                  onToggle={updateAllowArtworkDownloads}
-                  successMessage={on =>
-                    on
-                      ? 'Artwork downloads enabled'
-                      : 'Artwork downloads disabled'
-                  }
-                />
-              )}
-            </>
+            <ReleaseMetadata
+              release={release}
+              onCanvasStatusChange={
+                canEditCanvasStatus ? handleCanvasStatusChange : undefined
+              }
+            />
           )}
 
           {activeTab === 'lyrics' && (
