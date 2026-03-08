@@ -65,6 +65,19 @@ describe('toPublicContacts', () => {
     expect(result[0].channels[0].encoded).toBe(
       'encoded:email:john@booking.com'
     );
+    expect(result[0].primaryContactLabel).toBe('john@booking.com');
+  });
+
+  it('falls back to phone as primary contact label when email is absent', () => {
+    const contacts = [
+      createContact({
+        email: null,
+        phone: '+1-555-0123',
+      }),
+    ];
+    const result = toPublicContacts(contacts, 'Test Artist');
+
+    expect(result[0].primaryContactLabel).toBe('+1-555-0123');
   });
 
   it('converts a contact with both email and phone', () => {

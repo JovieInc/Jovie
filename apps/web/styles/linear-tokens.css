@@ -219,15 +219,15 @@
   --linear-gap-nav: 4px;
   --linear-gap-buttons: 8px;
   --linear-gap-cards: 24px;
-  --linear-section-pt-sm: 24px;
-  --linear-section-pb-sm: 28px;
-  --linear-section-pt-md: 28px;
-  --linear-section-pb-md: 32px;
-  --linear-section-pt-lg: 36px;
-  --linear-section-pb-lg: 40px;
-  --linear-content-gap-sm: 24px;
-  --linear-content-gap-md: 32px;
-  --linear-content-gap-lg: 40px;
+  --linear-section-pt-sm: 64px;
+  --linear-section-pb-sm: 72px;
+  --linear-section-pt-md: 96px;
+  --linear-section-pb-md: 112px;
+  --linear-section-pt-lg: 128px;
+  --linear-section-pb-lg: 144px;
+  --linear-content-gap-sm: 40px;
+  --linear-content-gap-md: 56px;
+  --linear-content-gap-lg: 72px;
   --linear-footer-py: 48px;
   --linear-footer-py-lg: 64px;
   /* ============================================

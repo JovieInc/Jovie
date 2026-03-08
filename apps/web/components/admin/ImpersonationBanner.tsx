@@ -171,7 +171,7 @@ export function ImpersonationBanner({
             size='sm'
             onClick={handleEndImpersonation}
             disabled={ending}
-            className='bg-black text-white hover:bg-gray-800'
+            className='bg-primary-token text-base hover:opacity-90'
           >
             {ending ? (
               'Ending...'

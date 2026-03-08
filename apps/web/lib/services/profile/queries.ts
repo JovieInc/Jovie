@@ -76,12 +76,13 @@ const MAX_CONTACTS = 50;
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
 
-// Query timeout for public profile pages (fail fast for user-facing pages)
-// Increase timeout in test/development to account for Turbopack compilation overhead
+// Query timeout for public profile pages.
+// Neon cold starts can take 10-15s, so production needs enough headroom to
+// avoid false 404s while still failing reasonably fast for genuine issues.
 const PUBLIC_PROFILE_QUERY_TIMEOUT_MS =
   process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
     ? 30000 // 30 seconds for dev/test
-    : 5000; // 5 seconds for production
+    : 15000; // 15 seconds for production (covers Neon cold starts)
 
 /**
  * Get a profile by its ID.

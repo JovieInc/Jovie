@@ -262,9 +262,11 @@ describe('ChatPageClient', () => {
 
     // Should show spinner, not JovieChat
     expect(container.querySelector('[data-testid="jovie-chat"]')).toBeNull();
-    expect(container.textContent).toContain(
-      'Looks like your profile is still being set up. This usually takes a few seconds.'
+    expect(container.textContent).toContain('Finishing your dashboard setup…');
+    const retryButton = Array.from(container.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Retry'
     );
+    expect(retryButton).toBeUndefined();
     expect(mockSentryAddBreadcrumb).toHaveBeenCalled();
   });
 

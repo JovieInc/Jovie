@@ -101,9 +101,22 @@ const STATS = [
 
 export function AudienceCRMSection() {
   return (
-    <section className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+      {/* Ambient glow behind the mockup */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/4'
+        style={{
+          width: '700px',
+          height: '500px',
+          borderRadius: '50%',
+          background:
+            'radial-gradient(ellipse at center, oklch(20% 0.02 260 / 0.2), transparent 70%)',
+        }}
+      />
+
       <Container size='homepage'>
-        <div className='mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
@@ -116,23 +129,33 @@ export function AudienceCRMSection() {
                 Every visit captures an email, a city, a referral source. No
                 integrations, no extra tools — just a CRM that fills itself.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
                 Built-in CRM
               </span>
             </div>
           </div>
 
           {/* Product demo */}
-          <div className='relative mt-8 md:mt-12 mx-auto w-full'>
+          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
             {/* Dashboard window */}
             <div
               className='relative overflow-hidden rounded-xl md:rounded-2xl'
               style={{
                 border: '1px solid var(--linear-border-subtle)',
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                boxShadow: 'var(--linear-shadow-card-elevated)',
+                boxShadow:
+                  'var(--linear-shadow-card-elevated), 0 0 80px rgba(0,0,0,0.3)',
               }}
             >
+              {/* Shine border overlay */}
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
+                style={{
+                  border: '1px solid rgba(255,255,255,0.04)',
+                }}
+              />
+
               {/* Mac window chrome */}
               <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                 <div className='flex gap-2'>
@@ -175,7 +198,7 @@ export function AudienceCRMSection() {
               <FansTable />
 
               {/* Bottom gradient fade */}
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
             </div>
           </div>
         </div>
