@@ -145,6 +145,10 @@ export function renderLtvCell({ row }: CellContext<AudienceMember, number>) {
       tipCount={row.original.tipCount}
       visits={row.original.visits}
       engagementScore={row.original.engagementScore}
+      streamingClicks={row.original.ltvStreamingClicks}
+      tipClickValueCents={row.original.ltvTipClickValueCents}
+      merchSalesCents={row.original.ltvMerchSalesCents}
+      ticketSalesCents={row.original.ltvTicketSalesCents}
     />
   );
 }

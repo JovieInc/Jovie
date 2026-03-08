@@ -71,6 +71,7 @@ async function AudienceContent({
           direction: parsedParams.direction,
         },
         view: parsedParams.view,
+        includeDetails: true,
         segments: validSegments,
       }),
       artist?.id
