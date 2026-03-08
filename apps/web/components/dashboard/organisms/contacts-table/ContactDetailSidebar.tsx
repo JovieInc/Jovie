@@ -243,7 +243,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     if (isEditing) {
       return (
         <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-          <Label className='text-xs text-secondary-token'>{label}</Label>
+          <Label className='text-[13px] text-secondary-token'>{label}</Label>
           <Input
             ref={inputRef}
             value={editValue}
@@ -251,7 +251,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             onBlur={saveField}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className='h-8 text-xs'
+            className='h-8 text-[13px]'
           />
         </div>
       );
@@ -263,8 +263,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         onClick={() => startEditing(field)}
         className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8 w-full text-left rounded-md -mx-2 px-2 hover:bg-surface-2 transition-colors cursor-pointer'
       >
-        <span className='text-xs text-secondary-token'>{label}</span>
-        <span className='text-xs text-primary-token hover:text-primary-token transition-colors truncate'>
+        <span className='text-[13px] text-secondary-token'>{label}</span>
+        <span className='text-[13px] text-primary-token hover:text-primary-token transition-colors truncate'>
           {displayValue}
         </span>
       </button>
@@ -286,11 +286,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {/* Role Section */}
           <DrawerSection title='Role'>
             <div className='space-y-2'>
-              <Label className='text-xs text-secondary-token'>
+              <Label className='text-[13px] text-secondary-token'>
                 Contact type
               </Label>
               <Select value={contact.role} onValueChange={handleRoleChange}>
-                <SelectTrigger className='h-9 text-xs rounded-lg border border-subtle bg-surface-1 px-3'>
+                <SelectTrigger className='h-9 text-[13px] rounded-lg border border-subtle bg-surface-1 px-3'>
                   <SelectValue>{roleLabel}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className='p-1'>
@@ -298,7 +298,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                     <SelectItem
                       key={option.value}
                       value={option.value}
-                      className='rounded-md px-2.5 py-2 text-sm font-medium text-secondary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token'
+                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token'
                     >
                       <div className='flex items-center gap-2'>
                         <Icon
@@ -338,14 +338,14 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {hasEmailAndPhone && (
             <DrawerSection title='Preferred Contact'>
               <div className='space-y-2'>
-                <Label className='text-xs text-secondary-token'>
+                <Label className='text-[13px] text-secondary-token'>
                   Default action
                 </Label>
                 <Select
                   value={contact.preferredChannel || ''}
                   onValueChange={handlePreferredChannelChange}
                 >
-                  <SelectTrigger className='h-9 text-xs'>
+                  <SelectTrigger className='h-9 text-[13px]'>
                     <SelectValue placeholder='Select preferred channel'>
                       {getPreferredChannelLabel(contact.preferredChannel)}
                     </SelectValue>
@@ -363,7 +363,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           <DrawerSection title='Territories'>
             <div className='space-y-3'>
               <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-                <span className='text-xs text-secondary-token'>Coverage</span>
+                <span className='text-[13px] text-secondary-token'>
+                  Coverage
+                </span>
                 <Badge size='sm'>{territorySummary}</Badge>
               </div>
               <div className='flex flex-wrap gap-1.5'>
@@ -375,7 +377,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       type='button'
                       onClick={() => handleTerritoryToggle(territory)}
                       className={cn(
-                        'px-2 py-1 text-xs rounded-md border transition-colors',
+                        'px-2 py-1 text-[13px] rounded-md border transition-colors',
                         isSelected
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'bg-surface-2 text-secondary-token border-subtle hover:bg-surface-3'
@@ -392,13 +394,13 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {/* Error display */}
           {contact.error && (
             <div className='rounded-md border border-error/30 bg-error-subtle p-3'>
-              <p className='text-xs text-destructive'>{contact.error}</p>
+              <p className='text-[13px] text-destructive'>{contact.error}</p>
             </div>
           )}
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='text-xs text-tertiary-token text-center'>
+            <div className='text-[13px] text-tertiary-token text-center'>
               Saving...
             </div>
           )}

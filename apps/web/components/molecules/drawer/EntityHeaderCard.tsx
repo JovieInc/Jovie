@@ -38,7 +38,7 @@ export function EntityHeaderCard({
       {image}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-1.5'>
-          <span className='truncate text-[15px] font-semibold text-primary-token'>
+          <span className='truncate text-[15px] font-[590] text-primary-token'>
             {title}
           </span>
           {badge}

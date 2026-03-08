@@ -68,7 +68,7 @@ function ContactListItem({
         <div className='group flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1 px-4 py-3 transition-colors hover:bg-surface-2'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <p className='text-sm font-medium text-primary-token'>
+              <p className='text-[13px] font-[510] text-primary-token'>
                 {roleLabel}
               </p>
               {territorySummary !== 'General' && (
@@ -76,7 +76,7 @@ function ContactListItem({
               )}
             </div>
             {secondaryLabel && (
-              <p className='truncate text-xs text-secondary-token'>
+              <p className='truncate text-[13px] text-secondary-token'>
                 {secondaryLabel}
               </p>
             )}
@@ -194,8 +194,8 @@ export function ContactMode({
   return (
     <div className='flex h-full flex-col'>
       <div className='border-b border-subtle px-4 py-3'>
-        <h1 className='text-sm font-semibold text-primary-token'>Contacts</h1>
-        <p className='text-xs text-secondary-token'>{artistName}</p>
+        <h1 className='text-[13px] font-[590] text-primary-token'>Contacts</h1>
+        <p className='text-[13px] text-secondary-token'>{artistName}</p>
       </div>
 
       <div className='flex-1 overflow-y-auto'>
@@ -216,7 +216,7 @@ export function ContactMode({
           size='sm'
           variant='ghost'
           onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
-          className='w-full text-xs text-secondary-token'
+          className='w-full text-[13px] text-secondary-token'
         >
           Manage contacts
         </Button>

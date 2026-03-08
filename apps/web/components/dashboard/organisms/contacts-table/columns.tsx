@@ -62,7 +62,7 @@ export function createContactColumns(
       cell: ({ row }) => {
         const contact = row.original;
         const label = getContactRoleLabel(contact.role, contact.customLabel);
-        return <span className='font-medium text-primary-token'>{label}</span>;
+        return <span className='font-[510] text-primary-token'>{label}</span>;
       },
       size: 180,
     }),

@@ -121,7 +121,7 @@ export function ConfirmMatchDialog({
             {/* Artist Info */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <h3 className='truncate text-lg font-semibold text-primary-token'>
+                <h3 className='truncate text-lg font-[590] text-primary-token'>
                   {externalArtistName}
                 </h3>
                 {externalArtistUrl && (
@@ -153,7 +153,7 @@ export function ConfirmMatchDialog({
         {/* Confidence Breakdown */}
         {confidenceBreakdown && (
           <div className='rounded-lg border border-subtle bg-surface-1 p-4'>
-            <h4 className='mb-3 text-sm font-medium text-primary-token'>
+            <h4 className='mb-3 text-[13px] font-[510] text-primary-token'>
               Match confidence breakdown
             </h4>
             <MatchConfidenceBreakdown

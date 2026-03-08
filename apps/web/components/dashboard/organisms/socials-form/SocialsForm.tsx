@@ -290,7 +290,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
-      <p className='text-xs text-secondary-token'>
+      <p className='text-[13px] text-secondary-token'>
         Links are shown contextually on your public profile based on where
         visitors come from. Not every link will display at all times.
       </p>
@@ -422,13 +422,13 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
       {error && (
         <div className='bg-error-subtle border border-error rounded-lg p-3'>
-          <p className='text-sm text-error'>{error}</p>
+          <p className='text-[13px] text-error'>{error}</p>
         </div>
       )}
 
       {success && (
         <div className='bg-success-subtle border border-success rounded-lg p-3'>
-          <p className='text-sm text-success'>
+          <p className='text-[13px] text-success'>
             Social links saved successfully!
           </p>
         </div>

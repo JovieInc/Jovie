@@ -99,7 +99,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
       >
         <div className='flex items-center gap-2 text-destructive'>
           <Icon name='AlertCircle' className='h-4 w-4' />
-          <span className='text-sm font-medium'>Failed to load matches</span>
+          <span className='text-[13px] font-[510]'>Failed to load matches</span>
         </div>
         <p className='mt-1 text-xs text-red-600/80 dark:text-red-400/80'>
           {error instanceof Error ? error.message : 'Unknown error'}
@@ -125,7 +125,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
               type='button'
               onClick={() => setStatusFilter(filter.value)}
               className={cn(
-                'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-[510] transition-colors',
                 isActive
                   ? 'bg-primary-token text-on-primary'
                   : 'bg-surface-2 text-secondary-token hover:bg-surface-3'

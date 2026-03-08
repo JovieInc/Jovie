@@ -40,8 +40,8 @@ export function DrawerPropertyRow({
       )}
       style={gridStyle}
     >
-      <div className='pt-0.5 text-xs text-tertiary-token'>{label}</div>
-      <div className='min-w-0 text-xs text-secondary-token'>{value}</div>
+      <div className='pt-0.5 text-[13px] text-tertiary-token'>{label}</div>
+      <div className='min-w-0 text-[13px] text-secondary-token'>{value}</div>
     </Wrapper>
   );
 }

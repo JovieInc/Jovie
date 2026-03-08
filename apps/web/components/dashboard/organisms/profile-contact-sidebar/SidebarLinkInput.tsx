@@ -55,7 +55,7 @@ function SidebarSuggestionItem({
     <button
       type='button'
       className={cn(
-        'flex w-full min-h-[44px] items-center gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
+        'flex w-full min-h-[44px] items-center gap-2.5 px-3 py-2.5 text-left text-[13px] text-primary-token transition',
         active ? 'bg-surface-2' : 'hover:bg-surface-2',
         'active:scale-[0.99]'
       )}
@@ -71,7 +71,7 @@ function SidebarSuggestionItem({
       >
         <SocialIcon platform={option.icon} className='h-3.5 w-3.5' />
       </span>
-      <span className='font-medium'>{option.name}</span>
+      <span className='font-[510]'>{option.name}</span>
       <span className='text-xs text-tertiary-token'>{option.hint}</span>
       {active && (
         <span className='ml-auto hidden text-xs text-tertiary-token sm:inline'>
@@ -175,7 +175,7 @@ export function SidebarLinkInput({
         autoCapitalize='none'
         autoCorrect='off'
         autoComplete='off'
-        className='h-8 text-sm'
+        className='h-8 text-[13px]'
         aria-label='Add link'
         autoFocus
       />
@@ -185,7 +185,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-default bg-surface-1 py-1 shadow-lg'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-default bg-surface-1 py-1 shadow-card-elevated'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >
@@ -206,7 +206,7 @@ export function SidebarLinkInput({
         <button
           type='button'
           onClick={handleAdd}
-          className='mt-1 flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-sm transition-colors hover:bg-surface-3'
+          className='mt-1 flex w-full items-center gap-2 rounded-md bg-surface-2 px-3 py-2 text-[13px] transition-colors hover:bg-surface-3'
         >
           <SocialIcon
             platform={detectedLink.platform.icon}
@@ -215,7 +215,7 @@ export function SidebarLinkInput({
           <span className='min-w-0 flex-1 truncate'>
             {detectedLink.normalizedUrl}
           </span>
-          <span className='ml-auto shrink-0 text-xs font-medium text-accent'>
+          <span className='ml-auto shrink-0 text-[13px] font-[510] text-accent'>
             Add
           </span>
         </button>
