@@ -20,6 +20,8 @@ const mockMaybeSetProfileAvatarFromLinks = vi.fn();
 const mockCaptureError = vi.fn();
 const mockCaptureException = vi.fn();
 const mockClerkClient = vi.fn();
+
+const mockCacheQuery = vi.fn();
 const mockSyncCanonicalUsername = vi.fn();
 
 let dbSelectResponses: QueryRows[] = [];
@@ -85,6 +87,10 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/queries/analytics', () => ({
   getUserDashboardAnalytics: (...args: any[]) =>
     mockGetUserDashboardAnalytics(...args),
+}));
+
+vi.mock('@/lib/db/cache', () => ({
+  cacheQuery: (...args: any[]) => mockCacheQuery(...args),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -185,6 +191,9 @@ function expectStatusOk(response: Response, body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockCacheQuery.mockImplementation(
+    async (_key: string, queryFn: () => Promise<unknown>) => queryFn()
+  );
   dbSelectResponses = [];
   dbSelectCallIndex = 0;
 });
@@ -408,6 +417,11 @@ describe('Dashboard API contracts', () => {
           },
         ],
       });
+      expect(mockCacheQuery).toHaveBeenCalledWith(
+        `audience-subscribers-total:${PROFILE_ID}`,
+        expect.any(Function),
+        { ttlSeconds: 60 }
+      );
     });
   });
 

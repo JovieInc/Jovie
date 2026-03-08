@@ -1,6 +1,7 @@
 import { asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { cacheQuery } from '@/lib/db/cache';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { captureError } from '@/lib/error-tracking';
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
       const sortColumn = SORTABLE_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const offset = (page - 1) * pageSize;
+      const subscribersCountCacheKey = `audience-subscribers-total:${profileId}`;
 
       const baseQuery = tx
         .select({
@@ -64,18 +66,26 @@ export async function GET(request: Request) {
         .from(notificationSubscriptions)
         .where(eq(notificationSubscriptions.creatorProfileId, profileId));
 
-      const [rows, [{ total }]] = await Promise.all([
+      const [rows, total] = await Promise.all([
         baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
-        tx
-          .select({
-            total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-          })
-          .from(notificationSubscriptions)
-          .where(eq(notificationSubscriptions.creatorProfileId, profileId)),
+        cacheQuery(
+          subscribersCountCacheKey,
+          async () => {
+            const [result] = await tx
+              .select({
+                total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
+              })
+              .from(notificationSubscriptions)
+              .where(eq(notificationSubscriptions.creatorProfileId, profileId));
+
+            return Number(result?.total ?? 0);
+          },
+          { ttlSeconds: 60 }
+        ),
       ]);
 
       return NextResponse.json(
-        { rows, total: Number(total ?? 0) },
+        { rows, total },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
