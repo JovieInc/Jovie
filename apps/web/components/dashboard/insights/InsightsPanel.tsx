@@ -29,7 +29,7 @@ function PrioritySection({
   return (
     <section>
       <h3
-        className={`mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] ${colorClass}`}
+        className={`mb-3 text-[11px] font-[510] uppercase tracking-[0.08em] ${colorClass}`}
       >
         {label}
       </h3>
@@ -73,7 +73,7 @@ function InsightsPanelContent({
   if (error) {
     return (
       <div className='rounded-xl border border-subtle bg-surface-1 p-6 text-center'>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-[13px] text-secondary-token'>
           Failed to load insights. Please try again.
         </p>
       </div>
@@ -151,10 +151,10 @@ export function InsightsPanel() {
       {/* Header */}
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>
-          <h2 className='text-lg font-semibold text-primary-token'>
-            AI Insights
-          </h2>
-          <p className='text-xs text-secondary-token'>{getSubtitle(total)}</p>
+          <h2 className='text-lg font-[590] text-primary-token'>AI Insights</h2>
+          <p className='text-[13px] text-secondary-token'>
+            {getSubtitle(total)}
+          </p>
         </div>
 
         <Button
@@ -181,7 +181,7 @@ export function InsightsPanel() {
             key={filter.value}
             type='button'
             onClick={() => setSelectedCategory(filter.value)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`rounded-full px-3 py-1 text-[13px] font-[510] transition-colors ${
               selectedCategory === filter.value
                 ? 'bg-accent-token text-white'
                 : 'bg-surface-2 text-secondary-token hover:text-primary-token'

@@ -34,7 +34,7 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <p className='text-sm text-tertiary-token'>
+      <p className='text-[13px] text-tertiary-token'>
         No recent activity. Share your profile to see engagement here.
       </p>
     </div>
@@ -69,7 +69,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         {activity.icon}
       </span>
       <div className='min-w-0 flex-1'>
-        <p className='text-sm leading-5 text-primary-token'>
+        <p className='text-[13px] leading-5 text-primary-token'>
           <span className='text-secondary-token tabular-nums'>
             {formatTimeAgo(activity.timestamp)}
           </span>
@@ -119,9 +119,11 @@ export function DashboardActivityFeed({
           <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10 dark:bg-violet-500/15'>
             <Zap className='h-4 w-4 text-violet-600 dark:text-violet-400' />
           </div>
-          <h3 className='text-xs font-medium text-secondary-token'>Activity</h3>
+          <h3 className='text-[13px] font-[510] text-secondary-token'>
+            Activity
+          </h3>
         </div>
-        <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-medium text-tertiary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-[510] text-tertiary-token'>
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'
@@ -134,7 +136,7 @@ export function DashboardActivityFeed({
         {(() => {
           if (error) {
             return (
-              <p className='text-sm text-error-token'>
+              <p className='text-[13px] text-error-token'>
                 {error.message || 'Failed to load activity'}
               </p>
             );

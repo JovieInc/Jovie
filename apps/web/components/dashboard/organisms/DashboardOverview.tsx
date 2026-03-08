@@ -140,7 +140,7 @@ export function DashboardOverview({
       <div className='grid grid-cols-1 gap-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-4'>
         <div className='min-w-0'>
           <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
-            <h1 className='text-xl font-semibold text-primary-token'>
+            <h1 className='text-xl font-[590] text-primary-token'>
               Welcome back, {greetingName}
             </h1>
             <div className='flex items-center gap-1'>
@@ -178,7 +178,7 @@ export function DashboardOverview({
           <DashboardOverviewHeaderToolbarClient />
         </div>
 
-        <p className='text-sm text-secondary-token sm:col-span-2'>
+        <p className='text-[13px] text-secondary-token sm:col-span-2'>
           Keep your profile polished and ready to share.
         </p>
       </div>

@@ -59,7 +59,7 @@ function StatCard({
   return (
     <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
       <p className='text-[13px] text-secondary-token'>{label}</p>
-      <p className='mt-1 text-2xl font-semibold tracking-tight text-primary-token tabular-nums'>
+      <p className='mt-1 text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
         {value}
       </p>
       {meta && (
@@ -98,9 +98,7 @@ function ListSection({
     <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
       <div className='mb-3 flex items-center gap-2'>
         <Icon className='h-4 w-4 text-tertiary-token' />
-        <h3 className='text-[13px] font-medium text-secondary-token'>
-          {title}
-        </h3>
+        <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
       </div>
 
       {loading && (
@@ -121,14 +119,14 @@ function ListSection({
               className='flex items-center justify-between group'
             >
               <div className='flex items-center gap-2 min-w-0 flex-1'>
-                <span className='text-[11px] font-medium text-tertiary-token w-4 tabular-nums'>
+                <span className='text-[11px] font-[510] text-tertiary-token w-4 tabular-nums'>
                   {index + 1}
                 </span>
                 <span className='text-[13px] text-secondary-token group-hover:text-primary-token transition-colors truncate'>
                   {item.label}
                 </span>
               </div>
-              <span className='text-[13px] font-medium text-primary-token tabular-nums ml-2'>
+              <span className='text-[13px] font-[510] text-primary-token tabular-nums ml-2'>
                 {item.value}
               </span>
             </li>

@@ -37,7 +37,7 @@ export function DashboardHeader({
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
-        <h1 className='text-[22px] font-bold tracking-[-0.02em] text-primary-token leading-tight'>
+        <h1 className='text-[22px] font-[590] tracking-[-0.022em] text-primary-token leading-tight'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
@@ -69,7 +69,7 @@ export function DashboardHeader({
             <>
               <span className='text-tertiary-token'>Jovie</span>
               <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
-              <span className='font-medium text-primary-token'>
+              <span className='font-[510] text-primary-token'>
                 {currentLabel}
               </span>
             </>

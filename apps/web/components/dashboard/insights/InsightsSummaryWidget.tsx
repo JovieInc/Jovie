@@ -40,16 +40,16 @@ export function InsightsSummaryWidget() {
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-2'>
           <Sparkles className='h-4 w-4 text-purple-600 dark:text-purple-400' />
-          <span className='text-xs font-semibold text-primary-token'>
+          <span className='text-[13px] font-[510] text-primary-token'>
             AI Insights
           </span>
-          <span className='rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-medium text-purple-600 dark:bg-purple-500/15 dark:text-purple-400'>
+          <span className='rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-[510] text-purple-600 dark:bg-purple-500/15 dark:text-purple-400'>
             {totalActive}
           </span>
         </div>
         <Link
           href={APP_ROUTES.INSIGHTS}
-          className='text-[11px] font-medium text-accent-token hover:underline'
+          className='text-[11px] font-[510] text-accent-token hover:underline'
         >
           View all &rarr;
         </Link>
@@ -60,8 +60,8 @@ export function InsightsSummaryWidget() {
         {insights.map(insight => (
           <li key={insight.id} className='flex items-start gap-2'>
             <InsightCategoryIcon category={insight.category} size='sm' />
-            <p className='text-xs text-secondary-token leading-snug line-clamp-2'>
-              <span className='font-medium text-primary-token'>
+            <p className='text-[13px] text-secondary-token leading-snug line-clamp-2'>
+              <span className='font-[510] text-primary-token'>
                 {insight.title}
               </span>
               {insight.actionSuggestion

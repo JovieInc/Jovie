@@ -104,7 +104,7 @@ export function RangeToggle({
             title={
               disabled ? 'Upgrade to Pro for extended analytics' : undefined
             }
-            className={`relative rounded-full px-3 py-1.5 text-[13px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${stateClass}`}
+            className={`relative rounded-full px-3 py-1.5 text-[13px] font-[510] transition-all duration-150 focus-visible:outline-none focus-visible:bg-interactive-hover ${stateClass}`}
           >
             {opt.label}
           </button>
