@@ -86,7 +86,11 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         </div>
         <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
           <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <AlertTriangle className={`h-4 w-4 ${tone.iconClassName}`} />
+            {summary.incidents24h > 0 ? (
+              <AlertTriangle className={`h-4 w-4 ${tone.iconClassName}`} />
+            ) : (
+              <CheckCircle2 className='h-4 w-4 text-success' />
+            )}
             Incidents (24h)
           </div>
           <span className='text-primary-token tabular-nums'>

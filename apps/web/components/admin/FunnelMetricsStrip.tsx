@@ -1,12 +1,5 @@
 import { Card, CardContent } from '@jovie/ui';
-import {
-  ArrowRight,
-  CircleDollarSign,
-  Mail,
-  MousePointerClick,
-  UserCheck,
-  UserPlus,
-} from 'lucide-react';
+import { CircleDollarSign, CreditCard, Timer, UserPlus } from 'lucide-react';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 interface FunnelMetricsStripProps {
@@ -70,7 +63,6 @@ export function FunnelMetricsStrip({
   metrics,
 }: Readonly<FunnelMetricsStripProps>) {
   const mrrDisplay = metrics.stripeAvailable ? formatUsd(metrics.mrrUsd) : '--';
-
   const runwayDisplay = formatRunway(
     metrics.runwayMonths,
     metrics.stripeAvailable
@@ -78,65 +70,39 @@ export function FunnelMetricsStrip({
 
   return (
     <div
-      className='grid gap-4 sm:grid-cols-2 lg:grid-cols-5'
+      className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'
       data-testid='funnel-metrics-strip'
     >
       <MetricCard
-        title='Outreach Sent (7d)'
-        value={metrics.outreachSent7d.toLocaleString('en-US')}
-        subtitle='Claim emails sent'
-        icon={Mail}
+        title='Signups (7d)'
+        value={metrics.signups7d.toLocaleString('en-US')}
+        subtitle='All sources'
+        icon={UserPlus}
+        iconClassName='text-success'
+      />
+
+      <MetricCard
+        title='Paid Conversions (7d)'
+        value={metrics.paidConversions7d.toLocaleString('en-US')}
+        subtitle={`${formatPercent(metrics.paidConversionRate)} of signups`}
+        icon={CreditCard}
         iconClassName='text-info'
       />
 
-      <div className='relative'>
-        <ArrowRight
-          className='absolute -left-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-tertiary-token lg:block'
-          aria-hidden='true'
-        />
-        <MetricCard
-          title='Claim Rate'
-          value={formatPercent(metrics.claimRate)}
-          subtitle={`${metrics.claimClicks7d} clicks / ${metrics.outreachSent7d} sent`}
-          icon={MousePointerClick}
-          iconClassName='text-accent'
-        />
-      </div>
-
-      <div className='relative'>
-        <ArrowRight
-          className='absolute -left-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-tertiary-token lg:block'
-          aria-hidden='true'
-        />
-        <MetricCard
-          title='Signup Rate'
-          value={formatPercent(metrics.signupRate)}
-          subtitle={`${metrics.signups7d} signups / ${metrics.claimClicks7d} clicks`}
-          icon={UserPlus}
-          iconClassName='text-success'
-        />
-      </div>
-
-      <div className='relative'>
-        <ArrowRight
-          className='absolute -left-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-tertiary-token lg:block'
-          aria-hidden='true'
-        />
-        <MetricCard
-          title='Paid Conversion'
-          value={formatPercent(metrics.paidConversionRate)}
-          subtitle={`${metrics.paidConversions7d} paid / ${metrics.signups7d} signups`}
-          icon={UserCheck}
-          iconClassName='text-warning'
-        />
-      </div>
-
       <MetricCard
-        title='MRR + Runway'
+        title='MRR'
         value={mrrDisplay}
-        subtitle={`Runway: ${runwayDisplay}`}
+        subtitle='Monthly recurring revenue'
         icon={CircleDollarSign}
         iconClassName='text-emerald-400'
+      />
+
+      <MetricCard
+        title='Runway'
+        value={runwayDisplay}
+        subtitle={mrrDisplay !== '--' ? `at ${mrrDisplay}/mo revenue` : '--'}
+        icon={Timer}
+        iconClassName='text-warning'
       />
     </div>
   );
