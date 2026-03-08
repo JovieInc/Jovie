@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { batchUpdateSocialLinks, type SocialLinkUpdate } from '@/lib/db/batch';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -246,6 +247,8 @@ export async function PUT(request: NextRequest) {
 
         // Invalidate cache to ensure public profile reflects changes
         await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
+
+        await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
 
         // Return updated links
         const updatedLinks = await db

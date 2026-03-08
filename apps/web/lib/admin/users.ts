@@ -1,9 +1,21 @@
 import 'server-only';
 
-import { asc, count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  ne,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
@@ -46,6 +58,13 @@ export interface AdminUserRow {
   suppressionFailedAt: Date | null;
   profileCreatedAt: Date | null;
   profileOrigin: string | null;
+  socialLinks?: Array<{
+    id: string;
+    platform: string;
+    platformType: string;
+    url: string;
+    displayText: string | null;
+  }>;
 }
 
 export interface GetAdminUsersParams {
@@ -138,6 +157,7 @@ export async function getAdminUsers(
           isPro: users.isPro,
           stripeCustomerId: users.stripeCustomerId,
           stripeSubscriptionId: users.stripeSubscriptionId,
+          profileId: creatorProfiles.id,
           profileUsername: creatorProfiles.username,
           founderWelcomeSentAt: users.founderWelcomeSentAt,
           welcomeFailedAt: users.welcomeFailedAt,
@@ -154,6 +174,56 @@ export async function getAdminUsers(
         .offset(offset),
       db.select({ value: count() }).from(users).where(whereClause),
     ]);
+
+    const profileIds = rows
+      .map(row => row.profileId)
+      .filter((id): id is string => typeof id === 'string');
+
+    const socialLinksRows =
+      profileIds.length > 0
+        ? await db
+            .select({
+              id: socialLinks.id,
+              creatorProfileId: socialLinks.creatorProfileId,
+              platform: socialLinks.platform,
+              platformType: socialLinks.platformType,
+              url: socialLinks.url,
+              displayText: socialLinks.displayText,
+            })
+            .from(socialLinks)
+            .where(
+              and(
+                inArray(socialLinks.creatorProfileId, profileIds),
+                ne(socialLinks.state, 'rejected')
+              )
+            )
+        : [];
+
+    const socialLinksByProfileId = new Map<
+      string,
+      Array<{
+        id: string;
+        platform: string;
+        platformType: string;
+        url: string;
+        displayText: string | null;
+      }>
+    >();
+
+    for (const link of socialLinksRows) {
+      if (!link.creatorProfileId) continue;
+      const existing = socialLinksByProfileId.get(link.creatorProfileId) ?? [];
+      if (link.platformType == null) continue;
+      if (link.platform === '' || link.url === '') continue;
+      existing.push({
+        id: link.id,
+        platform: link.platform,
+        platformType: link.platformType,
+        url: link.url,
+        displayText: link.displayText,
+      });
+      socialLinksByProfileId.set(link.creatorProfileId, existing);
+    }
 
     return {
       users: rows.map(row => ({
@@ -178,6 +248,9 @@ export async function getAdminUsers(
         suppressionFailedAt: row.suppressionFailedAt ?? null,
         profileCreatedAt: row.profileCreatedAt ?? null,
         profileOrigin: row.profileOrigin ?? null,
+        socialLinks: row.profileId
+          ? (socialLinksByProfileId.get(row.profileId) ?? [])
+          : [],
       })),
       page,
       pageSize,
