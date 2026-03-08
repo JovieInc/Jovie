@@ -23,7 +23,10 @@ import {
 } from '@/components/dashboard/audience/table/atoms';
 import { convertContextMenuItems } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
-import { useAudienceTableContext } from '../AudienceTableContext';
+import {
+  useAudienceTableStableContext,
+  useAudienceTableVolatileContext,
+} from '../AudienceTableContext';
 
 /**
  * Renders the user cell with display name, type, email, and phone
@@ -163,7 +166,8 @@ export function renderEmailCell({
  * Avoids closing over selectedIds/page/pageSize which would destabilize column defs.
  */
 export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
-  const { selectedIds, toggleSelect } = useAudienceTableContext();
+  const { selectedIds } = useAudienceTableVolatileContext();
+  const { toggleSelect } = useAudienceTableStableContext();
   const rowNumber = row.index + 1;
   return (
     <AudienceRowSelectionCell
@@ -182,7 +186,8 @@ export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
 export function LastSeenCell({
   row,
 }: CellContext<AudienceMember, string | null>) {
-  const { openMenuRowId, setOpenMenuRowId } = useAudienceTableContext();
+  const { openMenuRowId } = useAudienceTableVolatileContext();
+  const { setOpenMenuRowId } = useAudienceTableStableContext();
   return (
     <AudienceLastSeenCell
       row={row.original}
@@ -198,7 +203,7 @@ export function LastSeenCell({
  * Avoids closing over getContextMenuItems which would destabilize column defs.
  */
 export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
-  const { getContextMenuItems } = useAudienceTableContext();
+  const { getContextMenuItems } = useAudienceTableStableContext();
   const contextMenuItems = getContextMenuItems(row.original);
   const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
@@ -229,7 +234,7 @@ export function renderIdentificationCell({
  * Touring city badge cell - reads touring city map from context.
  */
 export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
-  const { getTouringCity } = useAudienceTableContext();
+  const { getTouringCity } = useAudienceTableStableContext();
   const info = getTouringCity(row.original);
   return (
     <AudienceTouringBadge
@@ -247,7 +252,7 @@ export function QuickActionsCell({
   row,
 }: CellContext<AudienceMember, unknown>) {
   const { onExportMember, onBlockMember, onViewProfile, onSendNotification } =
-    useAudienceTableContext();
+    useAudienceTableStableContext();
   const member = row.original;
   const canNotify = Boolean(member.email || member.phone);
 
