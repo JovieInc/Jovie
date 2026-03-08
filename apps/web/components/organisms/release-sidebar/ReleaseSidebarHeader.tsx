@@ -139,16 +139,41 @@ export function useReleaseHeaderParts({
     });
   }
 
-  const titleText =
-    hasRelease && release?.title ? release.title : 'No release selected';
+  const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
+  const titleText = isrcValue
+    ? isrcValue
+    : hasRelease && release?.title
+      ? release.title
+      : 'No release selected';
+
+  const handleCopyIsrc = useCallback(() => {
+    if (!isrcValue) return;
+    navigator.clipboard
+      ?.writeText(isrcValue)
+      .then(() => {
+        setIsIdCopied(true);
+        if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+        idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
+      })
+      .catch(() => {});
+  }, [isrcValue]);
 
   const title = (
-    <span className='min-w-0'>
-      <span className='block truncate'>{titleText}</span>
-      {artistName && (
-        <span className='block truncate text-[11px] font-normal text-secondary-token'>
-          {artistName}
-        </span>
+    <span className='group/isrc flex min-w-0 items-center gap-1'>
+      <span className='truncate font-mono'>{titleText}</span>
+      {isrcValue && (
+        <button
+          type='button'
+          onClick={handleCopyIsrc}
+          title={isIdCopied ? 'Copied!' : 'Copy ISRC'}
+          className='shrink-0 rounded p-0.5 text-tertiary-token opacity-0 transition-opacity group-hover/isrc:opacity-100 hover:text-primary-token'
+        >
+          {isIdCopied ? (
+            <Check className='h-3 w-3' />
+          ) : (
+            <Copy className='h-3 w-3' />
+          )}
+        </button>
       )}
     </span>
   );

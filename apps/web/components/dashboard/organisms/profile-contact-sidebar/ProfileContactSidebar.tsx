@@ -4,6 +4,7 @@ import { SegmentControl } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
@@ -11,7 +12,10 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerAsyncToggle,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import {
   useAvatarMutation,
@@ -23,7 +27,6 @@ import { ProfileAboutTab } from './ProfileAboutTab';
 import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
-import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
@@ -304,10 +307,18 @@ export function ProfileContactSidebar() {
 
   const photoSettingsFooter =
     resolvedCategory !== 'about' ? (
-      <ProfilePhotoSettings
-        allowDownloads={
+      <DrawerAsyncToggle
+        label='Photo downloads'
+        ariaLabel='Allow profile photo downloads on public pages'
+        checked={
           (selectedProfile?.settings as Record<string, unknown> | null)
             ?.allowProfilePhotoDownloads === true
+        }
+        onToggle={updateAllowProfilePhotoDownloads}
+        successMessage={on =>
+          on
+            ? 'Photo downloads enabled for visitors'
+            : 'Photo downloads disabled'
         }
       />
     ) : undefined;

@@ -61,12 +61,14 @@ vi.mock('@/components/molecules/drawer', () => ({
     emptyMessage,
     entityHeader,
     tabs,
+    footer,
   }: {
     children?: React.ReactNode;
     isEmpty?: boolean;
     emptyMessage?: string;
     entityHeader?: React.ReactNode;
     tabs?: React.ReactNode;
+    footer?: React.ReactNode;
     [key: string]: unknown;
   }) =>
     isEmpty ? (
@@ -76,6 +78,7 @@ vi.mock('@/components/molecules/drawer', () => ({
         {entityHeader}
         {tabs}
         {children}
+        {footer}
       </div>
     ),
   EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
@@ -91,6 +94,9 @@ vi.mock('@/components/molecules/drawer', () => ({
     <div>{children}</div>
   ),
   SidebarLinkRow: () => null,
+  DrawerAsyncToggle: ({ label }: { label: string }) => (
+    <div data-testid='async-toggle'>{label}</div>
+  ),
 }));
 
 // Mock sub-components that are not under test — useReleaseHeaderParts hook
@@ -129,8 +135,8 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div data-testid='metadata'>Metadata</div>,
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseSettings', () => ({
-  ReleaseSettings: () => <div data-testid='settings'>Settings</div>,
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
@@ -231,14 +237,13 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /links/i }));
+    await user.click(screen.getByRole('tab', { name: /platforms/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
 
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
     expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
@@ -249,7 +254,7 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
     // Switch back to Track list
-    await user.click(screen.getByRole('tab', { name: /track list/i }));
+    await user.click(screen.getByRole('tab', { name: /tracks/i }));
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
   });
 
@@ -260,7 +265,7 @@ describe('ReleaseSidebar Links tab', () => {
     );
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /links/i }));
+    await user.click(screen.getByRole('tab', { name: /platforms/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
 
     // Change release
@@ -275,7 +280,7 @@ describe('ReleaseSidebar Links tab', () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    await user.click(screen.getByRole('tab', { name: /links/i }));
+    await user.click(screen.getByRole('tab', { name: /platforms/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
   });
 

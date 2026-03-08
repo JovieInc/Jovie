@@ -1,31 +1,58 @@
 'use client';
 
-/**
- * ReleaseFields Component
- *
- * Read-only field for release date display
- */
-
-import { DrawerPropertyRow } from '@/components/molecules/drawer';
-
 import { formatReleaseDate } from './utils';
+
+const RELEASE_TYPE_LABELS: Record<string, string> = {
+  single: 'Single',
+  ep: 'EP',
+  album: 'Album',
+  compilation: 'Compilation',
+  live: 'Live',
+  mixtape: 'Mixtape',
+  other: 'Other',
+};
 
 interface ReleaseFieldsProps {
   readonly releaseDate: string | undefined;
+  readonly releaseType?: string;
+  readonly totalTracks?: number;
+  readonly platformCount?: number;
 }
 
-export function ReleaseFields({ releaseDate }: ReleaseFieldsProps) {
+export function ReleaseFields({
+  releaseDate,
+  releaseType,
+  totalTracks,
+  platformCount,
+}: ReleaseFieldsProps) {
+  const parts: string[] = [];
+  if (releaseType) {
+    parts.push(RELEASE_TYPE_LABELS[releaseType] ?? releaseType);
+  }
+  if (totalTracks != null && totalTracks > 0) {
+    parts.push(`${totalTracks} ${totalTracks === 1 ? 'track' : 'tracks'}`);
+  }
+  if (platformCount != null && platformCount > 0) {
+    parts.push(
+      `${platformCount} ${platformCount === 1 ? 'platform' : 'platforms'}`
+    );
+  }
+
   return (
-    <div className='space-y-3'>
-      {/* Release date field (read-only) */}
-      <DrawerPropertyRow
-        label='Released'
-        value={
-          <span className={releaseDate ? '' : 'text-secondary-token italic'}>
+    <div className='space-y-0.5'>
+      <p className='text-xs text-secondary-token'>
+        {releaseDate ? (
+          <>
+            <span className='text-tertiary-token'>Released</span>{' '}
             {formatReleaseDate(releaseDate)}
-          </span>
-        }
-      />
+          </>
+        ) : (
+          <span className='italic'>No release date</span>
+        )}
+      </p>
+      {parts.length > 0 && (
+        <p className='text-[11px] text-tertiary-token'>{parts.join(' · ')}</p>
+      )}
     </div>
   );
 }

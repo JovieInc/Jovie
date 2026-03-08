@@ -176,6 +176,9 @@ vi.mock('@/components/molecules/drawer', () => ({
       ) : null}
     </div>
   ),
+  DrawerAsyncToggle: ({ label }: { label: string }) => (
+    <div data-testid='async-toggle'>{label}</div>
+  ),
 }));
 
 vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
@@ -209,8 +212,8 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div>Metadata</div>,
 }));
-vi.mock('@/components/organisms/release-sidebar/ReleaseSettings', () => ({
-  ReleaseSettings: () => <div>Settings</div>,
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
   ReleaseLyricsSection: () => <div>Lyrics</div>,
@@ -286,7 +289,7 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Links' }));
+    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
     await user.click(screen.getByRole('button', { name: 'Add platform link' }));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
 
@@ -320,7 +323,7 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Links' }));
+    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
     await user.click(screen.getByRole('button', { name: 'Add platform link' }));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
@@ -353,7 +356,7 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Links' }));
+    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
 
     expect(onRemoveDspLink).toHaveBeenCalledWith(release.id, 'spotify');

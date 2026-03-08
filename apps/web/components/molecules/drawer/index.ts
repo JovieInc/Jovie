@@ -1,4 +1,8 @@
 export {
+  DrawerAsyncToggle,
+  type DrawerAsyncToggleProps,
+} from './DrawerAsyncToggle';
+export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';

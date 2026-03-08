@@ -20,8 +20,8 @@ const Switch = React.forwardRef<
       'transition-colors duration-[150ms] ease-in-out',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2',
       'disabled:cursor-not-allowed disabled:opacity-50',
-      'data-[state=unchecked]:bg-(--linear-border-strong)',
-      'data-[state=checked]:bg-(--linear-btn-primary-bg)',
+      'data-[state=unchecked]:bg-white/[0.08]',
+      'data-[state=checked]:bg-indigo-500',
       className
     )}
     {...props}

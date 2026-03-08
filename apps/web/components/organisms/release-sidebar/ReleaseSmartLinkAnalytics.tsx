@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DrawerSection } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import type { Release } from './types';
@@ -48,14 +47,16 @@ function StatTile({
   readonly hint?: string;
 }) {
   return (
-    <div className='space-y-1'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+    <div className='space-y-0.5'>
+      <p className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
         {label}
       </p>
-      <p className='text-2xl font-semibold leading-none tracking-tight text-primary-token tabular-nums'>
+      <p className='text-xl font-[510] leading-none tracking-tight text-primary-token tabular-nums'>
         {value}
       </p>
-      {hint && <p className='text-[11px] text-secondary-token'>{hint}</p>}
+      {hint && (
+        <p className='text-[11px] leading-tight text-tertiary-token'>{hint}</p>
+      )}
     </div>
   );
 }
@@ -74,7 +75,6 @@ export function ReleaseSmartLinkAnalytics({
     setIsLoading(prev => (data === null ? true : prev));
     setIsSwitching(data !== null);
     setHasError(false);
-    // Keep previous data visible while loading new data to prevent layout shift
 
     fetchReleaseAnalytics(release.id, controller.signal)
       .then(response => {
@@ -104,101 +104,96 @@ export function ReleaseSmartLinkAnalytics({
 
   const topProviders = providerClicks.slice(0, 4);
 
-  // Show loading skeleton only on first load (no previous data)
   const showSkeleton = isLoading && !data;
 
   return (
-    <DrawerSection title='Smart link analytics'>
-      <div className='min-h-[72px]'>
+    <div>
+      <div className='min-h-[60px]'>
         {showSkeleton && (
-          <div className='grid grid-cols-2 divide-x divide-subtle/80 rounded-lg border border-subtle/60 bg-surface-2/40 p-3.5'>
-            <div className='pr-3 space-y-1'>
-              <div className='h-[10px] w-16 rounded skeleton' />
-              <div className='h-7 w-14 rounded skeleton' />
-              <div className='h-[11px] w-12 rounded skeleton' />
+          <div className='grid grid-cols-2 rounded-md bg-white/[0.02] p-3'>
+            <div className='space-y-1'>
+              <div className='h-[10px] w-14 rounded skeleton' />
+              <div className='h-5 w-10 rounded skeleton' />
+              <div className='h-[11px] w-10 rounded skeleton' />
             </div>
-            <div className='pl-3 space-y-1'>
-              <div className='h-[10px] w-16 rounded skeleton' />
-              <div className='h-7 w-14 rounded skeleton' />
-              <div className='h-[11px] w-12 rounded skeleton' />
+            <div className='space-y-1 border-l border-white/[0.05] pl-3'>
+              <div className='h-[10px] w-14 rounded skeleton' />
+              <div className='h-5 w-10 rounded skeleton' />
+              <div className='h-[11px] w-10 rounded skeleton' />
             </div>
           </div>
         )}
 
         {!showSkeleton && hasError && (
-          <p className='text-xs text-error'>
-            Analytics are temporarily unavailable.
+          <p className='text-[13px] text-tertiary-token'>
+            Analytics unavailable
           </p>
         )}
 
         {!showSkeleton && !hasError && (
           <div
             className={cn(
-              'transition-opacity duration-150',
+              'transition-opacity duration-100',
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 divide-x divide-subtle/80 rounded-lg border border-subtle/60 bg-surface-2/40 p-3.5'>
-              <div className='pr-3'>
+            <div className='grid grid-cols-2 rounded-md bg-white/[0.02] p-3'>
+              <div>
                 <StatTile
                   label='Total clicks'
                   value={numberFormatter.format(totalClicks)}
                   hint='All time'
                 />
               </div>
-              <div className='pl-3'>
+              <div className='border-l border-white/[0.05] pl-3'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
-                  hint='Recent activity'
+                  hint='Recent'
                 />
               </div>
             </div>
 
             {showEmpty && (
-              <p className='mt-2 text-xs text-secondary-token'>
+              <p className='mt-1.5 text-[11px] text-tertiary-token'>
                 Share your smart link to start tracking clicks.
               </p>
             )}
 
             {!showEmpty && topProviders.length > 0 && (
-              <div className='mt-2 space-y-2'>
-                <p className='text-[11px] font-semibold uppercase tracking-wide text-secondary-token'>
-                  Top platforms
-                </p>
-                <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>
-                  {topProviders.map(provider => {
-                    const key = provider.provider as ProviderKey;
-                    const label =
-                      providerConfig[key]?.label ??
-                      provider.provider ??
-                      'Other';
-                    const accent = providerConfig[key]?.accent ?? '#64748B';
-                    return (
-                      <div
-                        key={provider.provider}
-                        className='flex items-center justify-between px-3 py-2 text-xs'
-                      >
-                        <div className='flex items-center gap-2 text-secondary-token'>
-                          <span
-                            className='h-2 w-2 rounded-full'
-                            style={{ backgroundColor: accent }}
-                            aria-hidden='true'
-                          />
-                          <span>{label}</span>
-                        </div>
-                        <span className='tabular-nums text-primary-token'>
-                          {numberFormatter.format(provider.clicks)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div className='mt-1.5'>
+                {topProviders.map((provider, i) => {
+                  const key = provider.provider as ProviderKey;
+                  const label =
+                    providerConfig[key]?.label ?? provider.provider ?? 'Other';
+                  const accent = providerConfig[key]?.accent ?? '#64748B';
+                  return (
+                    <div
+                      key={provider.provider}
+                      className={cn(
+                        'flex items-center justify-between py-1.5 text-[13px]',
+                        i > 0 && 'border-t border-white/[0.03]'
+                      )}
+                    >
+                      <span className='flex items-center gap-2 text-tertiary-token'>
+                        <span
+                          className='h-1.5 w-1.5 rounded-full'
+                          style={{ backgroundColor: accent }}
+                          aria-hidden='true'
+                        />
+                        {label}
+                      </span>
+                      <span className='tabular-nums text-secondary-token'>
+                        {numberFormatter.format(provider.clicks)}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
       </div>
-    </DrawerSection>
+    </div>
   );
 }

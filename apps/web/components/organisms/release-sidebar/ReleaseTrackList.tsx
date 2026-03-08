@@ -17,7 +17,6 @@ import {
   Copy,
   ExternalLink,
   Link2,
-  Loader2,
   MoreHorizontal,
   Pause,
   Play,
@@ -153,8 +152,26 @@ export function ReleaseTrackList({
       {isExpanded && (
         <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
           {isLoading && (
-            <div className='flex items-center justify-center py-4'>
-              <Loader2 className='h-4 w-4 animate-spin text-tertiary-token' />
+            <div className='space-y-0.5'>
+              {Array.from({ length: Math.min(release.totalTracks, 6) }).map(
+                (_, i) => (
+                  <div
+                    key={`skeleton-${
+                      // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholder
+                      i
+                    }`}
+                    className='flex items-start gap-2 px-1 py-1.5'
+                  >
+                    <div className='w-6 shrink-0 pt-0.5'>
+                      <div className='ml-auto h-3 w-4 rounded skeleton' />
+                    </div>
+                    <div className='min-w-0 flex-1 space-y-1'>
+                      <div className='h-3.5 w-3/4 rounded skeleton' />
+                      <div className='h-2.5 w-1/3 rounded skeleton' />
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           )}
 
@@ -374,7 +391,7 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          className='shrink-0 rounded p-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          className='mt-0.5 shrink-0 self-start rounded p-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
           aria-label={`Actions for ${track.title}`}
         >
           <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />

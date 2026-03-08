@@ -67,7 +67,7 @@ export function DspConnectionPill({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium',
+          'inline-flex items-center gap-1.5 rounded-md border py-1 pl-2.5 pr-3 text-xs font-medium',
           className
         )}
         style={{
@@ -94,7 +94,7 @@ export function DspConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
+              'inline-flex items-center gap-1.5 rounded-md border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               className
@@ -150,7 +150,7 @@ export function DspConnectionPill({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-xs font-medium text-secondary-token transition-colors',
+        'inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-xs font-medium text-secondary-token transition-colors',
         'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         className

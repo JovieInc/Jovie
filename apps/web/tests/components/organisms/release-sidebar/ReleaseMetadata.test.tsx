@@ -34,7 +34,7 @@ describe('ReleaseMetadata canvas status', () => {
     );
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getByText('Set')).toBeInTheDocument();
+    expect(screen.getByText('Has video')).toBeInTheDocument();
   });
 
   it('shows ready to upload when canvas is generated', () => {
@@ -54,9 +54,8 @@ describe('ReleaseMetadata canvas status', () => {
       />
     );
 
-    // Falls back to not_set config which renders "Set" badge
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getAllByText('Set').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Has video').length).toBeGreaterThanOrEqual(1);
   });
 
   it('defaults to not-set badge when canvas status is missing', () => {
@@ -65,6 +64,6 @@ describe('ReleaseMetadata canvas status', () => {
     );
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
-    expect(screen.getAllByText('Set').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Has video').length).toBeGreaterThanOrEqual(1);
   });
 });
