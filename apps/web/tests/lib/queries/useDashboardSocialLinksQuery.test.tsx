@@ -129,6 +129,28 @@ describe('useDashboardSocialLinksQuery', () => {
       });
     });
 
+    it('disables remount refetch while cache is valid', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ links: [] }),
+      });
+
+      renderHook(() => useDashboardSocialLinksQuery('profile-123'), {
+        wrapper,
+      });
+
+      await waitFor(() => {
+        const query = queryClient.getQueryCache().find({
+          queryKey: queryKeys.dashboard.socialLinks('profile-123'),
+        });
+
+        const options = query?.options as
+          | { refetchOnMount?: boolean }
+          | undefined;
+        expect(options?.refetchOnMount).toBe(false);
+      });
+    });
+
     it('uses correct query key', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
