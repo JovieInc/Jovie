@@ -1,0 +1,86 @@
+import { and, eq, isNull } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
+import { withDbSession } from '@/lib/auth/session';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { notifyVerificationRequest } from '@/lib/verification/notifications';
+
+export const runtime = 'nodejs';
+
+export async function POST() {
+  try {
+    return await withDbSession(async clerkUserId => {
+      const [user] = await db
+        .select({
+          id: users.id,
+          clerkId: users.clerkId,
+          name: users.name,
+          email: users.email,
+          isPro: users.isPro,
+        })
+        .from(users)
+        .where(and(eq(users.clerkId, clerkUserId), isNull(users.deletedAt)))
+        .limit(1);
+
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      if (!user.isPro) {
+        return NextResponse.json(
+          { error: 'Verification requests are available to Pro members.' },
+          { status: 403 }
+        );
+      }
+
+      const [profile] = await db
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          isVerified: creatorProfiles.isVerified,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, user.id))
+        .limit(1);
+
+      if (!profile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404 }
+        );
+      }
+
+      if (profile.isVerified) {
+        return NextResponse.json(
+          { error: 'Your profile is already verified.' },
+          { status: 409 }
+        );
+      }
+
+      await notifyVerificationRequest({
+        name: user.name?.trim() || user.email || user.clerkId,
+        email: user.email,
+        username: profile.usernameNormalized,
+        profileId: profile.id,
+      });
+
+      return NextResponse.json({ success: true });
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error && error.message === 'Unauthorized'
+            ? 'Unauthorized'
+            : 'Unable to submit verification request',
+      },
+      {
+        status:
+          error instanceof Error && error.message === 'Unauthorized'
+            ? 401
+            : 500,
+      }
+    );
+  }
+}
