@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Drawer } from 'vaul';
 import { TipSelector } from '@/components/molecules/TipSelector';
@@ -39,8 +39,6 @@ export function TipDrawer({
   venmoUsername,
   amounts = [3, 5, 7],
 }: TipDrawerProps) {
-  const historyPushedRef = useRef(false);
-
   useEffect(() => {
     if (!open) return;
 
@@ -55,28 +53,11 @@ export function TipDrawer({
       globalThis.joviePixel.track('tip_page_view');
     }
 
-    if (!historyPushedRef.current) {
-      globalThis.history.pushState({ tipDrawer: true }, '');
-      historyPushedRef.current = true;
-    }
-
-    const handlePopState = () => {
-      if (historyPushedRef.current) {
-        historyPushedRef.current = false;
-        onOpenChange(false);
-      }
-    };
-
-    globalThis.addEventListener('popstate', handlePopState);
-    return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [open, artistHandle, onOpenChange]);
+    return undefined;
+  }, [open, artistHandle]);
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen && historyPushedRef.current) {
-        historyPushedRef.current = false;
-        globalThis.history.back();
-      }
       onOpenChange(isOpen);
     },
     [onOpenChange]
