@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   Checkbox,
   ContextMenu,
   ContextMenuContent,
@@ -9,6 +10,7 @@ import {
   ContextMenuTrigger,
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
+import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import {
   memo,
@@ -311,6 +313,27 @@ function CreatorProfileTableRowComponent({
         }
       >
         <div className='flex items-center justify-end gap-2'>
+          <Button
+            type='button'
+            size='sm'
+            variant='ghost'
+            className='h-8 gap-1.5 px-2 text-xs text-secondary-token hover:text-primary-token'
+            onClick={async e => {
+              e.stopPropagation();
+              await onRefreshIngest();
+            }}
+            disabled={refreshIngestStatus === 'loading'}
+            aria-label='Refresh creator music data'
+            title='Refresh creator music data'
+          >
+            <RefreshCw
+              className={cn(
+                'h-3.5 w-3.5',
+                refreshIngestStatus === 'loading' && 'animate-spin'
+              )}
+            />
+            Refresh
+          </Button>
           {/* Icon action buttons - always visible on hover */}
           <div
             className={cn(
