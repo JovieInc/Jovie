@@ -23,7 +23,7 @@ interface UsernameUpdateOutcome {
   normalized: string;
   changed: boolean;
   conflict: boolean;
-  previousCanonicalUsername: string;
+  previousCanonicalUsername: string | null;
 }
 
 async function updateCanonicalUsernameInternal(
@@ -145,8 +145,12 @@ export async function syncCanonicalUsernameFromApp(
 
     // Invalidate handle-availability cache for both old and new handles.
     // This ensures old handle availability and new handle reservation update quickly.
-    await invalidateHandleCache(outcome.normalized);
-    await invalidateHandleCache(outcome.previousCanonicalUsername);
+    await Promise.all([
+      invalidateHandleCache(outcome.normalized),
+      outcome.previousCanonicalUsername
+        ? invalidateHandleCache(outcome.previousCanonicalUsername)
+        : Promise.resolve(),
+    ]);
   }
 }
 
