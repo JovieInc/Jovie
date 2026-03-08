@@ -16,8 +16,8 @@ import {
 } from 'next/cache';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { setupDbSession, validateClerkUserId } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { type DbOrTransaction } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -36,34 +36,6 @@ import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
-
-/**
- * Executes a query with RLS session setup before query execution.
- *
- * The session setup and query execution happen in sequence to avoid runtime
- * failures from batching raw SQL values with Neon HTTP's batch API.
- *
- * @param clerkUserId - The Clerk user ID for session setup
- * @param queryFn - Function that returns the Drizzle query builder (not executed yet)
- * @param context - Description for error messages (used for timeout wrapper)
- * @returns The query result with timeout wrapper
- */
-async function executeWithSession<T>(
-  clerkUserId: string,
-  queryFn: () => { execute: () => Promise<T> },
-  context?: string
-): Promise<T> {
-  validateClerkUserId(clerkUserId);
-
-  const query = queryFn();
-
-  // Neon HTTP batch currently requires runnable Drizzle queries only.
-  // setupDbSession() avoids runtime failures from batching db.execute(SQL).
-  return dashboardQuery(async () => {
-    await setupDbSession(clerkUserId);
-    return query.execute();
-  }, context ?? 'Query with session');
-}
 
 function truncateString(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
@@ -279,91 +251,83 @@ async function fetchDashboardCoreWithSession(
   clerkUserId: string
 ): Promise<CoreData> {
   try {
-    // First check if user exists in users table
-    // Use batch API to ensure RLS session variables are set on the same connection
-    const [userData] = await executeWithSession(
-      clerkUserId,
-      () =>
-        db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.clerkId, clerkUserId))
-          .limit(1),
-      'User lookup query'
-    );
-
-    if (!userData?.id) {
-      // No user row yet — send to onboarding to create user/artist
-      return {
-        user: null,
-        creatorProfiles: [],
-        selectedProfile: null,
-        needsOnboarding: true,
-        sidebarCollapsed: false,
-        hasSocialLinks: false,
-        hasMusicLinks: false,
-        tippingStats: createEmptyTippingStats(),
-        profileCompletion: buildProfileCompletion(null, false, false),
-        isFirstSession: false,
-      };
-    }
-
-    // Now that we know user exists, get creator profiles
-    // Use batch API to ensure RLS session variables are set on the same connection
-    const creatorData = await executeWithSession(
-      clerkUserId,
-      () =>
-        db
-          .select()
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.userId, userData.id))
-          .orderBy(asc(creatorProfiles.createdAt)),
-      'Creator profiles query'
-    ).catch((error: unknown) => {
-      const migrationResult = handleMigrationErrors(error, {
-        userId: userData.id,
-        operation: 'creator_profiles',
-      });
-
-      if (!migrationResult.shouldRetry) {
-        return migrationResult.fallbackData as CreatorProfile[];
-      }
-
-      Sentry.captureException(error, {
-        tags: { query: 'creator_profiles', context: 'dashboard_data' },
-      });
-      throw error;
-    });
-
-    if (!creatorData || creatorData.length === 0) {
-      // No creator profiles yet — onboarding
-      return {
-        user: userData,
-        creatorProfiles: [],
-        selectedProfile: null,
-        needsOnboarding: true,
-        sidebarCollapsed: false,
-        hasSocialLinks: false,
-        hasMusicLinks: false,
-        tippingStats: createEmptyTippingStats(),
-        profileCompletion: buildProfileCompletion(null, false, false),
-        isFirstSession: false,
-      };
-    }
-
-    const selected = selectDashboardProfile(creatorData);
-
-    // Performance optimization: Fetch settings, link counts, AND tipping stats in parallel.
-    // This eliminates the waterfall where tipping stats had to wait for chrome data to finish.
-    // Each query in Promise.all uses batch API to ensure RLS session on same connection.
-    // Use Promise.allSettled so a single query timeout doesn't crash the entire dashboard.
-    // Each settled result is unwrapped with a safe fallback default below.
-    const [settingsResult, linkCountsResult, tippingStatsResult] =
-      await Promise.allSettled([
-        executeWithSession(
-          clerkUserId,
+    return await withDbSessionTx(
+      async (tx, sessionUserId) => {
+        // First check if user exists in users table
+        const [userData] = await dashboardQuery(
           () =>
-            db
+            tx
+              .select({ id: users.id })
+              .from(users)
+              .where(eq(users.clerkId, sessionUserId))
+              .limit(1),
+          'User lookup query'
+        );
+
+        if (!userData?.id) {
+          // No user row yet — send to onboarding to create user/artist
+          return {
+            user: null,
+            creatorProfiles: [],
+            selectedProfile: null,
+            needsOnboarding: true,
+            sidebarCollapsed: false,
+            hasSocialLinks: false,
+            hasMusicLinks: false,
+            tippingStats: createEmptyTippingStats(),
+            profileCompletion: buildProfileCompletion(null, false, false),
+            isFirstSession: false,
+          };
+        }
+
+        // Now that we know user exists, get creator profiles
+        const creatorData = await dashboardQuery(
+          () =>
+            tx
+              .select()
+              .from(creatorProfiles)
+              .where(eq(creatorProfiles.userId, userData.id))
+              .orderBy(asc(creatorProfiles.createdAt)),
+          'Creator profiles query'
+        ).catch((error: unknown) => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: userData.id,
+            operation: 'creator_profiles',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return migrationResult.fallbackData as CreatorProfile[];
+          }
+
+          Sentry.captureException(error, {
+            tags: { query: 'creator_profiles', context: 'dashboard_data' },
+          });
+          throw error;
+        });
+
+        if (!creatorData || creatorData.length === 0) {
+          // No creator profiles yet — onboarding
+          return {
+            user: userData,
+            creatorProfiles: [],
+            selectedProfile: null,
+            needsOnboarding: true,
+            sidebarCollapsed: false,
+            hasSocialLinks: false,
+            hasMusicLinks: false,
+            tippingStats: createEmptyTippingStats(),
+            profileCompletion: buildProfileCompletion(null, false, false),
+            isFirstSession: false,
+          };
+        }
+
+        const selected = selectDashboardProfile(creatorData);
+
+        // Fetch settings, link counts, and tipping stats sequentially to
+        // avoid exhausting the connection pool during high-concurrency requests.
+        const settings = await dashboardQuery(
+          () =>
+            tx
               .select()
               .from(userSettings)
               .where(eq(userSettings.userId, userData.id))
@@ -384,15 +348,22 @@ async function fetchDashboardCoreWithSession(
                 | { sidebarCollapsed: boolean }
                 | undefined;
             }
-            throw error;
-          }),
+
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'user_settings',
+                context: 'dashboard_data_settled',
+              },
+            });
+            return undefined;
+          });
+
         // Optimized existence query for link booleans.
         // Aggregate counts are scoped to the selected profile's active links.
-        // Both queries share the same RLS session context set by executeWithSession.
-        executeWithSession(
-          clerkUserId,
+        const linkCounts = await dashboardQuery(
           () =>
-            db
+            tx
               .select({
                 hasLinks: drizzleSql<boolean>`
                 exists (
@@ -438,61 +409,46 @@ async function fetchDashboardCoreWithSession(
             if (!migrationResult.shouldRetry) {
               return { hasLinks: false, hasMusicLinks: false };
             }
-            throw error;
-          }),
-        // Tipping stats now run in parallel with settings and link counts,
-        // eliminating the previous waterfall where they waited for chrome data
-        fetchTippingStatsWithSession(selected.id, clerkUserId),
-      ]);
 
-    // Unwrap settled results with safe fallback defaults for rejected queries.
-    // This ensures individual timeouts degrade gracefully instead of crashing the dashboard.
-    const settings =
-      settingsResult.status === 'fulfilled' ? settingsResult.value : undefined;
-    const linkCounts =
-      linkCountsResult.status === 'fulfilled'
-        ? linkCountsResult.value
-        : { hasLinks: false, hasMusicLinks: false };
-    const tippingStats =
-      tippingStatsResult.status === 'fulfilled'
-        ? tippingStatsResult.value
-        : createEmptyTippingStats();
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'social_links_existence',
+                context: 'dashboard_data_settled',
+              },
+            });
+            return { hasLinks: false, hasMusicLinks: false };
+          });
 
-    // Report rejected queries to Sentry at warning level (timeouts are expected during cold starts)
-    for (const [label, result] of [
-      ['user_settings', settingsResult],
-      ['social_links_existence', linkCountsResult],
-      ['tipping_stats', tippingStatsResult],
-    ] as const) {
-      if (result.status === 'rejected') {
-        Sentry.captureException(result.reason, {
-          level: 'warning',
-          tags: { query: label, context: 'dashboard_data_settled' },
-        });
-      }
-    }
+        const tippingStats = await fetchTippingStatsWithSession(
+          tx,
+          selected.id
+        );
 
-    const hasLinks = linkCounts.hasLinks;
-    const hasMusicLinks = linkCounts.hasMusicLinks;
+        const hasLinks = linkCounts.hasLinks;
+        const hasMusicLinks = linkCounts.hasMusicLinks;
 
-    // Return data with first profile selected by default
-    return {
-      user: userData,
-      creatorProfiles: creatorData,
-      selectedProfile: selected,
-      needsOnboarding: !profileIsPublishable(selected),
-      sidebarCollapsed: settings?.sidebarCollapsed ?? false,
-      hasSocialLinks: hasLinks,
-      hasMusicLinks,
-      tippingStats,
-      profileCompletion: buildProfileCompletion(
-        selected,
-        hasLinks,
-        hasMusicLinks
-      ),
-      dashboardLoadError: undefined,
-      isFirstSession: deriveIsFirstSession(selected),
-    };
+        // Return data with first profile selected by default
+        return {
+          user: userData,
+          creatorProfiles: creatorData,
+          selectedProfile: selected,
+          needsOnboarding: !profileIsPublishable(selected),
+          sidebarCollapsed: settings?.sidebarCollapsed ?? false,
+          hasSocialLinks: hasLinks,
+          hasMusicLinks,
+          tippingStats,
+          profileCompletion: buildProfileCompletion(
+            selected,
+            hasLinks,
+            hasMusicLinks
+          ),
+          dashboardLoadError: undefined,
+          isFirstSession: deriveIsFirstSession(selected),
+        };
+      },
+      { clerkUserId }
+    );
   } catch (error) {
     // Handle both standard and non-standard error objects
     const errorObj = error as
@@ -547,8 +503,8 @@ async function fetchDashboardCoreWithSession(
 }
 
 async function fetchTippingStatsWithSession(
-  profileId: string,
-  clerkUserId: string
+  tx: DbOrTransaction,
+  profileId: string
 ): Promise<TippingStats> {
   try {
     const startOfMonth = new Date();
@@ -556,19 +512,14 @@ async function fetchTippingStatsWithSession(
     startOfMonth.setUTCHours(0, 0, 0, 0);
     const startOfMonthISO = startOfMonth.toISOString();
 
-    // Execute queries in parallel, each using batch API to ensure RLS session
-    // on the same connection. This is critical because the Neon HTTP driver is
-    // stateless - each query may hit a different connection.
-    const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select({
-              totalReceived: drizzleSql`
+    const tipTotalsRawResult = await dashboardQuery(
+      () =>
+        tx
+          .select({
+            totalReceived: drizzleSql`
             COALESCE(SUM(${tips.amountCents}), 0)
           `,
-              monthReceived: drizzleSql`
+            monthReceived: drizzleSql`
             COALESCE(
               SUM(
                 CASE
@@ -580,32 +531,31 @@ async function fetchTippingStatsWithSession(
               0
             )
           `,
-              tipsSubmitted: drizzleSql`
+            tipsSubmitted: drizzleSql`
             COALESCE(COUNT(${tips.id}), 0)
           `,
-            })
-            .from(tips)
-            .where(eq(tips.creatorProfileId, profileId)),
-        'Tipping stats query'
-      ),
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select({
-              qr: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'qr' then 1 else 0 end), 0)`,
-              link: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'link' then 1 else 0 end), 0)`,
-            })
-            .from(clickEvents)
-            .where(
-              and(
-                eq(clickEvents.creatorProfileId, profileId),
-                eq(clickEvents.linkType, 'tip')
-              )
-            ),
-        'Click events query'
-      ),
-    ]);
+          })
+          .from(tips)
+          .where(eq(tips.creatorProfileId, profileId)),
+      'Tipping stats query'
+    );
+
+    const clickStatsResult = await dashboardQuery(
+      () =>
+        tx
+          .select({
+            qr: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'qr' then 1 else 0 end), 0)`,
+            link: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'link' then 1 else 0 end), 0)`,
+          })
+          .from(clickEvents)
+          .where(
+            and(
+              eq(clickEvents.creatorProfileId, profileId),
+              eq(clickEvents.linkType, 'tip')
+            )
+          ),
+      'Click events query'
+    );
 
     const tipTotalsRaw = tipTotalsRawResult?.[0];
     const clickStats = clickStatsResult?.[0];
@@ -670,8 +620,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
 
   try {
     // Single cached fetch for all dashboard core data (profile, settings, links, tipping stats).
-    // Tipping stats now run in parallel with settings and link counts inside the core fetch,
-    // eliminating the previous waterfall where they waited for chrome data to complete.
+    // Queries are sequenced within the core fetch to reduce connection pool pressure.
     const coreData = await Sentry.startSpan(
       { op: 'task', name: 'dashboard.getCoreData' },
       async () => getCachedDashboardCore(userId)
@@ -723,9 +672,8 @@ async function resolveDashboardData(): Promise<DashboardData> {
 
 /**
  * Single consolidated cache for all dashboard core data.
- * Settings, link counts, and tipping stats are fetched in parallel
- * within fetchDashboardCoreWithSession, eliminating the previous
- * waterfall where tipping stats waited for chrome data.
+ * Settings, link counts, and tipping stats are fetched sequentially
+ * within fetchDashboardCoreWithSession to avoid pool exhaustion.
  */
 const getCachedDashboardCore = unstableCache(
   async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),

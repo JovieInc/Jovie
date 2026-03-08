@@ -105,12 +105,9 @@ vi.mock('next/cache', async () => {
   };
 });
 
-const setupDbSessionMock = vi.fn();
-const validateClerkUserIdMock = vi.fn();
-
 vi.mock('@/lib/auth/session', () => ({
-  setupDbSession: setupDbSessionMock,
-  validateClerkUserId: validateClerkUserIdMock,
+  setupDbSession: vi.fn(),
+  validateClerkUserId: vi.fn(),
   withDbSessionTx: withDbSessionTxMock,
   withDbSession: vi.fn(async handler => handler('user_123')),
 }));
@@ -235,7 +232,7 @@ describe('dashboard data prefetch', () => {
     ]);
 
     expect(first).toEqual(second);
-    expect(setupDbSessionMock).toHaveBeenCalled();
+    expect(withDbSessionTxMock).toHaveBeenCalled();
   });
 });
 
