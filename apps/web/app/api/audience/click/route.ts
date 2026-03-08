@@ -308,6 +308,19 @@ export async function POST(request: NextRequest) {
       const updatedScore = (member.engagementScore ?? 0) + weight;
       const intentLevel = deriveIntentLevel(member.visits ?? 0, actionCount);
 
+      const metadataWithTipValue =
+        linkType === 'tip'
+          ? {
+              ...(metadata ?? {}),
+              tipAmountCents:
+                typeof metadata?.tipAmountCents === 'number'
+                  ? metadata.tipAmountCents
+                  : typeof metadata?.tipAmount === 'number'
+                    ? Math.round(metadata.tipAmount * 100)
+                    : 500,
+            }
+          : (metadata ?? {});
+
       await tx.insert(clickEvents).values({
         creatorProfileId: profileId,
         linkId,
@@ -321,7 +334,7 @@ export async function POST(request: NextRequest) {
         os,
         browser,
         isBot: botDetection.isBot,
-        metadata: metadata ?? {},
+        metadata: metadataWithTipValue,
         audienceMemberId: member.id,
       });
 

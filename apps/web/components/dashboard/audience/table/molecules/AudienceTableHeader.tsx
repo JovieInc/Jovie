@@ -20,6 +20,7 @@ const MEMBER_COLUMNS = [
   { key: 'device', label: 'Device' },
   { key: 'visits', label: 'Visits' },
   { key: 'actions', label: 'Actions', align: 'right' as const },
+  { key: 'ltv', label: 'LTV' },
   { key: 'lastSeen', label: 'Last seen' },
 ] as const;
 

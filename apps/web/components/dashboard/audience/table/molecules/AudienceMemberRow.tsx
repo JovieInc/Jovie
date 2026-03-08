@@ -8,6 +8,7 @@ import {
   AudienceDeviceCell,
   AudienceLastSeenCell,
   AudienceLocationCell,
+  AudienceLtvCell,
   AudienceRowSelectionCell,
   AudienceTypeBadge,
   AudienceUserCell,
@@ -90,6 +91,19 @@ export function AudienceMemberRow({
       <AudienceVisitsCell visits={row.visits} intentLevel={row.intentLevel} />
 
       <AudienceActionsCell rowId={row.id} actions={row.latestActions} />
+
+      <td className='px-4 py-3'>
+        <AudienceLtvCell
+          tipAmountTotalCents={row.tipAmountTotalCents}
+          tipCount={row.tipCount}
+          visits={row.visits}
+          engagementScore={row.engagementScore}
+          streamingClicks={row.ltvStreamingClicks ?? 0}
+          tipClickValueCents={row.ltvTipClickValueCents ?? 0}
+          merchSalesCents={row.ltvMerchSalesCents ?? 0}
+          ticketSalesCents={row.ltvTicketSalesCents ?? 0}
+        />
+      </td>
 
       <AudienceLastSeenCell
         row={row}

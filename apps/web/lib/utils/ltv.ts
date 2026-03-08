@@ -1,62 +1,94 @@
 /**
  * Lifetime Value (LTV) tier calculation for audience members.
  *
- * Tiers are based on total tip amount:
- * - '$'   = low    (< $5 in tips)
- * - '$$'  = medium ($5–$25 in tips)
- * - '$$$' = high   (> $25 in tips)
- *
- * Members with zero tips and low engagement are considered "none" tier.
+ * Derived from tracked behavior with intentionally conservative defaults:
+ * - Streaming click-throughs: $0.01 each (intent signal)
+ * - Tip click-throughs: assumed conversion; defaults to $5 when amount missing
+ * - Merch sales: actual tracked cents
+ * - Ticket sales: actual tracked cents
  */
 
 export type LtvTier = 'none' | 'low' | 'medium' | 'high';
+
+const STREAMING_CLICK_VALUE_CENTS = 1;
+
+const LTV_TIER_THRESHOLDS = {
+  medium: 10_00,
+  high: 40_00,
+} as const;
 
 export interface LtvBreakdown {
   tier: LtvTier;
   /** Display label: "$", "$$", "$$$", or "—" */
   label: string;
-  /** Total tip amount in dollars */
-  tipTotalDollars: number;
+  /** Total LTV in cents */
+  totalValueCents: number;
+  /** Estimated value from streaming click-throughs */
+  streamingValueCents: number;
+  /** Assumed conversion value from tip clicks */
+  tipClickValueCents: number;
+  /** Actual tracked merch sales */
+  merchSalesCents: number;
+  /** Actual tracked ticket sales */
+  ticketSalesCents: number;
+  /** Number of streaming click-throughs */
+  streamingClicks: number;
   /** Number of tips sent */
   tipCount: number;
-  /** Number of visits */
+  /** Number of profile visits */
   visits: number;
-  /** Engagement score (0–100) */
+  /** Engagement score (0–100+) */
   engagementScore: number;
 }
 
 /**
- * Calculate LTV tier and breakdown from audience member data.
+ * Calculate LTV tier and breakdown from audience member tracking data.
  */
 export function calculateLtv(params: {
   tipAmountTotalCents: number;
   tipCount: number;
   visits: number;
   engagementScore: number;
+  streamingClicks?: number;
+  tipClickValueCents?: number;
+  merchSalesCents?: number;
+  ticketSalesCents?: number;
 }): LtvBreakdown {
-  const tipTotalDollars = params.tipAmountTotalCents / 100;
+  const streamingClicks = Math.max(0, params.streamingClicks ?? 0);
+  const streamingValueCents = streamingClicks * STREAMING_CLICK_VALUE_CENTS;
+  const tipValueCents = Math.max(
+    params.tipAmountTotalCents,
+    params.tipClickValueCents ?? 0
+  );
+  const merchSalesCents = Math.max(0, params.merchSalesCents ?? 0);
+  const ticketSalesCents = Math.max(0, params.ticketSalesCents ?? 0);
 
-  let tier: LtvTier;
-  let label: string;
+  const totalValueCents =
+    streamingValueCents + tipValueCents + merchSalesCents + ticketSalesCents;
 
-  if (tipTotalDollars >= 25) {
+  let tier: LtvTier = 'none';
+  let label = '—';
+
+  if (totalValueCents >= LTV_TIER_THRESHOLDS.high) {
     tier = 'high';
     label = '$$$';
-  } else if (tipTotalDollars >= 5) {
+  } else if (totalValueCents >= LTV_TIER_THRESHOLDS.medium) {
     tier = 'medium';
     label = '$$';
-  } else if (tipTotalDollars > 0) {
+  } else if (totalValueCents > 0) {
     tier = 'low';
     label = '$';
-  } else {
-    tier = 'none';
-    label = '\u2014'; // em-dash
   }
 
   return {
     tier,
     label,
-    tipTotalDollars,
+    totalValueCents,
+    streamingValueCents,
+    tipClickValueCents: tipValueCents,
+    merchSalesCents,
+    ticketSalesCents,
+    streamingClicks,
     tipCount: params.tipCount,
     visits: params.visits,
     engagementScore: params.engagementScore,

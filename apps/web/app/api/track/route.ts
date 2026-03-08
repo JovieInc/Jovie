@@ -267,6 +267,21 @@ export async function POST(request: NextRequest) {
         metadata.utmParams = utmParams;
       }
 
+      const rawTipAmount =
+        typeof context?.tipAmountCents === 'number'
+          ? context.tipAmountCents
+          : typeof context?.tipAmount === 'number'
+            ? Math.round(context.tipAmount * 100)
+            : undefined;
+
+      if (
+        linkType === 'tip' &&
+        typeof rawTipAmount === 'number' &&
+        rawTipAmount > 0
+      ) {
+        metadata.tipAmountCents = rawTipAmount;
+      }
+
       const [insertedClickEvent] = await tx
         .insert(clickEvents)
         .values({
