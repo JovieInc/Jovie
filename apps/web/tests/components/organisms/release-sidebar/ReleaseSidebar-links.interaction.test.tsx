@@ -87,6 +87,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSection: ({ children }: { children?: React.ReactNode }) => (
     <section>{children}</section>
   ),
+  DrawerAsyncToggle: ({ label }: { label: string }) => (
+    <div data-testid='async-toggle'>{label}</div>
+  ),
   DrawerLinkSection: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -129,8 +132,8 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div data-testid='metadata'>Metadata</div>,
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseSettings', () => ({
-  ReleaseSettings: () => <div data-testid='settings'>Settings</div>,
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
@@ -238,8 +241,8 @@ describe('ReleaseSidebar Links tab', () => {
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
     expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 

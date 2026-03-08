@@ -1,4 +1,8 @@
 export {
+  DrawerAsyncToggle,
+  type DrawerAsyncToggleProps,
+} from './DrawerAsyncToggle';
+export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';
@@ -25,3 +29,4 @@ export {
   type EntitySidebarShellProps,
 } from './EntitySidebarShell';
 export { SidebarLinkRow, type SidebarLinkRowProps } from './SidebarLinkRow';
+export { StatTile, type StatTileProps } from './StatTile';

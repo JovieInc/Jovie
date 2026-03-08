@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DrawerSection } from '@/components/molecules/drawer';
+import { DrawerSection, StatTile } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import type { Release } from './types';
@@ -36,28 +36,6 @@ interface ReleaseSmartLinkAnalyticsProps {
     ProviderKey,
     { label: string; accent: string }
   >;
-}
-
-function StatTile({
-  label,
-  value,
-  hint,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly hint?: string;
-}) {
-  return (
-    <div className='space-y-1'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='text-2xl font-semibold leading-none tracking-tight text-primary-token tabular-nums'>
-        {value}
-      </p>
-      {hint && <p className='text-[11px] text-secondary-token'>{hint}</p>}
-    </div>
-  );
 }
 
 export function ReleaseSmartLinkAnalytics({
@@ -163,7 +141,7 @@ export function ReleaseSmartLinkAnalytics({
 
             {!showEmpty && topProviders.length > 0 && (
               <div className='mt-2 space-y-2'>
-                <p className='text-[11px] font-semibold uppercase tracking-wide text-secondary-token'>
+                <p className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                   Top platforms
                 </p>
                 <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>

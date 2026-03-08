@@ -139,6 +139,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSection: ({ children }: { children?: React.ReactNode }) => (
     <section>{children}</section>
   ),
+  DrawerAsyncToggle: ({ label }: { label: string }) => (
+    <div data-testid='async-toggle'>{label}</div>
+  ),
   DrawerLinkSection: ({
     title,
     children,
@@ -209,8 +212,8 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseTrackList', () => ({
 vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div>Metadata</div>,
 }));
-vi.mock('@/components/organisms/release-sidebar/ReleaseSettings', () => ({
-  ReleaseSettings: () => <div>Settings</div>,
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
   ReleaseLyricsSection: () => <div>Lyrics</div>,
