@@ -68,15 +68,31 @@ export interface UnwrappedDbError {
 }
 
 function tryParseJsonError(str: string): Record<string, unknown> | null {
-  try {
-    const parsed = JSON.parse(str);
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as Record<string, unknown>;
+  const parseRecord = (candidate: string): Record<string, unknown> | null => {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Not JSON, that's fine
     }
-  } catch {
-    // Not JSON, that's fine
+    return null;
+  };
+
+  const directParse = parseRecord(str);
+  if (directParse) {
+    return directParse;
   }
-  return null;
+
+  const firstBrace = str.indexOf('{');
+  const lastBrace = str.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+
+  const embeddedJson = str.slice(firstBrace, lastBrace + 1);
+  return parseRecord(embeddedJson);
 }
 
 const EMPTY_DB_ERROR: UnwrappedDbError = {
