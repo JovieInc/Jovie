@@ -43,8 +43,8 @@ export function DefaultStatusBanner({
 
   if (isUnavailable) {
     statusLabel = 'Status Unavailable';
-    statusTone = 'text-slate-500 dark:text-slate-400';
-    badgeTone = 'border-slate-500/20 bg-slate-500/10';
+    statusTone = 'text-tertiary-token';
+    badgeTone = 'border-subtle bg-surface-2';
     Icon = HelpCircle;
   } else if (isAlive) {
     statusLabel = 'Default Alive';
