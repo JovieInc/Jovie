@@ -92,7 +92,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
       {/* Gradient separator */}
       <div
         aria-hidden='true'
-        className='mb-16 h-px max-w-lg mx-auto'
+        className='mb-20 h-px max-w-lg mx-auto'
         style={{
           background:
             'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
