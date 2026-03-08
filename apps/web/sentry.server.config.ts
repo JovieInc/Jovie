@@ -7,8 +7,24 @@ import { createBeforeSendHook, getBaseServerConfig } from '@/lib/sentry/config';
 
 const baseConfig = getBaseServerConfig();
 
+// Health endpoint is polled every minute by Sentry uptime monitoring.
+// Exclude it from performance traces to avoid polluting transaction data.
+// Sentry uptime monitor config: Alerts → Uptime → Add Monitor
+//   URL: https://app.jovie.com/api/health  |  Interval: 1 min
+const HEALTH_ENDPOINT_PATTERN = /^\/api\/health/;
+
 Sentry.init({
   ...baseConfig,
+
+  // Drop performance traces for the health endpoint — Sentry's uptime monitor
+  // pings it every minute, which would otherwise skew p50/p99 latency data.
+  tracesSampler: samplingContext => {
+    const name = samplingContext.name ?? '';
+    if (HEALTH_ENDPOINT_PATTERN.test(name)) {
+      return 0;
+    }
+    return baseConfig.tracesSampleRate;
+  },
 
   // Extend shared beforeSend with server-specific filtering
   beforeSend: createBeforeSendHook(event => {
