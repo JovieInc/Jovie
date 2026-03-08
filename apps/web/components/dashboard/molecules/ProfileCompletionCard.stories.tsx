@@ -49,9 +49,10 @@ const mockDashboardData: DashboardData = {
         href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
       },
       {
-        id: 'tip-jar',
-        label: 'Set up your tip jar',
-        description: 'Turn attention into support with a fast tipping link.',
+        id: 'email',
+        label: 'Add your account email',
+        description:
+          'Email keeps your account recoverable and mission-critical.',
         href: APP_ROUTES.DASHBOARD_EARNINGS,
       },
     ],

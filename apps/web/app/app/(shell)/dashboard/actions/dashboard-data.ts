@@ -32,6 +32,7 @@ import {
 import { sqlAny } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
+import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { mapSocialLinkExistence } from './social-link-utils';
 
@@ -120,7 +121,7 @@ export interface DashboardData {
 }
 
 export interface ProfileCompletionStep {
-  id: 'avatar' | 'social-links' | 'music-links' | 'tip-jar';
+  id: 'name' | 'avatar' | 'email' | 'music-links';
   label: string;
   description: string;
   href: string;
@@ -150,39 +151,38 @@ function deriveIsFirstSession(
 
 function buildProfileCompletion(
   selectedProfile: CreatorProfile | null,
-  hasSocialLinks: boolean,
+  email: string | null | undefined,
   hasMusicLinks: boolean
 ): ProfileCompletion {
-  // Criteria: name, avatar, social links, music links, tip jar.
-  // Bio is optional and excluded from completion scoring.
-  // Handle (username) is excluded because it is always present for existing profiles
-  // and would inflate the score with "free" points.
-  const totalCount = 5;
-
   if (!selectedProfile) {
     return {
       percentage: 0,
       completedCount: 0,
-      totalCount,
+      totalCount: 4,
       steps: [],
       profileIsLive: false,
     };
   }
 
-  const checks = {
-    name: hasText(selectedProfile.displayName),
-    avatar: hasText(selectedProfile.avatarUrl),
-    socialLinks: hasSocialLinks,
-    musicLinks: hasMusicLinks,
-    tipJar: hasText(selectedProfile.venmoHandle),
-  };
-
-  const completedCount = Object.values(checks).filter(Boolean).length;
-  const percentage = Math.round((completedCount / totalCount) * 100);
+  const completion = calculateRequiredProfileCompletion({
+    displayName: selectedProfile.displayName,
+    avatarUrl: selectedProfile.avatarUrl,
+    email,
+    hasMusicLinks,
+  });
 
   const steps: ProfileCompletionStep[] = [];
 
-  if (!checks.avatar) {
+  if (!completion.hasName) {
+    steps.push({
+      id: 'name',
+      label: 'Add your artist name',
+      description: 'A clear name helps fans recognize and trust your profile.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    });
+  }
+
+  if (!completion.hasAvatar) {
     steps.push({
       id: 'avatar',
       label: 'Add a profile photo',
@@ -191,16 +191,16 @@ function buildProfileCompletion(
     });
   }
 
-  if (!checks.socialLinks) {
+  if (!completion.hasEmail) {
     steps.push({
-      id: 'social-links',
-      label: 'Connect your social links',
-      description: 'Give fans one-tap access to your social presence.',
-      href: APP_ROUTES.DASHBOARD_LINKS,
+      id: 'email',
+      label: 'Add your account email',
+      description: 'Email keeps your account recoverable and mission-critical.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
     });
   }
 
-  if (!checks.musicLinks) {
+  if (!completion.hasMusicLinks) {
     steps.push({
       id: 'music-links',
       label: 'Add your music platforms',
@@ -210,25 +210,16 @@ function buildProfileCompletion(
     });
   }
 
-  if (!checks.tipJar) {
-    steps.push({
-      id: 'tip-jar',
-      label: 'Set up your tip jar',
-      description: 'Turn attention into support with a fast tipping link.',
-      href: APP_ROUTES.DASHBOARD_EARNINGS,
-    });
-  }
-
   const profileIsLive =
-    checks.name &&
-    checks.avatar &&
+    completion.hasName &&
+    completion.hasAvatar &&
     hasText(selectedProfile.username) &&
-    checks.musicLinks;
+    completion.hasMusicLinks;
 
   return {
-    percentage,
-    completedCount,
-    totalCount,
+    percentage: completion.percentage,
+    completedCount: completion.completedCount,
+    totalCount: completion.totalCount,
     steps,
     profileIsLive,
   };
@@ -257,7 +248,7 @@ async function fetchDashboardCoreWithSession(
         const [userData] = await dashboardQuery(
           () =>
             tx
-              .select({ id: users.id })
+              .select({ id: users.id, email: users.email })
               .from(users)
               .where(eq(users.clerkId, sessionUserId))
               .limit(1),
@@ -275,7 +266,7 @@ async function fetchDashboardCoreWithSession(
             hasSocialLinks: false,
             hasMusicLinks: false,
             tippingStats: createEmptyTippingStats(),
-            profileCompletion: buildProfileCompletion(null, false, false),
+            profileCompletion: buildProfileCompletion(null, null, false),
             isFirstSession: false,
           };
         }
@@ -316,7 +307,7 @@ async function fetchDashboardCoreWithSession(
             hasSocialLinks: false,
             hasMusicLinks: false,
             tippingStats: createEmptyTippingStats(),
-            profileCompletion: buildProfileCompletion(null, false, false),
+            profileCompletion: buildProfileCompletion(null, null, false),
             isFirstSession: false,
           };
         }
@@ -440,7 +431,7 @@ async function fetchDashboardCoreWithSession(
           tippingStats,
           profileCompletion: buildProfileCompletion(
             selected,
-            hasLinks,
+            userData.email,
             hasMusicLinks
           ),
           dashboardLoadError: undefined,
@@ -490,7 +481,7 @@ async function fetchDashboardCoreWithSession(
       hasSocialLinks: false,
       hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
-      profileCompletion: buildProfileCompletion(null, false, false),
+      profileCompletion: buildProfileCompletion(null, null, false),
       dashboardLoadError: {
         stage: 'core_fetch',
         message,
@@ -613,7 +604,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
-      profileCompletion: buildProfileCompletion(null, false, false),
+      profileCompletion: buildProfileCompletion(null, null, false),
       isFirstSession: false,
     };
   }
@@ -658,7 +649,7 @@ async function resolveDashboardData(): Promise<DashboardData> {
       hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
-      profileCompletion: buildProfileCompletion(null, false, false),
+      profileCompletion: buildProfileCompletion(null, null, false),
       dashboardLoadError: {
         stage: 'core_cache',
         message,

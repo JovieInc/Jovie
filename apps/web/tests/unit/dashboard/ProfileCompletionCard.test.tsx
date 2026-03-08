@@ -38,7 +38,7 @@ const baseDashboardData: DashboardData = {
   profileCompletion: {
     percentage: 60,
     completedCount: 3,
-    totalCount: 5,
+    totalCount: 4,
     steps: [
       {
         id: 'avatar',
@@ -47,9 +47,10 @@ const baseDashboardData: DashboardData = {
         href: '/app/settings/artist-profile',
       },
       {
-        id: 'tip-jar',
-        label: 'Set up your tip jar',
-        description: 'Turn attention into support with a fast tipping link.',
+        id: 'email',
+        label: 'Add your account email',
+        description:
+          'Email keeps your account recoverable and mission-critical.',
         href: '/app/dashboard/earnings',
       },
     ],
@@ -71,7 +72,7 @@ describe('ProfileCompletionCard', () => {
 
     expect(getByText('Your profile is not live yet')).toBeDefined();
     expect(getByText('Add a profile photo')).toBeDefined();
-    expect(getByText('Set up your tip jar')).toBeDefined();
+    expect(getByText('Add your account email')).toBeDefined();
   });
 
   it('does not crash when profileCompletion is missing', () => {
@@ -88,7 +89,7 @@ describe('ProfileCompletionCard', () => {
       profileCompletion: {
         percentage: 80,
         completedCount: 4,
-        totalCount: 5,
+        totalCount: 4,
         steps: [
           {
             id: 'avatar',
@@ -114,8 +115,8 @@ describe('ProfileCompletionCard', () => {
     const { queryByText } = renderCard({
       profileCompletion: {
         percentage: 100,
-        completedCount: 5,
-        totalCount: 5,
+        completedCount: 4,
+        totalCount: 4,
         steps: [],
         profileIsLive: false,
       },
