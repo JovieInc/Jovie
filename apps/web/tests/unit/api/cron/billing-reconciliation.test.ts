@@ -223,6 +223,83 @@ describe('GET /api/cron/billing-reconciliation', () => {
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
   });
 
+  it('continues second-pass repairs when one user repair fails', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    mockStripeList
+      .mockRejectedValueOnce(new Error('Stripe timeout'))
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: 'sub_active',
+            customer: 'cus_2',
+            status: 'active',
+          },
+        ],
+        has_more: false,
+      });
+
+    mockDbSelect
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'user_1',
+                clerkId: 'clerk_1',
+                isPro: true,
+                stripeCustomerId: 'cus_1',
+              },
+              {
+                id: 'user_2',
+                clerkId: 'clerk_2',
+                isPro: true,
+                stripeCustomerId: 'cus_2',
+              },
+            ]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+    const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const request = new Request(
+      'http://localhost/api/cron/billing-reconciliation',
+      {
+        headers: { Authorization: 'Bearer test-secret' },
+      }
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(false);
+    expect(data.stats.fixed).toBe(1);
+    expect(data.stats.errors).toBe(1);
+    expect(data.errors[0]).toContain('user user_1: Stripe timeout');
+    expect(mockDbUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripeSubscriptionId: 'sub_active',
+      })
+    );
+  });
+
   it('handles reconciliation errors gracefully', async () => {
     vi.stubEnv('NODE_ENV', 'test');
 
