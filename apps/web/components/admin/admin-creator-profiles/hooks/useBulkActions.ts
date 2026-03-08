@@ -9,6 +9,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { APP_ROUTES } from '@/constants/routes';
 import type { AdminCreatorProfileRow } from '../types';
 
 export interface BulkActionsParams {
@@ -31,6 +32,7 @@ export interface BulkActions {
   handleBulkVerify: () => Promise<void>;
   handleBulkUnverify: () => Promise<void>;
   handleBulkFeature: () => Promise<void>;
+  handleBulkRefreshMusicFetch: () => Promise<void>;
   handleBulkDelete: () => Promise<void>;
   handleClearSelection: () => void;
 }
@@ -103,6 +105,49 @@ export function useBulkActions({
     router.refresh();
   }, [profiles, selectedIds, toggleFeatured, clearSelection, router]);
 
+  const handleBulkRefreshMusicFetch = useCallback(async () => {
+    const selectedProfileIds = profiles
+      .filter(p => selectedIds.has(p.id))
+      .map(p => p.id);
+
+    if (selectedProfileIds.length === 0) {
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${APP_ROUTES.ADMIN_CREATORS}/bulk-refresh`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ profileIds: selectedProfileIds }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Bulk refresh request failed');
+      }
+
+      const payload = (await response.json()) as { queuedCount?: number };
+      const queuedCount = Number(payload.queuedCount ?? 0);
+
+      if (queuedCount > 0) {
+        toast.success(
+          `Queued MusicFetch refresh for ${queuedCount} creator${queuedCount === 1 ? '' : 's'}`
+        );
+      } else {
+        toast.info('No creators with Spotify links were eligible for refresh');
+      }
+
+      clearSelection();
+      router.refresh();
+    } catch {
+      toast.error('Failed to queue MusicFetch refresh');
+    }
+  }, [profiles, selectedIds, clearSelection, router]);
+
   const handleBulkDelete = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
     if (selectedProfiles.length === 0) return;
@@ -143,6 +188,7 @@ export function useBulkActions({
     handleBulkVerify,
     handleBulkUnverify,
     handleBulkFeature,
+    handleBulkRefreshMusicFetch,
     handleBulkDelete,
     handleClearSelection,
   };

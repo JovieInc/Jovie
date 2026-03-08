@@ -205,6 +205,7 @@ export function AdminCreatorProfilesUnified({
     handleBulkVerify,
     handleBulkUnverify,
     handleBulkFeature,
+    handleBulkRefreshMusicFetch,
     handleBulkDelete,
     handleClearSelection,
   } = useBulkActions({
@@ -415,6 +416,7 @@ export function AdminCreatorProfilesUnified({
               onBulkVerify={handleBulkVerify}
               onBulkUnverify={handleBulkUnverify}
               onBulkFeature={handleBulkFeature}
+              onBulkRefreshMusicFetch={handleBulkRefreshMusicFetch}
               onBulkDelete={handleBulkDelete}
               onClearSelection={handleClearSelection}
             />

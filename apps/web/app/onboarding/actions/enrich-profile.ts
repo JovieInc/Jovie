@@ -93,42 +93,56 @@ export async function enrichProfileFromDsp(
     followers: null,
   };
 
-  // Fetch Spotify artist data and MusicFetch data in parallel
-  const [spotifyArtist, musicFetchData] = await Promise.allSettled([
-    getSpotifyArtistProfile(spotifyArtistId),
-    isMusicFetchAvailable()
-      ? fetchArtistBySpotifyUrl(spotifyUrl)
-      : Promise.resolve(null),
-  ]);
+  // Prioritize MusicFetch to reduce direct Spotify API load.
+  let musicFetch: Awaited<ReturnType<typeof fetchArtistBySpotifyUrl>> = null;
+  if (isMusicFetchAvailable()) {
+    const musicFetchData = await Promise.allSettled([
+      fetchArtistBySpotifyUrl(spotifyUrl),
+    ]);
 
-  const artist =
-    spotifyArtist.status === 'fulfilled' ? spotifyArtist.value : null;
-  const musicFetch =
-    musicFetchData.status === 'fulfilled' ? musicFetchData.value : null;
+    const musicFetchResult = musicFetchData[0];
+    musicFetch =
+      musicFetchResult.status === 'fulfilled' ? musicFetchResult.value : null;
 
-  if (spotifyArtist.status === 'rejected') {
-    await captureError(
-      'Spotify artist fetch failed during onboarding enrichment',
-      spotifyArtist.reason,
-      { spotifyArtistId }
-    );
+    if (musicFetchResult.status === 'rejected') {
+      await captureError(
+        'MusicFetch failed during onboarding enrichment',
+        musicFetchResult.reason,
+        { spotifyUrl }
+      );
+    }
   }
 
-  if (musicFetchData.status === 'rejected') {
+  const needsSpotifyArtistData =
+    (!profile.displayNameLocked && !profile.displayName && !musicFetch?.name) ||
+    (!profile.avatarLockedByUser &&
+      !profile.avatarUrl &&
+      !musicFetch?.image?.url);
+
+  const spotifyArtist = needsSpotifyArtistData
+    ? await Promise.allSettled([getSpotifyArtistProfile(spotifyArtistId)])
+    : [];
+
+  const spotifyResult = spotifyArtist[0];
+  const artist =
+    spotifyResult?.status === 'fulfilled' ? spotifyResult.value : null;
+
+  if (spotifyResult?.status === 'rejected') {
     await captureError(
-      'MusicFetch failed during onboarding enrichment',
-      musicFetchData.reason,
-      { spotifyUrl }
+      'Spotify artist fetch failed during onboarding enrichment',
+      spotifyResult.reason,
+      { spotifyArtistId }
     );
   }
 
   // Build profile updates
   const profileUpdates: Partial<typeof creatorProfiles.$inferInsert> = {};
 
-  // Display name from Spotify (if not locked and not already set)
-  if (artist?.name && !profile.displayNameLocked && !profile.displayName) {
-    profileUpdates.displayName = artist.name;
-    result.name = artist.name;
+  // Display name from MusicFetch first, then Spotify fallback.
+  const enrichedName = musicFetch?.name ?? artist?.name;
+  if (enrichedName && !profile.displayNameLocked && !profile.displayName) {
+    profileUpdates.displayName = enrichedName;
+    result.name = enrichedName;
   }
 
   // Bio from MusicFetch (if not already set)
@@ -150,15 +164,16 @@ export async function enrichProfileFromDsp(
     profileUpdates.spotifyPopularity = artist.popularity;
   }
 
-  // Upload Spotify artist image as profile photo
-  if (artist?.images && !profile.avatarLockedByUser && !profile.avatarUrl) {
-    const bestImageUrl = getBestSpotifyImageUrl(artist.images);
-    if (bestImageUrl) {
+  // Upload profile image from MusicFetch first, then Spotify fallback.
+  if (!profile.avatarLockedByUser && !profile.avatarUrl) {
+    const imageUrl =
+      musicFetch?.image?.url ?? getBestSpotifyImageUrl(artist?.images ?? []);
+    if (imageUrl) {
       try {
         const cookieStore = await cookies();
         const cookieHeader = cookieStore.toString();
         const uploaded = await uploadRemoteAvatar({
-          imageUrl: bestImageUrl,
+          imageUrl,
           cookieHeader,
           maxRetries: 2,
         });
@@ -167,14 +182,15 @@ export async function enrichProfileFromDsp(
           profileUpdates.avatarUrl = uploaded.blobUrl;
           result.imageUrl = uploaded.blobUrl;
 
-          logger.info('Spotify artist image uploaded during onboarding', {
+          logger.info('Artist image uploaded during onboarding enrichment', {
             profileId: profile.id,
             spotifyArtistId,
+            source: musicFetch?.image?.url ? 'musicfetch' : 'spotify',
           });
         }
       } catch (error) {
         await captureError(
-          'Failed to upload Spotify artist image during onboarding',
+          'Failed to upload artist image during onboarding enrichment',
           error,
           { profileId: profile.id, spotifyArtistId }
         );

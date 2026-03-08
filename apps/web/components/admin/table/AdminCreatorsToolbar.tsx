@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
-import { CheckCircle, Star, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle, RefreshCw, Star, Trash2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { ExportCSVButton } from '@/components/organisms/table';
@@ -25,6 +25,7 @@ export interface AdminCreatorsToolbarProps {
   readonly onBulkVerify?: () => void;
   readonly onBulkUnverify?: () => void;
   readonly onBulkFeature?: () => void;
+  readonly onBulkRefreshMusicFetch?: () => void;
   readonly onBulkDelete?: () => void;
   readonly onClearSelection?: () => void;
 }
@@ -43,6 +44,7 @@ export function AdminCreatorsToolbar({
   onBulkVerify,
   onBulkUnverify,
   onBulkFeature,
+  onBulkRefreshMusicFetch,
   onBulkDelete,
   onClearSelection,
 }: AdminCreatorsToolbarProps) {
@@ -94,6 +96,15 @@ export function AdminCreatorsToolbar({
               >
                 <Star className='h-3.5 w-3.5' />
                 Feature
+              </Button>
+              <Button
+                size='sm'
+                variant='ghost'
+                onClick={onBulkRefreshMusicFetch}
+                className='gap-2.5'
+              >
+                <RefreshCw className='h-3.5 w-3.5' />
+                Refresh Music Data
               </Button>
               <Button
                 size='sm'
