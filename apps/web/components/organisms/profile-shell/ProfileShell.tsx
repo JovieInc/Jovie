@@ -182,7 +182,7 @@ export function ProfileShell({
           </div>
 
           <div className='relative z-10 flex min-h-dvh flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
-            <div className='flex flex-1 flex-col items-center justify-center px-4'>
+            <div className='flex flex-1 flex-col items-center px-4'>
               <div
                 className={`${maxWidthClass} space-y-4 sm:space-y-5 md:space-y-6`}
               >
