@@ -119,7 +119,7 @@ export function ProfileContactHeader({
   const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
 
   return (
-    <div className='flex items-center gap-3'>
+    <div className='flex items-center gap-4'>
       <ProfileAvatar
         editable={editable}
         avatarUrl={avatarUrl}
@@ -175,7 +175,7 @@ function ProfileAvatar({
         src={avatarUrl}
         alt={avatarAlt}
         name={displayName}
-        size='lg'
+        size='xl'
         uploadable
         onUpload={onAvatarUpload}
         onError={message => {
