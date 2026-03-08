@@ -5,10 +5,12 @@ import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { TouringCityInfo } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 
-interface AudienceTableContextValue {
-  readonly selectedIds: Set<string>;
+/**
+ * Stable context: callbacks and functions that rarely change.
+ * Consumers of this context will NOT re-render on selection or menu toggle.
+ */
+interface AudienceTableStableContextValue {
   readonly toggleSelect: (id: string) => void;
-  readonly openMenuRowId: string | null;
   readonly setOpenMenuRowId: (id: string | null) => void;
   readonly getContextMenuItems: (
     member: AudienceMember
@@ -21,18 +23,55 @@ interface AudienceTableContextValue {
   readonly getTouringCity: (member: AudienceMember) => TouringCityInfo | null;
 }
 
-const AudienceTableContext = createContext<AudienceTableContextValue | null>(
-  null
-);
+/**
+ * Volatile context: frequently-changing state (selection + open menu).
+ * Only cells that truly depend on these values (SelectCell, LastSeenCell)
+ * subscribe here and re-render on changes.
+ */
+interface AudienceTableVolatileContextValue {
+  readonly selectedIds: Set<string>;
+  readonly openMenuRowId: string | null;
+}
 
-export function useAudienceTableContext(): AudienceTableContextValue {
-  const ctx = useContext(AudienceTableContext);
+const AudienceTableStableContext =
+  createContext<AudienceTableStableContextValue | null>(null);
+
+const AudienceTableVolatileContext =
+  createContext<AudienceTableVolatileContextValue | null>(null);
+
+export function useAudienceTableStableContext(): AudienceTableStableContextValue {
+  const ctx = useContext(AudienceTableStableContext);
   if (!ctx) {
     throw new Error(
-      'useAudienceTableContext must be used within AudienceTableProvider'
+      'useAudienceTableStableContext must be used within AudienceTableProviders'
     );
   }
   return ctx;
 }
 
-export const AudienceTableProvider = AudienceTableContext.Provider;
+export function useAudienceTableVolatileContext(): AudienceTableVolatileContextValue {
+  const ctx = useContext(AudienceTableVolatileContext);
+  if (!ctx) {
+    throw new Error(
+      'useAudienceTableVolatileContext must be used within AudienceTableProviders'
+    );
+  }
+  return ctx;
+}
+
+/**
+ * Convenience hook for the full context value (combines stable + volatile).
+ * Use the targeted hooks (useAudienceTableStableContext /
+ * useAudienceTableVolatileContext) when a cell only needs one slice so it
+ * avoids spurious re-renders from the other.
+ */
+export function useAudienceTableContext(): AudienceTableStableContextValue &
+  AudienceTableVolatileContextValue {
+  const stable = useAudienceTableStableContext();
+  const volatile = useAudienceTableVolatileContext();
+  return { ...stable, ...volatile };
+}
+
+export const AudienceTableStableProvider = AudienceTableStableContext.Provider;
+export const AudienceTableVolatileProvider =
+  AudienceTableVolatileContext.Provider;
