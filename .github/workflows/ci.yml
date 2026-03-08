@@ -747,9 +747,15 @@ jobs:
           fi
 
           # Helper: curl with standard options, returns "body\nstatus_code"
+          # Append a cache-busting query parameter to bypass Vercel CDN edge cache,
+          # ensuring post-deploy smoke tests always hit the origin server.
           fetch() {
-            curl -sS -L -A "$USER_AGENT" -H "Cache-Control: no-cache" \
-              "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$1" || echo -e "\n000"
+            local sep="?"
+            [[ "$1" == *"?"* ]] && sep="&"
+            curl -sS -L -A "$USER_AGENT" \
+              -H "Cache-Control: no-cache, no-store, must-revalidate" \
+              -H "Pragma: no-cache" \
+              "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${1}${sep}_cb=$(date +%s%N)" || echo -e "\n000"
           }
 
           # Helper: retry a check function with exponential backoff (max 5 attempts)
