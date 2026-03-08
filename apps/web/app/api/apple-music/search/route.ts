@@ -3,8 +3,6 @@ import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { CircuitOpenError } from '@/lib/dsp-enrichment/circuit-breakers';
 import {
-  AppleMusicError,
-  AppleMusicNotConfiguredError,
   extractImageUrls,
   isAppleMusicAvailable,
   searchArtist,
@@ -25,8 +23,6 @@ const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
-const SEARCH_MAX_RETRIES = 1;
-const SEARCH_BASE_DELAY_MS = 1000;
 
 interface AppleMusicArtistResult {
   id: string;
@@ -68,40 +64,6 @@ function parseLimit(
   const parsed = Number.parseInt(limitParam, 10);
   if (Number.isNaN(parsed) || parsed < 1) return defaultLimit;
   return Math.min(parsed, maxLimit);
-}
-
-function isRetryableSearchError(error: unknown): boolean {
-  if (error instanceof CircuitOpenError) return false;
-  if (error instanceof AppleMusicNotConfiguredError) return false;
-  if (error instanceof AppleMusicError) {
-    return error.statusCode !== 401 && error.statusCode !== 404;
-  }
-  return true;
-}
-
-function calculateRetryDelay(attempt: number): number {
-  const jitter =
-    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 0.3 + 0.85;
-  return SEARCH_BASE_DELAY_MS * Math.pow(2, attempt) * jitter;
-}
-
-async function searchArtistWithRetry(query: string, limit: number) {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt <= SEARCH_MAX_RETRIES; attempt++) {
-    try {
-      return await searchArtist(query, {}, limit);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (!isRetryableSearchError(error) || attempt >= SEARCH_MAX_RETRIES) {
-        throw lastError;
-      }
-      const delayMs = calculateRetryDelay(attempt);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
-  throw lastError ?? new Error('Apple Music search retry failed');
 }
 
 /**
@@ -175,7 +137,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const artists = await searchArtistWithRetry(q, limit);
+    const artists = await searchArtist(q, {}, limit);
 
     const results: AppleMusicArtistResult[] = artists.map(artist => {
       const images = extractImageUrls(artist.attributes?.artwork);
