@@ -26,9 +26,16 @@ const USER_STATE_CACHE_TTL_SECONDS = 120; // 2 minutes - transitional users (inv
 const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active users
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts.
-// Neon cold starts can regularly exceed 5s, so we use a slightly higher
-// timeout to reduce false-positive failures while keeping proxy latency bounded.
-const DB_QUERY_TIMEOUT_MS = 8000; // 8 seconds
+// Kept below the Neon p99 cold-start budget (~3 s) so that a single cache-miss
+// does not block authenticated navigations for more than ~3 s. Retries are
+// intentionally disabled for this query (maxRetries: 1) — retrying on timeout
+// compounds latency rather than reducing it.
+const DB_QUERY_TIMEOUT_MS = 3000; // 3 seconds
+
+// Timeout for Redis cache reads. Upstash REST calls are normally <50 ms but
+// can stall under network partitions; cap them so a Redis hiccup does not add
+// seconds to every authenticated page load.
+const REDIS_CACHE_TIMEOUT_MS = 500; // 500 ms
 
 // ---------------------------------------------------------------------------
 // In-memory cache layer
@@ -98,7 +105,13 @@ async function tryGetCachedState(
 
   try {
     const cacheStart = Date.now();
-    const cached = await redis.get<ProxyUserState>(cacheKey);
+    const redisTimeoutPromise = new Promise<null>(resolve => {
+      setTimeout(() => resolve(null), REDIS_CACHE_TIMEOUT_MS);
+    });
+    const cached = await Promise.race([
+      redis.get<ProxyUserState>(cacheKey),
+      redisTimeoutPromise,
+    ]);
     const cacheDuration = Date.now() - cacheStart;
 
     if (cached) {
@@ -262,55 +275,61 @@ const ACTIVE_USER_STATE: ProxyUserState = {
  * distinguish transient timeouts from other failures.
  */
 async function executeUserStateQuery(clerkUserId: string) {
-  return withRetry(async () => {
-    let timeoutId: ReturnType<typeof setTimeout>;
-    const queryPromise = db
-      .select({
-        dbUserId: users.id,
-        userStatus: users.userStatus,
-        profileId: creatorProfiles.id,
-        profileComplete: creatorProfiles.onboardingCompletedAt,
-        profileUsername: creatorProfiles.username,
-        profileUsernameNormalized: creatorProfiles.usernameNormalized,
-        profileDisplayName: creatorProfiles.displayName,
-        profileAvatarUrl: creatorProfiles.avatarUrl,
-        profileIsPublic: creatorProfiles.isPublic,
-      })
-      .from(users)
-      .leftJoin(
-        creatorProfiles,
-        and(
-          eq(creatorProfiles.userId, users.id),
-          eq(creatorProfiles.isClaimed, true)
+  return withRetry(
+    async () => {
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const queryPromise = db
+        .select({
+          dbUserId: users.id,
+          userStatus: users.userStatus,
+          profileId: creatorProfiles.id,
+          profileComplete: creatorProfiles.onboardingCompletedAt,
+          profileUsername: creatorProfiles.username,
+          profileUsernameNormalized: creatorProfiles.usernameNormalized,
+          profileDisplayName: creatorProfiles.displayName,
+          profileAvatarUrl: creatorProfiles.avatarUrl,
+          profileIsPublic: creatorProfiles.isPublic,
+        })
+        .from(users)
+        .leftJoin(
+          creatorProfiles,
+          and(
+            eq(creatorProfiles.userId, users.id),
+            eq(creatorProfiles.isClaimed, true)
+          )
         )
-      )
-      .where(
-        and(
-          eq(users.clerkId, clerkUserId),
-          isNull(users.deletedAt),
-          ne(users.userStatus, 'banned')
+        .where(
+          and(
+            eq(users.clerkId, clerkUserId),
+            isNull(users.deletedAt),
+            ne(users.userStatus, 'banned')
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(
-        () =>
-          reject(
-            new QueryTimeoutError(
-              `[proxy-state] DB query timed out after ${DB_QUERY_TIMEOUT_MS}ms`
-            )
-          ),
-        DB_QUERY_TIMEOUT_MS
-      );
-    });
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () =>
+            reject(
+              new QueryTimeoutError(
+                `[proxy-state] DB query timed out after ${DB_QUERY_TIMEOUT_MS}ms`
+              )
+            ),
+          DB_QUERY_TIMEOUT_MS
+        );
+      });
 
-    try {
-      return await Promise.race([queryPromise, timeoutPromise]);
-    } finally {
-      clearTimeout(timeoutId!);
-    }
-  }, 'proxy_user_state_query');
+      try {
+        return await Promise.race([queryPromise, timeoutPromise]);
+      } finally {
+        clearTimeout(timeoutId!);
+      }
+      // maxRetries: 1 disables retries for proxy state — retrying a timed-out DB
+      // query compounds latency. Failures fall through to DEFAULT_WAITLIST_STATE.
+    },
+    'proxy_user_state_query',
+    1
+  );
 }
 
 /**
