@@ -10,6 +10,7 @@ import 'server-only';
 import { CircuitBreaker } from '@/lib/spotify/circuit-breaker';
 
 export const musicfetchCircuitBreaker = new CircuitBreaker({
+  name: 'musicfetch',
   failureThreshold: 5, // Open after 5 failures (conservative for lower rate limits)
   resetTimeout: 90_000, // Try again after 90 seconds
   successThreshold: 2, // Need 2 successes to close
