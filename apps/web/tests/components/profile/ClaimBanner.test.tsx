@@ -105,7 +105,10 @@ describe('ClaimBanner', () => {
 
       const cta = screen.getByTestId('claim-banner-cta');
       // ClaimBanner no longer includes a claim token — it directs to signup
-      expect(cta).toHaveAttribute('href', '/signup?redirect_url=%2Ftestartist');
+      expect(cta).toHaveAttribute(
+        'href',
+        '/signup?handle=testartist&redirect_url=%2Ftestartist'
+      );
     });
 
     it('generates signup URL while loading', () => {
@@ -114,7 +117,10 @@ describe('ClaimBanner', () => {
       render(<ClaimBanner {...defaultProps} />);
 
       const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute('href', '/signup?redirect_url=%2Ftestartist');
+      expect(cta).toHaveAttribute(
+        'href',
+        '/signup?handle=testartist&redirect_url=%2Ftestartist'
+      );
     });
   });
 

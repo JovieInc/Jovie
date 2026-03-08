@@ -2,22 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import ClaimPage from '../../../../../app/[username]/claim/page';
 
-const {
-  mockNoStore,
-  mockNotFound,
-  mockGetProfileByUsername,
-  mockIsClaimTokenValid,
-} = vi.hoisted(() => ({
-  mockNoStore: vi.fn(),
+const { mockNotFound, mockGetProfileByUsername } = vi.hoisted(() => ({
   mockNotFound: vi.fn(() => {
     throw new Error('NOT_FOUND');
   }),
   mockGetProfileByUsername: vi.fn(),
-  mockIsClaimTokenValid: vi.fn(),
-}));
-
-vi.mock('next/cache', () => ({
-  unstable_noStore: mockNoStore,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -26,7 +15,6 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: mockGetProfileByUsername,
-  isClaimTokenValid: mockIsClaimTokenValid,
 }));
 
 describe('ClaimPage', () => {
@@ -34,19 +22,19 @@ describe('ClaimPage', () => {
     vi.clearAllMocks();
   });
 
-  it('calls noStore so claim pages always bypass route cache', async () => {
-    mockIsClaimTokenValid.mockResolvedValue(true);
+  it('loads profile by lowercase username without validating a token', async () => {
     mockGetProfileByUsername.mockResolvedValue({
+      id: 'profile_1',
       username: 'testartist',
       displayName: 'Test Artist',
       avatarUrl: null,
     });
 
     await ClaimPage({
-      params: Promise.resolve({ username: 'testartist' }),
-      searchParams: Promise.resolve({ token: 'abc123' }),
+      params: Promise.resolve({ username: 'TestArtist' }),
     });
 
-    expect(mockNoStore).toHaveBeenCalledTimes(1);
+    expect(mockGetProfileByUsername).toHaveBeenCalledWith('testartist');
+    expect(mockNotFound).not.toHaveBeenCalled();
   });
 });
