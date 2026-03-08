@@ -12,6 +12,18 @@ export interface UseRowSelectionResult {
   toggleSelectAll: () => void;
   clearSelection: () => void;
   setSelection: (ids: Set<string>) => void;
+  /**
+   * Select a contiguous range of rows between two indices (inclusive).
+   * Used for shift+click range selection.
+   * @param fromIndex - Start of the range (the anchor row)
+   * @param toIndex   - End of the range (the clicked row)
+   * @param allRowIds - Ordered list of all visible row IDs
+   */
+  rangeSelect: (
+    fromIndex: number,
+    toIndex: number,
+    allRowIds: string[]
+  ) => void;
 }
 
 export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
@@ -77,6 +89,22 @@ export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
     setSelectedIds(ids);
   }, []);
 
+  const rangeSelect = useCallback(
+    (fromIndex: number, toIndex: number, allRowIds: string[]) => {
+      const start = Math.min(fromIndex, toIndex);
+      const end = Math.max(fromIndex, toIndex);
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        for (let i = start; i <= end; i++) {
+          const id = allRowIds[i];
+          if (id !== undefined) next.add(id);
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   return {
     selectedIds,
     selectedCount,
@@ -85,5 +113,6 @@ export function useRowSelection(rowIds: string[]): UseRowSelectionResult {
     toggleSelectAll,
     clearSelection,
     setSelection,
+    rangeSelect,
   };
 }

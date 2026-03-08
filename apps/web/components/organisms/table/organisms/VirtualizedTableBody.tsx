@@ -95,6 +95,13 @@ export interface VirtualizedTableBodyProps<TData> {
   readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
+   * Called when the row is shift-clicked (for range selection).
+   * @param rowIndex - The index of the clicked row
+   * @param rowData  - The data of the clicked row
+   */
+  readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
+
+  /**
    * Custom row renderer
    */
   readonly renderRow?: (row: TData, index: number) => React.ReactNode;
@@ -164,6 +171,7 @@ export function VirtualizedTableBody<TData>({
   onRowClick,
   onRowContextMenu,
   onKeyDown,
+  onRowShiftClick,
   getContextMenuItems,
   getRowClassName,
   renderRow,
@@ -238,6 +246,7 @@ export function VirtualizedTableBody<TData>({
             onFocusChange={onFocusChange}
             getRowClassName={getRowClassName}
             measureElement={rowVirtualizer?.measureElement}
+            onRowShiftClick={onRowShiftClick}
           />
         );
 

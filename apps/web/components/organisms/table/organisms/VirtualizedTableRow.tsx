@@ -23,6 +23,13 @@ export interface VirtualizedTableRowProps<TData> {
   readonly onFocusChange: (index: number) => void;
   readonly getRowClassName?: (row: TData, index: number) => string;
   readonly measureElement?: (el: HTMLTableRowElement | null) => void;
+  /**
+   * Called when the row is shift-clicked.
+   * The parent is responsible for computing the range and updating selection.
+   * @param rowIndex - The index of the clicked row
+   * @param rowData  - The data of the clicked row
+   */
+  readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
 }
 
 /**
@@ -34,6 +41,7 @@ export interface VirtualizedTableRowProps<TData> {
  * - Keyboard navigation support
  * - Context menu support
  * - Dynamic row measurement for variable heights
+ * - Shift+click range selection support
  *
  * This component is used internally by UnifiedTable and VirtualizedTableBody
  * to render individual table rows with optimal performance.
@@ -52,13 +60,22 @@ function VirtualizedTableRowComponent<TData>({
   onFocusChange,
   getRowClassName,
   measureElement,
+  onRowShiftClick,
 }: VirtualizedTableRowProps<TData>) {
   const rowData = row.original as TData;
 
-  const handleClick = useCallback(() => {
-    onRowClick?.(rowData);
-    onFocusChange(rowIndex);
-  }, [onRowClick, rowData, onFocusChange, rowIndex]);
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.shiftKey && onRowShiftClick) {
+        e.preventDefault();
+        onRowShiftClick(rowIndex, rowData);
+      } else {
+        onRowClick?.(rowData);
+      }
+      onFocusChange(rowIndex);
+    },
+    [onRowClick, onRowShiftClick, rowData, onFocusChange, rowIndex]
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => onKeyDown(e, rowIndex, rowData),
