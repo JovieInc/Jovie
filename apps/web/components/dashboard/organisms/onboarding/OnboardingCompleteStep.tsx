@@ -52,11 +52,11 @@ export function OnboardingCompleteStep({
                   style={{ width: `${((spotifyImportStage + 1) / 3) * 100}%` }}
                 />
               </div>
-              <span className='text-xs text-secondary-token'>
+              <span className='text-[11px] text-secondary-token'>
                 {spotifyImportStage + 1}/3
               </span>
             </div>
-            <p className='text-center text-sm text-secondary-token'>
+            <p className='text-center text-[13px] text-secondary-token'>
               {spotifyImportMessage}
             </p>
           </div>

@@ -160,7 +160,7 @@ export function OnboardingDspStep({
             </div>
 
             {state.showResults && results.length > 0 && (
-              <ul className='absolute left-0 right-0 top-full z-10 mt-1 max-h-[240px] overflow-y-auto rounded-lg border border-subtle bg-surface-1 shadow-lg'>
+              <ul className='absolute left-0 right-0 top-full z-10 mt-1 max-h-[240px] overflow-y-auto rounded-lg border border-subtle bg-surface-1 shadow-card-elevated'>
                 {results.map((artist, index) => (
                   <li key={artist.id}>
                     <button
@@ -192,11 +192,11 @@ export function OnboardingDspStep({
                         <div className='h-8 w-8 shrink-0 rounded-full bg-surface-2' />
                       )}
                       <div className='min-w-0 flex-1'>
-                        <p className='truncate text-sm font-medium text-primary-token'>
+                        <p className='truncate text-[13px] font-[510] text-primary-token'>
                           {artist.name}
                         </p>
                         {artist.followers != null && (
-                          <p className='text-xs text-secondary-token'>
+                          <p className='text-[11px] text-secondary-token'>
                             {artist.followers.toLocaleString()} followers
                           </p>
                         )}
@@ -209,7 +209,7 @@ export function OnboardingDspStep({
           </div>
 
           {state.error && (
-            <p className='text-error text-sm text-center'>{state.error}</p>
+            <p className='text-error text-[13px] text-center'>{state.error}</p>
           )}
 
           <AuthButton

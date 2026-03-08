@@ -101,10 +101,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         >
           <div className='flex items-center justify-between'>
             <div className='flex flex-col'>
-              <span className='text-sm font-medium text-primary-token'>
+              <span className='text-[13px] font-[510] text-primary-token'>
                 Show Jovie branding
               </span>
-              <span className='text-xs text-secondary-token'>
+              <span className='text-[11px] text-secondary-token'>
                 Display Jovie branding on your profile
               </span>
             </div>
@@ -160,7 +160,9 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           className='bg-green-500/10 border border-green-500/20 rounded-lg p-3 block'
           aria-live='polite'
         >
-          <p className='text-sm text-success'>Profile updated successfully!</p>
+          <p className='text-[13px] text-success'>
+            Profile updated successfully!
+          </p>
         </output>
       )}
     </form>

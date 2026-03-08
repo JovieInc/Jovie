@@ -40,7 +40,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-[13px] font-medium text-tertiary-token'>
+      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-[13px] font-[510] text-tertiary-token'>
         Past
       </span>
     );
@@ -49,19 +49,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-[13px] font-medium text-warning'>
+        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-[13px] font-[510] text-warning'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-[13px] font-medium text-error'>
+        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-[13px] font-[510] text-error'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-[13px] font-medium text-success'>
+        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-[13px] font-[510] text-success'>
           On Sale
         </span>
       );
@@ -77,7 +77,7 @@ const DateCell = memo(function DateCell({
 }) {
   return (
     <div className='flex flex-col'>
-      <span className='font-medium text-primary-token'>
+      <span className='font-[510] text-primary-token'>
         {formatShortDate(startDate)}
       </span>
       {startTime && (
@@ -137,7 +137,7 @@ const TicketsCell = memo(function TicketsCell({
       aria-label='Buy tickets (opens in new tab)'
     >
       <Icon name='Ticket' className='h-4 w-4' aria-hidden='true' />
-      <span className='text-sm'>Buy</span>
+      <span className='text-[13px]'>Buy</span>
     </a>
   );
 });
@@ -389,10 +389,10 @@ export function TourDatesTable({
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       className='text-[13px]'
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
           <Icon name='Calendar' className='h-6 w-6' />
           <div>
-            <div className='font-medium'>No tour dates</div>
+            <div className='font-[510]'>No tour dates</div>
             <div className='text-[13px]'>
               Add your first tour date to get started.
             </div>

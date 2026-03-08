@@ -175,7 +175,7 @@ export function OnboardingHandleStep({
   function renderValidationStatus(): React.ReactNode {
     if (autoSubmitClaimed && handleInput) {
       return (
-        <div className='text-success text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+        <div className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
           @{handleInput} claimed.
         </div>
       );
@@ -187,7 +187,7 @@ export function OnboardingHandleStep({
     if (handleValidation.clientValid && handleValidation.available) return null;
     if (handleValidation.error) {
       return (
-        <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+        <div className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
           Not available
         </div>
       );
@@ -203,10 +203,10 @@ export function OnboardingHandleStep({
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
           {isReservedHandle ? (
             <div className='flex flex-col items-center gap-2 rounded-2xl border border-subtle bg-surface-1 px-5 py-5 text-center mt-4'>
-              <p className='text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'>
+              <p className='text-2xl font-[590] tracking-[-0.022em] text-primary-token sm:text-3xl'>
                 @{handleInput}
               </p>
-              <p className='text-sm text-secondary-token'>
+              <p className='text-[13px] text-secondary-token'>
                 We reserved this for you. Edit below if you prefer something
                 else.
               </p>
@@ -225,7 +225,7 @@ export function OnboardingHandleStep({
                   : 'border-subtle',
               ].join(' ')}
             >
-              <span className='text-sm text-secondary-token whitespace-nowrap'>
+              <span className='text-[13px] text-secondary-token whitespace-nowrap'>
                 @
               </span>
               <input
@@ -279,7 +279,7 @@ export function OnboardingHandleStep({
                         ? onSuggestionClick(suggestion)
                         : onHandleChange(suggestion)
                     }
-                    className='rounded-full border border-subtle px-3 py-1 text-xs text-secondary-token hover:text-primary-token hover:border-accent transition-colors'
+                    className='rounded-full border border-subtle px-3 py-1 text-[11px] text-secondary-token hover:text-primary-token hover:border-accent transition-colors'
                   >
                     @{suggestion}
                   </button>
