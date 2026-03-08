@@ -601,11 +601,35 @@ export async function refreshRelease(params: { releaseId: string }): Promise<{
     };
   }
 
+  if (profile.spotifyId) {
+    // Trigger a fresh Spotify sync and MusicFetch enrichment so refresh actions
+    // re-ingest live upstream data instead of only returning cached DB rows.
+    await syncReleasesFromSpotify(profile.id);
+
+    void Promise.resolve(
+      enqueueMusicFetchEnrichmentJob({
+        creatorProfileId: profile.id,
+        spotifyUrl: `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`,
+      })
+    ).catch(error => {
+      void captureError(
+        'MusicFetch enrichment enqueue failed on refresh',
+        error,
+        {
+          action: 'refreshRelease',
+          creatorProfileId: profile.id,
+          releaseId: params.releaseId,
+        }
+      );
+    });
+  }
+
+  const refreshedRelease = await getReleaseById(params.releaseId);
   const providerLabels = buildProviderLabels();
 
   return {
     release: mapReleaseToViewModel(
-      release,
+      refreshedRelease ?? release,
       providerLabels,
       profile.id,
       profile.handle
@@ -885,10 +909,12 @@ export async function syncFromSpotify(): Promise<{
 
     // Re-trigger MusicFetch enrichment to discover cross-platform DSP profiles
     // This populates Deezer, Tidal, SoundCloud, YouTube Music IDs on the profile
-    void enqueueMusicFetchEnrichmentJob({
-      creatorProfileId: profile.id,
-      spotifyUrl: `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`,
-    }).catch(error => {
+    void Promise.resolve(
+      enqueueMusicFetchEnrichmentJob({
+        creatorProfileId: profile.id,
+        spotifyUrl: `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`,
+      })
+    ).catch(error => {
       void captureError('MusicFetch enrichment enqueue failed on sync', error, {
         action: 'syncFromSpotify',
         creatorProfileId: profile.id,

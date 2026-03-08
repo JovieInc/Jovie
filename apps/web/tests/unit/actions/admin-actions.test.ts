@@ -11,9 +11,7 @@ const {
   mockDbDelete,
   mockRevalidatePath,
   mockInvalidateProfileCache,
-  mockEnqueueLinktreeIngestionJob,
-  mockWithSystemIngestionSession,
-  mockIngestionStatusManagerMarkPendingBulk,
+  mockEnqueueMusicFetchEnrichmentJob,
 } = vi.hoisted(() => ({
   mockGetCachedAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
@@ -22,9 +20,7 @@ const {
   mockDbDelete: vi.fn(),
   mockRevalidatePath: vi.fn(),
   mockInvalidateProfileCache: vi.fn(),
-  mockEnqueueLinktreeIngestionJob: vi.fn(),
-  mockWithSystemIngestionSession: vi.fn(),
-  mockIngestionStatusManagerMarkPendingBulk: vi.fn(),
+  mockEnqueueMusicFetchEnrichmentJob: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -47,21 +43,7 @@ vi.mock('next/cache', () => ({
 }));
 
 vi.mock('@/lib/ingestion/jobs', () => ({
-  enqueueLinktreeIngestionJob: mockEnqueueLinktreeIngestionJob,
-}));
-
-vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: mockWithSystemIngestionSession,
-}));
-
-vi.mock('@/lib/ingestion/status-manager', () => ({
-  IngestionStatusManager: {
-    markPendingBulk: mockIngestionStatusManagerMarkPendingBulk,
-  },
-}));
-
-vi.mock('@/lib/utils/platform-detection', () => ({
-  normalizeUrl: (url: string) => url,
+  enqueueMusicFetchEnrichmentJob: mockEnqueueMusicFetchEnrichmentJob,
 }));
 
 vi.mock('@/constants/routes', () => ({
@@ -289,25 +271,21 @@ describe('admin/actions.ts', () => {
   describe('bulkRerunCreatorIngestionAction', () => {
     it('enqueues ingestion jobs for profiles', async () => {
       const profiles = [
-        { id: 'p1', username: 'user1', usernameNormalized: 'user1' },
-        { id: 'p2', username: 'user2', usernameNormalized: 'user2' },
+        {
+          id: 'p1',
+          spotifyId: 'spotify-1',
+          spotifyUrl: 'https://open.spotify.com/artist/spotify-1',
+        },
+        {
+          id: 'p2',
+          spotifyId: 'spotify-2',
+          spotifyUrl: 'https://open.spotify.com/artist/spotify-2',
+        },
       ];
 
-      mockWithSystemIngestionSession.mockImplementation(
-        async (fn: (tx: unknown) => Promise<number>) => {
-          const mockTx = {
-            select: vi.fn().mockReturnValue({
-              from: vi.fn().mockReturnValue({
-                where: vi.fn().mockResolvedValue(profiles),
-              }),
-            }),
-          };
-          return fn(mockTx);
-        }
-      );
+      createSelectChain(profiles);
 
-      mockEnqueueLinktreeIngestionJob.mockResolvedValue('job-id');
-      mockIngestionStatusManagerMarkPendingBulk.mockResolvedValue(undefined);
+      mockEnqueueMusicFetchEnrichmentJob.mockResolvedValue('job-id');
 
       const { bulkRerunCreatorIngestionAction } = await import(
         '@/app/app/(shell)/admin/actions'
@@ -320,7 +298,7 @@ describe('admin/actions.ts', () => {
       const result = await bulkRerunCreatorIngestionAction(fd);
 
       expect(result).toEqual({ queuedCount: 2 });
-      expect(mockEnqueueLinktreeIngestionJob).toHaveBeenCalledTimes(2);
+      expect(mockEnqueueMusicFetchEnrichmentJob).toHaveBeenCalledTimes(2);
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 

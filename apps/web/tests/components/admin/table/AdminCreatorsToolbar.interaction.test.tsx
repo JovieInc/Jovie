@@ -60,6 +60,7 @@ function renderToolbar(
     onBulkVerify: vi.fn(),
     onBulkUnverify: vi.fn(),
     onBulkFeature: vi.fn(),
+    onBulkRefreshMusicFetch: vi.fn(),
     onBulkDelete: vi.fn(),
     onClearSelection: vi.fn(),
   };
@@ -94,6 +95,9 @@ describe('AdminCreatorsToolbar interactions', () => {
     expect(screen.getByText('2 creators selected')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Verify' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Feature' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Refresh Music Data' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
 
@@ -120,11 +124,15 @@ describe('AdminCreatorsToolbar interactions', () => {
 
     await user.click(screen.getByRole('button', { name: 'Verify' }));
     await user.click(screen.getByRole('button', { name: 'Feature' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Refresh Music Data' })
+    );
     await user.click(screen.getByRole('button', { name: 'Delete' }));
     await user.click(screen.getByRole('button', { name: 'Clear Selection' }));
 
     expect(handlers.onBulkVerify).toHaveBeenCalledTimes(1);
     expect(handlers.onBulkFeature).toHaveBeenCalledTimes(1);
+    expect(handlers.onBulkRefreshMusicFetch).toHaveBeenCalledTimes(1);
     expect(handlers.onBulkDelete).toHaveBeenCalledTimes(1);
     expect(handlers.onClearSelection).toHaveBeenCalledTimes(1);
   });
