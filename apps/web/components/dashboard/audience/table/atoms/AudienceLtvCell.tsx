@@ -10,6 +10,10 @@ export interface AudienceLtvCellProps {
   readonly tipCount: number;
   readonly visits: number;
   readonly engagementScore: number;
+  readonly streamingClicks?: number;
+  readonly tipClickValueCents?: number;
+  readonly merchSalesCents?: number;
+  readonly ticketSalesCents?: number;
   readonly className?: string;
 }
 
@@ -28,8 +32,7 @@ const TIER_ICON_STYLES = {
 } as const;
 
 function formatDollars(cents: number): string {
-  const dollars = cents / 100;
-  return dollars.toLocaleString('en-US', {
+  return (cents / 100).toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 0,
@@ -43,26 +46,36 @@ function LtvTooltipContent({
   readonly breakdown: LtvBreakdown;
 }) {
   return (
-    <div className='flex flex-col gap-1.5 text-[12px]'>
-      <div className='font-medium text-primary-token'>Lifetime Value</div>
-      <div className='flex justify-between gap-4'>
-        <span className='text-tertiary-token'>Tip total</span>
-        <span className='text-secondary-token'>
-          {formatDollars(breakdown.tipTotalDollars * 100)}
+    <div className='flex min-w-56 flex-col gap-1.5 text-[12px]'>
+      <div className='flex items-center justify-between gap-4 border-b border-subtle pb-1.5'>
+        <span className='font-medium text-primary-token'>Lifetime Value</span>
+        <span className='font-medium text-primary-token'>
+          {formatDollars(breakdown.totalValueCents)}
         </span>
       </div>
       <div className='flex justify-between gap-4'>
-        <span className='text-tertiary-token'>Tips sent</span>
-        <span className='text-secondary-token'>{breakdown.tipCount}</span>
-      </div>
-      <div className='flex justify-between gap-4'>
-        <span className='text-tertiary-token'>Visits</span>
-        <span className='text-secondary-token'>{breakdown.visits}</span>
-      </div>
-      <div className='flex justify-between gap-4'>
-        <span className='text-tertiary-token'>Engagement</span>
+        <span className='text-tertiary-token'>Streaming clicks</span>
         <span className='text-secondary-token'>
-          {breakdown.engagementScore}
+          {breakdown.streamingClicks} ·{' '}
+          {formatDollars(breakdown.streamingValueCents)}
+        </span>
+      </div>
+      <div className='flex justify-between gap-4'>
+        <span className='text-tertiary-token'>Tips</span>
+        <span className='text-secondary-token'>
+          {breakdown.tipCount} · {formatDollars(breakdown.tipClickValueCents)}
+        </span>
+      </div>
+      <div className='flex justify-between gap-4'>
+        <span className='text-tertiary-token'>Merch sales</span>
+        <span className='text-secondary-token'>
+          {formatDollars(breakdown.merchSalesCents)}
+        </span>
+      </div>
+      <div className='flex justify-between gap-4'>
+        <span className='text-tertiary-token'>Ticket sales</span>
+        <span className='text-secondary-token'>
+          {formatDollars(breakdown.ticketSalesCents)}
         </span>
       </div>
     </div>
@@ -74,6 +87,10 @@ export function AudienceLtvCell({
   tipCount,
   visits,
   engagementScore,
+  streamingClicks,
+  tipClickValueCents,
+  merchSalesCents,
+  ticketSalesCents,
   className,
 }: AudienceLtvCellProps) {
   const breakdown = calculateLtv({
@@ -81,6 +98,10 @@ export function AudienceLtvCell({
     tipCount,
     visits,
     engagementScore,
+    streamingClicks: streamingClicks ?? 0,
+    tipClickValueCents: tipClickValueCents ?? 0,
+    merchSalesCents: merchSalesCents ?? 0,
+    ticketSalesCents: ticketSalesCents ?? 0,
   });
 
   const content = (

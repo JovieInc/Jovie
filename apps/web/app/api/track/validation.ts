@@ -45,6 +45,8 @@ export interface TrackClickContext {
   contentId?: string;
   provider?: string;
   smartLinkSlug?: string;
+  tipAmount?: number;
+  tipAmountCents?: number;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
@@ -206,6 +208,17 @@ function normalizeContext(context: unknown): TrackClickContext | undefined {
     raw.smartLinkSlug.trim().length > 0
   ) {
     normalized.smartLinkSlug = raw.smartLinkSlug.trim();
+  }
+
+  if (
+    typeof raw.tipAmountCents === 'number' &&
+    Number.isFinite(raw.tipAmountCents)
+  ) {
+    normalized.tipAmountCents = Math.max(0, Math.round(raw.tipAmountCents));
+  }
+
+  if (typeof raw.tipAmount === 'number' && Number.isFinite(raw.tipAmount)) {
+    normalized.tipAmount = Math.max(0, raw.tipAmount);
   }
 
   return Object.keys(normalized).length > 0 ? normalized : undefined;

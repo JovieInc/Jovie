@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { audienceMembers } from '@/lib/db/schema/analytics';
+import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -134,6 +134,31 @@ export async function GET(request: NextRequest) {
           tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
             'tip_count'
           ),
+          ltvStreamingClicks: drizzleSql<number>`(
+            SELECT COALESCE(COUNT(*), 0)
+            FROM ${clickEvents}
+            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+              AND ${clickEvents.linkType} = 'listen'
+              AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+          )`.as('ltv_streaming_clicks'),
+          ltvTipClickValueCents: drizzleSql<number>`(
+            SELECT COALESCE(
+              SUM(
+                CASE
+                  WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+                    THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
+                  ELSE 0
+                END
+              ),
+              0
+            )
+            FROM ${clickEvents}
+            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+          )`.as('ltv_tip_click_value_cents'),
+          ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
+          ltvTicketSalesCents: drizzleSql<number>`0`.as(
+            'ltv_ticket_sales_cents'
+          ),
           tags: audienceMembers.tags,
           lastSeenAt: audienceMembers.lastSeenAt,
           createdAt: audienceMembers.firstSeenAt,
@@ -193,6 +218,10 @@ export async function GET(request: NextRequest) {
         purchaseCount: member.purchaseCount,
         tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
         tipCount: member.tipCount ?? 0,
+        ltvStreamingClicks: member.ltvStreamingClicks ?? 0,
+        ltvTipClickValueCents: member.ltvTipClickValueCents ?? 0,
+        ltvMerchSalesCents: member.ltvMerchSalesCents ?? 0,
+        ltvTicketSalesCents: member.ltvTicketSalesCents ?? 0,
         tags: Array.isArray(member.tags) ? member.tags : [],
         lastSeenAt: serializeDate(member.lastSeenAt),
         createdAt: serializeDate(member.createdAt),

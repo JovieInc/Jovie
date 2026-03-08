@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   audienceMembers,
+  clickEvents,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -125,6 +126,10 @@ function transformMemberRow(member: {
   purchaseCount: number;
   tipAmountTotalCents: number | null;
   tipCount: number | null;
+  ltvStreamingClicks: number | null;
+  ltvTipClickValueCents: number | null;
+  ltvMerchSalesCents: number | null;
+  ltvTicketSalesCents: number | null;
   tags: string[] | null;
   lastSeenAt: Date;
 }): AudienceServerRow {
@@ -147,6 +152,10 @@ function transformMemberRow(member: {
     purchaseCount: member.purchaseCount,
     tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
     tipCount: member.tipCount ?? 0,
+    ltvStreamingClicks: member.ltvStreamingClicks ?? 0,
+    ltvTipClickValueCents: member.ltvTipClickValueCents ?? 0,
+    ltvMerchSalesCents: member.ltvMerchSalesCents ?? 0,
+    ltvTicketSalesCents: member.ltvTicketSalesCents ?? 0,
     tags: Array.isArray(member.tags) ? member.tags : [],
     deviceType: member.deviceType,
     lastSeenAt: toISOStringOrNull(member.lastSeenAt),
@@ -263,6 +272,29 @@ function buildMemberSelectFields(includeDetails: boolean) {
     tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
       'tip_count'
     ),
+    ltvStreamingClicks: drizzleSql<number>`(
+      SELECT COALESCE(COUNT(*), 0)
+      FROM ${clickEvents}
+      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+        AND ${clickEvents.linkType} = 'listen'
+        AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+    )`.as('ltv_streaming_clicks'),
+    ltvTipClickValueCents: drizzleSql<number>`(
+      SELECT COALESCE(
+        SUM(
+          CASE
+            WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+              THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
+            ELSE 0
+          END
+        ),
+        0
+      )
+      FROM ${clickEvents}
+      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+    )`.as('ltv_tip_click_value_cents'),
+    ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
+    ltvTicketSalesCents: drizzleSql<number>`0`.as('ltv_ticket_sales_cents'),
     tags: audienceMembers.tags,
     lastSeenAt: audienceMembers.lastSeenAt,
   };
@@ -488,6 +520,10 @@ async function fetchSubscribersData(
       purchaseCount: 0,
       tipAmountTotalCents: 0,
       tipCount: 0,
+      ltvStreamingClicks: 0,
+      ltvTipClickValueCents: 0,
+      ltvMerchSalesCents: 0,
+      ltvTicketSalesCents: 0,
       tags: [],
       deviceType: null,
       lastSeenAt: createdAt,
