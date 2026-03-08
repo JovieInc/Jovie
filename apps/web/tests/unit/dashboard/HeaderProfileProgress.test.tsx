@@ -61,15 +61,17 @@ describe('HeaderProfileProgress', () => {
     expect(getByText('80%')).toBeDefined();
   });
 
-  it('uses accent semantic tokens for progress ring gradient', () => {
+  it('uses design token classes for compact ring styling', () => {
     const { container } = renderProgress();
 
-    const stops = container.querySelectorAll('linearGradient stop');
-    expect(stops).toHaveLength(2);
-    expect(stops[0]?.getAttribute('stop-color')).toBe('var(--color-accent)');
-    expect(stops[1]?.getAttribute('stop-color')).toBe(
-      'var(--color-accent-hover)'
-    );
+    const svg = container.querySelector('svg');
+    expect(svg?.getAttribute('width')).toBe('20');
+    expect(svg?.getAttribute('height')).toBe('20');
+
+    const circles = container.querySelectorAll('circle');
+    expect(circles).toHaveLength(2);
+    expect(circles[0]?.getAttribute('class')).toContain('text-border-subtle');
+    expect(circles[1]?.getAttribute('class')).toContain('text-accent');
   });
 
   it('returns null when completionPercentage >= 100', () => {
@@ -80,8 +82,7 @@ describe('HeaderProfileProgress', () => {
       },
     });
 
-    const stops = container.querySelectorAll('linearGradient stop');
-    expect(stops).toHaveLength(0);
+    expect(container.querySelector('svg')).toBeNull();
     expect(container.querySelector('button')).toBeNull();
   });
 
