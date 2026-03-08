@@ -26,7 +26,7 @@ export function CategorySection({
       )}
     >
       <div className='flex items-center justify-between'>
-        <h3 className='text-[11px] font-semibold tracking-wider text-secondary-token'>
+        <h3 className='text-[11px] font-[510] tracking-[0.08em] text-secondary-token'>
           {title}
         </h3>
       </div>

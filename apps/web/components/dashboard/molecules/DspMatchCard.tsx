@@ -88,8 +88,8 @@ export function DspMatchCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-subtle bg-surface-1 p-4 shadow-sm',
-        'transition-shadow hover:shadow-md',
+        'rounded-xl border border-subtle bg-surface-1 p-4 shadow-card',
+        'transition-shadow hover:shadow-card-elevated',
         className
       )}
     >
@@ -117,7 +117,7 @@ export function DspMatchCard({
           {/* Artist Info */}
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <span className='truncate font-medium text-primary-token'>
+              <span className='truncate font-[510] text-primary-token'>
                 {externalArtistName}
               </span>
               {externalArtistUrl && (
@@ -132,7 +132,7 @@ export function DspMatchCard({
                 </a>
               )}
             </div>
-            <div className='mt-0.5 flex items-center gap-2 text-xs text-tertiary-token'>
+            <div className='mt-0.5 flex items-center gap-2 text-[13px] text-tertiary-token'>
               <DspProviderIcon provider={providerId} size='sm' />
               <span>{PROVIDER_LABELS[providerId]}</span>
               <span className='text-tertiary-token/50'>•</span>
@@ -154,7 +154,7 @@ export function DspMatchCard({
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex w-full items-center justify-between text-xs text-tertiary-token transition-colors hover:text-secondary-token'
+            className='flex w-full items-center justify-between text-[13px] text-tertiary-token transition-colors hover:text-secondary-token'
           >
             <span>Confidence breakdown</span>
             <Icon
@@ -183,7 +183,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onReject(matchId)}
               disabled={isLoading}
-              className='text-xs'
+              className='text-[13px]'
             >
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Button>
@@ -194,7 +194,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onConfirm(matchId)}
               disabled={isLoading}
-              className='text-xs'
+              className='text-[13px]'
             >
               {isConfirming ? 'Confirming...' : 'Confirm Match'}
             </Button>

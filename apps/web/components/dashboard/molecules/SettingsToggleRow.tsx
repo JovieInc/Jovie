@@ -46,7 +46,7 @@ export function SettingsToggleRow({
         <h3
           id={titleId}
           className={cn(
-            'text-sm font-medium',
+            'text-[13px] font-[510]',
             gated ? 'text-tertiary-token' : 'text-primary-token'
           )}
         >

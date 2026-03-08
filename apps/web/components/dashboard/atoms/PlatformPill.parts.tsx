@@ -121,7 +121,7 @@ export function ExpandedContent({
       </div>
 
       {badgeText ? (
-        <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-secondary-token ring-1 ring-subtle'>
+        <span className='shrink-0 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token ring-1 ring-subtle'>
           {badgeText}
         </span>
       ) : null}

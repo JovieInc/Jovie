@@ -17,7 +17,7 @@ export function SettingsErrorState({
     <DashboardCard variant='settings'>
       <div className='flex flex-col items-center justify-center gap-2 py-8'>
         <AlertCircle className='h-6 w-6 text-destructive' />
-        <p className='text-sm text-secondary-token'>{message}</p>
+        <p className='text-[13px] text-secondary-token'>{message}</p>
         {onRetry && (
           <Button variant='ghost' size='sm' onClick={onRetry}>
             Try again
