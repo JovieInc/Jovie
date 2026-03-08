@@ -69,6 +69,11 @@ export interface VirtualizedTableBodyProps<TData> {
    * Click handler for row
    */
   readonly onRowClick?: (row: TData) => void;
+  readonly onRowActivate: (
+    rowIndex: number,
+    rowData: TData,
+    event: { shiftKey: boolean }
+  ) => void;
 
   /**
    * Context menu handler for row
@@ -162,6 +167,7 @@ export function VirtualizedTableBody<TData>({
   focusedIndex,
   onFocusChange,
   onRowClick,
+  onRowActivate,
   onRowContextMenu,
   onKeyDown,
   getContextMenuItems,
@@ -233,6 +239,7 @@ export function VirtualizedTableBody<TData>({
             virtualStart={virtualItem?.start}
             focusedIndex={focusedIndex}
             onRowClick={onRowClick}
+            onRowActivate={onRowActivate}
             onRowContextMenu={onRowContextMenu}
             onKeyDown={onKeyDown}
             onFocusChange={onFocusChange}

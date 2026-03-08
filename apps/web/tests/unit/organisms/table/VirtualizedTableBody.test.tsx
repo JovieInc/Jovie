@@ -30,6 +30,7 @@ const baseProps = {
   focusedIndex: -1,
   onFocusChange: vi.fn(),
   onKeyDown: vi.fn(),
+  onRowActivate: vi.fn(),
   rowRefsMap: new Map<number, HTMLTableRowElement>(),
   columnCount: 1,
 };

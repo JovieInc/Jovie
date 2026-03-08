@@ -30,8 +30,8 @@ import {
 import { cn } from '../table.styles';
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
-import { useTableKeyboardNav } from './useTableKeyboardNav';
 import { useTableVirtualization } from './useTableVirtualization';
+import { useUnifiedTableBehavior } from './useUnifiedTableBehavior';
 import { VirtualizedTableBody } from './VirtualizedTableBody';
 import { VirtualizedTableRow } from './VirtualizedTableRow';
 
@@ -451,13 +451,23 @@ export function UnifiedTable<TData>({
     enabled: shouldVirtualize,
   });
 
-  // Initialize keyboard navigation
-  const { handleKeyDown } = useTableKeyboardNav({
+  const rowModelData = useMemo(
+    () => rows.map(row => row.original as TData),
+    [rows]
+  );
+  const rowModelIds = useMemo(() => rows.map(row => row.id), [rows]);
+
+  // Initialize unified table behavior (selection + keyboard + activation)
+  const { handleKeyDown, handleRowClick } = useUnifiedTableBehavior({
     enabled: shouldEnableKeyboardNav,
     focusedIndex,
     rowCount: rows.length,
     rowRefsMap: rowRefs.current,
     setFocusedIndex,
+    rows: rowModelData,
+    rowIds: rowModelIds,
+    rowSelection,
+    onRowSelectionChange,
     onRowClick,
   });
 
@@ -576,6 +586,7 @@ export function UnifiedTable<TData>({
                   shouldVirtualize={false}
                   focusedIndex={focusedIndex}
                   onRowClick={onRowClick}
+                  onRowActivate={handleRowClick}
                   onRowContextMenu={onRowContextMenu}
                   onKeyDown={handleKeyDown}
                   onFocusChange={setFocusedIndex}
@@ -646,6 +657,7 @@ export function UnifiedTable<TData>({
           focusedIndex={focusedIndex}
           onFocusChange={setFocusedIndex}
           onRowClick={onRowClick}
+          onRowActivate={handleRowClick}
           onRowContextMenu={onRowContextMenu}
           onKeyDown={handleKeyDown}
           getContextMenuItems={getContextMenuItems}

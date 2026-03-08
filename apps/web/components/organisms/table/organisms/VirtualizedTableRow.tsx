@@ -13,6 +13,11 @@ export interface VirtualizedTableRowProps<TData> {
   readonly shouldVirtualize: boolean;
   readonly virtualStart?: number;
   readonly focusedIndex: number;
+  readonly onRowActivate: (
+    rowIndex: number,
+    rowData: TData,
+    event: { shiftKey: boolean }
+  ) => void;
   readonly onRowClick?: (row: TData) => void;
   readonly onRowContextMenu?: (row: TData, event: React.MouseEvent) => void;
   readonly onKeyDown: (
@@ -46,6 +51,7 @@ function VirtualizedTableRowComponent<TData>({
   shouldVirtualize,
   virtualStart,
   focusedIndex,
+  onRowActivate,
   onRowClick,
   onRowContextMenu,
   onKeyDown,
@@ -55,10 +61,12 @@ function VirtualizedTableRowComponent<TData>({
 }: VirtualizedTableRowProps<TData>) {
   const rowData = row.original as TData;
 
-  const handleClick = useCallback(() => {
-    onRowClick?.(rowData);
-    onFocusChange(rowIndex);
-  }, [onRowClick, rowData, onFocusChange, rowIndex]);
+  const handleClick = useCallback(
+    (event: React.MouseEvent) => {
+      onRowActivate(rowIndex, rowData, { shiftKey: event.shiftKey });
+    },
+    [onRowActivate, rowData, rowIndex]
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => onKeyDown(e, rowIndex, rowData),
@@ -75,11 +83,10 @@ function VirtualizedTableRowComponent<TData>({
     (e: React.MouseEvent) => {
       // Right-click should focus/select the row before opening actions so
       // side panels and contextual action menus stay in sync.
-      onRowClick?.(rowData);
-      onFocusChange(rowIndex);
+      onRowActivate(rowIndex, rowData, { shiftKey: false });
       onRowContextMenu?.(rowData, e);
     },
-    [onRowClick, rowData, onFocusChange, rowIndex, onRowContextMenu]
+    [onRowActivate, rowData, onRowContextMenu, rowIndex]
   );
 
   const handleRef = useCallback(
