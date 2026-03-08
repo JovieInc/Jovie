@@ -79,18 +79,27 @@ const MUSICBRAINZ_CONFIG: Partial<CircuitBreakerConfig> = {
 /**
  * Global circuit breaker for Apple Music API calls.
  */
-export const appleMusicCircuitBreaker = new CircuitBreaker(APPLE_MUSIC_CONFIG);
+export const appleMusicCircuitBreaker = new CircuitBreaker({
+  name: 'apple_music',
+  ...APPLE_MUSIC_CONFIG,
+});
 
 /**
  * Global circuit breaker for Deezer API calls.
  */
-export const deezerCircuitBreaker = new CircuitBreaker(DEEZER_CONFIG);
+export const deezerCircuitBreaker = new CircuitBreaker({
+  name: 'deezer',
+  ...DEEZER_CONFIG,
+});
 
 /**
  * Global circuit breaker for MusicBrainz API calls.
  * More conservative due to the free nature of the service.
  */
-export const musicBrainzCircuitBreaker = new CircuitBreaker(MUSICBRAINZ_CONFIG);
+export const musicBrainzCircuitBreaker = new CircuitBreaker({
+  name: 'musicbrainz',
+  ...MUSICBRAINZ_CONFIG,
+});
 
 // ============================================================================
 // Helper Functions

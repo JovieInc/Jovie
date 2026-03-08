@@ -26,6 +26,8 @@ import * as Sentry from '@sentry/nextjs';
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export interface CircuitBreakerConfig {
+  /** Provider identifier used in logs and alerts. Default: external-service */
+  name: string;
   /** Number of failures before opening circuit. Default: 10 */
   failureThreshold: number;
   /** Time in ms before attempting recovery. Default: 60000 (60s) */
@@ -86,6 +88,7 @@ function parseEnvNumber(envVar: string | undefined, fallback: number): number {
  */
 function createDefaultConfig(): CircuitBreakerConfig {
   return {
+    name: 'external-service',
     failureThreshold: parseEnvNumber(
       process.env['CIRCUIT_BREAKER_FAILURE_THRESHOLD'],
       10
@@ -312,17 +315,20 @@ export class CircuitBreaker {
     // Log state transition for monitoring
     Sentry.addBreadcrumb({
       category: 'circuit-breaker',
-      message: `State transition: ${oldState} -> ${newState}`,
+      message: `[${this.config.name}] State transition: ${oldState} -> ${newState}`,
       level: 'info',
       data: this.getStats(),
     });
 
     // Alert Sentry when the circuit opens so we know the service is failing
     if (newState === 'OPEN') {
-      Sentry.captureMessage(`Circuit breaker opened (${oldState} -> OPEN)`, {
-        level: 'warning',
-        extra: { ...this.getStats() },
-      });
+      Sentry.captureMessage(
+        `[${this.config.name}] Circuit breaker opened (${oldState} -> OPEN)`,
+        {
+          level: 'warning',
+          extra: { ...this.getStats() },
+        }
+      );
     }
   }
 
@@ -430,6 +436,7 @@ function isRateLimitError(error: unknown): boolean {
  * - 2 consecutive successes required to close from HALF_OPEN
  */
 export const spotifyCircuitBreaker = new CircuitBreaker({
+  name: 'spotify',
   failureThreshold: 10, // Open after 10 real failures
   resetTimeout: 60_000, // Try again after 60 seconds
   successThreshold: 2, // Need 2 successes to close
