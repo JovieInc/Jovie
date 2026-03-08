@@ -4,6 +4,7 @@ import { BarChart3 } from 'lucide-react';
 import { useCallback } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useAnalyticsFilterMutation } from '@/lib/queries/useSettingsMutation';
 import type { Artist } from '@/types/db';
@@ -38,6 +39,7 @@ export function SettingsAnalyticsSection({
     checked: excludeSelf,
     handleToggle,
     isPending,
+    saveStatus,
   } = useOptimisticToggle({
     initialValue: artist.settings?.exclude_self_from_analytics ?? false,
     mutateAsync: updateAnalyticsFilterAsync,
@@ -51,6 +53,7 @@ export function SettingsAnalyticsSection({
       padding='none'
       className='divide-y divide-subtle'
     >
+      <SettingsStatusPill status={saveStatus} className='px-4 pt-3' />
       <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Exclude Yourself from Analytics'
