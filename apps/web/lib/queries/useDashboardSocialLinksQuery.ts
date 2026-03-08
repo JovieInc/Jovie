@@ -114,6 +114,7 @@ export function useDashboardSocialLinksQuery(profileId: string) {
     queryFn: ({ signal }) => fetchSocialLinks(profileId, signal),
     enabled: Boolean(profileId),
     ...STANDARD_CACHE,
+    refetchOnMount: false,
   });
 }
 
