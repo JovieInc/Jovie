@@ -24,6 +24,7 @@ interface UsernameUpdateOutcome {
   changed: boolean;
   conflict: boolean;
   canonicalUsername: string;
+  oldUsernameNormalized: string | null;
 }
 
 async function updateCanonicalUsernameInternal(
@@ -75,6 +76,7 @@ async function updateCanonicalUsernameInternal(
           changed: false,
           conflict: false,
           canonicalUsername,
+          oldUsernameNormalized: canonicalUsername,
         };
       }
 
@@ -90,6 +92,7 @@ async function updateCanonicalUsernameInternal(
           changed: false,
           conflict: true,
           canonicalUsername,
+          oldUsernameNormalized: canonicalUsername,
         };
       }
 
@@ -107,6 +110,7 @@ async function updateCanonicalUsernameInternal(
         changed: true,
         conflict: false,
         canonicalUsername: normalized,
+        oldUsernameNormalized: canonicalUsername,
       };
     },
     { clerkUserId }
@@ -138,13 +142,19 @@ export async function syncCanonicalUsernameFromApp(
 
   // Invalidate caches if username changed
   if (outcome.changed) {
-    // Note: We don't have the old username without a Clerk lookup,
-    // but invalidateUsernameChange handles undefined oldUsername gracefully
-    await invalidateUsernameChange(outcome.canonicalUsername, undefined);
+    await invalidateUsernameChange(
+      outcome.canonicalUsername,
+      outcome.oldUsernameNormalized
+    );
 
     // Invalidate handle availability cache so the old handle shows as available
     // and the new handle shows as unavailable on next check
-    await invalidateHandleCache(outcome.canonicalUsername);
+    await Promise.all([
+      invalidateHandleCache(outcome.canonicalUsername),
+      outcome.oldUsernameNormalized
+        ? invalidateHandleCache(outcome.oldUsernameNormalized)
+        : Promise.resolve(),
+    ]);
   }
 }
 
