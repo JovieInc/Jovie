@@ -174,11 +174,13 @@ function parseSourceForMobile(url: string): string {
 
 /** Subtitle lines for subscribers mode */
 function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
+  const subscriberLabel =
+    member.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber';
   return (
     <div className='mt-0.5 space-y-0.5'>
-      {member.email && (
+      {(member.email || member.phone) && (
         <p className='text-[13px] leading-snug text-secondary-token truncate'>
-          {member.email}
+          {subscriberLabel}
         </p>
       )}
       {member.lastSeenAt && (

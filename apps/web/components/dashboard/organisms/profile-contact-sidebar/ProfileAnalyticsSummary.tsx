@@ -8,6 +8,7 @@ import {
 } from '@jovie/ui';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
+import { StatTile } from '@/components/molecules/drawer';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -30,25 +31,6 @@ const RANGE_OPTIONS: RangeOption[] = [
   { value: 'all', label: 'All time', requiresPro: true },
 ];
 
-function StatTile({
-  label,
-  value,
-}: {
-  readonly label: string;
-  readonly value: string;
-}) {
-  return (
-    <div className='space-y-1'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='text-2xl font-semibold leading-none tracking-tight text-primary-token tabular-nums'>
-        {value}
-      </p>
-    </div>
-  );
-}
-
 export function ProfileAnalyticsSummary() {
   const [range, setRange] = useState<AnalyticsRange>('30d');
   const { data, isLoading, isFetching, isError } = useDashboardAnalyticsQuery({
@@ -62,20 +44,20 @@ export function ProfileAnalyticsSummary() {
   // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <div className='rounded-md border border-subtle/70 bg-surface/40'>
+      <div className='rounded-lg border border-subtle/60 bg-surface-2/40'>
         <div
           className={cn(
-            'grid grid-cols-2 divide-x divide-subtle p-3',
+            'grid grid-cols-2 divide-x divide-subtle/80 p-3.5',
             STAT_MIN_HEIGHT
           )}
         >
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-2 h-7 w-14 rounded skeleton' />
+            <div className='mt-2 h-6 w-14 rounded skeleton' />
           </div>
           <div className='pl-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-2 h-7 w-14 rounded skeleton' />
+            <div className='mt-2 h-6 w-14 rounded skeleton' />
           </div>
         </div>
       </div>
@@ -94,10 +76,10 @@ export function ProfileAnalyticsSummary() {
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <div className='rounded-md border border-subtle/70 bg-surface/40'>
+    <div className='rounded-lg border border-subtle/60 bg-surface-2/40'>
       <div
         className={cn(
-          'grid grid-cols-2 divide-x divide-subtle p-3 transition-opacity duration-150',
+          'grid grid-cols-2 divide-x divide-subtle/80 p-3.5 transition-opacity duration-150',
           STAT_MIN_HEIGHT,
           isFetching && 'opacity-50'
         )}
@@ -117,7 +99,7 @@ export function ProfileAnalyticsSummary() {
       </div>
 
       {/* Time range selector */}
-      <div className='flex justify-end border-t border-subtle/70 px-3 py-1.5'>
+      <div className='flex justify-end border-t border-subtle/60 px-3 py-1.5'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

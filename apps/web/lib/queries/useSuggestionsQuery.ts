@@ -10,6 +10,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
+import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface SuggestionsQueryResult {
@@ -39,16 +40,10 @@ async function fetchSuggestions(
   profileId: string,
   signal?: AbortSignal
 ): Promise<SuggestionsQueryResult> {
-  const response = await fetch(
+  const data = await fetchWithTimeout<{ links?: ProfileSocialLink[] }>(
     `/api/dashboard/social-links?profileId=${profileId}`,
     { signal }
   );
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch suggestions');
-  }
-
-  const data = (await response.json()) as { links?: ProfileSocialLink[] };
 
   if (!data?.links) {
     return { links: [], maxVersion: 1 };
@@ -226,7 +221,7 @@ export function useSuggestionsQuery({
     refetchOnWindowFocus: false,
     staleTime: 1 * 60 * 1000, // 1 min
     gcTime: 10 * 60 * 1000, // 10 min
-    refetchOnMount: true,
+    refetchOnMount: false,
     structuralSharing: true,
   });
 }

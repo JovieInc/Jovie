@@ -360,6 +360,8 @@ export function useCampaignStatsQuery({
       }
       return false;
     },
+    // Pause polling when the tab is hidden to avoid unnecessary background traffic
+    refetchIntervalInBackground: false,
   });
 }
 

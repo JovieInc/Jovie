@@ -3,7 +3,10 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { AudienceTableProvider } from '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
+import {
+  AudienceTableStableProvider,
+  AudienceTableVolatileProvider,
+} from '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
 import {
   renderIntentScoreCell,
   renderLastActionCell,
@@ -75,11 +78,9 @@ export function DemoRealAudiencePanel() {
   const getContextMenuItems = useCallback(() => [] as never[], []);
   const getTouringCity = useCallback(() => null, []);
 
-  const contextValue = useMemo(
+  const stableContextValue = useMemo(
     () => ({
-      selectedIds,
       toggleSelect,
-      openMenuRowId: null,
       setOpenMenuRowId: noop as (id: string | null) => void,
       getContextMenuItems,
       onExportMember: noopMember,
@@ -88,14 +89,12 @@ export function DemoRealAudiencePanel() {
       onSendNotification: noopMember,
       getTouringCity,
     }),
-    [
-      selectedIds,
-      toggleSelect,
-      noop,
-      noopMember,
-      getContextMenuItems,
-      getTouringCity,
-    ]
+    [toggleSelect, noop, noopMember, getContextMenuItems, getTouringCity]
+  );
+
+  const volatileContextValue = useMemo(
+    () => ({ selectedIds, openMenuRowId: null as string | null }),
+    [selectedIds]
   );
 
   const handleRowClick = useCallback((member: AudienceMember) => {
@@ -105,39 +104,44 @@ export function DemoRealAudiencePanel() {
   const getRowId = useCallback((row: AudienceMember) => row.id, []);
 
   return (
-    <AudienceTableProvider value={contextValue}>
-      <div
-        className='flex h-full min-h-0 flex-col'
-        data-testid='demo-audience-table'
-      >
-        {/* Summary bar */}
-        <div className='flex items-center gap-4 border-b border-subtle px-4 py-2 text-[13px]'>
-          <span className='font-medium text-primary-token'>
-            {DEMO_AUDIENCE_MEMBERS.length} visitors
-          </span>
-          <span className='text-tertiary-token'>
-            {DEMO_AUDIENCE_MEMBERS.filter(m => m.intentLevel === 'high').length}{' '}
-            high intent
-          </span>
-          <span className='text-tertiary-token'>
-            {DEMO_AUDIENCE_MEMBERS.filter(m => m.email).length} with email
-          </span>
-        </div>
+    <AudienceTableStableProvider value={stableContextValue}>
+      <AudienceTableVolatileProvider value={volatileContextValue}>
+        <div
+          className='flex h-full min-h-0 flex-col'
+          data-testid='demo-audience-table'
+        >
+          {/* Summary bar */}
+          <div className='flex items-center gap-4 border-b border-subtle px-4 py-2 text-[13px]'>
+            <span className='font-medium text-primary-token'>
+              {DEMO_AUDIENCE_MEMBERS.length} visitors
+            </span>
+            <span className='text-tertiary-token'>
+              {
+                DEMO_AUDIENCE_MEMBERS.filter(m => m.intentLevel === 'high')
+                  .length
+              }{' '}
+              high intent
+            </span>
+            <span className='text-tertiary-token'>
+              {DEMO_AUDIENCE_MEMBERS.filter(m => m.email).length} with email
+            </span>
+          </div>
 
-        {/* Real table */}
-        <div className='flex-1 min-h-0'>
-          <UnifiedTable
-            data={DEMO_AUDIENCE_MEMBERS}
-            columns={DEMO_COLUMNS}
-            isLoading={false}
-            getRowId={getRowId}
-            enableVirtualization
-            enableKeyboardNavigation
-            className='text-[13px]'
-            onRowClick={handleRowClick}
-          />
+          {/* Real table */}
+          <div className='flex-1 min-h-0'>
+            <UnifiedTable
+              data={DEMO_AUDIENCE_MEMBERS}
+              columns={DEMO_COLUMNS}
+              isLoading={false}
+              getRowId={getRowId}
+              enableVirtualization
+              enableKeyboardNavigation
+              className='text-[13px]'
+              onRowClick={handleRowClick}
+            />
+          </div>
         </div>
-      </div>
-    </AudienceTableProvider>
+      </AudienceTableVolatileProvider>
+    </AudienceTableStableProvider>
   );
 }

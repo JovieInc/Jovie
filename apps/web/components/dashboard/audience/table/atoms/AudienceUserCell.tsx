@@ -39,8 +39,8 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
 }: AudienceUserCellProps) {
   const getSecondaryLabel = () => {
     if (type === 'anonymous') return null;
-    if (type === 'email') return email ?? 'Email fan';
-    if (type === 'sms') return phone ?? 'SMS fan';
+    if (type === 'email') return 'Email Subscriber';
+    if (type === 'sms') return 'SMS Subscriber';
     return 'Connected fan';
   };
 

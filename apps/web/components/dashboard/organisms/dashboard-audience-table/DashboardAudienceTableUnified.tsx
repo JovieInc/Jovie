@@ -36,7 +36,10 @@ import {
   matchTouringCity,
 } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import { AudienceTableProvider } from './AudienceTableContext';
+import {
+  AudienceTableStableProvider,
+  AudienceTableVolatileProvider,
+} from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
@@ -89,7 +92,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
   memberColumnHelper.accessor('displayName', {
     id: 'user',
-    header: 'Visitor',
+    header: 'User',
     cell: renderUserCell,
     size: 220,
   }),
@@ -435,12 +438,10 @@ export const DashboardAudienceTableUnified = memo(
 
     const columns = mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
 
-    // Context value for cell renderers — avoids putting dynamic state in column defs
-    const contextValue = useMemo(
+    // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
+    const stableContextValue = useMemo(
       () => ({
-        selectedIds,
         toggleSelect,
-        openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
         onExportMember: handleExportMember,
@@ -450,9 +451,7 @@ export const DashboardAudienceTableUnified = memo(
         getTouringCity,
       }),
       [
-        selectedIds,
         toggleSelect,
-        openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
         handleExportMember,
@@ -461,6 +460,15 @@ export const DashboardAudienceTableUnified = memo(
         handleSendNotification,
         getTouringCity,
       ]
+    );
+
+    // Volatile context: frequently-changing state — only SelectCell and LastSeenCell subscribe
+    const volatileContextValue = useMemo(
+      () => ({
+        selectedIds,
+        openMenuRowId,
+      }),
+      [selectedIds, openMenuRowId]
     );
 
     const emptyStateHeading =
@@ -545,89 +553,93 @@ export const DashboardAudienceTableUnified = memo(
     useRegisterRightPanel(sidebarPanel);
 
     return (
-      <AudienceTableProvider value={contextValue}>
-        <div
-          className='flex h-full min-h-0 flex-col overflow-hidden'
-          data-testid='dashboard-audience-table'
-        >
-          <h1 className='sr-only'>
-            {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-          </h1>
-          <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
+      <AudienceTableStableProvider value={stableContextValue}>
+        <AudienceTableVolatileProvider value={volatileContextValue}>
+          <div
+            className='flex h-full min-h-0 flex-col overflow-hidden'
+            data-testid='dashboard-audience-table'
+          >
+            <h1 className='sr-only'>
+              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+            </h1>
+            <p className='sr-only'>
+              {getSrDescription(rows.length === 0, mode)}
+            </p>
 
-          {/* Subheader with filter dropdown and export */}
-          <AudienceTableSubheader
-            view={view}
-            onViewChange={onViewChange}
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            rows={rows}
-            selectedIds={selectedIds}
-            subscriberCount={subscriberCount}
-            total={total}
-          />
+            {/* Subheader with filter dropdown and export */}
+            <AudienceTableSubheader
+              view={view}
+              onViewChange={onViewChange}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              rows={rows}
+              selectedIds={selectedIds}
+              subscriberCount={subscriberCount}
+              total={total}
+            />
 
-          <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
-            {/* Scrollable content area */}
-            <div className='flex-1 min-h-0 overflow-auto'>
-              {rows.length === 0 ? (
-                <EmptyState
-                  icon={emptyStateIcon}
-                  heading={emptyStateHeading}
-                  description={emptyStateDescription}
-                  action={emptyStatePrimaryAction}
-                  secondaryAction={emptyStateSecondaryAction}
-                />
-              ) : (
-                <>
-                  {/* Mobile card list (virtualized) */}
-                  <MobileCardList
-                    rows={rows}
-                    mode={mode}
-                    selectedMemberId={selectedMember?.id ?? null}
-                    onTap={setSelectedMember}
+            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+              {/* Scrollable content area */}
+              <div className='flex-1 min-h-0 overflow-auto'>
+                {rows.length === 0 ? (
+                  <EmptyState
+                    icon={emptyStateIcon}
+                    heading={emptyStateHeading}
+                    description={emptyStateDescription}
+                    action={emptyStatePrimaryAction}
+                    secondaryAction={emptyStateSecondaryAction}
                   />
-
-                  {/* Desktop table */}
-                  <div className='hidden md:block h-full'>
-                    <UnifiedTable
-                      data={rows}
-                      columns={columns}
-                      isLoading={false}
-                      emptyState={
-                        <EmptyState
-                          icon={emptyStateIcon}
-                          heading={emptyStateHeading}
-                          description={emptyStateDescription}
-                          action={emptyStatePrimaryAction}
-                          secondaryAction={emptyStateSecondaryAction}
-                        />
-                      }
-                      getRowId={row => row.id}
-                      enableVirtualization={true}
-                      enableKeyboardNavigation={true}
-                      minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                      className='text-[13px]'
-                      getRowClassName={getRowClassName}
-                      onRowClick={row => handleViewProfile(row)}
-                      getContextMenuItems={getContextMenuItems}
-                      hasNextPage={hasNextPage}
-                      isFetchingNextPage={isFetchingNextPage}
-                      onLoadMore={onLoadMore}
+                ) : (
+                  <>
+                    {/* Mobile card list (virtualized) */}
+                    <MobileCardList
+                      rows={rows}
+                      mode={mode}
+                      selectedMemberId={selectedMember?.id ?? null}
+                      onTap={setSelectedMember}
                     />
-                  </div>
-                </>
-              )}
+
+                    {/* Desktop table */}
+                    <div className='hidden md:block h-full'>
+                      <UnifiedTable
+                        data={rows}
+                        columns={columns}
+                        isLoading={false}
+                        emptyState={
+                          <EmptyState
+                            icon={emptyStateIcon}
+                            heading={emptyStateHeading}
+                            description={emptyStateDescription}
+                            action={emptyStatePrimaryAction}
+                            secondaryAction={emptyStateSecondaryAction}
+                          />
+                        }
+                        getRowId={row => row.id}
+                        enableVirtualization={true}
+                        enableKeyboardNavigation={true}
+                        minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                        className='text-[13px]'
+                        getRowClassName={getRowClassName}
+                        onRowClick={row => handleViewProfile(row)}
+                        getContextMenuItems={getContextMenuItems}
+                        hasNextPage={hasNextPage}
+                        isFetchingNextPage={isFetchingNextPage}
+                        onLoadMore={onLoadMore}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className='sr-only' aria-live='polite' aria-atomic='true'>
+              {total > 0 && `Showing ${rows.length} of ${total}`}
+              {selectedCount > 0 &&
+                `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
             </div>
           </div>
-
-          <div className='sr-only' aria-live='polite' aria-atomic='true'>
-            {total > 0 && `Showing ${rows.length} of ${total}`}
-            {selectedCount > 0 &&
-              `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
-          </div>
-        </div>
-      </AudienceTableProvider>
+        </AudienceTableVolatileProvider>
+      </AudienceTableStableProvider>
     );
   }
 );
