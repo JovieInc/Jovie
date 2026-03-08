@@ -40,6 +40,7 @@ interface BuildDropdownItemsParams {
   handleSettings: () => void;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
+  upgradeLabel: string;
   handleSignOut: () => void;
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
@@ -56,6 +57,7 @@ function buildDropdownItems({
   handleSettings,
   handleManageBilling,
   handleUpgrade,
+  upgradeLabel,
   handleSignOut,
   setIsFeedbackOpen,
   handleOpenShortcuts,
@@ -187,7 +189,7 @@ function buildDropdownItems({
     items.push({
       type: 'action',
       id: 'upgrade',
-      label: loading.upgrade ? 'Opening…' : 'Upgrade to Pro',
+      label: loading.upgrade ? 'Opening…' : upgradeLabel,
       onClick: handleUpgrade,
       disabled: loading.upgrade,
       className: 'disabled:cursor-not-allowed disabled:opacity-70',
@@ -310,6 +312,7 @@ export function UserButton({
     handleSettings,
     handleManageBilling,
     handleUpgrade,
+    upgradeLabel: menuActions.upgradeLabel,
     handleSignOut,
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
