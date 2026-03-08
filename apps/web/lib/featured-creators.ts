@@ -49,16 +49,16 @@ function shuffle<T>(arr: T[], seed: number): T[] {
 
 async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
   try {
-    // Add timeout to table existence check (5s) to prevent hanging during cold starts
+    // Add timeout to table existence check (15s) to prevent false negatives during cold starts
     const tableExists = await Promise.race([
       doesTableExist(TABLE_NAMES.creatorProfiles),
       new Promise<boolean>(resolve =>
         setTimeout(() => {
           captureWarning(
-            '[FeaturedCreators] Table check timed out after 5s, assuming table does not exist'
+            '[FeaturedCreators] Table check timed out after 15s, assuming table does not exist'
           );
           resolve(false);
-        }, 5000)
+        }, 15000)
       ),
     ]);
 

@@ -35,7 +35,8 @@ let lastTableExistenceDatabaseUrl: string | null = null;
 const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
 
 // Timeout for tableExists queries (prevents hanging on cold starts / connection issues)
-const TABLE_EXISTS_TIMEOUT_MS = 5_000;
+// Neon cold starts can take 10-15s, so use a 15s timeout to avoid false negatives.
+const TABLE_EXISTS_TIMEOUT_MS = 15_000;
 
 /**
  * Check if a table exists in the database.
@@ -43,8 +44,8 @@ const TABLE_EXISTS_TIMEOUT_MS = 5_000;
  * repeated database round-trips on cold start.
  *
  * Includes retry logic for transient connection errors (e.g., "Connection
- * terminated unexpectedly") and a 5s timeout to prevent hanging on public
- * profile routes. See JOV-1218.
+ * terminated unexpectedly") and a 15s timeout to prevent hanging on public
+ * profile routes while still allowing Neon cold starts. See JOV-1218.
  */
 export async function doesTableExist(tableName: string): Promise<boolean> {
   // Clear cache if database URL changes
