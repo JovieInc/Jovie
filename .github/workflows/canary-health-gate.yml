@@ -81,7 +81,7 @@ jobs:
           response_code="000"
           canary_inconclusive="false"
           while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$health_url" || echo "\n000")
+            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
             response_code="${response##*$'\n'}"
 
             if [ "$response_code" = "200" ]; then
@@ -110,7 +110,7 @@ jobs:
               max_attempts=5
               response_code="000"
               while [ $attempt -le $max_attempts ]; do
-                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$health_url" || echo "\n000")
+                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
                 response_code="${response##*$'\n'}"
 
                 if [ "$response_code" = "200" ]; then
@@ -161,7 +161,7 @@ jobs:
 
           # Note: canary_inconclusive is no longer used - we fail fast on unverified deployments
 
-          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" "$health_url" || echo "")
+          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "")
           if [[ "$health_content" != *'"status":"ok"'* ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
@@ -183,7 +183,7 @@ jobs:
           # CRITICAL: Verify homepage renders (not just API health)
           echo "Checking homepage renders..."
           homepage_url="${deployment_url%/}/"
-          homepage_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$homepage_url" || echo "\n000")
+          homepage_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${homepage_url}$( [[ "$homepage_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
           homepage_code="${homepage_response##*$'\n'}"
           homepage_body="${homepage_response%$'\n'*}"
 
@@ -214,7 +214,7 @@ jobs:
           # should roll back automatically.
           echo "Checking canonical public profile renders..."
           profile_url="${deployment_url%/}/tim"
-          profile_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$profile_url" || echo "\n000")
+          profile_response=$(curl -s -L -A "$USER_AGENT" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${profile_url}$( [[ "$profile_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
           profile_code="${profile_response##*$'\n'}"
           profile_body="${profile_response%$'\n'*}"
 
