@@ -56,7 +56,7 @@ export function SettingsAppearanceSection() {
       {isLightModeEnabled && (
         <div className='px-4 py-3 flex items-center justify-between'>
           <div className='flex-1 min-w-0'>
-            <h3 className='text-sm font-medium text-primary-token'>
+            <h3 className='text-[13px] font-[510] text-primary-token'>
               Interface theme
             </h3>
             <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>

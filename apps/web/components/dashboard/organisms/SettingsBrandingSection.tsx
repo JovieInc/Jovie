@@ -69,7 +69,7 @@ export function SettingsBrandingSection({
       {isPro && hideBranding && (
         <div className='px-4 py-3 flex items-center gap-3'>
           <Sparkles className='h-4 w-4 text-emerald-500 shrink-0' />
-          <p className='text-sm text-emerald-600 dark:text-emerald-400'>
+          <p className='text-[13px] text-emerald-600 dark:text-emerald-400'>
             Branding is hidden on your profile.
           </p>
         </div>

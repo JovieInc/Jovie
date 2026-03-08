@@ -186,7 +186,7 @@ function ContactsListInner({
       <DashboardCard variant='settings'>
         <div className='space-y-3'>
           <div className='flex items-center justify-between'>
-            <p className='text-sm text-secondary-token'>
+            <p className='text-[13px] text-secondary-token'>
               Manage bookings, management, and press contacts for {artistName}.
             </p>
             <Button
@@ -203,7 +203,7 @@ function ContactsListInner({
           {isEmpty ? (
             <div className='text-center py-6'>
               <UserPlus className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
-              <p className='text-sm text-secondary-token'>
+              <p className='text-[13px] text-secondary-token'>
                 No contacts yet. Add your first contact to get started.
               </p>
             </div>
@@ -261,18 +261,18 @@ function ContactRow({
     >
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-xs font-medium text-tertiary-token uppercase tracking-wide'>
+          <span className='text-[11px] font-[510] text-tertiary-token uppercase tracking-[0.08em]'>
             {roleLabel}
           </span>
         </div>
         <div className='flex items-center gap-2 mt-0.5'>
           {contact.personName && (
-            <span className='text-sm text-primary-token truncate'>
+            <span className='text-[13px] text-primary-token truncate'>
               {contact.personName}
             </span>
           )}
           {contact.email && (
-            <span className='text-xs text-secondary-token truncate'>
+            <span className='text-[11px] text-secondary-token truncate'>
               {contact.email}
             </span>
           )}

@@ -90,7 +90,7 @@ export function SettingsPaymentsSection() {
     return (
       <DashboardCard variant='settings' padding='none'>
         <div className='px-4 py-3'>
-          <p className='text-sm text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Loading payment settings...
           </p>
         </div>
@@ -103,7 +103,7 @@ export function SettingsPaymentsSection() {
     return (
       <DashboardCard variant='settings' padding='none'>
         <div className='px-4 py-3'>
-          <p className='text-sm text-red-500'>{error}</p>
+          <p className='text-[13px] text-red-500'>{error}</p>
         </div>
       </DashboardCard>
     );
@@ -117,17 +117,17 @@ export function SettingsPaymentsSection() {
           <div className='flex items-start gap-3'>
             <CreditCard className='h-5 w-5 text-secondary-token mt-0.5 shrink-0' />
             <div className='flex-1'>
-              <p className='text-sm font-medium text-primary-token'>
+              <p className='text-[13px] font-[510] text-primary-token'>
                 Connect with Stripe
               </p>
-              <p className='text-xs text-secondary-token mt-1'>
+              <p className='text-[13px] text-secondary-token mt-1'>
                 Set up Stripe Connect to receive payments directly from fans.
                 Stripe handles all payment processing, payouts, and tax
                 reporting.
               </p>
             </div>
           </div>
-          {error && <p className='text-xs text-red-500'>{error}</p>}
+          {error && <p className='text-[13px] text-red-500'>{error}</p>}
           <Button
             onClick={handleConnect}
             loading={isActionLoading}
@@ -150,16 +150,16 @@ export function SettingsPaymentsSection() {
           <div className='flex items-start gap-3'>
             <AlertTriangle className='h-5 w-5 text-amber-500 mt-0.5 shrink-0' />
             <div className='flex-1'>
-              <p className='text-sm font-medium text-primary-token'>
+              <p className='text-[13px] font-[510] text-primary-token'>
                 Stripe Setup Incomplete
               </p>
-              <p className='text-xs text-secondary-token mt-1'>
+              <p className='text-[13px] text-secondary-token mt-1'>
                 Your Stripe account is connected but onboarding is not complete.
                 Finish setup to start receiving payments.
               </p>
             </div>
           </div>
-          {error && <p className='text-xs text-red-500'>{error}</p>}
+          {error && <p className='text-[13px] text-red-500'>{error}</p>}
           <div className='flex gap-2'>
             <Button
               onClick={handleConnect}
@@ -191,22 +191,22 @@ export function SettingsPaymentsSection() {
         <div className='flex items-start gap-3'>
           <CheckCircle2 className='h-5 w-5 text-green-500 mt-0.5 shrink-0' />
           <div className='flex-1'>
-            <p className='text-sm font-medium text-primary-token'>
+            <p className='text-[13px] font-[510] text-primary-token'>
               Stripe Connected
             </p>
-            <p className='text-xs text-secondary-token mt-1'>
+            <p className='text-[13px] text-secondary-token mt-1'>
               {status.payoutsEnabled
                 ? 'Payouts are enabled. You are ready to receive payments.'
                 : 'Account connected. Payouts are being reviewed by Stripe.'}
             </p>
             {status.email && (
-              <p className='text-xs text-secondary-token mt-1'>
+              <p className='text-[13px] text-secondary-token mt-1'>
                 Payout email: {status.email}
               </p>
             )}
           </div>
         </div>
-        {error && <p className='text-xs text-red-500'>{error}</p>}
+        {error && <p className='text-[13px] text-red-500'>{error}</p>}
         <Button
           onClick={handleDisconnect}
           loading={isActionLoading}
