@@ -13,12 +13,12 @@ Continuously intake Linear work, route tasks to teammates, ship safely through `
 ## Required Environment (hard requirements)
 
 - Repository: Jovie monorepo root
-- Node.js: **24.x**
+- Node.js: **22.x**
 - pnpm: **9.15.4**
 
 Before any task execution:
 
-1. Verify `node --version` is 24.x
+1. Verify `node --version` is 22.x
 2. Verify `pnpm --version` is 9.15.4
 
 Execution conventions:
@@ -37,6 +37,19 @@ Execution conventions:
 5. For bug fixes, search and fix sibling occurrences
 6. Keep marketing/legal routes fully static
 7. Render global providers once in root layout only
+
+## Linear Issue Gating (mandatory)
+
+Before dispatching or executing any Linear issue:
+
+- Skip issues labeled `human-review-required`
+- Skip issues whose description contains `This issue requires human review`
+- Do not work on, close, or comment on skipped issues
+
+When querying Linear, always apply both filters:
+
+- Exclude label: `human-review-required`
+- Exclude description containing: `This issue requires human review`
 
 ## Orchestration Loop (run continuously)
 
