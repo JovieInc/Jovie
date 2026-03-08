@@ -23,7 +23,7 @@ interface UsernameUpdateOutcome {
   normalized: string;
   changed: boolean;
   conflict: boolean;
-  canonicalUsername: string;
+  previousCanonicalUsername: string;
 }
 
 async function updateCanonicalUsernameInternal(
@@ -67,14 +67,14 @@ async function updateCanonicalUsernameInternal(
         throw new Error('Creator profile not found');
       }
 
-      const canonicalUsername = profile.usernameNormalized;
+      const previousCanonicalUsername = profile.usernameNormalized;
 
-      if (canonicalUsername === normalized) {
+      if (previousCanonicalUsername === normalized) {
         return {
           normalized,
           changed: false,
           conflict: false,
-          canonicalUsername,
+          previousCanonicalUsername,
         };
       }
 
@@ -89,7 +89,7 @@ async function updateCanonicalUsernameInternal(
           normalized,
           changed: false,
           conflict: true,
-          canonicalUsername,
+          previousCanonicalUsername,
         };
       }
 
@@ -106,7 +106,7 @@ async function updateCanonicalUsernameInternal(
         normalized,
         changed: true,
         conflict: false,
-        canonicalUsername: normalized,
+        previousCanonicalUsername,
       };
     },
     { clerkUserId }
@@ -138,13 +138,15 @@ export async function syncCanonicalUsernameFromApp(
 
   // Invalidate caches if username changed
   if (outcome.changed) {
-    // Note: We don't have the old username without a Clerk lookup,
-    // but invalidateUsernameChange handles undefined oldUsername gracefully
-    await invalidateUsernameChange(outcome.canonicalUsername, undefined);
+    await invalidateUsernameChange(
+      outcome.normalized,
+      outcome.previousCanonicalUsername
+    );
 
-    // Invalidate handle availability cache so the old handle shows as available
-    // and the new handle shows as unavailable on next check
-    await invalidateHandleCache(outcome.canonicalUsername);
+    // Invalidate handle-availability cache for both old and new handles.
+    // This ensures old handle availability and new handle reservation update quickly.
+    await invalidateHandleCache(outcome.normalized);
+    await invalidateHandleCache(outcome.previousCanonicalUsername);
   }
 }
 
