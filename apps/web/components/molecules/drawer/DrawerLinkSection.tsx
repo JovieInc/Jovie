@@ -43,7 +43,7 @@ export function DrawerLinkSection({
   return (
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex items-center justify-between'>
+      <div className='flex items-center justify-between min-h-[44px] lg:min-h-0'>
         <h4
           className={[
             'text-[11px] font-[510] uppercase',
@@ -52,15 +52,17 @@ export function DrawerLinkSection({
         >
           {title}
         </h4>
-        <div className='flex items-center gap-0.5'>
+        <div className='flex items-center gap-1 lg:gap-0.5'>
           {headerActions}
           {onAdd && (
             <button
               type='button'
               onClick={onAdd}
               className={[
-                'p-1 rounded-md text-tertiary-token',
-                'hover:text-primary-token hover:bg-surface-2',
+                'min-h-[44px] min-w-[44px] flex items-center justify-center',
+                'lg:min-h-0 lg:min-w-0 lg:p-1 rounded-md text-tertiary-token',
+                'active:bg-surface-2/50 lg:active:bg-transparent',
+                'lg:hover:text-primary-token lg:hover:bg-surface-2',
                 'transition-colors',
               ].join(' ')}
               aria-label={addLabel}
@@ -75,7 +77,7 @@ export function DrawerLinkSection({
       {isEmpty ? (
         <p className='text-xs text-tertiary-token py-2'>{emptyMessage}</p>
       ) : (
-        <div className='-mx-3 lg:mx-0'>{children}</div>
+        <div className='-mx-5 lg:mx-0'>{children}</div>
       )}
     </div>
   );

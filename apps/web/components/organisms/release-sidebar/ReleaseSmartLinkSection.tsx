@@ -41,7 +41,7 @@ export function ReleaseSmartLinkSection({
   const displayUrl = smartLinkUrl.replace(/^https?:\/\//, '');
 
   return (
-    <div className='flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 px-2 py-1.5'>
+    <div className='flex items-center gap-2 lg:gap-1.5 rounded-md border border-subtle bg-surface-1 px-3 py-2.5 lg:px-2 lg:py-1.5'>
       <Link2
         className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
         aria-hidden='true'
@@ -57,8 +57,11 @@ export function ReleaseSmartLinkSection({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : 'Copy link'}
         className={cn(
-          'shrink-0 rounded p-0.5 transition-colors',
-          'text-tertiary-token hover:text-primary-token hover:bg-white/[0.04]',
+          'shrink-0 rounded transition-colors',
+          'min-h-[44px] min-w-[44px] flex items-center justify-center',
+          'lg:min-h-0 lg:min-w-0 lg:p-0.5',
+          'text-tertiary-token active:bg-surface-2/50 lg:active:bg-transparent',
+          'lg:hover:text-primary-token lg:hover:bg-surface-2',
           isCopied && 'text-success'
         )}
       >
@@ -69,7 +72,13 @@ export function ReleaseSmartLinkSection({
         type='button'
         onClick={handleOpen}
         title='Open smart link'
-        className='shrink-0 rounded p-0.5 text-tertiary-token transition-colors hover:text-primary-token hover:bg-white/[0.04]'
+        className={cn(
+          'shrink-0 rounded transition-colors',
+          'min-h-[44px] min-w-[44px] flex items-center justify-center',
+          'lg:min-h-0 lg:min-w-0 lg:p-0.5',
+          'text-tertiary-token active:bg-surface-2/50 lg:active:bg-transparent',
+          'lg:hover:text-primary-token lg:hover:bg-surface-2'
+        )}
       >
         <ExternalLink className='h-3 w-3' />
         <span className='sr-only'>Open</span>

@@ -87,13 +87,13 @@ export function ReleaseSmartLinkAnalytics({
     <div>
       <div className='min-h-[60px]'>
         {showSkeleton && (
-          <div className='grid grid-cols-2 rounded-md bg-white/[0.02] p-3'>
+          <div className='grid grid-cols-2 rounded-md border border-subtle bg-surface-1 p-3'>
             <div className='space-y-1'>
               <div className='h-[10px] w-14 rounded skeleton' />
               <div className='h-5 w-10 rounded skeleton' />
               <div className='h-[11px] w-10 rounded skeleton' />
             </div>
-            <div className='space-y-1 border-l border-white/[0.05] pl-3'>
+            <div className='space-y-1 border-l border-subtle pl-3'>
               <div className='h-[10px] w-14 rounded skeleton' />
               <div className='h-5 w-10 rounded skeleton' />
               <div className='h-[11px] w-10 rounded skeleton' />
@@ -114,7 +114,7 @@ export function ReleaseSmartLinkAnalytics({
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 rounded-md bg-white/[0.02] p-3'>
+            <div className='grid grid-cols-2 rounded-md border border-subtle bg-surface-1 p-3'>
               <div>
                 <StatTile
                   label='Total clicks'
@@ -122,7 +122,7 @@ export function ReleaseSmartLinkAnalytics({
                   hint='All time'
                 />
               </div>
-              <div className='border-l border-white/[0.05] pl-3'>
+              <div className='border-l border-subtle pl-3'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
