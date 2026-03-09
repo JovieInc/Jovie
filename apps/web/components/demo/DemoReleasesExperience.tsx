@@ -1,40 +1,24 @@
 'use client';
 
-import { DemoAnalyticsPanel } from './DemoAnalyticsPanel';
-import { DemoEmptyState } from './DemoEmptyState';
-import { DemoRealAudiencePanel } from './DemoRealAudiencePanel';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { DemoAuthShell } from './DemoAuthShell';
 import { DemoRealReleasesPanel } from './DemoRealReleasesPanel';
-import { DemoSettingsPanel } from './DemoSettingsPanel';
-import { DemoShell } from './DemoShell';
-import type { DemoTab } from './demo-types';
-import { useDemoState } from './use-demo-state';
 
-/** Tabs that have a dedicated panel component */
-const FUNCTIONAL_TABS = new Set<DemoTab>([
-  'releases',
-  'audience',
-  'analytics',
-  'settings',
-]);
-
+/**
+ * DemoReleasesExperience — the full demo page content wrapped in the real
+ * authenticated app shell (sidebar, header, nav) fed by mock data.
+ *
+ * Accepts optional dashboardData from a server component that fetches
+ * a featured creator from the DB via getDemoCreator().
+ */
 export function DemoReleasesExperience({
-  containerClassName,
+  dashboardData,
 }: {
-  readonly containerClassName?: string;
+  readonly dashboardData?: DashboardData;
 } = {}) {
-  const { activeTab, switchTab } = useDemoState();
-
   return (
-    <DemoShell
-      activeTab={activeTab}
-      onTabChange={switchTab}
-      containerClassName={containerClassName}
-    >
-      {activeTab === 'releases' && <DemoRealReleasesPanel />}
-      {activeTab === 'audience' && <DemoRealAudiencePanel />}
-      {activeTab === 'analytics' && <DemoAnalyticsPanel />}
-      {activeTab === 'settings' && <DemoSettingsPanel />}
-      {!FUNCTIONAL_TABS.has(activeTab) && <DemoEmptyState tab={activeTab} />}
-    </DemoShell>
+    <DemoAuthShell dashboardData={dashboardData}>
+      <DemoRealReleasesPanel />
+    </DemoAuthShell>
   );
 }
