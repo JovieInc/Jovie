@@ -2,11 +2,11 @@ import {
   and,
   asc,
   desc,
+  sql as drizzleSql,
   eq,
   gt,
   gte,
   or,
-  sql as drizzleSql,
   type SQL,
 } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';

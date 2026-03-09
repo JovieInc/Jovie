@@ -7,11 +7,11 @@
 
 import {
   and,
+  sql as drizzleSql,
   eq,
   gt,
   lt,
   or,
-  sql as drizzleSql,
   type SQL,
   type SQLWrapper,
 } from 'drizzle-orm';

@@ -1,6 +1,10 @@
 'use client';
 
-import { keepPreviousData, useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  keepPreviousData,
+  useInfiniteQuery,
+} from '@tanstack/react-query';
 import type { AudienceFilters } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import type { AudienceMember } from '@/types';
 import { PAGINATED_CACHE } from './cache-strategies';
@@ -59,8 +63,12 @@ export function useAudienceInfiniteQuery({
   >({
     queryKey:
       mode === 'members'
-        ? ([...queryKeys.audience.members(profileId, filterParams)] as unknown[])
-        : ([...queryKeys.audience.subscribers(profileId, filterParams)] as unknown[]),
+        ? ([
+            ...queryKeys.audience.members(profileId, filterParams),
+          ] as unknown[])
+        : ([
+            ...queryKeys.audience.subscribers(profileId, filterParams),
+          ] as unknown[]),
     queryFn: async ({ pageParam, signal }) => {
       const params = new URLSearchParams({
         pageSize: String(pageSize),
