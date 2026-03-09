@@ -1,6 +1,6 @@
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { getPopularityLevel } from '../hooks/useReleaseFilterCounts';
-import type { ReleaseFilters } from '../ReleaseTableSubheader';
+import type { ReleaseFilters, ReleaseView } from '../ReleaseTableSubheader';
 
 /**
  * Filter releases by text search query and structured filters.
@@ -16,9 +16,16 @@ import type { ReleaseFilters } from '../ReleaseTableSubheader';
 export function filterReleases(
   releases: readonly ReleaseViewModel[],
   filters: ReleaseFilters,
-  searchQuery: string
+  searchQuery: string,
+  releaseView?: ReleaseView
 ): ReleaseViewModel[] {
   return releases.filter(release => {
+    const normalizedType = release.releaseType?.toLowerCase();
+    const behavesLikeTrack =
+      normalizedType === 'single' || release.totalTracks <= 1;
+
+    if (releaseView === 'tracks' && !behavesLikeTrack) return false;
+    if (releaseView === 'releases' && behavesLikeTrack) return false;
     // Text search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();

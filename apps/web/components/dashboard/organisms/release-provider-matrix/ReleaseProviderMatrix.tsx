@@ -217,8 +217,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apply filters and search to rows
   const filteredRows = useMemo(
-    () => filterReleases(rows, filters, deferredSearchQuery),
-    [rows, filters, deferredSearchQuery]
+    () => filterReleases(rows, filters, deferredSearchQuery, releaseView),
+    [rows, filters, deferredSearchQuery, releaseView]
   );
 
   // Smart link gating

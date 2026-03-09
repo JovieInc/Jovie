@@ -1,12 +1,13 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, SimpleTooltip } from '@jovie/ui';
 import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
+import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { PROVIDER_TO_DSP } from '@/lib/discography/provider-domains';
 import type {
   ProviderKey,
@@ -70,6 +71,11 @@ export const TrackRow = memo(function TrackRow({
 
   // Count available providers
   const availableCount = track.providers.filter(p => p.url).length;
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const hasPlaybackUrl = Boolean(track.previewUrl || track.audioUrl);
+  const playbackUrl = track.previewUrl || track.audioUrl;
+  const isPlaying =
+    playbackState.activeTrackId === track.id && playbackState.isPlaying;
 
   // Get linked providers for compact display (only show providers with URLs)
   const linkedProviders = useMemo(() => {
@@ -84,8 +90,44 @@ export const TrackRow = memo(function TrackRow({
       className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
       onClick={onClick}
     >
-      {/* 1. Spacer for checkbox column (always visible) */}
-      {isVisible('select') && <td className='w-14' />}
+      {/* 1. Playback control column */}
+      {isVisible('select') && (
+        <td className='w-14 py-2'>
+          <div className='flex items-center justify-center'>
+            {hasPlaybackUrl ? (
+              <SimpleTooltip
+                content={isPlaying ? 'Pause preview' : 'Play preview'}
+                side='top'
+              >
+                <button
+                  type='button'
+                  onClick={event => {
+                    event.stopPropagation();
+                    if (!playbackUrl) return;
+                    toggleTrack({
+                      id: track.id,
+                      title: track.title,
+                      audioUrl: playbackUrl,
+                    }).catch(() => {});
+                  }}
+                  className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-white/[0.06]'
+                  aria-label={
+                    isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
+                  }
+                >
+                  <Icon
+                    name={isPlaying ? 'Pause' : 'Play'}
+                    className='h-3.5 w-3.5'
+                    aria-hidden
+                  />
+                </button>
+              </SimpleTooltip>
+            ) : (
+              <span className='h-6 w-6' />
+            )}
+          </div>
+        </td>
+      )}
 
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (

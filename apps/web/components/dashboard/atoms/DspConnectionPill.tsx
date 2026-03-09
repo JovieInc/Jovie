@@ -58,6 +58,7 @@ export function DspConnectionPill({
 }: DspConnectionPillProps) {
   const accent = PROVIDER_COLORS[provider];
   const label = PROVIDER_LABELS[provider];
+  const isPremiumPill = provider === 'spotify' || provider === 'apple_music';
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -68,15 +69,25 @@ export function DspConnectionPill({
       <span
         className={cn(
           'inline-flex items-center gap-1.5 rounded-md border py-1 pl-2.5 pr-3 text-xs font-medium',
+          isPremiumPill && 'border-white/15 bg-white/10 text-white',
           className
         )}
-        style={{
-          borderColor: `${accent}30`,
-          backgroundColor: `${accent}10`,
-        }}
+        style={
+          isPremiumPill
+            ? undefined
+            : {
+                borderColor: `${accent}30`,
+                backgroundColor: `${accent}10`,
+              }
+        }
       >
         <DspProviderIcon provider={provider} size='sm' className='gap-0' />
-        <span className='truncate max-w-[120px] text-secondary-token'>
+        <span
+          className={cn(
+            'truncate max-w-[120px] text-secondary-token',
+            isPremiumPill && 'text-white'
+          )}
+        >
           {artistName || 'Connected'}
         </span>
         <CheckCircle2 className='h-4 w-4 shrink-0' style={{ color: accent }} />
@@ -95,21 +106,32 @@ export function DspConnectionPill({
             onMouseLeave={() => setHovered(false)}
             className={cn(
               'inline-flex items-center gap-1.5 rounded-md border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
+              isPremiumPill &&
+                'border-white/15 bg-white/10 text-white hover:bg-white/15',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               className
             )}
             style={
               {
-                borderColor: `${accent}30`,
-                backgroundColor: `${accent}10`,
+                ...(isPremiumPill
+                  ? {}
+                  : {
+                      borderColor: `${accent}30`,
+                      backgroundColor: `${accent}10`,
+                    }),
                 '--tw-ring-color': `${accent}50`,
               } as React.CSSProperties
             }
             aria-label={`${label} connection: ${artistName || 'Connected'}`}
           >
             <DspProviderIcon provider={provider} size='sm' className='gap-0' />
-            <span className='truncate max-w-[120px] text-secondary-token'>
+            <span
+              className={cn(
+                'truncate max-w-[120px] text-secondary-token',
+                isPremiumPill && 'text-white'
+              )}
+            >
               {artistName || 'Connected'}
             </span>
             {hovered || menuOpen ? (

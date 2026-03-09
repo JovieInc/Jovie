@@ -8,7 +8,6 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { PopularityIcon } from './PopularityIcon';
 
 /** Maps ProviderKey to SocialIcon platform name (only those with SVG icons) */
 const PROVIDER_ICON_MAP: Partial<Record<ProviderKey, string>> = {
@@ -80,10 +79,6 @@ export const ReleaseCell = memo(function ReleaseCell({
     [toggleTrack, release.id, release.title, release.previewUrl]
   );
 
-  const manualOverrideCount = release.providers.filter(
-    provider => provider.source === 'manual'
-  ).length;
-
   const typeStyle = release.releaseType
     ? getReleaseTypeStyle(release.releaseType)
     : null;
@@ -108,7 +103,7 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [release.providers]);
 
   return (
-    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[24px_minmax(0,1fr)_minmax(88px,132px)_minmax(72px,120px)_20px_minmax(54px,92px)]'>
+    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[24px_minmax(0,1fr)_minmax(56px,84px)]'>
       <div className='flex w-6 items-center justify-center'>
         {hasPreview ? (
           <button
@@ -139,13 +134,10 @@ export const ReleaseCell = memo(function ReleaseCell({
         >
           {release.title}
         </TruncatedText>
-      </div>
-
-      <div className='min-w-0'>
         {artistName ? (
           <TruncatedText
             lines={1}
-            className='text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'
+            className='mt-0.5 text-[11px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
             {artistName}
           </TruncatedText>
@@ -153,37 +145,24 @@ export const ReleaseCell = memo(function ReleaseCell({
       </div>
 
       <div className='flex min-w-0 items-center gap-1.5'>
-        {showType && typeStyle && (
+        {showType && typeStyle ? (
           <Badge
             size='sm'
             className={`shrink-0 ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
           >
             {typeStyle.label}
           </Badge>
-        )}
-        {manualOverrideCount > 0 && (
-          <Badge
-            variant='secondary'
-            className='shrink-0 border-amber-500/15 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300'
-          >
-            {manualOverrideCount} edited
-          </Badge>
-        )}
-      </div>
-
-      <div className='flex w-4 items-center justify-start'>
-        <PopularityIcon popularity={release.spotifyPopularity} />
+        ) : null}
       </div>
 
       <div className='flex min-w-0 items-center justify-start'>
         {platformInfo ? (
           <SimpleTooltip content={platformInfo.allNames.join(', ')} side='top'>
-            <button
-              type='button'
-              className='inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 text-[11px] font-[450] tracking-[-0.01em] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
-              aria-label={`Available platforms: ${platformInfo.allNames.join(', ')}`}
-            >
-              <span className='flex items-center -space-x-0.5'>
+            <div className='inline-flex items-center gap-1.5 text-(--linear-text-tertiary)'>
+              <span className='sr-only'>
+                Available platforms: {platformInfo.allNames.join(', ')}
+              </span>
+              <span className='flex items-center gap-1'>
                 {platformInfo.visible.map(p => (
                   <SocialIcon
                     key={p.key}
@@ -198,7 +177,7 @@ export const ReleaseCell = memo(function ReleaseCell({
                   +{platformInfo.remaining}
                 </span>
               )}
-            </button>
+            </div>
           </SimpleTooltip>
         ) : null}
       </div>
