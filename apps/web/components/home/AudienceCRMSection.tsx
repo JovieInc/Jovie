@@ -1,88 +1,12 @@
-import {
-  ArrowUpRight,
-  DollarSign,
-  Globe,
-  Mail,
-  MapPin,
-  Users,
-} from 'lucide-react';
+'use client';
+
+import { DollarSign, Mail, MapPin, Users } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 import { Container } from '@/components/site/Container';
 
-/* ------------------------------------------------------------------ */
-/*  Mock CRM table data — matches real audience table patterns          */
-/* ------------------------------------------------------------------ */
-
-type IntentLevel = 'high' | 'medium' | 'low';
-
-const INTENT_DOT_COLORS: Record<IntentLevel, string> = {
-  high: '#22c55e',
-  medium: '#fbbf24',
-  low: '#a1a1aa',
-};
-
-const INTENT_TEXT_COLORS: Record<IntentLevel, string> = {
-  high: '#4ade80',
-  medium: '#fbbf24',
-  low: 'var(--linear-text-tertiary)',
-};
-
-const MOCK_FANS = [
-  {
-    id: 1,
-    name: 'Sarah M.',
-    email: 'sarah.m***@gmail.com',
-    city: 'Los Angeles, CA',
-    source: 'Instagram',
-    intent: 'high' as IntentLevel,
-    visits: 12,
-    tipAmount: '$5.00',
-    joinedAt: '2 days ago',
-  },
-  {
-    id: 2,
-    name: 'Jake T.',
-    email: 'jake.t***@outlook.com',
-    city: 'Nashville, TN',
-    source: 'TikTok',
-    intent: 'medium' as IntentLevel,
-    visits: 3,
-    tipAmount: null,
-    joinedAt: '4 days ago',
-  },
-  {
-    id: 3,
-    name: 'Priya K.',
-    email: 'priya.k***@yahoo.com',
-    city: 'London, UK',
-    source: 'Spotify',
-    intent: 'high' as IntentLevel,
-    visits: 8,
-    tipAmount: '$10.00',
-    joinedAt: '1 week ago',
-  },
-  {
-    id: 4,
-    name: 'Carlos R.',
-    email: 'carlos.r***@gmail.com',
-    city: 'Mexico City, MX',
-    source: 'Direct link',
-    intent: 'high' as IntentLevel,
-    visits: 15,
-    tipAmount: '$3.00',
-    joinedAt: '1 week ago',
-  },
-  {
-    id: 5,
-    name: 'Emma L.',
-    email: 'emma.l***@icloud.com',
-    city: 'Berlin, DE',
-    source: 'Twitter',
-    intent: 'low' as IntentLevel,
-    visits: 1,
-    tipAmount: null,
-    joinedAt: '2 weeks ago',
-  },
-];
+const DemoAudienceSection = lazy(
+  () => import('@/components/demo/DemoAudienceSection')
+);
 
 /* ------------------------------------------------------------------ */
 /*  Stat cards shown above the table                                    */
@@ -94,6 +18,57 @@ const STATS = [
   { label: 'Cities reached', value: '189', icon: MapPin },
   { label: 'Tips earned', value: '$1,204', icon: DollarSign },
 ];
+
+/* ------------------------------------------------------------------ */
+/*  Loading skeleton (matches old FansTable layout)                     */
+/* ------------------------------------------------------------------ */
+
+function TableSkeleton() {
+  return (
+    <div className='animate-pulse bg-[var(--linear-bg-surface-0)]'>
+      {/* Table header skeleton */}
+      <div className='flex items-center justify-between border-b border-[var(--linear-border-subtle)] px-5 py-3'>
+        <div className='flex items-center gap-2'>
+          <div className='h-4 w-24 rounded bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-4 w-8 rounded-full bg-[var(--linear-bg-surface-2)]' />
+        </div>
+        <div className='h-4 w-16 rounded bg-[var(--linear-bg-surface-2)]' />
+      </div>
+
+      {/* Column headers skeleton */}
+      <div className='flex items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
+        {['w-16', 'w-12', 'w-16', 'w-14', 'w-20', 'w-10'].map((width, i) => (
+          <div
+            key={`col-${width}-${i}`}
+            className={`h-3 ${width} rounded bg-[var(--linear-bg-surface-2)]`}
+          />
+        ))}
+      </div>
+
+      {/* Row skeletons */}
+      {Array.from({ length: 5 }, (_, i) => (
+        <div
+          key={`row-${i}`}
+          className='flex items-center gap-4 px-5 py-3'
+          style={{
+            borderBottom:
+              i < 4 ? '1px solid var(--linear-border-subtle)' : undefined,
+          }}
+        >
+          <div className='flex-1 space-y-1.5'>
+            <div className='h-3.5 w-28 rounded bg-[var(--linear-bg-surface-2)]' />
+            <div className='h-3 w-40 rounded bg-[var(--linear-bg-surface-2)] opacity-50' />
+          </div>
+          <div className='h-3 w-14 rounded bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-3 w-10 rounded bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-5 w-16 rounded-full bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-3 w-24 rounded bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-5 w-12 rounded-full bg-[var(--linear-bg-surface-2)]' />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  AudienceCRMSection                                                  */
@@ -194,145 +169,19 @@ export function AudienceCRMSection() {
                 ))}
               </div>
 
-              {/* Fans table */}
-              <FansTable />
+              {/* Real audience table (lazy-loaded) */}
+              <div className='relative min-h-[320px]'>
+                <Suspense fallback={<TableSkeleton />}>
+                  <DemoAudienceSection />
+                </Suspense>
+              </div>
 
               {/* Bottom gradient fade */}
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent z-20' />
             </div>
           </div>
         </div>
       </Container>
     </section>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Fans Table — matches real DashboardAudienceTableUnified patterns    */
-/* ------------------------------------------------------------------ */
-
-function FansTable() {
-  return (
-    <div className='bg-[var(--linear-bg-surface-0)]'>
-      {/* Table header */}
-      <div className='flex items-center justify-between border-b border-[var(--linear-border-subtle)] px-5 py-3'>
-        <div className='flex items-center gap-2'>
-          <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-            Recent fans
-          </span>
-          <span className='rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
-            {MOCK_FANS.length}
-          </span>
-        </div>
-        <div className='flex items-center gap-1 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-          <span>View all</span>
-          <ArrowUpRight className='h-3 w-3' aria-hidden='true' />
-        </div>
-      </div>
-
-      {/* Column headers — matches real audience table columns */}
-      <div className='grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
-          Visitor
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden sm:block'>
-          Intent
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden md:block'>
-          Returning
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden md:block'>
-          Source
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden sm:block'>
-          Location
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
-          LTV
-        </span>
-      </div>
-
-      {/* Rows */}
-      {MOCK_FANS.map((fan, i) => (
-        <div
-          key={fan.id}
-          className='grid grid-cols-[1fr_auto_auto_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-[var(--linear-bg-hover)]'
-          style={{
-            borderBottom:
-              i < MOCK_FANS.length - 1
-                ? '1px solid var(--linear-border-subtle)'
-                : undefined,
-          }}
-        >
-          {/* Name + email */}
-          <div className='min-w-0'>
-            <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-              {fan.name}
-            </p>
-            <p className='mt-0.5 truncate text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-              {fan.email}
-            </p>
-          </div>
-
-          {/* Intent — dot + colored label (matches AudienceIntentScoreCell) */}
-          <div className='hidden sm:flex items-center gap-2 text-[13px]'>
-            <span
-              className='inline-block size-1.5 shrink-0 rounded-full'
-              style={{ backgroundColor: INTENT_DOT_COLORS[fan.intent] }}
-              aria-hidden='true'
-            />
-            <span
-              className='text-[var(--linear-label-size)]'
-              style={{
-                color: INTENT_TEXT_COLORS[fan.intent],
-                fontWeight:
-                  fan.intent === 'high'
-                    ? 600
-                    : fan.intent === 'medium'
-                      ? 500
-                      : 400,
-              }}
-            >
-              {fan.intent.charAt(0).toUpperCase() + fan.intent.slice(1)}
-            </span>
-          </div>
-
-          {/* Returning — Yes/No badge (matches AudienceReturningCell) */}
-          <span className='hidden md:inline-flex text-[var(--linear-label-size)] text-[var(--linear-text-secondary)]'>
-            {fan.visits > 1 ? 'Yes' : 'No'}
-          </span>
-
-          {/* Source — pill badge */}
-          <span className='hidden md:inline-flex rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
-            {fan.source}
-          </span>
-
-          {/* Location */}
-          <span className='hidden sm:inline-flex items-center gap-1 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-            <Globe className='h-3 w-3 shrink-0' aria-hidden='true' />
-            {fan.city}
-          </span>
-
-          {/* LTV / Tip amount */}
-          {fan.tipAmount ? (
-            <span
-              className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)]'
-              style={{
-                color: 'var(--linear-success)',
-                backgroundColor:
-                  'oklch(from var(--linear-success) l c h / 0.12)',
-              }}
-            >
-              <DollarSign className='h-3 w-3' aria-hidden='true' />
-              {fan.tipAmount}
-            </span>
-          ) : (
-            <span className='inline-flex rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-tertiary)] bg-[var(--linear-bg-surface-2)]'>
-              --
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
   );
 }
