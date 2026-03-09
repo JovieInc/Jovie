@@ -8,6 +8,9 @@ import type { AudienceView } from './types';
 interface AudienceHeaderBadgeProps {
   readonly view: AudienceView;
   readonly onViewChange: (view: AudienceView) => void;
+  readonly totalAudienceCount: number;
+  readonly subscriberCount: number;
+  readonly anonymousCount: number;
 }
 
 const VIEW_OPTIONS: {
@@ -15,15 +18,26 @@ const VIEW_OPTIONS: {
   label: string;
   Icon: typeof Users;
 }[] = [
-  { value: 'all', label: 'All audience', Icon: Users },
+  { value: 'all', label: 'All Audience', Icon: Users },
   { value: 'subscribers', label: 'Followers', Icon: BellRing },
   { value: 'anonymous', label: 'Anonymous', Icon: Ghost },
 ];
 
+const numberFormatter = new Intl.NumberFormat();
+
 export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   view,
   onViewChange,
+  totalAudienceCount,
+  subscriberCount,
+  anonymousCount,
 }: AudienceHeaderBadgeProps) {
+  const countsByView: Record<AudienceView, number> = {
+    all: totalAudienceCount,
+    subscribers: subscriberCount,
+    anonymous: anonymousCount,
+  };
+
   return (
     <div className='flex items-center min-w-0 overflow-x-auto scrollbar-hide'>
       <fieldset className='inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0/80 p-[3px] backdrop-blur-sm'>
@@ -42,7 +56,7 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
             )}
           >
             <Icon className='h-3 w-3' />
-            {label}
+            {`${label} (${numberFormatter.format(countsByView[value] ?? 0)})`}
           </button>
         ))}
       </fieldset>

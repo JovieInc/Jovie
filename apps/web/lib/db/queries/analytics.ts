@@ -328,12 +328,9 @@ export async function getUserDashboardAnalytics(
     ]);
 
     const appUserId = userRow?.id;
-    const userIsPro = Boolean(userRow?.isPro);
     if (!appUserId) {
       throw new TypeError('User not found for Clerk ID');
     }
-
-    const dynamicEnabled = userIsPro;
 
     if (!creatorProfile) {
       throw new TypeError('Creator profile not found');
@@ -507,10 +504,6 @@ export async function getUserDashboardAnalytics(
     };
 
     if (view === 'traffic') {
-      return base;
-    }
-
-    if (!dynamicEnabled) {
       return base;
     }
 

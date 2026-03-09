@@ -73,6 +73,8 @@ export interface DashboardAudienceClientProps {
   readonly profileId?: string;
   readonly subscriberCount: number;
   readonly filters: AudienceFilters;
+  readonly anonymousCount: number;
+  readonly totalAudienceCount: number;
   readonly tourDates?: TourDateForMatching[];
 }
 
@@ -128,10 +130,12 @@ export function DashboardAudienceClient({
   profileId,
   subscriberCount,
   filters: initialFilters,
+  anonymousCount,
+  totalAudienceCount,
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   return (
-    <AudiencePanelProvider>
+    <AudiencePanelProvider initialMode='analytics'>
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -143,6 +147,8 @@ export function DashboardAudienceClient({
         profileId={profileId}
         subscriberCount={subscriberCount}
         filters={initialFilters}
+        anonymousCount={anonymousCount}
+        totalAudienceCount={totalAudienceCount}
         tourDates={tourDates}
       />
     </AudiencePanelProvider>
@@ -160,6 +166,8 @@ function DashboardAudienceClientInner({
   profileId,
   subscriberCount,
   filters: initialFilters,
+  anonymousCount,
+  totalAudienceCount,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
   // Register header actions with both panel toggle buttons
@@ -274,6 +282,8 @@ function DashboardAudienceClientInner({
             profileId={profileId}
             subscriberCount={subscriberCount}
             filters={initialFilters}
+            anonymousCount={anonymousCount}
+            totalAudienceCount={totalAudienceCount}
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={handleLoadMore}

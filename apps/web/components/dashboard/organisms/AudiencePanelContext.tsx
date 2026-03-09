@@ -28,10 +28,12 @@ const AudiencePanelContext = createContext<AudiencePanelContextValue | null>(
 
 export function AudiencePanelProvider({
   children,
+  initialMode = null,
 }: {
   readonly children: ReactNode;
+  readonly initialMode?: AudiencePanelMode | null;
 }) {
-  const [mode, setMode] = useState<AudiencePanelMode | null>(null);
+  const [mode, setMode] = useState<AudiencePanelMode | null>(initialMode);
 
   const toggle = useCallback((panel: AudiencePanelMode) => {
     setMode(prev => (prev === panel ? null : panel));
