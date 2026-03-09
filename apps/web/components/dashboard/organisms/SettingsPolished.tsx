@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { SettingsAdminSection } from '@/components/dashboard/organisms/SettingsAdminSection';
@@ -187,7 +188,13 @@ export function SettingsPolished({
   // When focusing a single section, show just that section
   if (focusSection) {
     const section = allSections.find(s => s.id === focusSection);
-    if (!section) return null;
+    if (!section) {
+      return (
+        <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
+          <SettingsErrorState message='This settings section could not be found.' />
+        </div>
+      );
+    }
 
     return (
       <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>

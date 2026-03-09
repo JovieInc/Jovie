@@ -37,6 +37,9 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection pool exhausted/i,
   /client has encountered a connection error/i,
   /terminating connection due to administrator command/i,
+  // Neon/Drizzle wraps low-level connection failures as "Failed query: <sql>".
+  // These are transient (dropped WebSocket, cold-start timeout) and should be retried.
+  /^failed query/i,
 ] as const;
 
 type RetryableErrorCandidate = {

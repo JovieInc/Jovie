@@ -11,7 +11,22 @@ export type ReleasePriority = 'urgent' | 'high' | 'medium' | 'low' | 'none';
 
 export type ReleaseType = 'Single' | 'EP' | 'Album';
 
-export type DemoTab = 'releases' | 'audience' | 'analytics' | 'settings';
+export type DemoTab =
+  | 'inbox'
+  | 'my-releases'
+  | 'campaigns'
+  | 'projects'
+  | 'views'
+  | 'releases'
+  | 'audience'
+  | 'triage'
+  | 'cycles'
+  | 'current'
+  | 'upcoming'
+  | 'catalog'
+  | 'catalog-views'
+  | 'analytics'
+  | 'settings';
 
 // ── Structured sub-types ──
 

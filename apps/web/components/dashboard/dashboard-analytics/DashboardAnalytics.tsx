@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DashboardRefreshButton } from '@/components/dashboard/molecules/DashboardRefreshButton';
+import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { captureException } from '@/lib/sentry/client-lite';
@@ -164,7 +165,11 @@ export function DashboardAnalytics() {
 
   const { analyticsRetentionDays } = usePlanGate();
 
-  if (!artist) return null;
+  if (!artist) {
+    return (
+      <PageErrorState message='Unable to load analytics. Your profile data is unavailable — please refresh the page.' />
+    );
+  }
 
   const fmt = numberFormatter;
 

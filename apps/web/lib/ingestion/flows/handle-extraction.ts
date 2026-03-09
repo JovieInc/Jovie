@@ -74,7 +74,7 @@ export const PLATFORM_EXTRACTION_STRATEGIES: Record<
       // Handle /artist/ID or /user/username
       if (handle === 'artist' && segments[1]) {
         // Store the full artist ID with prefix for later API lookup
-        return `artist-${segments[1]}`;
+        return `artist_${segments[1]}`;
       }
       if (handle === 'user' && segments[1]) {
         return segments[1];
@@ -117,8 +117,8 @@ export function extractHandleFromSocialUrl(url: string): string | null {
       return null;
     }
 
-    // Spotify artist IDs are case-sensitive base62 strings; preserve case for `artist-*`.
-    const isSpotifyArtist = handle.startsWith('artist-');
+    // Spotify artist IDs are case-sensitive base62 strings; preserve case for `artist_*`.
+    const isSpotifyArtist = handle.startsWith('artist_');
 
     // Clean up the handle
     handle = handle
@@ -136,7 +136,7 @@ export function extractHandleFromSocialUrl(url: string): string | null {
 
     // Validate handle format based on type
     const validPattern = isSpotifyArtist
-      ? /^artist-[A-Za-z0-9]+$/ // Spotify: base62 artist IDs with `artist-` prefix
+      ? /^artist_[A-Za-z0-9]+$/ // Spotify: base62 artist IDs with `artist_` prefix
       : /^[a-z0-9._-]+$/; // Standard: alphanumeric, underscores, hyphens, periods
 
     if (!validPattern.test(handle)) return null;

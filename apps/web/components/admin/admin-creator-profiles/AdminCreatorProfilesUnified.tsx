@@ -26,6 +26,7 @@ import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
+import { useDebouncedContactSave } from './useDebouncedContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 import { createCreatorProfileColumns } from './utils/column-definitions';
 
@@ -185,10 +186,17 @@ export function AdminCreatorProfilesUnified({
 
   const { handleAvatarUpload } = useAvatarUpload();
 
-  const { saveContact } = useContactSave({
+  const { saveContact, isSaving } = useContactSave({
     onSaveSuccess: updatedContact => {
       setDraftContact(updatedContact);
     },
+  });
+
+  useDebouncedContactSave({
+    effectiveContact,
+    sidebarOpen,
+    isSaving,
+    saveContact,
   });
 
   const { getContextMenuItems } = useContextMenuItems({
@@ -369,7 +377,6 @@ export function AdminCreatorProfilesUnified({
         onClose={handleSidebarClose}
         onRefresh={handleSidebarRefresh}
         onContactChange={handleContactChange}
-        onSave={saveContact}
         contextMenuItems={sidebarContextMenuItems}
         onAvatarUpload={handleAvatarUpload}
       />
@@ -381,7 +388,6 @@ export function AdminCreatorProfilesUnified({
       handleSidebarClose,
       handleSidebarRefresh,
       handleContactChange,
-      saveContact,
       sidebarContextMenuItems,
       handleAvatarUpload,
     ]

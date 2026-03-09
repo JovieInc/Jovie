@@ -71,7 +71,7 @@ export function TableRowActions({
         className={cn(
           'h-8 w-8 rounded-md transition-colors hover:bg-surface-2 disabled:opacity-50',
           isVerified
-            ? 'text-blue-500 [&_svg]:fill-blue-500 [&_svg]:stroke-white'
+            ? 'text-info [&_svg]:fill-info [&_svg]:stroke-white'
             : 'text-tertiary-token/40'
         )}
         onClick={async (e: React.MouseEvent) => {

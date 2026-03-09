@@ -958,17 +958,45 @@ export async function checkSpotifyConnection(): Promise<{
       return { connected: false, spotifyId: null, artistName: null };
     }
 
-    const settings = data.selectedProfile.settings as Record<
-      string,
-      unknown
-    > | null;
+    const profile = data.selectedProfile;
+    const settings = profile.settings as Record<string, unknown> | null;
     const artistName = (settings?.spotifyArtistName as string) ?? null;
 
-    return {
-      connected: !!data.selectedProfile.spotifyId,
-      spotifyId: data.selectedProfile.spotifyId ?? null,
-      artistName,
-    };
+    // Primary check: profile.spotifyId (set when user explicitly connects Spotify)
+    if (profile.spotifyId) {
+      return { connected: true, spotifyId: profile.spotifyId, artistName };
+    }
+
+    // Fallback: check dspArtistMatches for a confirmed Spotify match.
+    // Keeps this consistent with ConnectedDspList which checks both sources.
+    const [spotifyMatch] = await db
+      .select({
+        externalArtistId: dspArtistMatches.externalArtistId,
+        externalArtistName: dspArtistMatches.externalArtistName,
+        status: dspArtistMatches.status,
+      })
+      .from(dspArtistMatches)
+      .where(
+        and(
+          eq(dspArtistMatches.creatorProfileId, profile.id),
+          eq(dspArtistMatches.providerId, 'spotify')
+        )
+      )
+      .limit(1);
+
+    if (
+      spotifyMatch &&
+      (spotifyMatch.status === 'confirmed' ||
+        spotifyMatch.status === 'auto_confirmed')
+    ) {
+      return {
+        connected: true,
+        spotifyId: spotifyMatch.externalArtistId,
+        artistName: spotifyMatch.externalArtistName ?? artistName,
+      };
+    }
+
+    return { connected: false, spotifyId: null, artistName };
   } catch (error) {
     throwIfRedirect(error);
     return { connected: false, spotifyId: null, artistName: null };
@@ -1330,7 +1358,13 @@ export async function checkAppleMusicConnection(): Promise<{
   }
 
   try {
-    const profile = await requireProfile();
+    const data = await getDashboardData();
+
+    if (data.needsOnboarding || !data.selectedProfile) {
+      return { connected: false, artistName: null, artistId: null };
+    }
+
+    const profile = data.selectedProfile;
 
     const [match] = await db
       .select({
@@ -1347,18 +1381,28 @@ export async function checkAppleMusicConnection(): Promise<{
       )
       .limit(1);
 
-    if (!match) {
-      return { connected: false, artistName: null, artistId: null };
+    if (
+      match &&
+      (match.status === 'confirmed' || match.status === 'auto_confirmed')
+    ) {
+      return {
+        connected: true,
+        artistName: match.externalArtistName,
+        artistId: match.externalArtistId,
+      };
     }
 
-    const isConnected =
-      match.status === 'confirmed' || match.status === 'auto_confirmed';
+    // Fallback: check profile.appleMusicId (set when connected directly).
+    // Keeps this consistent with ConnectedDspList which checks both sources.
+    if (profile.appleMusicId) {
+      return {
+        connected: true,
+        artistName: null,
+        artistId: profile.appleMusicId,
+      };
+    }
 
-    return {
-      connected: isConnected,
-      artistName: isConnected ? match.externalArtistName : null,
-      artistId: isConnected ? match.externalArtistId : null,
-    };
+    return { connected: false, artistName: null, artistId: null };
   } catch (error) {
     throwIfRedirect(error);
     return { connected: false, artistName: null, artistId: null };

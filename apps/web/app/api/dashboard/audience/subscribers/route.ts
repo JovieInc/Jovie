@@ -20,6 +20,44 @@ const SORT_COLUMN_SQL: Record<string, string> = {
   createdAt: 'created_at',
 };
 
+/**
+ * Decoded cursor carrying the last-seen (sortValue, id) pair.
+ */
+interface SubscriberCursor {
+  sortValue: string | null;
+  id: string;
+}
+
+/**
+ * Encode a cursor from the last row of the current page.
+ */
+function encodeCursor(sortValue: string | null, id: string): string {
+  const payload: SubscriberCursor = { sortValue, id };
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
+}
+
+/**
+ * Decode a cursor from a base64 string. Returns null if invalid.
+ */
+function decodeCursor(raw: string): SubscriberCursor | null {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(raw, 'base64').toString('utf8')
+    ) as unknown;
+    if (
+      payload !== null &&
+      typeof payload === 'object' &&
+      'id' in payload &&
+      typeof (payload as SubscriberCursor).id === 'string'
+    ) {
+      return payload as SubscriberCursor;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -28,7 +66,7 @@ export async function GET(request: Request) {
         profileId: searchParams.get('profileId'),
         sort: searchParams.get('sort') ?? undefined,
         direction: searchParams.get('direction') ?? undefined,
-        page: searchParams.get('page') ?? undefined,
+        cursor: searchParams.get('cursor') ?? null,
         pageSize: searchParams.get('pageSize') ?? undefined,
       });
 
@@ -39,25 +77,49 @@ export async function GET(request: Request) {
         );
       }
 
-      const { profileId, sort, direction, page, pageSize } = parsed.data;
+      const {
+        profileId,
+        sort,
+        direction,
+        cursor: cursorRaw,
+        pageSize,
+      } = parsed.data;
 
       // Verify user owns the profile
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
-          { rows: [], total: 0 },
+          { rows: [], total: 0, nextCursor: null },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
       const sortCol = SORT_COLUMN_SQL[sort] ?? 'created_at';
       const dir = direction === 'asc' ? drizzleSql`ASC` : drizzleSql`DESC`;
-      const offset = (page - 1) * pageSize;
+      const isFirstPage = !cursorRaw;
+      const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
+
+      // Build the keyset WHERE clause for pagination.
+      // For (sortCol ASC, id ASC): after cursor means sortValue > cursor.sortValue
+      //   OR (sortValue = cursor.sortValue AND id > cursor.id)
+      // For (sortCol DESC, id DESC): after cursor means sortValue < cursor.sortValue
+      //   OR (sortValue = cursor.sortValue AND id < cursor.id)
+      const cursorFragment = cursor
+        ? direction === 'asc'
+          ? drizzleSql`AND (
+              ${drizzleSql.raw(sortCol)} > ${cursor.sortValue}
+              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id > ${cursor.id})
+            )`
+          : drizzleSql`AND (
+              ${drizzleSql.raw(sortCol)} < ${cursor.sortValue}
+              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id < ${cursor.id})
+            )`
+        : drizzleSql``;
 
       // Deduplicate by contact identifier: keep the most recent subscription per
       // unique phone/email using DISTINCT ON. A subquery is required because
       // DISTINCT ON forces the first ORDER BY key to match the distinct key;
-      // the outer query then applies the user-requested sort and pagination.
+      // the outer query then applies the user-requested sort and keyset cursor filter.
       const rowsResult = await tx.execute(drizzleSql`
         SELECT id, email, phone, country_code AS "countryCode", created_at AS "createdAt", channel
         FROM (
@@ -67,8 +129,9 @@ export async function GET(request: Request) {
           WHERE creator_profile_id = ${profileId}
           ORDER BY COALESCE(phone, email), created_at DESC
         ) deduped
-        ORDER BY ${drizzleSql.raw(sortCol)} ${dir}
-        LIMIT ${pageSize} OFFSET ${offset}
+        WHERE true ${cursorFragment}
+        ORDER BY ${drizzleSql.raw(sortCol)} ${dir}, id ${dir}
+        LIMIT ${pageSize}
       `);
 
       const rows = rowsResult.rows as Array<{
@@ -80,10 +143,29 @@ export async function GET(request: Request) {
         channel: string;
       }>;
 
+      // Derive nextCursor from the last row in the page
+      const lastRow = rows[rows.length - 1];
+      let nextCursor: string | null = null;
+      if (rows.length === pageSize && lastRow) {
+        // Pick the sort column value for the cursor
+        let sortValue: string | null = null;
+        if (sortCol === 'created_at') {
+          const v = lastRow.createdAt;
+          sortValue = v instanceof Date ? v.toISOString() : String(v);
+        } else if (sortCol === 'email') {
+          sortValue = lastRow.email;
+        } else if (sortCol === 'phone') {
+          sortValue = lastRow.phone;
+        } else if (sortCol === 'country_code') {
+          sortValue = lastRow.countryCode;
+        }
+        nextCursor = encodeCursor(sortValue, lastRow.id);
+      }
+
       // Only run the exact COUNT on the first page to avoid per-page overhead.
-      // Subsequent pages receive total: null; the client uses rows.length < pageSize
+      // Subsequent pages receive total: null; the client uses nextCursor === null
       // as the "no more pages" signal instead.
-      if (page === 1) {
+      if (isFirstPage) {
         const countResult = await tx.execute(drizzleSql`
           SELECT COUNT(*) AS total
           FROM (
@@ -100,13 +182,13 @@ export async function GET(request: Request) {
         );
 
         return NextResponse.json(
-          { rows, total },
+          { rows, total, nextCursor },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
       return NextResponse.json(
-        { rows, total: null },
+        { rows, total: null, nextCursor },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
