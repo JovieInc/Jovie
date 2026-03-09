@@ -32,6 +32,7 @@ import { logger } from '@/lib/utils/logger';
 
 // Safety limit: process max 5000 users per run
 const MAX_BATCHES = 50;
+const FIRST_PASS_CONCURRENCY = 5;
 const SECOND_PASS_REPAIR_CONCURRENCY = 5;
 
 export const runtime = 'nodejs';
@@ -141,17 +142,39 @@ async function reconcileUsersWithSubscriptions(
     const batch = await fetchUserBatch(db, lastUserId);
     if (batch.length === 0) break;
 
-    for (const user of batch) {
-      stats.usersChecked++;
-      lastUserId = user.id;
+    // Update cursor to last user in batch before parallel processing
+    lastUserId = batch[batch.length - 1].id;
 
-      try {
-        const result = await processSingleUser(db, stripe, user);
-        updateStatsFromResult(stats, errors, user.id, result);
-      } catch (error) {
-        stats.errors++;
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Error processing user ${user.id}: ${message}`);
+    // Process users with bounded concurrency to avoid Stripe rate limits
+    for (
+      let chunkStart = 0;
+      chunkStart < batch.length;
+      chunkStart += FIRST_PASS_CONCURRENCY
+    ) {
+      const userChunk = batch.slice(
+        chunkStart,
+        chunkStart + FIRST_PASS_CONCURRENCY
+      );
+
+      const results = await Promise.allSettled(
+        userChunk.map(user => processSingleUser(db, stripe, user))
+      );
+
+      for (let i = 0; i < results.length; i++) {
+        stats.usersChecked++;
+        const result = results[i];
+        const user = userChunk[i];
+
+        if (result.status === 'fulfilled') {
+          updateStatsFromResult(stats, errors, user.id, result.value);
+        } else {
+          stats.errors++;
+          const message =
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason);
+          errors.push(`Error processing user ${user.id}: ${message}`);
+        }
       }
     }
 

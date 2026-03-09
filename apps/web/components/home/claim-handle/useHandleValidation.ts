@@ -119,8 +119,10 @@ export function useHandleValidation(handle: string): HandleValidationResult {
       } catch (err: unknown) {
         clearTimeout(timeoutId);
 
-        // Don't show error for intentional aborts (user kept typing)
+        // Aborts happen from user typing (effect cleanup) or fetch timeout.
+        // Either way, reset checking so the UI doesn't get stuck.
         if (err instanceof DOMException && err.name === 'AbortError') {
+          setChecking(false);
           return;
         }
 

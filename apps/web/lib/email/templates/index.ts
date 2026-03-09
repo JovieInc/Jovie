@@ -20,6 +20,13 @@ export {
   getDspBioUpdateSubject,
   getDspBioUpdateText,
 } from './dsp-bio-update';
+export type { FounderWelcomeTemplateData } from './founder-welcome';
+export {
+  getFounderWelcomeEmail,
+  getFounderWelcomeHtml,
+  getFounderWelcomeSubject,
+  getFounderWelcomeText,
+} from './founder-welcome';
 export type { TipThankYouTemplateData } from './tip-thank-you';
 export {
   getTipThankYouEmail,

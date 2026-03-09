@@ -28,12 +28,12 @@ interface AudienceTableSubheaderProps {
   readonly rows: AudienceMember[];
   /** Selected row IDs for filtered export */
   readonly selectedIds: Set<string>;
-  /** Total subscriber count (export disabled when 0) */
-  readonly subscriberCount: number;
-  /** Total row count for the current view */
-  readonly total: number;
-  /** Total audience members across all views */
-  readonly totalAudienceCount?: number;
+  /** Total subscriber count. Null when the COUNT query was skipped for performance (JOV-1262). */
+  readonly subscriberCount: number | null;
+  /** Total row count for the current view. Null when the COUNT query was skipped (JOV-1262, JOV-1264). */
+  readonly total: number | null;
+  /** Total audience members across all views. Null when the COUNT query was skipped (JOV-1262). */
+  readonly totalAudienceCount?: number | null;
 }
 
 /**
@@ -50,7 +50,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   total,
   totalAudienceCount,
 }: AudienceTableSubheaderProps) {
-  const hasData = total > 0;
+  const hasData = rows.length > 0;
 
   return (
     <div className='border-b border-subtle bg-transparent'>
