@@ -18,6 +18,7 @@ vi.mock('@/lib/redis', () => ({
 
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
+  getClient: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
