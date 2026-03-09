@@ -1,12 +1,14 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
+import { Pause, Play } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
+import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { PROVIDER_TO_DSP } from '@/lib/discography/provider-domains';
 import type {
   ProviderKey,
@@ -51,6 +53,7 @@ export const TrackRow = memo(function TrackRow({
   isSelected,
   onClick,
 }: TrackRowProps) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
   // Helper to check if a column is visible
   const isVisible = (id: string) => columnVisibility?.[id] !== false;
   // Format track number with disc number if multi-disc
@@ -79,13 +82,52 @@ export const TrackRow = memo(function TrackRow({
     });
   }, [allProviders, providerMap]);
 
+  const previewUrl = track.previewUrl || track.audioUrl;
+  const canPlay = Boolean(previewUrl);
+  const isActiveTrack = playbackState.activeTrackId === track.id;
+  const isPlaying = isActiveTrack && playbackState.isPlaying;
+
+  const handleTogglePlayback = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!previewUrl) return;
+      toggleTrack({
+        id: track.id,
+        title: track.title,
+        audioUrl: previewUrl,
+      }).catch(() => {});
+    },
+    [previewUrl, toggleTrack, track.id, track.title]
+  );
+
   return (
     <tr
       className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
       onClick={onClick}
     >
       {/* 1. Spacer for checkbox column (always visible) */}
-      {isVisible('select') && <td className='w-14' />}
+      {isVisible('select') && (
+        <td className='w-14 py-2'>
+          <div className='flex items-center justify-center'>
+            {canPlay ? (
+              <button
+                type='button'
+                onClick={handleTogglePlayback}
+                className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-white/[0.06]'
+                aria-label={
+                  isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
+                }
+              >
+                {isPlaying ? (
+                  <Pause className='h-3 w-3' />
+                ) : (
+                  <Play className='h-3 w-3' />
+                )}
+              </button>
+            ) : null}
+          </div>
+        </td>
+      )}
 
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
