@@ -55,6 +55,7 @@ const DISPOSABLE_DOMAINS = new Set([
 
 const ROLE_PREFIXES = [
   'noreply',
+  'donotreply',
   'admin',
   'webmaster',
   'postmaster',
@@ -73,10 +74,10 @@ export interface EmailFilterResult {
 }
 
 function isRandomLocalPart(local: string): boolean {
-  if (local.length <= 8) return false;
+  if (local.length < 30) return false;
   const matches = local.match(CONSONANTS_AND_DIGITS);
   const ratio = (matches?.length ?? 0) / local.length;
-  return ratio > 0.5;
+  return ratio > 0.7;
 }
 
 export function filterEmail(email: string): EmailFilterResult {
@@ -107,9 +108,9 @@ export function filterEmail(email: string): EmailFilterResult {
 
   if (isRandomLocalPart(local)) {
     return {
-      invalid: false,
-      suspicious: true,
-      reason: 'Possibly random local part',
+      invalid: true,
+      suspicious: false,
+      reason: 'Spam trap pattern: random local part',
     };
   }
 
