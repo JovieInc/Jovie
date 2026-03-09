@@ -26,7 +26,6 @@ import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPil
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
-import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -50,6 +49,13 @@ import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
 import { useReleaseProviderMatrix } from './useReleaseProviderMatrix';
 import { filterReleases } from './utils/filterReleases';
+
+// Lazy load AddReleaseSidebar
+const AddReleaseSidebar = lazy(() =>
+  import('./AddReleaseSidebar').then(m => ({
+    default: m.AddReleaseSidebar,
+  }))
+);
 
 // Lazy load ReleaseSidebar - reduces initial bundle by ~30-50KB
 const ReleaseSidebar = lazy(() =>
@@ -88,6 +94,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(initialImporting);
   const [spotifySearchOpen, setSpotifySearchOpen] = useState(false);
+
+  // Add Release sidebar state
+  const [addReleaseOpen, setAddReleaseOpen] = useState(false);
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
@@ -419,10 +428,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [router]);
 
   const handleNewRelease = useCallback(() => {
-    const prompt =
-      "I'd like to add a new release to my discography. Help me set it up.";
-    const encoded = encodeURIComponent(prompt);
-    router.push(`${APP_ROUTES.CHAT}?q=${encoded}`);
+    setAddReleaseOpen(true);
+  }, []);
+
+  const handleAddReleaseCreated = useCallback(() => {
+    router.refresh();
   }, [router]);
 
   // Artwork upload handler - calls the artwork upload API endpoint
@@ -941,6 +951,16 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           onImportStart={handleImportStart}
         />
       </Suspense>
+
+      {canCreateManualReleases && (
+        <Suspense fallback={null}>
+          <AddReleaseSidebar
+            isOpen={addReleaseOpen}
+            onClose={() => setAddReleaseOpen(false)}
+            onCreated={handleAddReleaseCreated}
+          />
+        </Suspense>
+      )}
     </>
   );
 });
