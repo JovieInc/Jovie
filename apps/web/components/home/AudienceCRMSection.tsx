@@ -38,24 +38,30 @@ function TableSkeleton() {
       {/* Column headers skeleton */}
       <div className='flex items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
         {[
-          { id: 'col-name', w: 'w-16' },
-          { id: 'col-email', w: 'w-12' },
-          { id: 'col-source', w: 'w-16' },
-          { id: 'col-date', w: 'w-14' },
-          { id: 'col-location', w: 'w-20' },
-          { id: 'col-status', w: 'w-10' },
-        ].map(({ id, w }) => (
+          { key: 'col-name', width: 'w-16' },
+          { key: 'col-city', width: 'w-12' },
+          { key: 'col-source', width: 'w-16' },
+          { key: 'col-date', width: 'w-14' },
+          { key: 'col-status', width: 'w-20' },
+          { key: 'col-tips', width: 'w-10' },
+        ].map(({ key, width }) => (
           <div
-            key={id}
-            className={`h-3 ${w} rounded bg-[var(--linear-bg-surface-2)]`}
+            key={key}
+            className={`h-3 ${width} rounded bg-[var(--linear-bg-surface-2)]`}
           />
         ))}
       </div>
 
       {/* Row skeletons */}
-      {['row-a', 'row-b', 'row-c', 'row-d', 'row-e'].map((id, i) => (
+      {[
+        'skeleton-row-1',
+        'skeleton-row-2',
+        'skeleton-row-3',
+        'skeleton-row-4',
+        'skeleton-row-5',
+      ].map((rowKey, i) => (
         <div
-          key={id}
+          key={rowKey}
           className='flex items-center gap-4 px-5 py-3'
           style={{
             borderBottom:
@@ -102,15 +108,14 @@ export function AudienceCRMSection() {
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Your fans. Your list.
+              Your audience.
+              <br />
+              Finally yours.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Every visit captures an email, a city, a referral source. No
                 integrations, no extra tools — just a CRM that fills itself.
-              </p>
-              <p className='mt-3 text-[13px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
-                Sync Spotify. Jovie does the rest.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in CRM
@@ -119,12 +124,7 @@ export function AudienceCRMSection() {
           </div>
 
           {/* Product demo */}
-          <div
-            className='relative mt-16 md:mt-20 mx-auto w-full'
-            style={{
-              perspective: '1200px',
-            }}
-          >
+          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
             {/* Dashboard window */}
             <div
               className='relative overflow-hidden rounded-xl md:rounded-2xl'
@@ -136,8 +136,6 @@ export function AudienceCRMSection() {
                   '0 8px 40px rgba(0,0,0,0.35)',
                   '0 24px 80px rgba(0,0,0,0.25)',
                 ].join(', '),
-                transform: 'rotateX(2deg)',
-                transformOrigin: 'center bottom',
               }}
             >
               {/* Shine border overlay */}
@@ -197,28 +195,16 @@ export function AudienceCRMSection() {
                 ))}
               </div>
 
-              {/* Real audience table (lazy-loaded) */}
-              <div className='relative overflow-hidden'>
+              {/* Real audience table (lazy-loaded, clipped to ~5 visible rows) */}
+              <div className='relative max-h-[360px] overflow-hidden'>
                 <Suspense fallback={<TableSkeleton />}>
                   <DemoAudienceSection />
                 </Suspense>
               </div>
-            </div>
 
-            {/* Reflection */}
-            <div
-              aria-hidden='true'
-              className='pointer-events-none mt-0 h-24 w-full rounded-xl'
-              style={{
-                background:
-                  'linear-gradient(to bottom, rgba(255,255,255,0.02), transparent)',
-                transform: 'rotateX(180deg) scaleY(0.3)',
-                opacity: 0.3,
-                maskImage: 'linear-gradient(to bottom, black 20%, transparent)',
-                WebkitMaskImage:
-                  'linear-gradient(to bottom, black 20%, transparent)',
-              }}
-            />
+              {/* Bottom gradient fade */}
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent z-20' />
+            </div>
           </div>
         </div>
       </Container>

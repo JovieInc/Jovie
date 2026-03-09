@@ -13,9 +13,8 @@ import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
-// ISR: revalidate every 24 hours so featured creators from the database
-// are refreshed without forcing fully dynamic rendering.
-export const revalidate = 86400;
+// Marketing pages must remain fully static.
+export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The link in bio your music deserves.`;
@@ -231,21 +230,9 @@ export default function HomePage() {
       <AuthRedirectHandler />
 
       {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
       {/* Hero + logo bar fill the viewport together (minus fixed header) */}
       <div className='flex flex-col'>

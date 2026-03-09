@@ -112,10 +112,11 @@ setup('authenticate', async ({ page, baseURL }) => {
     }
   }
 
-  // 5. Navigate to dashboard profile to verify auth + warm up route
-  // Use DASHBOARD_PROFILE instead of DASHBOARD (which redirects to chat)
+  // 5. Navigate to chat to verify auth + warm up route
+  // DASHBOARD_PROFILE is deprecated (it just redirects to CHAT), so navigate
+  // directly to CHAT to avoid a 307 → 404 chain on certain server configs.
   // Use 'domcontentloaded' to avoid Sentry blocking 'load'/'networkidle'
-  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+  await page.goto(APP_ROUTES.CHAT, {
     waitUntil: 'domcontentloaded',
     timeout: 120_000,
   });

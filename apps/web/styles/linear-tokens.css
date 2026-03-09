@@ -266,7 +266,7 @@
   --linear-text-primary: lch(100% 0 272);
   --linear-text-secondary: lch(90.65% 1.35 272);
   --linear-text-tertiary: lch(62.6% 1.35 272);
-  --linear-text-quaternary: lch(50% 1.35 272);
+  --linear-text-quaternary: lch(45% 1.35 272);
   --linear-text-inverse: oklch(5% 0.005 260);
   /* Backgrounds — re-extracted from linear.app/demo dark mode (2026-03-05) */
   /* Linear's exact dark token values: --bg-sidebar-dark:#090909, --bg-base-color:#101012 */

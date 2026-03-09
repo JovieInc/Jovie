@@ -428,10 +428,13 @@ export default function Home() {
       fallback={
         <div className='min-h-screen flex items-center justify-center p-6'>
           <div className='w-full max-w-xl text-center'>
-            {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading indicator */}
-            <div className='text-xl' role='status' aria-label='Loading quiz'>
+            <output
+              className='text-xl'
+              aria-live='polite'
+              aria-label='Loading quiz'
+            >
               Loading...
-            </div>
+            </output>
           </div>
         </div>
       }
