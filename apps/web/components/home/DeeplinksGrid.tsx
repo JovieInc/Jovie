@@ -1,294 +1,599 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { Bell } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArtistName } from '@/components/atoms/ArtistName';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { Avatar } from '@/components/molecules/Avatar';
 import { Container } from '@/components/site/Container';
+import { PhoneFrame } from './PhoneFrame';
 
 /* ------------------------------------------------------------------ */
-/*  Card mockups — premium fidelity                                    */
+/*  Mode data                                                          */
 /* ------------------------------------------------------------------ */
 
-function TipMockup() {
+interface ModeData {
+  id: string;
+  headline: string;
+  description: string;
+  stat: { value: string; label: string };
+  slug: string;
+}
+
+const MODES: ModeData[] = [
+  {
+    id: 'profile',
+    headline: 'Capture every visitor.',
+    description:
+      'First-time visitors see a notification opt-in. Return visitors see their preferred action. Every visit builds your audience.',
+    stat: { value: '342', label: 'emails captured this month' },
+    slug: '',
+  },
+  {
+    id: 'tour',
+    headline: 'Fill every show.',
+    description:
+      'A fan in Atlanta taps your link. Jovie surfaces the nearest show with a ticket button — not a list of 30 cities, just theirs.',
+    stat: { value: '847', label: 'ticket clicks this month' },
+    slug: 'tour',
+  },
+  {
+    id: 'tip',
+    headline: 'Turn fans into supporters.',
+    description:
+      'Someone scans the QR at your merch table. Jovie shows a one-tap tip flow — Venmo, Cash App, whatever they have. Average tip: $7.',
+    stat: { value: '$1,204', label: 'in tips this month' },
+    slug: 'tip',
+  },
+  {
+    id: 'listen',
+    headline: 'Direct streams to every platform.',
+    description:
+      'A new listener taps your link. Jovie detects their platform and opens Spotify, Apple Music, or YouTube — no choice paralysis, just plays.',
+    stat: { value: '3,421', label: 'platform clicks this month' },
+    slug: 'listen',
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/*  Mock artist (shared with hero)                                     */
+/* ------------------------------------------------------------------ */
+
+const MOCK_ARTIST = {
+  name: 'Tim White',
+  handle: 'timwhite',
+  image:
+    'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
+  isVerified: true,
+} as const;
+
+/* ------------------------------------------------------------------ */
+/*  Phone panel content                                                */
+/* ------------------------------------------------------------------ */
+
+const CTA_CLASS =
+  'inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-btn-primary px-8 py-3 text-[13px] font-semibold text-btn-primary-foreground shadow-sm';
+
+const CONTENT_HEIGHT = 196;
+
+function ListenContent() {
+  const dsps = [
+    { platform: 'spotify', label: 'Spotify' },
+    { platform: 'applemusic', label: 'Apple Music' },
+    { platform: 'youtube', label: 'YouTube' },
+  ] as const;
   return (
-    <div className='flex flex-col gap-3'>
-      <p className='text-[10px] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.15em] text-[var(--linear-text-tertiary)]'>
+    <div className='flex h-full flex-col justify-center gap-2'>
+      {dsps.map(dsp => (
+        <button key={dsp.platform} type='button' className={CTA_CLASS}>
+          <SocialIcon platform={dsp.platform} size={16} aria-hidden />
+          {dsp.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TipContent() {
+  return (
+    <div className='flex h-full flex-col justify-center gap-3'>
+      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
-      <div className='grid grid-cols-3 gap-3 border-0 p-0 m-0'>
-        {['$3', '$5', '$10'].map(amt => (
+      <div className='grid grid-cols-3 gap-2'>
+        {([3, 5, 10] as const).map((amount, i) => (
           <div
-            key={amt}
-            className='group relative w-full aspect-square rounded-2xl border text-center transition-all duration-150 ease-out flex flex-col items-center justify-center gap-0.5'
-            style={{
-              backgroundColor:
-                amt === '$5'
-                  ? 'var(--linear-text-primary)'
-                  : 'var(--linear-bg-surface-0)',
-              color:
-                amt === '$5'
-                  ? 'var(--linear-bg-page)'
-                  : 'var(--linear-text-primary)',
-              border:
-                amt === '$5'
-                  ? '1px solid transparent'
-                  : '1px solid var(--linear-border-subtle)',
-              boxShadow: amt === '$5' ? 'var(--linear-shadow-card)' : 'none',
-            }}
+            key={amount}
+            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border text-center ${
+              i === 1
+                ? 'border-transparent bg-btn-primary text-btn-primary-foreground shadow-sm'
+                : 'border-default bg-surface-1 text-primary-token'
+            }`}
           >
             <span
-              className='text-[10px] font-[var(--linear-font-weight-medium)] uppercase tracking-wider'
-              style={{
-                color:
-                  amt === '$5'
-                    ? 'var(--linear-text-inverse)'
-                    : 'var(--linear-text-tertiary)',
-              }}
+              className={`text-[10px] font-medium uppercase tracking-wider ${
+                i === 1
+                  ? 'text-btn-primary-foreground/70'
+                  : 'text-secondary-token'
+              }`}
             >
               USD
             </span>
-            <span className='text-2xl font-[var(--linear-font-weight-semibold)] tabular-nums tracking-tight'>
-              {amt}
+            <span className='text-xl font-semibold tabular-nums tracking-tight'>
+              ${amount}
             </span>
           </div>
         ))}
-      </div>
-      <div
-        className='flex items-center justify-center rounded-xl px-4 py-3 text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] w-full mt-1 bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)]'
-        style={{
-          boxShadow: 'var(--linear-shadow-card)',
-        }}
-      >
-        Continue with Venmo
       </div>
     </div>
   );
 }
 
-function TourMockup() {
-  const shows = [
-    { city: 'Atlanta, GA', venue: 'The Earl', date: 'Mar 14' },
-    { city: 'Nashville, TN', venue: 'Exit/In', date: 'Mar 21' },
-    { city: 'Brooklyn, NY', venue: "Baby's All Right", date: 'Apr 4' },
-  ];
+const MOCK_TOUR_DATES = [
+  { city: 'Atlanta, GA', venue: 'The Masquerade', date: 'Mar 22' },
+  { city: 'Nashville, TN', venue: 'Exit/In', date: 'Mar 28' },
+  { city: 'Austin, TX', venue: 'Mohawk', date: 'Apr 4' },
+] as const;
+
+function TourContent() {
   return (
-    <div className='flex flex-col gap-2'>
-      {shows.map(show => (
+    <div className='flex h-full flex-col justify-center gap-2'>
+      {MOCK_TOUR_DATES.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'
+          className='flex w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-4 py-3'
         >
-          <div className='flex flex-col gap-0.5'>
-            <span className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-medium)] text-[var(--linear-caption-size)] tracking-[-0.01em]'>
-              {show.city}
-            </span>
-            <span className='text-[var(--linear-text-tertiary)] text-[var(--linear-label-size)]'>
-              {show.date} · {show.venue}
-            </span>
+          <div className='min-w-0'>
+            <p className='text-[13px] font-medium text-primary-token truncate'>
+              {show.venue}
+            </p>
+            <p className='text-[11px] text-tertiary-token'>{show.city}</p>
           </div>
-          <button
-            type='button'
-            className='px-3 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] hover:opacity-90 transition-opacity'
-          >
-            Tickets
-          </button>
+          <span className='shrink-0 text-[11px] font-medium text-secondary-token'>
+            {show.date}
+          </span>
         </div>
       ))}
     </div>
   );
 }
 
-import { Calendar, Disc, FileText, Mail, Music, Youtube } from 'lucide-react';
-
-function ContactMockup() {
-  const contacts = [
-    { role: 'Management', name: 'Sarah Kim', icon: Mail },
-    { role: 'Booking', name: 'Marcus Dean', icon: Calendar },
-    { role: 'Publicist', name: 'Ava Chen', icon: FileText },
-  ];
+function ProfileContent() {
+  const platforms = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
   return (
-    <div className='flex flex-col gap-2'>
-      {contacts.map(c => {
-        const Icon = c.icon;
-        return (
-          <div
-            key={c.role}
-            className='flex items-center gap-3 p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'
+    <div className='flex h-full flex-col justify-center gap-4'>
+      <button type='button' className={CTA_CLASS}>
+        Turn on notifications
+      </button>
+      <div className='flex items-center justify-center gap-1.5'>
+        {platforms.map(p => (
+          <span
+            key={p}
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary-token'
           >
-            <div className='w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--linear-bg-surface-1)]'>
-              <Icon className='w-4 h-4 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-primary)] transition-colors' />
-            </div>
-            <div className='flex flex-col flex-1'>
-              <span className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-medium)] text-[var(--linear-caption-size)]'>
-                {c.role}
-              </span>
-              <span className='text-[var(--linear-text-tertiary)] text-[var(--linear-label-size)]'>
-                {c.name}
-              </span>
-            </div>
-          </div>
-        );
-      })}
+            <SocialIcon platform={p} size={18} aria-hidden />
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
 
-function ListenMockup() {
-  const dsps = [
-    { name: 'Spotify', icon: Disc, color: '#1DB954' },
-    { name: 'Apple Music', icon: Music, color: '#FA243C' },
-    { name: 'YouTube', icon: Youtube, color: '#FF0000' },
-  ];
+const MODE_CONTENT: Record<string, React.ReactNode> = {
+  listen: <ListenContent />,
+  tip: <TipContent />,
+  tour: <TourContent />,
+  profile: <ProfileContent />,
+};
+
+/* ------------------------------------------------------------------ */
+/*  Scroll-driven phone (desktop only)                                 */
+/* ------------------------------------------------------------------ */
+
+function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
   return (
-    <div className='flex flex-col gap-2'>
-      {dsps.map(dsp => {
-        const Icon = dsp.icon;
-        return (
+    <PhoneFrame>
+      {/* Nav bar */}
+      <div className='flex items-center justify-end px-4 pt-10 pb-1'>
+        <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
+          <Bell className='h-4 w-4' />
+        </CircleIconButton>
+      </div>
+
+      {/* Artist identity */}
+      <div className='flex flex-col items-center px-5 pb-2'>
+        <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+          <Avatar
+            src={MOCK_ARTIST.image}
+            alt={MOCK_ARTIST.name}
+            name={MOCK_ARTIST.name}
+            size='display-md'
+            verified={false}
+          />
+        </div>
+        <div className='mt-2.5 text-center'>
+          <ArtistName
+            name={MOCK_ARTIST.name}
+            handle={MOCK_ARTIST.handle}
+            isVerified={MOCK_ARTIST.isVerified}
+            size='md'
+            showLink={false}
+            as='p'
+          />
+          <p className='mt-0.5 text-[11px] text-secondary-token tracking-[0.2em] uppercase'>
+            Artist
+          </p>
+        </div>
+      </div>
+
+      {/* Mode dots */}
+      <div className='flex items-center justify-center gap-1.5 py-2.5'>
+        {MODES.map((mode, i) => (
           <div
-            key={dsp.name}
-            className='flex items-center justify-between p-3 rounded-xl transition-colors hover:bg-[var(--linear-bg-hover)] cursor-pointer group bg-[var(--linear-bg-surface-0)] border border-[var(--linear-border-subtle)]'
+            key={mode.id}
+            className='rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
+            style={{
+              width: i === activeIndex ? 16 : 6,
+              height: 6,
+              backgroundColor:
+                i === activeIndex
+                  ? 'rgb(247,248,248)'
+                  : 'rgba(255,255,255,0.2)',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Content — crossfade between modes */}
+      <div
+        className='relative overflow-hidden'
+        style={{ height: CONTENT_HEIGHT }}
+      >
+        {MODES.map((mode, i) => (
+          <div
+            key={mode.id}
+            className='absolute inset-0 px-5 transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+            style={{
+              opacity: i === activeIndex ? 1 : 0,
+              pointerEvents: i === activeIndex ? 'auto' : 'none',
+            }}
           >
-            <div className='flex items-center gap-3'>
-              <div className='w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--linear-bg-surface-1)]'>
-                <Icon className='w-4 h-4' style={{ color: dsp.color }} />
-              </div>
-              <span className='text-[var(--linear-text-primary)] font-[var(--linear-font-weight-medium)] text-[var(--linear-caption-size)]'>
-                {dsp.name}
-              </span>
-            </div>
-            <button
-              type='button'
-              className='px-4 py-1.5 rounded-full text-[12px] font-medium bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)] hover:bg-[var(--linear-bg-hover)] transition-colors'
-            >
-              Play
-            </button>
+            {MODE_CONTENT[mode.id]}
           </div>
-        );
-      })}
+        ))}
+      </div>
+
+      {/* Branding */}
+      <div className='pb-3 pt-1 text-center'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-tertiary-token/40'>
+          Powered by Jovie
+        </p>
+      </div>
+    </PhoneFrame>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Crossfade text block — sizes to tallest child                      */
+/* ------------------------------------------------------------------ */
+
+function CrossfadeBlock({
+  activeIndex,
+  children,
+}: {
+  readonly activeIndex: number;
+  readonly children: React.ReactNode[];
+}) {
+  return (
+    <div className='grid'>
+      {children.map((child, i) => (
+        <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: static array, order never changes
+          key={i}
+          aria-hidden={i !== activeIndex}
+          className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+          style={{
+            opacity: i === activeIndex ? 1 : 0,
+            gridArea: '1 / 1',
+          }}
+        >
+          {child}
+        </div>
+      ))}
     </div>
   );
 }
 
 /* ------------------------------------------------------------------ */
-/*  Card data                                                          */
+/*  Mobile card — static mode card for non-scroll-hijack layout        */
 /* ------------------------------------------------------------------ */
 
-interface CardData {
-  slugPath: string;
-  description: string;
-  mockup: ReactNode;
+function MobileCard({ mode }: { readonly mode: ModeData }) {
+  return (
+    <div
+      className='rounded-xl px-6 py-6'
+      style={{
+        backgroundColor: 'rgba(255,255,255,0.02)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      <h3 className='text-lg font-semibold tracking-tight text-[var(--linear-text-primary)]'>
+        {mode.headline}
+      </h3>
+      <p className='mt-2 text-[14px] leading-[1.6] text-[var(--linear-text-secondary)]'>
+        {mode.description}
+      </p>
+      <div className='mt-4 flex items-baseline justify-between'>
+        <div>
+          <span className='text-xl font-semibold text-primary-token tabular-nums tracking-tight'>
+            {mode.stat.value}
+          </span>
+          <span className='ml-2 text-[12px] text-tertiary-token'>
+            {mode.stat.label}
+          </span>
+        </div>
+        <span className='font-mono text-[12px] text-[var(--linear-text-tertiary)]'>
+          /tim{mode.slug ? `/${mode.slug}` : ''}
+        </span>
+      </div>
+    </div>
+  );
 }
 
-const cards: CardData[] = [
-  {
-    slugPath: 'tip',
-    description: 'QR on merch table. Fans tip in one tap.',
-    mockup: <TipMockup />,
-  },
-  {
-    slugPath: 'tour',
-    description: 'Drop in your story. Fans see dates instantly.',
-    mockup: <TourMockup />,
-  },
-  {
-    slugPath: 'contact',
-    description: 'One link for every industry inquiry.',
-    mockup: <ContactMockup />,
-  },
-  {
-    slugPath: 'listen',
-    description: 'Skip the profile. Opens their preferred platform.',
-    mockup: <ListenMockup />,
-  },
-];
-
 /* ------------------------------------------------------------------ */
-/*  Main component                                                    */
+/*  Main section                                                       */
 /* ------------------------------------------------------------------ */
 
 export function DeeplinksGrid() {
-  return (
-    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
-      {/* Ambient glow behind grid */}
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
-        style={{
-          width: '600px',
-          height: '600px',
-          borderRadius: '50%',
-          background:
-            'radial-gradient(ellipse at center, oklch(20% 0.025 270 / 0.2), transparent 65%)',
-        }}
-      />
+  const sectionRef = useRef<HTMLElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
 
-      <Container size='homepage'>
-        {/* Gradient separator */}
-        <div
-          aria-hidden='true'
-          className='mb-20 h-px max-w-lg mx-auto'
-          style={{
-            background:
-              'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
-          }}
-        />
+  const handleScroll = useCallback(() => {
+    const section = sectionRef.current;
+    if (!section) return;
 
-        {/* Heading */}
-        <div className='text-center heading-gap-linear'>
-          <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-            One link.{' '}
-            <span className='text-[var(--linear-text-tertiary)]'>
-              Infinite outcomes.
-            </span>
-          </h2>
-          <p
-            className='mx-auto mt-5 max-w-[440px] marketing-lead-linear'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Jovie automatically routes fans to the right action — or override
-            with a direct link to tips, tours, contacts, and every release.
-          </p>
-        </div>
+    const rect = section.getBoundingClientRect();
+    const sectionHeight = rect.height;
+    const scrolled = -rect.top;
+    const scrollableHeight = sectionHeight - globalThis.innerHeight;
 
-        {/* Card grid — 1px border-gap technique */}
-        <div
-          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-2xl border border-[var(--linear-border-subtle)]'
-          style={{
-            boxShadow:
-              'var(--linear-shadow-card-elevated), 0 0 60px rgba(0,0,0,0.2)',
-          }}
+    if (scrollableHeight <= 0) return;
+
+    const progress = Math.max(0, Math.min(1, scrolled / scrollableHeight));
+    const newIndex = Math.min(
+      MODES.length - 1,
+      Math.floor(progress * MODES.length)
+    );
+
+    setActiveIndex(newIndex);
+  }, []);
+
+  useEffect(() => {
+    globalThis.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    return () => globalThis.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
+
+  // Pre-build crossfade children so they're stable across renders
+  const headlines = useMemo(
+    () =>
+      MODES.map(mode => (
+        <h2
+          key={mode.id}
+          className='marketing-h2-linear text-[var(--linear-text-primary)]'
         >
-          {cards.map(card => (
+          {mode.headline}
+        </h2>
+      )),
+    []
+  );
+
+  const descriptions = useMemo(
+    () =>
+      MODES.map(mode => (
+        <p
+          key={mode.id}
+          className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'
+        >
+          {mode.description}
+        </p>
+      )),
+    []
+  );
+
+  return (
+    <>
+      {/* Desktop — scroll-hijack layout (lg+) */}
+      <section
+        ref={sectionRef}
+        className='relative hidden lg:block bg-[var(--linear-bg-page)]'
+        style={{ height: `${MODES.length * 75}vh` }}
+      >
+        <div className='sticky top-0 flex h-screen items-center overflow-hidden'>
+          {/* Ambient glow */}
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
+            style={{
+              width: '600px',
+              height: '600px',
+              borderRadius: '50%',
+              background:
+                'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.15), transparent 60%)',
+            }}
+          />
+
+          <Container size='homepage'>
+            {/* Gradient separator */}
             <div
-              key={card.slugPath}
-              className='group relative flex flex-col bg-[var(--linear-bg-surface-1)] transition-colors duration-200 hover:bg-[color-mix(in_oklch,var(--linear-bg-surface-1),white_2%)]'
-            >
-              <div className='flex flex-1 flex-col gap-3 p-6'>
-                {/* URL slug */}
-                <p className='font-mono text-[var(--linear-caption-size)] font-[450] text-[var(--linear-text-tertiary)]'>
-                  {'jov.ie/tim/'}
-                  <span className='text-[var(--linear-text-primary)]'>
-                    {card.slugPath}
+              aria-hidden='true'
+              className='absolute top-0 left-1/2 -translate-x-1/2 h-px w-full max-w-lg'
+              style={{
+                background:
+                  'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+              }}
+            />
+
+            <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+              <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-12'>
+                {/* Left — copy */}
+                <div className='flex flex-col gap-6'>
+                  {/* Section label */}
+                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+                    AI Personalization
                   </span>
-                </p>
 
-                {/* Description */}
-                <p className='text-[var(--linear-body-sm-size)] leading-[var(--linear-leading-normal)] text-[var(--linear-text-secondary)]'>
-                  {card.description}
-                </p>
+                  {/* Dynamic headline */}
+                  <CrossfadeBlock activeIndex={activeIndex}>
+                    {headlines}
+                  </CrossfadeBlock>
 
-                {/* Mockup UI */}
-                <div className='mt-auto pt-3'>{card.mockup}</div>
+                  {/* Dynamic description */}
+                  <CrossfadeBlock activeIndex={activeIndex}>
+                    {descriptions}
+                  </CrossfadeBlock>
+
+                  {/* Dynamic stat */}
+                  <div
+                    className='rounded-xl px-5 py-4 self-start'
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <div className='grid'>
+                      {MODES.map((mode, i) => (
+                        <div
+                          key={mode.id}
+                          className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                          style={{
+                            opacity: i === activeIndex ? 1 : 0,
+                            gridArea: '1 / 1',
+                          }}
+                        >
+                          <span className='text-2xl font-semibold text-primary-token tabular-nums tracking-tight'>
+                            {mode.stat.value}
+                          </span>
+                          <p className='mt-1 text-[12px] text-tertiary-token'>
+                            {mode.stat.label}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Progress dots */}
+                  <div className='flex gap-2'>
+                    {MODES.map((mode, i) => (
+                      <div
+                        key={mode.id}
+                        className='h-1 rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
+                        style={{
+                          width: i === activeIndex ? 32 : 8,
+                          backgroundColor:
+                            i === activeIndex
+                              ? 'var(--linear-text-primary)'
+                              : 'rgba(255,255,255,0.15)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Center — phone */}
+                <div className='flex justify-center'>
+                  <StickyPhone activeIndex={activeIndex} />
+                </div>
+
+                {/* Right — URL slugs, bold */}
+                <div className='flex flex-col items-end justify-center gap-4'>
+                  {MODES.map((mode, i) => (
+                    <div
+                      key={mode.id}
+                      className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                      style={{
+                        opacity: i === activeIndex ? 1 : 0.2,
+                        transform:
+                          i === activeIndex
+                            ? 'translateX(0)'
+                            : 'translateX(8px)',
+                      }}
+                    >
+                      <p
+                        className='font-mono tracking-[-0.02em]'
+                        style={{
+                          fontSize: i === activeIndex ? '20px' : '15px',
+                          fontWeight: i === activeIndex ? 600 : 400,
+                          color:
+                            i === activeIndex
+                              ? 'var(--linear-text-primary)'
+                              : 'var(--linear-text-tertiary)',
+                          transition:
+                            'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
+                        }}
+                      >
+                        jov.ie/tim
+                        {mode.slug && (
+                          <span
+                            style={{
+                              color:
+                                i === activeIndex
+                                  ? 'var(--linear-text-primary)'
+                                  : 'var(--linear-text-quaternary)',
+                            }}
+                          >
+                            /{mode.slug}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-
-              {/* Bottom accent line on hover */}
-              <div
-                className='absolute bottom-0 left-[10%] h-px w-[80%] opacity-0 transition-opacity duration-300 group-hover:opacity-40'
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, var(--linear-text-primary), transparent)',
-                }}
-              />
             </div>
-          ))}
+          </Container>
         </div>
-      </Container>
-    </section>
+      </section>
+
+      {/* Mobile layout — no scroll hijacking, static cards */}
+      <section className='lg:hidden section-spacing-linear bg-[var(--linear-bg-page)]'>
+        <Container size='homepage'>
+          {/* Gradient separator */}
+          <div
+            aria-hidden='true'
+            className='mb-16 h-px max-w-lg mx-auto'
+            style={{
+              background:
+                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+            }}
+          />
+
+          <div className='mx-auto max-w-[var(--linear-content-max)]'>
+            {/* Section header */}
+            <div className='flex flex-col items-center text-center gap-6 mb-12'>
+              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+                AI Personalization
+              </span>
+              <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+                One link. Every moment.
+              </h2>
+              <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+                Every visitor sees a personalized CTA based on the moment —
+                listen, tip, tour, or follow. AI that increases conversions on
+                autopilot.
+              </p>
+            </div>
+
+            {/* Mode cards */}
+            <div className='grid gap-4 sm:grid-cols-2'>
+              {MODES.map(mode => (
+                <MobileCard key={mode.id} mode={mode} />
+              ))}
+            </div>
+          </div>
+        </Container>
+      </section>
+    </>
   );
 }

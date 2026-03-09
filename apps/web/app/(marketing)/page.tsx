@@ -252,15 +252,13 @@ export default function HomePage() {
         <LogoBar />
       </div>
 
+      <DeeplinksGrid />
+
       <AutomaticReleaseSmartlinksSection />
 
       <AudienceCRMSection />
 
-      <DeeplinksGrid />
-
-      {publicEnv.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION === 'true' && (
-        <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
-      )}
+      <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
 
       {/* Gradient separator before final CTA */}
       <div
@@ -268,7 +266,7 @@ export default function HomePage() {
         className='h-px max-w-lg mx-auto'
         style={{
           background:
-            'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 

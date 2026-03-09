@@ -3,14 +3,11 @@
 /**
  * Handle Validation Hook
  *
- * Provides debounced handle availability checking using the shared
- * useAsyncValidation hook from TanStack Pacer.
- *
- * @see https://tanstack.com/pacer
+ * Simple debounced fetch for handle availability checking.
+ * No TanStack Pacer — just a plain setTimeout + AbortController.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
 
 export interface HandleValidationResult {
   handleError: string | null;
@@ -21,27 +18,25 @@ export interface HandleValidationResult {
   cancel: () => void;
 }
 
-interface HandleCheckResponse {
-  available: boolean;
-  error?: string;
-}
+/** Debounce before hitting the API */
+const DEBOUNCE_MS = 400;
 
-/**
- * Maximum time (ms) to wait for an availability check before showing an error.
- * Covers debounce (450ms) + API timeout (5s) + buffer.
- */
-const AVAILABILITY_CHECK_TIMEOUT_MS = 8_000;
+/** Abort fetch if it takes longer than this */
+const FETCH_TIMEOUT_MS = 5_000;
 
 /**
  * Hook for validating handle format and availability.
  *
- * Uses the shared useAsyncValidation hook to reduce code duplication
- * while maintaining the same API surface.
+ * Uses a plain debounced fetch with AbortController — no complex
+ * retry/cache machinery that can get stuck.
  */
 export function useHandleValidation(handle: string): HandleValidationResult {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
-  const safetyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Client-side handle validation
   const handleError = useMemo(() => {
@@ -55,105 +50,101 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  // Use the shared async validation hook
-  const { validate, cancel, isValidating, isPending, result, error } =
-    useAsyncValidation<string, HandleCheckResponse>({
-      validatorFn: async (handleValue, signal) => {
-        const value = handleValue.toLowerCase();
+  const cancel = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setChecking(false);
+  }, []);
+
+  // Trigger availability check when handle changes
+  useEffect(() => {
+    // Reset state
+    setAvailError(null);
+
+    // Clear any pending check
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    abortRef.current?.abort();
+
+    // Nothing to check
+    if (!handle || handleError) {
+      setAvailable(null);
+      setChecking(false);
+      return;
+    }
+
+    // Show checking state immediately (before debounce fires)
+    setChecking(true);
+    setAvailable(null);
+
+    // Debounce the actual API call
+    debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      // Timeout the fetch
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+      try {
         const res = await fetch(
-          `/api/handle/check?handle=${encodeURIComponent(value)}`,
-          { signal }
+          `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
+          { signal: controller.signal }
         );
+
+        clearTimeout(timeoutId);
+
+        // Aborted while waiting
+        if (controller.signal.aborted) return;
+
         const json = await res
           .json()
           .catch(() => ({ available: false, error: 'Parse error' }));
 
         if (!res.ok) {
-          throw new Error(json?.error || 'Error checking availability');
+          setAvailable(null);
+          setAvailError(json?.error || 'Error checking availability');
+          setChecking(false);
+          return;
         }
 
-        return json as HandleCheckResponse;
-      },
-      wait: PACER_TIMING.VALIDATION_DEBOUNCE_MS,
-      enabled: !handleError && handle.length >= 3,
-      onSuccess: res => {
-        setAvailable(Boolean(res?.available));
+        setAvailable(Boolean(json?.available));
         setAvailError(null);
-      },
-      onError: err => {
+        setChecking(false);
+      } catch (err: unknown) {
+        clearTimeout(timeoutId);
+
+        // Don't show error for intentional aborts (user kept typing)
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return;
+        }
+
         setAvailable(null);
-        setAvailError(err.message === 'AbortError' ? null : err.message);
-      },
-    });
-
-  // Sync result state
-  useEffect(() => {
-    if (result) {
-      setAvailable(Boolean(result.available));
-      setAvailError(null);
-    }
-  }, [result]);
-
-  // Sync error state
-  useEffect(() => {
-    if (error && error.name !== 'AbortError') {
-      setAvailable(null);
-      setAvailError(error.message || 'Network error');
-    }
-  }, [error]);
-
-  // Determine if we're in a loading state
-  const isLoading = isValidating || isPending;
-
-  // Safety timeout: if loading state persists beyond a reasonable window,
-  // force-clear it and show an error so the user isn't stuck forever.
-  // This handles edge cases where the debouncer/fetch gets stuck on mobile.
-  useEffect(() => {
-    if (safetyTimerRef.current) {
-      clearTimeout(safetyTimerRef.current);
-      safetyTimerRef.current = null;
-    }
-
-    if (isLoading && handle && !handleError) {
-      safetyTimerRef.current = setTimeout(() => {
-        // Still loading after timeout — force error state
-        cancel();
-        setAvailable(null);
-        setAvailError("Couldn't check availability \u2014 try again");
-      }, AVAILABILITY_CHECK_TIMEOUT_MS);
-    }
-
-    return () => {
-      if (safetyTimerRef.current) {
-        clearTimeout(safetyTimerRef.current);
-        safetyTimerRef.current = null;
+        setAvailError('Network error — try again');
+        setChecking(false);
       }
+    }, DEBOUNCE_MS);
+
+    // Cleanup on unmount or handle change
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      abortRef.current?.abort();
     };
-  }, [isLoading, handle, handleError, cancel]);
-
-  // Trigger validation when handle changes
-  useEffect(() => {
-    setAvailError(null);
-
-    if (!handle || handleError) {
-      cancel();
-      setAvailable(null);
-      return;
-    }
-
-    void validate(handle);
-  }, [handle, handleError, validate, cancel]);
-
-  // Wrap cancel to also reset state
-  const handleCancel = useCallback(() => {
-    cancel();
-  }, [cancel]);
+  }, [handle, handleError]);
 
   return {
     handleError,
-    checkingAvail: isLoading,
+    checkingAvail: checking,
     available,
     availError,
-    cancel: handleCancel,
+    cancel,
   };
 }
