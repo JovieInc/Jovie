@@ -624,6 +624,50 @@ useQuery({
 - E2E tests: Playwright
 - Focus on user behavior, not implementation details
 
+#### E2E Authentication with Clerk (Required Patterns)
+
+Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
+
+- Official docs: `https://clerk.com/docs/testing/playwright/test-helpers`
+- In this repo, `setupClerkTestingToken({ page })` must run **before** navigating to Clerk pages so the token is attached to Clerk FAPI calls.
+- Auth pages must include ClerkProvider, so start auth on `/signin` (not `/`).
+
+**Test user creation pattern (canonical):**
+
+1. Create a unique test email with the Clerk testing suffix:
+   - `const email = \`e2e+clerk_test+${Date.now().toString(36)}@example.com\``
+2. Call `setupClerkTestingToken({ page })`.
+3. Navigate to `/signin` and wait for `window.Clerk?.loaded`.
+4. Use `createOrReuseTestUserSession(page, email)` from `apps/web/tests/helpers/clerk-auth.ts`.
+5. Assert authenticated state before continuing the flow.
+
+**Do NOT do the following in E2E auth tests:**
+
+- Do **not** reuse auth sessions across tests. Each test that validates auth behavior must start from a fresh context/session.
+- Do **not** hardcode OTP codes in test code.
+- Do **not** use pre-authenticated Clerk tokens to skip sign-up/sign-in flows unless the test scope explicitly starts post-auth.
+- Do **not** mock Clerk auth in Playwright E2E tests.
+
+**Golden path reference:**
+
+- `apps/web/tests/e2e/golden-path-signup.spec.ts` is the canonical Clerk-authenticated onboarding example.
+
+**Test user cleanup:**
+
+- E2E users are tagged with metadata (`role: 'e2e'`).
+- Clean stale users with:
+  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
+- To re-seed users:
+  - `doppler run -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
+
+#### General E2E Rules (Required)
+
+- Every E2E test must include meaningful assertions on behavior/outcomes (not just render/no-crash checks).
+- Music fetch must remain real in integration/E2E coverage: if slow, increase timeout; do not mock the enrichment fetch.
+- Stripe flows must run in Stripe test mode and use test card `4242 4242 4242 4242`.
+- Do not assert on CSS values, spacing/padding, or brittle copy text.
+- Prefer stable `data-testid` selectors over fragile structural selectors.
+
 #### Test Performance (CI Runtime Is a First-Class Constraint)
 
 Tests are part of the deploy path. Slow tests slow shipping. Test runtime performance is a functional requirement of the testing system itself.
