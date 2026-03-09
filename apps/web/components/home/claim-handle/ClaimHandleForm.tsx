@@ -171,7 +171,7 @@ export function ClaimHandleForm({
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-30'
+            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-40 placeholder:text-[var(--linear-text-tertiary)]'
             style={{
               fontSize: '13px',
               fontWeight: 450,
