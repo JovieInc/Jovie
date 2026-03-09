@@ -1,4 +1,5 @@
 import { ClaimHandleForm } from './claim-handle';
+import { LiveSignal, SectionLabel } from './marketing-atoms';
 
 export function RedesignedHero() {
   return (
@@ -16,8 +17,8 @@ export function RedesignedHero() {
       <div className='relative w-full max-w-[var(--linear-content-max)] z-10'>
         {/* Centered text block — Linear layout */}
         <div className='hero-stagger flex flex-col items-center text-center max-w-2xl mx-auto'>
-          <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
-            Built for independent artists
+          <span className='mb-5'>
+            <SectionLabel>Built for independent artists</SectionLabel>
           </span>
           <h1
             className='marketing-h1-linear text-[var(--linear-text-primary)]'
@@ -66,21 +67,11 @@ export function RedesignedHero() {
             </div>
           </div>
 
-          <p
-            className='mt-4 flex items-center justify-center gap-2'
-            style={{
-              fontSize: '12px',
-              fontWeight: 450,
-              letterSpacing: '0.01em',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            <span
-              aria-hidden='true'
-              className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-            />{' '}
-            Free to start. Your page can be live in 60 seconds.
-          </p>
+          <div className='mt-4'>
+            <LiveSignal>
+              Free to start. Your page can be live in 60 seconds.
+            </LiveSignal>
+          </div>
         </div>
       </div>
     </section>

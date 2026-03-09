@@ -2,6 +2,7 @@
 
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './claim-handle';
+import { LiveSignal } from './marketing-atoms';
 
 export function FinalCTASection() {
   return (
@@ -58,21 +59,9 @@ export function FinalCTASection() {
           </div>
 
           {/* Trust signal below CTA */}
-          <p
-            className='mt-6 flex items-center justify-center gap-2'
-            style={{
-              fontSize: '12px',
-              fontWeight: 450,
-              letterSpacing: '0.01em',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            <span
-              aria-hidden='true'
-              className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-            />{' '}
-            Live in 60 seconds
-          </p>
+          <div className='mt-6'>
+            <LiveSignal>Live in 60 seconds</LiveSignal>
+          </div>
         </div>
       </Container>
     </section>

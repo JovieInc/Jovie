@@ -3,6 +3,7 @@
 import { DollarSign, Mail, MapPin, Users } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { Container } from '@/components/site/Container';
+import { SectionLabel } from './marketing-atoms';
 
 const DemoAudienceSection = lazy(
   () => import('@/components/demo/DemoAudienceSection')
@@ -118,8 +119,8 @@ export function AudienceCRMSection() {
                 platforms. Jovie turns each visit into first-party audience data
                 you can actually use later.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                Built-in fan CRM
+              <span className='mt-6'>
+                <SectionLabel>Built-in fan CRM</SectionLabel>
               </span>
             </div>
           </div>

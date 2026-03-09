@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { SectionLabel } from './marketing-atoms';
 
 const FREE_FEATURES = [
   'Smart link in bio',
@@ -26,9 +27,7 @@ export function PricingSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='flex flex-col items-center text-center gap-5 mb-16'>
-            <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-              Pricing
-            </span>
+            <SectionLabel>Pricing</SectionLabel>
             <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
               Start free. Pay when it pays you back.
             </h2>

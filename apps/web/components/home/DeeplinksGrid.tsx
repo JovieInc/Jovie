@@ -6,6 +6,7 @@ import { ArtistName } from '@/components/atoms/ArtistName';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { Avatar } from '@/components/molecules/Avatar';
 import { Container } from '@/components/site/Container';
+import { SectionLabel } from './marketing-atoms';
 import { PhoneFrame } from './PhoneFrame';
 import {
   MOCK_ARTIST,
@@ -315,8 +316,8 @@ export function DeeplinksGrid() {
                 {/* Left — copy */}
                 <div className='flex flex-col gap-6'>
                   {/* Section label */}
-                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                    Adaptive fan paths
+                  <span className='self-start'>
+                    <SectionLabel>Adaptive fan paths</SectionLabel>
                   </span>
 
                   {/* Dynamic headline */}
@@ -474,9 +475,7 @@ export function DeeplinksGrid() {
           <div className='mx-auto max-w-[var(--linear-content-max)]'>
             {/* Section header */}
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
-              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                AI Personalization
-              </span>
+              <SectionLabel>AI Personalization</SectionLabel>
               <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
                 One link. Every moment.
               </h2>

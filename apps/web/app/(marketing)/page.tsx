@@ -6,6 +6,7 @@ import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { LogoBar } from '@/components/home/LogoBar';
+import { SectionDivider } from '@/components/home/marketing-atoms';
 import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { ReleaseNotificationsSection } from '@/components/home/ReleaseNotificationsSection';
@@ -243,73 +244,31 @@ export default function HomePage() {
 
       <SocialProofSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <AudienceCRMSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <DeeplinksGrid />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <ReleaseNotificationsSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <AutomaticReleaseSmartlinksSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <PricingSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <SeeItInAction />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
+      <SectionDivider />
 
       <FinalCTASection />
 
