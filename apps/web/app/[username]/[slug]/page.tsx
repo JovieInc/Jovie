@@ -477,6 +477,14 @@ function ContentPageBody({
         contentId: content.id,
         smartLinkSlug: content.slug,
       }}
+      claimBanner={
+        creator.isClaimed
+          ? null
+          : {
+              profileId: creator.id,
+              username: creator.usernameNormalized,
+            }
+      }
     />
   );
 }
