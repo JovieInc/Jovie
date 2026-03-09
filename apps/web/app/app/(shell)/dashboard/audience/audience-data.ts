@@ -1,18 +1,12 @@
-import {
-  and,
-  asc,
-  desc,
-  sql as drizzleSql,
-  eq,
-  gt,
-  gte,
-  lt,
-  or,
-  type SQL,
-} from 'drizzle-orm';
+import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
+import {
+  buildCursorCondition,
+  decodeCursor,
+  encodeCursor,
+} from '@/lib/db/queries/audience-cursor';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -350,31 +344,6 @@ function buildSegmentFilter(segments: string[] | undefined) {
   return and(...conditions)!;
 }
 
-/** Encodes a keyset cursor: base64url(JSON({v: sortValue, id: rowId})). */
-function encodeCursor(sortValue: string, id: string): string {
-  return Buffer.from(JSON.stringify({ v: sortValue, id })).toString('base64url');
-}
-
-/** Decodes an opaque cursor. Returns null on malformed input. */
-function decodeCursor(cursor: string): { v: string; id: string } | null {
-  try {
-    const parsed = JSON.parse(
-      Buffer.from(cursor, 'base64url').toString('utf8')
-    );
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof parsed.v === 'string' &&
-      typeof parsed.id === 'string'
-    ) {
-      return parsed as { v: string; id: string };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Fetch audience members data
  */
@@ -405,28 +374,18 @@ async function fetchMembersData(
   const segmentCondition = buildSegmentFilter(segmentFilter);
 
   // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).
-  let cursorCondition: SQL<unknown> = drizzleSql`true`;
+  let cursorCondition = drizzleSql<boolean>`true`;
   if (safe.cursor) {
     const decoded = decodeCursor(safe.cursor);
     if (decoded) {
       const { v: cursorSortVal, id: cursorId } = decoded;
-      if (safe.direction === 'desc') {
-        cursorCondition = or(
-          lt(sortColumn, drizzleSql`${cursorSortVal}`),
-          and(
-            eq(sortColumn, drizzleSql`${cursorSortVal}`),
-            lt(audienceMembers.id, cursorId)
-          )
-        )!;
-      } else {
-        cursorCondition = or(
-          gt(sortColumn, drizzleSql`${cursorSortVal}`),
-          and(
-            eq(sortColumn, drizzleSql`${cursorSortVal}`),
-            gt(audienceMembers.id, cursorId)
-          )
-        )!;
-      }
+      cursorCondition = buildCursorCondition(
+        safe.direction,
+        sortColumn,
+        audienceMembers.id,
+        cursorSortVal,
+        cursorId
+      );
     }
   }
 

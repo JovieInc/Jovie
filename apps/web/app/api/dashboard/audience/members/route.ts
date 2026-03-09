@@ -6,13 +6,16 @@ import {
   eq,
   gt,
   gte,
-  lt,
   or,
-  type SQL,
 } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
+import {
+  buildCursorCondition,
+  decodeCursor,
+  encodeCursor,
+} from '@/lib/db/queries/audience-cursor';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
@@ -73,33 +76,6 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
-/** Encodes a keyset cursor: base64url(JSON({v: sortValue, id: rowId})). */
-function encodeCursor(sortValue: string, id: string): string {
-  return Buffer.from(JSON.stringify({ v: sortValue, id })).toString(
-    'base64url'
-  );
-}
-
-/** Decodes an opaque cursor. Returns null on malformed input. */
-function decodeCursor(cursor: string): { v: string; id: string } | null {
-  try {
-    const parsed = JSON.parse(
-      Buffer.from(cursor, 'base64url').toString('utf8')
-    );
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      typeof parsed.v === 'string' &&
-      typeof parsed.id === 'string'
-    ) {
-      return parsed as { v: string; id: string };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -138,28 +114,18 @@ export async function GET(request: NextRequest) {
       const segmentCondition = buildSegmentCondition(segments);
 
       // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
-      let cursorCondition: SQL<unknown> = drizzleSql`true`;
+      let cursorCondition = drizzleSql<boolean>`true`;
       if (cursor) {
         const decoded = decodeCursor(cursor);
         if (decoded) {
           const { v: cursorSortVal, id: cursorId } = decoded;
-          if (direction === 'desc') {
-            cursorCondition = or(
-              lt(sortColumn, drizzleSql`${cursorSortVal}`),
-              and(
-                eq(sortColumn, drizzleSql`${cursorSortVal}`),
-                lt(audienceMembers.id, cursorId)
-              )
-            )!;
-          } else {
-            cursorCondition = or(
-              gt(sortColumn, drizzleSql`${cursorSortVal}`),
-              and(
-                eq(sortColumn, drizzleSql`${cursorSortVal}`),
-                gt(audienceMembers.id, cursorId)
-              )
-            )!;
-          }
+          cursorCondition = buildCursorCondition(
+            direction,
+            sortColumn,
+            audienceMembers.id,
+            cursorSortVal,
+            cursorId
+          );
         }
       }
 
