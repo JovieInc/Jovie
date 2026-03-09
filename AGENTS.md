@@ -351,7 +351,11 @@ When in doubt, skip auto-merge and request review.
 
 1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
 2. **Run `/simplify`** - Simplify recently modified code for clarity
-3. **Enable automerge** with squash:
+3. **After pushing your branch, immediately open a draft PR** using GitHub CLI:
+   ```bash
+   gh pr create --draft --base main --title "<Linear issue title>" --body "## Summary\n- ...\n\nLinear: https://linear.app/jovie/issue/<ISSUE-ID>"
+   ```
+4. **Enable automerge** with squash:
    ```bash
    gh pr merge --auto --squash
    ```
