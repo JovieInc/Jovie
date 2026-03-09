@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
@@ -37,6 +38,17 @@ type PixelSettingsInput = z.infer<typeof pixelSettingsSchema>;
  */
 export async function GET() {
   try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.canAccessAdPixels) {
+      return NextResponse.json(
+        {
+          error:
+            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     return await withDbSessionTx(async (tx, clerkUserId) => {
       // Get user's profile
       const [userProfile] = await tx
@@ -140,6 +152,17 @@ export async function GET() {
  */
 export async function PUT(req: Request) {
   try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.canAccessAdPixels) {
+      return NextResponse.json(
+        {
+          error:
+            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     return await withDbSessionTx(async (tx, clerkUserId) => {
       // Parse request body
       const parsedBody = await parseJsonBody<PixelSettingsInput>(req, {
@@ -281,6 +304,17 @@ export async function PUT(req: Request) {
  */
 export async function DELETE() {
   try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.canAccessAdPixels) {
+      return NextResponse.json(
+        {
+          error:
+            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     return await withDbSessionTx(async (tx, clerkUserId) => {
       // Get user's profile
       const [userProfile] = await tx

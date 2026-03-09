@@ -38,7 +38,7 @@ export function renderSocialLinksCell({
   return (
     <SocialLinksCell
       links={profile.socialLinks ?? null}
-      filterPlatformType='social_media'
+      filterPlatformType='social'
       maxLinks={3}
     />
   );
@@ -54,7 +54,7 @@ export function renderMusicLinksCell({
   return (
     <SocialLinksCell
       links={profile.socialLinks ?? null}
-      filterPlatformType='music_streaming'
+      filterPlatformType='music'
       maxLinks={3}
     />
   );

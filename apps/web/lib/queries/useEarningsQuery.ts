@@ -42,5 +42,6 @@ export function useEarningsQuery(enabled = true) {
     enabled,
     ...FREQUENT_CACHE,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 }

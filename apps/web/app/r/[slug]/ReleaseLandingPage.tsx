@@ -10,13 +10,14 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
+import { APP_ROUTES } from '@/constants/routes';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
@@ -55,7 +56,70 @@ interface ReleaseLandingPageProps
     };
     /** UTM params captured from incoming request and passed to outbound links */
     readonly utmParams?: PartialUTMParams;
+    /** Optional profile-claim CTA details for unclaimed creators */
+    readonly claimBanner?: {
+      readonly profileId: string;
+      readonly username: string;
+    } | null;
   }> {}
+
+function SmartLinkClaimBanner({
+  profileId,
+  username,
+}: Readonly<{ profileId: string; username: string }>) {
+  const dismissalKey = useMemo(
+    () => `smartlink:claim-banner:dismissed:${profileId}`,
+    [profileId]
+  );
+  const [isDismissed, setIsDismissed] = useState(
+    () => globalThis.localStorage?.getItem(dismissalKey) === '1'
+  );
+
+  useEffect(() => {
+    setIsDismissed(globalThis.localStorage?.getItem(dismissalKey) === '1');
+  }, [dismissalKey]);
+
+  const handleDismiss = useCallback(() => {
+    globalThis.localStorage?.setItem(dismissalKey, '1');
+    setIsDismissed(true);
+  }, [dismissalKey]);
+
+  if (isDismissed) return null;
+
+  const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodeURIComponent(`/${username}`)}`;
+
+  return (
+    <div className='mt-4 rounded-xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>
+      <div className='flex items-start justify-between gap-3'>
+        <div>
+          <p className='text-foreground text-xs font-medium'>
+            Is this your music?
+          </p>
+          <p className='text-muted-foreground mt-1 text-2xs leading-relaxed'>
+            Claim this profile to unlock SmartLink analytics and manage your
+            releases.
+          </p>
+          <Link
+            href={signupUrl}
+            className='text-foreground/90 hover:text-foreground mt-2 inline-flex items-center gap-1 text-2xs font-semibold transition-colors'
+          >
+            Claim profile
+            <Icon name='ArrowRight' className='h-3 w-3' aria-hidden='true' />
+          </Link>
+        </div>
+
+        <button
+          type='button'
+          onClick={handleDismiss}
+          className='text-muted-foreground hover:text-foreground inline-flex h-6 w-6 items-center justify-center rounded-md transition-colors'
+          aria-label='Dismiss claim profile banner'
+        >
+          <Icon name='X' className='h-3.5 w-3.5' aria-hidden='true' />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function ReleaseLandingPage({
   release,
@@ -66,6 +130,7 @@ export function ReleaseLandingPage({
   soundsUrl,
   tracking,
   utmParams = {},
+  claimBanner = null,
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
     ? new Date(release.releaseDate).toLocaleDateString('en-US', {
@@ -177,6 +242,13 @@ export function ReleaseLandingPage({
                 <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
                   {formattedDate}
                 </p>
+              )}
+
+              {claimBanner && (
+                <SmartLinkClaimBanner
+                  profileId={claimBanner.profileId}
+                  username={claimBanner.username}
+                />
               )}
             </div>
           </div>

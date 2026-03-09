@@ -99,22 +99,29 @@ export async function PATCH(
         // Enrich with Spotify data for priority scoring
         await spotifyEnrichLead(id);
 
-        // Route the lead (email, dm, both, or manual_review)
+        // Route the lead (email, dm, both, manual_review, or skipped)
         const routeResult = await routeLead(id);
         routing = { route: routeResult.route };
 
-        // Push to Instantly if email route and lead has email
+        const [routedLead] = await db
+          .select()
+          .from(leads)
+          .where(eq(leads.id, id))
+          .limit(1);
+
+        // Push to Instantly if email route and lead has a valid email
         if (
-          (routeResult.route === 'email' || routeResult.route === 'both') &&
-          updated.contactEmail
+          routedLead?.contactEmail &&
+          !routedLead.emailInvalid &&
+          (routeResult.route === 'email' || routeResult.route === 'both')
         ) {
           try {
             const instantlyLeadId = await pushLeadToInstantly({
-              email: updated.contactEmail,
-              firstName: updated.displayName ?? updated.linktreeHandle,
+              email: routedLead.contactEmail,
+              firstName: routedLead.displayName ?? routedLead.linktreeHandle,
               claimLink: routeResult.claimUrl,
-              artistName: updated.displayName ?? updated.linktreeHandle,
-              priorityScore: updated.priorityScore ?? 0,
+              artistName: routedLead.displayName ?? routedLead.linktreeHandle,
+              priorityScore: routedLead.priorityScore ?? 0,
             });
 
             const queuedNow = new Date();

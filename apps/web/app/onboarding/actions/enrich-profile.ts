@@ -164,6 +164,14 @@ export async function enrichProfileFromDsp(
     profileUpdates.spotifyPopularity = artist.popularity;
   }
 
+  // Save Spotify URL and ID so DSP links render on the public profile
+  if (spotifyUrl) {
+    profileUpdates.spotifyUrl = spotifyUrl;
+  }
+  if (spotifyArtistId) {
+    profileUpdates.spotifyId = spotifyArtistId;
+  }
+
   // Upload profile image from MusicFetch first, then Spotify fallback.
   if (!profile.avatarLockedByUser && !profile.avatarUrl) {
     const imageUrl =

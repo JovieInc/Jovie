@@ -111,9 +111,9 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
       ? filterPlatformType.map(t => t.toLowerCase())
       : [filterPlatformType.toLowerCase()];
     filteredLinks = links.filter(link => {
-      const platformLower = link.platform.toLowerCase();
-      // Match against the platform category (social_media, music_streaming, etc.)
-      return types.includes(platformLower);
+      const platformTypeLower = link.platformType.toLowerCase();
+      // Match against the platform category (social, music, etc.)
+      return types.includes(platformTypeLower);
     });
   }
 

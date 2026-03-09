@@ -129,6 +129,20 @@ describe('DashboardNav interactions', () => {
     );
   });
 
+  it('shows grouped admin navigation with growth links for admin users', () => {
+    renderDashboardNav({ isAdmin: true });
+
+    expect(screen.getByText('Growth')).toBeDefined();
+    expect(screen.getByRole('link', { name: 'Leads' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.ADMIN_LEADS
+    );
+    expect(screen.getByRole('link', { name: 'Outreach' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.ADMIN_OUTREACH
+    );
+  });
+
   it('highlights the active route based on pathname', () => {
     mockUsePathname.mockReturnValueOnce(APP_ROUTES.RELEASES);
 
