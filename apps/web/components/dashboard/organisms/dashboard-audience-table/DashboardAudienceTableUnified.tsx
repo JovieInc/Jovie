@@ -643,7 +643,7 @@ export const DashboardAudienceTableUnified = memo(
             </div>
 
             <div className='sr-only' aria-live='polite' aria-atomic='true'>
-              {total > 0 && `Showing ${rows.length} of ${total}`}
+              {rows.length > 0 && `Showing ${rows.length} members`}
               {selectedCount > 0 &&
                 `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
             </div>

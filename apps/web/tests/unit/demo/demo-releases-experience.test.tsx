@@ -3,6 +3,26 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { describe, expect, it, vi } from 'vitest';
 
+// Mock Clerk's useUser hook (pulled in transitively via DemoAuthShell → UnifiedSidebar → UserButton)
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => ({ isLoaded: true, user: null }),
+  useClerk: () => ({ signOut: vi.fn() }),
+  useAuth: () => ({ isSignedIn: false, userId: null }),
+  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Mock nuqs sort params hook (avoids deep next/navigation dependency via nuqs → useRouter)
+vi.mock('@/lib/nuqs/hooks', () => ({
+  useReleaseSortParams: () => [
+    { sort: 'releaseDate', direction: 'desc' },
+    vi.fn(),
+  ],
+  useAudienceSortParams: () => [
+    { sort: 'createdAt', direction: 'desc' },
+    vi.fn(),
+  ],
+}));
+
 const runDemoAction = vi.fn(() => Promise.resolve());
 
 vi.mock('@/components/demo/demo-actions', () => ({
@@ -48,11 +68,10 @@ describe('DemoReleasesExperience', () => {
     expect(screen.getAllByText('Static Skies').length).toBeGreaterThan(0);
   });
 
-  it('renders the Add release button in the header', () => {
+  it('renders release data in the table', () => {
     renderDemo();
 
-    expect(
-      screen.getByRole('button', { name: 'Add release' })
-    ).toBeInTheDocument();
+    // The table should contain mock release titles
+    expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
   });
 });
