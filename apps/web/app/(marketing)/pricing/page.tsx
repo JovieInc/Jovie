@@ -237,11 +237,7 @@ export default function PricingPage() {
   return (
     <div className='min-h-screen'>
       {/* Structured Data for SEO */}
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: PRICING_SCHEMA }}
-      />
+      <script type='application/ld+json'>{PRICING_SCHEMA}</script>
 
       <Container size='lg'>
         <div className='section-spacing-linear'>

@@ -32,6 +32,63 @@ function hasRealEnv(): boolean {
 }
 
 /**
+ * Delete all stale golden-path test users from Clerk to stay within the
+ * 100-user dev-instance cap. Each golden-path run creates a new
+ * `gp-*+clerk_test@test.jovie.com` user; without cleanup the cap fills up.
+ */
+async function purgeStaleClerkTestUsers() {
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey || secretKey.includes('mock')) return;
+
+  try {
+    // Clerk's `query` param doesn't match emails with `+` characters, so we
+    // fetch all users (up to 500) and filter client-side.
+    const allUsers: Array<{
+      id: string;
+      email_addresses: Array<{ email_address: string }>;
+    }> = [];
+
+    for (let offset = 0; offset < 500; offset += 100) {
+      const url = new URL('https://api.clerk.com/v1/users');
+      url.searchParams.set('limit', '100');
+      url.searchParams.set('offset', String(offset));
+      const resp = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${secretKey}` },
+      });
+      if (!resp.ok) break;
+      const page = (await resp.json()) as typeof allUsers;
+      if (!Array.isArray(page) || page.length === 0) break;
+      allUsers.push(...page);
+      if (page.length < 100) break; // Last page
+    }
+
+    const toDelete = allUsers.filter(u =>
+      u.email_addresses.some(
+        e =>
+          e.email_address.startsWith('gp-') &&
+          e.email_address.endsWith('+clerk_test@test.jovie.com')
+      )
+    );
+
+    if (toDelete.length > 0) {
+      await Promise.all(
+        toDelete.map(u =>
+          fetch(`https://api.clerk.com/v1/users/${u.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${secretKey}` },
+          }).catch(() => {})
+        )
+      );
+      console.log(
+        `[golden-path] Purged ${toDelete.length} stale Clerk test user(s)`
+      );
+    }
+  } catch {
+    // Non-critical — if purge fails we'll still attempt to create
+  }
+}
+
+/**
  * Clear onboarding rate limits from Upstash Redis.
  * Repeated test runs exhaust the "3 per hour per IP" limit.
  */
@@ -86,6 +143,17 @@ async function ensureDbUser(clerkUserId: string, email: string) {
     WHERE user_id IN (
       SELECT id FROM users WHERE email LIKE '%+clerk_test@test.jovie.com'
     ) AND spotify_id IS NOT NULL
+  `;
+
+  // Also release the known primary "Tim White" Spotify ID from ANY profile.
+  // The top search result is deterministic (Spotify's ranking) and its ID can
+  // be held by non-test profiles from previous manual or dev-env runs, causing
+  // a unique constraint violation when the test tries to claim the same artist.
+  const KNOWN_TIM_WHITE_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
+  await sql`
+    UPDATE creator_profiles
+    SET spotify_id = NULL, spotify_url = NULL
+    WHERE spotify_id = ${KNOWN_TIM_WHITE_SPOTIFY_ID}
   `;
 
   await sql`
@@ -303,6 +371,10 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
       test.skip(true, 'Clerk testing setup was not successful');
     }
+
+    // Purge stale golden-path Clerk test users BEFORE signup to stay within
+    // the 100-user dev instance cap. Must run before createFreshUser.
+    await purgeStaleClerkTestUsers();
 
     await interceptTrackingCalls(page);
   });
@@ -523,6 +595,17 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       spotifyIdToSave
     );
 
+    // Navigate to the dashboard explicitly after the DB write + Redis cache
+    // invalidation. The ProfileCompletionRedirect client component fires
+    // immediately when the dashboard first loads. If avatar_url was still null
+    // at that point (Spotify enrichment is fire-and-forget), it redirects back
+    // to /onboarding. Navigating again after ensureSpotifyUrlOnProfile guarantees
+    // the profile is fully populated and the proxy cache is fresh.
+    await page.goto('/app/chat', {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
+    });
+
     // Should NOT be redirected back to onboarding or signin
     const currentUrl = page.url();
     expect(
@@ -627,6 +710,12 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     const checkoutResponse = await page.request.post('/api/stripe/checkout', {
       data: { priceId: foundingPriceId },
     });
+    if (!checkoutResponse.ok()) {
+      const errBody = await checkoutResponse.text().catch(() => '<unreadable>');
+      console.error(
+        `[golden-path] Checkout failed (${checkoutResponse.status()}): ${errBody}`
+      );
+    }
     expect(
       checkoutResponse.ok(),
       'Stripe checkout session creation failed'

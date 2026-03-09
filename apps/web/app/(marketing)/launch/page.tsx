@@ -11,8 +11,8 @@ import { publicEnv } from '@/lib/env-public';
 import { captureWarning } from '@/lib/error-tracking';
 import { getProfileByUsername } from '@/lib/services/profile';
 
-// ISR with 1-hour revalidation to keep profile data fresh (JOV-888)
-export const revalidate = 3600;
+// Marketing pages must remain fully static.
+export const revalidate = false;
 
 /** Fetch the /tim profile data for the subscribe preview mockup (JOV-888). */
 const getTimProfile = unstable_cache(
@@ -270,21 +270,9 @@ export default async function LaunchPage() {
       <AuthRedirectHandler />
 
       {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
       {/* ═══ 1. HERO ═══ */}
       <section
