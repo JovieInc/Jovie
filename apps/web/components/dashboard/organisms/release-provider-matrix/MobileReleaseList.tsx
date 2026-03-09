@@ -40,9 +40,13 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   const groups = new Map<string, ReleaseViewModel[]>();
 
   for (const release of releases) {
-    const year = release.releaseDate
-      ? new Date(release.releaseDate).getFullYear().toString()
-      : 'Unknown';
+    const rawYear = release.releaseDate
+      ? new Date(release.releaseDate).getFullYear()
+      : null;
+    const year =
+      rawYear !== null && !Number.isNaN(rawYear)
+        ? rawYear.toString()
+        : 'Unknown';
     const group = groups.get(year);
     if (group) {
       group.push(release);
@@ -141,9 +145,9 @@ const SwipeActions = memo(function SwipeActions({
 });
 
 function getReleaseYear(release: ReleaseViewModel): number | null {
-  return release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
-    : null;
+  if (!release.releaseDate) return null;
+  const year = new Date(release.releaseDate).getFullYear();
+  return Number.isNaN(year) ? null : year;
 }
 
 /** Single release row in the mobile list — Apple Music layout, Linear tokens */

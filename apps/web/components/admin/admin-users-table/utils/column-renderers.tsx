@@ -16,7 +16,9 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
 
 /**
- * Renders the name cell with name and email (truncated with tooltip)
+ * Renders the name cell with name and email (truncated with tooltip).
+ * Falls back to "Email Subscriber" when no name is available, since names
+ * are not collected during signup and the email is shown in its own column.
  */
 export function renderNameCell({
   getValue,
@@ -24,18 +26,17 @@ export function renderNameCell({
 }: CellContext<AdminUserRow, string | null>) {
   const user = row.original;
   const name = getValue();
+  const displayName = name || 'Email Subscriber';
 
   return (
     <div className='min-w-0'>
       <TruncatedText lines={1} className='font-semibold text-primary-token'>
-        {name || user.email || 'Unknown'}
+        {displayName}
       </TruncatedText>
       {name && user.email ? (
         <TruncatedText lines={1} className='text-xs text-secondary-token'>
           {user.email}
         </TruncatedText>
-      ) : !name && !user.email ? (
-        <EmptyCell />
       ) : null}
     </div>
   );

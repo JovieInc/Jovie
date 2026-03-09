@@ -28,11 +28,16 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 const ADMIN_PAGES = [
   { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/activity', name: 'Admin Activity' },
+  { path: '/app/admin/leads', name: 'Admin Leads' },
+  { path: '/app/admin/outreach', name: 'Admin Outreach' },
   { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
+  { path: '/app/admin/ingest', name: 'Admin Ingest' },
+  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
   { path: '/app/admin/creators', name: 'Admin Creators' },
   { path: '/app/admin/users', name: 'Admin Users' },
-  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
+  { path: '/app/admin/feedback', name: 'Admin Feedback' },
+  { path: '/app/admin/activity', name: 'Admin Activity' },
+  { path: '/app/admin/screenshots', name: 'Admin Screenshots' },
 ] as const;
 
 /**
