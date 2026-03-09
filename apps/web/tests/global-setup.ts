@@ -137,6 +137,7 @@ async function globalSetup() {
   const warmupRoutes = [
     '/',
     '/signin',
+    APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
     APP_ROUTES.DASHBOARD_PROFILE,
     `/${testProfile}`,
     `/${testProfile}?mode=listen`,
