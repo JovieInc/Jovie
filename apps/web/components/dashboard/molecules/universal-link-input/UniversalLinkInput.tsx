@@ -20,9 +20,11 @@ import {
 import {
   forwardRef,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
 } from 'react';
 
 import {
@@ -233,6 +235,49 @@ export const UniversalLinkInput = forwardRef<
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
+    const recordingTimerRef = useRef<ReturnType<
+      typeof globalThis.setInterval
+    > | null>(null);
+    const waveformTimerRef = useRef<ReturnType<
+      typeof globalThis.setInterval
+    > | null>(null);
+    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+    const [recordingDurationSeconds, setRecordingDurationSeconds] = useState(0);
+    const [waveformLevels, setWaveformLevels] = useState<number[]>([
+      0.35, 0.55, 0.75, 0.5, 0.68, 0.4, 0.62,
+    ]);
+
+    const clearRecordingTimers = useCallback(() => {
+      if (recordingTimerRef.current !== null) {
+        globalThis.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (waveformTimerRef.current !== null) {
+        globalThis.clearInterval(waveformTimerRef.current);
+        waveformTimerRef.current = null;
+      }
+    }, []);
+
+    const stopRecordingSession = useCallback(() => {
+      clearRecordingTimers();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+
+      for (const track of streamRef.current?.getTracks() ?? []) {
+        track.stop();
+      }
+      streamRef.current = null;
+      mediaRecorderRef.current = null;
+      setIsVoiceRecording(false);
+    }, [clearRecordingTimers]);
+
+    useEffect(() => {
+      return () => {
+        stopRecordingSession();
+      };
+    }, [stopRecordingSession]);
 
     const handleVoiceInput = useCallback(async () => {
       if (!voiceInputEnabled) return;
@@ -256,13 +301,39 @@ export const UniversalLinkInput = forwardRef<
         });
 
         recorder.start();
-        globalThis.setTimeout(() => {
-          recorder.stop();
-        }, 250);
+        setRecordingDurationSeconds(0);
+        setIsVoiceRecording(true);
+        recordingTimerRef.current = globalThis.setInterval(() => {
+          setRecordingDurationSeconds(current => current + 1);
+        }, 1000);
+        waveformTimerRef.current = globalThis.setInterval(() => {
+          setWaveformLevels(current =>
+            current.map(() => 0.3 + Math.random() * 0.7)
+          );
+        }, 200);
       } catch {
         // Ignore permission errors until voice feature is enabled.
       }
     }, [voiceInputEnabled]);
+
+    const recordingDurationLabel = useMemo(() => {
+      const minutes = Math.floor(recordingDurationSeconds / 60);
+      const seconds = recordingDurationSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, [recordingDurationSeconds]);
+
+    const handleCancelVoiceRecording = useCallback(() => {
+      stopRecordingSession();
+      setRecordingDurationSeconds(0);
+    }, [stopRecordingSession]);
+
+    const handleSendVoiceRecording = useCallback(() => {
+      stopRecordingSession();
+      setRecordingDurationSeconds(0);
+      if (onChatSubmit) {
+        onChatSubmit(`[Voice message ${recordingDurationLabel}]`);
+      }
+    }, [onChatSubmit, recordingDurationLabel, stopRecordingSession]);
 
     const canSubmit = useMemo(() => {
       const trimmed = url.trim();
@@ -350,6 +421,11 @@ export const UniversalLinkInput = forwardRef<
           canSubmit={canSubmit}
           voiceInputEnabled={voiceInputEnabled}
           onVoiceInput={handleVoiceInput}
+          isVoiceRecording={isVoiceRecording}
+          recordingDurationLabel={recordingDurationLabel}
+          waveformLevels={waveformLevels}
+          onCancelVoiceRecording={handleCancelVoiceRecording}
+          onSendVoiceRecording={handleSendVoiceRecording}
           isDropdownOpen={shouldShowAutosuggest}
           onFocus={() => {
             const trimmed = url.trim();
