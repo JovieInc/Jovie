@@ -14,6 +14,8 @@ export interface UseArtistContactsReturn {
     contact: PublicContact
   ) => void;
   onIconClick: () => void;
+  getActionHref: (channel: PublicContactChannel) => string | null;
+  trackAction: (channel: PublicContactChannel, contact: PublicContact) => void;
   primaryChannel: (contact: PublicContact) => PublicContactChannel;
   buildTerritoryLabel: (contact: PublicContact) => string;
   isEnabled: boolean;
