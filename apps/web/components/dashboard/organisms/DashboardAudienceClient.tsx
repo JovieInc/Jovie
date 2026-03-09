@@ -72,6 +72,7 @@ export interface DashboardAudienceClientProps {
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
+  readonly totalAudienceCount: number;
   readonly filters: AudienceFilters;
   readonly anonymousCount: number;
   readonly totalAudienceCount: number;
@@ -129,6 +130,7 @@ export function DashboardAudienceClient({
   profileUrl,
   profileId,
   subscriberCount,
+  totalAudienceCount,
   filters: initialFilters,
   anonymousCount,
   totalAudienceCount,
@@ -146,6 +148,7 @@ export function DashboardAudienceClient({
         profileUrl={profileUrl}
         profileId={profileId}
         subscriberCount={subscriberCount}
+        totalAudienceCount={totalAudienceCount}
         filters={initialFilters}
         anonymousCount={anonymousCount}
         totalAudienceCount={totalAudienceCount}
@@ -165,6 +168,7 @@ function DashboardAudienceClientInner({
   profileUrl,
   profileId,
   subscriberCount,
+  totalAudienceCount,
   filters: initialFilters,
   anonymousCount,
   totalAudienceCount,
@@ -281,6 +285,7 @@ function DashboardAudienceClientInner({
             profileUrl={profileUrl}
             profileId={profileId}
             subscriberCount={subscriberCount}
+            totalAudienceCount={totalAudienceCount}
             filters={initialFilters}
             anonymousCount={anonymousCount}
             totalAudienceCount={totalAudienceCount}
