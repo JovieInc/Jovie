@@ -1,4 +1,4 @@
-import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, sql as drizzleSql, type SQL } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -374,7 +374,7 @@ async function fetchMembersData(
   const segmentCondition = buildSegmentFilter(segmentFilter);
 
   // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).
-  let cursorCondition = drizzleSql<boolean>`true`;
+  let cursorCondition: SQL<unknown> = drizzleSql`true`;
   if (safe.cursor) {
     const decoded = decodeCursor(safe.cursor);
     if (decoded) {

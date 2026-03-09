@@ -5,7 +5,16 @@
  * server-data module (JOV-1254).
  */
 
-import { and, sql as drizzleSql, eq, gt, lt, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  eq,
+  gt,
+  lt,
+  or,
+  sql as drizzleSql,
+  type SQL,
+  type SQLWrapper,
+} from 'drizzle-orm';
 
 /** Encodes a keyset cursor: base64url(JSON({v: sortValue, id: rowId})). */
 export function encodeCursor(sortValue: string, id: string): string {
@@ -42,8 +51,8 @@ export function decodeCursor(cursor: string): { v: string; id: string } | null {
  */
 export function buildCursorCondition(
   direction: 'asc' | 'desc',
-  sortColumn: SQL,
-  idColumn: SQL,
+  sortColumn: SQLWrapper,
+  idColumn: SQLWrapper,
   cursorSortVal: unknown,
   cursorId: unknown
 ): SQL<unknown> {

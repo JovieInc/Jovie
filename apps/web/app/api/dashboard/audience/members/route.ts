@@ -2,11 +2,12 @@ import {
   and,
   asc,
   desc,
-  sql as drizzleSql,
   eq,
   gt,
   gte,
   or,
+  sql as drizzleSql,
+  type SQL,
 } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -114,7 +115,7 @@ export async function GET(request: NextRequest) {
       const segmentCondition = buildSegmentCondition(segments);
 
       // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
-      let cursorCondition = drizzleSql<boolean>`true`;
+      let cursorCondition: SQL<unknown> = drizzleSql`true`;
       if (cursor) {
         const decoded = decodeCursor(cursor);
         if (decoded) {
