@@ -4,6 +4,52 @@
 
 ---
 
+## Environment Setup (Run First)
+
+Before running ANY command in this repo, run:
+
+```bash
+./scripts/setup.sh
+```
+
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth.
+
+### Running tests and commands requiring secrets
+
+ALL commands that need secrets MUST be prefixed with `doppler run --`:
+
+- `doppler run -- pnpm test`
+- `doppler run -- pnpm exec playwright test`
+- `doppler run -- pnpm run dev:local`
+- `pnpm test` alone **will fail** — missing env vars
+
+### If Doppler is not installed
+
+```bash
+# macOS/Linux
+curl -Lsf https://cli.doppler.com/install.sh | sh
+
+# Windows (PowerShell)
+(Invoke-WebRequest -Uri "https://cli.doppler.com/install.ps1" -UseBasicParsing).Content | powershell
+```
+
+Then authenticate and configure:
+
+```bash
+doppler login
+doppler setup --project jovie-web --config dev
+```
+
+### For CI / Automation
+
+Set `DOPPLER_TOKEN` env var and use:
+
+```bash
+doppler run --token "$DOPPLER_TOKEN" -- <command>
+```
+
+---
+
 ## CRITICAL: Tooling Requirements (READ FIRST)
 
 **STOP AND VERIFY BEFORE RUNNING ANY COMMANDS.**
