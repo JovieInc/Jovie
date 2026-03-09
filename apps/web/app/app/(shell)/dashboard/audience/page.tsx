@@ -33,7 +33,9 @@ async function AudienceContent({
 
     // Handle unauthenticated users
     if (!dashboardData.user?.id) {
-      redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/audience`);
+      redirect(
+        `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
+      );
     }
 
     // Handle redirects for users who need onboarding
