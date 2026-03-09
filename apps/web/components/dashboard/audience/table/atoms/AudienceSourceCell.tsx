@@ -1,5 +1,14 @@
 'use client';
 
+import { SimpleTooltip } from '@jovie/ui';
+import {
+  Globe,
+  Instagram,
+  Music,
+  Search,
+  Twitter,
+  Youtube,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudienceReferrer, AudienceUtmParams } from '@/types';
 
@@ -25,6 +34,19 @@ const DOMAIN_MAP: Record<string, string> = {
   'l.instagram.com': 'Instagram',
 };
 
+const ICON_CLASS = 'h-3.5 w-3.5 shrink-0 text-tertiary-token';
+
+/** Pre-allocated icon elements keyed by source name — avoids creating components during render. */
+const SOURCE_ICON_ELEMENTS: Record<string, React.ReactElement> = {
+  X: <Twitter className={ICON_CLASS} aria-hidden='true' />,
+  Instagram: <Instagram className={ICON_CLASS} aria-hidden='true' />,
+  YouTube: <Youtube className={ICON_CLASS} aria-hidden='true' />,
+  Spotify: <Music className={ICON_CLASS} aria-hidden='true' />,
+  Google: <Search className={ICON_CLASS} aria-hidden='true' />,
+};
+
+const FALLBACK_ICON = <Globe className={ICON_CLASS} aria-hidden='true' />;
+
 const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
 
 function normalizeSourceName(rawSource: string): string {
@@ -46,10 +68,6 @@ function isInternalReferrer(url: string): boolean {
   }
 }
 
-/**
- * Extracts a human-readable source label from a referrer URL.
- * Detects known social platforms and falls back to domain name.
- */
 function parseSourceLabel(url: string): string {
   try {
     const parsed = new URL(url);
@@ -60,10 +78,6 @@ function parseSourceLabel(url: string): string {
   }
 }
 
-/**
- * Build a source label from UTM params (source + medium).
- * Returns null if no meaningful UTM data is available.
- */
 function formatUtmSourceLabel(utm: AudienceUtmParams): string | null {
   if (!utm.source) return null;
   const source = normalizeSourceName(utm.source);
@@ -71,52 +85,42 @@ function formatUtmSourceLabel(utm: AudienceUtmParams): string | null {
   return source;
 }
 
+function resolveSource(
+  referrerHistory: AudienceReferrer[],
+  utmParams?: AudienceUtmParams
+): string {
+  const utmLabel = utmParams ? formatUtmSourceLabel(utmParams) : null;
+  if (utmLabel) return utmLabel;
+
+  if (!referrerHistory.length) return 'Direct';
+
+  const latestReferrer = referrerHistory.find(
+    entry => !isInternalReferrer(entry.url)
+  );
+  if (!latestReferrer) return 'Direct';
+  return parseSourceLabel(latestReferrer.url);
+}
+
+function getIconForSource(label: string): React.ReactElement {
+  for (const [name, icon] of Object.entries(SOURCE_ICON_ELEMENTS)) {
+    if (label.startsWith(name)) return icon;
+  }
+  return FALLBACK_ICON;
+}
+
 export function AudienceSourceCell({
   referrerHistory,
   utmParams,
   className,
 }: AudienceSourceCellProps) {
-  // Prefer UTM params from the landing page URL
-  const utmLabel = utmParams ? formatUtmSourceLabel(utmParams) : null;
-  if (utmLabel) {
-    return (
-      <div
-        className={cn('text-[13px] text-secondary-token truncate', className)}
-      >
-        {utmLabel}
-        {utmParams?.campaign && (
-          <span className='text-tertiary-token ml-1'>
-            ({utmParams.campaign})
-          </span>
-        )}
-      </div>
-    );
-  }
-
-  // Fall back to referrer-based source
-  if (!referrerHistory.length) {
-    return (
-      <div className={cn('text-[13px] text-tertiary-token', className)}>
-        Direct
-      </div>
-    );
-  }
-
-  const latestReferrer = referrerHistory.find(
-    entry => !isInternalReferrer(entry.url)
-  );
-  if (!latestReferrer) {
-    return (
-      <div className={cn('text-[13px] text-tertiary-token', className)}>
-        Direct
-      </div>
-    );
-  }
-  const sourceLabel = parseSourceLabel(latestReferrer.url);
+  const sourceLabel = resolveSource(referrerHistory, utmParams);
+  const icon = getIconForSource(sourceLabel);
 
   return (
-    <div className={cn('text-[13px] text-secondary-token truncate', className)}>
-      {sourceLabel}
-    </div>
+    <SimpleTooltip content={sourceLabel} side='top'>
+      <div className={cn('flex items-center justify-center w-8', className)}>
+        {icon}
+      </div>
+    </SimpleTooltip>
   );
 }

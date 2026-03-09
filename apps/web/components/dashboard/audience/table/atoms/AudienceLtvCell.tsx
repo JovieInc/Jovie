@@ -1,7 +1,6 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { calculateLtv, type LtvBreakdown } from '@/lib/utils/ltv';
 
@@ -22,13 +21,6 @@ const TIER_STYLES = {
   low: 'text-secondary-token',
   medium: 'text-amber-600 dark:text-amber-400 font-[510]',
   high: 'text-emerald-600 dark:text-emerald-400 font-[590]',
-} as const;
-
-const TIER_ICON_STYLES = {
-  none: 'text-tertiary-token',
-  low: 'text-secondary-token',
-  medium: 'text-amber-500',
-  high: 'text-emerald-500',
 } as const;
 
 function formatDollars(cents: number): string {
@@ -105,17 +97,15 @@ export function AudienceLtvCell({
   });
 
   const content = (
-    <div className={cn('flex items-center gap-1.5 text-[13px]', className)}>
-      {breakdown.tier !== 'none' && (
-        <TrendingUp
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            TIER_ICON_STYLES[breakdown.tier]
-          )}
-          aria-hidden='true'
-        />
+    <div
+      className={cn(
+        'flex items-center justify-center w-8 text-[13px]',
+        className
       )}
-      <span className={TIER_STYLES[breakdown.tier]}>{breakdown.label}</span>
+    >
+      <span className={cn('font-[510]', TIER_STYLES[breakdown.tier])}>
+        {breakdown.label}
+      </span>
     </div>
   );
 
