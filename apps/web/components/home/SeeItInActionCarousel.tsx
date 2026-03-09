@@ -101,10 +101,10 @@ export function SeeItInActionCarousel({ creators }: Props) {
 
       <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-content-max)] mx-auto'>
         <div className='flex flex-col items-center text-center gap-5'>
-          <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+          <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
             See it in action
           </h2>
-          <p className='max-w-md marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
             Real profiles, real artists. Scroll through to see how creators use
             Jovie.
           </p>

@@ -94,17 +94,17 @@ export function AudienceCRMSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
+            <h2 className='max-w-md marketing-h2-linear text-[color:var(--linear-text-primary)]'>
               Your audience.
               <br />
               Finally yours.
             </h2>
             <div className='max-w-lg'>
-              <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              <p className='marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
                 Every visit captures an email, a city, a referral source. No
                 integrations, no extra tools — just a CRM that fills itself.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in CRM
               </span>
             </div>
@@ -151,7 +151,7 @@ export function AudienceCRMSection() {
                   <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
                   <div className='w-3 h-3 rounded-full bg-[#61C554] border border-black/10' />
                 </div>
-                <div className='flex-1 text-center text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
+                <div className='flex-1 text-center text-[var(--linear-caption-size)] text-[color:var(--linear-text-tertiary)]'>
                   Audience
                 </div>
                 <div className='w-[52px]' />
@@ -166,15 +166,15 @@ export function AudienceCRMSection() {
                   >
                     <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--linear-bg-surface-2)]'>
                       <stat.icon
-                        className='h-4 w-4 text-[var(--linear-text-secondary)]'
+                        className='h-4 w-4 text-[color:var(--linear-text-secondary)]'
                         aria-hidden='true'
                       />
                     </div>
                     <div className='min-w-0'>
-                      <p className='text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
+                      <p className='text-[var(--linear-label-size)] text-[color:var(--linear-text-tertiary)]'>
                         {stat.label}
                       </p>
-                      <p className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
+                      <p className='text-[var(--linear-caption-size)] font-[number:var(--linear-font-weight-medium)] text-[color:var(--linear-text-primary)]'>
                         {stat.value}
                       </p>
                     </div>

@@ -23,13 +23,13 @@ export function FinalCTASection() {
         <div className='relative mx-auto flex max-w-2xl flex-col items-center text-center'>
           <h2
             data-testid='final-cta-headline'
-            className='marketing-h2-linear text-[var(--linear-text-primary)]'
+            className='marketing-h2-linear text-[color:var(--linear-text-primary)]'
           >
             Your fans are visiting. Convert them.
           </h2>
           <p
             data-testid='final-cta-subtext'
-            className='mt-5 marketing-lead-linear text-[var(--linear-text-tertiary)]'
+            className='mt-5 marketing-lead-linear text-[color:var(--linear-text-tertiary)]'
           >
             Free forever. No credit card required.
           </p>

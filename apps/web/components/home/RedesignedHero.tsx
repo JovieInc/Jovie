@@ -17,14 +17,14 @@ export function RedesignedHero() {
         {/* Centered text block — Linear layout */}
         <div className='hero-stagger flex flex-col items-center text-center max-w-2xl mx-auto'>
           <h1
-            className='marketing-h1-linear text-[var(--linear-text-primary)]'
+            className='marketing-h1-linear text-[color:var(--linear-text-primary)]'
             style={{ fontWeight: 590 }}
           >
             The link in bio that <br className='hidden sm:block' />
             actually converts.
           </h1>
 
-          <p className='mt-5 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p className='mt-5 max-w-[460px] marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
             Sync Spotify once. Jovie builds a profile that captures emails,
             directs streams, and earns tips — all on autopilot.
           </p>

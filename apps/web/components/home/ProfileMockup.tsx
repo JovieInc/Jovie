@@ -115,7 +115,7 @@ export function ProfileMockup({
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
         </div>
-        <div className='flex-1 text-center text-xs text-[var(--linear-text-tertiary)]'>
+        <div className='flex-1 text-center text-xs text-[color:var(--linear-text-tertiary)]'>
           jov.ie/{displayHandle}
         </div>
       </div>
@@ -134,7 +134,7 @@ export function ProfileMockup({
             />
           ) : (
             <div
-              className='w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold text-[var(--linear-text-primary)] shrink-0'
+              className='w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold text-[color:var(--linear-text-primary)] shrink-0'
               style={{
                 background: 'linear-gradient(135deg, #2a1f3d, #1a1a2e)',
               }}
@@ -144,10 +144,10 @@ export function ProfileMockup({
             </div>
           )}
           <div>
-            <div className='text-base font-semibold text-[var(--linear-text-primary)] mb-0.5'>
+            <div className='text-base font-semibold text-[color:var(--linear-text-primary)] mb-0.5'>
               {displayName}
             </div>
-            <div className='text-[13px] text-[var(--linear-text-tertiary)]'>
+            <div className='text-[13px] text-[color:var(--linear-text-tertiary)]'>
               {displayTagline}
             </div>
           </div>
@@ -163,10 +163,10 @@ export function ProfileMockup({
                 aria-hidden='true'
               />
               <div className='min-w-0'>
-                <div className='text-[13px] font-medium text-[var(--linear-text-primary)] truncate'>
+                <div className='text-[13px] font-medium text-[color:var(--linear-text-primary)] truncate'>
                   {release.title}
                 </div>
-                <div className='text-xs text-[var(--linear-text-tertiary)]'>
+                <div className='text-xs text-[color:var(--linear-text-tertiary)]'>
                   {release.type} · {release.meta}
                 </div>
               </div>
@@ -226,7 +226,7 @@ export function ProfileMockup({
         </div>
 
         {/* Label */}
-        <div className='mt-2 text-center text-[11px] text-[var(--linear-text-tertiary)] transition-opacity duration-500'>
+        <div className='mt-2 text-center text-[11px] text-[color:var(--linear-text-tertiary)] transition-opacity duration-500'>
           {isListen
             ? 'Return visitor · preferred streaming platform'
             : 'New visitor · email / sms capture'}
