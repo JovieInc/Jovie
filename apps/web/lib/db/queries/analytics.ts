@@ -1,6 +1,7 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getSessionSetupSql } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import { cacheQuery } from '@/lib/db/cache';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
@@ -343,32 +344,43 @@ export async function getUserDashboardAnalytics(
     // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
     // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
     // Dashboard queries have a 20s timeout.
-    const aggregates = await dashboardQuery(
+    //
+    // Top-list aggregates (cities, countries, referrers, links) are cached for 5 minutes
+    // (JOV-1270). The heavy group-by work over raw click_events is identical for all
+    // concurrent requests from the same artist+range, so we share a single DB round-trip.
+    // The aggregates query filters only on creatorProfile.id and touches no RLS-protected
+    // tables, so it runs against the module-level db pool (not the RLS transaction).
+    const aggregates = await cacheQuery(
+      `analytics:dashboard:${creatorProfile.id}:${range}`,
       () =>
-        tx
-          .execute<{
-            top_cities: JsonArray<{ city: string | null; count: number }>;
-            top_countries: JsonArray<{ country: string | null; count: number }>;
-            top_referrers: JsonArray<{
-              referrer: string | null;
-              count: number;
-            }>;
-            total_views: AggregateValue;
-            unique_users: AggregateValue;
-            total_clicks: AggregateValue;
-            spotify_clicks: AggregateValue;
-            social_clicks: AggregateValue;
-            recent_clicks: AggregateValue;
-            listen_clicks: AggregateValue;
-            subscribers: AggregateValue;
-            identified_users: AggregateValue;
-            top_links: JsonArray<{
-              id: string | null;
-              url: string | null;
-              clicks: number;
-            }>;
-          }>(
-            drizzleSql`
+        dashboardQuery(() =>
+          db
+            .execute<{
+              top_cities: JsonArray<{ city: string | null; count: number }>;
+              top_countries: JsonArray<{
+                country: string | null;
+                count: number;
+              }>;
+              top_referrers: JsonArray<{
+                referrer: string | null;
+                count: number;
+              }>;
+              total_views: AggregateValue;
+              unique_users: AggregateValue;
+              total_clicks: AggregateValue;
+              spotify_clicks: AggregateValue;
+              social_clicks: AggregateValue;
+              recent_clicks: AggregateValue;
+              listen_clicks: AggregateValue;
+              subscribers: AggregateValue;
+              identified_users: AggregateValue;
+              top_links: JsonArray<{
+                id: string | null;
+                url: string | null;
+                clicks: number;
+              }>;
+            }>(
+              drizzleSql`
             with base_events as (
               select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
@@ -459,9 +471,10 @@ export async function getUserDashboardAnalytics(
               coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
             ;
           `
-          )
-          .then(res => res.rows?.[0]),
-      'getUserDashboardAnalytics'
+            )
+            .then(res => res.rows?.[0])
+        ),
+      { ttlSeconds: 300 }
     );
 
     const totalViews = Number(aggregates?.total_views ?? 0);
