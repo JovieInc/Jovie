@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
 import { waitlistSettingsUpdateSchema } from '@/lib/validation/schemas';
@@ -23,11 +25,12 @@ function forbiddenResponse(status: 401 | 403) {
 }
 
 export async function GET() {
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) return forbiddenResponse(401);
-  if (!entitlements.isAdmin) return forbiddenResponse(403);
-
+  let entitlements;
   try {
+    entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated) return forbiddenResponse(401);
+    if (!entitlements.isAdmin) return forbiddenResponse(403);
+
     const settings = await getWaitlistSettings();
     return NextResponse.json(
       {
@@ -40,6 +43,16 @@ export async function GET() {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    await captureCriticalError(
+      'Admin action failed: load waitlist settings',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: APP_ROUTES.ADMIN_WAITLIST_SETTINGS,
+        action: 'load_waitlist_settings',
+        adminEmail: entitlements?.email ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      }
+    );
     logger.error('Failed to load waitlist settings', { error });
     return NextResponse.json(
       { success: false, error: 'Failed to load waitlist settings' },
@@ -49,25 +62,26 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) return forbiddenResponse(401);
-  if (!entitlements.isAdmin) return forbiddenResponse(403);
-
-  const parsedBody = await parseJsonBody<unknown>(request, {
-    route: 'PATCH /app/admin/waitlist/settings',
-    headers: NO_STORE_HEADERS,
-  });
-  if (!parsedBody.ok) return parsedBody.response;
-
-  const parsed = waitlistSettingsUpdateSchema.safeParse(parsedBody.data);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { success: false, error: 'Invalid request body' },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
-
+  let entitlements;
   try {
+    entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated) return forbiddenResponse(401);
+    if (!entitlements.isAdmin) return forbiddenResponse(403);
+
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: `PATCH ${APP_ROUTES.ADMIN_WAITLIST_SETTINGS}`,
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const parsed = waitlistSettingsUpdateSchema.safeParse(parsedBody.data);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request body' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const settings = await updateWaitlistSettings(parsed.data);
     return NextResponse.json(
       {
@@ -80,6 +94,16 @@ export async function PATCH(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    await captureCriticalError(
+      'Admin action failed: update waitlist settings',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: APP_ROUTES.ADMIN_WAITLIST_SETTINGS,
+        action: 'update_waitlist_settings',
+        adminEmail: entitlements?.email ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      }
+    );
     logger.error('Failed to update waitlist settings', { error });
     return NextResponse.json(
       { success: false, error: 'Failed to update waitlist settings' },
