@@ -73,6 +73,8 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     avatarUrl: 'avatarUrl',
     avatarLockedByUser: 'avatarLockedByUser',
     bio: 'bio',
+    spotifyUrl: 'spotifyUrl',
+    spotifyId: 'spotifyId',
     appleMusicUrl: 'appleMusicUrl',
     appleMusicId: 'appleMusicId',
     youtubeUrl: 'youtubeUrl',
@@ -167,6 +169,8 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
     avatarUrl: null,
     avatarLockedByUser: false,
     bio: null,
+    spotifyUrl: null,
+    spotifyId: null,
     appleMusicUrl: null,
     appleMusicId: null,
     youtubeUrl: null,
@@ -305,6 +309,9 @@ describe('musicfetch-enrichment', () => {
         expect(setCallArgs.appleMusicUrl).toBe(
           'https://music.apple.com/us/artist/test-artist/123456'
         );
+        expect(setCallArgs.spotifyUrl).toBe(
+          'https://open.spotify.com/artist/123'
+        );
       }
     });
 
@@ -339,11 +346,11 @@ describe('musicfetch-enrichment', () => {
       expect(result.dspFieldsUpdated).not.toContain('deezerId');
     });
 
-    it('extracts social links for Instagram, TikTok, and Bandcamp', async () => {
+    it('extracts DSP and social links including Spotify', async () => {
       const musicFetchResult = makeMusicFetchResult();
       mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
       mockNormalizeAndMergeExtraction.mockResolvedValue({
-        inserted: 3,
+        inserted: 10,
         updated: 0,
       });
 
@@ -358,7 +365,7 @@ describe('musicfetch-enrichment', () => {
         makePayload()
       );
 
-      expect(result.socialLinksInserted).toBe(3);
+      expect(result.socialLinksInserted).toBe(10);
       expect(mockNormalizeAndMergeExtraction).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -366,6 +373,8 @@ describe('musicfetch-enrichment', () => {
         }),
         expect.objectContaining({
           links: expect.arrayContaining([
+            expect.objectContaining({ platformId: 'spotify' }),
+            expect.objectContaining({ platformId: 'apple_music' }),
             expect.objectContaining({ platformId: 'instagram' }),
             expect.objectContaining({ platformId: 'tiktok' }),
             expect.objectContaining({ platformId: 'bandcamp' }),
