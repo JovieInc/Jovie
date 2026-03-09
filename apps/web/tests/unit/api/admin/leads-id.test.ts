@@ -9,33 +9,52 @@ const mockRouteLead = vi.hoisted(() => vi.fn());
 const mockPushLeadToInstantly = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
 
-const { mockDb, mockLeadsSchema, mockUpdate, mockWhere, mockReturning } =
-  vi.hoisted(() => {
-    const mockReturning = vi.fn();
-    const mockWhere = vi.fn();
-    const mockSet = vi.fn(() => ({
-      where: mockWhere,
-    }));
+const {
+  mockDb,
+  mockLeadsSchema,
+  mockUpdate,
+  mockWhere,
+  mockReturning,
+  mockSelect,
+  mockSelectLimit,
+} = vi.hoisted(() => {
+  const mockReturning = vi.fn();
+  const mockWhere = vi.fn();
+  const mockSet = vi.fn(() => ({
+    where: mockWhere,
+  }));
 
-    const mockUpdate = vi.fn(() => ({
-      set: mockSet,
-    }));
+  const mockUpdate = vi.fn(() => ({
+    set: mockSet,
+  }));
 
-    const mockDb = { update: mockUpdate };
-    const mockLeadsSchema = {
-      id: 'id',
-      status: 'status',
-    };
+  const mockSelectLimit = vi.fn();
+  const mockSelectWhere = vi.fn(() => ({ limit: mockSelectLimit }));
+  const mockSelectFrom = vi.fn(() => ({ where: mockSelectWhere }));
+  const mockSelect = vi.fn(() => ({ from: mockSelectFrom }));
 
-    return {
-      mockDb,
-      mockLeadsSchema,
-      mockUpdate,
-      mockSet,
-      mockWhere,
-      mockReturning,
-    };
-  });
+  const mockDb = {
+    update: mockUpdate,
+    select: mockSelect,
+  };
+  const mockLeadsSchema = {
+    id: 'id',
+    status: 'status',
+  };
+
+  return {
+    mockDb,
+    mockLeadsSchema,
+    mockUpdate,
+    mockSet,
+    mockWhere,
+    mockReturning,
+    mockSelect,
+    mockSelectFrom,
+    mockSelectWhere,
+    mockSelectLimit,
+  };
+});
 
 vi.mock('drizzle-orm', () => ({
   eq: mockEq,
@@ -107,6 +126,17 @@ describe('PATCH /api/admin/leads/[id]', () => {
       },
     ]);
 
+    mockSelectLimit.mockResolvedValue([
+      {
+        id: 'lead-1',
+        contactEmail: 'artist@example.com',
+        displayName: 'Artist',
+        linktreeHandle: 'artist',
+        priorityScore: 72,
+        emailInvalid: false,
+      },
+    ]);
+
     mockIngestLeadAsCreator.mockResolvedValue({ success: true });
     mockSpotifyEnrichLead.mockResolvedValue(undefined);
     mockRouteLead.mockResolvedValue({
@@ -149,10 +179,13 @@ describe('PATCH /api/admin/leads/[id]', () => {
     expect(mockSpotifyEnrichLead).toHaveBeenCalledWith('lead-1');
     expect(mockRouteLead).toHaveBeenCalledWith('lead-1');
     expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
-      expect.objectContaining({ email: 'artist@example.com' })
+      expect.objectContaining({
+        email: 'artist@example.com',
+        priorityScore: 72,
+      })
     );
 
-    // First update = status update; second update = queue metadata update
+    expect(mockSelect).toHaveBeenCalledTimes(1);
     expect(mockUpdate).toHaveBeenCalledTimes(2);
     expect(data.routing).toEqual(
       expect.objectContaining({
