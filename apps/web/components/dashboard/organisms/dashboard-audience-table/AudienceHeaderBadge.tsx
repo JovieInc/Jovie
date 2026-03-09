@@ -8,9 +8,9 @@ import type { AudienceView } from './types';
 interface AudienceHeaderBadgeProps {
   readonly view: AudienceView;
   readonly onViewChange: (view: AudienceView) => void;
-  /** Null when the COUNT query was skipped for performance. */
+  /** Null when the COUNT query was skipped for performance (JOV-1262). */
   readonly totalAudienceCount: number | null;
-  /** Null when the COUNT query was skipped for performance. */
+  /** Null when the COUNT query was skipped for performance (JOV-1262). */
   readonly subscriberCount: number | null;
 }
 

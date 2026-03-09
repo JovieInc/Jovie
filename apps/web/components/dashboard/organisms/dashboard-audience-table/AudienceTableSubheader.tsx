@@ -28,11 +28,11 @@ interface AudienceTableSubheaderProps {
   readonly rows: AudienceMember[];
   /** Selected row IDs for filtered export */
   readonly selectedIds: Set<string>;
-  /** Total subscriber count. Null when the COUNT query was skipped for performance. */
+  /** Total subscriber count. Null when the COUNT query was skipped for performance (JOV-1262). */
   readonly subscriberCount: number | null;
-  /** Total row count for the current view. Null when the COUNT query was skipped. */
+  /** Total row count for the current view. Null when the COUNT query was skipped (JOV-1262, JOV-1264). */
   readonly total: number | null;
-  /** Total audience members across all views. Null when the COUNT query was skipped. */
+  /** Total audience members across all views. Null when the COUNT query was skipped (JOV-1262). */
   readonly totalAudienceCount?: number | null;
 }
 
