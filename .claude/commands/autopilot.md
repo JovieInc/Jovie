@@ -53,6 +53,23 @@ When querying Linear, always apply both filters:
 
 ## Orchestration Loop (run continuously)
 
+### 0) Auto-open draft PRs for orphaned Codex branches
+
+Before entering the issue intake/picking loop, scan for pushed Codex branches that still have no PR and auto-open a draft PR for each.
+
+```bash
+for branch in $(git branch -r | grep 'origin/tim/jov-' | sed 's/origin\///'); do
+  PR_EXISTS=$(gh pr list --head "$branch" --json number --jq 'length')
+  if [ "$PR_EXISTS" = "0" ]; then
+    gh pr create --draft --head "$branch" \
+      --title "fix: $(echo "$branch" | sed 's/tim\/jov-[0-9]*-//')" \
+      --body "Auto-opened by autopilot for Codex branch without PR"
+  fi
+done
+```
+
+Run this check once per autopilot cycle so no `tim/jov-*` Codex branch remains orphaned without a PR.
+
 ### 1) Intake from Linear
 
 - Poll Linear team (use team name from Linear, currently `Joive`) for issues in `new`, `ready`, or `todo`
