@@ -5,6 +5,10 @@ import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/components/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
@@ -183,21 +187,27 @@ export function AdminFeedbackTable({
       )}
 
       <div className='w-full lg:w-[58%] border-r border-subtle h-full'>
-        <div className='flex items-center justify-between border-b border-subtle px-4 py-2'>
-          <span className='text-xs text-secondary-token'>
-            {rows.length} item{rows.length !== 1 ? 's' : ''}
-          </span>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            onClick={copyAllAsMarkdown}
-            disabled={rows.length === 0}
-          >
-            <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
-            Copy All as Markdown
-          </Button>
-        </div>
+        <AdminTableHeader
+          title='Feedback'
+          subtitle='Triage product feedback and close the loop with clear status.'
+        />
+        <AdminTableSubheader>
+          <div className='flex items-center justify-between'>
+            <span className='text-xs text-secondary-token'>
+              {rows.length} item{rows.length !== 1 ? 's' : ''}
+            </span>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={copyAllAsMarkdown}
+              disabled={rows.length === 0}
+            >
+              <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
+              Copy All as Markdown
+            </Button>
+          </div>
+        </AdminTableSubheader>
         <AdminTableShell testId='admin-feedback-table'>
           {() => (
             <UnifiedTable

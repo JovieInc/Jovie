@@ -14,6 +14,7 @@ import {
   billingStatusQueryOptions,
   useBillingStatusQuery,
 } from '@/lib/queries/useBillingStatusQuery';
+import { useBuildInfoQuery } from '@/lib/queries/useBuildInfoQuery';
 import { useEarningsQuery } from '@/lib/queries/useEarningsQuery';
 import { useImpersonationQuery } from '@/lib/queries/useImpersonationQuery';
 import { useInsightsSummaryQuery } from '@/lib/queries/useInsightsQuery';
@@ -61,12 +62,23 @@ describe('query refetch policies', () => {
     );
   });
 
-  it('disables mount refetch for earnings', () => {
+  it('disables focus refetch for build info polling', () => {
+    useBuildInfoQuery();
+
+    expect(useQueryMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        refetchOnWindowFocus: false,
+      })
+    );
+  });
+
+  it('disables mount and focus refetch for earnings', () => {
     useEarningsQuery();
 
     expect(useQueryMock).toHaveBeenCalledWith(
       expect.objectContaining({
         refetchOnMount: false,
+        refetchOnWindowFocus: false,
       })
     );
   });

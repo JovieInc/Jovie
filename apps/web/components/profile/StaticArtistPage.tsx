@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { AboutSection } from '@/components/profile/AboutSection';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import {
@@ -10,6 +11,7 @@ import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
+import { TourModePanel } from '@/components/profile/TourModePanel';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
@@ -81,6 +83,8 @@ interface StaticArtistPageProps {
   readonly showTipButton: boolean;
   readonly isTipModeActive?: boolean;
   readonly showBackButton: boolean;
+  readonly showTourButton?: boolean;
+  readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly primaryAction?: PrimaryAction;
@@ -94,6 +98,7 @@ interface StaticArtistPageProps {
   readonly subscribeTwoStep?: boolean;
   /** Artist genres for the about section */
   readonly genres?: string[] | null;
+  readonly tourDates?: TourDateViewModel[];
 }
 
 /**
@@ -152,6 +157,7 @@ interface RenderContentOptions {
   readonly enableDynamicEngagement: boolean;
   readonly subscribeTwoStep: boolean;
   readonly genres?: string[] | null;
+  readonly tourDates: TourDateViewModel[];
 }
 
 function renderContent({
@@ -164,6 +170,7 @@ function renderContent({
   enableDynamicEngagement,
   subscribeTwoStep,
   genres,
+  tourDates,
 }: RenderContentOptions) {
   switch (mode) {
     case 'listen':
@@ -232,6 +239,9 @@ function renderContent({
     case 'about':
       return <AboutSection artist={artist} genres={genres} />;
 
+    case 'tour':
+      return <TourModePanel artist={artist} tourDates={tourDates} />;
+
     default: // 'profile' mode
       // spotifyPreferred is now read client-side in ProfilePrimaryCTA
       return (
@@ -253,6 +263,8 @@ export function StaticArtistPage({
   showTipButton,
   isTipModeActive = false,
   showBackButton,
+  showTourButton = false,
+  isTourModeActive = false,
   showFooter = true,
   autoOpenCapture,
   primaryAction = 'subscribe',
@@ -262,6 +274,7 @@ export function StaticArtistPage({
   allowPhotoDownloads = false,
   subscribeTwoStep = false,
   genres,
+  tourDates = [],
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
@@ -277,6 +290,8 @@ export function StaticArtistPage({
         showTipButton={showTipButton}
         isTipModeActive={isTipModeActive}
         showBackButton={showBackButton}
+        showTourButton={showTourButton}
+        isTourModeActive={isTourModeActive}
         showFooter={showFooter}
         showNotificationButton={true}
         photoDownloadSizes={photoDownloadSizes}
@@ -320,6 +335,7 @@ export function StaticArtistPage({
               enableDynamicEngagement,
               subscribeTwoStep,
               genres,
+              tourDates,
             })
           )}
         </div>
