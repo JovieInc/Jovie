@@ -36,10 +36,9 @@ export function DemoRealReleasesPanel() {
       <ReleaseTable
         releases={DEMO_RELEASE_VIEW_MODELS}
         providerConfig={DEMO_PROVIDER_CONFIG}
-        artistName='Sora Vale'
+        artistName='Tim White'
         onCopy={handleCopy}
         onEdit={handleEdit}
-        groupByYear
       />
     </div>
   );

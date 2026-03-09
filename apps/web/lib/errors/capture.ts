@@ -11,7 +11,8 @@ export function captureErrorInSentry(
   extra?: { componentStack?: string | null; digest?: string }
 ): void {
   const sentryMode = getSentryMode();
-  const isInitialized = isSentryInitialized();
+  // Check both client-side state tracker and server-side Sentry.getClient()
+  const isInitialized = isSentryInitialized() || !!Sentry.getClient();
 
   if (isInitialized) {
     try {
