@@ -20,6 +20,7 @@ import {
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
