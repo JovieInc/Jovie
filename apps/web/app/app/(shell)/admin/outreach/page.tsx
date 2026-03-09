@@ -1,9 +1,9 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { OutreachKpis } from '@/components/admin/outreach/OutreachKpis';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface QueueResponse {
   items: unknown[];
@@ -62,7 +62,7 @@ export default function AdminOutreachPage() {
   if (loading) {
     return (
       <div className='flex items-center justify-center py-16'>
-        <Loader2 className='size-6 animate-spin text-secondary-token' />
+        <LoadingSpinner size='md' tone='muted' />
       </div>
     );
   }

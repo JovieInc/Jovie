@@ -56,7 +56,11 @@ const STATUS_VARIANT: Record<
   rejected: 'error',
 };
 
-export function LeadTable() {
+interface LeadTableProps {
+  readonly refreshKey?: number;
+}
+
+export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -95,7 +99,7 @@ export function LeadTable() {
 
   useEffect(() => {
     void fetchLeads();
-  }, [fetchLeads]);
+  }, [fetchLeads, refreshKey]);
 
   async function updateLeadStatus(id: string, status: 'approved' | 'rejected') {
     setActioningId(id);

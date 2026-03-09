@@ -22,7 +22,7 @@ export const MOCK_ARTIST = {
 } as const;
 
 export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-8 py-3 text-[13px] font-semibold shadow-sm bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)] border border-[var(--linear-border-subtle)]';
+  'inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-8 py-3 text-[13px] font-semibold shadow-sm bg-[var(--linear-bg-surface-2)] text-[color:var(--linear-text-primary)] border border-[var(--linear-border-subtle)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 
@@ -57,7 +57,7 @@ function ListenContent() {
 function TipContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--linear-text-tertiary)]'>
+      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-[color:var(--linear-text-tertiary)]'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
@@ -66,15 +66,15 @@ function TipContent() {
             key={amount}
             className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border text-center ${
               i === 1
-                ? 'border-[var(--linear-border-default)] bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)] shadow-sm'
-                : 'border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] text-[var(--linear-text-primary)]'
+                ? 'border-[var(--linear-border-default)] bg-[var(--linear-bg-surface-2)] text-[color:var(--linear-text-primary)] shadow-sm'
+                : 'border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] text-[color:var(--linear-text-primary)]'
             }`}
           >
             <span
               className={`text-[10px] font-medium uppercase tracking-wider ${
                 i === 1
-                  ? 'text-[var(--linear-text-secondary)]'
-                  : 'text-[var(--linear-text-tertiary)]'
+                  ? 'text-[color:var(--linear-text-secondary)]'
+                  : 'text-[color:var(--linear-text-tertiary)]'
               }`}
             >
               USD
@@ -95,20 +95,20 @@ function TourContent() {
     <div className='flex h-full flex-col justify-center gap-3'>
       <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)]'>
         <div className='min-w-0'>
-          <p className='text-[13px] font-medium text-[var(--linear-text-primary)] truncate'>
+          <p className='text-[13px] font-medium text-[color:var(--linear-text-primary)] truncate'>
             {show.venue}
           </p>
-          <p className='text-[11px] text-[var(--linear-text-tertiary)]'>
+          <p className='text-[11px] text-[color:var(--linear-text-tertiary)]'>
             {show.city}
           </p>
         </div>
-        <span className='shrink-0 text-[11px] font-medium text-[var(--linear-text-secondary)]'>
+        <span className='shrink-0 text-[11px] font-medium text-[color:var(--linear-text-secondary)]'>
           {show.date}
         </span>
       </div>
       <button
         type='button'
-        className='text-[12px] font-medium text-[var(--linear-text-tertiary)] hover:text-[var(--linear-text-secondary)] transition-colors'
+        className='text-[12px] font-medium text-[color:var(--linear-text-tertiary)] hover:text-[color:var(--linear-text-secondary)] transition-colors'
       >
         See more dates
       </button>
@@ -127,7 +127,7 @@ function ProfileContent() {
         {platforms.map(p => (
           <span
             key={p}
-            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--linear-text-tertiary)]'
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-[color:var(--linear-text-tertiary)]'
           >
             <SocialIcon platform={p} size={18} aria-hidden />
           </span>

@@ -2,7 +2,7 @@
  * Error Tracking Utility
  *
  * Provides structured error logging with Sentry integration for production monitoring.
- * Uses Sentry as the primary error tracking service with PostHog as a secondary sink.
+ * Uses Sentry as the primary error tracking service.
  *
  * SDK Variant Awareness:
  * This module works with both lite and full Sentry SDK variants:
@@ -101,9 +101,13 @@ function sendToSentry(params: {
     context,
   } = params;
 
-  if (!isSentryInitialized()) {
+  // Check both client-side state tracker and server-side Sentry.getClient().
+  // sentry.server.config.ts calls Sentry.init() directly without updating the
+  // custom state tracker, so isSentryInitialized() returns false on the server
+  // even though Sentry IS initialized via @sentry/nextjs.
+  if (!isSentryInitialized() && !Sentry.getClient()) {
     console.warn(
-      '[Error Tracking] Sentry not initialized, error will only be logged to console and PostHog:',
+      '[Error Tracking] Sentry not initialized, error will only be logged to console:',
       {
         message,
         errorType: error instanceof Error ? error.name : 'UnknownError',
@@ -180,12 +184,12 @@ function formatError(error: unknown): {
 }
 
 /**
- * Capture an error and send to Sentry and PostHog
+ * Capture an error and send to Sentry
  *
  * This function:
  * - Logs to console for debugging
  * - Sends error to Sentry for error tracking (if SDK is initialized)
- * - Sends error event to PostHog for monitoring
+ * - Sends error event to analytics for monitoring
  * - Never throws (safe to use in catch blocks)
  *
  * SDK Variant Awareness:
@@ -227,7 +231,7 @@ export async function captureError(
     context,
   });
 
-  // Send to PostHog for monitoring (secondary, fire-and-forget)
+  // Send to analytics for monitoring (secondary, fire-and-forget)
   const eventName =
     severity === 'critical' ? '$exception_critical' : '$exception';
 
@@ -245,7 +249,10 @@ export async function captureError(
     },
     context?.userId as string | undefined
   ).catch(trackingError => {
-    console.warn('[Error Tracking] Failed to send to PostHog:', trackingError);
+    console.warn(
+      '[Error Tracking] Failed to send analytics event:',
+      trackingError
+    );
   });
 }
 

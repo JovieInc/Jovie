@@ -1,10 +1,11 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { OutreachStatusBadge } from '@/components/admin/outreach/OutreachStatusBadge';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface EmailQueueLead {
   id: string;
@@ -88,7 +89,11 @@ export default function AdminOutreachEmailPage() {
                     colSpan={6}
                     className='py-8 text-center text-secondary-token'
                   >
-                    <Loader2 className='mx-auto size-5 animate-spin' />
+                    <LoadingSpinner
+                      size='sm'
+                      tone='muted'
+                      className='mx-auto'
+                    />
                   </td>
                 </tr>
               ) : leads.length === 0 ? (

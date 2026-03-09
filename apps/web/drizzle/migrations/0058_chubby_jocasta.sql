@@ -1,6 +1,6 @@
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lead_outreach_route') THEN CREATE TYPE "public"."lead_outreach_route" AS ENUM('email', 'dm', 'both', 'manual_review', 'skipped'); END IF; END $$;--> statement-breakpoint
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lead_outreach_status') THEN CREATE TYPE "public"."lead_outreach_status" AS ENUM('pending', 'queued', 'sent', 'failed', 'dm_sent', 'dismissed'); END IF; END $$;--> statement-breakpoint
-ALTER TABLE "leads" ADD COLUMN "is_linktree_verified" boolean;--> statement-breakpoint
+ALTER TABLE "leads" ADD COLUMN IF NOT EXISTS "is_linktree_verified" boolean;--> statement-breakpoint
 ALTER TABLE "leads" ADD COLUMN "spotify_popularity" integer;--> statement-breakpoint
 ALTER TABLE "leads" ADD COLUMN "spotify_followers" integer;--> statement-breakpoint
 ALTER TABLE "leads" ADD COLUMN "release_count" integer;--> statement-breakpoint

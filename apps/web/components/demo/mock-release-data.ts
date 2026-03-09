@@ -56,6 +56,69 @@ function makeProviders(
 export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
   {
     profileId: 'demo-profile',
+    id: 'rel-take-me-over',
+    title: 'Take Me Over',
+    releaseDate: '2014-10-01',
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
+    slug: 'take-me-over',
+    smartLinkPath: '/tim-white/take-me-over',
+    spotifyPopularity: 45,
+    releaseType: 'single',
+    isExplicit: false,
+    totalTracks: 1,
+    totalDurationMs: 210_000,
+    primaryIsrc: 'USRC17300001',
+    genres: ['Trance', 'Progressive House'],
+    providers: makeProviders(
+      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
+      'take-me-over'
+    ),
+  },
+  {
+    profileId: 'demo-profile',
+    id: 'rel-never-say-a-word',
+    title: 'Never Say A Word',
+    releaseDate: '2024-01-15',
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
+    slug: 'never-say-a-word',
+    smartLinkPath: '/tim-white/never-say-a-word',
+    spotifyPopularity: 38,
+    releaseType: 'single',
+    isExplicit: false,
+    totalTracks: 1,
+    totalDurationMs: 225_000,
+    primaryIsrc: 'USRC17400002',
+    genres: ['Trance', 'Electronic'],
+    providers: makeProviders(
+      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer'],
+      'never-say-a-word'
+    ),
+  },
+  {
+    profileId: 'demo-profile',
+    id: 'rel-deep-end',
+    title: 'The Deep End',
+    releaseDate: '2017-02-10',
+    artworkUrl:
+      'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
+    slug: 'the-deep-end',
+    smartLinkPath: '/tim-white/the-deep-end',
+    spotifyPopularity: 52,
+    releaseType: 'single',
+    isExplicit: false,
+    totalTracks: 1,
+    totalDurationMs: 198_000,
+    primaryIsrc: 'USRC17100003',
+    genres: ['Trance', 'Progressive House'],
+    providers: makeProviders(
+      ['spotify', 'apple_music', 'youtube', 'amazon_music', 'deezer', 'tidal'],
+      'the-deep-end'
+    ),
+  },
+  {
+    profileId: 'demo-profile',
     id: 'rel-01',
     title: 'Night Drive',
     releaseDate: '2026-02-18',
@@ -495,6 +558,6 @@ function makeAudienceMember(index: number): AudienceMember {
 }
 
 export const DEMO_AUDIENCE_MEMBERS: AudienceMember[] = Array.from(
-  { length: 54 },
+  { length: 5 },
   (_, i) => makeAudienceMember(i)
 );

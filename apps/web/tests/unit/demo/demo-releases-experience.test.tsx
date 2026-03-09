@@ -37,6 +37,86 @@ vi.mock('next/image', () => ({
   },
 }));
 
+// ─── Drizzle cycle prevention ────────────────────────────────────────────────
+// The worktree installs its own copy of drizzle-orm under a different real-path
+// than the monorepo root copy. When Node v22+ resolves the module graph it sees
+// two distinct module identities for drizzle-orm and, combined with the
+// profiles ↔ waitlist mutual FK cycle that drizzle schema files use, throws
+// ERR_REQUIRE_CYCLE_MODULE. We break the cycle by short-circuiting every
+// 'use server' action file that directly imports drizzle-orm before the
+// component tree is evaluated.
+vi.mock('@/app/app/(shell)/dashboard/actions/dashboard-data', () => ({
+  getDashboardData: vi.fn(),
+  getDashboardDataFresh: vi.fn(),
+  getDashboardDataCached: vi.fn(),
+  prefetchDashboardData: vi.fn(),
+}));
+
+vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
+  getDashboardData: vi.fn(),
+  getDashboardDataFresh: vi.fn(),
+  getDashboardDataCached: vi.fn(),
+  prefetchDashboardData: vi.fn(),
+}));
+
+// releases/actions.ts is imported by ReleaseProviderMatrix (via column-renderers
+// → AvailabilityCell) and directly imports drizzle-orm — mock it to stop the
+// schema evaluation chain.
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  getSpotifyImportStatus: vi.fn(),
+  pollReleasesCount: vi.fn(),
+  connectAppleMusicArtist: vi.fn(),
+  rescanAppleMusicLinks: vi.fn(),
+  revertReleaseArtwork: vi.fn(),
+  getReleases: vi.fn(),
+  deleteRelease: vi.fn(),
+  updateRelease: vi.fn(),
+  importSpotifyReleases: vi.fn(),
+}));
+
+// tour-dates/actions.ts is also a 'use server' file that imports drizzle-orm.
+vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
+  getTourDates: vi.fn(),
+  createTourDate: vi.fn(),
+  updateTourDate: vi.fn(),
+  deleteTourDate: vi.fn(),
+}));
+
+// Stub DashboardDataContext so it never imports from the barrel.
+vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
+  DashboardDataProvider: ({
+    children,
+  }: {
+    value: unknown;
+    children: React.ReactNode;
+  }) => <>{children}</>,
+  useDashboardData: () => ({
+    user: null,
+    creatorProfiles: [],
+    selectedProfile: null,
+    needsOnboarding: false,
+    sidebarCollapsed: false,
+    hasSocialLinks: false,
+    hasMusicLinks: false,
+    isAdmin: false,
+    tippingStats: {
+      tipClicks: 0,
+      qrTipClicks: 0,
+      linkTipClicks: 0,
+      tipsSubmitted: 0,
+      totalReceivedCents: 0,
+      monthReceivedCents: 0,
+    },
+    profileCompletion: {
+      percentage: 0,
+      completedCount: 0,
+      totalCount: 4,
+      steps: [],
+      profileIsLive: false,
+    },
+  }),
+}));
+
 const { DemoReleasesExperience } = await import(
   '@/components/demo/DemoReleasesExperience'
 );

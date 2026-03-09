@@ -1,5 +1,7 @@
 'use client';
 
+import { SimpleTooltip } from '@jovie/ui';
+import { Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudienceIntentLevel } from '@/types';
 
@@ -9,33 +11,29 @@ export interface AudienceIntentScoreCellProps {
 }
 
 const INTENT_DOT_STYLES: Record<AudienceIntentLevel, string> = {
-  high: 'bg-emerald-500',
-  medium: 'bg-amber-400',
-  low: 'bg-zinc-400',
+  high: 'text-emerald-500 fill-emerald-500',
+  medium: 'text-amber-400 fill-amber-400',
+  low: 'text-zinc-500 fill-zinc-500',
 };
 
-const INTENT_LABEL_STYLES: Record<AudienceIntentLevel, string> = {
-  high: 'text-emerald-600 dark:text-emerald-400 font-[590]',
-  medium: 'text-amber-600 dark:text-amber-400 font-[510]',
-  low: 'text-tertiary-token',
+const INTENT_LABELS: Record<AudienceIntentLevel, string> = {
+  high: 'High intent',
+  medium: 'Medium intent',
+  low: 'Low intent',
 };
 
 export function AudienceIntentScoreCell({
   intentLevel,
   className,
 }: AudienceIntentScoreCellProps) {
-  const label = intentLevel.charAt(0).toUpperCase() + intentLevel.slice(1);
-
   return (
-    <div className={cn('flex items-center gap-2 text-[13px]', className)}>
-      <span
-        className={cn(
-          'inline-block size-1.5 shrink-0 rounded-full',
-          INTENT_DOT_STYLES[intentLevel]
-        )}
-        aria-hidden='true'
-      />
-      <span className={INTENT_LABEL_STYLES[intentLevel]}>{label}</span>
-    </div>
+    <SimpleTooltip content={INTENT_LABELS[intentLevel]} side='top'>
+      <div className={cn('flex items-center justify-center w-8', className)}>
+        <Circle
+          className={cn('h-2 w-2 shrink-0', INTENT_DOT_STYLES[intentLevel])}
+          aria-label={INTENT_LABELS[intentLevel]}
+        />
+      </div>
+    </SimpleTooltip>
   );
 }

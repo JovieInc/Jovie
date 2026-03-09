@@ -88,3 +88,4 @@ package-lock.json
 .security-key
 logs/security/
 output/
+.audit/

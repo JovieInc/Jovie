@@ -64,6 +64,7 @@ import {
   getCanvasStatusFromMetadata,
 } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { slugify } from '@/lib/utils';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
@@ -1753,4 +1754,112 @@ export async function revertReleaseArtwork(
   // and a path revalidation resets client-side state (closing the sidebar).
 
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
+}
+
+/* ------------------------------------------------------------------ */
+/*  createRelease — manually add a release to the creator's discography */
+/* ------------------------------------------------------------------ */
+
+export async function createRelease(formData: {
+  title: string;
+  releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
+  releaseDate?: string | null;
+  artworkUrl?: string | null;
+  providerUrls?: Record<string, string>;
+}): Promise<{ success: boolean; message: string; releaseId?: string }> {
+  noStore();
+
+  const profile = await requireProfile();
+
+  const title = formData.title.trim();
+  if (!title) {
+    return { success: false, message: 'Title is required.' };
+  }
+
+  const slug = slugify(title);
+  if (!slug) {
+    return {
+      success: false,
+      message: 'Could not generate a valid slug from the title.',
+    };
+  }
+
+  const releaseDate = formData.releaseDate
+    ? new Date(formData.releaseDate)
+    : null;
+
+  try {
+    const [inserted] = await db
+      .insert(discogReleases)
+      .values({
+        creatorProfileId: profile.id,
+        title,
+        slug,
+        releaseType: formData.releaseType,
+        releaseDate,
+        artworkUrl: formData.artworkUrl ?? null,
+        sourceType: 'manual',
+        totalTracks: formData.releaseType === 'single' ? 1 : 0,
+      })
+      .returning({ id: discogReleases.id });
+
+    const releaseId = inserted.id;
+
+    // Upsert any provider URLs the user supplied
+    if (formData.providerUrls) {
+      const providerLabels = buildProviderLabels();
+      const entries = Object.entries(formData.providerUrls).filter(
+        ([, url]) => url.trim().length > 0
+      );
+
+      for (const [key, url] of entries) {
+        const provider = key as ProviderKey;
+        const providerLabel = providerLabels[provider];
+        if (!providerLabel) continue;
+        const trimmedUrl = url.trim();
+        const validation = validateProviderUrl(
+          trimmedUrl,
+          provider,
+          providerLabel
+        );
+        if (!validation.valid) continue;
+
+        await upsertProviderLink({
+          releaseId,
+          providerId: provider,
+          url: trimmedUrl,
+          sourceType: 'manual',
+        });
+      }
+    }
+
+    revalidatePath(APP_ROUTES.RELEASES);
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+
+    return {
+      success: true,
+      message: `Release "${title}" created.`,
+      releaseId,
+    };
+  } catch (error) {
+    throwIfRedirect(error);
+
+    // Handle duplicate slug
+    const dbError = error as Error & { code?: string };
+    if (dbError.code === '23505') {
+      return {
+        success: false,
+        message: `A release with the slug "${slug}" already exists. Please choose a different title.`,
+      };
+    }
+
+    void captureError('createRelease failed', error as Error, {
+      action: 'createRelease',
+      title,
+    });
+    return {
+      success: false,
+      message: 'Failed to create release. Please try again.',
+    };
+  }
 }
