@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { getSessionContext } from '@/lib/auth/session';
 import { getDashboardData } from '../dashboard/actions';
+import { checkAppleMusicConnection } from '../dashboard/releases/actions';
 import { ChatPageClient } from './ChatPageClient';
 
 const CHAT_DESCRIPTION = 'Start a new thread with Jovie AI';
@@ -28,5 +29,17 @@ export default async function ChatPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
-  return <ChatPageClient isFirstSession={dashboardData.isFirstSession} />;
+  const appleMusicResult = await checkAppleMusicConnection().catch(() => ({
+    connected: false,
+    artistName: null,
+    artistId: null,
+  }));
+
+  return (
+    <ChatPageClient
+      isFirstSession={dashboardData.isFirstSession}
+      appleMusicConnected={appleMusicResult.connected}
+      appleMusicArtistName={appleMusicResult.artistName}
+    />
+  );
 }
