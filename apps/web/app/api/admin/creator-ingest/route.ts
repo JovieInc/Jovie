@@ -1,6 +1,4 @@
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -10,84 +8,26 @@ import {
   fetchFullExtractionProfile,
   resolveFullExtractionContext,
 } from '@/lib/ingestion/flows/full-extraction-flow';
-import { extractHandleFromSocialUrl } from '@/lib/ingestion/flows/handle-extraction';
 import {
   checkExistingProfile,
-  findAvailableHandle,
   markReingestFailure,
 } from '@/lib/ingestion/flows/profile-operations';
 import {
   handleNewProfileIngest,
   handleReingestProfile,
 } from '@/lib/ingestion/flows/reingest-flow';
-import {
-  createNewSocialProfile,
-  handleExistingUnclaimedProfile,
-  type SocialPlatformContext,
-} from '@/lib/ingestion/flows/social-platform-flow';
-import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
-import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import {
-  isValidHandle,
-  normalizeHandle,
-} from '@/lib/ingestion/strategies/linktree';
+import { ingestSocialPlatformUrl } from '@/lib/ingestion/flows/social-platform-ingest';
 import {
   checkAdminCreatorIngestRateLimit,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
-import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
+import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-/**
- * Validate a social handle extracted from a URL.
- *
- * @param inputUrl - Original URL to extract handle from
- * @param detectedPlatformName - Platform name for error messages
- * @returns Validated handle result or error response
- */
-function validateSocialHandle(
-  inputUrl: string,
-  detectedPlatformName: string
-):
-  | { ok: true; handle: string; normalizedHandle: string }
-  | { ok: false; response: NextResponse } {
-  const handle = extractHandleFromSocialUrl(inputUrl);
-
-  if (!handle) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          error: 'Unable to extract username from URL',
-          details: `Could not parse a valid username from the ${detectedPlatformName} URL. Please ensure the URL points to a valid profile.`,
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  const normalizedHandle = normalizeHandle(handle);
-  if (!isValidHandle(normalizedHandle)) {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          error: 'Invalid username format',
-          details:
-            'Username must be 1-30 characters, alphanumeric and underscores only',
-        },
-        { status: 422, headers: NO_STORE_HEADERS }
-      ),
-    };
-  }
-
-  return { ok: true, handle, normalizedHandle };
-}
 
 /**
  * Process a full-extraction platform ingestion (Linktree/Laylo).
@@ -179,85 +119,6 @@ async function processFullExtractionPlatform(
     displayName,
     hostedAvatarUrl,
     extraction: extractionWithHostedAvatar,
-  });
-}
-
-/**
- * Process a social platform ingestion (Instagram, TikTok, YouTube, etc.).
- */
-async function processSocialPlatformIngestion(
-  inputUrl: string,
-  detected: ReturnType<typeof detectPlatform>
-): Promise<NextResponse> {
-  const handleResult = validateSocialHandle(inputUrl, detected.platform.name);
-  if (!handleResult.ok) {
-    return handleResult.response;
-  }
-
-  const { handle, normalizedHandle } = handleResult;
-  const platformId = detected.platform.id;
-  const spotifyData = await fetchSpotifyArtistData(handle, platformId);
-
-  // For Spotify artists, derive the username from the artist name
-  // instead of the opaque Spotify artist ID (e.g. "fisher" not "artist_5yMCA6...")
-  let effectiveHandle = handle;
-  let effectiveNormalizedHandle = normalizedHandle;
-  if (spotifyData?.name) {
-    const artistHandle = spotifyData.name
-      .toLowerCase()
-      .normalize('NFD')
-      .replaceAll(/[\u0300-\u036f]/g, '')
-      .replaceAll(/[^a-z0-9_]/g, '')
-      .slice(0, 30);
-    const normalized = normalizeHandle(artistHandle);
-    if (isValidHandle(normalized)) {
-      effectiveHandle = artistHandle;
-      effectiveNormalizedHandle = normalized;
-    }
-  }
-
-  const socialContext: SocialPlatformContext = {
-    handle: effectiveHandle,
-    normalizedHandle: effectiveNormalizedHandle,
-    platformId,
-    platformName: detected.platform.name,
-    normalizedUrl: detected.normalizedUrl,
-    spotifyArtistName: spotifyData?.name ?? null,
-    spotifyData,
-  };
-
-  return withSystemIngestionSession(async tx => {
-    const [existing] = await tx
-      .select({
-        id: creatorProfiles.id,
-        isClaimed: creatorProfiles.isClaimed,
-        usernameNormalized: creatorProfiles.usernameNormalized,
-      })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, effectiveNormalizedHandle))
-      .limit(1);
-
-    let finalHandle = effectiveNormalizedHandle;
-    if (existing?.isClaimed) {
-      const altHandle = await findAvailableHandle(
-        tx,
-        effectiveNormalizedHandle
-      );
-      if (!altHandle) {
-        return NextResponse.json(
-          {
-            error: 'Unable to allocate unique username',
-            details: 'All fallback username attempts exhausted.',
-          },
-          { status: 409, headers: NO_STORE_HEADERS }
-        );
-      }
-      finalHandle = altHandle;
-    } else if (existing && !existing.isClaimed) {
-      return handleExistingUnclaimedProfile(tx, existing, socialContext);
-    }
-
-    return createNewSocialProfile(tx, finalHandle, socialContext);
   });
 }
 
@@ -376,7 +237,6 @@ export async function POST(request: Request) {
     }
 
     const inputUrl = normalizeUrl(parsed.data.url);
-    const detected = detectPlatform(inputUrl);
     const { isLinktree, isLaylo, linktreeValidatedUrl } =
       detectFullExtractionPlatform(inputUrl);
 
@@ -388,7 +248,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return processSocialPlatformIngestion(inputUrl, detected);
+    return ingestSocialPlatformUrl(inputUrl);
   } catch (error) {
     logger.error('Admin ingestion failed', {
       error: error instanceof Error ? error.message : 'Unknown error',
