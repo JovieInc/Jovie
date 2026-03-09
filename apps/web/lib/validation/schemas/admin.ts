@@ -89,7 +89,7 @@ export const creatorIngestSchema = z.object({
  * Used for POST /api/admin/batch-ingest requests.
  */
 export const batchCreatorIngestSchema = z.object({
-  spotifyUrls: z.array(z.string().trim().min(1).max(2048)).min(1).max(50),
+  urls: z.array(z.string().trim().min(1).max(2048)).min(1).max(50),
 });
 
 export type BatchCreatorIngestPayload = z.infer<
