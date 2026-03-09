@@ -297,17 +297,53 @@ async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
 export async function getSpotifyArtistProfile(
   artistId: string
 ): Promise<SpotifyArtistProfile | null> {
-  try {
-    const artist = await executeWithCircuitBreaker(async () => {
-      return spotifyRequest<SpotifyArtistProfile>(`/artists/${artistId}`);
-    });
-    return artist;
-  } catch (error) {
-    if (error instanceof SpotifyError && error.statusCode === 404) {
-      return null;
+  const spotifyUrl = `${SPOTIFY_API_BASE}/artists/${artistId}`;
+  return Sentry.startSpan(
+    {
+      op: 'music.fetch',
+      name: `Spotify: get artist profile`,
+      attributes: { 'artist.id': artistId, 'music.fetch.url': spotifyUrl },
+    },
+    async span => {
+      Sentry.addBreadcrumb({
+        category: 'music.fetch',
+        message: `Fetching Spotify artist profile`,
+        data: {
+          artistId,
+          url: spotifyUrl,
+          timestamp: new Date().toISOString(),
+        },
+        level: 'info',
+      });
+
+      try {
+        const artist = await executeWithCircuitBreaker(async () => {
+          return spotifyRequest<SpotifyArtistProfile>(`/artists/${artistId}`);
+        });
+        span.setStatus({ code: 1, message: 'ok' });
+        span.setAttribute('artist.name', artist.name);
+        return artist;
+      } catch (error) {
+        if (error instanceof SpotifyError && error.statusCode === 404) {
+          span.setStatus({ code: 1, message: 'ok' });
+          return null;
+        }
+        span.setStatus({ code: 2, message: 'error' });
+        Sentry.captureException(error, {
+          tags: { 'music.fetch.source': 'spotify' },
+          extra: {
+            artistId,
+            spotifyUrl,
+            statusCode:
+              error instanceof SpotifyError ? error.statusCode : undefined,
+            errorMessage:
+              error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+        throw error;
+      }
     }
-    throw error;
-  }
+  );
 }
 
 /**
@@ -323,28 +359,57 @@ export async function getSpotifyArtists(
     return [];
   }
 
-  // Spotify allows max 50 artists per request
-  const chunks: string[][] = [];
-  for (let i = 0; i < artistIds.length; i += 50) {
-    chunks.push(artistIds.slice(i, i + 50));
-  }
-
-  const allArtists: SpotifyArtistProfile[] = [];
-
-  for (const chunk of chunks) {
-    try {
-      const response = await executeWithCircuitBreaker(async () => {
-        return spotifyRequest<{ artists: SpotifyArtistProfile[] }>(
-          `/artists?ids=${chunk.join(',')}`
-        );
+  return Sentry.startSpan(
+    {
+      op: 'music.fetch',
+      name: 'Spotify: batch get artists',
+      attributes: { 'artists.count': artistIds.length },
+    },
+    async span => {
+      Sentry.addBreadcrumb({
+        category: 'music.fetch',
+        message: `Fetching Spotify artists batch`,
+        data: {
+          artistCount: artistIds.length,
+          timestamp: new Date().toISOString(),
+        },
+        level: 'info',
       });
-      allArtists.push(...response.artists.filter(Boolean));
-    } catch {
-      // Continue with other chunks if one fails
-    }
-  }
 
-  return allArtists;
+      // Spotify allows max 50 artists per request
+      const chunks: string[][] = [];
+      for (let i = 0; i < artistIds.length; i += 50) {
+        chunks.push(artistIds.slice(i, i + 50));
+      }
+
+      const allArtists: SpotifyArtistProfile[] = [];
+
+      for (const chunk of chunks) {
+        try {
+          const response = await executeWithCircuitBreaker(async () => {
+            return spotifyRequest<{ artists: SpotifyArtistProfile[] }>(
+              `/artists?ids=${chunk.join(',')}`
+            );
+          });
+          allArtists.push(...response.artists.filter(Boolean));
+        } catch (error) {
+          Sentry.captureException(error, {
+            tags: { 'music.fetch.source': 'spotify' },
+            extra: {
+              chunkSize: chunk.length,
+              errorMessage:
+                error instanceof Error ? error.message : 'Unknown error',
+            },
+          });
+          // Continue with other chunks if one fails
+        }
+      }
+
+      span.setStatus({ code: 1, message: 'ok' });
+      span.setAttribute('artists.fetched', allArtists.length);
+      return allArtists;
+    }
+  );
 }
 
 // ============================================================================

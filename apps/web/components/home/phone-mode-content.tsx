@@ -5,7 +5,9 @@
  * DeeplinksGrid (scroll-driven phone) to avoid code duplication.
  */
 
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */
@@ -34,17 +36,19 @@ export const MOCK_TOUR_DATES = [
 
 function ListenContent() {
   const dsps = [
-    { platform: 'spotify', label: 'Spotify' },
-    { platform: 'applemusic', label: 'Apple Music' },
-    { platform: 'youtube', label: 'YouTube' },
+    { key: 'spotify', label: 'Spotify' },
+    { key: 'apple_music', label: 'Apple Music' },
+    { key: 'youtube', label: 'YouTube' },
   ] as const;
   return (
     <div className='flex h-full flex-col justify-center gap-2'>
       {dsps.map(dsp => (
-        <button key={dsp.platform} type='button' className={PHONE_CTA_CLASS}>
-          <SocialIcon platform={dsp.platform} size={16} aria-hidden />
-          {dsp.label}
-        </button>
+        <SmartLinkProviderButton
+          key={dsp.key}
+          label={dsp.label}
+          iconPath={DSP_LOGO_CONFIG[dsp.key]?.iconPath}
+          className='px-3 py-2.5 text-[13px] bg-[var(--linear-bg-surface-2)] border border-[var(--linear-border-subtle)] ring-0 backdrop-blur-none hover:bg-[var(--linear-bg-hover)]'
+        />
       ))}
     </div>
   );

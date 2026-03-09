@@ -7,6 +7,10 @@ export {
   AdminOutreachSectionSkeleton,
 } from './AdminOutreachSection';
 export {
+  AdminPlatformStatsSection,
+  AdminPlatformStatsSectionSkeleton,
+} from './AdminPlatformStatsSection';
+export {
   AdminSentrySection,
   AdminSentrySectionSkeleton,
 } from './AdminSentrySection';
