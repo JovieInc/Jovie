@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReleaseMetadata } from '@/components/organisms/release-sidebar/ReleaseMetadata';
@@ -27,31 +28,33 @@ function buildRelease(overrides: Partial<Release> = {}): Release {
   };
 }
 
+function renderReleaseMetadata(release: Release) {
+  return render(
+    <TooltipProvider>
+      <ReleaseMetadata release={release} />
+    </TooltipProvider>
+  );
+}
+
 describe('ReleaseMetadata canvas status', () => {
   it('shows set status when canvas is uploaded', () => {
-    render(
-      <ReleaseMetadata release={buildRelease({ canvasStatus: 'uploaded' })} />
-    );
+    renderReleaseMetadata(buildRelease({ canvasStatus: 'uploaded' }));
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
     expect(screen.getByText('Has video')).toBeInTheDocument();
   });
 
   it('shows ready to upload when canvas is generated', () => {
-    render(
-      <ReleaseMetadata release={buildRelease({ canvasStatus: 'generated' })} />
-    );
+    renderReleaseMetadata(buildRelease({ canvasStatus: 'generated' }));
 
     expect(screen.getByText('Ready to upload')).toBeInTheDocument();
   });
 
   it('falls back to not-set badge for unknown canvas status values', () => {
-    render(
-      <ReleaseMetadata
-        release={buildRelease({
-          canvasStatus: 'unknown_value' as Release['canvasStatus'],
-        })}
-      />
+    renderReleaseMetadata(
+      buildRelease({
+        canvasStatus: 'unknown_value' as Release['canvasStatus'],
+      })
     );
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
@@ -59,11 +62,56 @@ describe('ReleaseMetadata canvas status', () => {
   });
 
   it('defaults to not-set badge when canvas status is missing', () => {
-    render(
-      <ReleaseMetadata release={buildRelease({ canvasStatus: undefined })} />
-    );
+    renderReleaseMetadata(buildRelease({ canvasStatus: undefined }));
 
     expect(screen.getByText('Canvas')).toBeInTheDocument();
     expect(screen.getAllByText('Has video').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('ReleaseMetadata copyright labels', () => {
+  it('renders both ℗ and © copyright lines when both values exist', () => {
+    renderReleaseMetadata(
+      buildRelease({
+        copyrightLine: '2020 To Mine Limited',
+        distributor: '2020 To Mine Limited',
+      })
+    );
+
+    expect(screen.getByText('℗')).toBeInTheDocument();
+    expect(screen.getByText('©')).toBeInTheDocument();
+    expect(screen.getByText('℗ 2020 To Mine Limited')).toBeInTheDocument();
+    expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
+  });
+
+  it('shows only the available copyright type', () => {
+    renderReleaseMetadata(
+      buildRelease({
+        copyrightLine: undefined,
+        distributor: '2020 To Mine Limited',
+      })
+    );
+
+    expect(screen.queryByText('℗')).not.toBeInTheDocument();
+    expect(screen.getByText('©')).toBeInTheDocument();
+    expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
+  });
+
+  it('normalizes existing leading symbols to avoid duplication', () => {
+    renderReleaseMetadata(
+      buildRelease({
+        copyrightLine: '℗ 2020 To Mine Limited',
+        distributor: '© 2020 To Mine Limited',
+      })
+    );
+
+    expect(screen.getByText('℗ 2020 To Mine Limited')).toBeInTheDocument();
+    expect(screen.getByText('© 2020 To Mine Limited')).toBeInTheDocument();
+    expect(
+      screen.queryByText('℗ ℗ 2020 To Mine Limited')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('© © 2020 To Mine Limited')
+    ).not.toBeInTheDocument();
   });
 });
