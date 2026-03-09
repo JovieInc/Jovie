@@ -15,8 +15,8 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
           backgroundColor: 'var(--linear-bg-surface-1)',
           boxShadow: [
             '0 0 0 1px var(--linear-border-default)',
-            '0 4px 32px rgba(8,9,10,0.6)',
-            '0 12px 48px rgba(0,0,0,0.4)',
+            '0 8px 40px rgba(0,0,0,0.45)',
+            '0 24px 80px rgba(0,0,0,0.35)',
           ].join(', '),
         }}
       >

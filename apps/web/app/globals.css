@@ -386,9 +386,9 @@ body {
       1rem,
       var(--linear-h2-size-lg)
     );
-    font-weight: var(--linear-font-weight-semibold);
+    font-weight: 590;
     letter-spacing: var(--linear-tracking-headline);
-    line-height: 1.1;
+    line-height: 1.05;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
@@ -407,16 +407,12 @@ body {
     }
   }
   .marketing-lead-linear {
-    font-size: clamp(
-      var(--linear-body-lg-size-sm),
-      1.5vw +
-      0.5rem,
-      var(--linear-body-lg-size-lg)
-    );
+    font-size: clamp(15px, 1.2vw + 0.4rem, 17px);
+    font-weight: 400;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
-    letter-spacing: var(--linear-tracking-body);
-    line-height: var(--linear-leading-normal);
+    letter-spacing: -0.011em;
+    line-height: 1.65;
   }
   .marketing-body {
     font-feature-settings:
@@ -435,6 +431,29 @@ body {
   }
   .marketing-cta {
     @apply relative inline-flex items-center justify-center rounded bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors duration-normal;
+  }
+
+  /* Hero stagger entrance — children fade up in sequence */
+  .hero-stagger {
+    animation: hero-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .hero-stagger > * {
+    animation: hero-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .hero-stagger > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  .hero-stagger > *:nth-child(2) {
+    animation-delay: 60ms;
+  }
+  .hero-stagger > *:nth-child(3) {
+    animation-delay: 120ms;
+  }
+  .hero-stagger > *:nth-child(4) {
+    animation-delay: 180ms;
+  }
+  .hero-stagger > *:nth-child(5) {
+    animation-delay: 240ms;
   }
 }
 
@@ -876,6 +895,26 @@ body {
   from {
     opacity: 0;
     transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-tab-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
   }
   to {
     opacity: 1;

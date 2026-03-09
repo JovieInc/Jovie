@@ -1,4 +1,5 @@
-import { ChevronRight, Disc3, ExternalLink, Link2 } from 'lucide-react';
+import { ChevronRight, ExternalLink, Link2 } from 'lucide-react';
+import Image from 'next/image';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Container } from '@/components/site/Container';
@@ -56,7 +57,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 smart link — Spotify, Apple Music, YouTube Music, all in one
                 page your fans actually use.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Zero manual work
               </span>
             </div>
@@ -130,20 +131,20 @@ export function AutomaticReleaseSmartlinksSection() {
                 </div>
 
                 <div className='relative px-6 pt-10 pb-5 flex flex-col items-center'>
-                  {/* Album artwork */}
+                  {/* Album artwork — real art from jov.ie/tim/the-deep-end */}
                   <div
                     className='relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40'
                     style={{
                       border: '1px solid var(--linear-border-subtle)',
-                      background: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
                     }}
                   >
-                    <div className='flex h-full w-full items-center justify-center'>
-                      <Disc3
-                        className='h-16 w-16 text-[var(--linear-text-tertiary)]'
-                        aria-hidden='true'
-                      />
-                    </div>
+                    <Image
+                      src='https://i.scdn.co/image/ab67616d0000b2739f0aacc7a97241bea42f7815'
+                      alt='The Deep End — Tim White'
+                      fill
+                      className='object-cover'
+                      sizes='272px'
+                    />
                   </div>
 
                   {/* Release info */}

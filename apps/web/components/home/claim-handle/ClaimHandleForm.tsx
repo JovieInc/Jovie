@@ -100,8 +100,6 @@ export function ClaimHandleForm({
   const helperToneClass = HELPER_TONE_CLASSES[helperState.tone];
 
   const buttonContent = useMemo((): ReactNode => {
-    // The input-adjacent HandleStatusIcon already shows a spinner while checking,
-    // so the button only shows a spinner during navigation (post-submit).
     if (navigating) {
       return (
         <>
@@ -115,36 +113,50 @@ export function ClaimHandleForm({
         <>
           <span>Claim @{handle}</span>
           <ChevronRight
-            className='h-4 w-4 transition-transform group-hover:translate-x-0.5'
+            className='h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5'
             aria-hidden='true'
           />
         </>
       );
     }
-    return 'Claim handle';
+    return 'Claim';
   }, [navigating, available, handle]);
+
+  const isAvailable = available === true;
+  const isDisabled = navigating || checkingAvail;
 
   return (
     <form onSubmit={onSubmit} className='w-full' noValidate>
-      {/* Input row — matches HeroSpotifySearch layout */}
+      {/* Input row */}
       <div
         className={cn(
-          'flex w-full items-center gap-3 rounded-[20px] border p-2',
-          'transition-all duration-300',
-          'border-(--linear-border-default) bg-(--linear-bg-surface-0) shadow-[inset_0_1px_3px_rgba(0,0,0,0.15),0_0_0_1px_var(--linear-border-subtle)]',
-          'focus-within:border-(--linear-text-primary) focus-within:shadow-[0_0_0_1px_var(--linear-text-primary)]',
-          available === true &&
-            'border-(--linear-success) focus-within:border-(--linear-success) focus-within:shadow-[0_0_0_1px_var(--linear-success)]'
+          'claim-input-row',
+          'relative flex w-full items-center gap-2 rounded-[14px] p-1.5',
+          'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          isAvailable && 'claim-input-row--available'
         )}
-        style={{ minHeight: 64 }}
+        style={{
+          minHeight: 52,
+          background: 'rgba(255,255,255,0.03)',
+          border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
+          boxShadow: [
+            'inset 0 1px 2px rgba(0,0,0,0.2)',
+            isAvailable
+              ? '0 0 20px rgba(74,222,128,0.06)'
+              : '0 1px 2px rgba(0,0,0,0.1)',
+          ].join(', '),
+        }}
       >
-        <div className='flex items-center flex-1 min-w-0 px-4 gap-2'>
+        <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
+          {/* Domain prefix — etched, permanent feel */}
           <span
-            className='shrink-0 select-none'
+            className='shrink-0 select-none font-mono'
             style={{
-              fontSize: '15px',
-              fontWeight: 510,
-              color: 'var(--linear-text-tertiary)',
+              fontSize: '13px',
+              fontWeight: 400,
+              color: 'var(--linear-text-quaternary)',
+              letterSpacing: '-0.02em',
+              opacity: 0.7,
             }}
           >
             {displayDomain}/
@@ -163,11 +175,14 @@ export function ClaimHandleForm({
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none placeholder:text-tertiary-token/50'
+            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-30'
             style={{
-              fontSize: '15px',
-              fontWeight: 500,
+              fontSize: '13px',
+              fontWeight: 450,
               letterSpacing: '-0.01em',
+              color: isAvailable
+                ? 'rgb(74,222,128)'
+                : 'var(--linear-text-primary)',
             }}
           />
 
@@ -182,33 +197,47 @@ export function ClaimHandleForm({
 
         <button
           type='submit'
+          disabled={isDisabled}
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[14px] px-6 text-[15px] font-medium transition-all duration-300 focus-ring-themed',
-            navigating || checkingAvail
-              ? 'bg-surface-2 text-tertiary-token cursor-not-allowed'
-              : 'bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] shadow-[0_2px_10px_rgba(255,255,255,0.15)] hover:scale-[1.02] hover:shadow-[0_4px_20px_rgba(255,255,255,0.25)]'
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[10px] px-4 sm:px-5 transition-all duration-200 focus-ring-themed',
+            isDisabled
+              ? 'cursor-not-allowed opacity-40'
+              : 'hover:brightness-110 active:scale-[0.98]'
           )}
-          style={{ height: 48 }}
+          style={{
+            height: 36,
+            fontSize: '13px',
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            background: isDisabled
+              ? 'rgba(255,255,255,0.06)'
+              : 'rgb(237,238,238)',
+            color: isDisabled ? 'var(--linear-text-quaternary)' : 'rgb(8,9,10)',
+            boxShadow: isDisabled
+              ? 'none'
+              : '0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+          }}
         >
-          <span className='inline-flex items-center gap-1.5'>
+          <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
             {buttonContent}
           </span>
         </button>
       </div>
 
-      {/* Helper text */}
+      {/* Helper text — minimal, surgical */}
       {helperState.text && (
         <p
           id='handle-hint'
           className={cn(
-            'mt-2 text-sm transition-colors duration-200',
+            'mt-2.5 pl-1 transition-colors duration-200',
             helperToneClass
           )}
           aria-live={helperState.tone === 'error' ? 'assertive' : 'polite'}
           style={{
-            fontSize: '13px',
-            lineHeight: '20px',
-            letterSpacing: '-0.01em',
+            fontSize: '11px',
+            lineHeight: '16px',
+            letterSpacing: '0.01em',
+            fontWeight: 400,
           }}
         >
           {helperState.text}
@@ -218,10 +247,11 @@ export function ClaimHandleForm({
       {/* Error summary for form validation */}
       {formSubmitted && handleError && (
         <p
-          className='mt-1.5'
+          className='mt-1.5 pl-1'
           style={{
-            fontSize: '12px',
+            fontSize: '11px',
             color: 'var(--linear-warning)',
+            fontWeight: 400,
           }}
           role='alert'
         >
