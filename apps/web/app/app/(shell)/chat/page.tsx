@@ -12,7 +12,7 @@ const getDashboardTitle = async () => {
   const { profile } = await getSessionContext({ requireProfile: false });
   const displayName = profile?.displayName?.trim();
 
-  return displayName ? `${displayName} | Jovie` : 'Jovie Dashboard';
+  return displayName ? `${displayName} | Jovie` : 'Home | Jovie';
 };
 
 export async function generateMetadata(): Promise<Metadata> {
