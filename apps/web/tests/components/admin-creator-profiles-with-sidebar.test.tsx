@@ -119,7 +119,7 @@ const expectSidebarOpen = async () => {
 
   await waitFor(
     () => {
-      expect(screen.getByPlaceholderText('First')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Full name')).toBeInTheDocument();
     },
     { timeout: 3000 }
   );
@@ -232,8 +232,9 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     expect(within(sidebar).getByPlaceholderText('@username')).toHaveValue(
       '@alice'
     );
-    expect(within(sidebar).getByPlaceholderText('First')).toHaveValue('');
-    expect(within(sidebar).getByPlaceholderText('Last')).toHaveValue('');
+    expect(within(sidebar).getByPlaceholderText('Full name')).toHaveValue(
+      'alice'
+    );
   });
 
   it('saves edited contact details with the expected payload', async () => {
@@ -253,18 +254,25 @@ describe('AdminCreatorProfilesWithSidebar', () => {
 
     await user.click(getProfileRow('alice'));
     await expectSidebarOpen();
-    const firstNameInput = await screen.findByPlaceholderText('First');
-    await user.type(firstNameInput, 'Alice');
+    const nameInput = await screen.findByPlaceholderText('Full name');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Alice Example');
 
-    await waitFor(() => {
-      expect(saveContactSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 'profile-1',
-          username: 'alice',
-          firstName: 'Alice',
-        })
-      );
-    });
+    await waitFor(
+      () => {
+        expect(saveContactSpy).toHaveBeenCalled();
+
+        const savedContact = saveContactSpy.mock.calls.at(-1)?.[0];
+        expect(savedContact).toEqual(
+          expect.objectContaining({
+            id: 'profile-1',
+            username: 'alice',
+          })
+        );
+        expect(savedContact?.displayName).toContain('Alice');
+      },
+      { timeout: 4000 }
+    );
   });
 
   it('closes the sidebar via the close button', async () => {

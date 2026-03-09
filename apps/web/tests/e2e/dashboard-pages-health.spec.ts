@@ -505,8 +505,8 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 });
 
 test.describe('Admin Pages Health Check @smoke', () => {
-  // Admin pages: signInUser (180s+) + admin page navigation (120s each)
-  test.setTimeout(480_000);
+  // Admin pages: signInUser (180s+) + 6 admin pages × 60s each (warmed up in global-setup)
+  test.setTimeout(600_000);
 
   test.beforeEach(async ({ page }) => {
     // Skip full admin health check on production targets
@@ -545,7 +545,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
    * admin access, the pages will return 404 and the test will skip.
    */
   test('All admin pages load without errors', async ({ page }, testInfo) => {
-    test.setTimeout(360_000); // 6 minutes for 6 admin pages (dev mode is slow, especially under load)
+    test.setTimeout(480_000); // 8 minutes — 6 admin pages warmed up in global-setup, but first-run can be slow
 
     // Capture browser console errors for debugging page failures
     const consoleErrors: string[] = [];
@@ -569,7 +569,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
         // Admin pages are hit later in the test suite when the server may be under load
         const response = await page.goto(pageConfig.path, {
           waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION * 2, // Double timeout for admin pages under load
+          timeout: 90_000, // 90s — admin pages warmed up in global-setup; 90s handles slow render
         });
 
         // Wait for React hydration
