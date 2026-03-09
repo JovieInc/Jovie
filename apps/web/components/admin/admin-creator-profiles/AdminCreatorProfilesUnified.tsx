@@ -26,6 +26,7 @@ import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
+import { useDebouncedContactSave } from './useDebouncedContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 import { createCreatorProfileColumns } from './utils/column-definitions';
 
@@ -191,49 +192,12 @@ export function AdminCreatorProfilesUnified({
     },
   });
 
-  const [lastSavedSignature, setLastSavedSignature] = useState<string | null>(
-    null
-  );
-
-  React.useEffect(() => {
-    if (!sidebarOpen || !effectiveContact?.id) return;
-
-    const signature = JSON.stringify({
-      id: effectiveContact.id,
-      displayName: effectiveContact.displayName ?? null,
-      firstName: effectiveContact.firstName ?? null,
-      lastName: effectiveContact.lastName ?? null,
-      username: effectiveContact.username,
-      avatarUrl: effectiveContact.avatarUrl ?? null,
-      socialLinks: effectiveContact.socialLinks.map((link, index) => ({
-        id: link.id ?? null,
-        url: link.url,
-        label: link.label ?? null,
-        platformType: link.platformType ?? null,
-        sortOrder: index,
-      })),
-    });
-
-    if (signature === lastSavedSignature || isSaving) return;
-
-    const timer = setTimeout(() => {
-      void saveContact(effectiveContact).then(success => {
-        if (success) {
-          setLastSavedSignature(signature);
-        }
-      });
-    }, 500);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [
+  useDebouncedContactSave({
     effectiveContact,
-    isSaving,
-    lastSavedSignature,
-    saveContact,
     sidebarOpen,
-  ]);
+    isSaving,
+    saveContact,
+  });
 
   const { getContextMenuItems } = useContextMenuItems({
     ingestRefreshStatuses,
