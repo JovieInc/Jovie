@@ -35,6 +35,12 @@ export interface AdminFunnelMetrics {
   stripeAvailable: boolean;
   /** Errors encountered during fetch (non-fatal) */
   errors: string[];
+  /** Outreach to signup conversion rate: signups7d / outreachSent7d (0-1) */
+  outreachToSignupRate: number | null;
+  /** Signup to paid conversion rate: paidConversions7d / signups7d (0-1) */
+  signupToPaidRate: number | null;
+  /** MRR dollars generated per outreach sent: mrrUsd / outreachSent7d */
+  dollarPerOutreach: number | null;
 }
 
 /**
@@ -207,5 +213,8 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     runwayMonths,
     stripeAvailable,
     errors,
+    outreachToSignupRate: safeRate(signups7d, outreachSent7d),
+    signupToPaidRate: safeRate(paidConversions7d, signups7d),
+    dollarPerOutreach: safeRate(mrrUsd, outreachSent7d),
   };
 }

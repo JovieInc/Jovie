@@ -74,7 +74,7 @@ function ProfileCompletenessBar({
             className='flex items-center gap-2 text-xs text-secondary-token'
           >
             <span
-              className={`inline-block h-1.5 w-1.5 rounded-full ${field.filled ? 'bg-green-500' : 'bg-red-400'}`}
+              className={`inline-block h-1.5 w-1.5 rounded-full ${field.filled ? 'bg-success' : 'bg-error'}`}
             />
             {field.label}
           </li>

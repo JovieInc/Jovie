@@ -42,7 +42,7 @@ export function OutreachKpis({ counts }: OutreachKpisProps) {
           value={String(counts.manualReview)}
           metadata={<span>Needs human review</span>}
           icon={AlertTriangle}
-          iconClassName='text-amber-500'
+          iconClassName='text-warning'
         />
       </div>
     </section>

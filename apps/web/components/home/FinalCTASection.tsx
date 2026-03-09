@@ -5,31 +5,21 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
-    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-48'>
-      {/* Ambient glow behind CTA */}
+    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-md)] pb-32'>
+      {/* Ambient glow behind CTA — larger, more diffuse */}
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/3'
+        className='pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2'
         style={{
-          width: '500px',
-          height: '400px',
+          width: '700px',
+          height: '500px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(20% 0.03 260 / 0.2), transparent 65%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.2), transparent 60%)',
         }}
       />
 
       <Container size='homepage'>
-        {/* Gradient separator */}
-        <div
-          aria-hidden='true'
-          className='mb-20 h-px max-w-lg mx-auto'
-          style={{
-            background:
-              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-          }}
-        />
-
         <div className='relative mx-auto flex max-w-2xl flex-col items-center text-center'>
           <h2
             data-testid='final-cta-headline'
@@ -39,8 +29,7 @@ export function FinalCTASection() {
           </h2>
           <p
             data-testid='final-cta-subtext'
-            className='mt-5 marketing-lead-linear'
-            style={{ color: 'var(--linear-text-quaternary)' }}
+            className='mt-5 marketing-lead-linear text-[var(--linear-text-tertiary)]'
           >
             Free forever. No credit card required.
           </p>
@@ -53,7 +42,7 @@ export function FinalCTASection() {
               className='relative w-full max-w-[560px] overflow-hidden rounded-2xl p-2'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                border: '1px solid rgba(255,255,255,0.08)',
+                border: '1px solid var(--linear-border-default)',
                 boxShadow: [
                   '0 0 0 1px rgba(255,255,255,0.04)',
                   '0 8px 40px rgba(0,0,0,0.4)',
@@ -70,6 +59,23 @@ export function FinalCTASection() {
               <ClaimHandleForm />
             </div>
           </div>
+
+          {/* Trust signal below CTA */}
+          <p
+            className='mt-6 flex items-center justify-center gap-2'
+            style={{
+              fontSize: '12px',
+              fontWeight: 450,
+              letterSpacing: '0.01em',
+              color: 'var(--linear-text-tertiary)',
+            }}
+          >
+            <span
+              aria-hidden='true'
+              className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
+            />{' '}
+            Live in 60 seconds
+          </p>
         </div>
       </Container>
     </section>

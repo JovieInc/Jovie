@@ -64,17 +64,19 @@ export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
   readonly initialRows: AudienceMember[];
-  readonly total: number;
+  /** Null when the per-page COUNT query was skipped for performance (JOV-1262, JOV-1264). */
+  readonly total: number | null;
   readonly page: number;
   readonly pageSize: number;
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
   readonly profileUrl?: string;
   readonly profileId?: string;
-  readonly subscriberCount: number;
+  /** Null when the subscriber COUNT query was skipped for performance (JOV-1262). */
+  readonly subscriberCount: number | null;
+  /** Null when the audience COUNT query was skipped for performance (JOV-1262). */
+  readonly totalAudienceCount: number | null;
   readonly filters: AudienceFilters;
-  readonly anonymousCount: number;
-  readonly totalAudienceCount: number;
   readonly tourDates?: TourDateForMatching[];
 }
 
@@ -129,13 +131,12 @@ export function DashboardAudienceClient({
   profileUrl,
   profileId,
   subscriberCount,
-  filters: initialFilters,
-  anonymousCount,
   totalAudienceCount,
+  filters: initialFilters,
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   return (
-    <AudiencePanelProvider initialMode='analytics'>
+    <AudiencePanelProvider>
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -146,9 +147,8 @@ export function DashboardAudienceClient({
         profileUrl={profileUrl}
         profileId={profileId}
         subscriberCount={subscriberCount}
-        filters={initialFilters}
-        anonymousCount={anonymousCount}
         totalAudienceCount={totalAudienceCount}
+        filters={initialFilters}
         tourDates={tourDates}
       />
     </AudiencePanelProvider>
@@ -165,9 +165,8 @@ function DashboardAudienceClientInner({
   profileUrl,
   profileId,
   subscriberCount,
-  filters: initialFilters,
-  anonymousCount,
   totalAudienceCount,
+  filters: initialFilters,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
   // Register header actions with both panel toggle buttons
@@ -281,9 +280,8 @@ function DashboardAudienceClientInner({
             profileUrl={profileUrl}
             profileId={profileId}
             subscriberCount={subscriberCount}
-            filters={initialFilters}
-            anonymousCount={anonymousCount}
             totalAudienceCount={totalAudienceCount}
+            filters={initialFilters}
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={handleLoadMore}

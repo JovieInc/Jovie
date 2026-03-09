@@ -58,8 +58,8 @@ Smoke tests are designed for **fast PR feedback** (< 10 min target):
 These run on main branch and PRs with `testing` label:
 
 - `billing.spec.ts` - Billing routes (/billing, /account, etc.)
-- `onboarding-*.spec.ts` - Onboarding flows
-- `profile.public.spec.ts` - Detailed profile features
+- `onboarding.spec.ts` - Onboarding flows (happy path, existing user, taken handle)
+- `profile.spec.ts` - Public profile rendering, modes, drawers, deep links
 - `axe-audit.spec.ts` - Accessibility tests
 
 ## Adding New Tests
