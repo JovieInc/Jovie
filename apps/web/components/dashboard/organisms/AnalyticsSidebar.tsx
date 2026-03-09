@@ -1,8 +1,8 @@
 'use client';
 
 import { SegmentControl } from '@jovie/ui';
-import { Globe, Link2, MapPin } from 'lucide-react';
-import { type ComponentType, useState } from 'react';
+import { ArrowDown, Globe, Link2, MapPin } from 'lucide-react';
+import { type ComponentType, useCallback, useState } from 'react';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
@@ -60,36 +60,83 @@ function SidebarRangeToggle({
   );
 }
 
-function EngagementMetric({
+const FUNNEL_WIDTHS = ['100%', '75%', '55%'] as const;
+
+function FunnelStage({
   label,
   value,
+  description,
+  conversionRate,
+  stageIndex,
+  isLast,
   loading,
 }: {
   readonly label: string;
   readonly value: string;
+  readonly description: string;
+  readonly conversionRate: string | null;
+  readonly stageIndex: number;
+  readonly isLast: boolean;
   readonly loading: boolean;
 }) {
-  return (
-    <div className='flex min-w-0 flex-1 flex-col rounded-xl border border-subtle bg-surface-1 px-3 py-3'>
-      {loading ? (
-        <>
-          <LoadingSkeleton height='h-8' width='w-14' rounded='sm' />
+  const width = FUNNEL_WIDTHS[stageIndex] ?? '50%';
+
+  if (loading) {
+    return (
+      <div className='flex w-full flex-col items-center'>
+        <div
+          className='w-full rounded-xl border border-subtle bg-surface-1 px-5 py-4 text-center'
+          style={{ maxWidth: width }}
+        >
           <LoadingSkeleton
             height='h-3'
             width='w-20'
             rounded='sm'
-            className='mt-2'
+            className='mx-auto mb-2'
           />
-        </>
-      ) : (
-        <>
-          <p className='text-3xl font-[590] tracking-[-0.02em] text-primary-token tabular-nums'>
-            {value}
-          </p>
-          <p className='mt-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-            {label}
-          </p>
-        </>
+          <LoadingSkeleton
+            height='h-7'
+            width='w-16'
+            rounded='sm'
+            className='mx-auto'
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className='flex w-full flex-col items-center'>
+      <div
+        className={cn(
+          'relative w-full overflow-hidden rounded-xl border px-5 py-4 text-center',
+          isLast
+            ? 'border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--color-bg-surface-1)] ring-1 ring-accent/15'
+            : 'border-subtle bg-gradient-to-r from-[var(--color-bg-surface-1)] to-[var(--color-bg-surface-2)]'
+        )}
+        style={{ maxWidth: width }}
+      >
+        <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          {label}
+        </p>
+        <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+          {value}
+        </p>
+        <p className='mt-0.5 text-[11px] text-secondary-token'>{description}</p>
+      </div>
+
+      {!isLast && (
+        <div className='flex min-h-[40px] flex-col items-center py-2'>
+          <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
+          <span
+            className={cn(
+              'mt-0.5 min-h-[16px] text-[11px] font-[510] tabular-nums',
+              conversionRate ? 'text-accent' : 'text-transparent'
+            )}
+          >
+            {conversionRate ?? '—'}
+          </span>
+        </div>
       )}
     </div>
   );
@@ -162,6 +209,39 @@ function RankedList({
   );
 }
 
+function EngagementMetricCard({
+  label,
+  value,
+  loading,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly loading: boolean;
+}) {
+  return (
+    <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
+      {loading ? (
+        <>
+          <LoadingSkeleton
+            height='h-7'
+            width='w-14'
+            rounded='sm'
+            className='mb-2'
+          />
+          <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
+        </>
+      ) : (
+        <>
+          <p className='text-xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+            {value}
+          </p>
+          <p className='mt-1 text-[11px] text-tertiary-token'>{label}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 export interface AnalyticsSidebarProps {
   readonly isOpen: boolean;
   readonly onClose: () => void;
@@ -179,6 +259,32 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
 
   const loading = isLoading;
 
+  const stages = [
+    {
+      label: 'Profile Views',
+      value: data?.profile_views ?? 0,
+      description: 'Total page visits',
+    },
+    {
+      label: 'Unique Visitors',
+      value: data?.unique_users ?? 0,
+      description: 'Distinct users',
+    },
+    {
+      label: 'Followers',
+      value: data?.subscribers ?? 0,
+      description: 'Opted-in contacts',
+    },
+  ];
+
+  const calculateRate = useCallback(
+    (current: number, previous: number): string | null => {
+      if (previous === 0) return null;
+      return `${Math.round((current / previous) * 100)}%`;
+    },
+    []
+  );
+
   return (
     <EntitySidebarShell
       isOpen={isOpen}
@@ -193,24 +299,61 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           isFetching && !loading && 'opacity-70'
         )}
       >
-        <div className='flex gap-2'>
-          <EngagementMetric
+        <div className='flex flex-col items-center gap-0'>
+          {stages.map((stage, index) => {
+            const isLast = index === stages.length - 1;
+            const prevStage = index > 0 ? stages[index - 1] : null;
+            const conversionRate = prevStage
+              ? calculateRate(stage.value, prevStage.value)
+              : null;
+
+            return (
+              <FunnelStage
+                key={stage.label}
+                label={stage.label}
+                value={numberFormatter.format(stage.value)}
+                description={stage.description}
+                conversionRate={conversionRate}
+                stageIndex={index}
+                isLast={isLast}
+                loading={loading}
+              />
+            );
+          })}
+        </div>
+
+        <div className='grid grid-cols-3 gap-2'>
+          <EngagementMetricCard
             label='Total Clicks'
             value={
-              loading ? '' : numberFormatter.format(data?.total_clicks ?? 0)
+              loading
+                ? ''
+                : typeof data?.total_clicks === 'number'
+                  ? numberFormatter.format(data.total_clicks)
+                  : '--'
             }
             loading={loading}
           />
-          <EngagementMetric
+          <EngagementMetricCard
             label='Listen Clicks'
             value={
-              loading ? '' : numberFormatter.format(data?.listen_clicks ?? 0)
+              loading
+                ? ''
+                : typeof data?.listen_clicks === 'number'
+                  ? numberFormatter.format(data.listen_clicks)
+                  : '--'
             }
             loading={loading}
           />
-          <EngagementMetric
-            label='Capture Rate'
-            value={loading ? '' : `${data?.capture_rate ?? 0}%`}
+          <EngagementMetricCard
+            label='Captures'
+            value={
+              loading
+                ? ''
+                : typeof data?.subscribers === 'number'
+                  ? numberFormatter.format(data.subscribers)
+                  : '--'
+            }
             loading={loading}
           />
         </div>
@@ -227,7 +370,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
 
-        <div className='min-h-[212px] rounded-xl border border-subtle bg-surface-0 p-2'>
+        <div className='min-h-[176px]'>
           {activeTab === 'cities' && (
             <RankedList
               icon={MapPin}

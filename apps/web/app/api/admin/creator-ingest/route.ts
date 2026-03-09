@@ -198,9 +198,27 @@ async function processSocialPlatformIngestion(
   const platformId = detected.platform.id;
   const spotifyData = await fetchSpotifyArtistData(handle, platformId);
 
+  // For Spotify artists, derive the username from the artist name
+  // instead of the opaque Spotify artist ID (e.g. "fisher" not "artist_5yMCA6...")
+  let effectiveHandle = handle;
+  let effectiveNormalizedHandle = normalizedHandle;
+  if (spotifyData?.name) {
+    const artistHandle = spotifyData.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replaceAll(/[\u0300-\u036f]/g, '')
+      .replaceAll(/[^a-z0-9_]/g, '')
+      .slice(0, 30);
+    const normalized = normalizeHandle(artistHandle);
+    if (isValidHandle(normalized)) {
+      effectiveHandle = artistHandle;
+      effectiveNormalizedHandle = normalized;
+    }
+  }
+
   const socialContext: SocialPlatformContext = {
-    handle,
-    normalizedHandle,
+    handle: effectiveHandle,
+    normalizedHandle: effectiveNormalizedHandle,
     platformId,
     platformName: detected.platform.name,
     normalizedUrl: detected.normalizedUrl,
@@ -216,12 +234,15 @@ async function processSocialPlatformIngestion(
         usernameNormalized: creatorProfiles.usernameNormalized,
       })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, normalizedHandle))
+      .where(eq(creatorProfiles.usernameNormalized, effectiveNormalizedHandle))
       .limit(1);
 
-    let finalHandle = normalizedHandle;
+    let finalHandle = effectiveNormalizedHandle;
     if (existing?.isClaimed) {
-      const altHandle = await findAvailableHandle(tx, normalizedHandle);
+      const altHandle = await findAvailableHandle(
+        tx,
+        effectiveNormalizedHandle
+      );
       if (!altHandle) {
         return NextResponse.json(
           {

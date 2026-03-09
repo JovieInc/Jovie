@@ -6,6 +6,7 @@ import { getSessionContext } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { getDashboardData } from '../../dashboard/actions';
+import { checkAppleMusicConnection } from '../../dashboard/releases/actions';
 import { ChatPageClient } from '../ChatPageClient';
 
 interface Props {
@@ -51,11 +52,19 @@ export default async function ChatConversationPage({ params }: Props) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
+  const appleMusicResult = await checkAppleMusicConnection().catch(() => ({
+    connected: false,
+    artistName: null,
+    artistId: null,
+  }));
+
   const { id } = await params;
   return (
     <ChatPageClient
       conversationId={id}
       isFirstSession={dashboardData.isFirstSession}
+      appleMusicConnected={appleMusicResult.connected}
+      appleMusicArtistName={appleMusicResult.artistName}
     />
   );
 }
