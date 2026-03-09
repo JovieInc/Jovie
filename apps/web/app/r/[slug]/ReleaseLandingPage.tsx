@@ -17,9 +17,9 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
+import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ProviderKey } from '@/lib/discography/types';
-import { getContrastSafeIconColor } from '@/lib/utils/color';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface Provider {
@@ -258,41 +258,15 @@ export function ReleaseLandingPage({
             <div className='space-y-2 py-1'>
               {clickableProviders.map(provider => {
                 const logoConfig = DSP_LOGO_CONFIG[provider.key];
-                const brandHover = logoConfig
-                  ? getContrastSafeIconColor(logoConfig.color, true)
-                  : '#ffffff';
 
                 return (
-                  <a
+                  <SmartLinkProviderButton
                     key={provider.key}
                     href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    target='_blank'
-                    rel='noopener noreferrer'
                     onClick={() => handleProviderClick(provider.key)}
-                    className='group flex w-full items-center gap-3.5 rounded-xl bg-surface-1/70 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:bg-white/[0.06]'
-                    style={
-                      { '--brand-hover': brandHover } as React.CSSProperties
-                    }
-                  >
-                    {logoConfig && (
-                      <svg
-                        viewBox='0 0 24 24'
-                        fill='currentColor'
-                        className='h-5 w-5 shrink-0 text-muted-foreground transition-colors duration-100 group-hover:text-[var(--brand-hover)]'
-                        aria-hidden='true'
-                      >
-                        <path d={logoConfig.iconPath} />
-                      </svg>
-                    )}
-                    <span className='text-foreground flex-1 text-base font-semibold'>
-                      {logoConfig?.name ?? provider.label}
-                    </span>
-                    <Icon
-                      name='ChevronRight'
-                      className='h-4 w-4 text-muted-foreground/70 transition-colors duration-100 group-hover:text-foreground/80'
-                      aria-hidden='true'
-                    />
-                  </a>
+                    label={logoConfig?.name ?? provider.label}
+                    iconPath={logoConfig?.iconPath}
+                  />
                 );
               })}
             </div>
