@@ -15,6 +15,8 @@ pnpm --version   # MUST be 9.15.4
 | `pnpm --filter web dev` | `cd apps/web && pnpm dev` |
 | `pnpm turbo build` | `npx turbo build` |
 
+**Secrets require Doppler:** Prefix commands with `doppler run --` (e.g. `doppler run -- pnpm test`). Run `./scripts/setup.sh` to install and configure. See `AGENTS.md` for full Doppler setup instructions.
+
 ---
 
 ## Linear Issue Gating
