@@ -4,6 +4,7 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
@@ -155,6 +156,20 @@ describe('DashboardNav', () => {
     const primaryGroup = primaryMenuParent?.parentElement;
 
     expect(primaryGroup?.className).toMatch(/space-y-/);
+  });
+
+  it('renders full admin navigation for admin users', () => {
+    const { getByRole } = renderDashboardNav({ isAdmin: true });
+
+    expect(getByRole('link', { name: 'Leads' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_LEADS
+    );
+    expect(getByRole('link', { name: 'Outreach' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_OUTREACH
+    );
+    expect(getByRole('link', { name: 'Ingest' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_INGEST
+    );
   });
 
   it('renders with different pathname', () => {

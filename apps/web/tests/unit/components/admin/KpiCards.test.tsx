@@ -67,6 +67,34 @@ describe('FunnelMetricsStrip', () => {
     expect(screen.queryByText('Signup Rate')).not.toBeInTheDocument();
   });
 
+  it('shows actionable message when runway cannot be calculated (no balance data)', () => {
+    const noBalanceMetrics: AdminFunnelMetrics = {
+      ...defaultMetrics,
+      mrrUsd: 39,
+      runwayMonths: 0,
+    };
+
+    render(<FunnelMetricsStrip metrics={noBalanceMetrics} />);
+
+    expect(screen.getByText('No balance')).toBeInTheDocument();
+    expect(
+      screen.getByText('Add bank balance to calculate')
+    ).toBeInTheDocument();
+  });
+
+  it('shows infinite runway when revenue covers burn', () => {
+    const infiniteRunwayMetrics: AdminFunnelMetrics = {
+      ...defaultMetrics,
+      mrrUsd: 6000,
+      runwayMonths: null,
+    };
+
+    render(<FunnelMetricsStrip metrics={infiniteRunwayMetrics} />);
+
+    expect(screen.getByText('Infinite')).toBeInTheDocument();
+    expect(screen.getByText('Revenue covers burn')).toBeInTheDocument();
+  });
+
   it('does not render old vanity metrics', () => {
     render(<FunnelMetricsStrip metrics={defaultMetrics} />);
 

@@ -6,6 +6,10 @@ import { Copy, ExternalLink, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/components/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -82,7 +86,7 @@ function AdminUserMobileCard({
           />
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold text-primary-token'>
-              {user.name || user.email || 'Unknown'}
+              {user.name || 'Email Subscriber'}
             </p>
             <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
@@ -428,44 +432,50 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                 />
 
                 {/* Main toolbar (always visible) */}
-                <div className='flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3'>
-                  <div className='text-xs text-secondary-token tabular-nums'>
-                    <span className='hidden sm:inline'>Showing </span>
-                    {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                    {total.toLocaleString()}
-                    <span className='hidden sm:inline'> users</span>
-                  </div>
-                  <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
-                    <form
-                      action={APP_ROUTES.ADMIN_USERS}
-                      method='get'
-                      className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
-                    >
-                      <input type='hidden' name='sort' value={sort} />
-                      <Input
-                        name='q'
-                        defaultValue={search}
-                        placeholder='Search by email or name'
-                        className='w-full sm:w-[240px]'
-                      />
-                      <Button type='submit' size='sm' variant='secondary'>
-                        Search
-                      </Button>
-                      {search ? (
-                        <Button asChild size='sm' variant='ghost'>
-                          <Link href='?'>Clear</Link>
+                <AdminTableHeader
+                  title='Users'
+                  subtitle='Review lifecycle state, profile completion, and suppression health.'
+                />
+                <AdminTableSubheader>
+                  <div className='flex flex-wrap items-center justify-between gap-2 sm:gap-3'>
+                    <div className='text-xs text-secondary-token tabular-nums'>
+                      <span className='hidden sm:inline'>Showing </span>
+                      {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                      {total.toLocaleString()}
+                      <span className='hidden sm:inline'> users</span>
+                    </div>
+                    <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
+                      <form
+                        action={APP_ROUTES.ADMIN_USERS}
+                        method='get'
+                        className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
+                      >
+                        <input type='hidden' name='sort' value={sort} />
+                        <Input
+                          name='q'
+                          defaultValue={search}
+                          placeholder='Search by email, name, or handle'
+                          className='w-full sm:w-[280px]'
+                        />
+                        <Button type='submit' size='sm' variant='secondary'>
+                          Search
                         </Button>
-                      ) : null}
-                    </form>
-                    <ExportCSVButton<AdminUserRow>
-                      getData={() => users}
-                      columns={usersCSVColumns}
-                      filename={USERS_CSV_FILENAME_PREFIX}
-                      disabled={users.length === 0}
-                      ariaLabel='Export users to CSV file'
-                    />
+                        {search ? (
+                          <Button asChild size='sm' variant='ghost'>
+                            <Link href='?'>Clear</Link>
+                          </Button>
+                        ) : null}
+                      </form>
+                      <ExportCSVButton<AdminUserRow>
+                        getData={() => users}
+                        columns={usersCSVColumns}
+                        filename={USERS_CSV_FILENAME_PREFIX}
+                        disabled={users.length === 0}
+                        ariaLabel='Export users to CSV file'
+                      />
+                    </div>
                   </div>
-                </div>
+                </AdminTableSubheader>
               </>
             }
           >
