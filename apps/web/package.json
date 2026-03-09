@@ -167,7 +167,7 @@
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "statsig-node": "^6.5.1",
-    "streamdown": "^2.3.0",
+    "streamdown": "^2.4.0",
     "stripe": "^20.3.1",
     "svix": "^1.86.0",
     "tailwind-merge": "^3.4.1",
