@@ -1,4 +1,8 @@
 export {
+  AdminBraggingRightsSection,
+  AdminBraggingRightsSectionSkeleton,
+} from './AdminBraggingRightsSection';
+export {
   AdminKpiSection,
   AdminKpiSectionSkeleton,
 } from './AdminKpiSection';
