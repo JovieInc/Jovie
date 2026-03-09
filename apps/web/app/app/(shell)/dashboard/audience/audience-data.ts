@@ -1,4 +1,15 @@
-import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gt,
+  gte,
+  lt,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -33,6 +44,10 @@ export interface AudienceServerData {
   pageSize: number;
   sort: string;
   direction: 'asc' | 'desc';
+  /** Opaque cursor token for the next page; null when no further pages. */
+  nextCursor: string | null;
+  /** True when more rows exist beyond the current page. */
+  hasMore: boolean;
   subscriberCount: number;
   totalAudienceCount: number;
 }
@@ -46,6 +61,9 @@ const DEFAULT_MEMBER_SORT = 'lastSeen' as const;
 const DEFAULT_SUBSCRIBER_SORT = 'createdAt' as const;
 
 const memberQuerySchema = z.object({
+  /** Opaque keyset cursor for next-page fetch. When present, page is ignored (JOV-1254). */
+  cursor: z.string().optional(),
+  /** @deprecated Use cursor instead. */
   page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
   pageSize: z.preprocess(
     val => Number(val ?? 10),
@@ -58,6 +76,9 @@ const memberQuerySchema = z.object({
 });
 
 const subscriberQuerySchema = z.object({
+  /** Opaque keyset cursor for next-page fetch. When present, page is ignored (JOV-1261). */
+  cursor: z.string().optional(),
+  /** @deprecated Use cursor instead. */
   page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
   pageSize: z.preprocess(
     val => Number(val ?? 10),
@@ -209,6 +230,7 @@ function normalizeUtmParams(value: unknown): AudienceUtmParams {
 
 /** Default member query params when validation fails */
 const DEFAULT_MEMBER_PARAMS = {
+  cursor: undefined,
   page: 1,
   pageSize: 10,
   sort: DEFAULT_MEMBER_SORT,
@@ -222,6 +244,7 @@ type SearchParams = Record<string, string | string[] | undefined>;
  */
 function parseMemberQueryParams(searchParams: SearchParams) {
   const parsed = memberQuerySchema.safeParse({
+    cursor: searchParams.cursor,
     page: searchParams.page,
     pageSize: searchParams.pageSize,
     sort: searchParams.sort ?? undefined,
@@ -327,6 +350,31 @@ function buildSegmentFilter(segments: string[] | undefined) {
   return and(...conditions)!;
 }
 
+/** Encodes a keyset cursor: base64url(JSON({v: sortValue, id: rowId})). */
+function encodeCursor(sortValue: string, id: string): string {
+  return Buffer.from(JSON.stringify({ v: sortValue, id })).toString('base64url');
+}
+
+/** Decodes an opaque cursor. Returns null on malformed input. */
+function decodeCursor(cursor: string): { v: string; id: string } | null {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8')
+    );
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof parsed.v === 'string' &&
+      typeof parsed.id === 'string'
+    ) {
+      return parsed as { v: string; id: string };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetch audience members data
  */
@@ -348,7 +396,6 @@ async function fetchMembersData(
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
-  const offset = (safe.page - 1) * safe.pageSize;
 
   const ownershipFilter = buildOwnershipFilter(clerkUserId);
   const memberIdFilter = buildMemberIdFilter(memberId);
@@ -356,12 +403,40 @@ async function fetchMembersData(
     ? eq(audienceMembers.type, typeFilter)
     : drizzleSql<boolean>`true`;
   const segmentCondition = buildSegmentFilter(segmentFilter);
+
+  // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).
+  let cursorCondition: SQL<unknown> = drizzleSql`true`;
+  if (safe.cursor) {
+    const decoded = decodeCursor(safe.cursor);
+    if (decoded) {
+      const { v: cursorSortVal, id: cursorId } = decoded;
+      if (safe.direction === 'desc') {
+        cursorCondition = or(
+          lt(sortColumn, drizzleSql`${cursorSortVal}`),
+          and(
+            eq(sortColumn, drizzleSql`${cursorSortVal}`),
+            lt(audienceMembers.id, cursorId)
+          )
+        )!;
+      } else {
+        cursorCondition = or(
+          gt(sortColumn, drizzleSql`${cursorSortVal}`),
+          and(
+            eq(sortColumn, drizzleSql`${cursorSortVal}`),
+            gt(audienceMembers.id, cursorId)
+          )
+        )!;
+      }
+    }
+  }
+
   const whereClause = and(
     ownershipFilter,
     eq(audienceMembers.creatorProfileId, selectedProfileId),
     memberIdFilter,
     typeCondition,
-    segmentCondition
+    segmentCondition,
+    cursorCondition
   );
 
   const baseQuery = tx
@@ -381,31 +456,36 @@ async function fetchMembersData(
     )
     .where(whereClause);
 
-  const totalQuery = tx
-    .select({
-      total: drizzleSql`COALESCE(COUNT(${audienceMembers.id}), 0)`,
-    })
-    .from(audienceMembers)
-    .innerJoin(
-      creatorProfiles,
-      eq(audienceMembers.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(whereClause);
+  // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1260).
+  const rawRows = await baseQuery
+    .orderBy(orderFn(sortColumn), orderFn(audienceMembers.id))
+    .limit(safe.pageSize + 1);
 
-  const [rows, [{ total }]] = await Promise.all([
-    baseQuery.orderBy(orderFn(sortColumn)).limit(safe.pageSize).offset(offset),
-    totalQuery,
-  ]);
+  const hasMore = rawRows.length > safe.pageSize;
+  const rows = hasMore ? rawRows.slice(0, safe.pageSize) : rawRows;
+
+  // Build next-page cursor from the last returned row.
+  let nextCursor: string | null = null;
+  if (hasMore && rows.length > 0) {
+    const lastRow = rows[rows.length - 1];
+    const rawSortVal = lastRow.lastSeenAt;
+    const sortValStr =
+      rawSortVal instanceof Date
+        ? rawSortVal.toISOString()
+        : String(rawSortVal ?? '');
+    nextCursor = encodeCursor(sortValStr, lastRow.id);
+  }
 
   return {
     mode: 'members',
     rows: rows.map(transformMemberRow),
-    total: Number(total ?? 0),
+    total: rows.length,
     page: safe.page,
     pageSize: safe.pageSize,
     sort: safe.sort,
     direction: safe.direction,
+    nextCursor,
+    hasMore,
   };
 }
 
@@ -421,6 +501,7 @@ async function fetchSubscribersData(
   Omit<AudienceServerData, 'view' | 'subscriberCount' | 'totalAudienceCount'>
 > {
   const parsed = subscriberQuerySchema.safeParse({
+    cursor: searchParams.cursor,
     page: searchParams.page,
     pageSize: searchParams.pageSize,
     sort: searchParams.sort ?? undefined,
@@ -430,6 +511,7 @@ async function fetchSubscribersData(
   const safe = parsed.success
     ? parsed.data
     : {
+        cursor: undefined,
         page: 1,
         pageSize: 10,
         sort: DEFAULT_SUBSCRIBER_SORT,
@@ -447,13 +529,37 @@ async function fetchSubscribersData(
       safe.sort as keyof typeof SUBSCRIBER_SORT_COLUMN_SQL
     ] ?? 'ns.created_at';
   const dir = safe.direction === 'asc' ? drizzleSql`ASC` : drizzleSql`DESC`;
-  const offset = (safe.page - 1) * safe.pageSize;
 
   // Ownership JOIN condition: when clerkUserId is available, verify the profile
   // belongs to the authenticated user via the users → creatorProfiles chain.
   const ownershipJoinFetch = clerkUserId
     ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
     : drizzleSql``;
+
+  // Keyset cursor clause for subscribers (JOV-1261).
+  // Subscribers sort by (created_at, id) composite key for stable ordering.
+  let cursorClause = drizzleSql``;
+  if (safe.cursor) {
+    const decoded = decodeCursor(safe.cursor);
+    if (decoded) {
+      const cursorCreatedAt = decoded.v;
+      const cursorId = decoded.id;
+      if (safe.direction === 'desc') {
+        cursorClause = drizzleSql`
+          AND (ns.created_at < ${cursorCreatedAt}::timestamptz
+               OR (ns.created_at = ${cursorCreatedAt}::timestamptz AND ns.id < ${cursorId}))
+        `;
+      } else {
+        cursorClause = drizzleSql`
+          AND (ns.created_at > ${cursorCreatedAt}::timestamptz
+               OR (ns.created_at = ${cursorCreatedAt}::timestamptz AND ns.id > ${cursorId}))
+        `;
+      }
+    }
+  }
+
+  // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1261).
+  const fetchLimit = safe.pageSize + 1;
 
   // Deduplicate by contact: keep the most recent subscription per unique
   // phone/email using DISTINCT ON. The inner query must ORDER BY the distinct
@@ -478,24 +584,12 @@ async function fetchSubscribersData(
       ${ownershipJoinFetch}
       ORDER BY COALESCE(ns_inner.phone, ns_inner.email), ns_inner.created_at DESC
     ) ns
-    ORDER BY ${drizzleSql.raw(sortColSql)} ${dir}
-    LIMIT ${safe.pageSize} OFFSET ${offset}
+    WHERE true ${cursorClause}
+    ORDER BY ${drizzleSql.raw(sortColSql)} ${dir}, ns.id ${dir}
+    LIMIT ${fetchLimit}
   `);
 
-  const fetchCountResult = await tx.execute(drizzleSql`
-    SELECT COUNT(*) AS total
-    FROM (
-      SELECT DISTINCT ON (COALESCE(ns_inner.phone, ns_inner.email)) ns_inner.id
-      FROM notification_subscriptions ns_inner
-      INNER JOIN creator_profiles cp ON ns_inner.creator_profile_id = cp.id
-      INNER JOIN users u             ON cp.user_id = u.id
-      WHERE ns_inner.creator_profile_id = ${selectedProfileId}
-      ${ownershipJoinFetch}
-      ORDER BY COALESCE(ns_inner.phone, ns_inner.email), ns_inner.created_at DESC
-    ) deduped
-  `);
-
-  const rows = rowsResult.rows as Array<{
+  const allRows = rowsResult.rows as Array<{
     id: string;
     email: string | null;
     phone: string | null;
@@ -503,10 +597,18 @@ async function fetchSubscribersData(
     createdAt: Date | string;
     channel: string;
   }>;
-  const total = Number(
-    (fetchCountResult.rows[0] as { total: string | number } | undefined)
-      ?.total ?? 0
-  );
+
+  const hasMore = allRows.length > safe.pageSize;
+  const rows = hasMore ? allRows.slice(0, safe.pageSize) : allRows;
+
+  // Build next-page cursor from the last returned row.
+  let nextCursor: string | null = null;
+  if (hasMore && rows.length > 0) {
+    const lastRow = rows[rows.length - 1];
+    const sortValStr = toISOStringOrNull(lastRow.createdAt) ?? '';
+    nextCursor = encodeCursor(sortValStr, lastRow.id);
+  }
+
   const normalizedRows: AudienceServerRow[] = rows.map(subscriber => {
     const country = subscriber.countryCode;
     const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
@@ -547,11 +649,13 @@ async function fetchSubscribersData(
   return {
     mode: 'subscribers',
     rows: normalizedRows,
-    total: Number(total ?? 0),
+    total: rows.length,
     page: safe.page,
     pageSize: safe.pageSize,
     sort: safe.sort,
     direction: safe.direction,
+    nextCursor,
+    hasMore,
   };
 }
 
@@ -615,6 +719,8 @@ function buildEmptyAudienceData(
     pageSize: 10,
     sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
     direction: 'desc',
+    nextCursor: null,
+    hasMore: false,
     subscriberCount: 0,
     totalAudienceCount: 0,
   };

@@ -6,7 +6,9 @@ import {
   eq,
   gt,
   gte,
+  lt,
   or,
+  type SQL,
 } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -71,6 +73,33 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
+/** Encodes a keyset cursor: base64url(JSON({v: sortValue, id: rowId})). */
+function encodeCursor(sortValue: string, id: string): string {
+  return Buffer.from(JSON.stringify({ v: sortValue, id })).toString(
+    'base64url'
+  );
+}
+
+/** Decodes an opaque cursor. Returns null on malformed input. */
+function decodeCursor(cursor: string): { v: string; id: string } | null {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, 'base64url').toString('utf8')
+    );
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof parsed.v === 'string' &&
+      typeof parsed.id === 'string'
+    ) {
+      return parsed as { v: string; id: string };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -79,6 +108,7 @@ export async function GET(request: NextRequest) {
         profileId: searchParams.get('profileId'),
         sort: searchParams.get('sort') ?? undefined,
         direction: searchParams.get('direction') ?? undefined,
+        cursor: searchParams.get('cursor') ?? undefined,
         page: searchParams.get('page') ?? undefined,
         pageSize: searchParams.get('pageSize') ?? undefined,
         segments: searchParams.getAll('segments'),
@@ -91,23 +121,47 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const { profileId, sort, direction, page, pageSize, segments } =
+      const { profileId, sort, direction, cursor, pageSize, segments } =
         parsed.data;
 
       // Verify user owns the profile
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
-          { rows: [], total: 0 },
+          { rows: [], total: null, hasMore: false, nextCursor: null },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
-      const offset = (page - 1) * pageSize;
-
       const segmentCondition = buildSegmentCondition(segments);
+
+      // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
+      let cursorCondition: SQL<unknown> = drizzleSql`true`;
+      if (cursor) {
+        const decoded = decodeCursor(cursor);
+        if (decoded) {
+          const { v: cursorSortVal, id: cursorId } = decoded;
+          if (direction === 'desc') {
+            cursorCondition = or(
+              lt(sortColumn, drizzleSql`${cursorSortVal}`),
+              and(
+                eq(sortColumn, drizzleSql`${cursorSortVal}`),
+                lt(audienceMembers.id, cursorId)
+              )
+            )!;
+          } else {
+            cursorCondition = or(
+              gt(sortColumn, drizzleSql`${cursorSortVal}`),
+              and(
+                eq(sortColumn, drizzleSql`${cursorSortVal}`),
+                gt(audienceMembers.id, cursorId)
+              )
+            )!;
+          }
+        }
+      }
 
       const baseQuery = tx
         .select({
@@ -172,23 +226,32 @@ export async function GET(request: NextRequest) {
           )
         )
         .where(
-          and(eq(audienceMembers.creatorProfileId, profileId), segmentCondition)
+          and(
+            eq(audienceMembers.creatorProfileId, profileId),
+            segmentCondition,
+            cursorCondition
+          )
         );
 
-      const [rows, [{ total }]] = await Promise.all([
-        baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
-        tx
-          .select({
-            total: drizzleSql`COALESCE(COUNT(${audienceMembers.id}), 0)`,
-          })
-          .from(audienceMembers)
-          .where(
-            and(
-              eq(audienceMembers.creatorProfileId, profileId),
-              segmentCondition
-            )
-          ),
-      ]);
+      // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1260, JOV-1263).
+      const rawRows = await baseQuery
+        .orderBy(orderFn(sortColumn), orderFn(audienceMembers.id))
+        .limit(pageSize + 1);
+
+      const hasMore = rawRows.length > pageSize;
+      const rows = hasMore ? rawRows.slice(0, pageSize) : rawRows;
+
+      // Build next-page cursor from the last returned row.
+      let nextCursor: string | null = null;
+      if (hasMore && rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        const rawSortVal = lastRow.lastSeenAt;
+        const sortValStr =
+          rawSortVal instanceof Date
+            ? rawSortVal.toISOString()
+            : String(rawSortVal ?? '');
+        nextCursor = encodeCursor(sortValStr, lastRow.id);
+      }
 
       const serializeDate = (value?: Date | string | null) => {
         if (!value) return null;
@@ -227,8 +290,9 @@ export async function GET(request: NextRequest) {
         createdAt: serializeDate(member.createdAt),
       }));
 
+      // total is null — clients use hasMore / nextCursor for pagination control.
       return NextResponse.json(
-        { rows: members, total: Number(total ?? 0) },
+        { rows: members, total: null, hasMore, nextCursor },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });
