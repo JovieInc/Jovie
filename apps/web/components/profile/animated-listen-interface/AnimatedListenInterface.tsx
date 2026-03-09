@@ -6,9 +6,6 @@ import type { AnimatedListenInterfaceProps } from './types';
 import { useAnimatedListenInterface } from './useAnimatedListenInterface';
 
 // Animation constants
-const HOVER_SCALE = 1.02;
-const TAP_SCALE = 0.98;
-const HOVER_Y_OFFSET = -2;
 const HOVER_DURATION = 0.2;
 const TAP_DURATION = 0.1;
 const SHIMMER_DURATION = 0.6;
@@ -16,15 +13,9 @@ const SHIMMER_OPACITY = 0.2;
 const BUTTON_SCALE_SELECTED = 1.05;
 const ICON_ROTATION_FULL = 360;
 
-// Pre-computed motion props to reduce cognitive complexity in render
-const hoverProps: MotionProps['whileHover'] = {
-  scale: HOVER_SCALE,
-  y: HOVER_Y_OFFSET,
-  transition: { duration: HOVER_DURATION, ease: [0.16, 1, 0.3, 1] },
-};
-
+// Tap animation only — no scale/translate on hover
 const tapProps: MotionProps['whileTap'] = {
-  scale: TAP_SCALE,
+  scale: 0.99,
   transition: { duration: TAP_DURATION },
 };
 
@@ -94,9 +85,8 @@ export function AnimatedListenInterface({
                   onClick={() => handleDSPClick(dsp)}
                   disabled={isSelected}
                   variants={prefersReducedMotion ? undefined : itemVariants}
-                  whileHover={prefersReducedMotion ? undefined : hoverProps}
                   whileTap={prefersReducedMotion ? undefined : tapProps}
-                  className='w-full group relative overflow-hidden rounded-xl p-4 font-semibold text-base transition-all duration-300 ease-out shadow-lg hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/50 disabled:cursor-not-allowed'
+                  className='w-full group relative overflow-hidden rounded-xl p-4 font-semibold text-base transition-[opacity] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/50 disabled:cursor-not-allowed'
                   style={{
                     backgroundColor: dsp.config.color,
                     color: dsp.config.textColor,
