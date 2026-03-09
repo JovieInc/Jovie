@@ -73,7 +73,7 @@ const MOCK_ARTIST = {
 /* ------------------------------------------------------------------ */
 
 const CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-btn-primary px-8 py-3 text-[13px] font-semibold text-btn-primary-foreground shadow-sm';
+  'inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-8 py-3 text-[13px] font-semibold shadow-sm bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)] border border-[var(--linear-border-subtle)]';
 
 const CONTENT_HEIGHT = 196;
 
@@ -98,7 +98,7 @@ function ListenContent() {
 function TipContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
+      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--linear-text-tertiary)]'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
@@ -107,15 +107,15 @@ function TipContent() {
             key={amount}
             className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border text-center ${
               i === 1
-                ? 'border-transparent bg-btn-primary text-btn-primary-foreground shadow-sm'
-                : 'border-default bg-surface-1 text-primary-token'
+                ? 'border-[var(--linear-border-default)] bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)] shadow-sm'
+                : 'border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] text-[var(--linear-text-primary)]'
             }`}
           >
             <span
               className={`text-[10px] font-medium uppercase tracking-wider ${
                 i === 1
-                  ? 'text-btn-primary-foreground/70'
-                  : 'text-secondary-token'
+                  ? 'text-[var(--linear-text-secondary)]'
+                  : 'text-[var(--linear-text-tertiary)]'
               }`}
             >
               USD
@@ -142,15 +142,17 @@ function TourContent() {
       {MOCK_TOUR_DATES.map(show => (
         <div
           key={show.city}
-          className='flex w-full items-center justify-between rounded-xl border border-subtle bg-surface-1 px-4 py-3'
+          className='flex w-full items-center justify-between rounded-xl px-4 py-3 bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)]'
         >
           <div className='min-w-0'>
-            <p className='text-[13px] font-medium text-primary-token truncate'>
+            <p className='text-[13px] font-medium text-[var(--linear-text-primary)] truncate'>
               {show.venue}
             </p>
-            <p className='text-[11px] text-tertiary-token'>{show.city}</p>
+            <p className='text-[11px] text-[var(--linear-text-tertiary)]'>
+              {show.city}
+            </p>
           </div>
-          <span className='shrink-0 text-[11px] font-medium text-secondary-token'>
+          <span className='shrink-0 text-[11px] font-medium text-[var(--linear-text-secondary)]'>
             {show.date}
           </span>
         </div>
@@ -170,7 +172,7 @@ function ProfileContent() {
         {platforms.map(p => (
           <span
             key={p}
-            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-secondary-token'
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--linear-text-tertiary)]'
           >
             <SocialIcon platform={p} size={18} aria-hidden />
           </span>
@@ -221,7 +223,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
             showLink={false}
             as='p'
           />
-          <p className='mt-0.5 text-[11px] text-secondary-token tracking-[0.2em] uppercase'>
+          <p className='mt-0.5 text-[11px] text-[var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
             Artist
           </p>
         </div>
@@ -266,7 +268,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
 
       {/* Branding */}
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-tertiary-token/40'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
           Powered by Jovie
         </p>
       </div>
@@ -326,10 +328,10 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
       </p>
       <div className='mt-4 flex items-baseline justify-between'>
         <div>
-          <span className='text-xl font-semibold text-primary-token tabular-nums tracking-tight'>
+          <span className='text-xl font-semibold text-[var(--linear-text-primary)] tabular-nums tracking-tight'>
             {mode.stat.value}
           </span>
-          <span className='ml-2 text-[12px] text-tertiary-token'>
+          <span className='ml-2 text-[12px] text-[var(--linear-text-tertiary)]'>
             {mode.stat.label}
           </span>
         </div>
@@ -410,7 +412,7 @@ export function DeeplinksGrid() {
         className='relative hidden lg:block bg-[var(--linear-bg-page)]'
         style={{ height: `${MODES.length * 75}vh` }}
       >
-        <div className='sticky top-0 flex h-screen items-center overflow-hidden'>
+        <div className='sticky top-0 flex h-dvh items-center justify-center overflow-hidden'>
           {/* Ambient glow */}
           <div
             aria-hidden='true'
@@ -436,7 +438,7 @@ export function DeeplinksGrid() {
             />
 
             <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-              <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-12'>
+              <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 {/* Left — copy */}
                 <div className='flex flex-col gap-6'>
                   {/* Section label */}
@@ -472,10 +474,10 @@ export function DeeplinksGrid() {
                             gridArea: '1 / 1',
                           }}
                         >
-                          <span className='text-2xl font-semibold text-primary-token tabular-nums tracking-tight'>
+                          <span className='text-2xl font-semibold text-[var(--linear-text-primary)] tabular-nums tracking-tight'>
                             {mode.stat.value}
                           </span>
-                          <p className='mt-1 text-[12px] text-tertiary-token'>
+                          <p className='mt-1 text-[12px] text-[var(--linear-text-tertiary)]'>
                             {mode.stat.label}
                           </p>
                         </div>
