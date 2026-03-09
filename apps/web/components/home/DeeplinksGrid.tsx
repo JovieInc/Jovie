@@ -96,7 +96,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
             showLink={false}
             as='p'
           />
-          <p className='mt-0.5 text-[11px] text-[color:var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
+          <p className='mt-0.5 text-[11px] text-[var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
             Artist
           </p>
         </div>
@@ -141,7 +141,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
 
       {/* Branding */}
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-[color:var(--linear-text-quaternary)]'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
           Powered by Jovie
         </p>
       </div>
@@ -193,22 +193,22 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
         border: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      <h3 className='text-lg font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
+      <h3 className='text-lg font-semibold tracking-tight text-[var(--linear-text-primary)]'>
         {mode.headline}
       </h3>
-      <p className='mt-2 text-[14px] leading-[1.6] text-[color:var(--linear-text-secondary)]'>
+      <p className='mt-2 text-[14px] leading-[1.6] text-[var(--linear-text-secondary)]'>
         {mode.description}
       </p>
       <div className='mt-4 flex items-baseline justify-between'>
         <div>
-          <span className='text-xl font-semibold text-[color:var(--linear-text-primary)] tabular-nums tracking-tight'>
+          <span className='text-xl font-semibold text-[var(--linear-text-primary)] tabular-nums tracking-tight'>
             {mode.stat.value}
           </span>
-          <span className='ml-2 text-[12px] text-[color:var(--linear-text-tertiary)]'>
+          <span className='ml-2 text-[12px] text-[var(--linear-text-tertiary)]'>
             {mode.stat.label}
           </span>
         </div>
-        <span className='font-mono text-[12px] text-[color:var(--linear-text-tertiary)]'>
+        <span className='font-mono text-[12px] text-[var(--linear-text-tertiary)]'>
           /tim{mode.slug ? `/${mode.slug}` : ''}
         </span>
       </div>
@@ -256,7 +256,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => (
         <h2
           key={mode.id}
-          className='marketing-h2-linear text-[color:var(--linear-text-primary)]'
+          className='marketing-h2-linear text-[var(--linear-text-primary)]'
         >
           {mode.headline}
         </h2>
@@ -269,7 +269,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => (
         <p
           key={mode.id}
-          className='max-w-[400px] marketing-lead-linear text-[color:var(--linear-text-secondary)]'
+          className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'
         >
           {mode.description}
         </p>
@@ -315,7 +315,7 @@ export function DeeplinksGrid() {
                 {/* Left — copy */}
                 <div className='flex flex-col gap-6'>
                   {/* Section label */}
-                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                     AI Personalization
                   </span>
 
@@ -347,10 +347,10 @@ export function DeeplinksGrid() {
                             gridArea: '1 / 1',
                           }}
                         >
-                          <span className='text-2xl font-semibold text-[color:var(--linear-text-primary)] tabular-nums tracking-tight'>
+                          <span className='text-2xl font-semibold text-[var(--linear-text-primary)] tabular-nums tracking-tight'>
                             {mode.stat.value}
                           </span>
-                          <p className='mt-1 text-[12px] text-[color:var(--linear-text-tertiary)]'>
+                          <p className='mt-1 text-[12px] text-[var(--linear-text-tertiary)]'>
                             {mode.stat.label}
                           </p>
                         </div>
@@ -377,8 +377,35 @@ export function DeeplinksGrid() {
                 </div>
 
                 {/* Center — phone */}
-                <div className='flex justify-center'>
+                <div className='flex flex-col items-center gap-4'>
                   <StickyPhone activeIndex={activeIndex} />
+                  <a
+                    href='https://jov.ie/tim'
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
+                    style={{
+                      color: 'var(--linear-text-tertiary)',
+                      border: '1px solid var(--linear-border-subtle)',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    View a Real Page
+                    <svg
+                      width='14'
+                      height='14'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeWidth='2'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      aria-hidden='true'
+                    >
+                      <path d='M5 12h14' />
+                      <path d='m12 5 7 7-7 7' />
+                    </svg>
+                  </a>
                 </div>
 
                 {/* Right — URL slugs, bold */}
@@ -447,13 +474,13 @@ export function DeeplinksGrid() {
           <div className='mx-auto max-w-[var(--linear-content-max)]'>
             {/* Section header */}
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
-              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 AI Personalization
               </span>
-              <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
+              <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
                 One link. Every moment.
               </h2>
-              <p className='max-w-[400px] marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
+              <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Every visitor sees a personalized CTA based on the moment —
                 listen, tip, tour, or follow. AI that increases conversions on
                 autopilot.

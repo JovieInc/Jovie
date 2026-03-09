@@ -6,6 +6,7 @@ import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { LogoBar } from '@/components/home/LogoBar';
+import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -16,9 +17,9 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = 86400;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The link in bio that actually converts.`;
+  const title = `${APP_NAME} — The link in bio your music deserves.`;
   const description =
-    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free forever.';
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -84,7 +85,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The link in bio that actually converts`,
+          alt: `${APP_NAME} - The link in bio that converts`,
           type: 'image/png',
         },
       ],
@@ -96,7 +97,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The link in bio that actually converts`,
+          alt: `${APP_NAME} - The link in bio that converts`,
           width: 1200,
           height: 630,
         },
@@ -140,7 +141,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free forever.',
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -207,7 +208,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free forever.',
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -251,21 +252,61 @@ export default function HomePage() {
         <LogoBar />
       </div>
 
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
       <DeeplinksGrid />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
       <AutomaticReleaseSmartlinksSection />
 
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
       <AudienceCRMSection />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
+      <PricingSection />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
       <SeeItInAction />
 
-      {/* Gradient separator before final CTA */}
-      <div
-        aria-hidden='true'
-        className='h-px max-w-lg mx-auto'
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
         }}
       />
 

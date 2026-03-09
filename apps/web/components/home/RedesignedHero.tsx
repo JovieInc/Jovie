@@ -16,15 +16,18 @@ export function RedesignedHero() {
       <div className='relative w-full max-w-[var(--linear-content-max)] z-10'>
         {/* Centered text block — Linear layout */}
         <div className='hero-stagger flex flex-col items-center text-center max-w-2xl mx-auto'>
+          <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
+            Built for independent music artists
+          </span>
           <h1
-            className='marketing-h1-linear text-[color:var(--linear-text-primary)]'
+            className='marketing-h1-linear text-[var(--linear-text-primary)]'
             style={{ fontWeight: 590 }}
           >
-            The link in bio that <br className='hidden sm:block' />
-            actually converts.
+            The link in bio your <br className='hidden sm:block' />
+            music deserves.
           </h1>
 
-          <p className='mt-5 max-w-[460px] marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
+          <p className='mt-5 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
             Sync Spotify once. Jovie builds a profile that captures emails,
             directs streams, and earns tips — all on autopilot.
           </p>
@@ -49,14 +52,14 @@ export function RedesignedHero() {
               fontSize: '12px',
               fontWeight: 450,
               letterSpacing: '0.01em',
-              color: 'var(--linear-text-quaternary)',
+              color: 'var(--linear-text-tertiary)',
             }}
           >
             <span
               aria-hidden='true'
               className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
             />{' '}
-            Free forever. Live in 60 seconds.
+            Free to start. Live in 60 seconds.
           </p>
         </div>
       </div>

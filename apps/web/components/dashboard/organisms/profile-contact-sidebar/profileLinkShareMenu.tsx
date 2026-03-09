@@ -126,9 +126,11 @@ export function groupPresetsByPlatform(
     .map(([source, sourcePresets]) => ({
       source,
       label: formatPlatformName(source),
-      presets: sourcePresets.toSorted((a, b) => a.label.localeCompare(b.label)),
+      presets: [...sourcePresets].sort((a, b) =>
+        a.label.localeCompare(b.label)
+      ),
     }))
-    .toSorted((a, b) => a.label.localeCompare(b.label));
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export function buildProfileShareDropdownItems({
