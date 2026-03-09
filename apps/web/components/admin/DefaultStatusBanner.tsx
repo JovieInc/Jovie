@@ -48,13 +48,13 @@ export function DefaultStatusBanner({
     Icon = HelpCircle;
   } else if (isAlive) {
     statusLabel = 'Default Alive';
-    statusTone = 'text-emerald-600 dark:text-emerald-300';
-    badgeTone = 'border-emerald-500/20 bg-emerald-500/10';
+    statusTone = 'text-success';
+    badgeTone = 'border-success/20 bg-success/10';
     Icon = CheckCircle2;
   } else {
     statusLabel = 'Default Dead';
-    statusTone = 'text-rose-600 dark:text-rose-300';
-    badgeTone = 'border-rose-500/20 bg-rose-500/10';
+    statusTone = 'text-error';
+    badgeTone = 'border-error/20 bg-error/10';
     Icon = AlertTriangle;
   }
 

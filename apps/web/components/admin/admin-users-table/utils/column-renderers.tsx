@@ -173,8 +173,7 @@ export function renderStatusCell({ row }: CellContext<AdminUserRow, unknown>) {
   ) : (
     <Badge size='sm' variant='success'>
       <span className='flex items-center gap-1.5'>
-        <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />{' '}
-        Active
+        <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-success' /> Active
       </span>
     </Badge>
   );
