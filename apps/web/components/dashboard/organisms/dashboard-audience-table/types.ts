@@ -30,7 +30,8 @@ export interface DashboardAudienceTableProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
   readonly rows: AudienceRow[];
-  readonly total: number;
+  /** Null when the per-page COUNT query was skipped for performance. */
+  readonly total: number | null;
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
   readonly onSortChange: (sort: string) => void;
@@ -38,8 +39,10 @@ export interface DashboardAudienceTableProps {
   readonly onFiltersChange: (filters: AudienceFilters) => void;
   readonly profileUrl?: string;
   readonly profileId?: string;
-  readonly subscriberCount: number;
-  readonly totalAudienceCount?: number;
+  /** Null when the subscriber COUNT query was skipped for performance. */
+  readonly subscriberCount: number | null;
+  /** Null when the audience COUNT query was skipped for performance. */
+  readonly totalAudienceCount?: number | null;
   readonly filters: AudienceFilters;
   readonly hasNextPage?: boolean;
   readonly isFetchingNextPage?: boolean;

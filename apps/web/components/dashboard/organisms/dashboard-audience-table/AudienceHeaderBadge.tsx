@@ -8,8 +8,10 @@ import type { AudienceView } from './types';
 interface AudienceHeaderBadgeProps {
   readonly view: AudienceView;
   readonly onViewChange: (view: AudienceView) => void;
-  readonly totalAudienceCount: number;
-  readonly subscriberCount: number;
+  /** Null when the COUNT query was skipped for performance. */
+  readonly totalAudienceCount: number | null;
+  /** Null when the COUNT query was skipped for performance. */
+  readonly subscriberCount: number | null;
 }
 
 const VIEW_OPTIONS: {
@@ -27,12 +29,20 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   totalAudienceCount,
   subscriberCount,
 }: AudienceHeaderBadgeProps) {
-  const anonymousCount = Math.max(totalAudienceCount - subscriberCount, 0);
+  const anonymousCount =
+    totalAudienceCount !== null && subscriberCount !== null
+      ? Math.max(totalAudienceCount - subscriberCount, 0)
+      : null;
 
   const labels: Record<AudienceView, string> = {
-    all: `All Audience (${totalAudienceCount})`,
-    subscribers: `Followers (${subscriberCount})`,
-    anonymous: `Anonymous (${anonymousCount})`,
+    all:
+      totalAudienceCount !== null
+        ? `All Audience (${totalAudienceCount})`
+        : 'All Audience',
+    subscribers:
+      subscriberCount !== null ? `Followers (${subscriberCount})` : 'Followers',
+    anonymous:
+      anonymousCount !== null ? `Anonymous (${anonymousCount})` : 'Anonymous',
   };
 
   return (

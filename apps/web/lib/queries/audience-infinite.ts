@@ -36,7 +36,7 @@ interface UseAudienceInfiniteQueryParams {
   direction: 'asc' | 'desc';
   filters: AudienceFilters;
   pageSize?: number;
-  initialData?: { rows: AudienceMember[]; total: number };
+  initialData?: { rows: AudienceMember[]; total: number | null };
 }
 
 export function useAudienceInfiniteQuery({

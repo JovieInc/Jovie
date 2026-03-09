@@ -42,7 +42,8 @@ export interface AudienceServerData {
   mode: AudienceMode;
   view: AudienceView;
   rows: AudienceServerRow[];
-  total: number;
+  /** Exact page-scoped count. Null when the COUNT query was skipped for performance. */
+  total: number | null;
   page: number;
   pageSize: number;
   sort: string;
@@ -51,8 +52,10 @@ export interface AudienceServerData {
   nextCursor: string | null;
   /** True when more rows exist beyond the current page. */
   hasMore: boolean;
-  subscriberCount: number;
-  totalAudienceCount: number;
+  /** Total subscriber count. Null when the COUNT query was skipped for performance. */
+  subscriberCount: number | null;
+  /** Total audience member count. Null when the COUNT query was skipped for performance. */
+  totalAudienceCount: number | null;
 }
 
 /**
@@ -447,7 +450,7 @@ async function fetchMembersData(
   return {
     mode: 'members',
     rows: rows.map(transformMemberRow),
-    total: rows.length,
+    total: null,
     page: safe.page,
     pageSize: safe.pageSize,
     sort: safe.sort,
@@ -617,7 +620,7 @@ async function fetchSubscribersData(
   return {
     mode: 'subscribers',
     rows: normalizedRows,
-    total: rows.length,
+    total: null,
     page: safe.page,
     pageSize: safe.pageSize,
     sort: safe.sort,
@@ -627,53 +630,6 @@ async function fetchSubscribersData(
   };
 }
 
-async function countSubscribers(
-  tx: DbSessionTx,
-  clerkUserId: string | null,
-  selectedProfileId: string
-): Promise<number> {
-  // Ownership JOIN condition for counting
-  const ownershipJoin = clerkUserId
-    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
-    : drizzleSql``;
-
-  // Deduplicate by contact identifier when counting subscribers
-  const countResult = await tx.execute(drizzleSql`
-    SELECT COUNT(*) AS total
-    FROM (
-      SELECT DISTINCT ON (COALESCE(ns.phone, ns.email)) ns.id
-      FROM notification_subscriptions ns
-      INNER JOIN creator_profiles cp ON ns.creator_profile_id = cp.id
-      INNER JOIN users u             ON cp.user_id = u.id
-      WHERE ns.creator_profile_id = ${selectedProfileId}
-      ${ownershipJoin}
-      ORDER BY COALESCE(ns.phone, ns.email), ns.created_at DESC
-    ) deduped
-  `);
-
-  return Number(
-    (countResult.rows[0] as { total: string | number } | undefined)?.total ?? 0
-  );
-}
-
-async function countAudienceMembers(
-  tx: DbSessionTx,
-  clerkUserId: string | null,
-  profileId: string
-): Promise<number> {
-  const countResult = await tx.execute<{ total: string | number }>(drizzleSql`
-    SELECT COUNT(*) AS total
-    FROM ${audienceMembers} am
-    JOIN ${creatorProfiles} cp ON cp.id = am.creator_profile_id
-    JOIN ${users} u ON u.id = cp.user_id
-    WHERE am.creator_profile_id = ${profileId}
-      AND ${buildOwnershipFilter(clerkUserId)}
-  `);
-
-  return Number(
-    (countResult.rows[0] as { total: string | number } | undefined)?.total ?? 0
-  );
-}
 function buildEmptyAudienceData(
   mode: AudienceMode,
   view: AudienceView
@@ -682,15 +638,15 @@ function buildEmptyAudienceData(
     mode,
     view,
     rows: [],
-    total: 0,
+    total: null,
     page: 1,
     pageSize: 10,
     sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
     direction: 'desc',
     nextCursor: null,
     hasMore: false,
-    subscriberCount: 0,
-    totalAudienceCount: 0,
+    subscriberCount: null,
+    totalAudienceCount: null,
   };
 }
 
@@ -752,9 +708,7 @@ export async function getAudienceServerData(params: {
   // All audience reads now go through authenticated RLS-protected sessions
   // RLS bypass capability has been removed for security hardening
   return await withDbSessionTx(async (tx, clerkUserId) => {
-    // Subscriber count and main data query are independent — run in parallel
-    // to eliminate the sequential waterfall.
-    const dataPromise = buildDataPromise(
+    const data = await buildDataPromise(
       tx,
       clerkUserId,
       selectedProfileId,
@@ -764,17 +718,14 @@ export async function getAudienceServerData(params: {
       { includeDetails, memberId, segments }
     );
 
-    const [subscriberCount, totalAudienceCount, data] = await Promise.all([
-      countSubscribers(tx, clerkUserId, selectedProfileId),
-      countAudienceMembers(tx, clerkUserId, selectedProfileId),
-      dataPromise,
-    ]);
-
+    // Exact subscriber/audience counts are omitted per JOV-1262/JOV-1264 —
+    // running COUNT(*) on every page load adds avoidable DB overhead.
+    // Callers use hasMore / nextCursor for pagination state instead.
     return {
       ...data,
       view,
-      subscriberCount,
-      totalAudienceCount,
+      subscriberCount: null,
+      totalAudienceCount: null,
     };
   });
 }
