@@ -4,6 +4,8 @@
  * Processes new user signups by:
  * - Storing full name in private metadata (for display purposes)
  * - Syncing initial Jovie metadata to Clerk
+ * - Cancelling any active outbound sales/prospecting sequences for the email
+ * - Sending a personal founder welcome email
  *
  * NOTE: Username suggestions are generated on-the-fly in the onboarding flow,
  * not stored in Clerk metadata. Usernames are stored only in the database.
@@ -11,6 +13,9 @@
 
 import { clerkClient } from '@clerk/nextjs/server';
 import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
+import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
+import { sendEmail } from '@/lib/email/send';
+import { getFounderWelcomeEmail } from '@/lib/email/templates/founder-welcome';
 import { notifySlackSignup } from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
 import type {
@@ -63,9 +68,31 @@ async function handleUserCreated(
 
     logger.info(`Post-signup processing completed for user ${user.id}`);
 
-    // Send Slack notification for new signup (fire-and-forget)
     const displayName = fullName || user.username || 'A new user';
     const primaryEmail = user.email_addresses?.[0]?.email_address;
+
+    // Cancel outbound sales/prospecting sequences for the new user's email
+    // (fire-and-forget — failure should not block the signup response)
+    if (primaryEmail) {
+      stopEnrollmentsForEmail(primaryEmail, 'claimed').catch(err => {
+        logger.warn('[user-created] Failed to stop outbound sequences', err);
+      });
+
+      // Send personal founder welcome email
+      const welcomeEmail = getFounderWelcomeEmail({
+        firstName: user.first_name ?? null,
+      });
+      sendEmail({
+        to: primaryEmail,
+        subject: welcomeEmail.subject,
+        text: welcomeEmail.text,
+        html: welcomeEmail.html,
+      }).catch(err => {
+        logger.warn('[user-created] Founder welcome email failed', err);
+      });
+    }
+
+    // Send Slack notification for new signup (fire-and-forget)
     notifySlackSignup(displayName, primaryEmail).catch(err => {
       logger.warn('[user-created] Slack notification failed', err);
     });

@@ -100,7 +100,6 @@ async function AudienceContent({
         profileUrl={profileUrl}
         profileId={artist?.id ?? undefined}
         subscriberCount={audienceData.subscriberCount}
-        anonymousCount={audienceData.anonymousCount}
         totalAudienceCount={audienceData.totalAudienceCount}
         filters={{ segments: validSegments }}
         tourDates={tourDatesForMatching}

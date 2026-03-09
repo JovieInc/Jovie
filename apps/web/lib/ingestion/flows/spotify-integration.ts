@@ -26,7 +26,7 @@ export interface SpotifyArtistData {
 /**
  * Fetch full artist data from Spotify API for a Spotify artist handle.
  *
- * @param handle - Handle that may be a Spotify artist ID (prefixed with 'artist-')
+ * @param handle - Handle that may be a Spotify artist ID (prefixed with 'artist_')
  * @param platformId - Platform identifier to verify this is a Spotify URL
  * @returns Spotify artist data, or null if not a Spotify artist or fetch failed
  */
@@ -35,14 +35,14 @@ export async function fetchSpotifyArtistData(
   platformId: string
 ): Promise<SpotifyArtistData | null> {
   const isSpotifyArtist =
-    handle.startsWith('artist-') && platformId === 'spotify';
+    handle.startsWith('artist_') && platformId === 'spotify';
   if (!isSpotifyArtist) {
     return null;
   }
 
   try {
     const { getSpotifyArtist } = await import('@/lib/spotify');
-    const artistId = handle.replace('artist-', '');
+    const artistId = handle.replace('artist_', '');
     const artist = await getSpotifyArtist(artistId);
     if (artist?.name) {
       // Pick the best image (largest available)
@@ -88,7 +88,7 @@ export async function fetchSpotifyArtistData(
  * Fetch the artist name from Spotify API for a Spotify artist handle.
  *
  * @deprecated Use fetchSpotifyArtistData for full metadata.
- * @param handle - Handle that may be a Spotify artist ID (prefixed with 'artist-')
+ * @param handle - Handle that may be a Spotify artist ID (prefixed with 'artist_')
  * @param platformId - Platform identifier to verify this is a Spotify URL
  * @returns Artist name from Spotify, or null if not a Spotify artist or fetch failed
  */

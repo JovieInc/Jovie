@@ -2,10 +2,12 @@
  * Campaign Invites API
  *
  * Lists invites with engagement data for the campaign dashboard.
+ * Uses cursor/keyset pagination on (createdAt DESC, id DESC) to avoid
+ * OFFSET scan penalties on large invite tables (JOV-1286).
  */
 
 import type { SQLWrapper } from 'drizzle-orm';
-import { and, count, desc, eq, gte, ilike, inArray } from 'drizzle-orm';
+import { and, count, desc, eq, gte, ilike, inArray, lt, or } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -47,27 +49,71 @@ interface InviteWithEngagement {
   };
 }
 
+/**
+ * Decoded cursor carrying the last-seen (createdAt, id) pair.
+ */
+interface InviteCursor {
+  createdAt: string;
+  id: string;
+}
+
 type QueryParams = {
   status?: string;
   search?: string;
   limit: number;
-  offset: number;
+  cursor: InviteCursor | null;
   dateFilter: Date;
 };
+
+/**
+ * Encode a cursor from the last item in the current page.
+ */
+function encodeCursor(createdAt: Date | string, id: string): string {
+  const payload: InviteCursor = {
+    createdAt: createdAt instanceof Date ? createdAt.toISOString() : createdAt,
+    id,
+  };
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
+}
+
+/**
+ * Decode a cursor from a base64 string. Returns null if invalid.
+ */
+function decodeCursor(raw: string): InviteCursor | null {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(raw, 'base64').toString('utf8')
+    ) as unknown;
+    if (
+      payload !== null &&
+      typeof payload === 'object' &&
+      'createdAt' in payload &&
+      'id' in payload &&
+      typeof (payload as InviteCursor).createdAt === 'string' &&
+      typeof (payload as InviteCursor).id === 'string'
+    ) {
+      return payload as InviteCursor;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 function parseQueryParams(request: NextRequest): QueryParams {
   const url = new URL(request.url);
   const status = url.searchParams.get('status') || undefined;
   const search = url.searchParams.get('search') || undefined;
   const limit = Math.min(Number(url.searchParams.get('limit')) || 50, 100);
-  const offset = Number(url.searchParams.get('offset')) || 0;
   const days = Number(url.searchParams.get('days')) || 30;
+  const cursorRaw = url.searchParams.get('cursor');
+  const cursor = cursorRaw ? decodeCursor(cursorRaw) : null;
 
   return {
     status,
     search,
     limit,
-    offset,
+    cursor,
     dateFilter: new Date(Date.now() - days * 24 * 60 * 60 * 1000),
   };
 }
@@ -96,7 +142,7 @@ const getCachedInviteCount = unstable_cache(
       status,
       search,
       limit: 0,
-      offset: 0,
+      cursor: null,
       dateFilter: new Date(dateFilterISO),
     });
     const [countResult] = await db
@@ -113,12 +159,33 @@ const getCachedInviteCount = unstable_cache(
   { revalidate: 60 }
 );
 
+/**
+ * Build the keyset WHERE clause that positions the query after the cursor.
+ *
+ * Ordering is (createdAt DESC, id DESC), so "after cursor" means:
+ *   createdAt < cursor.createdAt
+ *   OR (createdAt = cursor.createdAt AND id < cursor.id)
+ */
+function buildCursorCondition(cursor: InviteCursor): SQLWrapper {
+  const cursorDate = new Date(cursor.createdAt);
+  return or(
+    lt(creatorClaimInvites.createdAt, cursorDate),
+    and(
+      eq(creatorClaimInvites.createdAt, cursorDate),
+      lt(creatorClaimInvites.id, cursor.id)
+    )
+  ) as SQLWrapper;
+}
+
 async function fetchInvitesWithProfiles(
   conditions: SQLWrapper[],
   query: QueryParams,
-  limit: number,
-  offset: number
+  limit: number
 ) {
+  const allConditions = query.cursor
+    ? [...conditions, buildCursorCondition(query.cursor)]
+    : conditions;
+
   const [invites, total] = await Promise.all([
     db
       .select({
@@ -139,10 +206,12 @@ async function fetchInvitesWithProfiles(
         creatorProfiles,
         eq(creatorClaimInvites.creatorProfileId, creatorProfiles.id)
       )
-      .where(and(...conditions))
-      .orderBy(desc(creatorClaimInvites.createdAt))
-      .limit(limit)
-      .offset(offset),
+      .where(and(...allConditions))
+      .orderBy(
+        desc(creatorClaimInvites.createdAt),
+        desc(creatorClaimInvites.id)
+      )
+      .limit(limit),
     getCachedInviteCount(
       query.status,
       query.search,
@@ -268,13 +337,19 @@ export async function GET(request: NextRequest) {
     const { invites, total } = await fetchInvitesWithProfiles(
       conditions,
       query,
-      query.limit,
-      query.offset
+      query.limit
     );
 
     const engagementData = await fetchEngagementData(invites.map(i => i.id));
     const engagementMap = buildEngagementMap(engagementData);
     const result = buildInviteResponse(invites, engagementMap);
+
+    // Derive nextCursor from the last item in the page
+    const lastInvite = invites[invites.length - 1];
+    const nextCursor =
+      invites.length === query.limit && lastInvite
+        ? encodeCursor(lastInvite.createdAt, lastInvite.id)
+        : null;
 
     return NextResponse.json(
       {
@@ -283,8 +358,8 @@ export async function GET(request: NextRequest) {
         pagination: {
           total,
           limit: query.limit,
-          offset: query.offset,
-          hasMore: query.offset + query.limit < total,
+          nextCursor,
+          hasMore: nextCursor !== null,
         },
       },
       { headers: NO_STORE_HEADERS }

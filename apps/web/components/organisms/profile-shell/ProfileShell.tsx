@@ -275,23 +275,25 @@ export function ProfileShell({
                             />
                           </>
                         ) : (
-                          mode !== 'tip' && (
-                            <CircleIconButton
-                              size='md'
-                              variant='ghost'
-                              ariaLabel='Tip'
-                              data-testid='tip-trigger'
-                              className='border border-transparent transition-colors hover:border-subtle hover:bg-surface-2'
-                              asChild
-                            >
-                              <Link href={`/${artist.handle}?mode=tip`}>
-                                <DollarSign
-                                  className='h-4 w-4'
-                                  aria-hidden='true'
-                                />
-                              </Link>
-                            </CircleIconButton>
-                          )
+                          /* Always reserve space for the tip button to prevent layout shift.
+                             When tip mode is active, render invisibly instead of not at all. */
+                          <CircleIconButton
+                            size='md'
+                            variant='ghost'
+                            ariaLabel='Tip'
+                            data-testid='tip-trigger'
+                            className={`border border-transparent transition-colors hover:border-subtle hover:bg-surface-2${isTipModeActive ? ' invisible' : ''}`}
+                            aria-hidden={isTipModeActive || undefined}
+                            tabIndex={isTipModeActive ? -1 : undefined}
+                            asChild
+                          >
+                            <Link href={`/${artist.handle}?mode=tip`}>
+                              <DollarSign
+                                className='h-4 w-4'
+                                aria-hidden='true'
+                              />
+                            </Link>
+                          </CircleIconButton>
                         ))}
                     </div>
                   </div>

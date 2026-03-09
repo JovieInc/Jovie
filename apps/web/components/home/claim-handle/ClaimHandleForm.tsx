@@ -25,7 +25,6 @@ export function ClaimHandleForm({
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
-  const _shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const displayDomain = BASE_URL.replace(/^https?:\/\//, '');
 
@@ -47,12 +46,6 @@ export function ClaimHandleForm({
       );
     }
   }, [available, handle, router]);
-
-  useEffect(() => {
-    return () => {
-      // Cleanup if necessary
-    };
-  }, []);
 
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -123,7 +116,10 @@ export function ClaimHandleForm({
   }, [navigating, available, handle]);
 
   const isAvailable = available === true;
-  const isDisabled = navigating || checkingAvail;
+  // Only block during navigation — never gate on availability check.
+  // Availability is informational; server validates during onboarding.
+  const hasClientError = !!handleError;
+  const isDisabled = navigating || hasClientError;
 
   return (
     <form onSubmit={onSubmit} className='w-full' noValidate>
@@ -175,7 +171,7 @@ export function ClaimHandleForm({
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-30'
+            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-40 placeholder:text-[var(--linear-text-tertiary)]'
             style={{
               fontSize: '13px',
               fontWeight: 450,
