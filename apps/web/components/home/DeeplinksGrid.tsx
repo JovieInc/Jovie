@@ -38,7 +38,7 @@ const MODES: ModeData[] = [
     id: 'tour',
     headline: 'Fill every show.',
     description:
-      'A fan in Atlanta taps your link. Jovie surfaces the nearest show with a ticket button — not a list of 30 cities, just theirs.',
+      'A fan in LA taps your link. Jovie surfaces the nearest show with a ticket button — not a list of 30 cities, just theirs.',
     stat: { value: '847', label: 'ticket clicks this month' },
     slug: 'tour',
   },
