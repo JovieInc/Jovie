@@ -44,6 +44,8 @@ export interface ProfileShellProps {
   readonly showTipButton?: boolean;
   readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
+  readonly showTourButton?: boolean;
+  readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly showNotificationButton?: boolean;
   readonly maxWidthClass?: string;

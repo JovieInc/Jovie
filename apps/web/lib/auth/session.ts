@@ -69,20 +69,12 @@ function getSessionSetupFallbackSql(userId: string) {
 }
 
 async function applySessionUserId(userId: string): Promise<void> {
-  try {
-    await db.execute(getSessionSetupSql(userId));
-  } catch (error) {
-    logDbError('setupDbSession_set_config_failed', error, { userId });
-    // Fallback: use session-scoped set_config (is_local=false) which doesn't require a transaction
-    try {
-      await db.execute(
-        drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
-      );
-    } catch (fallbackError) {
-      logDbError('setupDbSession_fallback_failed', fallbackError, { userId });
-      throw fallbackError;
-    }
-  }
+  // setupDbSession is used outside explicit transaction boundaries.
+  // Use session-scoped set_config (is_local=false) directly to avoid
+  // emitting avoidable query errors for transaction-local scope.
+  await db.execute(
+    drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
+  );
 }
 
 /**
