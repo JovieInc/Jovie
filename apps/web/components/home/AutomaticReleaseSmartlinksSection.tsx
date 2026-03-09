@@ -236,21 +236,35 @@ export function AutomaticReleaseSmartlinksSection() {
                       return (
                         <div
                           key={key}
-                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 transition-[background-color] duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
+                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 transition-[background-color] duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] cursor-pointer'
                           style={{
+                            backgroundColor: 'var(--linear-bg-surface-1)',
                             border: '1px solid var(--linear-border-subtle)',
                           }}
                         >
-                          <SocialIcon
-                            platform={key}
-                            className='h-5 w-5 shrink-0 text-[color:var(--linear-text-tertiary)] transition-colors duration-150'
-                            aria-hidden
-                          />
-                          <span className='flex-1 text-base font-[number:var(--linear-font-weight-semibold)] text-[color:var(--linear-text-primary)]'>
+                          <span
+                            className='shrink-0'
+                            style={{ color: 'var(--linear-text-tertiary)' }}
+                          >
+                            <SocialIcon
+                              platform={key}
+                              className='h-5 w-5 transition-colors duration-150'
+                              aria-hidden
+                            />
+                          </span>
+                          <span
+                            className='flex-1 text-base'
+                            style={{
+                              fontWeight:
+                                'var(--linear-font-weight-semibold)' as React.CSSProperties['fontWeight'],
+                              color: 'var(--linear-text-primary)',
+                            }}
+                          >
                             {config.name}
                           </span>
                           <ChevronRight
-                            className='h-4 w-4 transition-all duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] text-[color:var(--linear-text-tertiary)] group-hover:text-[color:var(--linear-text-secondary)] group-hover:translate-x-0.5'
+                            className='h-4 w-4 transition-all duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] group-hover:translate-x-0.5'
+                            style={{ color: 'var(--linear-text-tertiary)' }}
                             aria-hidden='true'
                           />
                         </div>
