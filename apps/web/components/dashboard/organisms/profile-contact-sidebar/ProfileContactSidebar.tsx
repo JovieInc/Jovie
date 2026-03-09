@@ -305,6 +305,10 @@ export function ProfileContactSidebar() {
   } = previewData;
 
   const profileUrl = `${BASE_URL}${profilePath}`;
+  const canAddLinks =
+    resolvedCategory === 'social' ||
+    resolvedCategory === 'dsp' ||
+    resolvedCategory === 'earnings';
 
   const photoSettingsFooter =
     resolvedCategory !== 'about' ? (
@@ -363,18 +367,21 @@ export function ProfileContactSidebar() {
             className='flex-1'
             aria-label='Profile sidebar view'
           />
-          {(resolvedCategory === 'social' ||
-            resolvedCategory === 'dsp' ||
-            resolvedCategory === 'earnings') && (
-            <button
-              type='button'
-              onClick={() => handleAddLink(resolvedCategory)}
-              className='shrink-0 p-1 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
-              aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
-            >
-              <Plus className='h-4 w-4' />
-            </button>
-          )}
+          <div
+            className='h-6 w-6 shrink-0'
+            data-testid='profile-tab-action-slot'
+          >
+            {canAddLinks && (
+              <button
+                type='button'
+                onClick={() => handleAddLink(resolvedCategory)}
+                className='rounded-md p-1 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+              >
+                <Plus className='h-4 w-4' />
+              </button>
+            )}
+          </div>
         </div>
       }
       footer={photoSettingsFooter}
