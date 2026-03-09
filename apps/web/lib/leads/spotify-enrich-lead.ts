@@ -6,6 +6,7 @@ import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { spotifyClient } from '@/lib/spotify/client';
 import { SPOTIFY_API_BASE } from '@/lib/spotify/env';
+import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { computePriorityScore } from './priority-score';
 
 interface SpotifyAlbumsResponse {
@@ -22,11 +23,22 @@ function extractArtistId(spotifyUrl: string): string | null {
 }
 
 export async function spotifyEnrichLead(leadId: string): Promise<void> {
+  pipelineLog('enrich', 'Starting Spotify enrichment', { leadId });
+
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
-  if (!lead?.spotifyUrl) return;
+  if (!lead?.spotifyUrl) {
+    pipelineWarn('enrich', 'Skipped — no Spotify URL on lead', { leadId });
+    return;
+  }
 
   const artistId = extractArtistId(lead.spotifyUrl);
-  if (!artistId) return;
+  if (!artistId) {
+    pipelineWarn('enrich', 'Skipped — could not extract artist ID from URL', {
+      leadId,
+      spotifyUrl: lead.spotifyUrl,
+    });
+    return;
+  }
 
   try {
     // Get artist details
@@ -34,7 +46,14 @@ export async function spotifyEnrichLead(leadId: string): Promise<void> {
 
     // Get albums via direct fetch using the client's access token
     const token = await spotifyClient.getAccessToken();
-    if (!token) return;
+    if (!token) {
+      pipelineWarn(
+        'enrich',
+        'Skipped — Spotify not configured or token unavailable',
+        { leadId }
+      );
+      return;
+    }
 
     const albumsRes = await fetch(
       `${SPOTIFY_API_BASE}/artists/${artistId}/albums?include_groups=album,single&limit=50`,
@@ -78,6 +97,14 @@ export async function spotifyEnrichLead(leadId: string): Promise<void> {
         updatedAt: new Date(),
       })
       .where(eq(leads.id, leadId));
+
+    pipelineLog('enrich', 'Enrichment complete', {
+      leadId,
+      popularity: artist.popularity,
+      followers: artist.followerCount,
+      releaseCount,
+      priorityScore,
+    });
   } catch (error) {
     await captureError('Spotify lead enrichment failed', error, {
       route: 'leads/spotify-enrich-lead',
