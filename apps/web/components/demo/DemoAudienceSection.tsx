@@ -1,71 +1,17 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { BarChart3 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import {
   AudienceTableStableProvider,
   AudienceTableVolatileProvider,
 } from '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
-import {
-  renderIntentScoreCell,
-  renderLastActionCell,
-  renderLtvCell,
-  renderReturningCell,
-  renderSourceCell,
-  renderUserCell,
-} from '@/components/dashboard/organisms/dashboard-audience-table/utils/column-renderers';
 import { UnifiedTable } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
 import { DemoAnalyticsSidebar } from './DemoAnalyticsSidebar';
+import { DEMO_AUDIENCE_COLUMNS } from './demo-audience-columns';
 import { DEMO_AUDIENCE_MEMBERS } from './mock-release-data';
-
-/* ------------------------------------------------------------------ */
-/*  Column definitions (same as DemoRealAudiencePanel)                  */
-/* ------------------------------------------------------------------ */
-
-const columnHelper = createColumnHelper<AudienceMember>();
-
-// biome-ignore lint/suspicious/noExplicitAny: TanStack Table ColumnDef requires `any` for mixed accessor types
-const DEMO_COLUMNS: ColumnDef<AudienceMember, any>[] = [
-  columnHelper.accessor('displayName', {
-    id: 'user',
-    header: 'Visitor',
-    cell: renderUserCell,
-    size: 220,
-  }),
-  columnHelper.accessor('intentLevel', {
-    id: 'intentScore',
-    header: 'Intent',
-    cell: renderIntentScoreCell,
-    size: 110,
-  }),
-  columnHelper.accessor('tipAmountTotalCents', {
-    id: 'ltv',
-    header: 'LTV',
-    cell: renderLtvCell,
-    size: 80,
-  }),
-  columnHelper.accessor('visits', {
-    id: 'returning',
-    header: 'Returning',
-    cell: renderReturningCell,
-    size: 100,
-  }),
-  columnHelper.accessor('referrerHistory', {
-    id: 'source',
-    header: 'Source',
-    cell: renderSourceCell,
-    size: 140,
-  }),
-  columnHelper.accessor('latestActions', {
-    id: 'lastAction',
-    header: 'Last Action',
-    cell: renderLastActionCell,
-    size: 160,
-  }),
-];
 
 /* ------------------------------------------------------------------ */
 /*  DemoAudienceSection                                                 */
@@ -144,7 +90,7 @@ export default function DemoAudienceSection() {
             <div className='flex-1 min-w-0'>
               <UnifiedTable
                 data={DEMO_AUDIENCE_MEMBERS}
-                columns={DEMO_COLUMNS}
+                columns={DEMO_AUDIENCE_COLUMNS}
                 isLoading={false}
                 getRowId={getRowId}
                 enableVirtualization

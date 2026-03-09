@@ -3,7 +3,7 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EntitySidebarShell } from '@/components/molecules/drawer';
@@ -33,7 +33,6 @@ export const ContactSidebar = memo(function ContactSidebar({
   onClose,
   onRefresh,
   onContactChange,
-  onSave,
   contextMenuItems: providedContextMenuItems,
   onAvatarUpload,
 }: ContactSidebarProps) {
@@ -46,6 +45,7 @@ export const ContactSidebar = memo(function ContactSidebar({
     setNewLinkUrl,
     hasContact,
     fullName,
+    displayName,
     canUploadAvatar,
     handleAvatarUpload,
     handleCopyProfileUrl,
@@ -113,38 +113,6 @@ export const ContactSidebar = memo(function ContactSidebar({
 
   const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
 
-  const serializedContact = useMemo(() => {
-    if (!contact) return null;
-    return JSON.stringify({
-      id: contact.id,
-      firstName: contact.firstName ?? null,
-      lastName: contact.lastName ?? null,
-      username: contact.username ?? null,
-      avatarUrl: contact.avatarUrl ?? null,
-      socialLinks: contact.socialLinks.map(link => ({
-        id: link.id ?? null,
-        label: link.label ?? null,
-        url: link.url,
-        platformType: link.platformType ?? null,
-      })),
-    });
-  }, [contact]);
-
-  const lastSavedContactRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!onSave || !contact || !serializedContact) return;
-    if (serializedContact === lastSavedContactRef.current) return;
-
-    const timer = globalThis.setTimeout(() => {
-      void Promise.resolve(onSave(contact)).then(() => {
-        lastSavedContactRef.current = serializedContact;
-      });
-    }, 300);
-
-    return () => globalThis.clearTimeout(timer);
-  }, [contact, onSave, serializedContact]);
-
   return (
     <EntitySidebarShell
       isOpen={isOpen}
@@ -185,8 +153,7 @@ export const ContactSidebar = memo(function ContactSidebar({
         <>
           {activeTab === 'details' && (
             <ContactFields
-              firstName={contact.firstName}
-              lastName={contact.lastName}
+              name={displayName ?? ''}
               username={contact.username}
               onNameChange={handleNameChange}
               onUsernameChange={handleUsernameChange}
