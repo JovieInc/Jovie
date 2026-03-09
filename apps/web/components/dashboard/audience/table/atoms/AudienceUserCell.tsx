@@ -11,7 +11,30 @@ export interface AudienceUserCellProps {
   readonly type: AudienceMemberType;
   readonly email?: string | null;
   readonly phone?: string | null;
+  readonly deviceType?: string | null;
+  readonly geoCity?: string | null;
+  readonly geoCountry?: string | null;
   readonly className?: string;
+}
+
+function formatAnonymousVisitorLabel(
+  deviceType?: string | null,
+  geoCity?: string | null,
+  geoCountry?: string | null
+): string {
+  const deviceLabel =
+    deviceType === 'mobile'
+      ? 'Mobile'
+      : deviceType === 'tablet'
+        ? 'Tablet'
+        : deviceType === 'desktop'
+          ? 'Desktop'
+          : 'Unknown';
+
+  const locationLabel = geoCity ?? geoCountry ?? null;
+  return locationLabel
+    ? `${deviceLabel} visitor from ${locationLabel}`
+    : `${deviceLabel} visitor`;
 }
 
 /**
@@ -35,10 +58,15 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   type,
   email,
   phone,
+  deviceType,
+  geoCity,
+  geoCountry,
   className,
 }: AudienceUserCellProps) {
   const getSecondaryLabel = () => {
-    if (type === 'anonymous') return null;
+    if (type === 'anonymous') {
+      return formatAnonymousVisitorLabel(deviceType, geoCity, geoCountry);
+    }
     if (type === 'email') return 'Email Subscriber';
     if (type === 'sms') return 'SMS Subscriber';
     return 'Connected fan';
