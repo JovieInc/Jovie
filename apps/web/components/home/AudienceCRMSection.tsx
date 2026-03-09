@@ -37,6 +37,7 @@ function TableSkeleton() {
 
       {/* Column headers skeleton */}
       <div className='flex items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
+        {/* biome-ignore lint/suspicious/noArrayIndexKey: static skeleton */}
         {['w-16', 'w-12', 'w-16', 'w-14', 'w-20', 'w-10'].map((width, i) => (
           <div
             key={`col-${width}-${i}`}
@@ -46,6 +47,7 @@ function TableSkeleton() {
       </div>
 
       {/* Row skeletons */}
+      {/* biome-ignore lint/suspicious/noArrayIndexKey: static skeleton */}
       {Array.from({ length: 5 }, (_, i) => (
         <div
           key={`row-${i}`}
