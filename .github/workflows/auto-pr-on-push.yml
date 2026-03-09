@@ -48,7 +48,7 @@ jobs:
           # When 50 Codex branches push simultaneously, this spreads PR creation
           # over ~2 minutes instead of all hitting at once.
           HASH=$(echo -n "$BRANCH" | md5sum | tr -d -c '0-9' | head -c 8)
-          DELAY=$((HASH % 120))
+          DELAY=$((10#$HASH % 120))
           echo "Stagger delay for $BRANCH: ${DELAY}s (hash-based)"
           sleep $DELAY
       - name: Generate Jovie Bot token
