@@ -76,7 +76,12 @@ export const membersQuerySchema = z.object({
   sort: memberSortSchema.default('lastSeen'),
   /** Sort direction */
   direction: sortDirectionSchema.default('desc'),
-  /** Page number (1-indexed) */
+  /**
+   * Opaque keyset cursor returned by the previous page response.
+   * When present, keyset pagination is used instead of OFFSET (JOV-1263).
+   */
+  cursor: z.string().optional(),
+  /** @deprecated Use `cursor` instead. Kept for backward-compatibility. */
   page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
   /** Items per page (1-100) */
   pageSize: z.preprocess(
