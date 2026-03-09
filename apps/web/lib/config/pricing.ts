@@ -6,7 +6,7 @@ export const PRICING = {
   founding: {
     monthly: {
       priceId: env.STRIPE_PRICE_FOUNDING_MONTHLY,
-      amount: 900,
+      amount: 1200,
       label: 'Founding Member',
       entitlementPlan: 'pro',
       billingTier: 'founding',
