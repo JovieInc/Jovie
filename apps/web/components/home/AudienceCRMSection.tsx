@@ -86,7 +86,7 @@ export function AudienceCRMSection() {
           height: '500px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(20% 0.02 260 / 0.2), transparent 70%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.15), transparent 65%)',
         }}
       />
 
@@ -118,8 +118,11 @@ export function AudienceCRMSection() {
               style={{
                 border: '1px solid var(--linear-border-subtle)',
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                boxShadow:
-                  'var(--linear-shadow-card-elevated), 0 0 80px rgba(0,0,0,0.3)',
+                boxShadow: [
+                  '0 0 0 1px rgba(255,255,255,0.03)',
+                  '0 8px 40px rgba(0,0,0,0.35)',
+                  '0 24px 80px rgba(0,0,0,0.25)',
+                ].join(', '),
               }}
             >
               {/* Shine border overlay */}
@@ -128,6 +131,16 @@ export function AudienceCRMSection() {
                 className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
                 style={{
                   border: '1px solid rgba(255,255,255,0.04)',
+                }}
+              />
+
+              {/* Top edge highlight — Linear glass reflection */}
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
+                style={{
+                  background:
+                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
                 }}
               />
 
@@ -169,8 +182,8 @@ export function AudienceCRMSection() {
                 ))}
               </div>
 
-              {/* Real audience table (lazy-loaded) */}
-              <div className='relative min-h-[320px]'>
+              {/* Real audience table (lazy-loaded, clipped to ~5 visible rows) */}
+              <div className='relative max-h-[360px] overflow-hidden'>
                 <Suspense fallback={<TableSkeleton />}>
                   <DemoAudienceSection />
                 </Suspense>
