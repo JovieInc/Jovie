@@ -37,20 +37,25 @@ function TableSkeleton() {
 
       {/* Column headers skeleton */}
       <div className='flex items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
-        {/* biome-ignore lint/suspicious/noArrayIndexKey: static skeleton */}
-        {['w-16', 'w-12', 'w-16', 'w-14', 'w-20', 'w-10'].map((width, i) => (
+        {[
+          { id: 'col-name', w: 'w-16' },
+          { id: 'col-email', w: 'w-12' },
+          { id: 'col-source', w: 'w-16' },
+          { id: 'col-date', w: 'w-14' },
+          { id: 'col-location', w: 'w-20' },
+          { id: 'col-status', w: 'w-10' },
+        ].map(({ id, w }) => (
           <div
-            key={`col-${width}-${i}`}
-            className={`h-3 ${width} rounded bg-[var(--linear-bg-surface-2)]`}
+            key={id}
+            className={`h-3 ${w} rounded bg-[var(--linear-bg-surface-2)]`}
           />
         ))}
       </div>
 
       {/* Row skeletons */}
-      {/* biome-ignore lint/suspicious/noArrayIndexKey: static skeleton */}
-      {Array.from({ length: 5 }, (_, i) => (
+      {['row-a', 'row-b', 'row-c', 'row-d', 'row-e'].map((id, i) => (
         <div
-          key={`row-${i}`}
+          key={id}
           className='flex items-center gap-4 px-5 py-3'
           style={{
             borderBottom:
