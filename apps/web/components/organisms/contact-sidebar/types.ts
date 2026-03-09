@@ -23,9 +23,6 @@ export interface ContactSidebarProps {
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   readonly onContactChange?: (contact: Contact) => void;
-  readonly onSave?: (
-    contact: Contact
-  ) => void | Promise<void> | Promise<boolean>;
   /**
    * Optional externally provided drawer actions.
    * When omitted, the sidebar falls back to its built-in actions.

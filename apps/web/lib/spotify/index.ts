@@ -16,6 +16,7 @@ export {
 } from './circuit-breaker';
 // Client and API functions
 export {
+  getPlaylistArtistIds,
   getSpotifyArtist,
   getSpotifyArtistsBatch,
   isSpotifyAvailable,

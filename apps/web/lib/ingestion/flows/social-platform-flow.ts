@@ -220,7 +220,7 @@ export async function createNewSocialProfile(
   // For Spotify artist IDs, use the fetched artist name if available
   const displayName =
     spotifyArtistName ||
-    (handle.startsWith('artist-') && platformId === 'spotify'
+    (handle.startsWith('artist_') && platformId === 'spotify'
       ? platformName
       : handle);
 

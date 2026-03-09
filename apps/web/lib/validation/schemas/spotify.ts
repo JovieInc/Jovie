@@ -161,6 +161,69 @@ export type SpotifyOAuthCallbackParams = z.infer<
 >;
 
 // ============================================================================
+// Playlist Validation
+// ============================================================================
+
+/**
+ * Spotify playlist IDs are 22 characters, base62 encoded.
+ *
+ * @example "37i9dQZF1DXcBWIGoYBM5M" (Today's Top Hits)
+ */
+export const spotifyPlaylistIdSchema = z
+  .string()
+  .regex(/^[0-9A-Za-z]{22}$/, 'Invalid Spotify playlist ID');
+
+/**
+ * Inferred TypeScript type for Spotify playlist IDs.
+ */
+export type SpotifyPlaylistId = z.infer<typeof spotifyPlaylistIdSchema>;
+
+/**
+ * Regex to extract playlist ID from a Spotify URL.
+ * Matches: https://open.spotify.com/playlist/{id}?si=...
+ */
+const SPOTIFY_PLAYLIST_URL_REGEX =
+  /^https?:\/\/(?:open\.)?spotify\.com\/playlist\/([0-9A-Za-z]{22})/;
+
+/**
+ * Playlist extraction input schema.
+ *
+ * Accepts either a raw playlist ID or a full Spotify playlist URL.
+ * The transform normalizes the input to a validated playlist ID.
+ */
+export const playlistExtractionSchema = z
+  .object({
+    playlistInput: z
+      .string()
+      .min(1, 'Playlist input required')
+      .max(300, 'Input too long'),
+  })
+  .transform((val, ctx) => {
+    const input = val.playlistInput.trim();
+
+    // Try to extract from URL first
+    const urlMatch = input.match(SPOTIFY_PLAYLIST_URL_REGEX);
+    const rawId = urlMatch ? urlMatch[1] : input;
+
+    const parsed = spotifyPlaylistIdSchema.safeParse(rawId);
+    if (!parsed.success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          'Invalid Spotify playlist URL or ID. Expected a playlist URL (https://open.spotify.com/playlist/...) or a 22-character playlist ID.',
+      });
+      return z.NEVER;
+    }
+
+    return { playlistId: parsed.data };
+  });
+
+/**
+ * Inferred TypeScript type for playlist extraction input.
+ */
+export type PlaylistExtractionInput = z.infer<typeof playlistExtractionSchema>;
+
+// ============================================================================
 // Optional Schemas
 // ============================================================================
 
@@ -229,3 +292,11 @@ export const validateArtistSearchQuery = createValidator(
  * @returns Object with success status and error message if invalid
  */
 export const validateHandle = createValidator(handleSchema);
+
+/**
+ * Validate a Spotify playlist ID or URL.
+ *
+ * @param value - The playlist ID or URL to validate
+ * @returns Object with success status and extracted playlist ID
+ */
+export const validatePlaylistInput = createValidator(playlistExtractionSchema);

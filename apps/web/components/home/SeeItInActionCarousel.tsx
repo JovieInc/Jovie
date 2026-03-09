@@ -87,47 +87,53 @@ export function SeeItInActionCarousel({ creators }: Props) {
   return (
     <section
       ref={sectionRef}
-      className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'
+      className='section-spacing-linear-sm overflow-hidden bg-[var(--linear-bg-page)]'
     >
       {/* Gradient separator */}
       <div
         aria-hidden='true'
-        className='mb-20 h-px max-w-lg mx-auto'
+        className='mb-12 h-px max-w-lg mx-auto'
         style={{
           background:
-            'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
-      <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-container-max)] mx-auto heading-gap-linear'>
-        <h2 className='text-center marketing-h2-linear text-[var(--linear-text-primary)]'>
-          See it in action
-        </h2>
+      <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-content-max)] mx-auto'>
+        <div className='flex flex-col items-center text-center gap-5'>
+          <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+            See it in action
+          </h2>
+          <p className='max-w-md marketing-lead-linear text-[var(--linear-text-secondary)]'>
+            Real profiles, real artists. Scroll through to see how creators use
+            Jovie.
+          </p>
+        </div>
       </div>
 
-      <div className='relative mt-12'>
-        {/* Fade edges for premium feel */}
+      <div className='relative mt-14'>
+        {/* Fade edges */}
         <div
-          className='absolute left-0 top-0 bottom-0 w-32 z-10 pointer-events-none'
+          className='absolute left-0 top-0 bottom-0 w-40 z-10 pointer-events-none'
           style={{
             background:
               'linear-gradient(to right, var(--linear-bg-page), transparent)',
           }}
         />
         <div
-          className='absolute right-0 top-0 bottom-0 w-32 z-10 pointer-events-none'
+          className='absolute right-0 top-0 bottom-0 w-40 z-10 pointer-events-none'
           style={{
             background:
               'linear-gradient(to left, var(--linear-bg-page), transparent)',
           }}
         />
 
-        {/* Scrolling track - driven by page scroll */}
+        {/* Scrolling track — scroll-driven */}
         <div
           className='flex will-change-transform motion-reduce:transform-none'
           style={{
             width: 'max-content',
-            gap: 'var(--linear-gap-cards)',
+            gap: '16px',
             transform: `translateX(-${scrollOffset}px)`,
             transition: isVisible ? 'transform 0.1s linear' : 'none',
           }}
@@ -135,44 +141,51 @@ export function SeeItInActionCarousel({ creators }: Props) {
           {extendedCreators.map((creator, index) => (
             <div
               key={`${creator.id}-${index}`}
-              className='relative flex flex-col gap-3 group'
+              className='relative flex flex-col group'
             >
               <div
-                className='relative w-[220px] h-[300px] shrink-0 overflow-hidden rounded-2xl'
+                className='relative w-[200px] h-[280px] shrink-0 overflow-hidden rounded-xl'
                 style={{
-                  boxShadow:
-                    'var(--linear-shadow-card-elevated), 0 0 40px rgba(0,0,0,0.2)',
+                  boxShadow: [
+                    '0 0 0 1px rgba(255,255,255,0.03)',
+                    '0 8px 40px rgba(0,0,0,0.35)',
+                    '0 24px 80px rgba(0,0,0,0.25)',
+                  ].join(', '),
                 }}
               >
                 <Image
                   src={creator.src}
-                  alt={`${creator.name}'s avatar`}
+                  alt={`${creator.name}'s profile`}
                   fill
                   sizes='200px'
                   placeholder='blur'
                   blurDataURL={BLUR_DATA_URL}
                   loading={index < 12 ? 'eager' : 'lazy'}
-                  className='object-cover transition-transform duration-500 group-hover:scale-105'
+                  className='object-cover'
                 />
-                {/* Gradient overlay to make text readable */}
-                <div className='absolute inset-0 bg-linear-to-t from-black/80 via-black/10 to-transparent opacity-50 transition-opacity duration-300 group-hover:opacity-75' />
 
-                {/* Profile info overlay */}
-                <div className='absolute bottom-0 left-0 w-full p-4 flex flex-col gap-1'>
-                  <span className='text-[var(--linear-text-inverse)] font-[var(--linear-font-weight-medium)] text-[var(--linear-body-size)] truncate drop-shadow-md'>
-                    {creator.name}
-                  </span>
-                  {creator.tagline && (
-                    <span className='text-[var(--linear-text-inverse)]/80 text-[var(--linear-label-size)] truncate'>
-                      {creator.tagline}
-                    </span>
-                  )}
-                </div>
-
-                {/* Inner border for premium feel */}
+                {/* Subtle vignette */}
                 <div
-                  className='absolute inset-0 rounded-2xl pointer-events-none'
-                  style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                  className='absolute inset-0 pointer-events-none'
+                  style={{
+                    background:
+                      'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.3) 100%)',
+                  }}
+                />
+
+                {/* Glass edge — shine border */}
+                <div
+                  className='absolute inset-0 rounded-xl pointer-events-none'
+                  style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+                />
+
+                {/* Top edge highlight */}
+                <div
+                  className='absolute inset-x-0 top-0 h-px pointer-events-none'
+                  style={{
+                    background:
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.10) 30%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.10) 70%, transparent)',
+                  }}
                 />
               </div>
             </div>

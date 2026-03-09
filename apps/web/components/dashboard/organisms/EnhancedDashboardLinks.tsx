@@ -205,6 +205,11 @@ export function EnhancedDashboardLinks({
 
   // Sync preview data
   useEffect(() => {
+    const spotifyConnected = !!selectedProfile?.spotifyId;
+    const spotifyArtistName =
+      ((selectedProfile?.settings as Record<string, unknown> | null)
+        ?.spotifyArtistName as string | null) ?? null;
+    const appleMusicConnected = !!selectedProfile?.appleMusicId;
     setPreviewData({
       username,
       displayName,
@@ -214,8 +219,8 @@ export function EnhancedDashboardLinks({
       links: dashboardLinks,
       profilePath,
       dspConnections: {
-        spotify: { connected: false, artistName: null },
-        appleMusic: { connected: false, artistName: null },
+        spotify: { connected: spotifyConnected, artistName: spotifyArtistName },
+        appleMusic: { connected: appleMusicConnected, artistName: null },
       },
     });
   }, [
@@ -225,6 +230,9 @@ export function EnhancedDashboardLinks({
     profilePath,
     selectedProfile?.bio,
     selectedProfile?.genres,
+    selectedProfile?.spotifyId,
+    selectedProfile?.appleMusicId,
+    selectedProfile?.settings,
     setPreviewData,
     username,
   ]);
