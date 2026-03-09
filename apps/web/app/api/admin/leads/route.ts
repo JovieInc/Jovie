@@ -19,6 +19,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export const runtime = 'nodejs';
 
+function toIsoStringOrNull(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
@@ -78,9 +82,28 @@ export async function GET(request: NextRequest) {
       db.select({ count: count() }).from(leads).where(where),
     ]);
 
+    const normalizedItems = items.map(item => ({
+      ...item,
+      hasSpotifyLink: item.hasSpotifyLink ?? false,
+      hasInstagram: item.hasInstagram ?? false,
+      musicToolsDetected: item.musicToolsDetected ?? [],
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
+      qualifiedAt: toIsoStringOrNull(item.qualifiedAt),
+      disqualifiedAt: toIsoStringOrNull(item.disqualifiedAt),
+      approvedAt: toIsoStringOrNull(item.approvedAt),
+      ingestedAt: toIsoStringOrNull(item.ingestedAt),
+      rejectedAt: toIsoStringOrNull(item.rejectedAt),
+      latestReleaseDate: toIsoStringOrNull(item.latestReleaseDate),
+      scrapedAt: toIsoStringOrNull(item.scrapedAt),
+      outreachQueuedAt: toIsoStringOrNull(item.outreachQueuedAt),
+      claimTokenExpiresAt: toIsoStringOrNull(item.claimTokenExpiresAt),
+      dmSentAt: toIsoStringOrNull(item.dmSentAt),
+    }));
+
     return NextResponse.json(
       {
-        items,
+        items: normalizedItems,
         total: totalRow?.count ?? 0,
         page: query.page,
         limit: query.limit,
