@@ -42,7 +42,7 @@ export interface AudienceServerData {
   mode: AudienceMode;
   view: AudienceView;
   rows: AudienceServerRow[];
-  /** Exact page-scoped count. Null when the COUNT query was skipped for performance. */
+  /** Null — exact COUNT queries are skipped per JOV-1262/JOV-1264. Use hasMore/nextCursor for pagination. */
   total: number | null;
   page: number;
   pageSize: number;
@@ -52,9 +52,9 @@ export interface AudienceServerData {
   nextCursor: string | null;
   /** True when more rows exist beyond the current page. */
   hasMore: boolean;
-  /** Total subscriber count. Null when the COUNT query was skipped for performance. */
+  /** Null — exact COUNT queries are skipped per JOV-1262 to avoid per-page DB overhead. */
   subscriberCount: number | null;
-  /** Total audience member count. Null when the COUNT query was skipped for performance. */
+  /** Null — exact COUNT queries are skipped per JOV-1262 to avoid per-page DB overhead. */
   totalAudienceCount: number | null;
 }
 
@@ -718,9 +718,9 @@ export async function getAudienceServerData(params: {
       { includeDetails, memberId, segments }
     );
 
-    // Exact subscriber/audience counts are omitted per JOV-1262/JOV-1264 —
+    // Exact subscriber/audience counts are omitted per JOV-1262 —
     // running COUNT(*) on every page load adds avoidable DB overhead.
-    // Callers use hasMore / nextCursor for pagination state instead.
+    // Clients use hasMore/nextCursor for pagination state instead.
     return {
       ...data,
       view,
