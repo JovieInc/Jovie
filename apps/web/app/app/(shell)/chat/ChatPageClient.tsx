@@ -122,7 +122,13 @@ export function ChatPageClient({
         },
       },
     });
-  }, [selectedProfile, previewLinks, setPreviewData, appleMusicConnected, appleMusicArtistName]);
+  }, [
+    selectedProfile,
+    previewLinks,
+    setPreviewData,
+    appleMusicConnected,
+    appleMusicArtistName,
+  ]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
     onSuccess: () => notifications.success('Session ID copied'),
