@@ -28,33 +28,33 @@ interface ModeData {
 const MODES: ModeData[] = [
   {
     id: 'profile',
-    headline: 'Capture every visitor.',
+    headline: 'Make every tap feel intentional.',
     description:
-      'First-time visitors see a notification opt-in. Return visitors see their preferred action. Every visit builds your audience.',
-    stat: { value: '342', label: 'emails captured this month' },
+      'First-time visitors can join your list. Returning fans see the action they are most likely to take next. The profile adapts instead of making everyone hunt.',
+    stat: { value: '342', label: 'new fan contacts this month' },
     slug: '',
   },
   {
     id: 'tour',
-    headline: 'Fill every show.',
+    headline: 'Put the nearest show first.',
     description:
-      'A fan in LA taps your link. Jovie surfaces the nearest show with a ticket button — not a list of 30 cities, just theirs.',
+      'A fan in Los Angeles should not scroll through 30 cities. Jovie can surface the closest date and ticket button first.',
     stat: { value: '847', label: 'ticket clicks this month' },
     slug: 'tour',
   },
   {
     id: 'tip',
-    headline: 'Turn fans into supporters.',
+    headline: 'Turn the merch table into revenue.',
     description:
-      'Someone scans the QR at your merch table. Jovie shows a one-tap tip flow — Venmo, Cash App, whatever they have. Average tip: $7.',
+      'When someone scans your QR code after a set, Jovie can open the fastest tip flow available instead of another menu of links.',
     stat: { value: '$1,204', label: 'in tips this month' },
     slug: 'tip',
   },
   {
     id: 'listen',
-    headline: 'Direct streams to every platform.',
+    headline: 'Open the right streaming app.',
     description:
-      'A new listener taps your link. Jovie detects their platform and opens Spotify, Apple Music, or YouTube — no choice paralysis, just plays.',
+      'A new listener taps once. Jovie can route them to Spotify, Apple Music, or YouTube Music without making them choose from a grid first.',
     stat: { value: '3,421', label: 'platform clicks this month' },
     slug: 'listen',
   },
@@ -316,7 +316,7 @@ export function DeeplinksGrid() {
                 <div className='flex flex-col gap-6'>
                   {/* Section label */}
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                    AI Personalization
+                    Adaptive fan paths
                   </span>
 
                   {/* Dynamic headline */}
