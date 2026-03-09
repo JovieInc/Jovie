@@ -135,11 +135,15 @@ async function globalSetup() {
   console.log('🔥 Warming up Turbopack routes...');
   const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
   const warmupRoutes = [
+    '/',
     '/signin',
     APP_ROUTES.DASHBOARD_PROFILE,
     `/${testProfile}`,
     `/${testProfile}?mode=listen`,
     `/${testProfile}?mode=tip`,
+    '/app/admin',
+    '/app/admin/creators',
+    '/app/admin/users',
   ];
   await Promise.all(
     warmupRoutes.map(async route => {

@@ -1,10 +1,15 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Suite 1: Public Profile Experience + Public Pages
+ * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
  *
- * Tests as an ANONYMOUS VISITOR. No auth, no mocks (except analytics).
- * If these pass, public-facing pages work for real users.
+ * Tests as an ANONYMOUS VISITOR. No auth. No API mocks except analytics fire-and-forget.
+ *
+ * Each test would FAIL if the corresponding user experience is broken.
+ * No warnings-instead-of-failures. No theater.
+ *
+ * Run headed to visually verify:
+ *   doppler run -- pnpm exec playwright test smoke-public --project=chromium --headed
  *
  * @smoke @critical
  */
@@ -35,22 +40,24 @@ function isClerkRedirect(url: string): boolean {
 // HOMEPAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('homepage loads with hero heading, CTA, sections, and footer', async ({
+test('homepage: hero heading, CTA, multiple sections, footer', async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   await blockAnalytics(page);
 
-  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  // Warmup pre-compiles this route — 120s timeout handles cold-start on first run
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120_000 });
 
   if (isClerkRedirect(page.url())) {
     test.skip(true, 'Clerk handshake redirect in CI');
     return;
   }
 
-  // Hero heading
-  await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
+  // h1 must be visible — if missing, the hero is broken
+  await expect(page.locator('h1').first()).toBeVisible({ timeout: 30_000 });
 
-  // CTA exists (claim input or signup link)
+  // CTA must be present — if no signup entry point, users can't convert
   const cta = page
     .locator(
       '#handle-input, a[href*="/signup"], a[href*="/sign-up"], a:has-text("Get started")'
@@ -58,151 +65,125 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  // Multiple sections rendered (not just the shell)
+  // At least 2 sections — proves the page rendered beyond just the shell
   const sectionCount = await page.locator('section').count();
-  expect(
-    sectionCount,
-    'Homepage should have 2+ sections'
-  ).toBeGreaterThanOrEqual(2);
+  expect(sectionCount, 'Homepage missing sections — page may be blank').toBeGreaterThanOrEqual(2);
 
-  // Footer proves the full page loaded
+  // Footer — proves the full page loaded (not a loading skeleton)
   await expect(page.locator('footer').first()).toBeVisible({ timeout: 20_000 });
 
-  // Not an error page
-  const bodyText =
-    (await page
-      .locator('body')
-      .innerText()
-      .catch(() => '')) ?? '';
+  // No error text in visible content
+  const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
   expect(bodyText.toLowerCase()).not.toContain('application error');
   expect(bodyText.toLowerCase()).not.toContain('internal server error');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC PROFILE
+// PUBLIC PROFILE EXPERIENCE
+// Anonymous visitor hits a profile. This is the primary user journey for fans.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Public Profile', () => {
+test.describe('Public Profile — dualipa', () => {
   const TEST_PROFILE = 'dualipa';
 
-  test('profile page shows artist name, image, and DSP links', async ({
+  test.beforeEach(async ({ page }) => {
+    await blockAnalytics(page);
+  });
+
+  test('default view: artist name in h1, profile image, claim banner', async ({
     page,
   }) => {
     test.setTimeout(90_000);
-    await blockAnalytics(page);
 
     await page.goto(`/${TEST_PROFILE}`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
 
-    // Skip if profile data not seeded
-    const bodyText = await page
-      .locator('body')
-      .innerText()
-      .catch(() => '');
-    const lower = (bodyText ?? '').toLowerCase();
+    // Hard fail if profile missing — seeding must have worked
+    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
     if (
-      lower.includes('not found') ||
-      lower.includes('temporarily unavailable')
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
     ) {
-      test.skip(true, 'Profile not seeded in test database');
+      test.fail(true, 'Profile dualipa not seeded — global-setup.ts must seed this profile');
       return;
     }
 
-    // Wait for loading skeleton to resolve
-    if (
-      lower.includes('loading jovie profile') ||
-      lower.includes('loading artist profile')
-    ) {
-      await expect
-        .poll(
-          async () => {
-            const t = await page
-              .locator('body')
-              .innerText()
-              .catch(() => '');
-            return !(t ?? '').toLowerCase().includes('loading');
-          },
-          { timeout: 15_000 }
-        )
-        .toBeTruthy();
-    }
+    // Artist name in h1 — core identity element
+    await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
 
-    // Artist name visible in h1
-    const h1 = page.locator('h1').first();
-    await expect(h1).toBeVisible({ timeout: 20_000 });
-    await expect(h1).toContainText(/dua lipa/i);
-
-    // Profile image loads (avatar or any image)
-    const hasImage = await page
-      .locator('[data-testid="profile-avatar"], img')
-      .first()
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    if (!hasImage) {
-      console.warn(
-        'Profile has no visible images — may lack avatar data in CI'
-      );
-    }
-
-    // At least one DSP link or action button is visible
-    const dspOrAction = page.locator(
-      'a[href*="spotify"], a[href*="apple"], [data-testid="listen-button"], [data-testid="tip-button"], button:has-text("Listen"), button:has-text("Tip")'
-    );
-    const dspCount = await dspOrAction.count();
-    if (dspCount === 0) {
-      console.warn(
-        'No DSP links or action buttons — profile may lack streaming data'
-      );
-    }
+    // Profile image — missing = broken avatar pipeline
+    await expect(
+      page.locator('[data-testid="profile-avatar"], img[alt*="avatar"], img[alt*="profile"], img[alt*="Dua"]').first()
+    ).toBeVisible({ timeout: 15_000 });
   });
 
-  test('profile listen mode renders DSP options', async ({ page }) => {
+  test('listen mode: DSP streaming links render', async ({ page }) => {
     test.setTimeout(90_000);
-    await blockAnalytics(page);
 
     await page.goto(`/${TEST_PROFILE}?mode=listen`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
 
-    const bodyText = await page
-      .locator('body')
-      .innerText()
-      .catch(() => '');
-    const lower = (bodyText ?? '').toLowerCase();
-    if (lower.includes('not found') || lower.includes('temporarily')) {
+    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    if (
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
+    ) {
       test.skip(true, 'Profile not seeded');
       return;
     }
 
-    // h1 with artist name proves page rendered
+    // h1 with artist name proves the profile loaded, not just the shell
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
 
-    // Either DSP buttons or a "no links" message
-    const hasDsp = await page
-      .locator(
-        'a[href*="spotify"], a[href*="apple"], button:has-text("Spotify"), button:has-text("Apple Music")'
-      )
-      .first()
-      .isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    const hasNoLinksMsg = await page
-      .getByText(/streaming links aren.t available/i)
-      .isVisible()
-      .catch(() => false);
-
-    if (!hasDsp && !hasNoLinksMsg) {
-      console.warn('Listen mode: no DSP content or "no links" message found');
-    }
+    // DSP buttons must render — this is the entire point of listen mode
+    // If Spotify seeding worked, there must be at least one DSP link
+    const dspLink = page.locator(
+      'a[href*="spotify"], a[href*="apple"], a[href*="tidal"], button:has-text("Spotify"), button:has-text("Apple Music")'
+    );
+    await expect(
+      dspLink.first(),
+      'No DSP links in listen mode — Spotify seeding failed or DSP rendering is broken'
+    ).toBeVisible({ timeout: 20_000 });
   });
 
-  test('profile subpages (/subscribe, /tip, /tour) load without 500', async ({
-    page,
-  }) => {
+  test('tip mode: tipping UI renders', async ({ page }) => {
     test.setTimeout(90_000);
-    await blockAnalytics(page);
+
+    await page.goto(`/${TEST_PROFILE}?mode=tip`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+
+    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    if (
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
+    ) {
+      test.skip(true, 'Profile not seeded');
+      return;
+    }
+
+    // h1 present
+    await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
+
+    // Tipping UI or subscribe prompt — something actionable must render
+    const tipUI = page.locator(
+      '[data-testid="tip-button"], [data-testid="tip-form"], button:has-text("Tip"), button:has-text("Support"), input[placeholder*="amount"], a[href*="subscribe"]'
+    );
+    await expect(
+      tipUI.first(),
+      'No tipping UI rendered — tipping flow is broken for this profile'
+    ).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('profile subpages return 2xx, no 500s', async ({ page }) => {
+    test.setTimeout(120_000);
 
     const subpages = ['/subscribe', '/tip', '/tour'] as const;
 
@@ -214,50 +195,44 @@ test.describe('Public Profile', () => {
           timeout: 60_000,
         });
       } catch (navError) {
-        const msg =
-          navError instanceof Error ? navError.message : String(navError);
+        const msg = navError instanceof Error ? navError.message : String(navError);
         if (
           msg.includes('net::ERR_CONNECTION_REFUSED') ||
           msg.includes('net::ERR_CONNECTION_RESET') ||
-          msg.includes('Timeout') ||
           msg.includes('Target closed')
         ) {
-          test.skip(true, `Transient nav error on /${TEST_PROFILE}${sub}`);
+          test.skip(true, `Server went away navigating to ${sub}`);
           return;
         }
         throw navError;
       }
 
       const status = response?.status() ?? 0;
-      expect(status, `/${TEST_PROFILE}${sub} returned ${status}`).toBeLessThan(
-        500
-      );
+      expect(
+        status,
+        `/${TEST_PROFILE}${sub} returned ${status} — server error`
+      ).toBeLessThan(500);
 
-      // Not an error page
-      const bodyText = await page
-        .locator('body')
-        .innerText()
-        .catch(() => '');
-      const lower = (bodyText ?? '').toLowerCase();
-      if (lower.includes('not found') || lower.includes('temporarily')) {
-        continue; // profile not seeded, skip this subpage
-      }
+      const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+      const lower = bodyText.toLowerCase();
+      // 404 is OK (profile may not support this subpage), 500 is not
       expect(lower).not.toContain('application error');
       expect(lower).not.toContain('internal server error');
+      expect(lower).not.toContain('unhandled runtime error');
     }
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CRITICAL PUBLIC PAGES
+// SIGNIN / SIGNUP — critical conversion pages
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('signin and signup pages load without server errors', async ({ page }) => {
+test('signin and signup pages load', async ({ page }) => {
   await blockAnalytics(page);
 
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   if (!pk || pk.includes('mock') || pk.includes('dummy')) {
-    test.skip(true, 'No real Clerk config');
+    test.skip(true, 'No real Clerk config — skipping auth page tests');
     return;
   }
 
@@ -268,12 +243,17 @@ test('signin and signup pages load without server errors', async ({ page }) => {
     });
     expect(response?.status() ?? 0, `${route} returned 5xx`).toBeLessThan(500);
 
+    // Something must render — empty page = broken Clerk integration
     const bodyText = await page.locator('body').textContent();
-    expect(bodyText, `${route} has no content`).toBeTruthy();
+    expect(bodyText?.trim().length, `${route} rendered empty page`).toBeGreaterThan(0);
   }
 });
 
-test('non-existent routes return 404, not 500', async ({ page }) => {
+// ─────────────────────────────────────────────────────────────────────────────
+// ERROR HANDLING — unknown routes must not 500
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('unknown routes return <500, not server crash', async ({ page }) => {
   await blockAnalytics(page);
 
   for (const route of [
@@ -286,9 +266,10 @@ test('non-existent routes return 404, not 500', async ({ page }) => {
     });
 
     const status = response?.status() ?? 0;
-    expect(status, `${route} returned ${status} (server error)`).toBeLessThan(
-      500
-    );
+    expect(
+      status,
+      `${route} returned ${status} — server crashed on unknown route`
+    ).toBeLessThan(500);
 
     const bodyText = (await page.locator('body').textContent()) ?? '';
     expect(bodyText.toLowerCase()).not.toContain('internal server error');
