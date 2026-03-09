@@ -6,33 +6,32 @@ import { captureWarning } from '@/lib/error-tracking';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+let _cachedBuildId: string | undefined;
+
 export function GET() {
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
   const environment = process.env.VERCEL_ENV;
 
-  try {
-    const buildId = readFileSync(
-      join(process.cwd(), '.next/BUILD_ID'),
-      'utf-8'
-    ).trim();
-
-    return NextResponse.json({
-      buildId,
-      version,
-      deployedAt: process.env.VERCEL_DEPLOYMENT_TIME || Date.now(),
-      commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7),
-      environment,
-    });
-  } catch (error) {
-    void captureWarning('Build info health check failed', error, {
-      service: 'build-info',
-      route: '/api/health/build-info',
-    });
-    return NextResponse.json({
-      buildId: 'unknown',
-      version,
-      deployedAt: Date.now(),
-      environment,
-    });
+  if (_cachedBuildId === undefined) {
+    try {
+      _cachedBuildId = readFileSync(
+        join(process.cwd(), '.next/BUILD_ID'),
+        'utf-8'
+      ).trim();
+    } catch (error) {
+      void captureWarning('Build info health check failed', error, {
+        service: 'build-info',
+        route: '/api/health/build-info',
+      });
+      _cachedBuildId = 'unknown';
+    }
   }
+
+  return NextResponse.json({
+    buildId: _cachedBuildId,
+    version,
+    deployedAt: process.env.VERCEL_DEPLOYMENT_TIME || Date.now(),
+    commitSha: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7),
+    environment,
+  });
 }

@@ -8,7 +8,7 @@ import {
   SimpleTooltip,
 } from '@jovie/ui';
 import { ArrowUp, ImagePlus, Loader2, Mic, MicOff, Plus } from 'lucide-react';
-import { forwardRef, useCallback, useState } from 'react';
+import { forwardRef, useCallback, useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -178,14 +178,28 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
 
+    // Snapshot of the input value at the moment dictation starts, so that the
+    // in-session transcript is appended rather than replacing existing text.
+    const dictationBaselineRef = useRef('');
+
     // Voice dictation via Web Speech API
     const {
       isSupported: hasDictation,
       isListening,
       toggle: toggleDictation,
     } = useSpeechRecognition({
-      onTranscript: text => onChange(text),
+      onTranscript: sessionTranscript => {
+        onChange(dictationBaselineRef.current + sessionTranscript);
+      },
     });
+
+    const handleMicToggle = useCallback(() => {
+      if (!isListening) {
+        // Capture the current input value as the baseline before recording.
+        dictationBaselineRef.current = value;
+      }
+      toggleDictation();
+    }, [isListening, toggleDictation, value]);
 
     const handleFormSubmit = useCallback(
       (e: React.FormEvent) => {
@@ -289,7 +303,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 <button
                   type='button'
                   onMouseDown={handleMouseDown}
-                  onClick={toggleDictation}
+                  onClick={handleMicToggle}
                   disabled={isLoading || isSubmitting}
                   className={cn(
                     'flex shrink-0 items-center justify-center rounded-full transition-colors',

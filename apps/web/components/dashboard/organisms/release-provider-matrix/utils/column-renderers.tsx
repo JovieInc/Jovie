@@ -258,9 +258,10 @@ export function createRightMetaCellRenderer(
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
-    const year = release.releaseDate
+    const rawYear = release.releaseDate
       ? new Date(release.releaseDate).getFullYear()
       : null;
+    const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
     return (
       <div className='grid min-w-[260px] grid-cols-[minmax(0,220px)_48px] items-center justify-end gap-x-4 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
@@ -273,7 +274,7 @@ export function createRightMetaCellRenderer(
         </div>
 
         <span className='hidden w-12 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
-          {year ?? '—'}
+          {year ?? 'Unknown'}
         </span>
       </div>
     );
@@ -474,9 +475,10 @@ export function renderStatsCell({
   row,
 }: CellContext<ReleaseViewModel, unknown>) {
   const release = row.original;
-  const year = release.releaseDate
+  const rawYear = release.releaseDate
     ? new Date(release.releaseDate).getFullYear()
     : null;
+  const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
   return (
     <div className='flex items-center gap-2 text-[13px] text-secondary-token tabular-nums'>
@@ -486,7 +488,7 @@ export function renderStatsCell({
       </div>
 
       {/* Year - fixed width, right aligned */}
-      <span className='w-10 text-right'>{year ?? '—'}</span>
+      <span className='w-10 text-right'>{year ?? 'Unknown'}</span>
     </div>
   );
 }
