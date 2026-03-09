@@ -22,8 +22,19 @@ function formatUsd(value: number): string {
 function formatRunway(months: number | null, stripeAvailable: boolean): string {
   if (!stripeAvailable) return '--';
   if (months === null) return 'Infinite';
-  if (months === 0) return 'N/A';
+  if (months === 0) return 'No balance';
   return `${months.toFixed(1)}mo`;
+}
+
+function runwaySubtitle(
+  months: number | null,
+  stripeAvailable: boolean,
+  mrrDisplay: string
+): string {
+  if (!stripeAvailable) return '--';
+  if (months === null) return 'Revenue covers burn';
+  if (months === 0) return 'Add bank balance to calculate';
+  return `at ${mrrDisplay}/mo revenue`;
 }
 
 interface MetricCardProps {
@@ -100,7 +111,11 @@ export function FunnelMetricsStrip({
       <MetricCard
         title='Runway'
         value={runwayDisplay}
-        subtitle={mrrDisplay !== '--' ? `at ${mrrDisplay}/mo revenue` : '--'}
+        subtitle={runwaySubtitle(
+          metrics.runwayMonths,
+          metrics.stripeAvailable,
+          mrrDisplay
+        )}
         icon={Timer}
         iconClassName='text-warning'
       />
