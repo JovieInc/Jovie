@@ -72,9 +72,8 @@ export interface DashboardAudienceClientProps {
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
-  readonly filters: AudienceFilters;
-  readonly anonymousCount: number;
   readonly totalAudienceCount: number;
+  readonly filters: AudienceFilters;
   readonly tourDates?: TourDateForMatching[];
 }
 
@@ -129,13 +128,12 @@ export function DashboardAudienceClient({
   profileUrl,
   profileId,
   subscriberCount,
-  filters: initialFilters,
-  anonymousCount,
   totalAudienceCount,
+  filters: initialFilters,
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   return (
-    <AudiencePanelProvider initialMode='analytics'>
+    <AudiencePanelProvider>
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -146,9 +144,8 @@ export function DashboardAudienceClient({
         profileUrl={profileUrl}
         profileId={profileId}
         subscriberCount={subscriberCount}
-        filters={initialFilters}
-        anonymousCount={anonymousCount}
         totalAudienceCount={totalAudienceCount}
+        filters={initialFilters}
         tourDates={tourDates}
       />
     </AudiencePanelProvider>
@@ -165,9 +162,8 @@ function DashboardAudienceClientInner({
   profileUrl,
   profileId,
   subscriberCount,
-  filters: initialFilters,
-  anonymousCount,
   totalAudienceCount,
+  filters: initialFilters,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
   // Register header actions with both panel toggle buttons
@@ -281,9 +277,8 @@ function DashboardAudienceClientInner({
             profileUrl={profileUrl}
             profileId={profileId}
             subscriberCount={subscriberCount}
-            filters={initialFilters}
-            anonymousCount={anonymousCount}
             totalAudienceCount={totalAudienceCount}
+            filters={initialFilters}
             hasNextPage={hasNextPage}
             isFetchingNextPage={isFetchingNextPage}
             onLoadMore={handleLoadMore}

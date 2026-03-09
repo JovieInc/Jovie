@@ -33,7 +33,7 @@ export function AudiencePanelProvider({
   readonly children: ReactNode;
   readonly initialMode?: AudiencePanelMode | null;
 }) {
-  const [mode, setMode] = useState<AudiencePanelMode | null>(initialMode);
+  const [mode, setMode] = useState<AudiencePanelMode | null>('analytics');
 
   const toggle = useCallback((panel: AudiencePanelMode) => {
     setMode(prev => (prev === panel ? null : panel));

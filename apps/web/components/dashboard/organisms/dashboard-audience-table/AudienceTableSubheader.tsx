@@ -32,10 +32,8 @@ interface AudienceTableSubheaderProps {
   readonly subscriberCount: number;
   /** Total row count for the current view */
   readonly total: number;
-  /** Total audience count across all audience views */
+  /** Total audience members across all views */
   readonly totalAudienceCount?: number;
-  /** Total anonymous audience count */
-  readonly anonymousCount?: number;
 }
 
 /**
@@ -50,8 +48,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   selectedIds,
   subscriberCount,
   total,
-  totalAudienceCount = 0,
-  anonymousCount = 0,
+  totalAudienceCount,
 }: AudienceTableSubheaderProps) {
   const hasData = total > 0;
 
@@ -63,9 +60,8 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
           <AudienceHeaderBadge
             view={view}
             onViewChange={onViewChange}
-            totalAudienceCount={totalAudienceCount}
+            totalAudienceCount={totalAudienceCount ?? total}
             subscriberCount={subscriberCount}
-            anonymousCount={anonymousCount}
           />
         </div>
 
