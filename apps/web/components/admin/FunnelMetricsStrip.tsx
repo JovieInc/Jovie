@@ -105,7 +105,7 @@ export function FunnelMetricsStrip({
         value={mrrDisplay}
         subtitle='Monthly recurring revenue'
         icon={CircleDollarSign}
-        iconClassName='text-emerald-400'
+        iconClassName='text-success'
       />
 
       <MetricCard

@@ -139,7 +139,7 @@ export function LeadTable() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <section className='border border-subtle bg-surface-1 p-4 sm:p-6'>
+    <section className='rounded-lg border border-subtle bg-surface-1 p-4 sm:p-6'>
       <div className='mb-4'>
         <h2 className='text-sm font-semibold text-primary-token'>
           Leads ({total})
@@ -174,13 +174,13 @@ export function LeadTable() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className='ml-auto h-8 w-48 rounded-md border border-subtle bg-background px-3 text-xs'
+          className='ml-auto h-8 w-48 rounded-md border border-subtle bg-surface-2 px-3 text-xs text-primary-token'
         />
 
         <select
           value={sortBy}
           onChange={e => setSortBy(e.target.value as 'createdAt' | 'fitScore')}
-          className='h-8 rounded-md border border-subtle bg-background px-2 text-xs'
+          className='h-8 rounded-md border border-subtle bg-surface-2 px-2 text-xs text-primary-token'
         >
           <option value='createdAt'>Newest</option>
           <option value='fitScore'>Fit Score</option>
@@ -292,7 +292,7 @@ export function LeadTable() {
                             void updateLeadStatus(lead.id, 'approved')
                           }
                           disabled={actioningId === lead.id}
-                          className='rounded-md p-1 text-emerald-600 hover:bg-emerald-50 disabled:opacity-50 dark:hover:bg-emerald-950'
+                          className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
                           title='Approve & ingest'
                         >
                           {actioningId === lead.id ? (
