@@ -12,6 +12,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
+  getClient: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('@/lib/sentry/init', () => ({

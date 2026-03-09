@@ -30,10 +30,11 @@ export function PricingSection() {
               Pricing
             </span>
             <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
-              Simple, transparent pricing.
+              Start free. Pay when it pays you back.
             </h2>
             <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
-              Start free. Upgrade when you&apos;re ready.
+              Free gets an artist live fast. Founding Member adds the tools that
+              turn attention into revenue and repeat reach.
             </p>
           </div>
 
@@ -59,7 +60,7 @@ export function PricingSection() {
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                Everything you need to get started.
+                Get your page live and start capturing fan intent.
               </p>
 
               <ul className='mt-8 flex flex-col gap-3 flex-1'>
@@ -83,7 +84,7 @@ export function PricingSection() {
                   color: 'var(--linear-text-primary)',
                 }}
               >
-                Get Started
+                Launch for Free
               </Link>
             </div>
 
@@ -122,7 +123,7 @@ export function PricingSection() {
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                Early adopter pricing. Lock it in forever.
+                Early adopter pricing for artists ready to own the full funnel.
               </p>
 
               <ul className='mt-8 flex flex-col gap-3 flex-1'>
@@ -145,7 +146,7 @@ export function PricingSection() {
                   color: 'rgb(10,10,10)',
                 }}
               >
-                Become a Founding Member
+                Choose Founding Member
               </Link>
             </div>
           </div>

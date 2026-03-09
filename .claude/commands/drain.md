@@ -125,6 +125,50 @@ for PR in $OPEN_PRS; do
 done
 ```
 
+## Phase 2.5: Promote Drafts + Close Duplicates
+
+After rebasing, audit drafts and duplicates before orchestrating:
+
+### Promote passing drafts to ready-for-review
+
+```bash
+DRAFT_PRS=$(gh pr list --state open --draft --json number --limit 100 --jq '.[].number')
+
+for PR in $DRAFT_PRS; do
+  FAILING=$(gh pr checks $PR 2>/dev/null | grep -v skipping | grep "fail" | grep -v "Preview Deploy")
+  if [ -z "$FAILING" ]; then
+    echo "PR #$PR passed CI — promoting to ready-for-review"
+    gh pr ready $PR
+    gh pr merge $PR --auto
+  else
+    echo "PR #$PR still has failures — skipping"
+  fi
+done
+```
+
+### Close duplicate PRs
+
+Duplicates appear when agents open two PRs for the same Linear issue. Identify by matching titles:
+
+```bash
+gh pr list --state open --json number,title --limit 100 | python3 -c "
+import sys, json, collections
+prs = json.load(sys.stdin)
+by_title = collections.defaultdict(list)
+for p in prs:
+    by_title[p['title']].append(p['number'])
+for title, nums in by_title.items():
+    if len(nums) > 1:
+        print(f'DUPLICATE: {title} -> PRs {sorted(nums)}')
+"
+```
+
+For each duplicate group, keep the **lowest-numbered PR** and close the rest:
+
+```bash
+gh pr close <DUPLICATE_NUMBER> --comment "Closing duplicate — #<CANONICAL> is the canonical PR."
+```
+
 ## Phase 3: Run /orchestrate
 
 Now that main is fixed and all PRs are rebased, use the existing orchestrate workflow to process remaining failures:
