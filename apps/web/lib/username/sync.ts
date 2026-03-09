@@ -58,7 +58,10 @@ async function updateCanonicalUsernameInternal(
       }
 
       const [profile] = await tx
-        .select()
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.userId, userRow.id))
         .limit(1);

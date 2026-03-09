@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Switch } from '@jovie/ui';
+import { Button, Input, Switch } from '@jovie/ui';
 import { Loader2, Play, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -190,16 +190,17 @@ export function LeadPipelineControls() {
         </div>
 
         <div className='flex flex-wrap gap-4'>
-          <label className='block'>
+          <label htmlFor='auto-ingest-min-score' className='block'>
             <span className='text-sm text-primary-token'>
               Min fit score for auto-ingest
             </span>
-            <input
+            <Input
+              id='auto-ingest-min-score'
               type='number'
               min={0}
               max={100}
               value={settings.autoIngestMinFitScore}
-              onChange={e => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 const val = Number.parseInt(e.target.value, 10);
                 setSettings(s =>
                   s
@@ -210,21 +211,22 @@ export function LeadPipelineControls() {
                     : s
                 );
               }}
-              className='mt-1 h-10 w-24 rounded-md border border-subtle bg-background px-3 text-sm'
+              className='mt-1 w-24'
               disabled={saving}
             />
           </label>
 
-          <label className='block'>
+          <label htmlFor='daily-query-budget' className='block'>
             <span className='text-sm text-primary-token'>
               Daily query budget
             </span>
-            <input
+            <Input
+              id='daily-query-budget'
               type='number'
               min={1}
               max={10000}
               value={settings.dailyQueryBudget}
-              onChange={e => {
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                 const val = Number.parseInt(e.target.value, 10);
                 setSettings(s =>
                   s
@@ -235,7 +237,7 @@ export function LeadPipelineControls() {
                     : s
                 );
               }}
-              className='mt-1 h-10 w-24 rounded-md border border-subtle bg-background px-3 text-sm'
+              className='mt-1 w-24'
               disabled={saving}
             />
             <p className='mt-1 text-xs text-secondary-token'>

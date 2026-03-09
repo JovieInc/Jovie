@@ -12,6 +12,7 @@ import {
   DateCell,
   TableCheckboxCell,
 } from '@/components/organisms/table';
+import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
 
@@ -54,7 +55,7 @@ export function renderUsernameCell({
     return <EmptyCell />;
   }
 
-  const profileUrl = `https://jov.ie/@${username}`;
+  const profileUrl = getProfileUrl(username);
 
   return (
     <div className='group/username flex items-center gap-1.5 min-w-0'>
@@ -172,8 +173,7 @@ export function renderStatusCell({ row }: CellContext<AdminUserRow, unknown>) {
   ) : (
     <Badge size='sm' variant='success'>
       <span className='flex items-center gap-1.5'>
-        <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400' />{' '}
-        Active
+        <span className='h-1.5 w-1.5 shrink-0 rounded-full bg-success' /> Active
       </span>
     </Badge>
   );

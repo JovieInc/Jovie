@@ -159,7 +159,7 @@ export function SendInviteDialog({
 
           {/* Success message */}
           {success && (
-            <div className='flex items-center gap-2 rounded-lg bg-green-500/10 px-3 py-2'>
+            <div className='flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2'>
               <Icon
                 name='CheckCircle'
                 className='h-3.5 w-3.5 text-success shrink-0'

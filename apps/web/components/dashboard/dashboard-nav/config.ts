@@ -29,11 +29,11 @@ import type { NavItem } from './types';
 // ---------------------------------------------------------------------------
 
 export const dashboardHome: NavItem = {
-  name: 'Dashboard',
-  href: APP_ROUTES.DASHBOARD,
+  name: 'Home',
+  href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Overview of your dashboard',
+  description: 'Start a new thread',
 };
 
 export const profileNavItem: NavItem = {
