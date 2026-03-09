@@ -1,6 +1,5 @@
 'use client';
 
-import DOMPurify from 'dompurify';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -24,7 +23,6 @@ export interface UseAnimatedListenInterfaceReturn {
   availableDSPs: AvailableDSP[];
   selectedDSP: string | null;
   prefersReducedMotion: boolean;
-  sanitizedLogos: Record<string, string>;
   handleDSPClick: (dsp: AvailableDSP) => Promise<void>;
 }
 
@@ -65,17 +63,6 @@ export function useAnimatedListenInterface(
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Sanitize SVG logos to prevent XSS
-  const sanitizedLogos = useMemo(() => {
-    const logos: Record<string, string> = {};
-    for (const dsp of availableDSPs) {
-      logos[dsp.key] = DOMPurify.sanitize(dsp.config.logoSvg, {
-        USE_PROFILES: { svg: true },
-      });
-    }
-    return logos;
-  }, [availableDSPs]);
 
   // Handle backspace key to go back
   useEffect(() => {
@@ -166,7 +153,6 @@ export function useAnimatedListenInterface(
     availableDSPs,
     selectedDSP,
     prefersReducedMotion,
-    sanitizedLogos,
     handleDSPClick,
   };
 }
