@@ -1,11 +1,11 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { Suspense } from 'react';
 
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import { Container } from '@/components/site/Container';
 import { DSP_CONFIGS } from '@/lib/dsp';
 
@@ -234,26 +234,15 @@ export function AutomaticReleaseSmartlinksSection() {
                       const config = DSP_CONFIGS[key];
                       if (!config) return null;
                       return (
-                        <div
+                        <SmartLinkProviderButton
                           key={key}
-                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 transition-[background-color] duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
-                          style={{
-                            border: '1px solid var(--linear-border-subtle)',
-                          }}
-                        >
-                          <SocialIcon
-                            platform={key}
-                            className='h-5 w-5 shrink-0 text-[var(--linear-text-tertiary)] transition-colors duration-150'
-                            aria-hidden
-                          />
-                          <span className='flex-1 text-base font-[var(--linear-font-weight-semibold)] text-[var(--linear-text-primary)]'>
-                            {config.name}
-                          </span>
-                          <ChevronRight
-                            className='h-4 w-4 transition-all duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-secondary)] group-hover:translate-x-0.5'
-                            aria-hidden='true'
-                          />
-                        </div>
+                          label={config.name}
+                          iconPath={
+                            DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
+                              ?.iconPath
+                          }
+                          className='bg-[var(--linear-bg-surface-1)] ring-[color:var(--linear-border-subtle)] hover:bg-[var(--linear-bg-hover)]'
+                        />
                       );
                     })}
                   </div>
