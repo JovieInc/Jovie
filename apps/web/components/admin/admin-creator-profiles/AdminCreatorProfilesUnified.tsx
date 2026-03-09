@@ -191,6 +191,50 @@ export function AdminCreatorProfilesUnified({
     },
   });
 
+  const [lastSavedSignature, setLastSavedSignature] = useState<string | null>(
+    null
+  );
+
+  React.useEffect(() => {
+    if (!sidebarOpen || !effectiveContact?.id) return;
+
+    const signature = JSON.stringify({
+      id: effectiveContact.id,
+      displayName: effectiveContact.displayName ?? null,
+      firstName: effectiveContact.firstName ?? null,
+      lastName: effectiveContact.lastName ?? null,
+      username: effectiveContact.username,
+      avatarUrl: effectiveContact.avatarUrl ?? null,
+      socialLinks: effectiveContact.socialLinks.map((link, index) => ({
+        id: link.id ?? null,
+        url: link.url,
+        label: link.label ?? null,
+        platformType: link.platformType ?? null,
+        sortOrder: index,
+      })),
+    });
+
+    if (signature === lastSavedSignature || isSaving) return;
+
+    const timer = setTimeout(() => {
+      void saveContact(effectiveContact).then(success => {
+        if (success) {
+          setLastSavedSignature(signature);
+        }
+      });
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    effectiveContact,
+    isSaving,
+    lastSavedSignature,
+    saveContact,
+    sidebarOpen,
+  ]);
+
   const { getContextMenuItems } = useContextMenuItems({
     ingestRefreshStatuses,
     refreshIngest,
@@ -369,7 +413,6 @@ export function AdminCreatorProfilesUnified({
         onClose={handleSidebarClose}
         onRefresh={handleSidebarRefresh}
         onContactChange={handleContactChange}
-        onSave={saveContact}
         contextMenuItems={sidebarContextMenuItems}
         onAvatarUpload={handleAvatarUpload}
       />
@@ -381,7 +424,6 @@ export function AdminCreatorProfilesUnified({
       handleSidebarClose,
       handleSidebarRefresh,
       handleContactChange,
-      saveContact,
       sidebarContextMenuItems,
       handleAvatarUpload,
     ]
