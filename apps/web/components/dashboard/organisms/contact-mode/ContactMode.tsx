@@ -50,17 +50,8 @@ function ContactListItem({
   const hasPhone = Boolean(contact.phone);
   const hasAnyContact = hasEmail || hasPhone;
 
-  const handleEmailClick = useCallback(() => {
-    if (contact.email) {
-      globalThis.location.href = `mailto:${contact.email}`;
-    }
-  }, [contact.email]);
-
-  const handlePhoneClick = useCallback(() => {
-    if (contact.phone) {
-      globalThis.location.href = `tel:${contact.phone}`;
-    }
-  }, [contact.phone]);
+  const emailHref = contact.email ? `mailto:${contact.email}` : null;
+  const phoneHref = contact.phone ? `tel:${contact.phone}` : null;
 
   return (
     <ContextMenu>
@@ -88,24 +79,28 @@ function ContactListItem({
                 <Button
                   size='sm'
                   variant='ghost'
-                  onClick={handleEmailClick}
+                  asChild
                   className='h-8 w-8 p-0'
                   title={`Email ${contact.email}`}
                 >
-                  <Mail className='h-4 w-4' />
-                  <span className='sr-only'>Email</span>
+                  <a href={emailHref ?? '#'}>
+                    <Mail className='h-4 w-4' />
+                    <span className='sr-only'>Email</span>
+                  </a>
                 </Button>
               )}
               {hasPhone && (
                 <Button
                   size='sm'
                   variant='ghost'
-                  onClick={handlePhoneClick}
+                  asChild
                   className='h-8 w-8 p-0'
                   title={`Call ${contact.phone}`}
                 >
-                  <Phone className='h-4 w-4' />
-                  <span className='sr-only'>Call</span>
+                  <a href={phoneHref ?? '#'}>
+                    <Phone className='h-4 w-4' />
+                    <span className='sr-only'>Call</span>
+                  </a>
                 </Button>
               )}
             </div>
@@ -126,12 +121,14 @@ function ContactListItem({
         )}
         {hasEmail && hasPhone && <ContextMenuSeparator />}
         {hasEmail && (
-          <ContextMenuItem onClick={handleEmailClick}>
-            Send email
+          <ContextMenuItem asChild>
+            <a href={emailHref ?? '#'}>Send email</a>
           </ContextMenuItem>
         )}
         {hasPhone && (
-          <ContextMenuItem onClick={handlePhoneClick}>Call</ContextMenuItem>
+          <ContextMenuItem asChild>
+            <a href={phoneHref ?? '#'}>Call</a>
+          </ContextMenuItem>
         )}
       </ContextMenuContent>
     </ContextMenu>

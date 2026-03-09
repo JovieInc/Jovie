@@ -237,7 +237,10 @@ export function DeeplinksGrid() {
               Infinite outcomes.
             </span>
           </h2>
-          <p className='mx-auto mt-5 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p
+            className='mx-auto mt-5 max-w-[440px] marketing-lead-linear'
+            style={{ color: 'var(--linear-text-tertiary)' }}
+          >
             Jovie automatically routes fans to the right action — or override
             with a direct link to tips, tours, contacts, and every release.
           </p>

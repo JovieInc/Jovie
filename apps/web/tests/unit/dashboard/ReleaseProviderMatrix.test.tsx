@@ -4,6 +4,12 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 
+let latestSubheaderProps:
+  | {
+      onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
+    }
+  | undefined;
+
 /**
  * ReleaseProviderMatrix Component Tests
  *
@@ -115,16 +121,25 @@ vi.mock('@/lib/queries', () => ({
 vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
-    ReleaseTable: () => <div data-testid='release-table'>table</div>,
+    ReleaseTable: ({ releases }: { releases: Array<{ id: string }> }) => (
+      <div data-testid='release-table'>rows:{releases.length}</div>
+    ),
   })
 );
 
 vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
   () => ({
-    ReleaseTableSubheader: () => (
-      <div data-testid='release-subheader'>subheader</div>
-    ),
+    ReleaseTableSubheader: (props: {
+      onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
+    }) => {
+      latestSubheaderProps = props;
+      return (
+        <button type='button' data-testid='release-subheader'>
+          subheader
+        </button>
+      );
+    },
     DEFAULT_RELEASE_FILTERS: { releaseTypes: [], popularity: [], labels: [] },
   })
 );
@@ -282,6 +297,7 @@ const primaryProviders = [
 describe('ReleaseProviderMatrix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    latestSubheaderProps = undefined;
   });
 
   describe('conditional rendering', () => {
@@ -361,6 +377,30 @@ describe('ReleaseProviderMatrix', () => {
       // Allow for React.StrictMode double render (2) + useEffect re-renders
       // but catch infinite loops (which would blow past any reasonable count)
       expect(renderCount).toBeLessThanOrEqual(4);
+    });
+  });
+
+  describe('release view filtering', () => {
+    it('filters to single-track entries when switched to tracks view', () => {
+      const single = makeRelease('single-track');
+      const album = {
+        ...makeRelease('album-track'),
+        releaseType: 'album' as const,
+        totalTracks: 12,
+      };
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[single, album]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      latestSubheaderProps?.onReleaseViewChange?.('tracks');
+
+      expect(screen.getByTestId('release-table')).toHaveTextContent('rows:1');
     });
   });
 });
