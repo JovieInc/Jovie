@@ -112,13 +112,26 @@ export async function withRetry<T>(
           // Check if error is retryable
           const isRetryable = isRetryableError(error);
 
-          logDbError('retry_attempt', error, {
-            context,
-            attempt,
-            maxRetries,
-            isRetryable,
-            willRetry: attempt < maxRetries && isRetryable,
-          });
+          const willRetry = attempt < maxRetries && isRetryable;
+          logDbError(
+            'retry_attempt',
+            error,
+            {
+              context,
+              attempt,
+              maxRetries,
+              isRetryable,
+              willRetry,
+            },
+            // Log intermediate retryable failures as breadcrumbs only — they
+            // are expected transient events that will be retried. Capturing
+            // them as Sentry exceptions floods the error dashboard with noise
+            // for errors that the retry loop ultimately recovers from.
+            // Only the final unrecoverable throw (after all retries or a
+            // non-retryable error) reaches the caller and Sentry via normal
+            // exception propagation.
+            { asBreadcrumb: willRetry }
+          );
 
           // Don't retry if not retryable or on last attempt
           if (!isRetryable || attempt >= maxRetries) {
