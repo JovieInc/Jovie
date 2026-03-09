@@ -71,6 +71,16 @@ The Linear automation path uses two workflows:
   - Trigger: `pull_request.closed` (merged)
   - Behavior: reads Linear markers from PR body, moves issue to done, comments merge details back to Linear
 
+## Main CI Health Monitor
+
+The `main-ci-health-monitor.yml` workflow runs every 15 minutes and alerts `#alerts-production` when:
+
+- A `ci.yml` run on `main` is queued/in-progress for more than 15 minutes
+- The latest `main` CI run failed and remains unresolved for over 15 minutes
+- No successful `main` CI has occurred for 3+ hours while merged PRs are waiting
+
+This closes the silent-failure gap when merge queue passes but `main` post-merge CI is blocked.
+
 ## Synthetic Monitoring
 
 The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on a schedule to catch production issues.

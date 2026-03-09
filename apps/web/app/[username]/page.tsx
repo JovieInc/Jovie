@@ -2,6 +2,7 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
@@ -382,7 +383,14 @@ interface Props {
     readonly username: string;
   }>;
   readonly searchParams?: Promise<{
-    mode?: 'profile' | 'listen' | 'tip' | 'subscribe' | 'about' | 'contact';
+    mode?:
+      | 'profile'
+      | 'listen'
+      | 'tip'
+      | 'tour'
+      | 'subscribe'
+      | 'about'
+      | 'contact';
   }>;
 }
 
@@ -459,6 +467,9 @@ export default async function ArtistPage({
 
   const subtitle = PAGE_SUBTITLES[mode] ?? PAGE_SUBTITLES.profile;
 
+  const tourDates =
+    mode === 'tour' ? await loadUpcomingTourDates(profile.id) : [];
+
   // Show tip button whenever artist has Venmo, and style active state in tip mode.
   const hasVenmoLink = links.some(link => link.platform === 'venmo');
   const showTipButton = hasVenmoLink;
@@ -514,12 +525,15 @@ export default async function ArtistPage({
         showTipButton={showTipButton}
         isTipModeActive={mode === 'tip'}
         showBackButton={showBackButton}
+        showTourButton={true}
+        isTourModeActive={mode === 'tour'}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
+        tourDates={tourDates}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

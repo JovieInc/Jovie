@@ -4,7 +4,8 @@
 # code to an agent branch without an existing PR. This closes the gap where
 # agents complete work and push, but leave no PR for the CI pipeline to process.
 #
-# TRIGGER: Push to agent branch pattern (codex/*, codegen-bot/*, linear/*, claude/*)
+# TRIGGER: Push to agent branch pattern (codex/*, codegen-bot/*, linear/*, claude/*,
+#          plus personal branches like tim/jov-XXXX-description)
 #
 # SAFETY:
 # - Idempotent: skips if PR already exists for the branch
@@ -22,6 +23,7 @@ on:
       - 'codegen-bot/**'
       - 'linear/**'
       - 'claude/**'
+      - '*/jov-**'
 
 permissions: {}
 
@@ -119,7 +121,7 @@ jobs:
 
           while true; do
             OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-              | jq '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/"))] | length')
+              | jq '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/") or (.headRefName | test("^[^/]+/jov-[0-9]+-"; "i")))] | length')
 
             echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
 
@@ -287,13 +289,8 @@ jobs:
             --repo "${{ github.repository }}" \
             --base main \
             --head "$BRANCH" \
+            --draft \
             --title "$TITLE" \
             --body-file "$BODY_FILE")
 
           echo "Created PR: $PR_URL"
-
-          # Enable auto-merge so it flows through the pipeline
-          PR_NUMBER=$(echo "$PR_URL" | grep -oP '\d+$')
-          gh pr merge "$PR_NUMBER" --repo "${{ github.repository }}" --auto --squash || echo "Auto-merge not available (repo setting may be disabled)"
-
-          echo "Auto-merge enabled for PR #$PR_NUMBER"
