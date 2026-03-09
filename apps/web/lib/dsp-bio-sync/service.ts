@@ -58,6 +58,16 @@ export interface BioSyncResponse {
   failedCount: number;
 }
 
+/** Minimal profile fields required for DSP bio sync operations. */
+interface BioSyncProfile {
+  id: string;
+  bio: string | null;
+  displayName: string | null;
+  username: string;
+  spotifyId: string | null;
+  spotifyUrl: string | null;
+}
+
 // ============================================================================
 // Service
 // ============================================================================
@@ -69,7 +79,7 @@ const emailProvider = new ResendEmailProvider();
  * Catches and records failures as tracking records.
  */
 async function syncSingleProvider(params: {
-  profile: typeof creatorProfiles.$inferSelect;
+  profile: BioSyncProfile;
   providerId: string;
   provider: DspBioProvider;
   match: typeof dspArtistMatches.$inferSelect | undefined;
@@ -155,9 +165,16 @@ export async function syncBioToDsps(
 ): Promise<BioSyncResponse> {
   const { creatorProfileId, providerIds } = request;
 
-  // Fetch the creator profile
+  // Fetch the creator profile (only the fields needed for bio sync)
   const [profile] = await db
-    .select()
+    .select({
+      id: creatorProfiles.id,
+      bio: creatorProfiles.bio,
+      displayName: creatorProfiles.displayName,
+      username: creatorProfiles.username,
+      spotifyId: creatorProfiles.spotifyId,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
@@ -234,7 +251,7 @@ export async function syncBioToDsps(
 // ============================================================================
 
 interface SyncParams {
-  profile: typeof creatorProfiles.$inferSelect;
+  profile: BioSyncProfile;
   providerId: string;
   provider: DspBioProvider;
   match: typeof dspArtistMatches.$inferSelect | undefined;
