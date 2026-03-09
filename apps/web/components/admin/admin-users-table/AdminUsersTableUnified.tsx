@@ -82,7 +82,7 @@ function AdminUserMobileCard({
           />
           <div className='min-w-0'>
             <p className='truncate text-sm font-semibold text-primary-token'>
-              {user.name || user.email || 'Unknown'}
+              {user.name || 'Email Subscriber'}
             </p>
             <p className='truncate text-xs text-secondary-token'>
               {user.email ?? 'No email'}
