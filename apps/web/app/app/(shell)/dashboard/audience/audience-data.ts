@@ -555,37 +555,6 @@ async function fetchSubscribersData(
   };
 }
 
-/**
- * Count total subscribers for a profile (lightweight query for UI state)
- */
-
-async function countAudienceByType(
-  tx: DbSessionTx,
-  clerkUserId: string | null,
-  selectedProfileId: string,
-  type?: AudienceMemberType
-): Promise<number> {
-  const ownershipJoin = clerkUserId
-    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
-    : drizzleSql``;
-
-  const typeFilter = type ? drizzleSql`AND am.type = ${type}` : drizzleSql``;
-
-  const countResult = await tx.execute(drizzleSql`
-    SELECT COUNT(*) AS total
-    FROM audience_members am
-    INNER JOIN creator_profiles cp ON am.creator_profile_id = cp.id
-    INNER JOIN users u             ON cp.user_id = u.id
-    WHERE am.creator_profile_id = ${selectedProfileId}
-    ${ownershipJoin}
-    ${typeFilter}
-  `);
-
-  return Number(
-    (countResult.rows[0] as { total: string | number } | undefined)?.total ?? 0
-  );
-}
-
 async function countSubscribers(
   tx: DbSessionTx,
   clerkUserId: string | null,
