@@ -36,6 +36,18 @@ vi.mock('@/lib/db/social-links-sync', () => ({
   syncSocialLinksFromPrimaryMusicUrls: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/db', () => ({
+  db: {},
+}));
+
+vi.mock('@/lib/db/query-timeout', () => ({
+  dashboardQuery: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 vi.mock('@/app/api/dashboard/profile/lib', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
   validateUpdatesPayload: mockValidateUpdatesPayload,
@@ -53,6 +65,7 @@ vi.mock('@/app/api/dashboard/profile/lib', () => ({
 
 describe('PUT /api/dashboard/profile rollback behavior', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.stubEnv('NODE_ENV', 'development');
     vi.clearAllMocks();
 
