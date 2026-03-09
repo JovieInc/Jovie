@@ -1,10 +1,8 @@
 import { Skeleton } from '@jovie/ui';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { LeadKeywordsManager } from '@/components/admin/leads/LeadKeywordsManager';
-import { LeadPipelineControls } from '@/components/admin/leads/LeadPipelineControls';
 import { LeadPipelineKpis } from '@/components/admin/leads/LeadPipelineKpis';
-import { LeadTable } from '@/components/admin/leads/LeadTable';
+import { LeadPipelineWorkspace } from '@/components/admin/leads/LeadPipelineWorkspace';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 export const metadata: Metadata = {
@@ -35,11 +33,7 @@ export default function AdminLeadsPage() {
             <LeadPipelineKpis />
           </Suspense>
 
-          <LeadPipelineControls />
-
-          <LeadKeywordsManager />
-
-          <LeadTable />
+          <LeadPipelineWorkspace />
         </div>
       </PageContent>
     </PageShell>

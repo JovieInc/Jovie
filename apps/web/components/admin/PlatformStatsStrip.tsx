@@ -1,0 +1,107 @@
+import {
+  Badge,
+  Card,
+  CardContent,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@jovie/ui';
+import { Building2 } from 'lucide-react';
+
+import type { AdminPlatformStats } from '@/lib/admin/platform-stats';
+
+interface PlatformStatsStripProps {
+  readonly stats: AdminPlatformStats;
+}
+
+interface StatItemProps {
+  readonly value: number;
+  readonly label: string;
+}
+
+function StatItem({ value, label }: Readonly<StatItemProps>) {
+  return (
+    <div className='space-y-1'>
+      <p className='text-3xl font-semibold tracking-tight text-primary-token'>
+        {value.toLocaleString('en-US')}
+      </p>
+      <p className='text-app text-secondary-token'>{label}</p>
+    </div>
+  );
+}
+
+function getUsageCopy(stats: AdminPlatformStats): string {
+  const badgeList = stats.labelBadges;
+  if (badgeList.length === 0) {
+    return 'Used by artists across the global independent music ecosystem';
+  }
+
+  const [first, second, third] = badgeList;
+
+  if (stats.labelsOnPlatform <= 3 || !third) {
+    if (!second) return `Used by artists on ${first}`;
+    if (!third) return `Used by artists on ${first} and ${second}`;
+    return `Used by artists on ${first}, ${second}, and ${third}`;
+  }
+
+  return `Used by artists on ${first}, ${second}, and ${stats.labelsOnPlatform - 2} others`;
+}
+
+export function PlatformStatsStrip({
+  stats,
+}: Readonly<PlatformStatsStripProps>) {
+  return (
+    <Card
+      data-testid='platform-stats-strip'
+      className='border-subtle bg-surface'
+    >
+      <CardContent className='space-y-6 p-5'>
+        <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
+          <StatItem value={stats.labelsOnPlatform} label='Labels on platform' />
+          <StatItem
+            value={stats.totalUniqueVisitors}
+            label='Total unique visitors'
+          />
+          <StatItem value={stats.dspClicksDriven} label='DSP clicks driven' />
+          <StatItem value={stats.contactsCaptured} label='Contacts captured' />
+          <StatItem
+            value={stats.creatorsOnPlatform}
+            label='Creators on platform'
+          />
+          <StatItem value={stats.releasesTracked} label='Releases tracked' />
+        </div>
+
+        <div className='space-y-3 border-t border-subtle pt-4'>
+          <p className='flex items-center gap-2 text-app font-medium text-secondary-token'>
+            <Building2 className='size-4 text-tertiary-token' />
+            {getUsageCopy(stats)}
+          </p>
+
+          {stats.labelBadges.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className='flex cursor-help flex-wrap items-center gap-2'>
+                  {stats.labelBadges.map(label => (
+                    <Badge key={label} size='sm' variant='secondary'>
+                      {label}
+                    </Badge>
+                  ))}
+                  {stats.labelsOnPlatform > stats.labelBadges.length && (
+                    <Badge size='sm' variant='secondary'>
+                      +{stats.labelsOnPlatform - stats.labelBadges.length}
+                    </Badge>
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side='top' className='max-w-lg'>
+                <p className='text-xs text-secondary-token'>
+                  {stats.allLabelsAndDistributors.join(', ')}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

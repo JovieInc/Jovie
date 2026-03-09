@@ -8,6 +8,8 @@ import {
   AdminKpiSectionSkeleton,
   AdminOutreachSection,
   AdminOutreachSectionSkeleton,
+  AdminPlatformStatsSection,
+  AdminPlatformStatsSectionSkeleton,
   AdminSentrySection,
   AdminSentrySectionSkeleton,
   AdminUsageSection,
@@ -36,6 +38,10 @@ export default function AdminPage() {
           {/* Row 1: Growth KPIs */}
           <Suspense fallback={<AdminKpiSectionSkeleton />}>
             <AdminKpiSection />
+          </Suspense>
+
+          <Suspense fallback={<AdminPlatformStatsSectionSkeleton />}>
+            <AdminPlatformStatsSection />
           </Suspense>
 
           {/* Row 2: Outreach pipeline + Reliability side by side */}
