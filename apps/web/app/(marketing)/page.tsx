@@ -10,6 +10,7 @@ import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { ReleaseNotificationsSection } from '@/components/home/ReleaseNotificationsSection';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
+import { SocialProofSection } from '@/components/home/SocialProofSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
@@ -239,6 +240,8 @@ export default function HomePage() {
         <RedesignedHero />
         <LogoBar />
       </div>
+
+      <SocialProofSection />
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'
