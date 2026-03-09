@@ -1,0 +1,136 @@
+name: Autopilot Scheduled (Hourly Overnight)
+
+on:
+  schedule:
+    # Every hour from 10 PM to 7 AM UTC (overnight window)
+    - cron: '0 22-23,0-7 * * *'
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: autopilot-scheduled
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    name: Intake Linear Issues
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: write
+    steps:
+      - name: Query Linear for Todo issues and dispatch
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "::error::Missing LINEAR_API_KEY secret"
+            exit 1
+          fi
+
+          echo "Querying Linear for Todo issues..."
+
+          RESPONSE=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: ${LINEAR_API_KEY}" \
+            -H 'Content-Type: application/json' \
+            -d '{
+              "query": "query TodoIssues { team(id: \"jovie\") { issues(filter: { state: { type: { eq: \"unstarted\" } }, labels: { every: { name: { neq: \"human-review-required\" } } } }, first: 10, orderBy: createdAt) { nodes { id identifier title url description state { name type } labels { nodes { name } } } } } }"
+            }')
+
+          # Try team by key if team by id fails
+          HAS_DATA=$(echo "$RESPONSE" | jq -r '.data.team.issues.nodes // empty')
+          if [[ -z "$HAS_DATA" ]]; then
+            echo "Team lookup by id failed, trying by key..."
+            RESPONSE=$(curl -sS https://api.linear.app/graphql \
+              -H "Authorization: ${LINEAR_API_KEY}" \
+              -H 'Content-Type: application/json' \
+              -d '{
+                "query": "query TodoIssues { issues(filter: { state: { type: { eq: \"unstarted\" } }, team: { key: { eq: \"JOV\" } }, labels: { every: { name: { neq: \"human-review-required\" } } } }, first: 10, orderBy: createdAt) { nodes { id identifier title url description state { name type } labels { nodes { name } } } } }"
+              }')
+          fi
+
+          # Extract issues, filtering out human-review-required
+          ISSUES=$(echo "$RESPONSE" | jq -c '
+            [
+              (.data.team.issues.nodes // .data.issues.nodes // [])[]
+              | select(
+                  (.labels.nodes | map(.name) | index("human-review-required") | not)
+                  and ((.description // "") | test("This issue requires human review") | not)
+                )
+            ]
+          ')
+
+          COUNT=$(echo "$ISSUES" | jq 'length')
+          echo "Found $COUNT eligible issues"
+
+          if [[ "$COUNT" -eq 0 ]]; then
+            echo "No issues to dispatch. Exiting."
+            exit 0
+          fi
+
+          # Check how many agent PRs are already open (rate limit)
+          MAX_OPEN_AGENT_PRS=10
+          OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
+            | jq '[.[] | select(.headRefName | test("^(codex|claude|codegen-bot|linear)/"))] | length')
+
+          echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS"
+
+          if [[ "$OPEN_AGENT_PRS" -ge "$MAX_OPEN_AGENT_PRS" ]]; then
+            echo "::warning::Rate limit reached ($OPEN_AGENT_PRS open agent PRs). Skipping dispatch."
+            exit 0
+          fi
+
+          SLOTS=$(( MAX_OPEN_AGENT_PRS - OPEN_AGENT_PRS ))
+          echo "Available slots: $SLOTS"
+
+          # Dispatch each issue to the Linear AI Orchestrator workflow
+          DISPATCHED=0
+          echo "$ISSUES" | jq -c '.[]' | while read -r ISSUE; do
+            if [[ "$DISPATCHED" -ge "$SLOTS" ]]; then
+              echo "Slot limit reached; deferring remaining issues to next cycle"
+              break
+            fi
+
+            ISSUE_ID=$(echo "$ISSUE" | jq -r '.id')
+            ISSUE_IDENTIFIER=$(echo "$ISSUE" | jq -r '.identifier')
+            ISSUE_TITLE=$(echo "$ISSUE" | jq -r '.title')
+            ISSUE_URL=$(echo "$ISSUE" | jq -r '.url')
+            ISSUE_DESCRIPTION=$(echo "$ISSUE" | jq -r '.description // ""')
+
+            # Check if a PR already exists for this issue
+            EXISTING_PR=$(gh pr list --state open --json number,title,body --jq "
+              map(
+                select(
+                  ((.title // \"\") + \"\\n\" + (.body // \"\")) as \$text
+                  | (\$text | test(\"$ISSUE_IDENTIFIER\"; \"i\"))
+                    or (\$text | contains(\"linear-issue-id:$ISSUE_ID\"))
+                )
+              )
+              | .[0].number // empty
+            ")
+
+            if [[ -n "$EXISTING_PR" ]]; then
+              echo "Skipping ${ISSUE_IDENTIFIER}: PR #${EXISTING_PR} already exists"
+              continue
+            fi
+
+            echo "Dispatching ${ISSUE_IDENTIFIER}: ${ISSUE_TITLE}"
+
+            gh workflow run linear-ai-orchestrator.yml \
+              -f issue_id="$ISSUE_ID" \
+              -f issue_identifier="$ISSUE_IDENTIFIER" \
+              -f issue_title="$ISSUE_TITLE" \
+              -f issue_url="$ISSUE_URL"
+
+            DISPATCHED=$((DISPATCHED + 1))
+            echo "Dispatched ${ISSUE_IDENTIFIER} ($DISPATCHED/$SLOTS)"
+
+            # Small delay between dispatches to avoid overwhelming the system
+            sleep 5
+          done
+
+          echo "Autopilot intake complete. Dispatched issues to orchestrator."
