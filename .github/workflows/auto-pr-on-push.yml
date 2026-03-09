@@ -104,9 +104,10 @@ jobs:
         run: |
           echo "Branch: $BRANCH"
 
-          # Use jq --arg to prevent shell injection via branch name
-          EXISTING=$(gh api repos/${{ github.repository }}/pulls \
-            | jq --arg branch "$BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | length')
+          # Check if a PR already exists for this branch using gh pr list
+          # (gh api /pulls only returns first page and can miss the PR)
+          EXISTING=$(gh pr list --state open --head "$BRANCH" --json number --limit 1 \
+            | jq 'length')
 
           if [[ "$EXISTING" -gt 0 ]]; then
             echo "PR already exists for $BRANCH. Skipping."
@@ -120,8 +121,10 @@ jobs:
           POLL_INTERVAL=30
 
           while true; do
+            # Fetch all open PRs and filter for agent branches
+            # Use type guard to safely handle non-array responses from gh
             OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-              | jq '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/") or (.headRefName | test("^[^/]+/jov-[0-9]+-"; "i")))] | length')
+              | jq '[if type == "array" then .[] else empty end | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/") or (.headRefName | test("^[^/]+/jov-[0-9]+-"; "i")))] | length')
 
             echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
 
