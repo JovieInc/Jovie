@@ -121,6 +121,8 @@ export type SubscriberSort = z.infer<typeof subscriberSortSchema>;
  * Used for GET /api/dashboard/audience/subscribers requests.
  *
  * Pre-instantiated to avoid per-request Zod schema construction overhead.
+ * Uses cursor/keyset pagination (JOV-1265): pass `cursor` (opaque base64
+ * token returned in previous response) instead of `page`.
  */
 export const subscribersQuerySchema = z.object({
   /** Creator profile ID (UUID format) */
@@ -129,8 +131,14 @@ export const subscribersQuerySchema = z.object({
   sort: subscriberSortSchema.default('createdAt'),
   /** Sort direction */
   direction: sortDirectionSchema.default('desc'),
-  /** Page number (1-indexed) */
-  page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
+  /**
+   * Opaque cursor token from the previous page's `nextCursor` field.
+   * Omit (or pass null/empty) to start from the beginning.
+   */
+  cursor: z
+    .string()
+    .nullish()
+    .transform(v => v ?? null),
   /** Items per page (1-100) */
   pageSize: z.preprocess(
     val => Number(val ?? 10),
