@@ -1814,20 +1814,27 @@ export async function createRelease(formData: {
 
       for (const [key, url] of entries) {
         const provider = key as ProviderKey;
-        if (!providerLabels[provider]) continue;
-        const validation = validateProviderUrl(provider, url.trim());
-        if (!validation.isValid) continue;
+        const providerLabel = providerLabels[provider];
+        if (!providerLabel) continue;
+        const trimmedUrl = url.trim();
+        const validation = validateProviderUrl(
+          trimmedUrl,
+          provider,
+          providerLabel
+        );
+        if (!validation.valid) continue;
 
         await upsertProviderLink({
           releaseId,
-          provider,
-          url: validation.normalizedUrl ?? url.trim(),
+          providerId: provider,
+          url: trimmedUrl,
+          sourceType: 'manual',
         });
       }
     }
 
     revalidatePath(APP_ROUTES.RELEASES);
-    revalidateTag(createSmartLinkContentTag(profile.id));
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
 
     return {
       success: true,
@@ -1846,7 +1853,10 @@ export async function createRelease(formData: {
       };
     }
 
-    captureError(error, { context: 'createRelease', title });
+    void captureError('createRelease failed', error as Error, {
+      action: 'createRelease',
+      title,
+    });
     return {
       success: false,
       message: 'Failed to create release. Please try again.',
