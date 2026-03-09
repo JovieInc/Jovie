@@ -15,6 +15,10 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
+  extractMusicFetchLinks,
+  mapMusicFetchProfileFields,
+} from '@/lib/dsp-enrichment/musicfetch-mapping';
+import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
@@ -35,13 +39,6 @@ export interface EnrichedProfileData {
   genres: string[];
   followers: number | null;
 }
-
-/** Social platforms to extract from MusicFetch */
-const SOCIAL_PLATFORM_MAPPINGS = [
-  { serviceKey: 'instagram', platformId: 'instagram' },
-  { serviceKey: 'tiktok', platformId: 'tiktok' },
-  { serviceKey: 'bandcamp', platformId: 'bandcamp' },
-] as const;
 
 /**
  * Enrich a creator profile from Spotify API + MusicFetch API.
@@ -75,6 +72,15 @@ export async function enrichProfileFromDsp(
       avatarLockedByUser: creatorProfiles.avatarLockedByUser,
       bio: creatorProfiles.bio,
       usernameNormalized: creatorProfiles.usernameNormalized,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      spotifyId: creatorProfiles.spotifyId,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
+      appleMusicId: creatorProfiles.appleMusicId,
+      youtubeUrl: creatorProfiles.youtubeUrl,
+      youtubeMusicId: creatorProfiles.youtubeMusicId,
+      deezerId: creatorProfiles.deezerId,
+      tidalId: creatorProfiles.tidalId,
+      soundcloudId: creatorProfiles.soundcloudId,
     })
     .from(creatorProfiles)
     .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -137,6 +143,18 @@ export async function enrichProfileFromDsp(
 
   // Build profile updates
   const profileUpdates: Partial<typeof creatorProfiles.$inferInsert> = {};
+
+  if (musicFetch) {
+    Object.assign(
+      profileUpdates,
+      mapMusicFetchProfileFields(
+        musicFetch,
+        profile,
+        spotifyUrl,
+        spotifyArtistId
+      )
+    );
+  }
 
   // Display name from MusicFetch first, then Spotify fallback.
   const enrichedName = musicFetch?.name ?? artist?.name;
@@ -209,22 +227,10 @@ export async function enrichProfileFromDsp(
 
   // Process social links from MusicFetch
   if (musicFetch) {
-    const socialLinks: ExtractedLink[] = SOCIAL_PLATFORM_MAPPINGS.flatMap(
-      ({ serviceKey, platformId }) => {
-        const url = musicFetch.services[serviceKey]?.url;
-        if (!url) return [];
-        return [
-          {
-            url,
-            platformId,
-            sourcePlatform: 'musicfetch' as const,
-            evidence: {
-              sources: ['musicfetch'],
-              signals: ['onboarding_enrichment'],
-            },
-          },
-        ];
-      }
+    const socialLinks: ExtractedLink[] = extractMusicFetchLinks(
+      musicFetch,
+      spotifyUrl,
+      'onboarding_enrichment'
     );
 
     if (socialLinks.length > 0) {

@@ -15,19 +15,15 @@ import { z } from 'zod';
 
 import { type DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
-import type { ExtractedLink } from '@/lib/ingestion/types';
-import { logger } from '@/lib/utils/logger';
-
 import {
-  extractAppleMusicId,
-  extractDeezerId,
-  extractSoundcloudId,
-  extractTidalId,
-  extractYoutubeMusicId,
+  extractMusicFetchLinks,
+  mapMusicFetchProfileFields,
+} from '@/lib/dsp-enrichment/musicfetch-mapping';
+import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
+import { logger } from '@/lib/utils/logger';
+import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
-  type MusicFetchArtistResult,
 } from '../providers/musicfetch';
 
 // ============================================================================
@@ -57,117 +53,8 @@ export interface MusicFetchEnrichmentResult {
 }
 
 // ============================================================================
-// DSP Mapping
+// Field + Link Mapping
 // ============================================================================
-
-/** DSP ID extraction mappings: serviceKey → profile field + extractor */
-const DSP_ID_MAPPINGS: Array<{
-  serviceKey: string;
-  idField: keyof DspProfileFields;
-  extractor: (url: string) => string | null;
-}> = [
-  { serviceKey: 'deezer', idField: 'deezerId', extractor: extractDeezerId },
-  { serviceKey: 'tidal', idField: 'tidalId', extractor: extractTidalId },
-  {
-    serviceKey: 'soundcloud',
-    idField: 'soundcloudId',
-    extractor: extractSoundcloudId,
-  },
-  {
-    serviceKey: 'youtubeMusic',
-    idField: 'youtubeMusicId',
-    extractor: extractYoutubeMusicId,
-  },
-];
-
-type DspProfileFields = {
-  appleMusicUrl: string | null;
-  appleMusicId: string | null;
-  youtubeUrl: string | null;
-  youtubeMusicId: string | null;
-  deezerId: string | null;
-  tidalId: string | null;
-  soundcloudId: string | null;
-};
-
-/**
- * Map MusicFetch services to creator profile DSP fields.
- * Only sets fields that are currently null — never overwrites existing values.
- */
-function mapDspFields(
-  result: MusicFetchArtistResult,
-  existingProfile: DspProfileFields
-): Record<string, string> {
-  const updates: Record<string, string> = {};
-  const services = result.services;
-
-  // Apple Music (special case: has both URL and ID fields)
-  const appleMusicUrl = services.appleMusic?.url;
-  if (appleMusicUrl) {
-    mapAppleMusicFields(appleMusicUrl, existingProfile, updates);
-  }
-
-  // Extract IDs for DSPs with ID-only fields (data-driven)
-  for (const mapping of DSP_ID_MAPPINGS) {
-    const serviceUrl = services[mapping.serviceKey]?.url;
-    if (existingProfile[mapping.idField] || !serviceUrl) continue;
-    const id = mapping.extractor(serviceUrl);
-    if (id) updates[mapping.idField] = id;
-  }
-
-  // YouTube URL (fallback to YouTube Music if main YouTube unavailable)
-  const ytUrl =
-    !existingProfile.youtubeUrl &&
-    (services.youtube?.url || services.youtubeMusic?.url);
-  if (ytUrl) updates.youtubeUrl = ytUrl;
-
-  return updates;
-}
-
-function mapAppleMusicFields(
-  url: string,
-  existingProfile: DspProfileFields,
-  updates: Record<string, string>
-): void {
-  if (!existingProfile.appleMusicId) {
-    const id = extractAppleMusicId(url);
-    if (id) updates.appleMusicId = id;
-  }
-  if (!existingProfile.appleMusicUrl) {
-    updates.appleMusicUrl = url;
-  }
-}
-
-/** Social platforms to extract from MusicFetch (stored as social_links, not DSP profile fields) */
-const SOCIAL_PLATFORM_MAPPINGS = [
-  { serviceKey: 'instagram', platformId: 'instagram' },
-  { serviceKey: 'tiktok', platformId: 'tiktok' },
-  { serviceKey: 'bandcamp', platformId: 'bandcamp' },
-] as const;
-
-/**
- * Extract social links from MusicFetch services.
- * Returns links for platforms that map to social_links (not DSP profile fields).
- */
-function extractSocialLinks(result: MusicFetchArtistResult): ExtractedLink[] {
-  const services = result.services;
-
-  return SOCIAL_PLATFORM_MAPPINGS.flatMap(({ serviceKey, platformId }) => {
-    const url = services[serviceKey]?.url;
-    if (!url) return [];
-    return [
-      {
-        url,
-        platformId,
-        sourcePlatform: 'musicfetch' as const,
-        evidence: {
-          sources: ['musicfetch'],
-          signals: ['musicfetch_artist_lookup'],
-        },
-      },
-    ];
-  });
-}
 
 // ============================================================================
 // Job Processor
@@ -212,6 +99,8 @@ export async function processMusicFetchEnrichmentJob(
       avatarUrl: creatorProfiles.avatarUrl,
       avatarLockedByUser: creatorProfiles.avatarLockedByUser,
       bio: creatorProfiles.bio,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      spotifyId: creatorProfiles.spotifyId,
       appleMusicUrl: creatorProfiles.appleMusicUrl,
       appleMusicId: creatorProfiles.appleMusicId,
       youtubeUrl: creatorProfiles.youtubeUrl,
@@ -237,14 +126,12 @@ export async function processMusicFetchEnrichmentJob(
   }
 
   // Map DSP services to profile fields
-  const dspUpdates = mapDspFields(artistData, profile);
+  const dspUpdates = mapMusicFetchProfileFields(
+    artistData,
+    profile,
+    spotifyUrl
+  );
   const dspFieldNames = Object.keys(dspUpdates);
-
-  // Update bio if profile has none
-  if (!profile.bio && artistData.bio) {
-    dspUpdates.bio = artistData.bio;
-    dspFieldNames.push('bio');
-  }
 
   // Apply profile DSP updates
   if (dspFieldNames.length > 0) {
@@ -265,7 +152,11 @@ export async function processMusicFetchEnrichmentJob(
   }
 
   // Extract and merge social links
-  const socialLinks = extractSocialLinks(artistData);
+  const socialLinks = extractMusicFetchLinks(
+    artistData,
+    spotifyUrl,
+    'musicfetch_artist_lookup'
+  );
   if (socialLinks.length > 0) {
     const mergeResult = await normalizeAndMergeExtraction(
       tx,
