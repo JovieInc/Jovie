@@ -23,18 +23,23 @@ test.describe('Sentry Integration', () => {
   test('Sentry DSN is configured in the environment', () => {
     // If SENTRY_DSN is not set, errors will silently drop in production.
     // This test catches the "forgot to set DSN" deployment mistake.
-    const dsn = process.env.SENTRY_DSN ?? process.env.NEXT_PUBLIC_SENTRY_DSN ?? '';
+    const dsn =
+      process.env.SENTRY_DSN ?? process.env.NEXT_PUBLIC_SENTRY_DSN ?? '';
 
     if (!dsn) {
       // In local dev without Doppler this is expected — skip gracefully
       const hasDoppler =
-        Boolean(process.env.DATABASE_URL) && Boolean(process.env.CLERK_SECRET_KEY);
+        Boolean(process.env.DATABASE_URL) &&
+        Boolean(process.env.CLERK_SECRET_KEY);
       if (!hasDoppler) {
         test.skip(true, 'Sentry DSN not set — run with doppler to verify');
         return;
       }
       // In a Doppler environment (staging/production target), DSN must be set
-      expect(dsn, 'SENTRY_DSN not configured — errors will drop silently in production').toBeTruthy();
+      expect(
+        dsn,
+        'SENTRY_DSN not configured — errors will drop silently in production'
+      ).toBeTruthy();
     }
 
     // DSN must match the Sentry ingest format
@@ -91,7 +96,9 @@ test.describe('Sentry Integration', () => {
       console.log(
         'ℹ SENTRY_E2E_REPORTING not enabled — test failures will not be sent to Sentry'
       );
-      console.log('  To enable: set SENTRY_E2E_REPORTING=1 and SENTRY_DSN in Doppler');
+      console.log(
+        '  To enable: set SENTRY_E2E_REPORTING=1 and SENTRY_DSN in Doppler'
+      );
       return;
     }
 

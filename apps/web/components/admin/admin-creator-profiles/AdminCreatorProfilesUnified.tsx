@@ -185,7 +185,7 @@ export function AdminCreatorProfilesUnified({
 
   const { handleAvatarUpload } = useAvatarUpload();
 
-  const { saveContact } = useContactSave({
+  const { saveContact, isSaving } = useContactSave({
     onSaveSuccess: updatedContact => {
       setDraftContact(updatedContact);
     },

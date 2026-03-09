@@ -226,15 +226,8 @@ describe('ContactSidebar', () => {
     expect(screen.getByPlaceholderText('Full name')).toHaveValue('sparse');
   });
 
-  it('does not render a Save changes button when onSave is provided', () => {
-    render(
-      <ContactSidebar
-        contact={mockContact}
-        mode='admin'
-        isOpen={true}
-        onSave={vi.fn()}
-      />
-    );
+  it('does not render a Save changes button in admin mode (autosave)', () => {
+    render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     expect(
       screen.queryByRole('button', { name: /save changes/i })

@@ -67,13 +67,20 @@ test('homepage: hero heading, CTA, multiple sections, footer', async ({
 
   // At least 2 sections — proves the page rendered beyond just the shell
   const sectionCount = await page.locator('section').count();
-  expect(sectionCount, 'Homepage missing sections — page may be blank').toBeGreaterThanOrEqual(2);
+  expect(
+    sectionCount,
+    'Homepage missing sections — page may be blank'
+  ).toBeGreaterThanOrEqual(2);
 
   // Footer — proves the full page loaded (not a loading skeleton)
   await expect(page.locator('footer').first()).toBeVisible({ timeout: 20_000 });
 
   // No error text in visible content
-  const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+  const bodyText =
+    (await page
+      .locator('body')
+      .innerText()
+      .catch(() => '')) ?? '';
   expect(bodyText.toLowerCase()).not.toContain('application error');
   expect(bodyText.toLowerCase()).not.toContain('internal server error');
 });
@@ -101,12 +108,19 @@ test.describe('Public Profile — dualipa', () => {
     });
 
     // Hard fail if profile missing — seeding must have worked
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
     ) {
-      test.fail(true, 'Profile dualipa not seeded — global-setup.ts must seed this profile');
+      test.fail(
+        true,
+        'Profile dualipa not seeded — global-setup.ts must seed this profile'
+      );
       return;
     }
 
@@ -116,7 +130,11 @@ test.describe('Public Profile — dualipa', () => {
 
     // Profile image — missing = broken avatar pipeline
     await expect(
-      page.locator('[data-testid="profile-avatar"], img[alt*="avatar"], img[alt*="profile"], img[alt*="Dua"]').first()
+      page
+        .locator(
+          '[data-testid="profile-avatar"], img[alt*="avatar"], img[alt*="profile"], img[alt*="Dua"]'
+        )
+        .first()
     ).toBeVisible({ timeout: 15_000 });
   });
 
@@ -128,7 +146,11 @@ test.describe('Public Profile — dualipa', () => {
       timeout: 60_000,
     });
 
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
@@ -160,7 +182,11 @@ test.describe('Public Profile — dualipa', () => {
       timeout: 60_000,
     });
 
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
@@ -195,7 +221,8 @@ test.describe('Public Profile — dualipa', () => {
           timeout: 60_000,
         });
       } catch (navError) {
-        const msg = navError instanceof Error ? navError.message : String(navError);
+        const msg =
+          navError instanceof Error ? navError.message : String(navError);
         if (
           msg.includes('net::ERR_CONNECTION_REFUSED') ||
           msg.includes('net::ERR_CONNECTION_RESET') ||
@@ -213,7 +240,11 @@ test.describe('Public Profile — dualipa', () => {
         `/${TEST_PROFILE}${sub} returned ${status} — server error`
       ).toBeLessThan(500);
 
-      const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+      const bodyText =
+        (await page
+          .locator('body')
+          .innerText()
+          .catch(() => '')) ?? '';
       const lower = bodyText.toLowerCase();
       // 404 is OK (profile may not support this subpage), 500 is not
       expect(lower).not.toContain('application error');
@@ -245,7 +276,10 @@ test('signin and signup pages load', async ({ page }) => {
 
     // Something must render — empty page = broken Clerk integration
     const bodyText = await page.locator('body').textContent();
-    expect(bodyText?.trim().length, `${route} rendered empty page`).toBeGreaterThan(0);
+    expect(
+      bodyText?.trim().length,
+      `${route} rendered empty page`
+    ).toBeGreaterThan(0);
   }
 });
 

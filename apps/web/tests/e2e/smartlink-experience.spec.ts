@@ -21,8 +21,12 @@ const TEST_PROFILE = 'dualipa';
 
 function blockAnalytics(page: import('@playwright/test').Page) {
   return Promise.all([
-    page.route('**/api/profile/view', r => r.fulfill({ status: 200, body: '{}' })),
-    page.route('**/api/audience/visit', r => r.fulfill({ status: 200, body: '{}' })),
+    page.route('**/api/profile/view', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    ),
+    page.route('**/api/audience/visit', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    ),
     page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' })),
   ]);
 }
@@ -43,7 +47,11 @@ test.describe('SmartLink — Fan Experience', () => {
     });
 
     // Skip if profile not seeded
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
@@ -73,7 +81,11 @@ test.describe('SmartLink — Fan Experience', () => {
       timeout: 30_000,
     });
 
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
@@ -114,7 +126,11 @@ test.describe('SmartLink — Fan Experience', () => {
       timeout: 30_000,
     });
 
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
@@ -127,7 +143,10 @@ test.describe('SmartLink — Fan Experience', () => {
     const listenTab = page.locator(
       'a[href*="mode=listen"], button:has-text("Listen"), [data-testid="listen-tab"]'
     );
-    const hasListenTab = await listenTab.first().isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasListenTab = await listenTab
+      .first()
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     if (hasListenTab) {
       await listenTab.first().click();
@@ -137,7 +156,10 @@ test.describe('SmartLink — Fan Experience', () => {
     const tipTab = page.locator(
       'a[href*="mode=tip"], button:has-text("Tip"), [data-testid="tip-tab"]'
     );
-    const hasTipTab = await tipTab.first().isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasTipTab = await tipTab
+      .first()
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
 
     if (hasTipTab) {
       await tipTab.first().click();
@@ -146,7 +168,9 @@ test.describe('SmartLink — Fan Experience', () => {
 
     // No React crashes from mode switching
     const reactErrors = consoleErrors.filter(e =>
-      /minified react error|hydration failed|unhandled runtime|too many re-renders/i.test(e)
+      /minified react error|hydration failed|unhandled runtime|too many re-renders/i.test(
+        e
+      )
     );
     expect(
       reactErrors,
@@ -162,7 +186,11 @@ test.describe('SmartLink — Fan Experience', () => {
       timeout: 30_000,
     });
 
-    const bodyText = (await page.locator('body').innerText().catch(() => '')) ?? '';
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
     if (
       bodyText.toLowerCase().includes('not found') ||
       bodyText.toLowerCase().includes('temporarily unavailable')
@@ -173,11 +201,16 @@ test.describe('SmartLink — Fan Experience', () => {
 
     // Find the Spotify link specifically (seeded in global-setup.ts)
     const spotifyLink = page.locator('a[href*="open.spotify.com"]');
-    const hasSpotify = await spotifyLink.first().isVisible({ timeout: 15_000 }).catch(() => false);
+    const hasSpotify = await spotifyLink
+      .first()
+      .isVisible({ timeout: 15_000 })
+      .catch(() => false);
 
     if (!hasSpotify) {
       // Might have a different DSP seeded — check for any DSP
-      const anyDsp = page.locator('a[href*="spotify"], a[href*="apple"], a[href*="tidal"]');
+      const anyDsp = page.locator(
+        'a[href*="spotify"], a[href*="apple"], a[href*="tidal"]'
+      );
       await expect(
         anyDsp.first(),
         'No streaming platform links found — DSP seeding or rendering is broken'
