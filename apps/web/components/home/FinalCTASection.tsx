@@ -25,8 +25,12 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-[var(--linear-text-primary)]'
           >
-            Your fans are already here.
+            Give the next fan one clear place to go.
           </h2>
+          <p className='mt-4 max-w-xl marketing-lead-linear text-[var(--linear-text-secondary)]'>
+            Claim your handle, launch your page, and start collecting the
+            audience data every other profile page leaves behind.
+          </p>
           {/* Docking zone — matches FloatingClaimBar dimensions/style */}
           <div className='mt-10 w-full flex justify-center'>
             <div
