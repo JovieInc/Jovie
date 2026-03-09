@@ -68,15 +68,22 @@ export async function GET(request: Request) {
     const forceRefresh = refreshParam === '1';
 
     // Clamp date range to user's plan retention limit.
-    // On entitlements failure, default to 7-day (free) limit.
-    let retentionDays = 7;
-    try {
-      const entitlements = await getCurrentUserEntitlements();
-      retentionDays = entitlements.analyticsRetentionDays;
-    } catch {
-      // Billing unavailable — use free-tier default (7 days)
-    }
-    const range = clampRange(rawRange, retentionDays);
+    // Cache the entitlement lookup (5 min TTL) to avoid repeated billing
+    // round-trips on every analytics fetch.
+    const range = await cacheQuery(
+      `analytics-range:${userId}`,
+      async () => {
+        let retentionDays = 7;
+        try {
+          const entitlements = await getCurrentUserEntitlements();
+          retentionDays = entitlements.analyticsRetentionDays;
+        } catch {
+          // Billing unavailable — use free-tier default (7 days)
+        }
+        return clampRange(rawRange, retentionDays);
+      },
+      { ttlSeconds: 5 * 60 }
+    );
 
     const key = `dashboard-analytics:${userId}:${view}:${range}`;
 
