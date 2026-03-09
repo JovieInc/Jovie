@@ -29,26 +29,38 @@ export function useArtistContacts({
     channel: PublicContactChannel,
     contact: PublicContact
   ) => {
-    const decoded = decodeContactPayload(channel.encoded);
-    if (!decoded) return;
+    const href = getActionHref(channel);
+    if (!href) return;
 
+    trackAction(channel, contact);
+    navigate(href);
+  };
+
+  const trackAction = (
+    channel: PublicContactChannel,
+    contact: PublicContact
+  ) => {
     track('contacts_contact_click', {
       handle: artistHandle,
       role: contact.role,
       channel: channel.type,
       territory_count: contact.territoryCount,
     });
+  };
+
+  const getActionHref = (channel: PublicContactChannel): string | null => {
+    const decoded = decodeContactPayload(channel.encoded);
+    if (!decoded) return null;
 
     if (decoded.type === 'email') {
       const subject = decoded.subject
         ? `?subject=${encodeURIComponent(decoded.subject)}`
         : '';
-      navigate(`mailto:${decoded.value}${subject}`);
-      return;
+      return `mailto:${decoded.value}${subject}`;
     }
 
     const normalized = (decoded.value ?? '').replaceAll(/[^\d+]/g, '');
-    navigate(`tel:${normalized}`);
+    return `tel:${normalized}`;
   };
 
   const onIconClick = () => {
@@ -72,6 +84,8 @@ export function useArtistContacts({
   return {
     available,
     performAction,
+    getActionHref,
+    trackAction,
     onIconClick,
     primaryChannel,
     buildTerritoryLabel,
