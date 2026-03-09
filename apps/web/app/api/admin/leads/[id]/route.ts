@@ -7,6 +7,7 @@ import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { ingestLeadAsCreator } from '@/lib/leads/ingest-lead';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { pipelineLog } from '@/lib/leads/pipeline-logger';
 import { routeLead } from '@/lib/leads/route-lead';
 import { spotifyEnrichLead } from '@/lib/leads/spotify-enrich-lead';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
@@ -72,6 +73,8 @@ export async function PATCH(
       );
     }
 
+    pipelineLog('approve', `Lead ${validated.data.status}`, { leadId: id });
+
     // Auto-ingest on approval: create a creator profile from the Linktree data
     let ingestion = null;
     if (validated.data.status === 'approved' && updated.linktreeUrl) {
@@ -97,11 +100,17 @@ export async function PATCH(
     if (validated.data.status === 'approved') {
       try {
         // Enrich with Spotify data for priority scoring
+        pipelineLog('approve', 'Starting Spotify enrichment', { leadId: id });
         await spotifyEnrichLead(id);
 
         // Route the lead (email, dm, both, manual_review, or skipped)
+        pipelineLog('approve', 'Starting lead routing', { leadId: id });
         const routeResult = await routeLead(id);
         routing = { route: routeResult.route };
+        pipelineLog('approve', 'Lead routed', {
+          leadId: id,
+          route: routeResult.route,
+        });
 
         const [routedLead] = await db
           .select()
@@ -110,6 +119,12 @@ export async function PATCH(
           .limit(1);
 
         // Push to Instantly if email route and lead has a valid email
+        pipelineLog('approve', 'Checking Instantly eligibility', {
+          leadId: id,
+          route: routeResult.route,
+          hasEmail: !!routedLead?.contactEmail,
+          emailInvalid: routedLead?.emailInvalid,
+        });
         if (
           routedLead?.contactEmail &&
           !routedLead.emailInvalid &&

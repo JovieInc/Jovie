@@ -1,4 +1,5 @@
 import { captureError } from '@/lib/error-tracking';
+import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
 export interface GoogleCSEResult {
   link: string;
@@ -28,8 +29,15 @@ export async function searchGoogleCSE(
   const engineId = process.env.GOOGLE_CSE_ENGINE_ID;
 
   if (!apiKey || !engineId) {
+    const missing = [
+      !apiKey && 'GOOGLE_CSE_API_KEY',
+      !engineId && 'GOOGLE_CSE_ENGINE_ID',
+    ].filter(Boolean);
+    pipelineWarn('discovery', 'Google CSE not configured', { missing });
     throw new Error('GOOGLE_CSE_API_KEY and GOOGLE_CSE_ENGINE_ID must be set');
   }
+
+  pipelineLog('discovery', 'CSE search started', { query, startIndex });
 
   const url = new URL('https://www.googleapis.com/customsearch/v1');
   url.searchParams.set('key', apiKey);
@@ -47,6 +55,7 @@ export async function searchGoogleCSE(
 
     // 429 = quota exceeded — not an error, just budget exhausted
     if (code === 429) {
+      pipelineWarn('discovery', 'Google CSE quota exhausted (429)', { query });
       return [];
     }
 
@@ -57,9 +66,16 @@ export async function searchGoogleCSE(
     return [];
   }
 
-  return (data.items ?? []).map(item => ({
+  const results = (data.items ?? []).map(item => ({
     link: item.link,
     title: item.title,
     snippet: item.snippet,
   }));
+
+  pipelineLog('discovery', 'CSE search complete', {
+    query,
+    resultCount: results.length,
+  });
+
+  return results;
 }
