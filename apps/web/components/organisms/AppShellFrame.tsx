@@ -54,8 +54,8 @@ export const AppShellFrame = memo(function AppShellFrame({
               className={cn(
                 'flex-1 min-h-0 min-w-0',
                 isTableRoute
-                  ? 'overflow-hidden overflow-x-auto'
-                  : 'overflow-y-auto overflow-x-hidden p-4 sm:p-6',
+                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
+                  : 'overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6',
                 contentClassName
               )}
             >

@@ -26,6 +26,7 @@ import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
+import { useDebouncedContactSave } from './useDebouncedContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 
 interface RowActionHandlers {
@@ -154,10 +155,17 @@ export function AdminCreatorProfilesWithSidebar({
 
   const { handleAvatarUpload } = useAvatarUpload();
 
-  const { saveContact } = useContactSave({
+  const { saveContact, isSaving } = useContactSave({
     onSaveSuccess: updatedContact => {
       setDraftContact(updatedContact);
     },
+  });
+
+  useDebouncedContactSave({
+    effectiveContact,
+    sidebarOpen,
+    isSaving,
+    saveContact,
   });
 
   const handleRowClick = useCallback(
@@ -447,7 +455,6 @@ export function AdminCreatorProfilesWithSidebar({
               onClose={handleSidebarClose}
               onRefresh={handleSidebarRefresh}
               onContactChange={handleContactChange}
-              onSave={saveContact}
               onAvatarUpload={handleAvatarUpload}
             />
           </Suspense>

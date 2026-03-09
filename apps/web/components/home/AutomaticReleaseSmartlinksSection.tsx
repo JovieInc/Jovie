@@ -1,14 +1,30 @@
-import { ChevronRight, ExternalLink, Link2 } from 'lucide-react';
+'use client';
+
+import { ChevronRight } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import { Suspense } from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Container } from '@/components/site/Container';
 import { DSP_CONFIGS } from '@/lib/dsp';
-import { RELEASES } from './demo/mock-data';
+
+/* ------------------------------------------------------------------ */
+/*  Lazy-load the real ReleaseTable (heavy component, below-fold)       */
+/* ------------------------------------------------------------------ */
+
+const DemoRealReleasesPanel = dynamic(
+  () =>
+    import('@/components/demo/DemoRealReleasesPanel').then(
+      m => m.DemoRealReleasesPanel
+    ),
+  { ssr: false }
+);
 
 /* ------------------------------------------------------------------ */
 /*  DSP platforms shown on the floating smart link card                  */
 /* ------------------------------------------------------------------ */
+
 const SMART_LINK_DSPS = [
   'spotify',
   'apple_music',
@@ -17,28 +33,50 @@ const SMART_LINK_DSPS = [
 ] as const;
 
 /* ------------------------------------------------------------------ */
-/*  Provider dots shown per release row                                 */
+/*  Skeleton loader — shown while real table loads                       */
 /* ------------------------------------------------------------------ */
-const PROVIDER_KEYS = [
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'deezer',
-] as const;
+
+function ReleasesTableSkeleton() {
+  return (
+    <div className='bg-[var(--linear-bg-surface-0)] p-5'>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div
+          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton
+          key={i}
+          className='flex items-center gap-4 py-3'
+          style={{
+            borderBottom:
+              i < 5 ? '1px solid var(--linear-border-subtle)' : undefined,
+          }}
+        >
+          <div className='h-10 w-10 shrink-0 rounded-md bg-[var(--linear-bg-surface-2)] animate-pulse' />
+          <div className='flex-1 space-y-2'>
+            <div className='h-3 w-32 rounded bg-[var(--linear-bg-surface-2)] animate-pulse' />
+            <div className='h-2.5 w-20 rounded bg-[var(--linear-bg-surface-2)] animate-pulse' />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Section                                                             */
+/* ------------------------------------------------------------------ */
 
 export function AutomaticReleaseSmartlinksSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
-      {/* Ambient glow behind the mockup */}
+      {/* Ambient glow — large, soft, centered behind mockup */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/3'
         style={{
-          width: '800px',
-          height: '600px',
+          width: '900px',
+          height: '700px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(20% 0.02 260 / 0.25), transparent 70%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.12), transparent 65%)',
         }}
       />
 
@@ -53,9 +91,8 @@ export function AutomaticReleaseSmartlinksSection() {
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Connect Spotify once. Every new release automatically gets a
-                smart link — Spotify, Apple Music, YouTube Music, all in one
-                page your fans actually use.
+                Connect Spotify once. Every new release gets a smart link across
+                every platform — automatically.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Zero manual work
@@ -63,25 +100,38 @@ export function AutomaticReleaseSmartlinksSection() {
             </div>
           </div>
 
-          {/* Full Width Product Mockup */}
-          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
-            <div className='relative w-full'>
-              {/* Dashboard Window — releases table */}
+          {/* Product Mockup — side-by-side layout */}
+          <div className='mt-16 md:mt-20 mx-auto w-full'>
+            <div className='flex flex-col md:flex-row gap-6 md:items-start'>
+              {/* Dashboard window — real ReleaseTable */}
               <div
-                className='relative overflow-hidden rounded-xl md:rounded-2xl md:w-[85%] md:mt-8'
+                className='relative overflow-hidden rounded-xl md:rounded-2xl flex-1 min-w-0'
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
-                  boxShadow:
-                    'var(--linear-shadow-card-elevated), 0 0 80px rgba(0,0,0,0.3)',
+                  boxShadow: [
+                    '0 0 0 1px rgba(255,255,255,0.03)',
+                    '0 8px 40px rgba(0,0,0,0.35)',
+                    '0 24px 80px rgba(0,0,0,0.25)',
+                  ].join(', '),
                 }}
               >
-                {/* Shine border overlay */}
+                {/* Shine border */}
                 <div
                   aria-hidden='true'
                   className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
                   style={{
                     border: '1px solid rgba(255,255,255,0.04)',
+                  }}
+                />
+
+                {/* Top edge highlight */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
+                  style={{
+                    background:
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
                   }}
                 />
 
@@ -98,44 +148,62 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div className='w-[52px]' />
                 </div>
 
-                {/* Releases table */}
-                <ReleasesTable />
+                {/* Real ReleaseTable — capped height with fade */}
+                <div className='relative h-[420px] overflow-hidden'>
+                  <Suspense fallback={<ReleasesTableSkeleton />}>
+                    <DemoRealReleasesPanel />
+                  </Suspense>
 
-                {/* Bottom gradient fade */}
-                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
+                  {/* Bottom gradient fade */}
+                  <div
+                    className='pointer-events-none absolute inset-x-0 bottom-0 h-32 z-[2]'
+                    style={{
+                      background:
+                        'linear-gradient(to top, var(--linear-bg-surface-0), transparent)',
+                    }}
+                  />
+                </div>
               </div>
 
-              {/* Floating Smart Link Card */}
+              {/* Smart Link Card — beside the table */}
               <div
-                className='absolute z-10 hidden md:flex flex-col right-0 top-0 w-[272px] overflow-hidden rounded-2xl'
+                className='hidden md:flex flex-col w-[272px] shrink-0 overflow-hidden rounded-2xl'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   color: 'var(--linear-text-primary)',
-                  boxShadow:
-                    '0 0 0 1px var(--linear-border-subtle), var(--linear-shadow-card-elevated), 0 20px 60px rgba(0,0,0,0.4)',
+                  border: '1px solid var(--linear-border-subtle)',
+                  boxShadow: [
+                    '0 0 0 1px rgba(255,255,255,0.03)',
+                    '0 8px 40px rgba(0,0,0,0.35)',
+                    '0 24px 80px rgba(0,0,0,0.25)',
+                  ].join(', '),
                 }}
               >
-                {/* Shine border overlay */}
+                {/* Shine border */}
                 <div
                   aria-hidden='true'
                   className='pointer-events-none absolute inset-0 rounded-2xl z-10'
                   style={{ border: '1px solid rgba(255,255,255,0.05)' }}
                 />
 
-                {/* Ambient glow */}
-                <div className='pointer-events-none absolute inset-0'>
-                  <div
-                    className='absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]'
-                    style={{ backgroundColor: 'rgba(255,255,255,0.03)' }}
-                  />
-                </div>
+                {/* Top edge highlight */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
+                  style={{
+                    background:
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.10) 30%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.10) 70%, transparent)',
+                  }}
+                />
 
-                <div className='relative px-6 pt-10 pb-5 flex flex-col items-center'>
-                  {/* Album artwork — real art from jov.ie/tim/the-deep-end */}
+                <div className='relative px-6 pt-8 pb-5 flex flex-col items-center'>
+                  {/* Album artwork */}
                   <div
-                    className='relative w-full aspect-square overflow-hidden rounded-lg shadow-2xl shadow-black/40'
+                    className='relative w-full aspect-square overflow-hidden rounded-lg'
                     style={{
                       border: '1px solid var(--linear-border-subtle)',
+                      boxShadow:
+                        '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
                     }}
                   >
                     <Image
@@ -160,7 +228,7 @@ export function AutomaticReleaseSmartlinksSection() {
                     </p>
                   </div>
 
-                  {/* Platform buttons — using real SocialIcon components */}
+                  {/* Platform buttons */}
                   <div className='mt-5 w-full space-y-2'>
                     {SMART_LINK_DSPS.map(key => {
                       const config = DSP_CONFIGS[key];
@@ -168,7 +236,7 @@ export function AutomaticReleaseSmartlinksSection() {
                       return (
                         <div
                           key={key}
-                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 backdrop-blur-sm transition-all duration-150 ease-out cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
+                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 transition-[background-color] duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
                           style={{
                             border: '1px solid var(--linear-border-subtle)',
                           }}
@@ -182,7 +250,7 @@ export function AutomaticReleaseSmartlinksSection() {
                             {config.name}
                           </span>
                           <ChevronRight
-                            className='h-4 w-4 transition-all duration-150 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-secondary)] group-hover:translate-x-0.5'
+                            className='h-4 w-4 transition-all duration-[var(--linear-duration-normal)] ease-[var(--linear-ease)] text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-secondary)] group-hover:translate-x-0.5'
                             aria-hidden='true'
                           />
                         </div>
@@ -206,135 +274,5 @@ export function AutomaticReleaseSmartlinksSection() {
         </div>
       </Container>
     </section>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Releases Table — uses real DSP provider dots                        */
-/* ------------------------------------------------------------------ */
-
-function ReleasesTable() {
-  return (
-    <div className='bg-[var(--linear-bg-surface-0)]'>
-      {/* Table header */}
-      <div className='flex items-center justify-between border-b border-[var(--linear-border-subtle)] px-5 py-3'>
-        <div className='flex items-center gap-2'>
-          <span className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-            Releases
-          </span>
-          <span className='rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
-            {RELEASES.length}
-          </span>
-        </div>
-        <div className='flex items-center gap-2'>
-          <span className='text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-            All synced from Spotify
-          </span>
-        </div>
-      </div>
-
-      {/* Column headers */}
-      <div className='grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
-        <span className='w-10' />
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
-          Title
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden sm:block'>
-          Platforms
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)] hidden md:block'>
-          Type
-        </span>
-        <span className='text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] uppercase tracking-[0.05em] text-[var(--linear-text-tertiary)]'>
-          Smart Link
-        </span>
-      </div>
-
-      {/* Rows */}
-      {RELEASES.map((release, i) => (
-        <div
-          key={release.id}
-          className='grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors duration-150 hover:bg-[var(--linear-bg-hover)]'
-          style={{
-            borderBottom:
-              i < RELEASES.length - 1
-                ? '1px solid var(--linear-border-subtle)'
-                : undefined,
-          }}
-        >
-          {/* Artwork swatch */}
-          <div
-            className='h-10 w-10 shrink-0 rounded-md'
-            style={{ background: release.gradient }}
-          />
-
-          {/* Title + date */}
-          <div className='min-w-0'>
-            <p className='truncate text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
-              {release.title}
-            </p>
-            <p className='mt-0.5 text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
-              {release.date} · {release.trackCount}{' '}
-              {release.trackCount === 1 ? 'track' : 'tracks'}
-            </p>
-          </div>
-
-          {/* Provider dots — matches real ReleaseTable availability column */}
-          <div className='hidden sm:flex items-center gap-1'>
-            {PROVIDER_KEYS.map(key => {
-              const config = DSP_CONFIGS[key];
-              const isAvailable = release.platforms.some(
-                p =>
-                  p.toLowerCase().replace(/\s+/g, '_') === key ||
-                  p.toLowerCase().replace(/\s+/g, '') === key.replace(/_/g, '')
-              );
-              return (
-                <span
-                  key={key}
-                  className='inline-flex h-5 w-5 items-center justify-center rounded-full transition-opacity duration-150'
-                  style={{
-                    backgroundColor: isAvailable
-                      ? `${config?.color ?? '#888'}20`
-                      : 'var(--linear-bg-surface-2)',
-                    color: isAvailable
-                      ? config?.color
-                      : 'var(--linear-text-tertiary)',
-                    opacity: isAvailable ? 1 : 0.3,
-                  }}
-                  title={config?.name}
-                >
-                  <SocialIcon platform={key} className='h-3 w-3' aria-hidden />
-                </span>
-              );
-            })}
-          </div>
-
-          {/* Type badge */}
-          <span className='hidden md:inline-flex rounded-full px-2 py-0.5 text-[var(--linear-label-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-secondary)] bg-[var(--linear-bg-surface-2)]'>
-            {release.type}
-          </span>
-
-          {/* Smart link status */}
-          {release.hasSmartLink ? (
-            <span
-              className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)]'
-              style={{
-                color: 'var(--linear-success)',
-                backgroundColor:
-                  'oklch(from var(--linear-success) l c h / 0.12)',
-              }}
-            >
-              <Link2 className='h-3 w-3' aria-hidden='true' />
-              Live
-            </span>
-          ) : (
-            <span className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-tertiary)] bg-[var(--linear-bg-surface-2)]'>
-              <ExternalLink className='h-3 w-3' aria-hidden='true' />
-              None
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
   );
 }

@@ -198,8 +198,7 @@ describe('ContactSidebar', () => {
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     expect(screen.getByTestId('contact-avatar')).toHaveTextContent('John Doe');
-    expect(screen.getByPlaceholderText('First')).toHaveValue('John');
-    expect(screen.getByPlaceholderText('Last')).toHaveValue('Doe');
+    expect(screen.getByPlaceholderText('Full name')).toHaveValue('John Doe');
   });
 
   it('Social tab shows social links', async () => {
@@ -224,19 +223,11 @@ describe('ContactSidebar', () => {
 
     // Should render without throwing
     expect(screen.getByTestId('contact-sidebar')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('First')).toHaveValue('');
-    expect(screen.getByPlaceholderText('Last')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Full name')).toHaveValue('sparse');
   });
 
-  it('does not render a Save changes button when onSave is provided', () => {
-    render(
-      <ContactSidebar
-        contact={mockContact}
-        mode='admin'
-        isOpen={true}
-        onSave={vi.fn()}
-      />
-    );
+  it('does not render a Save changes button in admin mode', () => {
+    render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     expect(
       screen.queryByRole('button', { name: /save changes/i })
