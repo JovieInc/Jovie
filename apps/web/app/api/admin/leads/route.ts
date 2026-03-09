@@ -5,11 +5,8 @@ import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import {
-  extractLinktreeHandle,
-  validateLinktreeUrl,
-} from '@/lib/ingestion/strategies/linktree';
 import { processLeadBatch } from '@/lib/leads/process-batch';
+import { seedLeadFromUrl } from '@/lib/leads/url-intake';
 import {
   leadListQuerySchema,
   manualLeadSubmitSchema,
@@ -139,22 +136,12 @@ export async function POST(request: NextRequest) {
     const newLeadIds: string[] = [];
 
     for (const url of validated.data.urls) {
-      const validated = validateLinktreeUrl(url);
-      if (!validated) {
+      const seed = seedLeadFromUrl(url);
+      if (!seed) {
         results.push({
           url,
           status: 'invalid',
-          reason: 'Invalid Linktree URL',
-        });
-        continue;
-      }
-
-      const handle = extractLinktreeHandle(url);
-      if (!handle) {
-        results.push({
-          url,
-          status: 'invalid',
-          reason: 'Could not extract handle',
+          reason: 'Invalid URL',
         });
         continue;
       }
@@ -163,7 +150,7 @@ export async function POST(request: NextRequest) {
       const [existing] = await db
         .select({ id: leads.id })
         .from(leads)
-        .where(eq(leads.linktreeHandle, handle))
+        .where(eq(leads.linktreeHandle, seed.handle))
         .limit(1);
 
       if (existing) {
@@ -174,9 +161,15 @@ export async function POST(request: NextRequest) {
       const [inserted] = await db
         .insert(leads)
         .values({
-          linktreeHandle: handle,
-          linktreeUrl: validated,
+          linktreeHandle: seed.handle,
+          linktreeUrl: seed.normalizedUrl,
           discoverySource: 'manual',
+          hasSpotifyLink: seed.hasSpotifyLink,
+          spotifyUrl: seed.spotifyUrl,
+          hasInstagram: seed.hasInstagram,
+          instagramHandle: seed.instagramHandle,
+          musicToolsDetected:
+            seed.kind === 'apple_music' ? ['apple_music'] : [],
         })
         .returning({ id: leads.id });
 
