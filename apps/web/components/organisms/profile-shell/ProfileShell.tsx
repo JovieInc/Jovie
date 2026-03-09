@@ -1,6 +1,6 @@
 'use client';
 
-import { DollarSign } from 'lucide-react';
+import { Calendar, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
@@ -48,6 +48,8 @@ export function ProfileShell({
   showTipButton = false,
   isTipModeActive = false,
   showBackButton = false,
+  showTourButton = false,
+  isTourModeActive = false,
   showFooter = true,
   showNotificationButton = false,
   maxWidthClass = 'w-full max-w-md',
@@ -194,7 +196,10 @@ export function ProfileShell({
                 />
                 {children}
                 {/* Social bar with contacts and tip buttons inline */}
-                {(showSocialBar || hasTipSupport || hasActiveSubscriptions) && (
+                {(showSocialBar ||
+                  showTourButton ||
+                  hasTipSupport ||
+                  hasActiveSubscriptions) && (
                   <div className='flex justify-center'>
                     <div
                       className='flex flex-wrap items-center justify-center gap-3'
@@ -218,6 +223,26 @@ export function ProfileShell({
                             artistName={artist.name}
                           />
                         ))}
+                      {/* Tour */}
+                      {showTourButton && (
+                        <CircleIconButton
+                          size='md'
+                          variant='ghost'
+                          ariaLabel='Tour dates'
+                          data-testid='tour-trigger'
+                          className={`border transition-colors ${
+                            isTourModeActive
+                              ? 'border-subtle bg-surface-2 text-primary-token'
+                              : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                          }`}
+                          asChild
+                        >
+                          <Link href={`/${artist.handle}?mode=tour`}>
+                            <Calendar className='h-4 w-4' aria-hidden='true' />
+                          </Link>
+                        </CircleIconButton>
+                      )}
+
                       {/* Tip — right */}
                       {hasTipSupport &&
                         venmoLink &&
