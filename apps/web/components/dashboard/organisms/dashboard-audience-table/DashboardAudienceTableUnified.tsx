@@ -253,8 +253,7 @@ export const DashboardAudienceTableUnified = memo(
     profileUrl,
     profileId,
     subscriberCount,
-    anonymousCount = 0,
-    totalAudienceCount = 0,
+    totalAudienceCount,
     filters,
     hasNextPage,
     isFetchingNextPage,
@@ -585,9 +584,8 @@ export const DashboardAudienceTableUnified = memo(
               rows={rows}
               selectedIds={selectedIds}
               subscriberCount={subscriberCount}
-              total={total}
-              anonymousCount={anonymousCount}
               totalAudienceCount={totalAudienceCount}
+              total={total}
             />
 
             <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
@@ -645,7 +643,7 @@ export const DashboardAudienceTableUnified = memo(
             </div>
 
             <div className='sr-only' aria-live='polite' aria-atomic='true'>
-              {total > 0 && `Showing ${rows.length} of ${total}`}
+              {rows.length > 0 && `Showing ${rows.length} members`}
               {selectedCount > 0 &&
                 `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
             </div>

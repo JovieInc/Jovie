@@ -15,6 +15,9 @@ const defaultMetrics: AdminFunnelMetrics = {
   runwayMonths: null,
   stripeAvailable: true,
   errors: [],
+  outreachToSignupRate: 0.067,
+  signupToPaidRate: 0.2,
+  dollarPerOutreach: 0.003,
 };
 
 describe('FunnelMetricsStrip', () => {

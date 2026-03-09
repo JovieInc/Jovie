@@ -45,6 +45,7 @@
   --linear-text-primary: oklch(12% 0.005 260);
   --linear-text-secondary: oklch(45% 0.012 260);
   --linear-text-tertiary: oklch(55% 0.01 260);
+  --linear-text-quaternary: oklch(70% 0.008 260);
   --linear-text-inverse: oklch(97% 0.005 260);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
@@ -265,6 +266,7 @@
   --linear-text-primary: lch(100% 0 272);
   --linear-text-secondary: lch(90.65% 1.35 272);
   --linear-text-tertiary: lch(62.6% 1.35 272);
+  --linear-text-quaternary: lch(45% 1.35 272);
   --linear-text-inverse: oklch(5% 0.005 260);
   /* Backgrounds — re-extracted from linear.app/demo dark mode (2026-03-05) */
   /* Linear's exact dark token values: --bg-sidebar-dark:#090909, --bg-base-color:#101012 */
@@ -274,8 +276,8 @@
   --linear-bg-header: rgba(9, 9, 9, 0.8);
   --linear-bg-surface-0: lch(14.133 4.2 272);
   /* Linear --color-bg-tertiary — elevated menus/popovers */
-  --linear-bg-surface-1: #2a2c32;
-  /* Linear --color-bg-surface-3 = rgb(42,44,50) — item hover */
+  --linear-bg-surface-1: lch(18.6 3.033 272);
+  /* Linear content views — rgb(18,19,20) */
   --linear-bg-surface-2: lch(10.633 3.033 272);
   /* Linear --color-bg-secondary — cards/panels */
   --linear-bg-button: oklch(26.5% 0.01 265);

@@ -33,7 +33,7 @@ export function BulkDeleteCreatorDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className='max-w-md'>
         <AlertDialogHeader className='gap-4'>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10'>
             <Icon name='AlertTriangle' className='h-6 w-6 text-destructive' />
           </div>
 
@@ -48,7 +48,7 @@ export function BulkDeleteCreatorDialog({
           </div>
         </AlertDialogHeader>
 
-        <div className='flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2'>
+        <div className='flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2'>
           <Icon
             name='AlertCircle'
             className='h-3.5 w-3.5 text-destructive shrink-0'

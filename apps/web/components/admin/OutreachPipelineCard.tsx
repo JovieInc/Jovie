@@ -1,5 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
-import { ArrowRight, Mail, MousePointerClick } from 'lucide-react';
+import {
+  ArrowRight,
+  DollarSign,
+  Mail,
+  MousePointerClick,
+  TrendingUp,
+  UserCheck,
+} from 'lucide-react';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 interface OutreachPipelineCardProps {
@@ -9,6 +16,37 @@ interface OutreachPipelineCardProps {
 function formatPercent(rate: number | null): string {
   if (rate === null) return '--';
   return `${(rate * 100).toFixed(1)}%`;
+}
+
+function formatDollarPerOutreach(value: number | null): string {
+  if (value === null) return '--';
+  return `$${value.toFixed(2)}`;
+}
+
+interface ConversionMetricProps {
+  readonly label: string;
+  readonly value: string;
+  readonly icon: React.ComponentType<{ className?: string }>;
+  readonly iconClassName: string;
+}
+
+function ConversionMetric({
+  label,
+  value,
+  icon: Icon,
+  iconClassName,
+}: ConversionMetricProps) {
+  return (
+    <div className='flex items-center justify-between'>
+      <div className='flex items-center gap-1.5'>
+        <Icon className={`size-3 ${iconClassName}`} />
+        <span className='text-2xs text-secondary-token'>{label}</span>
+      </div>
+      <span className='text-2xs font-semibold tabular-nums text-primary-token'>
+        {value}
+      </span>
+    </div>
+  );
 }
 
 interface PipelineStepProps {
@@ -94,6 +132,30 @@ export function OutreachPipelineCard({
             week from inbound &amp; organic sources.
           </p>
         )}
+
+        <div className='space-y-2 rounded-lg bg-surface-2 p-3'>
+          <p className='text-2xs font-medium text-tertiary-token'>
+            Conversion rates
+          </p>
+          <ConversionMetric
+            label='Outreach → Signup'
+            value={formatPercent(metrics.outreachToSignupRate)}
+            icon={TrendingUp}
+            iconClassName='text-info'
+          />
+          <ConversionMetric
+            label='Signup → Paid'
+            value={formatPercent(metrics.signupToPaidRate)}
+            icon={UserCheck}
+            iconClassName='text-success'
+          />
+          <ConversionMetric
+            label='$/outreach'
+            value={formatDollarPerOutreach(metrics.dollarPerOutreach)}
+            icon={DollarSign}
+            iconClassName='text-accent'
+          />
+        </div>
       </CardContent>
     </Card>
   );

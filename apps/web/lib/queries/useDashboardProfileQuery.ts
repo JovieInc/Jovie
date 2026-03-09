@@ -54,6 +54,8 @@ export function useDashboardProfileQuery() {
     queryFn: fetchDashboardProfile,
     // Use STANDARD_CACHE preset (5 min stale time) to prevent frequent refetches
     ...STANDARD_CACHE,
+    // Profile data is stable within the stale window — skip mount refetch
+    refetchOnMount: false,
   });
 }
 

@@ -71,7 +71,7 @@ export async function LeadPipelineKpis() {
           value={String(kpis.qualified)}
           metadata={<span>Ready for review</span>}
           icon={CheckCircle}
-          iconClassName='text-emerald-500'
+          iconClassName='text-success'
         />
         <KpiItem
           title='QUERIES TODAY'

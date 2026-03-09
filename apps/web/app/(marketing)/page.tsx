@@ -5,16 +5,15 @@ import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticRe
 import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
-import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
 import { LogoBar } from '@/components/home/LogoBar';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
+import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
-// Static rendering: use hardcoded flag defaults instead of evaluating flag()
-// functions which call cookies()/headers() and force dynamic rendering.
-export const revalidate = false;
+// ISR: revalidate every 24 hours so featured creators from the database
+// are refreshed without forcing fully dynamic rendering.
+export const revalidate = 86400;
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The link in bio that actually converts.`;
@@ -252,15 +251,13 @@ export default function HomePage() {
         <LogoBar />
       </div>
 
+      <DeeplinksGrid />
+
       <AutomaticReleaseSmartlinksSection />
 
       <AudienceCRMSection />
 
-      <DeeplinksGrid />
-
-      {publicEnv.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION === 'true' && (
-        <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
-      )}
+      <SeeItInAction />
 
       {/* Gradient separator before final CTA */}
       <div
@@ -268,7 +265,7 @@ export default function HomePage() {
         className='h-px max-w-lg mx-auto'
         style={{
           background:
-            'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
