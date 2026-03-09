@@ -34,6 +34,8 @@ export interface AudienceServerData {
   sort: string;
   direction: 'asc' | 'desc';
   subscriberCount: number;
+  anonymousCount: number;
+  totalAudienceCount: number;
 }
 
 /**
@@ -340,7 +342,12 @@ async function fetchMembersData(
     typeFilter?: AudienceMemberType;
     segmentFilter?: string[];
   }
-): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
+): Promise<
+  Omit<
+    AudienceServerData,
+    'view' | 'subscriberCount' | 'anonymousCount' | 'totalAudienceCount'
+  >
+> {
   const { includeDetails, memberId, typeFilter, segmentFilter } = options;
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
@@ -414,7 +421,12 @@ async function fetchSubscribersData(
   clerkUserId: string | null,
   selectedProfileId: string,
   searchParams: SearchParams
-): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
+): Promise<
+  Omit<
+    AudienceServerData,
+    'view' | 'subscriberCount' | 'anonymousCount' | 'totalAudienceCount'
+  >
+> {
   const parsed = subscriberQuerySchema.safeParse({
     page: searchParams.page,
     pageSize: searchParams.pageSize,
@@ -553,6 +565,34 @@ async function fetchSubscribersData(
 /**
  * Count total subscribers for a profile (lightweight query for UI state)
  */
+
+async function countAudienceByType(
+  tx: DbSessionTx,
+  clerkUserId: string | null,
+  selectedProfileId: string,
+  type?: AudienceMemberType
+): Promise<number> {
+  const ownershipJoin = clerkUserId
+    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
+    : drizzleSql``;
+
+  const typeFilter = type ? drizzleSql`AND am.type = ${type}` : drizzleSql``;
+
+  const countResult = await tx.execute(drizzleSql`
+    SELECT COUNT(*) AS total
+    FROM audience_members am
+    INNER JOIN creator_profiles cp ON am.creator_profile_id = cp.id
+    INNER JOIN users u             ON cp.user_id = u.id
+    WHERE am.creator_profile_id = ${selectedProfileId}
+    ${ownershipJoin}
+    ${typeFilter}
+  `);
+
+  return Number(
+    (countResult.rows[0] as { total: string | number } | undefined)?.total ?? 0
+  );
+}
+
 async function countSubscribers(
   tx: DbSessionTx,
   clerkUserId: string | null,
@@ -595,6 +635,8 @@ function buildEmptyAudienceData(
     sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
     direction: 'desc',
     subscriberCount: 0,
+    anonymousCount: 0,
+    totalAudienceCount: 0,
   };
 }
 
@@ -668,15 +710,23 @@ export async function getAudienceServerData(params: {
       { includeDetails, memberId, segments }
     );
 
-    const [subscriberCount, data] = await Promise.all([
-      countSubscribers(tx, clerkUserId, selectedProfileId),
-      dataPromise,
-    ]);
+    const countsPromise = includeDetails
+      ? Promise.all([
+          countSubscribers(tx, clerkUserId, selectedProfileId),
+          countAudienceByType(tx, clerkUserId, selectedProfileId, 'anonymous'),
+          countAudienceByType(tx, clerkUserId, selectedProfileId),
+        ])
+      : Promise.resolve([0, 0, 0] as const);
+
+    const [[subscriberCount, anonymousCount, totalAudienceCount], data] =
+      await Promise.all([countsPromise, dataPromise]);
 
     return {
       ...data,
       view,
       subscriberCount,
+      anonymousCount,
+      totalAudienceCount,
     };
   });
 }

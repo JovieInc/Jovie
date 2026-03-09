@@ -8,7 +8,6 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { PopularityIcon } from './PopularityIcon';
 
 /** Maps ProviderKey to SocialIcon platform name (only those with SVG icons) */
 const PROVIDER_ICON_MAP: Partial<Record<ProviderKey, string>> = {
@@ -108,7 +107,7 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [release.providers]);
 
   return (
-    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[24px_minmax(0,1fr)_minmax(88px,132px)_20px_minmax(54px,92px)]'>
+    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[24px_minmax(0,1fr)_minmax(88px,120px)_auto_minmax(0,72px)]'>
       <div className='flex w-6 items-center justify-center'>
         {hasPreview ? (
           <button
@@ -168,32 +167,26 @@ export const ReleaseCell = memo(function ReleaseCell({
         ) : null}
       </div>
 
-      <div className='flex w-4 items-center justify-start'>
-        <PopularityIcon popularity={release.spotifyPopularity} />
-      </div>
-
-      <div className='flex min-w-0 items-center gap-1 justify-start'>
+      <div className='flex min-w-0 items-center justify-start'>
         {platformInfo ? (
           <SimpleTooltip content={platformInfo.allNames.join(', ')} side='top'>
-            <span
-              role='img'
-              className='inline-flex shrink-0 items-center gap-1'
-              aria-label={`Available platforms: ${platformInfo.allNames.join(', ')}`}
-            >
-              {platformInfo.visible.map(p => (
-                <SocialIcon
-                  key={p.key}
-                  platform={p.icon}
-                  className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
-                  aria-hidden
-                />
-              ))}
+            <div className='inline-flex h-6 shrink-0 items-center gap-1 text-[11px] text-(--linear-text-tertiary)'>
+              <span className='flex items-center gap-0.5'>
+                {platformInfo.visible.map(p => (
+                  <SocialIcon
+                    key={p.key}
+                    platform={p.icon}
+                    className='h-3.5 w-3.5 text-(--linear-text-secondary)'
+                    aria-hidden
+                  />
+                ))}
+              </span>
               {platformInfo.remaining > 0 && (
                 <span className='tabular-nums text-[10px] text-(--linear-text-tertiary)'>
                   +{platformInfo.remaining}
                 </span>
               )}
-            </span>
+            </div>
           </SimpleTooltip>
         ) : null}
       </div>

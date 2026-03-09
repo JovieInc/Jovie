@@ -32,6 +32,10 @@ interface AudienceTableSubheaderProps {
   readonly subscriberCount: number;
   /** Total row count for the current view */
   readonly total: number;
+  /** Total audience count across all audience views */
+  readonly totalAudienceCount?: number;
+  /** Total anonymous audience count */
+  readonly anonymousCount?: number;
 }
 
 /**
@@ -46,6 +50,8 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   selectedIds,
   subscriberCount,
   total,
+  totalAudienceCount = 0,
+  anonymousCount = 0,
 }: AudienceTableSubheaderProps) {
   const hasData = total > 0;
 
@@ -54,7 +60,13 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
       <div className='flex items-center justify-between px-4 py-1'>
         {/* Left: Audience view selector */}
         <div className='flex items-center gap-2'>
-          <AudienceHeaderBadge view={view} onViewChange={onViewChange} />
+          <AudienceHeaderBadge
+            view={view}
+            onViewChange={onViewChange}
+            totalAudienceCount={totalAudienceCount}
+            subscriberCount={subscriberCount}
+            anonymousCount={anonymousCount}
+          />
         </div>
 
         {/* Right: Filter + Export CSV */}

@@ -26,6 +26,43 @@ const INTENT_DOT_STYLES: Record<AudienceIntentLevel, string> = {
   low: 'bg-zinc-400',
 };
 
+const MOBILE_SOURCE_MAP: Record<string, string> = {
+  'x.com': 'X',
+  'twitter.com': 'X',
+  'instagram.com': 'Instagram',
+  'facebook.com': 'Facebook',
+  'tiktok.com': 'TikTok',
+  'youtube.com': 'YouTube',
+  'spotify.com': 'Spotify',
+  'google.com': 'Google',
+  'reddit.com': 'Reddit',
+  'linkedin.com': 'LinkedIn',
+  't.co': 'X',
+  'l.facebook.com': 'Facebook',
+  'l.instagram.com': 'Instagram',
+};
+
+const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
+
+function normalizeSourceLabel(source: string): string {
+  const normalized = source.trim().toLowerCase();
+  return (
+    MOBILE_SOURCE_MAP[normalized] ??
+    normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  );
+}
+
+function isInternalReferrer(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '').toLowerCase();
+    return INTERNAL_HOST_SUFFIXES.some(
+      suffix => hostname === suffix || hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * AudienceMobileCard - Clean, Apple-esque card for audience members on mobile.
  *
@@ -111,9 +148,14 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
   const utmSource = member.utmParams?.source;
   let source = 'Direct';
   if (utmSource) {
-    source = utmSource.charAt(0).toUpperCase() + utmSource.slice(1);
+    source = normalizeSourceLabel(utmSource);
   } else if (member.referrerHistory.length > 0) {
-    source = parseSourceForMobile(member.referrerHistory[0].url);
+    const externalReferrer = member.referrerHistory.find(
+      entry => !isInternalReferrer(entry.url)
+    );
+    source = externalReferrer
+      ? parseSourceForMobile(externalReferrer.url)
+      : 'Direct';
   }
   const lastAction =
     member.latestActions.length > 0 ? member.latestActions[0].label : null;
@@ -155,18 +197,9 @@ function parseSourceForMobile(url: string): string {
   try {
     const parsed = new URL(url);
     const utmSource = parsed.searchParams.get('utm_source');
-    if (utmSource) return utmSource;
-    const hostname = parsed.hostname.replace('www.', '');
-    const domainMap: Record<string, string> = {
-      'x.com': 'X',
-      'twitter.com': 'X',
-      'instagram.com': 'IG',
-      'facebook.com': 'FB',
-      'tiktok.com': 'TikTok',
-      'youtube.com': 'YT',
-      't.co': 'X',
-    };
-    return domainMap[hostname] ?? hostname;
+    if (utmSource) return normalizeSourceLabel(utmSource);
+    const hostname = parsed.hostname.replace('www.', '').toLowerCase();
+    return MOBILE_SOURCE_MAP[hostname] ?? hostname;
   } catch {
     return url || 'Direct';
   }

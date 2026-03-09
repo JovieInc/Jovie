@@ -80,6 +80,9 @@ export function AudienceMemberRow({
         type={row.type}
         email={row.email}
         phone={row.phone}
+        deviceType={row.deviceType}
+        geoCity={row.geoCity}
+        geoCountry={row.geoCountry}
       />
 
       <AudienceTypeBadge type={row.type} />

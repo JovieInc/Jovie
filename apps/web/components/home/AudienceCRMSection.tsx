@@ -129,7 +129,7 @@ export function AudienceCRMSection() {
                 Every visit captures an email, a city, a referral source. No
                 integrations, no extra tools — just a CRM that fills itself.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in CRM
               </span>
             </div>

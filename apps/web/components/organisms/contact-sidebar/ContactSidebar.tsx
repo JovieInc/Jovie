@@ -1,9 +1,9 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button, SegmentControl } from '@jovie/ui';
+import { SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EntitySidebarShell } from '@/components/molecules/drawer';
@@ -34,7 +34,6 @@ export const ContactSidebar = memo(function ContactSidebar({
   onRefresh,
   onContactChange,
   onSave,
-  isSaving,
   contextMenuItems: providedContextMenuItems,
   onAvatarUpload,
 }: ContactSidebarProps) {
@@ -114,20 +113,37 @@ export const ContactSidebar = memo(function ContactSidebar({
 
   const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
 
-  const saveFooter =
-    onSave && contact ? (
-      <div className='flex justify-end'>
-        <Button
-          type='button'
-          size='sm'
-          variant='primary'
-          onClick={() => onSave(contact)}
-          disabled={isSaving}
-        >
-          {isSaving ? 'Saving\u2026' : 'Save changes'}
-        </Button>
-      </div>
-    ) : undefined;
+  const serializedContact = useMemo(() => {
+    if (!contact) return null;
+    return JSON.stringify({
+      id: contact.id,
+      firstName: contact.firstName ?? null,
+      lastName: contact.lastName ?? null,
+      username: contact.username ?? null,
+      avatarUrl: contact.avatarUrl ?? null,
+      socialLinks: contact.socialLinks.map(link => ({
+        id: link.id ?? null,
+        label: link.label ?? null,
+        url: link.url,
+        platformType: link.platformType ?? null,
+      })),
+    });
+  }, [contact]);
+
+  const lastSavedContactRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!onSave || !contact || !serializedContact) return;
+    if (serializedContact === lastSavedContactRef.current) return;
+
+    const timer = globalThis.setTimeout(() => {
+      void Promise.resolve(onSave(contact)).then(() => {
+        lastSavedContactRef.current = serializedContact;
+      });
+    }, 300);
+
+    return () => globalThis.clearTimeout(timer);
+  }, [contact, onSave, serializedContact]);
 
   return (
     <EntitySidebarShell
@@ -164,7 +180,6 @@ export const ContactSidebar = memo(function ContactSidebar({
           />
         ) : undefined
       }
-      footer={saveFooter}
     >
       {contact && (
         <>

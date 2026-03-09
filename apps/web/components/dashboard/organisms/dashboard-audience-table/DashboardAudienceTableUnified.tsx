@@ -253,6 +253,8 @@ export const DashboardAudienceTableUnified = memo(
     profileUrl,
     profileId,
     subscriberCount,
+    anonymousCount = 0,
+    totalAudienceCount = 0,
     filters,
     hasNextPage,
     isFetchingNextPage,
@@ -584,6 +586,8 @@ export const DashboardAudienceTableUnified = memo(
               selectedIds={selectedIds}
               subscriberCount={subscriberCount}
               total={total}
+              anonymousCount={anonymousCount}
+              totalAudienceCount={totalAudienceCount}
             />
 
             <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>

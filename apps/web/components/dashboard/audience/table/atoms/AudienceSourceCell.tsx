@@ -25,6 +25,27 @@ const DOMAIN_MAP: Record<string, string> = {
   'l.instagram.com': 'Instagram',
 };
 
+const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
+
+function normalizeSourceName(rawSource: string): string {
+  const normalized = rawSource.trim().toLowerCase();
+  return (
+    DOMAIN_MAP[normalized] ??
+    normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  );
+}
+
+function isInternalReferrer(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '').toLowerCase();
+    return INTERNAL_HOST_SUFFIXES.some(
+      suffix => hostname === suffix || hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Extracts a human-readable source label from a referrer URL.
  * Detects known social platforms and falls back to domain name.
@@ -45,7 +66,7 @@ function parseSourceLabel(url: string): string {
  */
 function formatUtmSourceLabel(utm: AudienceUtmParams): string | null {
   if (!utm.source) return null;
-  const source = utm.source.charAt(0).toUpperCase() + utm.source.slice(1);
+  const source = normalizeSourceName(utm.source);
   if (utm.medium) return `${source} / ${utm.medium}`;
   return source;
 }
@@ -81,7 +102,16 @@ export function AudienceSourceCell({
     );
   }
 
-  const latestReferrer = referrerHistory[0];
+  const latestReferrer = referrerHistory.find(
+    entry => !isInternalReferrer(entry.url)
+  );
+  if (!latestReferrer) {
+    return (
+      <div className={cn('text-[13px] text-tertiary-token', className)}>
+        Direct
+      </div>
+    );
+  }
   const sourceLabel = parseSourceLabel(latestReferrer.url);
 
   return (

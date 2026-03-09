@@ -135,6 +135,11 @@ export function useHandleValidation({
 
   // Update checking state when Pacer is pending or validating
   const isChecking = isPending || isValidating;
+  const validateApiRef = useRef(validateApi);
+
+  useEffect(() => {
+    validateApiRef.current = validateApi;
+  }, [validateApi]);
 
   // Safety valve: reset checking after max duration to prevent infinite "Checking..."
   // This catches edge cases where Pacer state or callbacks don't resolve.
@@ -212,9 +217,9 @@ export function useHandleValidation({
       });
 
       // Trigger API validation via Pacer (debounced, cached)
-      void validateApi(normalizedInput);
+      void validateApiRef.current(normalizedInput);
     },
-    [normalizedInitialHandle, validateApi]
+    [normalizedInitialHandle]
   );
 
   return {

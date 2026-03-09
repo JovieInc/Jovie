@@ -71,7 +71,7 @@ export async function GET(
       }>(
         drizzleSql`
           with release_clicks as (
-            select *
+            select created_at, metadata
             from ${clickEvents}
             where ${clickEvents.creatorProfileId} = ${profile.id}
               and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
@@ -79,7 +79,7 @@ export async function GET(
               and ${clickEvents.metadata} ->> 'contentType' = 'release'
           ),
           recent_clicks as (
-            select *
+            select 1
             from release_clicks
             where created_at >= ${sqlTimestamp(sevenDaysAgo)}
           ),

@@ -185,7 +185,7 @@ export function AdminCreatorProfilesUnified({
 
   const { handleAvatarUpload } = useAvatarUpload();
 
-  const { isSaving, saveContact } = useContactSave({
+  const { saveContact } = useContactSave({
     onSaveSuccess: updatedContact => {
       setDraftContact(updatedContact);
     },
@@ -370,7 +370,6 @@ export function AdminCreatorProfilesUnified({
         onRefresh={handleSidebarRefresh}
         onContactChange={handleContactChange}
         onSave={saveContact}
-        isSaving={isSaving}
         contextMenuItems={sidebarContextMenuItems}
         onAvatarUpload={handleAvatarUpload}
       />
@@ -383,7 +382,6 @@ export function AdminCreatorProfilesUnified({
       handleSidebarRefresh,
       handleContactChange,
       saveContact,
-      isSaving,
       sidebarContextMenuItems,
       handleAvatarUpload,
     ]
