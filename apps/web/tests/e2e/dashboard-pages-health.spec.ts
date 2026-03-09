@@ -8,18 +8,16 @@ import {
 } from './utils/smoke-test-utils';
 
 /**
- * Dashboard Pages Health Check
+ * Dashboard E2E Tests (consolidated from dashboard-pages-health, dashboard-landing, dashboard-routing)
  *
- * Comprehensive E2E tests that verify every dashboard page:
- * 1. Loads without white screens or error pages
- * 2. No critical console errors
- * 3. Key content elements are visible
+ * Covers:
+ * 1. All dashboard page health checks (loads, no errors, content visible)
+ * 2. Admin page health checks
+ * 3. Routing (back/forward nav, deep linking, redirect behavior)
+ * 4. Lazy component hydration
  *
  * Run with doppler:
  *   doppler run -- pnpm exec playwright test dashboard-pages-health --project=chromium
- *
- * For debugging individual pages:
- *   doppler run -- pnpm exec playwright test dashboard-pages-health --project=chromium --grep "Profile"
  */
 
 /**
@@ -790,6 +788,144 @@ test.describe('Admin Pages Health Check @smoke', () => {
     expect(
       realFailures,
       `${realFailures.length} pages failed health check (excluding ${infraFailures.length} transient infra failures)`
+    ).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Dashboard Routing Tests (consolidated from dashboard-routing.spec.ts)
+// ============================================================================
+
+test.describe('Dashboard Routing', () => {
+  test.setTimeout(180_000);
+
+  test.beforeEach(async ({ page }) => {
+    if (!hasClerkCredentials()) {
+      test.skip();
+      return;
+    }
+
+    await page.route('**/api/profile/view', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+
+    await setupClerkTestingToken({ page });
+    try {
+      await signInUser(page);
+    } catch {
+      test.skip();
+    }
+  });
+
+  test('legacy /app/dashboard redirects away', async ({ page }) => {
+    await page.goto('/app/dashboard', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForURL(url => !url.pathname.endsWith('/app/dashboard'), {
+      timeout: 30000,
+    });
+  });
+
+  test('browser back/forward navigation works', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await page.goto('/app/dashboard/profile', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/dashboard\/profile/);
+
+    await page.goto('/app/settings', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/settings/);
+
+    await page.goBack({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/app\/dashboard\/profile/, {
+      timeout: 30_000,
+    });
+
+    await page.goForward({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/app\/settings/, { timeout: 30_000 });
+  });
+
+  test('all dashboard routes render content @smoke', async ({ page }) => {
+    test.setTimeout(240_000);
+    const routes = [
+      { path: '/app/dashboard/profile', content: /profile|links|edit/i },
+      { path: '/app/dashboard/earnings', content: /earnings|tips|revenue/i },
+      { path: '/app/dashboard/releases', content: /releases|music|tracks/i },
+      {
+        path: '/app/dashboard/audience',
+        content: /audience|fans|subscribers/i,
+      },
+    ];
+
+    for (const { path, content } of routes) {
+      await page.goto(path, { timeout: SMOKE_TIMEOUTS.NAVIGATION });
+      await waitForHydration(page);
+      await waitForNetworkIdle(page);
+
+      const mainContent = page.locator('main').getByText(content).first();
+      const hasMatchingContent = await mainContent
+        .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+        .catch(() => false);
+
+      if (hasMatchingContent) continue;
+
+      // Fallback: verify page has some content (not blank)
+      const bodyText = await page
+        .locator('body')
+        .textContent()
+        .catch(() => '');
+      const bodyLength = bodyText?.trim().length ?? 0;
+      expect(
+        bodyLength > 10,
+        `Route ${path} should render some content (found ${bodyLength} chars)`
+      ).toBe(true);
+    }
+  });
+
+  test('lazy components hydrate without errors @smoke', async ({ page }) => {
+    test.setTimeout(180_000);
+    const hydrationErrors: string[] = [];
+
+    page.on('console', msg => {
+      const text = msg.text();
+      if (
+        text.includes('Hydration failed') ||
+        text.includes('Text content did not match') ||
+        text.includes('did not match. Server:')
+      ) {
+        hydrationErrors.push(text);
+      }
+    });
+
+    await page.goto('/app/dashboard/profile', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {});
+
+    await page
+      .waitForFunction(
+        () => !document.querySelector('[data-loading="true"], .skeleton'),
+        { timeout: 15_000 }
+      )
+      .catch(() => {});
+
+    expect(
+      hydrationErrors,
+      `Hydration errors detected: ${hydrationErrors.join(', ')}`
     ).toHaveLength(0);
   });
 });
