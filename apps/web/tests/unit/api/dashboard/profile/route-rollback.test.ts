@@ -32,6 +32,10 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
+vi.mock('@/lib/db/social-links-sync', () => ({
+  syncSocialLinksFromPrimaryMusicUrls: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/app/api/dashboard/profile/lib', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
   validateUpdatesPayload: mockValidateUpdatesPayload,
