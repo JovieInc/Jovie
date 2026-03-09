@@ -29,9 +29,7 @@ export const PHONE_CONTENT_HEIGHT = 196;
 /* ------------------------------------------------------------------ */
 
 export const MOCK_TOUR_DATES = [
-  { city: 'Atlanta, GA', venue: 'The Masquerade', date: 'Mar 22' },
-  { city: 'Nashville, TN', venue: 'Exit/In', date: 'Mar 28' },
-  { city: 'Austin, TX', venue: 'Mohawk', date: 'Apr 4' },
+  { city: 'Los Angeles, CA', venue: 'Academy LA', date: 'Apr 12' },
 ] as const;
 
 function ListenContent() {
@@ -88,26 +86,28 @@ function TipContent() {
 }
 
 function TourContent() {
+  const show = MOCK_TOUR_DATES[0];
   return (
-    <div className='flex h-full flex-col justify-center gap-2'>
-      {MOCK_TOUR_DATES.map(show => (
-        <div
-          key={show.city}
-          className='flex w-full items-center justify-between rounded-xl px-4 py-3 bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)]'
-        >
-          <div className='min-w-0'>
-            <p className='text-[13px] font-medium text-[var(--linear-text-primary)] truncate'>
-              {show.venue}
-            </p>
-            <p className='text-[11px] text-[var(--linear-text-tertiary)]'>
-              {show.city}
-            </p>
-          </div>
-          <span className='shrink-0 text-[11px] font-medium text-[var(--linear-text-secondary)]'>
-            {show.date}
-          </span>
+    <div className='flex h-full flex-col justify-center gap-3'>
+      <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)]'>
+        <div className='min-w-0'>
+          <p className='text-[13px] font-medium text-[var(--linear-text-primary)] truncate'>
+            {show.venue}
+          </p>
+          <p className='text-[11px] text-[var(--linear-text-tertiary)]'>
+            {show.city}
+          </p>
         </div>
-      ))}
+        <span className='shrink-0 text-[11px] font-medium text-[var(--linear-text-secondary)]'>
+          {show.date}
+        </span>
+      </div>
+      <button
+        type='button'
+        className='text-[12px] font-medium text-[var(--linear-text-tertiary)] hover:text-[var(--linear-text-secondary)] transition-colors'
+      >
+        See more dates
+      </button>
     </div>
   );
 }
