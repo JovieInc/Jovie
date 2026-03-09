@@ -6,6 +6,7 @@ import {
   LEAD_QUALIFICATION_CONCURRENCY,
   LINKTREE_FETCH_DELAY_MS,
 } from './constants';
+import { pipelineLog } from './pipeline-logger';
 import { qualifyLead } from './qualify';
 
 export interface BatchResult {
@@ -59,7 +60,10 @@ async function processOneLead(
       .where(eq(leads.id, leadId))
       .limit(1);
 
-    if (!lead) return 'error';
+    if (!lead) {
+      pipelineLog('qualify', 'Lead not found in DB', { leadId });
+      return 'error';
+    }
 
     const qualification = await qualifyLead(lead.linktreeUrl);
     const now = new Date();
@@ -93,6 +97,10 @@ async function processOneLead(
 
     return qualification.status;
   } catch (error) {
+    pipelineLog('qualify', 'Lead qualification failed', {
+      leadId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     await captureError('Lead qualification failed', error, {
       route: 'leads/process-batch',
       contextData: { leadId },

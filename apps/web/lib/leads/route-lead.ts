@@ -7,6 +7,7 @@ import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { filterEmail } from './email-filter';
 import { detectRepresentation } from './management-filter';
+import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
 export interface RouteLeadResult {
   route: 'email' | 'dm' | 'both' | 'manual_review' | 'skipped';
@@ -15,9 +16,12 @@ export interface RouteLeadResult {
 }
 
 export async function routeLead(leadId: string): Promise<RouteLeadResult> {
+  pipelineLog('routing', 'Starting lead routing', { leadId });
+
   // 1. Fetch lead
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) {
+    pipelineWarn('routing', 'Lead not found', { leadId });
     throw new Error(`Lead not found: ${leadId}`);
   }
 
@@ -48,6 +52,15 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
   } else {
     route = 'skipped';
   }
+
+  pipelineLog('routing', 'Route determined', {
+    leadId,
+    route,
+    isHighProfile,
+    hasRepresentation: repResult.hasRepresentation,
+    emailInvalid: emailResult.invalid,
+    hasInstagram: lead.hasInstagram,
+  });
 
   // 6. Reuse token if present, otherwise generate claim token
   const token = lead.claimToken;
