@@ -67,22 +67,22 @@ export function ContactDrawer({
           </Drawer.Title>
 
           <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
-            <div className='space-y-1'>
+            <div className='space-y-2'>
               {contacts.map(contact => {
                 const primary = primaryChannel(contact);
                 return (
                   <div
                     key={contact.id}
-                    className='flex items-center justify-between gap-3 rounded-xl px-3 py-3 transition-colors duration-150 ease-out hover:bg-black/5 active:bg-black/8'
+                    className='flex items-center justify-between gap-3 rounded-xl border border-subtle/70 bg-surface-2 px-3.5 py-3 transition-colors duration-150 ease-out hover:bg-surface-3 active:bg-surface-3'
                     data-testid='contact-drawer-item'
                   >
                     <button
                       type='button'
-                      className='flex flex-1 flex-col items-start gap-1.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                      className='flex flex-1 flex-col items-start gap-1 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                       onClick={() => performAction(primary, contact)}
                     >
                       <div className='flex items-center gap-2'>
-                        <span className='text-sm font-semibold text-primary-token'>
+                        <span className='text-[13px] font-medium text-primary-token'>
                           {contact.roleLabel}
                         </span>
                         {contact.territorySummary ? (
@@ -90,8 +90,13 @@ export function ContactDrawer({
                         ) : null}
                       </div>
                       {contact.secondaryLabel ? (
-                        <span className='text-xs text-secondary-token'>
+                        <span className='text-[11px] text-secondary-token'>
                           {contact.secondaryLabel}
+                        </span>
+                      ) : null}
+                      {contact.primaryContactLabel ? (
+                        <span className='text-[11px] text-secondary-token/90'>
+                          {contact.primaryContactLabel}
                         </span>
                       ) : null}
                     </button>
@@ -100,7 +105,7 @@ export function ContactDrawer({
                         <button
                           key={`${contact.id}-${channel.type}`}
                           type='button'
-                          className='flex h-10 w-10 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-black/5 active:bg-black/8 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+                          className='flex h-9 w-9 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-surface-1 active:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
                           aria-label={`${channel.type === 'email' ? 'Email' : 'Call'} ${contact.roleLabel}`}
                           onClick={() => performAction(channel, contact)}
                           data-testid='contact-drawer-channel-action'

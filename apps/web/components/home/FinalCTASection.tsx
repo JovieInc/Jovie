@@ -5,7 +5,7 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
-    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-32'>
+    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-40'>
       {/* Ambient glow behind CTA */}
       <div
         aria-hidden='true'
@@ -23,7 +23,7 @@ export function FinalCTASection() {
         {/* Gradient separator */}
         <div
           aria-hidden='true'
-          className='mb-16 h-px max-w-lg mx-auto'
+          className='mb-20 h-px max-w-lg mx-auto'
           style={{
             background:
               'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',

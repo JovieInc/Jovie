@@ -7,11 +7,11 @@ import {
 
 export function LogoBar() {
   return (
-    <section className='py-8 px-5 sm:px-6'>
+    <section className='py-12 md:py-16 px-5 sm:px-6'>
       {/* Top gradient separator */}
       <div
         aria-hidden='true'
-        className='mb-8 h-px max-w-md mx-auto'
+        className='mb-10 md:mb-12 h-px max-w-md mx-auto'
         style={{
           background:
             'linear-gradient(to right, transparent, var(--linear-border-subtle), transparent)',

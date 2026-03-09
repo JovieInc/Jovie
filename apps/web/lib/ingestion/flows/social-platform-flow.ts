@@ -9,6 +9,7 @@
 
 import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import type { DbOrTransaction } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -263,6 +264,8 @@ export async function createNewSocialProfile(
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
+
+  await invalidateProfileCache(created.usernameNormalized);
 
   // Add the social link
   const linkDisplayText = getLinkDisplayText(

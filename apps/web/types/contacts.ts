@@ -45,5 +45,6 @@ export interface PublicContact {
   territorySummary: string;
   territoryCount: number;
   secondaryLabel?: string;
+  primaryContactLabel?: string;
   channels: PublicContactChannel[];
 }

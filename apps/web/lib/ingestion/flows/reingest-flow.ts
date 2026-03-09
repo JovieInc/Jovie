@@ -8,6 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -151,6 +152,8 @@ export async function handleNewProfileIngest({
         { status: 500, headers: NO_STORE_HEADERS }
       );
     }
+
+    await invalidateProfileCache(created.usernameNormalized);
 
     const { mergeError } = await processProfileExtraction(
       tx,
