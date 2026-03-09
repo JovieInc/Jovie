@@ -8,6 +8,7 @@ import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { LogoBar } from '@/components/home/LogoBar';
 import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
+import { ReleaseNotificationsSection } from '@/components/home/ReleaseNotificationsSection';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
@@ -271,6 +272,16 @@ export default function HomePage() {
       />
 
       <AutomaticReleaseSmartlinksSection />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
+      <ReleaseNotificationsSection />
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'
