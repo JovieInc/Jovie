@@ -151,6 +151,34 @@ reviews:
         - Check for proper session handling
         - Ensure no hardcoded credentials or tokens
 
+    - path: "apps/web/app/(marketing)/**"
+      instructions: |
+        Marketing pages must remain fully static.
+        - `export const revalidate = false` is required
+        - Flag any use of `headers()`, `cookies()`, or `cache: 'no-store'`
+        - Flag JSON-LD implemented with `dangerouslySetInnerHTML` plus lint suppression
+        - Prefer `<script type="application/ld+json">{safeJsonLdStringify(data)}</script>` for structured data
+
+    - path: "apps/web/app/**/layout.tsx"
+      instructions: |
+        Layout review:
+        - Global singleton UI must only mount from `apps/web/app/layout.tsx`
+        - Flag `CookieBannerSection`, toast providers, modal providers, or analytics providers in nested layouts
+
+    - path: "apps/web/app/**/*.{ts,tsx}"
+      instructions: |
+        Routing review:
+        - Do not allow hardcoded `/app/dashboard/*` literals in app code
+        - Require imports from `apps/web/constants/routes.ts`
+        - Legacy compatibility paths still need named constants rather than inline strings
+
+    - path: "apps/web/components/**/*.{ts,tsx}"
+      instructions: |
+        Routing review:
+        - Do not allow hardcoded `/app/dashboard/*` literals in component code
+        - Require imports from `apps/web/constants/routes.ts`
+        - Legacy compatibility paths still need named constants rather than inline strings
+
     # === PAYMENT RULES ===
     - path: "app/api/stripe/**"
       instructions: |
@@ -162,10 +190,9 @@ reviews:
     # === MIDDLEWARE ===
     - path: "middleware.ts"
       instructions: |
-        Middleware affects all routes.
-        - Verify route matching is correct
-        - Check for performance implications
-        - Ensure proper Clerk middleware usage
+        This repo should not add middleware.ts directly.
+        - Flag creation or edits unless the PR explicitly justifies a human-reviewed exception
+        - Prefer `apps/web/proxy.ts`
 
     # === CORE FLOWS ===
     - path: "app/onboarding/**"

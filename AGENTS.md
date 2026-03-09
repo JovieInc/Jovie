@@ -14,6 +14,9 @@ Before running ANY command in this repo, run:
 
 This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth.
 
+On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
+Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
+
 ### Running tests and commands requiring secrets
 
 ALL commands that need secrets MUST be prefixed with `doppler run --`:
@@ -180,7 +183,7 @@ Turbo 2.8 automatically shares local cache across Git worktrees. Use worktrees t
 git worktree add ../Jovie-agent-1 -b agent/task-name
 
 # Each worktree needs its own node_modules but shares turbo cache
-cd ../Jovie-agent-1 && pnpm install && pnpm turbo build
+cd ../Jovie-agent-1 && ./scripts/setup.sh && pnpm turbo build
 
 # Clean up when done
 git worktree remove ../Jovie-agent-1
@@ -222,6 +225,7 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 - **NEVER** add `// biome-ignore` comments to bypass linting
 - Fix the underlying issue instead
 - If truly necessary, discuss with maintainers first
+- For JSON-LD or structured data, prefer plain `<script type="application/ld+json">{...}</script>` children or `safeJsonLdStringify()` from `apps/web/lib/utils/json-ld.ts` instead of `dangerouslySetInnerHTML` plus suppression
 
 ### 4. No Emoji in UI — Use Icons
 
@@ -257,19 +261,21 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
-### 6. Marketing Pages Must Be Fully Static
+### 7. Marketing Pages Must Be Fully Static
 
 - All marketing, blog, and legal pages **must be fully static** (`export const revalidate = false`): no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` and `app/(dynamic)/legal` pages/layouts.
+- Any non-`false` `revalidate` value under `app/(marketing)` is a bug unless a human explicitly documents an exception in the PR.
 - `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
 - Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
 - Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
 - Blog and changelog pages must be fully static, reading content from filesystem at build time only.
 - Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
+- Structured data on marketing pages should be rendered without `biome-ignore`; use string children inside `<script type="application/ld+json">` and `safeJsonLdStringify()` whenever user-controlled content is involved.
 - Public profiles (`/[username]`) use ISR (1h revalidate) for real-time updates, with cache tag invalidation for instant profile updates.
 
 **Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
 
-### 7. Global UI Components Render Once
+### 8. Global UI Components Render Once
 
 Global UI elements must only render in root `app/layout.tsx`:
 - Cookie banners
@@ -278,8 +284,9 @@ Global UI elements must only render in root `app/layout.tsx`:
 - Analytics scripts
 
 **NEVER** render these in individual pages or nested layouts—causes duplicate overlapping UI elements.
+- Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, `ClerkAnalytics`, or other analytics/provider singletons directly.
 
-### 8. Entitlements: Single Source of Truth
+### 9. Entitlements: Single Source of Truth
 
 Entitlements behavior must stay centralized and predictable. Use these files as the canonical chain:
 
@@ -520,6 +527,7 @@ const slug = title?.replaceAll(' ', '-') ?? '';
 - **NEVER** hardcode route paths like `/app/dashboard/audience`
 - **ALWAYS** import from `constants/routes.ts`: `APP_ROUTES.AUDIENCE`
 - This prevents broken URLs from path typos and enables safe refactoring
+- Legacy compatibility paths still need named constants. If a redirect intentionally targets an old `/app/dashboard/*` route, add a constant for that legacy path instead of embedding the literal.
 
 ### Server/Client Boundaries (Enforced by ESLint)
 
@@ -559,8 +567,10 @@ Remove the import or remove "use client" if this should be a server component.
 
 The project uses `@neondatabase/serverless` with the HTTP driver and Neon's built-in connection pooling. The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
 
-**Transaction Restrictions (Neon HTTP Driver):**
-- **NEVER** use `db.transaction()` - Neon HTTP driver does not support interactive transactions
+**Transaction Restrictions (Canonical Policy):**
+- **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
+- Existing transaction-based RLS/session helpers are legacy exceptions and must not be copied into new call-sites.
+- If you need transaction-scoped session state, use an approved wrapper or escalate before adding new transaction logic.
 - For atomicity, use Drizzle's batch operations: `db.insert().values([...items])`
 - If you need true ACID transactions, document the requirement and discuss alternatives
 

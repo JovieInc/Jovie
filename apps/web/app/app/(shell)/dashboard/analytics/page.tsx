@@ -109,7 +109,9 @@ export default async function AnalyticsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/analytics`);
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_ANALYTICS}`
+    );
   }
 
   return (

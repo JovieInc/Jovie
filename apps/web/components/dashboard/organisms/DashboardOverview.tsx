@@ -214,14 +214,14 @@ export function DashboardOverview({
                 isComplete={hasMusicLink}
                 stepNumber={2}
                 label='Add a music link'
-                actionHref={APP_ROUTES.PROFILE}
+                actionHref={APP_ROUTES.SETTINGS_ARTIST_PROFILE}
                 actionLabel='Add'
               />
               <SetupTaskItem
                 isComplete={hasSocialLinks}
                 stepNumber={3}
                 label='Add social links'
-                actionHref={APP_ROUTES.PROFILE}
+                actionHref={APP_ROUTES.SETTINGS_ARTIST_PROFILE}
                 actionLabel='Add'
               />
             </ul>

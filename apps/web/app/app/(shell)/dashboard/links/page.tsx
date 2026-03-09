@@ -9,7 +9,9 @@ export default async function LinksPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/dashboard/profile`);
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_PROFILE}`
+    );
   }
 
   redirect(APP_ROUTES.DASHBOARD_PROFILE);

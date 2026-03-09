@@ -64,15 +64,18 @@ export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
   readonly initialRows: AudienceMember[];
-  readonly total: number;
+  /** Null when the per-page COUNT query was skipped for performance (JOV-1262, JOV-1264). */
+  readonly total: number | null;
   readonly page: number;
   readonly pageSize: number;
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
   readonly profileUrl?: string;
   readonly profileId?: string;
-  readonly subscriberCount: number;
-  readonly totalAudienceCount: number;
+  /** Null when the subscriber COUNT query was skipped for performance (JOV-1262). */
+  readonly subscriberCount: number | null;
+  /** Null when the audience COUNT query was skipped for performance (JOV-1262). */
+  readonly totalAudienceCount: number | null;
   readonly filters: AudienceFilters;
   readonly tourDates?: TourDateForMatching[];
 }
