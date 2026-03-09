@@ -52,8 +52,19 @@ interface DemoShellProps {
 }
 
 const TAB_LABEL: Record<DemoTab, string> = {
+  inbox: 'Inbox',
+  'my-releases': 'My Releases',
+  campaigns: 'Campaigns',
+  projects: 'Projects',
+  views: 'Views',
   releases: 'Releases',
   audience: 'Audience',
+  triage: 'Triage',
+  cycles: 'Cycles',
+  current: 'Current',
+  upcoming: 'Upcoming',
+  catalog: 'Catalog',
+  'catalog-views': 'Views',
   analytics: 'Analytics',
   settings: 'Settings',
 };
@@ -105,7 +116,11 @@ export function DemoShell({
                 <SidebarGroupContent>
                   <SidebarMenu className='gap-0.5'>
                     <SidebarMenuItem>
-                      <SidebarMenuButton className='h-7'>
+                      <SidebarMenuButton
+                        className='h-7'
+                        isActive={activeTab === 'inbox'}
+                        onClick={() => onTabChange('inbox')}
+                      >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
                         <span className='text-[10px] text-secondary-token bg-interactive-hover rounded-[2px] border border-subtle px-1 py-px leading-none [font-weight:var(--font-weight-medium)]'>
@@ -114,7 +129,11 @@ export function DemoShell({
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
-                      <SidebarMenuButton className='h-7'>
+                      <SidebarMenuButton
+                        className='h-7'
+                        isActive={activeTab === 'my-releases'}
+                        onClick={() => onTabChange('my-releases')}
+                      >
                         <Music2 className='size-3.5' />
                         <span>My Releases</span>
                       </SidebarMenuButton>
@@ -131,19 +150,31 @@ export function DemoShell({
                 <SidebarGroupContent>
                   <SidebarMenu className='gap-0.5'>
                     <SidebarMenuItem>
-                      <SidebarMenuButton className='h-7'>
+                      <SidebarMenuButton
+                        className='h-7'
+                        isActive={activeTab === 'campaigns'}
+                        onClick={() => onTabChange('campaigns')}
+                      >
                         <Target className='size-3.5' />
                         <span>Campaigns</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
-                      <SidebarMenuButton className='h-7'>
+                      <SidebarMenuButton
+                        className='h-7'
+                        isActive={activeTab === 'projects'}
+                        onClick={() => onTabChange('projects')}
+                      >
                         <Folder className='size-3.5' />
                         <span>Projects</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarMenuItem>
-                      <SidebarMenuButton className='h-7'>
+                      <SidebarMenuButton
+                        className='h-7'
+                        isActive={activeTab === 'views'}
+                        onClick={() => onTabChange('views')}
+                      >
                         <Eye className='size-3.5' />
                         <span>Views</span>
                       </SidebarMenuButton>
@@ -176,7 +207,11 @@ export function DemoShell({
                       </SidebarMenuButton>
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton className='h-7'>
+                          <SidebarMenuSubButton
+                            className='h-7'
+                            isActive={activeTab === 'triage'}
+                            onClick={() => onTabChange('triage')}
+                          >
                             <Layers className='size-3.5' />
                             <span>Triage</span>
                           </SidebarMenuSubButton>
@@ -202,31 +237,51 @@ export function DemoShell({
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton className='h-7'>
+                          <SidebarMenuSubButton
+                            className='h-7'
+                            isActive={activeTab === 'cycles'}
+                            onClick={() => onTabChange('cycles')}
+                          >
                             <Repeat className='size-3.5' />
                             <span>Cycles</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton className='h-7'>
+                          <SidebarMenuSubButton
+                            className='h-7'
+                            isActive={activeTab === 'current'}
+                            onClick={() => onTabChange('current')}
+                          >
                             <CircleDot className='size-3.5' />
                             <span>Current</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton className='h-7'>
+                          <SidebarMenuSubButton
+                            className='h-7'
+                            isActive={activeTab === 'upcoming'}
+                            onClick={() => onTabChange('upcoming')}
+                          >
                             <Compass className='size-3.5' />
                             <span>Upcoming</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton className='h-7'>
+                          <SidebarMenuSubButton
+                            className='h-7'
+                            isActive={activeTab === 'catalog'}
+                            onClick={() => onTabChange('catalog')}
+                          >
                             <Archive className='size-3.5' />
                             <span>Catalog</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton className='h-7'>
+                          <SidebarMenuSubButton
+                            className='h-7'
+                            isActive={activeTab === 'catalog-views'}
+                            onClick={() => onTabChange('catalog-views')}
+                          >
                             <Eye className='size-3.5' />
                             <span>Views</span>
                           </SidebarMenuSubButton>
@@ -296,7 +351,7 @@ export function DemoShell({
               )}
             </div>
 
-            {activeTab === 'releases' && (
+            {(activeTab === 'releases' || activeTab === 'audience') && (
               <div className='flex items-center gap-2'>
                 <div className='flex items-center mr-2 gap-1'>
                   <button
@@ -316,9 +371,11 @@ export function DemoShell({
                     <span>Display</span>
                   </button>
                 </div>
-                <Button size='sm' className='h-7 text-xs px-2.5'>
-                  Add release
-                </Button>
+                {activeTab === 'releases' && (
+                  <Button size='sm' className='h-7 text-xs px-2.5'>
+                    Add release
+                  </Button>
+                )}
               </div>
             )}
           </header>
