@@ -51,7 +51,7 @@ export async function findAvailableHandle(
   // Generate all candidate handles upfront
   const candidates: string[] = [];
   for (let i = 0; i < maxAttempts; i++) {
-    const suffix = i === 0 ? '' : `-${i}`;
+    const suffix = i === 0 ? '' : `_${i}`;
     const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
     const candidate = `${trimmedBase}${suffix}`;
     if (isValidHandle(candidate)) {
