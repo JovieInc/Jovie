@@ -250,25 +250,23 @@ export function ProfileShell({
                             />
                           </>
                         ) : (
-                          <CircleIconButton
-                            size='md'
-                            variant='ghost'
-                            ariaLabel='Tip'
-                            data-testid='tip-trigger'
-                            className={`border transition-colors ${
-                              isTipModeActive
-                                ? 'border-subtle bg-surface-2 text-primary-token'
-                                : 'border-transparent hover:border-subtle hover:bg-surface-2'
-                            }`}
-                            asChild
-                          >
-                            <Link href={`/${artist.handle}?mode=tip`}>
-                              <DollarSign
-                                className='h-4 w-4'
-                                aria-hidden='true'
-                              />
-                            </Link>
-                          </CircleIconButton>
+                          mode !== 'tip' && (
+                            <CircleIconButton
+                              size='md'
+                              variant='ghost'
+                              ariaLabel='Tip'
+                              data-testid='tip-trigger'
+                              className='border border-transparent transition-colors hover:border-subtle hover:bg-surface-2'
+                              asChild
+                            >
+                              <Link href={`/${artist.handle}?mode=tip`}>
+                                <DollarSign
+                                  className='h-4 w-4'
+                                  aria-hidden='true'
+                                />
+                              </Link>
+                            </CircleIconButton>
+                          )
                         ))}
                     </div>
                   </div>
