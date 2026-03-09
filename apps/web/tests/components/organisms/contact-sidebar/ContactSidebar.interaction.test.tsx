@@ -227,4 +227,19 @@ describe('ContactSidebar', () => {
     expect(screen.getByPlaceholderText('First')).toHaveValue('');
     expect(screen.getByPlaceholderText('Last')).toHaveValue('');
   });
+
+  it('does not render a Save changes button when onSave is provided', () => {
+    render(
+      <ContactSidebar
+        contact={mockContact}
+        mode='admin'
+        isOpen={true}
+        onSave={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: /save changes/i })
+    ).not.toBeInTheDocument();
+  });
 });
