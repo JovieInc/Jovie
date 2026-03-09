@@ -11,6 +11,7 @@ import {
 } from '@/components/organisms/Dialog';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
+import { parseBatchUrls } from './batch-url-utils';
 
 interface BatchResult {
   input: string;
@@ -63,14 +64,7 @@ export function BatchIngestModal({
   const [result, setResult] = useState<BatchIngestApiResponse | null>(null);
   const notifications = useNotifications();
 
-  const parsedCount = useMemo(
-    () =>
-      value
-        .split('\n')
-        .map(line => line.trim())
-        .filter(Boolean).length,
-    [value]
-  );
+  const parsedCount = useMemo(() => parseBatchUrls(value).length, [value]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -81,13 +75,10 @@ export function BatchIngestModal({
   }, [open]);
 
   const handleSubmit = async () => {
-    const spotifyUrls = value
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean);
+    const urls = parseBatchUrls(value);
 
-    if (spotifyUrls.length === 0) {
-      notifications.error('Paste at least one Spotify artist URL.');
+    if (urls.length === 0) {
+      notifications.error('Paste at least one URL to import.');
       return;
     }
 
@@ -97,7 +88,7 @@ export function BatchIngestModal({
       const response = await fetch('/api/admin/batch-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spotifyUrls }),
+        body: JSON.stringify({ urls }),
       });
 
       const payload = (await response.json()) as BatchIngestApiResponse & {
@@ -119,9 +110,7 @@ export function BatchIngestModal({
       onComplete?.();
     } catch (error) {
       notifications.error(
-        error instanceof Error
-          ? error.message
-          : 'Failed to ingest Spotify artists.'
+        error instanceof Error ? error.message : 'Failed to ingest URLs.'
       );
     } finally {
       setIsSubmitting(false);
@@ -130,23 +119,23 @@ export function BatchIngestModal({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='md'>
-      <DialogTitle>Batch Spotify ingest</DialogTitle>
+      <DialogTitle>Batch URL import</DialogTitle>
       <DialogBody className='space-y-3'>
         <p className='text-xs text-tertiary-token'>
-          Paste Spotify artist URLs or IDs, one per line. Artists with
-          1,000-50,000 followers will be ingested.
+          Paste URLs one per line or comma-separated. Linktree, Spotify, Apple
+          Music, Instagram, and website URLs are all supported.
         </p>
         <Textarea
           rows={5}
           value={value}
           onChange={event => setValue(event.target.value)}
           placeholder={
-            'https://open.spotify.com/artist/...\nhttps://open.spotify.com/artist/...\n4Z8W4fKeB5YxbusRsdQVPb'
+            'https://linktr.ee/artistname\nhttps://open.spotify.com/artist/...\nhttps://www.instagram.com/artistname, https://artist-website.com'
           }
           disabled={isSubmitting}
         />
         <p className='text-2xs text-tertiary-token'>
-          {parsedCount} artist {parsedCount === 1 ? 'URL' : 'URLs'} parsed
+          {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
         </p>
 
         {result && (
@@ -216,7 +205,7 @@ export function BatchIngestModal({
             onClick={handleSubmit}
             disabled={isSubmitting || parsedCount === 0}
           >
-            {isSubmitting ? 'Ingesting\u2026' : 'Run batch ingest'}
+            {isSubmitting ? 'Ingesting\u2026' : 'Run batch import'}
           </Button>
         )}
       </DialogActions>
