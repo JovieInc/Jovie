@@ -218,48 +218,41 @@ export default async function RootLayout({
         type='application/ld+json'
         strategy='afterInteractive'
         suppressHydrationWarning
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'WebSite',
+      >
+        {JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: APP_NAME,
+          alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
+          url: APP_URL,
+          description:
+            'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+          inLanguage: 'en-US',
+          publisher: {
+            '@type': 'Organization',
             name: APP_NAME,
-            alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
             url: APP_URL,
-            description:
-              'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
-            inLanguage: 'en-US',
-            publisher: {
-              '@type': 'Organization',
-              name: APP_NAME,
-              url: APP_URL,
-            },
-          }),
-        }}
-      />
+          },
+        })}
+      </Script>
       <Script
         id='organization-schema'
         type='application/ld+json'
         strategy='afterInteractive'
         suppressHydrationWarning
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Organization',
-            name: APP_NAME,
-            legalName: 'Jovie Technology Inc.',
-            url: APP_URL,
-            logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-            description:
-              'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
-            sameAs: [
-              'https://x.com/jovieapp',
-              'https://instagram.com/jovieapp',
-            ],
-          }),
-        }}
-      />
+      >
+        {JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: APP_NAME,
+          legalName: 'Jovie Technology Inc.',
+          url: APP_URL,
+          logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+          description:
+            'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+          sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
+        })}
+      </Script>
     </head>
   );
 

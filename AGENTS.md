@@ -6,39 +6,28 @@
 
 ## Environment Setup (Run First)
 
-Run the idempotent setup script before any command. It checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth:
+Before running ANY command in this repo, run:
 
 ```bash
 ./scripts/setup.sh
 ```
 
+This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, installs missing tools, runs `pnpm install`, and verifies Doppler auth.
 
-### Tooling Requirements
+On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
+Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
-| Tool | Required Version |
-|------|-----------------|
-| **Node.js** | **22.x** (22.13.0+) — enforced by `.nvmrc` and `package.json` engines |
-| **pnpm** | **9.15.4** (exact) — enforced by `package.json` packageManager field |
-| **Turbo** | 2.8+ |
-
-Verify before any task:
-```bash
-node --version  # Must be v22.13.0+
-pnpm --version  # Must be 9.15.4
-
-# Fix if wrong:
-nvm use 22
-corepack enable && corepack prepare pnpm@9.15.4 --activate
-```
-### Secrets (Doppler)
+### Running tests and commands requiring secrets
 
 ALL commands that need secrets MUST be prefixed with `doppler run --`:
 
 - `doppler run -- pnpm test`
 - `doppler run -- pnpm exec playwright test`
 - `doppler run -- pnpm run dev:local`
+- `pnpm test` alone **will fail** — missing env vars
 
-**Install Doppler if missing:**
+### If Doppler is not installed
+
 ```bash
 # macOS/Linux
 curl -Lsf https://cli.doppler.com/install.sh | sh
@@ -47,19 +36,54 @@ curl -Lsf https://cli.doppler.com/install.sh | sh
 (Invoke-WebRequest -Uri "https://cli.doppler.com/install.ps1" -UseBasicParsing).Content | powershell
 ```
 
-Then authenticate:
+Then authenticate and configure:
 
 ```bash
 doppler login
 doppler setup --project jovie-web --config dev
 ```
 
-**CI/Automation:** Set `DOPPLER_TOKEN` env var and use `doppler run --token "$DOPPLER_TOKEN" -- <command>`.
+### For CI / Automation
+
+Set `DOPPLER_TOKEN` env var and use:
+
+```bash
+doppler run --token "$DOPPLER_TOKEN" -- <command>
+```
 
 ---
+
+## CRITICAL: Tooling Requirements (READ FIRST)
+
+**STOP AND VERIFY BEFORE RUNNING ANY COMMANDS.**
+
+| Tool | Required Version | Enforcement |
+|------|------------------|-------------|
+| **Node.js** | **22.x** (22.13.0+) | `.nvmrc`, `package.json` engines |
+| **pnpm** | **9.15.4** (exact) | `package.json` packageManager field |
+| **Turbo** | 2.8+ | Root devDependencies |
+
+### Why This Matters
+
+AI agents frequently default to Node 18/20 which **will fail** or cause subtle issues. The entire CI/CD pipeline, build system, and runtime are configured for Node 22 LTS.
+
+### Pre-Flight Checklist (Run Before Any Task)
+
+```bash
+# 1. Verify Node version - MUST be 22.x (22.13+)
+node --version  # Expected: v22.13.0 or higher
+
+# 2. Verify pnpm version - MUST be 9.15.4
+pnpm --version  # Expected: 9.15.4
+
+# 3. If wrong version, fix it:
+nvm use 22       # or: nvm install 22
+corepack enable && corepack prepare pnpm@9.15.4 --activate
+```
+
 ### Cloud Container Bootstrap (AI Agent Platforms)
 
-For headless/container environments (Codex, cloud sandboxes, CI runners). Requires `DOPPLER_TOKEN` env var.
+For headless/container environments (Codex, cloud sandboxes, CI runners). Requires `DOPPLER_TOKEN` env var set to a service token.
 
 ```bash
 #!/usr/bin/env bash
@@ -90,9 +114,20 @@ pnpm install
 pnpm turbo build --filter=@jovie/web
 ```
 
-**Doppler service token:** Doppler dashboard → Project `jovie-web` → Config `dev` → Access → Service Tokens → Generate.
+**Creating a Doppler service token:** Doppler dashboard → Project `jovie-web` → Config `dev` → Access → Service Tokens → Generate. Pass as `DOPPLER_TOKEN` env var.
 
-**Alternative:** Run `./scripts/codex-setup.sh` which handles OS detection, Doppler installation, and `.env.local` generation automatically.
+**Alternative:** Run `./scripts/codex-setup.sh` which handles OS detection (macOS/Linux), Doppler installation, and `.env.local` generation automatically.
+
+### Common Mistakes to Avoid
+
+| Wrong | Correct |
+|-------|---------|
+| `npm install` | `pnpm install` |
+| `yarn add` | `pnpm add` |
+| `npx turbo ...` | `pnpm turbo ...` |
+| Running turbo from wrong directory | Always run from repo root |
+| `cd apps/web && pnpm dev` | `pnpm --filter web dev` (from root) |
+| `node script.js` with Node < 22 | Verify `node --version` first |
 
 ---
 
@@ -117,35 +152,56 @@ pnpm --filter web test      # Run web tests only
 pnpm lint                   # Lint all packages
 pnpm typecheck              # Type check all packages
 
-# Database (web app)
-pnpm --filter web drizzle:generate
-pnpm --filter web drizzle:migrate
-pnpm --filter web drizzle:studio
-
-# CI optimization — run tasks only for changed packages
-pnpm turbo build --affected
-pnpm turbo test --affected
-pnpm turbo lint --affected
+# Database (web app specific)
+pnpm --filter web drizzle:generate   # Generate migrations
+pnpm --filter web drizzle:migrate    # Apply migrations
+pnpm --filter web drizzle:studio     # Open Drizzle Studio
 ```
 
 ---
 
-### Turborepo Features
+### Turborepo 2.8 Features
 
-- `turbo.json` tasks have `description` fields readable by AI agents. Run `pnpm turbo build --dry` to see the plan.
-- Search docs: `turbo docs "topic"` (e.g. `turbo docs "remote caching setup"`)
-- Machine-readable docs: append `.md` to any `turborepo.dev` URL. Full sitemap: `turborepo.dev/sitemap.md`
+All tasks in `turbo.json` have `description` fields that explain their purpose. These are readable by AI agents and help with onboarding. Run `pnpm turbo build --dry` to see task descriptions and the execution plan.
+
+**Search Turborepo docs from the terminal:**
+
+```bash
+turbo docs "task configuration"     # Search for any topic
+turbo docs "remote caching setup"   # Caching documentation
+turbo docs "environment variables"  # Env var handling
+```
+
+Machine-readable docs: append `.md` to any URL at `turborepo.dev` (e.g., `turborepo.dev/docs/reference/configuration.md`). Full sitemap: `turborepo.dev/sitemap.md`.
 
 ### Git Worktrees for Parallel Agents
 
-Turbo 2.8 automatically shares local cache across Git worktrees:
+Turbo 2.8 automatically shares local cache across Git worktrees. Use worktrees to run multiple agents in parallel on the same repo:
 
 ```bash
+# Create a worktree for parallel work
 git worktree add ../Jovie-agent-1 -b agent/task-name
-cd ../Jovie-agent-1 && pnpm install && pnpm turbo build
+
+# Each worktree needs its own node_modules but shares turbo cache
+cd ../Jovie-agent-1 && ./scripts/setup.sh && pnpm turbo build
+
+# Clean up when done
 git worktree remove ../Jovie-agent-1
 ```
 
+No configuration is needed -- Turbo detects worktrees automatically and shares the local cache. Combined with remote caching, agents in separate worktrees get near-instant cache hits.
+
+### Affected Builds (CI Optimization)
+
+Use `--affected` to run tasks only for packages that changed relative to the base branch:
+
+```bash
+pnpm turbo build --affected    # Build only changed packages
+pnpm turbo test --affected     # Test only changed packages
+pnpm turbo lint --affected     # Lint only changed packages
+```
+
+This is particularly useful in CI to avoid rebuilding the entire monorepo on every PR. For non-standard setups, set `TURBO_SCM_BASE` and `TURBO_SCM_HEAD` explicitly.
 
 ---
 
@@ -155,22 +211,28 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 
 ### 1. Migration Files Are Immutable
 
-- **NEVER** edit, delete, or rename files in `drizzle/migrations/`
+- **NEVER** edit files in `drizzle/migrations/`
+- **NEVER** delete or rename migration files
 - To fix a migration issue: create a NEW migration
 
 ### 2. No Direct middleware.ts Creation
 
-- `middleware.ts` requires careful review — propose changes via PR, don't create directly
+- `middleware.ts` requires careful review
+- Propose changes via PR description, don't create directly
 
 ### 3. No biome-ignore Comments
 
-- **NEVER** add `// biome-ignore` comments — fix the underlying issue instead
+- **NEVER** add `// biome-ignore` comments to bypass linting
+- Fix the underlying issue instead
+- If truly necessary, discuss with maintainers first
+- For JSON-LD or structured data, prefer plain `<script type="application/ld+json">{...}</script>` children or `safeJsonLdStringify()` from `apps/web/lib/utils/json-ld.ts` instead of `dangerouslySetInnerHTML` plus suppression
 
 ### 4. No Emoji in UI — Use Icons
 
-- **NEVER** use emoji in component markup, mock data, or UI strings
-- Use proper SVG icons instead (e.g. Lucide icons or inline SVGs)
-- Applies to all user-facing surfaces: marketing, dashboards, mockups
+- **NEVER** use emoji characters in component markup, mock data, or UI strings
+- Emoji looks cheap and undesigned — always use proper SVG icons instead
+- For decorative indicators, use small SVG icon components (e.g., Lucide icons or inline SVGs)
+- This applies to marketing pages, dashboards, mockups, and all user-facing surfaces
 
 ### 5. Conventional Commits Required
 
@@ -184,20 +246,31 @@ docs(readme): update setup instructions
 
 ### 6. Scan for Similar Bugs
 
-When you fix a bug, search for the same pattern in related files and fix all instances. A bug in one file often indicates a systemic issue.
+When you discover and fix a bug:
+
+1. **Identify the pattern** - What caused the bug? (wrong import, missing null check, incorrect type, etc.)
+2. **Search for siblings** - Use grep/glob to find the same pattern in related files
+3. **Fix all instances** - Don't leave the same bug lurking elsewhere
+
+**Example:** If you fix a missing `'use client'` directive in `Button.tsx`, search for other components with the same hook usage pattern that might also be missing it.
 
 ```bash
+# Find similar patterns to what you just fixed
 grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 ```
+
+**Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
 ### 7. Marketing Pages Must Be Fully Static
 
 - All marketing, blog, and legal pages **must be fully static** (`export const revalidate = false`): no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` and `app/(dynamic)/legal` pages/layouts.
+- Any non-`false` `revalidate` value under `app/(marketing)` is a bug unless a human explicitly documents an exception in the PR.
 - `app/layout.tsx` must not read per-request headers for marketing; theme init belongs in static `/public/theme-init.js` (no nonce).
 - Middleware (`proxy.ts`) should only issue CSP nonces for app/protected/API paths. Marketing routes must not depend on nonce or geo headers for rendering.
 - Homepage "See It In Action" must not hit the database during SSR; use static `FALLBACK_AVATARS` only.
 - Blog and changelog pages must be fully static, reading content from filesystem at build time only.
 - Cookie banner remains client-driven (localStorage + server cookie write) without server-provided `x-show-cookie-banner` headers.
+- Structured data on marketing pages should be rendered without `biome-ignore`; use string children inside `<script type="application/ld+json">` and `safeJsonLdStringify()` whenever user-controlled content is involved.
 - Public profiles (`/[username]`) use ISR (1h revalidate) for real-time updates, with cache tag invalidation for instant profile updates.
 
 **Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
@@ -211,6 +284,7 @@ Global UI elements must only render in root `app/layout.tsx`:
 - Analytics scripts
 
 **NEVER** render these in individual pages or nested layouts—causes duplicate overlapping UI elements.
+- Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, `ClerkAnalytics`, or other analytics/provider singletons directly.
 
 ### 9. Entitlements: Single Source of Truth
 
@@ -239,13 +313,22 @@ For deeper implementation guidance, use `.claude/skills/entitlements.md`.
 
 ## Linear Issue Gating
 
-Skip any Linear issue labeled `human-review-required` or whose description contains "This issue requires human review". Do not work on, close, or comment on these issues.
+Before working on any Linear issue, check for the `human-review-required` label.
+If present, SKIP the issue entirely. Do not attempt to work on it, close it,
+or add comments. These issues require human decision-making.
 
-When scanning for issues, always filter out:
-- Label: `human-review-required`
-- Description containing: "This issue requires human review"
+Also skip any issue whose description contains:
+"This issue requires human review"
 
-**Apply `human-review-required` to:** automation/infra setup tasks, architectural decisions, process changes, and untriaged scanner-filed issues.
+When scanning Linear for issues to work on, always filter with:
+- Exclude label: `human-review-required`
+- Exclude description containing: "This issue requires human review"
+
+### When to apply the `human-review-required` label
+- Automation/infrastructure setup tasks
+- Architectural decisions requiring human judgment
+- Process or workflow changes
+- Issues filed by automated scanners that haven't been triaged
 
 ---
 
@@ -260,11 +343,11 @@ When scanning for issues, always filter out:
 ### Pre-Push Gate
 
 Before pushing to a branch, agents MUST pass locally:
-1. `pnpm turbo typecheck`
-2. `pnpm --filter web exec tsc --noEmit`
-3. `pnpm biome check apps/web`
-4. `pnpm vitest --run --changed`
-5. `pnpm --filter web lint:server-boundaries`
+1. `pnpm turbo typecheck` (monorepo typecheck)
+2. `pnpm --filter web exec tsc --noEmit` (web typecheck)
+3. `pnpm biome check apps/web` (lint)
+4. `pnpm vitest --run --changed` (affected tests)
+5. `pnpm --filter web lint:server-boundaries` (boundaries)
 
 Do NOT push code that fails any of these. Fix first, push once.
 
@@ -277,14 +360,17 @@ Do NOT push code that fails any of these. Fix first, push once.
 ### Branch Hygiene
 
 - Always rebase on develop before pushing (not merge)
-- Branch strategy: `feature/* → develop → preview → production`
+- Follow the branch strategy: `feature/* -> develop -> preview -> production`
 - If a PR has been open >24h without progress, close it and re-create from fresh develop
 
-### Incremental Shipping
+### Incremental Shipping (Ship Fast, Fail Fast)
 
-- Ship independent fixes as separate PRs
+- When a command produces multiple independent fixes, ship each as its own PR
 - Push and enable auto-merge immediately — don't wait for CI before starting the next fix
-- Each PR must still pass the pre-push gate locally before pushing
+- CI runs in parallel on all PRs while the agent continues working
+- This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
+- If a PR fails CI, the agent can fix it while other PRs continue merging
+- Each PR must still pass /verify locally before pushing
 
 ### Auto-Merge Path Guardrails
 
@@ -300,7 +386,7 @@ Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual
 | Leads/outreach pipeline | Growth engine — silent failures lose prospects |
 | Profile ownership / claim flow | Trust — incorrect ownership = legal + trust risk |
 
-**Auto-merge ALLOWED (CI-gated):**
+**Auto-merge ALLOWED (CI-gated, no manual review needed):**
 
 | Change Type | Examples |
 |-------------|---------|
@@ -314,7 +400,7 @@ When in doubt, skip auto-merge and request review.
 
 ---
 
-### Pre-PR Checklist
+## Pre-PR Checklist (required before opening any PR)
 
 1. **Run `/verify`** - Self-verification: typecheck, lint, tests, security checks
 2. **Run `/simplify`** - Simplify recently modified code for clarity
@@ -327,6 +413,21 @@ When in doubt, skip auto-merge and request review.
    gh pr merge --auto --squash
    ```
 
+## Ship Validation (CodeRabbit Issue Planner Instruction)
+
+When generating implementation plans for GitHub issues, the plan MUST include a final **"Ship Validation"** phase as the last step. This phase ensures all changes pass quality gates before a PR is opened.
+
+The validation phase must instruct the coding agent to run:
+
+```bash
+pnpm run typecheck && pnpm run biome:check && pnpm run test
+```
+
+**Requirements for the Ship Validation phase:**
+- All TypeScript type checks pass (zero errors)
+- All Biome lint and formatting checks pass (zero errors)
+- All unit tests pass
+- If any check fails, fix before proceeding to PR creation
 
 ---
 
@@ -362,9 +463,11 @@ Jovie/
 
 ### API Runtime
 
-All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge runtime — the API relies on connection pooling (Neon), native bindings (Sharp), Stripe SDK, and long-duration cron jobs (60–300s), none of which work on Edge.
+All API routes run on **Node.js runtime** (the Next.js default). Do not use Edge runtime.
 
-Only add `export const runtime = 'nodejs'` when documenting a specific constraint (e.g. Sharp, Stripe). Don't add it as boilerplate.
+**Why:** The API relies on connection pooling (Neon), native bindings (Sharp), payment SDKs (Stripe), and long-duration cron jobs (60-300s)—none of which work on Edge.
+
+**Convention:** Only add `export const runtime = 'nodejs'` when documenting a specific constraint (e.g., Sharp, Stripe). Don't add it to every route as boilerplate.
 
 ---
 
@@ -372,11 +475,19 @@ Only add `export const runtime = 'nodejs'` when documenting a specific constrain
 
 ### TypeScript
 
-- Strict mode — no `any` without justification; prefer `unknown` for truly unknown types
+- Strict mode enabled - no `any` types without justification
 - Use proper interfaces for all data structures
-- **Always run `pnpm turbo typecheck` before pushing** — do not push with known type errors
+- Prefer `unknown` over `any` for truly unknown types
 
-**Null safety:** Always guard against null/undefined before calling string methods:
+**Typecheck Gate (Mandatory):**
+- **ALWAYS** run `pnpm turbo typecheck` before pushing any branch or creating a PR
+- If typecheck fails, fix all errors before pushing — do not push with known type errors
+- Use `/verify` or `/ship` commands which include typecheck as part of their validation
+- The CI pipeline will block merges on type errors, but catching them locally is faster and prevents wasted CI cycles
+
+**Null Safety for String Methods:**
+- Always guard against null/undefined before calling string methods
+- Common offenders: `.replaceAll()`, `.toLowerCase()`, `.split()`, `.trim()`
 
 ```typescript
 // WRONG: Will throw TypeError if title is undefined
@@ -386,68 +497,115 @@ const slug = title.replaceAll(' ', '-');
 const slug = title?.replaceAll(' ', '-') ?? '';
 ```
 
-**Cross-environment globals:** Use `globalThis` instead of `window` or `global`:
+**Cross-Environment Globals:**
+- Use `globalThis` instead of `window` or `global` where applicable
+- `window` fails in SSR/Node, `global` fails in browser
+- Note: `globalThis.location` is still `undefined` in Node.js SSR - SSR guards are required
 
-| Wrong | Correct |
-|-------|---------|
+| Wrong                        | Correct                                                       |
+| ---------------------------- | ------------------------------------------------------------- |
 | `window.location` (no guard) | `typeof window !== 'undefined' ? window.location : undefined` |
-| `global.fetch` | `globalThis.fetch` |
-
-Note: `globalThis.location` is still `undefined` in Node.js SSR — SSR guards are required.
+| `global.fetch`               | `globalThis.fetch`                                            |
 
 ### React/Next.js
 
-- Functional components with hooks only; Server Components by default
-- Use `'use client'` sparingly and intentionally
-- **Never define components inline** (inside other components or render functions) — they are recreated every render, breaking reconciliation
-- **Never hardcode route paths** — import from `constants/routes.ts` (e.g. `APP_ROUTES.AUDIENCE`)
+- Functional components with hooks only
+- Server Components by default, Client Components when needed
+- Use `'use client'` directive sparingly and intentionally
+
+**Component Definition Rules:**
+- **NEVER** define components inline (inside other components or render functions)
+- Inline components are recreated every render, breaking React reconciliation and causing performance issues
+- Extract all components to module scope or separate files
+
+| Wrong                                          | Correct                                                                    |
+| ---------------------------------------------- | -------------------------------------------------------------------------- |
+| `const columns = [{ cell: () => <Button /> }]` | Extract: `const ActionCell = () => <Button />` then use `cell: ActionCell` |
+| `{items.map(i => { const Item = () => ... })}`  | Define `Item` outside the parent component                                 |
+
+**Route Constants:**
+- **NEVER** hardcode route paths like `/app/dashboard/audience`
+- **ALWAYS** import from `constants/routes.ts`: `APP_ROUTES.AUDIENCE`
+- This prevents broken URLs from path typos and enables safe refactoring
+- Legacy compatibility paths still need named constants. If a redirect intentionally targets an old `/app/dashboard/*` route, add a constant for that legacy path instead of embedding the literal.
 
 ### Server/Client Boundaries (Enforced by ESLint)
 
-Client components MUST have `'use client'` when using React hooks. Server-only modules cannot be imported in `'use client'` files:
-- `@/lib/db/*`, `@clerk/nextjs/server`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts`
+**Client components MUST have `'use client'`** when using React hooks (useState, useEffect, etc.).
 
-```bash
-pnpm --filter web lint:server-boundaries  # quick check
-pnpm --filter web lint:eslint             # full ESLint check
+**Server-only modules CANNOT be imported in `'use client'` files:**
+- `@/lib/db/*` - Database access
+- `@clerk/nextjs/server` - Server-side auth
+- `stripe`, `resend` - API clients with secrets
+- `drizzle-orm` - ORM queries
+- `*.server.ts` files
+
+**Commands:**
+- `pnpm --filter web lint:server-boundaries` - Quick check for boundary violations
+- `pnpm --filter web lint:eslint` - Full ESLint check
+
+**Error Messages:**
+```
+# Missing 'use client':
+React hook "useState" can only be used in client components.
+Add "use client" directive at the top of this file.
+
+# Server import in client:
+Server-only import "@/lib/db" cannot be used in client components.
+Remove the import or remove "use client" if this should be a server component.
 ```
 
 ### Database Access (Single Driver Policy)
 
-**Always use `import { db } from '@/lib/db'`** — this is the canonical database client.
+**ALWAYS use `import { db } from '@/lib/db'`** - this is the canonical database client.
 
-- `lib/db/client.ts` is a legacy HTTP-based client — do not use it
-- Use `db.query.*` or `db.select()`, not raw SQL strings outside `lib/db`
-- Use `db.insert().values([...items])` for batches, never loop with individual `db.insert()` calls
+| Correct | Wrong |
+|---------|-------|
+| `import { db } from '@/lib/db'` | `import { db } from '@/lib/db/client'` |
+| Use `db.query.*` or `db.select()` | Direct SQL strings outside lib/db |
+| `db.insert().values([...items])` | Loop with individual `db.insert()` calls |
 
-**Transaction Restrictions (Neon HTTP Driver):**
-- **NEVER** use `db.transaction()` — Neon HTTP driver does not support interactive transactions
-- For atomicity, use Drizzle batch operations: `db.insert().values([...items])`
+The project uses `@neondatabase/serverless` with the HTTP driver and Neon's built-in connection pooling. The `lib/db/client.ts` is a legacy HTTP-based client - do not use it.
 
-**Forbidden patterns:**
+**Transaction Restrictions (Canonical Policy):**
+- **NEVER** introduce new direct `db.transaction()` usage in app code without explicit human approval.
+- Existing transaction-based RLS/session helpers are legacy exceptions and must not be copied into new call-sites.
+- If you need transaction-scoped session state, use an approved wrapper or escalate before adding new transaction logic.
+- For atomicity, use Drizzle's batch operations: `db.insert().values([...items])`
+- If you need true ACID transactions, document the requirement and discuss alternatives
 
-| Forbidden | Why | Alternative |
-|-----------|-----|-------------|
-| `db.transaction(async (tx) => ...)` | Neon HTTP incompatible | Sequential ops or batch insert |
-| `import { Pool } from 'pg'` / `import pg from 'pg'` | Manual pooling conflicts with Neon | `import { db } from '@/lib/db'` |
-| `new Pool()` / `pool.connect()` | Manual connection management | `import { db } from '@/lib/db'` |
-| Loop with individual `db.insert()` | O(N) DB operations | `db.insert().values([...items])` |
+**Forbidden Database Patterns:**
+| Forbidden                          | Why                               | Alternative                            |
+| ---------------------------------- | --------------------------------- | -------------------------------------- |
+| `db.transaction(async (tx) => ...)` | Neon HTTP driver incompatible     | Sequential operations or batch insert  |
+| `import { Pool } from 'pg'`        | Manual pooling conflicts with Neon | Use `import { db } from '@/lib/db'`   |
+| `import pg from 'pg'`              | Direct postgres driver            | Use `import { db } from '@/lib/db'`   |
+| `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
+| Loop with individual `db.insert()` | O(N) database operations          | `db.insert().values([...items])` batch |
 
 ### Data Serialization (Server → Client Boundaries)
 
-**Date objects MUST be serialized** before caching in Redis, returning from Server Actions/API routes, or passing from RSC to Client Components:
+**Date objects MUST be serialized** before:
+- Caching in Redis (`JSON.stringify` cannot serialize Date)
+- Returning from Server Actions / API routes
+- Passing from RSC to Client Components
+
+| Wrong                                                   | Correct                                                |
+| ------------------------------------------------------- | ------------------------------------------------------ |
+| `return { createdAt: user.createdAt }`                  | `return { createdAt: user.createdAt?.toISOString() }`  |
+| `redis.set(key, JSON.stringify(data))` with Date fields | Convert dates first with `toISOStringOrNull()` helper  |
+| Drizzle query result directly to client                 | Map dates: `{ ...row, date: row.date?.toISOString() }` |
+
+**Helper pattern:**
 
 ```typescript
-// Wrong
-return { createdAt: user.createdAt }
-// Correct
-return { createdAt: user.createdAt?.toISOString() }
-
-// Helper
-const toISOStringOrNull = (date: Date | null | undefined) => date?.toISOString() ?? null;
+const toISOStringOrNull = (date: Date | null | undefined) =>
+  date?.toISOString() ?? null;
 ```
 
 ### React Hook Guidelines
+
+**Prevent render loops and memory leaks:**
 
 ```typescript
 // CORRECT: Stable dependencies
@@ -474,27 +632,45 @@ useEffect(() => {
 
 ### TanStack Query Patterns
 
-All `useQuery` calls MUST specify cache configuration and pass `AbortSignal`:
-
+**Required Configuration:**
+All `useQuery` calls MUST specify cache configuration:
 ```typescript
-// Correct
+// CORRECT: Explicit cache config with AbortSignal
 useQuery({
   queryKey: keys.user(id),
-  queryFn: ({ signal }) => fetchUser(id, { signal }),
-  staleTime: 5 * 60 * 1000,
-  gcTime: 10 * 60 * 1000,
+  queryFn: ({ signal }) => fetchUser(id, { signal }), // AbortSignal required!
+  staleTime: 5 * 60 * 1000, // Required: when data becomes stale
+  gcTime: 10 * 60 * 1000,   // Required: when to garbage collect
 })
 
-// Wrong: missing cache config and signal
+// WRONG: Missing cache config (causes aggressive refetching and API spam)
 useQuery({
   queryKey: keys.user(id),
-  queryFn: () => fetchUser(id),
+  queryFn: () => fetchUser(id), // Missing signal = memory leaks, missing cache = API spam
 })
 ```
 
-Use presets from `lib/queries/cache.ts`: `STABLE_CACHE` (rarely-changing data) and `DYNAMIC_CACHE` (frequently-updated data).
+**AbortSignal Requirement:**
+- All `queryFn` must destructure and pass `signal` to fetch operations
+- This prevents memory leaks and race conditions on component unmount
+- Without signal, requests continue after navigation, wasting resources
 
-For stable data, disable aggressive refetching: `refetchOnMount: false, refetchOnWindowFocus: false`.
+**Cache Presets:**
+Use presets from `lib/queries/cache.ts` for consistency:
+- `STABLE_CACHE` - for data that rarely changes (user profile, billing status)
+- `DYNAMIC_CACHE` - for frequently updated data (notifications, real-time feeds)
+
+**Disable Aggressive Refetch:**
+
+For stable data, disable automatic refetching:
+
+```typescript
+useQuery({
+  ...options,
+  refetchOnMount: false,
+  refetchOnWindowFocus: false,
+})
+```
 
 ### Styling
 
@@ -504,124 +680,206 @@ For stable data, disable aggressive refetching: `refetchOnMount: false, refetchO
 
 ### Testing
 
-- Unit tests: Vitest with jsdom; E2E tests: Playwright
+- Unit tests: Vitest with jsdom
+- E2E tests: Playwright
 - Focus on user behavior, not implementation details
-- Write tests at feature creation time, not retroactively
 
-#### E2E Authentication with Clerk
+#### E2E Authentication with Clerk (Required Patterns)
 
-Use Clerk's official Playwright helpers for any E2E test that needs auth:
+Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 
-1. Create unique test email: `` `e2e+clerk_test+${Date.now().toString(36)}@example.com` ``
-2. Call `setupClerkTestingToken({ page })` before navigating to Clerk pages
-3. Navigate to `/signin` and wait for `window.Clerk?.loaded`
-4. Use `createOrReuseTestUserSession(page, email)` from `apps/web/tests/helpers/clerk-auth.ts`
-5. Assert authenticated state before continuing
+- Official docs: `https://clerk.com/docs/testing/playwright/test-helpers`
+- In this repo, `setupClerkTestingToken({ page })` must run **before** navigating to Clerk pages so the token is attached to Clerk FAPI calls.
+- Auth pages must include ClerkProvider, so start auth on `/signin` (not `/`).
 
-**Do NOT:** reuse auth sessions across tests, hardcode OTP codes, mock Clerk auth, or skip sign-in flows unless the test scope explicitly starts post-auth.
+**Test user creation pattern (canonical):**
 
-**Reference:** `apps/web/tests/e2e/golden-path-signup.spec.ts`
+1. Create a unique test email with the Clerk testing suffix:
+   - `const email = \`e2e+clerk_test+${Date.now().toString(36)}@example.com\``
+2. Call `setupClerkTestingToken({ page })`.
+3. Navigate to `/signin` and wait for `window.Clerk?.loaded`.
+4. Use `createOrReuseTestUserSession(page, email)` from `apps/web/tests/helpers/clerk-auth.ts`.
+5. Assert authenticated state before continuing the flow.
+
+**Do NOT do the following in E2E auth tests:**
+
+- Do **not** reuse auth sessions across tests. Each test that validates auth behavior must start from a fresh context/session.
+- Do **not** hardcode OTP codes in test code.
+- Do **not** use pre-authenticated Clerk tokens to skip sign-up/sign-in flows unless the test scope explicitly starts post-auth.
+- Do **not** mock Clerk auth in Playwright E2E tests.
+
+**Golden path reference:**
+
+- `apps/web/tests/e2e/golden-path-signup.spec.ts` is the canonical Clerk-authenticated onboarding example.
 
 **Test user cleanup:**
-```bash
-doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts
-doppler run -- pnpm tsx apps/web/scripts/setup-e2e-users.ts
-```
 
-#### General E2E Rules
+- E2E users are tagged with metadata (`role: 'e2e'`).
+- Clean stale users with:
+  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
+- To re-seed users:
+  - `doppler run -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
 
-- Include meaningful behavioral assertions (not just render/no-crash checks)
-- Music fetch must remain real in integration/E2E — do not mock it; increase timeout if slow
-- Stripe flows use test mode and card `4242 4242 4242 4242`
-- Do not assert on CSS values, spacing, or brittle copy text
-- Prefer `data-testid` selectors over fragile structural selectors
+#### General E2E Rules (Required)
+
+- Every E2E test must include meaningful assertions on behavior/outcomes (not just render/no-crash checks).
+- Music fetch must remain real in integration/E2E coverage: if slow, increase timeout; do not mock the enrichment fetch.
+- Stripe flows must run in Stripe test mode and use test card `4242 4242 4242 4242`.
+- Do not assert on CSS values, spacing/padding, or brittle copy text.
+- Prefer stable `data-testid` selectors over fragile structural selectors.
 
 #### Test Performance (CI Runtime Is a First-Class Constraint)
 
-Tests are part of the deploy path. Slow tests slow shipping.
+Tests are part of the deploy path. Slow tests slow shipping. Test runtime performance is a functional requirement of the testing system itself.
 
-**Core rule:** Any test that materially slows CI without proportional risk reduction is harmful, even if correct. We're pre-PMF — iteration speed is critical; gated CI must support 2–3 deploys per day.
+**Core Rule:** Any test that materially slows CI without proportional risk reduction is considered harmful, even if it is "correct."
 
-| Gated CI — Allowed | Gated CI — Not Allowed |
-|--------------------|-----------------------|
-| Fast, deterministic unit/integration tests | Long-running E2E, exhaustive fuzzing |
-| Minimal fixture setup, mocked external calls | Large fixtures, real network, sleep/polling loops |
+**Why This Matters (Pre-PMF Context):**
+- We're pre product-market fit—iteration speed is critical
+- Gated CI tests must run fast enough to support 2–3 deploys per day
+- Test runtime must not grow unbounded over time
+- Added tests must justify their runtime cost with real risk coverage
 
-Slow or high-cardinality tests belong in nightly/async jobs that never block deploys.
+**Gated CI (Deploy-Blocking):**
+| Allowed | Not Allowed |
+|---------|-------------|
+| Fast, deterministic tests | Long-running E2E |
+| Focused unit/integration tests | Exhaustive fuzzing |
+| Minimal fixture setup | Large fixture setup |
+| Mocked external calls | Real network, sleep, or polling loops |
 
-**Agent rules:** Prefer fewer, stronger assertions. Collapse redundant tests. Call out expected runtime impact in PRs when adding tests.
+**Nightly / Async Jobs:**
+- May be slow and exhaustive
+- May trade speed for coverage
+- Must never block deploys
 
-#### Test Coverage Guidelines
+**Agent Rules:**
+
+| Do | Don't |
+|----|-------|
+| Prefer fewer, stronger assertions over more tests | Add slow tests to gated CI by default |
+| Collapse redundant tests | Increase CI runtime without explaining why |
+| Move slow or high-cardinality tests to nightly | Justify slow tests with "better coverage" alone |
+| Call out expected runtime impact in PRs when adding tests | |
+
+**Signs of a Broken Test Suite:**
+- CI time increases noticeably without corresponding risk reduction
+- Engineers avoid deploys due to slow feedback
+- Tests are skipped locally to save time
+
+**Default Bias:** When there's a tradeoff between test thoroughness and iteration speed in gated CI, bias toward speed and move thoroughness to nightly runs.
+
+### Test Coverage Guidelines (When to Write Tests)
+
+Tests must be written **at feature creation time**, not retroactively. Apply coverage selectively — don't slow iteration speed.
 
 **Tests REQUIRED for:**
-- Core logic (parsers, transformers, validators)
-- API routes and server actions
+- Core logic and data processing (parsers, transformers, validators)
+- API routes and server actions (contract with frontend)
 - Gating systems (waitlist, auth, permissions, entitlements)
-- Deterministic workflows (intent router, CRUD, feedback submission)
-- Backend services and data pipelines
+- Deterministic workflows (intent router, feedback submission, CRUD operations)
+- Backend services and data pipelines (ingestion, enrichment, jobs)
 - Database queries and mutations (especially complex joins/filters)
 
 **Tests may be SKIPPED for:**
-- Rapidly changing UI components (layout, styling, copy)
+- Rapidly changing UI components (layout, styling, copy changes)
 - Prototype/experimental features still in flux
 - Pure presentation components with no logic
 - Marketing page content and static pages
 
-No strict coverage % targets — quality over quantity. Deterministic workflows must have 100% path coverage.
+**Coverage philosophy:**
+- No strict coverage % targets — quality over quantity
+- Deterministic workflows must have 100% path coverage
+- AI-dependent workflows should use mocked LLM responses for determinism
+- Focus testing where correctness and reliability are critical
+
+| Area | Tests Required? | Why |
+|------|----------------|-----|
+| Intent router patterns | Yes | Deterministic, must be reliable |
+| Waitlist/auth gating | Yes | Security-critical gating |
+| API route handlers | Yes | Contract with frontend |
+| Server actions (CRUD) | Yes | Data integrity |
+| Ingestion/enrichment pipelines | Yes | Data correctness |
+| Dashboard layout | No | Changes frequently, visual |
+| Homepage copy | No | Marketing, iterates fast |
+| Feedback submission flow | Yes | Deterministic workflow |
 
 ---
 
 ## Infrastructure & Scheduling Guardrails (CRITICAL)
 
-AI agents lack context about operational costs and infrastructure consequences. Before creating any scheduled/background work, walk through this hierarchy **in order** and use the first option that works:
+AI agents lack context about operational costs, API billing, and infrastructure consequences. These guardrails exist because agents have historically created expensive, redundant, and architecturally unsound infrastructure without understanding the impact.
+
+### The Decision Hierarchy: Before Creating Any Scheduled/Background Work
+
+**STOP.** Before creating a cron job, scheduled task, background worker, or polling loop, walk through this hierarchy **in order**. Use the first option that works:
 
 | Priority | Approach | When to Use |
 |----------|----------|-------------|
-| 1 | **Webhook / Event handler** | An external service (Stripe, Clerk, etc.) can notify you. **Almost always the right answer.** |
-| 2 | **Inline after-action** | Work can happen synchronously after the triggering action |
-| 3 | **On-demand / lazy evaluation** | Work can happen when data is next accessed |
-| 4 | **Add to existing scheduled job** | Add logic to an existing nightly/periodic job |
-| 5 | **New scheduled job** | Only if none of the above work, AND documented in the PR |
+| 1 | **Webhook / Event handler** | An external service (Stripe, Clerk, etc.) can notify you when state changes. **This is almost always the right answer.** |
+| 2 | **Inline after-action** | The work can happen synchronously after the triggering action (e.g., clean up a record right after it's used). |
+| 3 | **On-demand / lazy evaluation** | The work can happen when the data is next accessed (e.g., check if a token is expired when it's read, not on a timer). |
+| 4 | **Add to existing scheduled job** | If a nightly/periodic job already exists, add your logic there instead of creating a new one. |
+| 5 | **New scheduled job** | Only if none of the above work, AND you've documented why in the PR. |
 
 ### Rules for Cron Jobs & Scheduled Tasks
 
-1. **NEVER create a new cron job without explicit approval.** Document in the PR: why webhooks won't work, why it can't join an existing job, expected API call volume, and proposed frequency justification.
+1. **NEVER create a new cron job without explicit approval.** Document in the PR description:
+   - Why a webhook/event-driven approach won't work
+   - Why it can't be added to an existing scheduled job
+   - Expected API call volume and cost impact
+   - Proposed frequency and why that frequency is necessary
 
-2. **Consolidate, don't proliferate.** Multiple cleanup tasks that run at similar times should be a single job with multiple steps.
+2. **Consolidate, don't proliferate.** Multiple cleanup tasks that run at similar times should be a single job with multiple steps. One nightly cleanup job that handles photos, keys, retention, etc. is better than four separate cron entries.
 
-3. **Frequency must be justified by business need.** If you can't explain what breaks between intervals, the interval is too frequent.
+3. **Frequency must be justified by business need, not convenience.**
+   - Hourly jobs must justify why daily isn't sufficient
+   - "Near real-time" requirements should use webhooks, not polling
+   - If you can't explain what bad thing happens between intervals, the interval is too frequent
 
-4. **Cron jobs are NOT a substitute for webhooks.** If Stripe, Clerk, or any external service provides webhooks, use them. Reconciliation jobs (if needed) run at most daily as a safety net.
+4. **Cron jobs are NOT a substitute for proper event handling.** If Stripe, Clerk, or any external service provides webhooks:
+   - Use the webhook to react to state changes in real time
+   - Do NOT poll the external API to check for changes
+   - Reconciliation jobs (if needed at all) should run at most daily and serve as a safety net, not the primary mechanism
 
-### External API Call Budget
+### External API Call Budget Awareness
 
-Every external API call has a cost. Before writing code that calls third-party services:
+**Every external API call has a cost.** Agents MUST consider API call volume before writing code that interacts with third-party services.
 
 | Rule | Rationale |
 |------|-----------|
-| **NEVER iterate over all users to call an external API** | O(users) calls per run × runs/day. At 1,000 users hourly = 24,000 calls/day. |
-| **NEVER poll external APIs for state you can receive via webhook** | Stripe, Clerk, Resend all push state changes. Use them. |
-| **Batch where possible** | Use batch/list endpoints instead of per-record fetches |
-| **Cache aggressively** | Cache with appropriate TTLs; don't re-fetch what hasn't changed |
-| **Log and monitor call volume** | New integrations must log call counts so we can track costs |
+| **NEVER iterate over all users to call an external API** | Calling Stripe/Clerk/etc. once per user per run = O(users) calls per run × runs per day. At 1,000 users hourly, that's 24,000 calls/day. At 10,000 users, it's 240,000. |
+| **NEVER poll external APIs for state you can receive via webhook** | Stripe, Clerk, Resend, and most services push state changes. Use those. |
+| **Batch where possible** | If you must call an external API, use batch/list endpoints instead of per-record fetches. |
+| **Cache aggressively** | If you need external data, cache it with appropriate TTLs. Don't re-fetch what hasn't changed. |
+| **Log and monitor call volume** | Any new external API integration must log call counts so we can track costs. |
 
-**Stripe specifically:** Webhooks are the primary mechanism. NEVER enumerate all Stripe customers/subscriptions. Query the local DB for anomalies, then spot-check individual records. Before adding any Stripe API call: `(calls/run) × (runs/day) × 30 = monthly calls`. If >1,000/month, justify it in the PR.
+**Stripe-Specific Rules:**
+- Stripe webhooks are the **primary** mechanism for billing state changes. The webhook handlers already exist and are hardened with deduplication, optimistic locking, and audit logging.
+- Reconciliation (if any) is a **safety net**, not a primary mechanism. It should run at most once daily and only check users whose state actually looks inconsistent (e.g., `isPro = true` but `stripeSubscriptionId` is null).
+- NEVER enumerate all Stripe customers/subscriptions. Query the local database for anomalies, then spot-check individual records against Stripe only when something looks wrong.
+- Before adding any Stripe API call, calculate: `(calls per run) × (runs per day) × 30 = monthly API calls`. If this number exceeds 1,000/month, justify it in the PR.
 
 ### Forbidden Infrastructure Patterns
 
 | Forbidden | Why | Do This Instead |
 |-----------|-----|-----------------|
-| New Vercel Cron entry without PR approval | Cron proliferation | Add logic to existing cron or use events |
-| Polling loop calling external APIs | Burns API budget and rate limits | Use webhooks |
-| Per-user external API call in a loop | O(N) API calls | Batch endpoints or event-driven |
-| New job queue / worker system | We already have `ingestionJobs` in-database queue | Use existing system or justify |
-| Adding Bull, Agenda, BullMQ, or similar | Operational complexity at our scale | Use existing in-database queue or Vercel Cron |
-| `setInterval` / `setTimeout` in server code | Serverless functions don't persist; silently fail | Use Vercel Cron or existing job queue |
-| Dedicated "sync" service | Polling-based sync is almost always wrong | Webhook + reconciliation safety net |
+| New Vercel Cron entry without PR approval | Cron proliferation leads to unmanageable scheduled work | Add logic to existing cron or use events |
+| Polling loop that calls external APIs | Burns through API budgets and rate limits | Use webhooks |
+| Per-user external API call in a loop | O(N) API calls scale linearly with user growth | Batch endpoints or event-driven approach |
+| Creating a new job queue / worker system | We already have an in-database job queue (`ingestionJobs`) | Use the existing system or justify why it's insufficient |
+| Adding Bull, Agenda, BullMQ, or similar | Adds operational complexity for no benefit at our scale | Use existing in-database queue or Vercel Cron |
+| `setInterval` or `setTimeout` in server code | Serverless functions don't persist; these silently fail | Use Vercel Cron or the existing job queue |
+| Creating a dedicated "sync" service | Polling-based sync is almost always the wrong pattern | Webhook + reconciliation safety net |
 
 ### Cost Impact Disclosure
 
-PRs that introduce/modify external API calls, cron frequency, scheduled DB queries, or new third-party integrations MUST include a **Cost Impact** section:
+When a PR introduces or modifies any of the following, the PR description MUST include a **Cost Impact** section:
+
+- New external API calls (Stripe, Clerk, Resend, AI providers, etc.)
+- New or modified cron job frequency
+- New database queries that run on a schedule
+- New third-party service integrations
 
 **Cost Impact template:**
 
@@ -637,39 +895,46 @@ PRs that introduce/modify external API calls, cron frequency, scheduled DB queri
 
 ## General Agent Decision-Making Rules
 
-1. **Don't architect what you don't understand.** If you're unsure about billing model, pricing tiers, API rate limits, or infrastructure costs, ASK before building.
+### You Don't Know What You Don't Know
 
-2. **Prefer boring, proven patterns.** Use established codebase patterns for webhooks, job queues, caching, and API integration. Don't invent new patterns for solved problems.
+AI agents confidently make decisions about topics they have zero context on. These rules exist to prevent that.
 
-3. **Scope your changes to what was asked.** Don't refactor unrelated systems while fixing one thing.
+1. **Don't architect what you don't understand.** If you're unsure about the billing model, pricing tiers, API rate limits, or infrastructure costs of a service, ASK before building. "I'll just add a cron job" is not a low-risk default — it has real operational and financial consequences.
 
-4. **Read the provider's webhook docs first.** Almost every SaaS (Stripe, Clerk, Resend, Vercel) has webhook support. Check before building a polling solution.
+2. **Prefer boring, proven patterns.** The existing codebase has established patterns for webhooks, job queues, caching, and API integration. Use them. Don't invent new patterns for solved problems.
 
-5. **Never silently add recurring costs.** If your change will run repeatedly in production, say so in the PR with volume estimates.
+3. **Scope your changes to what was asked.** If the task is "add a field to the user profile," don't also refactor the database client, add a reconciliation job, or restructure the API layer. Do the thing that was asked and nothing more.
 
-**Before merging any PR with background/scheduled work, verify:**
-- [ ] Is there already a webhook for this event?
+4. **When adding integrations, read the provider's docs on webhooks first.** Almost every SaaS provider (Stripe, Clerk, Resend, Vercel, etc.) has webhook support. Check for it before building a polling solution.
+
+5. **Never silently add recurring costs.** Cron jobs, API polling, scheduled tasks, and external service calls all cost money. If your change will run repeatedly in production, say so in the PR description with volume estimates.
+
+### Operational Awareness Checklist
+
+Before merging any PR that introduces background/scheduled work, verify:
+
+- [ ] Is there already a webhook for this event? (Check the provider's docs)
 - [ ] Can this logic run inline after the triggering action?
-- [ ] Can this be lazy-evaluated when data is next read?
-- [ ] If a cron job is truly needed, can it join an existing one?
-- [ ] What's the API call volume at 100 / 1,000 / 10,000 / 100,000 users?
-- [ ] What happens if this job fails? Is there retry/dead-letter handling?
+- [ ] Can this be lazy-evaluated when the data is next read?
+- [ ] If a cron job is truly needed, can it be added to an existing one?
+- [ ] What's the API call volume at 100 users? 1,000? 10,000? 100,000?
+- [ ] What happens if this job fails? Is there retry logic? Dead letter handling?
 - [ ] Is the frequency justified? What breaks if we run it less often?
-- [ ] Is a Cost Impact section included in the PR description?
+- [ ] Have I included a Cost Impact section in the PR description?
 
 ---
 
 ## Environment Variables
 
-**NEVER** hardcode secrets. Always use the validated env:
+**NEVER** hardcode secrets. Always use environment validation:
 
 ```typescript
-// Correct
+// CORRECT: Use validated env
 import { env } from '@/lib/env';
 const apiKey = env.STRIPE_SECRET_KEY;
 
-// Wrong — no validation
-const apiKey = process.env.STRIPE_SECRET_KEY;
+// WRONG: Direct process.env access
+const apiKey = process.env.STRIPE_SECRET_KEY; // No validation!
 ```
 
 Required variables are defined in `lib/env.ts` with Zod validation.
@@ -680,6 +945,8 @@ Required variables are defined in `lib/env.ts` with Zod validation.
 
 ```
 feature/* ──► develop ──► preview ──► production
+                │
+                └── PR required for each transition
 ```
 
 - **NEVER** push directly to `preview` or `production`
@@ -698,6 +965,7 @@ corepack enable && corepack prepare pnpm@9.15.4 --activate
 ### "Node version mismatch"
 ```bash
 nvm install 22 && nvm use 22
+# Or check .nvmrc: cat .nvmrc
 ```
 
 ### "Turbo cache issues"
@@ -708,13 +976,23 @@ rm -rf node_modules/.cache
 
 ### "Test OOM / Out of Memory"
 ```bash
+# Run tests with reduced concurrency to lower memory pressure
 pnpm turbo test --concurrency=1
+
+# Run only tests for changed packages
+pnpm turbo test --affected
+
+# Combine both for maximum memory savings
 pnpm turbo test --affected --concurrency=1
+
+# The web app already uses NODE_OPTIONS=--max-old-space-size=4096
+# and --pool=forks --maxWorkers=2 for memory safety.
 ```
 
 ### "Type errors after pull"
 ```bash
-pnpm install && pnpm typecheck
+pnpm install  # Ensure deps are synced
+pnpm typecheck  # Re-run type check
 ```
 
 ---
@@ -723,13 +1001,13 @@ pnpm install && pnpm typecheck
 
 - **Copilot-specific**: `.github/copilot-instructions.md`
 - **Cursor-specific**: `apps/web/.cursorrules`
-- **Hooks documentation**: `.claude/hooks/README.md`
+- **Hooks documentation**: `.claude/hooks/README.md` (if exists)
 
 ---
 
 ## Turborepo Quick Reference (Agent Index)
 
-Compressed documentation index. Use `turbo docs "topic"` for full details.
+Compressed documentation index for AI agents. Use `turbo docs "topic"` or the `/turbo-docs` command for full details.
 
 ```
 topic|config/command|notes
