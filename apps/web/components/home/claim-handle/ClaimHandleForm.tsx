@@ -25,7 +25,6 @@ export function ClaimHandleForm({
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
-  const _shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const displayDomain = BASE_URL.replace(/^https?:\/\//, '');
 
@@ -47,12 +46,6 @@ export function ClaimHandleForm({
       );
     }
   }, [available, handle, router]);
-
-  useEffect(() => {
-    return () => {
-      // Cleanup if necessary
-    };
-  }, []);
 
   const onSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -123,7 +116,10 @@ export function ClaimHandleForm({
   }, [navigating, available, handle]);
 
   const isAvailable = available === true;
-  const isDisabled = navigating || checkingAvail;
+  // Only block during navigation — never gate on availability check.
+  // Availability is informational; server validates during onboarding.
+  const hasClientError = !!handleError;
+  const isDisabled = navigating || hasClientError;
 
   return (
     <form onSubmit={onSubmit} className='w-full' noValidate>

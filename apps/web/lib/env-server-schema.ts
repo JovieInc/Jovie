@@ -150,6 +150,14 @@ export const ServerEnvSchema = z.object({
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
 
+  // Instantly (outreach email campaigns)
+  INSTANTLY_API_KEY: z.string().optional(),
+  INSTANTLY_CAMPAIGN_ID: z.string().optional(),
+
+  // Google Custom Search Engine (lead discovery)
+  GOOGLE_CSE_API_KEY: z.string().optional(),
+  GOOGLE_CSE_ENGINE_ID: z.string().optional(),
+
   // Jovie Marketing Pixels (for retargeting Jovie visitors)
   JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
   JOVIE_FACEBOOK_ACCESS_TOKEN: z.string().optional(),
@@ -233,6 +241,10 @@ export const ENV_KEYS = [
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
   'JOVIE_DEV_MEMORY_MONITOR',
+  'INSTANTLY_API_KEY',
+  'INSTANTLY_CAMPAIGN_ID',
+  'GOOGLE_CSE_API_KEY',
+  'GOOGLE_CSE_ENGINE_ID',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',
   'JOVIE_GOOGLE_MEASUREMENT_ID',

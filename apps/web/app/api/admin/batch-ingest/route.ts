@@ -53,7 +53,7 @@ async function ingestSpotifyArtist(
     };
   }
 
-  const fallbackHandle = `artist-${spotifyArtistId.toLowerCase().slice(0, 10)}`;
+  const fallbackHandle = `artist_${spotifyArtistId.toLowerCase().slice(0, 10)}`;
   const normalizedUrl = `https://open.spotify.com/artist/${spotifyArtistId}`;
 
   const socialContext: SocialPlatformContext = {

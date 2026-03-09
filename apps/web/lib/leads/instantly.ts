@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { pipelineError, pipelineLog } from './pipeline-logger';
+
 const INSTANTLY_API_BASE = 'https://api.instantly.ai/api/v2';
 
 interface PushLeadParams {
@@ -17,10 +19,25 @@ export async function pushLeadToInstantly(
   const campaignId = process.env.INSTANTLY_CAMPAIGN_ID;
 
   if (!apiKey || !campaignId) {
+    const missing = [
+      !apiKey && 'INSTANTLY_API_KEY',
+      !campaignId && 'INSTANTLY_CAMPAIGN_ID',
+    ].filter(Boolean);
+    pipelineError(
+      'instantly',
+      'Instantly API not configured',
+      new Error(`Missing: ${missing.join(', ')}`),
+      { missing }
+    );
     throw new Error(
       'Instantly API not configured: missing INSTANTLY_API_KEY or INSTANTLY_CAMPAIGN_ID'
     );
   }
+
+  pipelineLog('instantly', 'Pushing lead to Instantly', {
+    email: params.email,
+    campaignId,
+  });
 
   const body = {
     campaign_id: campaignId,
@@ -47,6 +64,9 @@ export async function pushLeadToInstantly(
       });
 
       if (response.status === 429 && attempt === 0) {
+        pipelineLog('instantly', 'Rate limited, retrying after 2s', {
+          email: params.email,
+        });
         await new Promise(resolve => setTimeout(resolve, 2000));
         continue;
       }
@@ -57,7 +77,12 @@ export async function pushLeadToInstantly(
       }
 
       const data = await response.json();
-      return data.id ?? data.lead_id ?? '';
+      const instantlyLeadId = data.id ?? data.lead_id ?? '';
+      pipelineLog('instantly', 'Lead pushed successfully', {
+        email: params.email,
+        instantlyLeadId,
+      });
+      return instantlyLeadId;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (
