@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
+import { parseBatchUrls } from './batch-url-utils';
 
 interface BatchResult {
   input: string;
@@ -60,14 +61,7 @@ export function BatchIngestForm({
   const [result, setResult] = useState<BatchIngestApiResponse | null>(null);
   const notifications = useNotifications();
 
-  const parsedCount = useMemo(
-    () =>
-      value
-        .split('\n')
-        .map(line => line.trim())
-        .filter(Boolean).length,
-    [value]
-  );
+  const parsedCount = useMemo(() => parseBatchUrls(value).length, [value]);
 
   // Auto-expand when results arrive
   useEffect(() => {
@@ -77,13 +71,10 @@ export function BatchIngestForm({
   }, [result]);
 
   const handleSubmit = async () => {
-    const spotifyUrls = value
-      .split('\n')
-      .map(line => line.trim())
-      .filter(Boolean);
+    const urls = parseBatchUrls(value);
 
-    if (spotifyUrls.length === 0) {
-      notifications.error('Paste at least one Spotify artist URL.');
+    if (urls.length === 0) {
+      notifications.error('Paste at least one URL to import.');
       return;
     }
 
@@ -95,7 +86,7 @@ export function BatchIngestForm({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ spotifyUrls }),
+        body: JSON.stringify({ urls }),
       });
 
       const payload = (await response.json()) as BatchIngestApiResponse & {
@@ -117,9 +108,7 @@ export function BatchIngestForm({
       onComplete?.();
     } catch (error) {
       notifications.error(
-        error instanceof Error
-          ? error.message
-          : 'Failed to ingest Spotify artists.'
+        error instanceof Error ? error.message : 'Failed to ingest URLs.'
       );
     } finally {
       setIsSubmitting(false);
@@ -150,7 +139,7 @@ export function BatchIngestForm({
               isOpen && 'rotate-90'
             )}
           />
-          <span className='text-app font-medium'>Batch Spotify ingest</span>
+          <span className='text-app font-medium'>Batch URL import</span>
           {summaryText && !isOpen && (
             <span className='ml-auto text-2xs text-tertiary-token'>
               {summaryText}
@@ -164,13 +153,13 @@ export function BatchIngestForm({
             rows={4}
             value={value}
             onChange={event => setValue(event.target.value)}
-            placeholder='https://open.spotify.com/artist/...
+            placeholder='https://linktr.ee/artistname
 https://open.spotify.com/artist/...
-4Z8W4fKeB5YxbusRsdQVPb'
+https://www.instagram.com/artistname, https://artist-website.com'
           />
           <div className='flex items-center justify-between text-2xs text-tertiary-token'>
             <span>
-              {parsedCount} artist {parsedCount === 1 ? 'URL' : 'URLs'} parsed
+              {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
             </span>
             <Button
               type='button'
@@ -178,7 +167,7 @@ https://open.spotify.com/artist/...
               onClick={handleSubmit}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Ingesting\u2026' : 'Run batch ingest'}
+              {isSubmitting ? 'Ingesting\u2026' : 'Run batch import'}
             </Button>
           </div>
 
