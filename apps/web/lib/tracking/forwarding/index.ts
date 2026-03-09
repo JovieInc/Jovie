@@ -11,6 +11,7 @@
 
 import { and, sql as drizzleSql, eq, inArray, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import {
   type CreatorPixel,
   creatorPixels,
@@ -18,6 +19,8 @@ import {
   type PixelForwardingStatus,
   pixelEvents,
 } from '@/lib/db/schema/pixels';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { checkBoolean } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
@@ -199,6 +202,7 @@ function decryptCreatorConfig(
 /**
  * Forward event to creator's configured pixels.
  * Accepts an optional pre-fetched config map (used by batch processing).
+ * The config map must only contain entries for creators with canAccessAdPixels.
  */
 async function forwardToCreatorPixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
@@ -210,12 +214,23 @@ async function forwardToCreatorPixels(
   if (creatorConfigMap) {
     creatorConfig = creatorConfigMap.get(profileId);
   } else {
+    // Fetch pixel config and join to users to verify plan entitlement.
+    // Only forward creator pixels for users on a paid plan (canAccessAdPixels).
     const [result] = await db
-      .select()
+      .select({ pixels: creatorPixels, plan: users.plan })
       .from(creatorPixels)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, creatorPixels.profileId)
+      )
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(eq(creatorPixels.profileId, profileId))
       .limit(1);
-    creatorConfig = result;
+
+    if (!result || !checkBoolean(result.plan, 'canAccessAdPixels')) {
+      return [];
+    }
+    creatorConfig = result.pixels;
   }
 
   if (!creatorConfig?.enabled) {
@@ -341,18 +356,27 @@ export async function processPendingEvents(limit = 100): Promise<{
       return { processed, successful, failed };
     }
 
-    // Batch-fetch all creator pixel configs upfront (eliminates N+1)
+    // Batch-fetch all creator pixel configs upfront (eliminates N+1).
+    // Only include configs for creators on a paid plan (canAccessAdPixels).
     const profileIds = [...new Set(pendingEvents.map(e => e.profileId))];
-    const creatorConfigs = await db
-      .select()
+    const creatorConfigRows = await db
+      .select({ pixels: creatorPixels })
       .from(creatorPixels)
+      .innerJoin(
+        creatorProfiles,
+        eq(creatorProfiles.id, creatorPixels.profileId)
+      )
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
       .where(
         and(
           inArray(creatorPixels.profileId, profileIds),
-          eq(creatorPixels.enabled, true)
+          eq(creatorPixels.enabled, true),
+          eq(users.isPro, true)
         )
       );
-    const creatorConfigMap = new Map(creatorConfigs.map(c => [c.profileId, c]));
+    const creatorConfigMap = new Map(
+      creatorConfigRows.map(r => [r.pixels.profileId, r.pixels])
+    );
 
     for (const event of pendingEvents) {
       try {

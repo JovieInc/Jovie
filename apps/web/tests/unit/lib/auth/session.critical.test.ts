@@ -127,24 +127,18 @@ describe('@critical session.ts', () => {
       expect(queryText).not.toContain('app.user_id');
     });
 
-    it('falls back to session-scoped set_config when transaction-scoped fails', async () => {
+    it('throws when session-scoped set_config fails', async () => {
       const { setupDbSession } = await import('@/lib/auth/session');
 
-      mockDbExecute
-        .mockRejectedValueOnce(new Error('set_config unavailable'))
-        .mockResolvedValueOnce(undefined);
+      mockDbExecute.mockRejectedValueOnce(new Error('set_config unavailable'));
 
-      const result = await setupDbSession('user_fallback_123');
+      await expect(setupDbSession('user_fallback_123')).rejects.toThrow(
+        'set_config unavailable'
+      );
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
 
-      expect(result.userId).toBe('user_fallback_123');
-      expect(mockDbExecute).toHaveBeenCalledTimes(2);
-
-      const firstQueryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
-      const secondQueryText = JSON.stringify(mockDbExecute.mock.calls[1]?.[0]);
-
-      expect(firstQueryText).toContain("set_config('app.clerk_user_id'");
-      // Fallback uses session-scoped set_config (is_local=false)
-      expect(secondQueryText).toContain("set_config('app.clerk_user_id'");
+      const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+      expect(queryText).toContain("set_config('app.clerk_user_id'");
     });
 
     it('returns null userId when no authenticated user and no clerkUserId', async () => {

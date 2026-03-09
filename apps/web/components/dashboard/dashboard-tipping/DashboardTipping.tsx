@@ -112,7 +112,7 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
           type='button'
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          className='inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-1 text-[13px] font-[510] text-accent-token transition-colors hover:bg-accent/20 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[14px]'
+          className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-2 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[14px]'
         >
           <Wallet className='h-3.5 w-3.5 sm:h-4 sm:w-4' />
           <span className='truncate'>@{venmoHandle}</span>

@@ -103,6 +103,10 @@ export function useSpeechRecognition({
     recognition.lang = lang;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      // Accumulate the full session transcript on every event.
+      // resultIndex marks where the new/updated results begin; earlier
+      // indices are already-final results whose text must also be included
+      // so the caller always receives the complete in-session transcript.
       let transcript = '';
       for (let i = 0; i < event.results.length; i++) {
         transcript += event.results[i][0].transcript;
@@ -111,6 +115,10 @@ export function useSpeechRecognition({
     };
 
     recognition.onend = () => {
+      // Discard the instance so the next start() creates a fresh one.
+      // Reusing a stopped SpeechRecognition instance throws InvalidStateError
+      // in Chrome, causing the mic button to appear as a mute toggle.
+      recognitionRef.current = null;
       setIsListening(false);
     };
 
