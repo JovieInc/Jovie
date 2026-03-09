@@ -3,7 +3,7 @@
 import { ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { Suspense } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Container } from '@/components/site/Container';
@@ -31,6 +31,36 @@ const SMART_LINK_DSPS = [
   'youtube_music',
   'amazon_music',
 ] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Rotating releases for the smartlink card                             */
+/* ------------------------------------------------------------------ */
+
+const ROTATING_RELEASES = [
+  {
+    title: 'Take Me Over',
+    artist: 'Tim White & Erica Gibson',
+    date: 'Oct 2014',
+    artwork: 'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
+    rowIndex: 0,
+  },
+  {
+    title: 'Never Say A Word',
+    artist: 'Tim White',
+    date: 'Jan 2024',
+    artwork: 'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
+    rowIndex: 1,
+  },
+  {
+    title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
+    date: 'Feb 2017',
+    artwork: 'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
+    rowIndex: 2,
+  },
+] as const;
+
+const ROTATE_INTERVAL_MS = 3500;
 
 /* ------------------------------------------------------------------ */
 /*  Skeleton loader — shown while real table loads                       */
@@ -61,10 +91,54 @@ function ReleasesTableSkeleton() {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Row highlight overlay — sits on top of the ReleaseTable              */
+/* ------------------------------------------------------------------ */
+
+function RowHighlight({ activeRow }: { readonly activeRow: number }) {
+  // ReleaseTable rows: header ~48px, then each row ~56px
+  const headerHeight = 48;
+  const rowHeight = 56;
+  const top = headerHeight + activeRow * rowHeight;
+
+  return (
+    <div
+      className='pointer-events-none absolute inset-x-0 z-[1] transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+      style={{
+        top: `${top}px`,
+        height: `${rowHeight}px`,
+        background:
+          'linear-gradient(90deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}
+    />
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Section                                                             */
 /* ------------------------------------------------------------------ */
 
 export function AutomaticReleaseSmartlinksSection() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startRotation = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setActiveIndex(prev => (prev + 1) % ROTATING_RELEASES.length);
+    }, ROTATE_INTERVAL_MS);
+  }, []);
+
+  useEffect(() => {
+    startRotation();
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [startRotation]);
+
+  const release = ROTATING_RELEASES[activeIndex];
+
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
       {/* Ambient glow — large, soft, centered behind mockup */}
@@ -85,9 +159,9 @@ export function AutomaticReleaseSmartlinksSection() {
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              New release?
+              Unlimited smartlinks.
               <br />
-              Already live.
+              Built-in.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
@@ -101,7 +175,12 @@ export function AutomaticReleaseSmartlinksSection() {
           </div>
 
           {/* Product Mockup — side-by-side layout */}
-          <div className='mt-16 md:mt-20 mx-auto w-full'>
+          <div
+            className='mt-16 md:mt-20 mx-auto w-full'
+            style={{
+              perspective: '1200px',
+            }}
+          >
             <div className='flex flex-col md:flex-row gap-6 md:items-start'>
               {/* Dashboard window — real ReleaseTable */}
               <div
@@ -114,6 +193,8 @@ export function AutomaticReleaseSmartlinksSection() {
                     '0 8px 40px rgba(0,0,0,0.35)',
                     '0 24px 80px rgba(0,0,0,0.25)',
                   ].join(', '),
+                  transform: 'rotateX(2deg)',
+                  transformOrigin: 'center bottom',
                 }}
               >
                 {/* Shine border */}
@@ -150,6 +231,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                 {/* Real ReleaseTable — capped height with fade */}
                 <div className='relative h-[420px] overflow-hidden'>
+                  <RowHighlight activeRow={release.rowIndex} />
                   <Suspense fallback={<ReleasesTableSkeleton />}>
                     <DemoRealReleasesPanel />
                   </Suspense>
@@ -165,7 +247,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 </div>
               </div>
 
-              {/* Smart Link Card — beside the table */}
+              {/* Smart Link Card — rotates through releases */}
               <div
                 className='hidden md:flex flex-col w-[272px] shrink-0 overflow-hidden rounded-2xl'
                 style={{
@@ -197,7 +279,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 />
 
                 <div className='relative px-6 pt-8 pb-5 flex flex-col items-center'>
-                  {/* Album artwork */}
+                  {/* Album artwork — crossfade between releases */}
                   <div
                     className='relative w-full aspect-square overflow-hidden rounded-lg'
                     style={{
@@ -206,30 +288,71 @@ export function AutomaticReleaseSmartlinksSection() {
                         '0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2)',
                     }}
                   >
-                    <Image
-                      src='https://i.scdn.co/image/ab67616d0000b2739f0aacc7a97241bea42f7815'
-                      alt='The Deep End — Tim White'
-                      fill
-                      className='object-cover'
-                      sizes='272px'
-                    />
+                    {ROTATING_RELEASES.map((r, i) => (
+                      <Image
+                        key={r.title}
+                        src={r.artwork}
+                        alt={`${r.title} — ${r.artist}`}
+                        fill
+                        className='object-cover transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                        style={{
+                          opacity: i === activeIndex ? 1 : 0,
+                        }}
+                        sizes='272px'
+                        priority={i === 0}
+                      />
+                    ))}
                   </div>
 
-                  {/* Release info */}
-                  <div className='mt-4 w-full text-center'>
-                    <h3 className='text-lg font-[var(--linear-font-weight-semibold)] leading-snug tracking-tight'>
-                      The Deep End
-                    </h3>
-                    <p className='mt-1 text-sm text-[var(--linear-text-secondary)]'>
-                      Tim White
-                    </p>
-                    <p className='mt-0.5 text-2xs tracking-wide text-[var(--linear-text-tertiary)]'>
-                      Feb 2017
-                    </p>
+                  {/* Release info — crossfade */}
+                  <div className='mt-4 w-full text-center relative h-[68px]'>
+                    {ROTATING_RELEASES.map((r, i) => (
+                      <div
+                        key={r.title}
+                        className='absolute inset-0 transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                        style={{
+                          opacity: i === activeIndex ? 1 : 0,
+                        }}
+                      >
+                        <h3 className='text-lg font-[var(--linear-font-weight-semibold)] leading-snug tracking-tight'>
+                          {r.title}
+                        </h3>
+                        <p className='mt-1 text-sm text-[var(--linear-text-secondary)]'>
+                          {r.artist}
+                        </p>
+                        <p className='mt-0.5 text-2xs tracking-wide text-[var(--linear-text-tertiary)]'>
+                          {r.date}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Progress dots */}
+                  <div className='flex items-center justify-center gap-1.5 mt-1 mb-3'>
+                    {ROTATING_RELEASES.map((r, i) => (
+                      <button
+                        key={r.title}
+                        type='button'
+                        onClick={() => {
+                          setActiveIndex(i);
+                          startRotation();
+                        }}
+                        className='rounded-full transition-all duration-300'
+                        style={{
+                          width: i === activeIndex ? 16 : 6,
+                          height: 6,
+                          backgroundColor:
+                            i === activeIndex
+                              ? 'rgb(247,248,248)'
+                              : 'rgba(255,255,255,0.2)',
+                        }}
+                        aria-label={`Show ${r.title}`}
+                      />
+                    ))}
                   </div>
 
                   {/* Platform buttons */}
-                  <div className='mt-5 w-full space-y-2'>
+                  <div className='w-full space-y-2'>
                     {SMART_LINK_DSPS.map(key => {
                       const config = DSP_CONFIGS[key];
                       if (!config) return null;
@@ -270,6 +393,21 @@ export function AutomaticReleaseSmartlinksSection() {
                 </div>
               </div>
             </div>
+
+            {/* Reflection */}
+            <div
+              aria-hidden='true'
+              className='pointer-events-none mt-0 h-24 w-full rounded-xl'
+              style={{
+                background:
+                  'linear-gradient(to bottom, rgba(255,255,255,0.02), transparent)',
+                transform: 'rotateX(180deg) scaleY(0.3)',
+                opacity: 0.3,
+                maskImage: 'linear-gradient(to bottom, black 20%, transparent)',
+                WebkitMaskImage:
+                  'linear-gradient(to bottom, black 20%, transparent)',
+              }}
+            />
           </div>
         </div>
       </Container>

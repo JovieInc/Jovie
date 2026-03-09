@@ -161,7 +161,7 @@ function RankedList({
 }) {
   if (loading) {
     return (
-      <ul className='space-y-1.5'>
+      <ul className='min-h-[196px] space-y-1.5'>
         {[1, 2, 3, 4, 5].map(i => (
           <li
             key={i}
@@ -180,12 +180,14 @@ function RankedList({
 
   if (items.length === 0) {
     return (
-      <p className='py-4 text-[13px] text-tertiary-token'>{emptyMessage}</p>
+      <div className='min-h-[196px]'>
+        <p className='py-4 text-[13px] text-tertiary-token'>{emptyMessage}</p>
+      </div>
     );
   }
 
   return (
-    <ul className='space-y-1.5'>
+    <ul className='min-h-[196px] space-y-1.5'>
       {items.map((item, index) => (
         <li
           key={item.key}
@@ -218,9 +220,11 @@ function EngagementMetricCard({
   readonly value: string;
   readonly loading: boolean;
 }) {
+  const showSkeleton = loading || !value;
+
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
-      {loading ? (
+    <div className='min-h-[72px] rounded-xl border border-subtle bg-surface-1 p-3'>
+      {showSkeleton ? (
         <>
           <LoadingSkeleton
             height='h-7'
@@ -299,7 +303,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           isFetching && !loading && 'opacity-70'
         )}
       >
-        <div className='flex flex-col items-center gap-0'>
+        <div className='flex min-h-[280px] flex-col items-center gap-0'>
           {stages.map((stage, index) => {
             const isLast = index === stages.length - 1;
             const prevStage = index > 0 ? stages[index - 1] : null;
@@ -370,7 +374,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
 
-        <div className='min-h-[176px]'>
+        <div className='min-h-[196px]'>
           {activeTab === 'cities' && (
             <RankedList
               icon={MapPin}

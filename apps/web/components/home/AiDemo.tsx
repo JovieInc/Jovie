@@ -234,7 +234,7 @@ export function AiDemo() {
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
         </div>
-        <div className='flex-1 text-center text-xs text-[var(--linear-text-tertiary)]'>
+        <div className='flex-1 text-center text-xs text-[color:var(--linear-text-tertiary)]'>
           Jovie AI
         </div>
         {/* Pause/Play toggle */}
@@ -242,7 +242,7 @@ export function AiDemo() {
           type='button'
           onClick={prefersReducedMotion ? showNextDemo : togglePause}
           aria-label={toggleLabel}
-          className='focus-ring w-6 h-6 flex items-center justify-center rounded text-[var(--linear-text-tertiary)] hover:text-[var(--linear-text-secondary)] transition-colors'
+          className='focus-ring w-6 h-6 flex items-center justify-center rounded text-[color:var(--linear-text-tertiary)] hover:text-[color:var(--linear-text-secondary)] transition-colors'
         >
           {prefersReducedMotion || isPaused ? (
             <svg
@@ -271,7 +271,7 @@ export function AiDemo() {
       <div className='px-5 pt-5 pb-6'>
         {/* Prompt */}
         {currentDemo && (
-          <div className='font-mono text-sm text-[var(--linear-text-tertiary)] mb-4'>
+          <div className='font-mono text-sm text-[color:var(--linear-text-tertiary)] mb-4'>
             {currentDemo.prompt}
           </div>
         )}
@@ -279,7 +279,7 @@ export function AiDemo() {
         {/* Response */}
         <output
           aria-live='polite'
-          className='block text-sm leading-[1.7] text-[var(--linear-text-secondary)] min-h-[80px]'
+          className='block text-sm leading-[1.7] text-[color:var(--linear-text-secondary)] min-h-[80px]'
         >
           {currentDemo?.segments.map((segment, i) => {
             if (i >= visibleCount) return null;

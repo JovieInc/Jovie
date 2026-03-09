@@ -45,19 +45,19 @@ export function IGComparisonAside() {
         <div className='grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-[10px]'>
           {/* Linktree side (dimmed) */}
           <div className='flex flex-col gap-4 p-6 bg-[var(--linear-bg-surface-0)] opacity-50'>
-            <span className='text-xs font-medium uppercase tracking-wider text-[var(--linear-text-tertiary)]'>
+            <span className='text-xs font-medium uppercase tracking-wider text-[color:var(--linear-text-tertiary)]'>
               Linktree in your bio
             </span>
 
-            <div className='rounded-md px-3 py-2 font-mono text-sm bg-[var(--linear-bg-surface-1)] text-[var(--linear-text-tertiary)]'>
+            <div className='rounded-md px-3 py-2 font-mono text-sm bg-[var(--linear-bg-surface-1)] text-[color:var(--linear-text-tertiary)]'>
               linktr.ee/timwhite
             </div>
 
-            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-[var(--linear-text-tertiary)]'>
+            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-[color:var(--linear-text-tertiary)]'>
               Fan taps → Linktree page → scrolls to find link → taps again
             </p>
 
-            <p className='font-medium text-[length:var(--linear-body-sm-size)] text-[var(--linear-text-secondary)]'>
+            <p className='font-medium text-[length:var(--linear-body-sm-size)] text-[color:var(--linear-text-secondary)]'>
               2 extra clicks
             </p>
           </div>
@@ -81,17 +81,17 @@ export function IGComparisonAside() {
                   className='flex items-center gap-2.5 rounded-md px-3 py-2 text-sm bg-[var(--linear-bg-surface-1)]'
                 >
                   <span>{link.emoji}</span>
-                  <span className='text-[var(--linear-text-secondary)] text-[length:var(--linear-body-sm-size)]'>
+                  <span className='text-[color:var(--linear-text-secondary)] text-[length:var(--linear-body-sm-size)]'>
                     {link.label}
                   </span>
-                  <span className='ml-auto font-mono text-xs text-[var(--linear-text-tertiary)]'>
+                  <span className='ml-auto font-mono text-xs text-[color:var(--linear-text-tertiary)]'>
                     {link.url}
                   </span>
                 </div>
               ))}
             </div>
 
-            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-[var(--linear-text-tertiary)]'>
+            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-[color:var(--linear-text-tertiary)]'>
               Fan taps → arrives exactly where they need to be
             </p>
 

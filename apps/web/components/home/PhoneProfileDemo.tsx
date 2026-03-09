@@ -75,7 +75,7 @@ function TipContent() {
             className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 ${
               amt === '$5'
                 ? 'bg-[var(--linear-text-primary)] text-[var(--linear-bg-page)] border border-transparent'
-                : 'bg-white/[0.04] text-[var(--linear-text-primary)] border border-white/[0.06]'
+                : 'bg-white/[0.04] text-[color:var(--linear-text-primary)] border border-white/[0.06]'
             }`}
           >
             <span
@@ -252,7 +252,7 @@ export function PhoneProfileDemo() {
                     onClick={() => setActiveTab(tab.id)}
                     className={`relative z-10 flex-1 py-2 text-[11px] font-medium text-center transition-colors ${
                       tab.id === activeTab
-                        ? 'text-[var(--linear-text-primary)]'
+                        ? 'text-[color:var(--linear-text-primary)]'
                         : 'text-white/40'
                     }`}
                   >
@@ -282,13 +282,13 @@ export function PhoneProfileDemo() {
 
           {/* Section heading — below phone */}
           <div className='text-center heading-gap-linear'>
-            <p className='inline-flex w-fit items-center rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-[var(--linear-text-secondary)] backdrop-blur mx-auto'>
+            <p className='inline-flex w-fit items-center rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-[color:var(--linear-text-secondary)] backdrop-blur mx-auto'>
               Link in bio
             </p>
-            <h2 className='mt-4 marketing-h2-linear text-[var(--linear-text-primary)]'>
+            <h2 className='mt-4 marketing-h2-linear text-[color:var(--linear-text-primary)]'>
               One profile. Adapts to every fan.
             </h2>
-            <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+            <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
               Opinionated by design. Your link instantly adapts to a fan&apos;s
               location, preferred music app, and notification status. Jovie
               handles the optimization and retargeting so you can focus on the
