@@ -5,7 +5,7 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
-    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-40'>
+    <section className='bg-[var(--linear-bg-page)] relative z-10 pt-[var(--linear-section-pt-lg)] pb-48'>
       {/* Ambient glow behind CTA */}
       <div
         aria-hidden='true'
@@ -39,7 +39,8 @@ export function FinalCTASection() {
           </h2>
           <p
             data-testid='final-cta-subtext'
-            className='mt-5 marketing-lead-linear text-[var(--linear-text-secondary)]'
+            className='mt-5 marketing-lead-linear'
+            style={{ color: 'var(--linear-text-quaternary)' }}
           >
             Free forever. No credit card required.
           </p>
@@ -49,12 +50,23 @@ export function FinalCTASection() {
             <div
               id='final-cta-dock'
               data-testid='final-cta-dock'
-              className='w-full max-w-[600px] overflow-hidden rounded-[24px] border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] p-2'
+              className='relative w-full max-w-[560px] overflow-hidden rounded-2xl p-2'
               style={{
-                boxShadow:
-                  '0 0 0 1px var(--linear-border-subtle), var(--linear-shadow-card-elevated), 0 0 80px rgba(0,0,0,0.15)',
+                backgroundColor: 'var(--linear-bg-surface-0)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: [
+                  '0 0 0 1px rgba(255,255,255,0.04)',
+                  '0 8px 40px rgba(0,0,0,0.4)',
+                  '0 24px 80px rgba(0,0,0,0.25)',
+                ].join(', '),
               }}
             >
+              {/* Shine edge */}
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-0 rounded-2xl'
+                style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+              />
               <ClaimHandleForm />
             </div>
           </div>

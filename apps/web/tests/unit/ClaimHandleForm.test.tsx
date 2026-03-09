@@ -37,9 +37,9 @@ describe('ClaimHandleForm', () => {
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toHaveAttribute('required');
 
-    // Helper text is visible
-    const helpText = screen.getByText(/Your Jovie profile will live at/i);
-    expect(helpText).toBeInTheDocument();
+    // No helper text shown when handle is empty (removed redundant hint)
+    const helpText = screen.queryByText(/Your Jovie profile will live at/i);
+    expect(helpText).not.toBeInTheDocument();
   });
 
   test('renders form element', () => {
