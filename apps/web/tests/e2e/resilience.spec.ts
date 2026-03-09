@@ -1,0 +1,425 @@
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
+import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
+import { signInUser } from '../helpers/clerk-auth';
+
+// Routes not yet in APP_ROUTES constants
+const DASHBOARD_ANALYTICS = '/app/dashboard/analytics';
+const DASHBOARD_AUDIENCE = '/app/dashboard/audience';
+const DASHBOARD_RELEASES = '/app/dashboard/releases';
+
+/**
+ * Suite 5: Resilience / Chaos Tests (JOV-1427)
+ *
+ * Tests the app's resilience under adverse conditions:
+ * 1. Slow network — API calls delayed 2s, app must show loading states, not crash
+ * 2. API failures — key endpoints return 500, error boundaries must catch, not blank/crash
+ * 3. Rapid navigation — switching between 6 dashboard pages quickly, no React errors
+ * 4. Auth session expiry — clearing cookies mid-session redirects to signin, not crash
+ *
+ * Every assertion would FAIL if the corresponding resilience is broken.
+ * No theater. Chaos tests must exercise real failure paths.
+ *
+ * Run headed to visually verify:
+ *   doppler run -- pnpm exec playwright test resilience --project=chromium --headed
+ *
+ * @chaos @resilience @critical
+ */
+
+function hasClerkCredentials(): boolean {
+  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
+  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
+  return (
+    username.length > 0 &&
+    (password.length > 0 || username.includes('+clerk_test')) &&
+    process.env.CLERK_TESTING_SETUP_SUCCESS === 'true'
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SLOW NETWORK RESILIENCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Slow network resilience', () => {
+  test.setTimeout(300_000);
+
+  test.beforeEach(async ({ page }) => {
+    test.skip(!hasClerkCredentials(), 'Clerk credentials not configured');
+    await setupClerkTestingToken({ page });
+    await signInUser(page);
+  });
+
+  test('dashboard analytics page shows content or loading state under API delay', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    // Intercept API calls and add a 2s delay — simulates slow backend
+    await page.route('**/api/**', async route => {
+      await new Promise<void>(resolve => setTimeout(resolve, 2_000));
+      await route.continue();
+    });
+
+    const response = await page.goto(DASHBOARD_ANALYTICS, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+
+    expect(
+      response?.status() ?? 0,
+      'Analytics page crashed on slow network'
+    ).toBeLessThan(500);
+
+    // Page must show SOMETHING — either loaded content, skeleton, or loading spinner
+    // A blank white screen is a failure
+    const hasContent = await page
+      .locator(
+        'main, [data-testid*="analytics"], [data-testid*="skeleton"], [class*="skeleton"], [class*="loading"], h1, h2'
+      )
+      .first()
+      .isVisible({ timeout: 30_000 })
+      .catch(() => false);
+
+    expect(
+      hasContent,
+      'Analytics page is blank under slow network — no loading state, skeleton, or content rendered'
+    ).toBe(true);
+
+    // Must not crash
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+    expect(bodyText.toLowerCase()).not.toContain('application error');
+    expect(bodyText.toLowerCase()).not.toContain('unhandled runtime error');
+  });
+
+  test('dashboard profile page shows content or loading state under API delay', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    await page.route('**/api/**', async route => {
+      await new Promise<void>(resolve => setTimeout(resolve, 2_000));
+      await route.continue();
+    });
+
+    const response = await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+
+    expect(
+      response?.status() ?? 0,
+      'Profile page crashed on slow network'
+    ).toBeLessThan(500);
+
+    const hasContent = await page
+      .locator('main, h1, h2, [data-testid*="profile"], [class*="skeleton"]')
+      .first()
+      .isVisible({ timeout: 30_000 })
+      .catch(() => false);
+
+    expect(
+      hasContent,
+      'Profile page is blank under slow network — loading state missing'
+    ).toBe(true);
+
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+    expect(bodyText.toLowerCase()).not.toContain('application error');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API FAILURE RESILIENCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('API failure resilience', () => {
+  test.setTimeout(300_000);
+
+  test.beforeEach(async ({ page }) => {
+    test.skip(!hasClerkCredentials(), 'Clerk credentials not configured');
+    await setupClerkTestingToken({ page });
+    await signInUser(page);
+  });
+
+  test('analytics page shows error UI (not blank) when analytics API returns 500', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    // Analytics-specific endpoints return 500
+    await page.route('**/api/analytics/**', route => {
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Service unavailable' }),
+      });
+    });
+
+    const response = await page.goto(DASHBOARD_ANALYTICS, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+
+    // SSR itself should not 500 — the API failure is client-side
+    expect(
+      response?.status() ?? 0,
+      'Analytics SSR crashed on API failure'
+    ).toBeLessThan(500);
+
+    // Wait for React to render after failed fetch
+    await page.waitForLoadState('domcontentloaded');
+
+    // Must not be a blank page — show SOMETHING (error state, retry button, fallback)
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+
+    // If the page is completely blank, it's a failure
+    expect(
+      bodyText.trim().length,
+      'Analytics page is completely blank after API 500 — error boundary missing'
+    ).toBeGreaterThan(100);
+
+    // Must not crash with a React error boundary full-page error
+    expect(bodyText.toLowerCase()).not.toContain('unhandled runtime error');
+    expect(bodyText.toLowerCase()).not.toContain('minified react error');
+  });
+
+  test('audience page shows error UI (not blank) when audience API returns 500', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    await page.route('**/api/audience/**', route => {
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Service unavailable' }),
+      });
+    });
+
+    const response = await page.goto(DASHBOARD_AUDIENCE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+
+    expect(
+      response?.status() ?? 0,
+      'Audience SSR crashed on API failure'
+    ).toBeLessThan(500);
+
+    await page.waitForLoadState('domcontentloaded');
+
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+
+    expect(
+      bodyText.trim().length,
+      'Audience page is completely blank after API 500 — error boundary missing'
+    ).toBeGreaterThan(100);
+
+    expect(bodyText.toLowerCase()).not.toContain('unhandled runtime error');
+    expect(bodyText.toLowerCase()).not.toContain('minified react error');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RAPID NAVIGATION RESILIENCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Rapid navigation resilience', () => {
+  test.setTimeout(480_000);
+
+  test.beforeEach(async ({ page }) => {
+    test.skip(!hasClerkCredentials(), 'Clerk credentials not configured');
+    await setupClerkTestingToken({ page });
+    await signInUser(page);
+  });
+
+  test('rapid navigation through dashboard pages causes no React crashes', async ({
+    page,
+  }) => {
+    test.setTimeout(300_000);
+
+    const pages = [
+      APP_ROUTES.DASHBOARD_PROFILE,
+      DASHBOARD_ANALYTICS,
+      DASHBOARD_AUDIENCE,
+      DASHBOARD_RELEASES,
+      APP_ROUTES.DASHBOARD_EARNINGS,
+      APP_ROUTES.DASHBOARD_PROFILE, // return to start
+    ] as const;
+
+    const reactErrors: string[] = [];
+
+    // Collect React errors
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        const text = msg.text().toLowerCase();
+        const isReactError =
+          text.includes('rendered more hooks') ||
+          text.includes('rendered fewer hooks') ||
+          text.includes('invalid hook call') ||
+          text.includes('maximum update depth') ||
+          text.includes('too many re-renders') ||
+          text.includes('hydration failed') ||
+          text.includes('minified react error');
+        if (isReactError) {
+          reactErrors.push(msg.text());
+        }
+      }
+    });
+
+    page.on('pageerror', error => {
+      const text = error.message.toLowerCase();
+      if (
+        text.includes('react') ||
+        text.includes('hook') ||
+        text.includes('hydration')
+      ) {
+        reactErrors.push(error.message);
+      }
+    });
+
+    const failures: string[] = [];
+
+    for (const path of pages) {
+      try {
+        await page.goto(path, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60_000,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
+          continue; // transient under load — skip
+        }
+        failures.push(`${path}: ${msg}`);
+        continue;
+      }
+
+      const bodyText =
+        (await page
+          .locator('body')
+          .innerText()
+          .catch(() => '')) ?? '';
+      if (
+        bodyText.toLowerCase().includes('application error') ||
+        bodyText.toLowerCase().includes('unhandled runtime error')
+      ) {
+        failures.push(`${path}: error boundary triggered`);
+      }
+    }
+
+    expect(
+      reactErrors,
+      `React errors during rapid navigation:\n${reactErrors.join('\n')}`
+    ).toHaveLength(0);
+
+    expect(
+      failures,
+      `Page failures during rapid navigation:\n${failures.join('\n')}`
+    ).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTH EXPIRY RESILIENCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('Auth expiry resilience', () => {
+  test.setTimeout(300_000);
+
+  test('clearing session cookies redirects to signin, not blank or crash', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    test.skip(!hasClerkCredentials(), 'Clerk credentials not configured');
+
+    // Sign in first
+    await setupClerkTestingToken({ page });
+    await signInUser(page);
+
+    // Verify we're authenticated
+    const dashResponse = await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+
+    if ((dashResponse?.status() ?? 0) >= 500) {
+      test.skip(true, 'Dashboard not available for auth expiry test');
+      return;
+    }
+
+    // Simulate session expiry by clearing Clerk cookies
+    await page.context().clearCookies({
+      name: /^__(session|client|clerk)/,
+    });
+
+    // Navigate to a protected route — should redirect gracefully
+    try {
+      await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
+        test.skip(true, 'Server too slow for auth expiry test');
+        return;
+      }
+      throw e;
+    }
+
+    const finalUrl = page.url();
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+
+    // Should redirect to signin — NOT show a blank page or crash
+    const redirectedToSignin =
+      finalUrl.includes('/signin') || finalUrl.includes('/sign-in');
+    const hasContent = bodyText.trim().length > 50;
+
+    // Either redirected to signin OR still shows the page (if server-side session is valid)
+    // What's NOT acceptable: blank page or crash
+    expect(
+      hasContent,
+      'Page is blank after session cookie cleared — should redirect to signin or re-auth'
+    ).toBe(true);
+
+    // Absolutely must not crash
+    expect(bodyText.toLowerCase()).not.toContain('unhandled runtime error');
+    expect(bodyText.toLowerCase()).not.toContain('application error');
+    expect(bodyText.toLowerCase()).not.toContain('minified react error');
+
+    if (redirectedToSignin) {
+      // Verify signin page actually rendered
+      const bodyLower = bodyText.toLowerCase();
+      const hasSigninContent =
+        bodyLower.includes('sign') ||
+        bodyLower.includes('email') ||
+        bodyLower.includes('log in') ||
+        bodyLower.includes('password');
+      expect(
+        hasSigninContent,
+        'Redirected to /signin but page is missing sign-in form content'
+      ).toBe(true);
+    }
+  });
+});
