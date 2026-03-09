@@ -26,6 +26,8 @@ import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 interface ChatPageClientProps {
   readonly conversationId?: string;
   readonly isFirstSession?: boolean;
+  readonly appleMusicConnected?: boolean;
+  readonly appleMusicArtistName?: string | null;
 }
 
 /**
@@ -44,6 +46,8 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
 export function ChatPageClient({
   conversationId,
   isFirstSession = false,
+  appleMusicConnected = false,
+  appleMusicArtistName = null,
 }: ChatPageClientProps) {
   const {
     selectedProfile,
@@ -94,6 +98,10 @@ export function ChatPageClient({
   // Hydrate preview panel with profile data and links
   useEffect(() => {
     if (!selectedProfile) return;
+    const profileSettings = selectedProfile.settings as Record<
+      string,
+      unknown
+    > | null;
     setPreviewData({
       username: selectedProfile.username,
       displayName: selectedProfile.displayName ?? selectedProfile.username,
@@ -103,11 +111,24 @@ export function ChatPageClient({
       links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
       dspConnections: {
-        spotify: { connected: false, artistName: null },
-        appleMusic: { connected: false, artistName: null },
+        spotify: {
+          connected: Boolean(selectedProfile.spotifyId),
+          artistName:
+            (profileSettings?.spotifyArtistName as string | null) ?? null,
+        },
+        appleMusic: {
+          connected: appleMusicConnected,
+          artistName: appleMusicArtistName,
+        },
       },
     });
-  }, [selectedProfile, previewLinks, setPreviewData]);
+  }, [
+    selectedProfile,
+    previewLinks,
+    setPreviewData,
+    appleMusicConnected,
+    appleMusicArtistName,
+  ]);
 
   const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
     onSuccess: () => notifications.success('Session ID copied'),
