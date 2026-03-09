@@ -428,7 +428,6 @@ export async function getUserDashboardAnalytics(
               from ${audienceMembers}
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
-                and ${audienceMembers.fingerprint} is not null
             ),
             audience_identified as (
               select 1

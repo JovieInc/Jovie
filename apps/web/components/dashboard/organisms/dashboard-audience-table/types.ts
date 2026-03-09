@@ -39,7 +39,6 @@ export interface DashboardAudienceTableProps {
   readonly profileUrl?: string;
   readonly profileId?: string;
   readonly subscriberCount: number;
-  readonly anonymousCount?: number;
   readonly totalAudienceCount?: number;
   readonly filters: AudienceFilters;
   readonly hasNextPage?: boolean;
