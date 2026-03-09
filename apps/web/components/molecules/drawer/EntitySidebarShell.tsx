@@ -120,7 +120,9 @@ export function EntitySidebarShell({
           <>
             {/* Entity header — image + name area */}
             {entityHeader && (
-              <div className='shrink-0 px-5 pt-4 pb-4'>{entityHeader}</div>
+              <div className='shrink-0 overflow-hidden px-5 pt-4 pb-4'>
+                {entityHeader}
+              </div>
             )}
 
             {/* Tabs */}

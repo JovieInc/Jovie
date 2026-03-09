@@ -73,6 +73,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       usernameNormalized: creatorProfiles.usernameNormalized,
       avatarUrl: creatorProfiles.avatarUrl,
       settings: creatorProfiles.settings,
+      isClaimed: creatorProfiles.isClaimed,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))

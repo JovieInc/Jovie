@@ -59,9 +59,11 @@ export async function GET(request: NextRequest) {
     const orderColumn =
       query.sortBy === 'fitScore'
         ? leads.fitScore
-        : query.sortBy === 'displayName'
-          ? leads.displayName
-          : leads.createdAt;
+        : query.sortBy === 'priorityScore'
+          ? leads.priorityScore
+          : query.sortBy === 'displayName'
+            ? leads.displayName
+            : leads.createdAt;
 
     const orderFn = query.sortOrder === 'asc' ? asc : desc;
 

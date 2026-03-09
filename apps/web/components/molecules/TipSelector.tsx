@@ -78,7 +78,7 @@ export function TipSelector({
 
       <Button
         onClick={handleContinue}
-        className='mt-4 w-full flex items-center justify-center gap-2.5'
+        className='mt-4 w-full flex items-center justify-center gap-2.5 text-btn-primary-foreground'
         size='lg'
         disabled={isLoading}
         variant='primary'
@@ -93,7 +93,7 @@ export function TipSelector({
             width='20'
             height='20'
             viewBox='0 0 24 24'
-            fill='white'
+            fill='currentColor'
             className='shrink-0'
             aria-hidden='true'
             role='img'

@@ -27,9 +27,22 @@ const PROVIDER_KEYS = [
 
 export function AutomaticReleaseSmartlinksSection() {
   return (
-    <section className='section-spacing-linear overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+      {/* Ambient glow behind the mockup */}
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/3'
+        style={{
+          width: '800px',
+          height: '600px',
+          borderRadius: '50%',
+          background:
+            'radial-gradient(ellipse at center, oklch(20% 0.02 260 / 0.25), transparent 70%)',
+        }}
+      />
+
       <Container size='homepage'>
-        <div className='mx-auto max-w-[var(--linear-content-max)]'>
+        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
@@ -43,14 +56,14 @@ export function AutomaticReleaseSmartlinksSection() {
                 smart link — Spotify, Apple Music, YouTube Music, all in one
                 page your fans actually use.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 border transition-colors text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)] bg-[var(--linear-bg-surface-1)] border-[var(--linear-border-default)]'>
                 Zero manual work
               </span>
             </div>
           </div>
 
           {/* Full Width Product Mockup */}
-          <div className='relative mt-8 md:mt-12 mx-auto w-full'>
+          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
             <div className='relative w-full'>
               {/* Dashboard Window — releases table */}
               <div
@@ -58,9 +71,19 @@ export function AutomaticReleaseSmartlinksSection() {
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
-                  boxShadow: 'var(--linear-shadow-card-elevated)',
+                  boxShadow:
+                    'var(--linear-shadow-card-elevated), 0 0 80px rgba(0,0,0,0.3)',
                 }}
               >
+                {/* Shine border overlay */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
+                  style={{
+                    border: '1px solid rgba(255,255,255,0.04)',
+                  }}
+                />
+
                 {/* Mac window chrome */}
                 <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                   <div className='flex gap-2'>
@@ -78,7 +101,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 <ReleasesTable />
 
                 {/* Bottom gradient fade */}
-                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
+                <div className='pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
               </div>
 
               {/* Floating Smart Link Card */}
@@ -88,9 +111,16 @@ export function AutomaticReleaseSmartlinksSection() {
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   color: 'var(--linear-text-primary)',
                   boxShadow:
-                    'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-border-subtle)',
+                    '0 0 0 1px var(--linear-border-subtle), var(--linear-shadow-card-elevated), 0 20px 60px rgba(0,0,0,0.4)',
                 }}
               >
+                {/* Shine border overlay */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-0 rounded-2xl z-10'
+                  style={{ border: '1px solid rgba(255,255,255,0.05)' }}
+                />
+
                 {/* Ambient glow */}
                 <div className='pointer-events-none absolute inset-0'>
                   <div
@@ -118,7 +148,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                   {/* Release info */}
                   <div className='mt-4 w-full text-center'>
-                    <h3 className='text-lg font-semibold leading-snug tracking-tight'>
+                    <h3 className='text-lg font-[var(--linear-font-weight-semibold)] leading-snug tracking-tight'>
                       The Deep End
                     </h3>
                     <p className='mt-1 text-sm text-[var(--linear-text-secondary)]'>
@@ -137,7 +167,7 @@ export function AutomaticReleaseSmartlinksSection() {
                       return (
                         <div
                           key={key}
-                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 backdrop-blur-sm transition-colors duration-150 ease-out cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
+                          className='group flex w-full items-center gap-3.5 rounded-xl px-4 py-3 backdrop-blur-sm transition-all duration-150 ease-out cursor-pointer bg-[var(--linear-bg-surface-1)] hover:bg-[var(--linear-bg-hover)]'
                           style={{
                             border: '1px solid var(--linear-border-subtle)',
                           }}
@@ -147,11 +177,11 @@ export function AutomaticReleaseSmartlinksSection() {
                             className='h-5 w-5 shrink-0 text-[var(--linear-text-tertiary)] transition-colors duration-150'
                             aria-hidden
                           />
-                          <span className='flex-1 text-base font-semibold text-[var(--linear-text-primary)]'>
+                          <span className='flex-1 text-base font-[var(--linear-font-weight-semibold)] text-[var(--linear-text-primary)]'>
                             {config.name}
                           </span>
                           <ChevronRight
-                            className='h-4 w-4 transition-colors duration-150 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-secondary)]'
+                            className='h-4 w-4 transition-all duration-150 text-[var(--linear-text-tertiary)] group-hover:text-[var(--linear-text-secondary)] group-hover:translate-x-0.5'
                             aria-hidden='true'
                           />
                         </div>
@@ -163,7 +193,9 @@ export function AutomaticReleaseSmartlinksSection() {
                   <div className='mt-3 pt-3 text-center'>
                     <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-[var(--linear-text-tertiary)]'>
                       <span>Powered by</span>
-                      <span className='font-semibold'>Jovie</span>
+                      <span className='font-[var(--linear-font-weight-semibold)]'>
+                        Jovie
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -221,7 +253,7 @@ function ReleasesTable() {
       {RELEASES.map((release, i) => (
         <div
           key={release.id}
-          className='grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-[var(--linear-bg-hover)]'
+          className='grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-4 px-5 py-3 transition-colors duration-150 hover:bg-[var(--linear-bg-hover)]'
           style={{
             borderBottom:
               i < RELEASES.length - 1
@@ -258,7 +290,7 @@ function ReleasesTable() {
               return (
                 <span
                   key={key}
-                  className='inline-flex h-5 w-5 items-center justify-center rounded-full'
+                  className='inline-flex h-5 w-5 items-center justify-center rounded-full transition-opacity duration-150'
                   style={{
                     backgroundColor: isAvailable
                       ? `${config?.color ?? '#888'}20`

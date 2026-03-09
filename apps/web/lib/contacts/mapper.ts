@@ -61,6 +61,8 @@ export function toPublicContacts(
         .filter(Boolean)
         .join(' @ ');
 
+      const primaryContactLabel = contact.email ?? contact.phone ?? undefined;
+
       return {
         id: contact.id,
         role: contact.role,
@@ -68,6 +70,7 @@ export function toPublicContacts(
         territorySummary: summary,
         territoryCount: count,
         secondaryLabel: secondary || undefined,
+        primaryContactLabel,
         channels,
       };
     })

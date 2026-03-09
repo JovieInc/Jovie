@@ -16,7 +16,9 @@ export const leadListQuerySchema = z.object({
     ])
     .optional(),
   search: z.string().max(200).optional(),
-  sortBy: z.enum(['fitScore', 'createdAt', 'displayName']).default('createdAt'),
+  sortBy: z
+    .enum(['fitScore', 'priorityScore', 'createdAt', 'displayName'])
+    .default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),

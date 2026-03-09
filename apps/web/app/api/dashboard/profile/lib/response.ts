@@ -5,7 +5,7 @@
  */
 
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
-import { invalidateProfileCache } from '@/lib/cache/profile';
+import { invalidateUsernameChange } from '@/lib/cache/profile';
 import type { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 
@@ -23,14 +23,19 @@ export function addAvatarCacheBust(
 
 export interface FinalizeProfileResponseParams {
   updatedProfile: (typeof creatorProfiles)['$inferSelect'];
+  oldUsernameNormalized: string | null;
   clerkUserId: string;
 }
 
 export async function finalizeProfileResponse({
   updatedProfile,
+  oldUsernameNormalized,
   clerkUserId,
 }: FinalizeProfileResponseParams) {
-  await invalidateProfileCache(updatedProfile.usernameNormalized);
+  await invalidateUsernameChange(
+    updatedProfile.usernameNormalized,
+    oldUsernameNormalized
+  );
 
   trackServerEvent('dashboard_profile_updated', undefined, clerkUserId).catch(
     error => logger.warn('Analytics tracking failed:', error)

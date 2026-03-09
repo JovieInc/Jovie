@@ -32,6 +32,22 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
 
+vi.mock('@/lib/db/social-links-sync', () => ({
+  syncSocialLinksFromPrimaryMusicUrls: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {},
+}));
+
+vi.mock('@/lib/db/query-timeout', () => ({
+  dashboardQuery: vi.fn(),
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
 vi.mock('@/app/api/dashboard/profile/lib', () => ({
   NO_STORE_HEADERS: { 'Cache-Control': 'no-store' },
   validateUpdatesPayload: mockValidateUpdatesPayload,
@@ -49,6 +65,7 @@ vi.mock('@/app/api/dashboard/profile/lib', () => ({
 
 describe('PUT /api/dashboard/profile rollback behavior', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.stubEnv('NODE_ENV', 'development');
     vi.clearAllMocks();
 
@@ -76,6 +93,36 @@ describe('PUT /api/dashboard/profile rollback behavior', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it('passes old username to finalize response after profile update', async () => {
+    const rollback = vi.fn().mockResolvedValue(undefined);
+    mockSyncClerkProfile.mockResolvedValue({
+      clerkSyncFailed: false,
+      rollback,
+    });
+    mockUpdateProfileRecords.mockResolvedValue({
+      updatedProfile: { id: 'profile-1', usernameNormalized: 'newname' },
+      oldUsernameNormalized: 'oldname',
+    });
+
+    const { PUT } = await import('@/app/api/dashboard/profile/route');
+    const response = await PUT(
+      new Request('http://localhost/api/dashboard/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ updates: { username: 'newname' } }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockFinalizeProfileResponse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        oldUsernameNormalized: 'oldname',
+        updatedProfile: expect.objectContaining({
+          usernameNormalized: 'newname',
+        }),
+      })
+    );
   });
 
   it('rolls Clerk back when DB update throws', async () => {

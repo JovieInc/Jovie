@@ -9,7 +9,7 @@ import { filterEmail } from './email-filter';
 import { detectRepresentation } from './management-filter';
 
 export interface RouteLeadResult {
-  route: 'email' | 'dm' | 'both' | 'manual_review';
+  route: 'email' | 'dm' | 'both' | 'manual_review' | 'skipped';
   claimUrl: string;
   dmCopy: string | null;
 }
@@ -35,7 +35,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     (lead.spotifyPopularity !== null && lead.spotifyPopularity > 72);
 
   // 5. Determine route
-  let route: 'email' | 'dm' | 'both' | 'manual_review';
+  let route: 'email' | 'dm' | 'both' | 'manual_review' | 'skipped';
 
   if (isHighProfile || repResult.hasRepresentation) {
     route = 'manual_review';
@@ -46,12 +46,19 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
   } else if (lead.hasInstagram) {
     route = 'dm';
   } else {
-    route = 'manual_review';
+    route = 'skipped';
   }
 
-  // 6. Generate claim token
-  const { token, tokenHash, expiresAt } = await generateClaimTokenPair();
-  const claimUrl = getAppUrl(`/claim/${token}`);
+  // 6. Reuse token if present, otherwise generate claim token
+  const token = lead.claimToken;
+  const tokenHash = lead.claimTokenHash;
+  const expiresAt = lead.claimTokenExpiresAt;
+
+  const tokenPair =
+    token && tokenHash && expiresAt
+      ? { token, tokenHash, expiresAt }
+      : await generateClaimTokenPair();
+  const claimUrl = getAppUrl(`/claim/${tokenPair.token}`);
 
   // 7. Build DM copy if needed
   let dmCopy: string | null = null;
@@ -76,9 +83,9 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     .set({
       outreachRoute: route,
       outreachStatus: 'pending',
-      claimToken: token,
-      claimTokenHash: tokenHash,
-      claimTokenExpiresAt: expiresAt,
+      claimToken: tokenPair.token,
+      claimTokenHash: tokenPair.tokenHash,
+      claimTokenExpiresAt: tokenPair.expiresAt,
       emailInvalid: emailResult.invalid,
       emailSuspicious: emailResult.suspicious,
       emailInvalidReason: emailResult.reason,

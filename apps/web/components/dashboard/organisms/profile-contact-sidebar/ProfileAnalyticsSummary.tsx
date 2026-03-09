@@ -65,11 +65,7 @@ export function ProfileAnalyticsSummary() {
   }
 
   if (isError && !data) {
-    return (
-      <p className='text-xs text-tertiary-token'>
-        Analytics temporarily unavailable.
-      </p>
-    );
+    return <p className='text-xs text-tertiary-token'>No data yet.</p>;
   }
 
   const profileViews = data?.profile_views ?? 0;

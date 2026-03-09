@@ -17,7 +17,7 @@ import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
-  adminNavigation,
+  adminNavigationSections,
   artistSettingsNavigation,
   primaryNavigation,
   userSettingsNavigation,
@@ -196,7 +196,19 @@ export function DashboardNav(_: DashboardNavProps) {
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            {renderSection(adminNavigation)}
+            <div className='space-y-2'>
+              {adminNavigationSections.map((section, index) => (
+                <div key={section.label} data-admin-section={section.label}>
+                  {index > 0 ? (
+                    <div className='my-1.5 mx-2 border-t border-sidebar-border' />
+                  ) : null}
+                  <p className='px-2 pb-1 text-[11px] uppercase tracking-wide text-sidebar-muted group-data-[collapsible=icon]:hidden'>
+                    {section.label}
+                  </p>
+                  {renderSection(section.items)}
+                </div>
+              ))}
+            </div>
           </SidebarCollapsibleGroup>
         </div>
       )}
