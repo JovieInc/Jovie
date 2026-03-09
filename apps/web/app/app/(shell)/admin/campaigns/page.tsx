@@ -28,7 +28,7 @@ export const runtime = 'nodejs';
 export default function AdminCampaignsPage() {
   return (
     <PageShell>
-      <PageContent className='mx-auto max-w-4xl'>
+      <PageContent>
         <div className='mb-6'>
           <p className='text-sm text-secondary-token'>
             Send claim invites to unclaimed creator profiles. Emails are

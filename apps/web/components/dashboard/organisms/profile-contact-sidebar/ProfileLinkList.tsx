@@ -9,10 +9,7 @@ import type {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
-import {
-  DspProviderIcon,
-  PROVIDER_LABELS,
-} from '@/components/dashboard/atoms/DspProviderIcon';
+import { PROVIDER_LABELS } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
 import {
@@ -128,9 +125,10 @@ function ConnectedDspRows({
       {connectedProviders.map(entry => (
         <SidebarLinkRow
           key={entry.provider}
-          icon={<DspProviderIcon provider={entry.provider} size='sm' />}
+          icon={<SocialIcon platform={entry.provider} className='h-4 w-4' />}
           label={entry.artistName || PROVIDER_LABELS[entry.provider]}
           url=''
+          deepLinkPlatform={entry.provider}
           badge='Connected'
           isEditable={Boolean(onDisconnect)}
           onRemove={

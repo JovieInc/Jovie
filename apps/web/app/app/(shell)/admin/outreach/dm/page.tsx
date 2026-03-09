@@ -1,9 +1,9 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { DmQueueCard } from '@/components/admin/outreach/DmQueueCard';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface DmQueueLead {
   id: string;
@@ -59,7 +59,7 @@ export default function AdminOutreachDmPage() {
 
       {loading ? (
         <div className='flex items-center justify-center py-16'>
-          <Loader2 className='size-6 animate-spin text-secondary-token' />
+          <LoadingSpinner size='md' tone='muted' />
         </div>
       ) : leads.length === 0 ? (
         <p className='py-8 text-center text-sm text-secondary-token'>

@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { AlertCircle, Check, Copy, Loader2, RefreshCw } from 'lucide-react';
+import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -10,6 +10,7 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
@@ -312,10 +313,7 @@ export function ChatPageClient({
       <div className='flex h-full items-center justify-center'>
         <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
           {isProfileSetupRace ? (
-            <Loader2
-              className='h-8 w-8 text-tertiary-token animate-spin'
-              aria-hidden='true'
-            />
+            <LoadingSpinner size='lg' tone='muted' />
           ) : (
             <AlertCircle className='h-8 w-8 text-tertiary-token' />
           )}

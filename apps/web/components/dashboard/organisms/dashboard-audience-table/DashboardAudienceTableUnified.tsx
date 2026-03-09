@@ -84,55 +84,55 @@ function getSrDescription(
 }
 
 /**
- * Redesigned column definitions for members mode.
+ * Compact Linear-style column definitions for members mode.
  *
- * Columns: Select | User | Intent Score | LTV | Returning | Source | Last Action | Quick Actions
+ * Layout: Select | User (primary label) | Intent dot | LTV ($) | Returning icon | Source icon | Touring badge | Last Action | Quick Actions
  *
- * Cell renderers that need dynamic state (selection, menu, quick actions) read from
- * AudienceTableContext instead of closing over values, keeping these definitions fully stable.
+ * Headers are hidden via `hideHeader` on the table. Icon columns use fixed widths
+ * so layout never shifts when content appears/disappears.
  */
 const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   memberColumnHelper.display({
     id: 'select',
     header: () => null,
     cell: SelectCell,
-    size: 56,
+    size: 40,
   }),
   memberColumnHelper.accessor('displayName', {
     id: 'user',
     header: 'User',
     cell: renderUserCell,
-    size: 220,
+    size: 260,
   }),
   memberColumnHelper.accessor('intentLevel', {
     id: 'intentScore',
     header: 'Intent',
     cell: renderIntentScoreCell,
-    size: 110,
+    size: 40,
   }),
   memberColumnHelper.accessor('tipAmountTotalCents', {
     id: 'ltv',
     header: 'LTV',
     cell: renderLtvCell,
-    size: 80,
+    size: 40,
   }),
   memberColumnHelper.accessor('visits', {
     id: 'returning',
     header: 'Returning',
     cell: renderReturningCell,
-    size: 100,
+    size: 40,
   }),
   memberColumnHelper.accessor('referrerHistory', {
     id: 'source',
     header: 'Source',
     cell: renderSourceCell,
-    size: 140,
+    size: 40,
   }),
   memberColumnHelper.display({
     id: 'touringCity',
     header: 'Touring',
     cell: TouringCityCell,
-    size: 140,
+    size: 110,
   }),
   memberColumnHelper.accessor('latestActions', {
     id: 'lastAction',
@@ -509,17 +509,26 @@ export const DashboardAudienceTableUnified = memo(
       href: '/support',
     };
 
-    // Row className — high intent rows get bold styling for visual hierarchy
+    // Row className — compact Linear-style rows with subtle hover
     const getRowClassName = React.useCallback(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
-        const isHighIntent = row.intentLevel === 'high';
         return cn(
-          isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]',
-          isHighIntent && 'font-[510]'
+          'h-8',
+          isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'
         );
       },
       [selectedMember]
+    );
+
+    // Issue 4: Arrow keys update sidebar when panel is open
+    const handleFocusedRowChange = React.useCallback(
+      (index: number) => {
+        if (panelMode === 'contact' && rows[index]) {
+          setSelectedMember(rows[index]);
+        }
+      },
+      [panelMode, rows, setSelectedMember]
     );
 
     // Close handler for the right panel
@@ -627,10 +636,12 @@ export const DashboardAudienceTableUnified = memo(
                         getRowId={row => row.id}
                         enableVirtualization={true}
                         enableKeyboardNavigation={true}
+                        hideHeader={mode === 'members'}
                         minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
                         className='text-[13px]'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}
+                        onFocusedRowChange={handleFocusedRowChange}
                         getContextMenuItems={getContextMenuItems}
                         hasNextPage={hasNextPage}
                         isFetchingNextPage={isFetchingNextPage}

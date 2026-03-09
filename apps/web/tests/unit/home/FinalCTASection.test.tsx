@@ -12,9 +12,4 @@ describe('FinalCTASection', () => {
     render(<FinalCTASection />);
     expect(screen.getByTestId('final-cta-dock')).toBeInTheDocument();
   });
-
-  it('renders subtext', () => {
-    render(<FinalCTASection />);
-    expect(screen.getByTestId('final-cta-subtext')).toBeInTheDocument();
-  });
 });

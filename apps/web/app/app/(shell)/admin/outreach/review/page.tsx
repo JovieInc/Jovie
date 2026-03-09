@@ -1,9 +1,10 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import { ChevronLeft, ChevronRight, ExternalLink, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 interface ReviewLead {
   id: string;
@@ -119,7 +120,11 @@ export default function AdminOutreachReviewPage() {
                     colSpan={7}
                     className='py-8 text-center text-secondary-token'
                   >
-                    <Loader2 className='mx-auto size-5 animate-spin' />
+                    <LoadingSpinner
+                      size='sm'
+                      tone='muted'
+                      className='mx-auto'
+                    />
                   </td>
                 </tr>
               ) : leads.length === 0 ? (
@@ -192,7 +197,11 @@ export default function AdminOutreachReviewPage() {
                         disabled={skippingId === lead.id}
                       >
                         {skippingId === lead.id ? (
-                          <Loader2 className='mr-1.5 size-3.5 animate-spin' />
+                          <LoadingSpinner
+                            size='sm'
+                            tone='muted'
+                            className='mr-1.5'
+                          />
                         ) : null}
                         Skip
                       </Button>

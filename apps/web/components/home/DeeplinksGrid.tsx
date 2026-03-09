@@ -377,8 +377,35 @@ export function DeeplinksGrid() {
                 </div>
 
                 {/* Center — phone */}
-                <div className='flex justify-center'>
+                <div className='flex flex-col items-center gap-4'>
                   <StickyPhone activeIndex={activeIndex} />
+                  <a
+                    href='https://jov.ie/tim'
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
+                    style={{
+                      color: 'var(--linear-text-tertiary)',
+                      border: '1px solid var(--linear-border-subtle)',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    View a Real Page
+                    <svg
+                      width='14'
+                      height='14'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeWidth='2'
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      aria-hidden='true'
+                    >
+                      <path d='M5 12h14' />
+                      <path d='m12 5 7 7-7 7' />
+                    </svg>
+                  </a>
                 </div>
 
                 {/* Right — URL slugs, bold */}
