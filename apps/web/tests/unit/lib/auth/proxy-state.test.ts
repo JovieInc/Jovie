@@ -36,6 +36,7 @@ vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
   addBreadcrumb: vi.fn(),
+  getClient: vi.fn().mockReturnValue(null),
   withScope: vi.fn((cb: (scope: unknown) => void) =>
     cb({ setExtra: vi.fn(), setTag: vi.fn() })
   ),
