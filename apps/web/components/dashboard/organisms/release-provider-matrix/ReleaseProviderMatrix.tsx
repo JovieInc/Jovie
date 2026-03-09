@@ -215,10 +215,21 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const showTracksFromView = releaseView === 'tracks';
 
   // Apply filters and search to rows
-  const filteredRows = useMemo(
-    () => filterReleases(rows, filters, deferredSearchQuery),
-    [rows, filters, deferredSearchQuery]
-  );
+  const filteredRows = useMemo(() => {
+    const baseRows = filterReleases(rows, filters, deferredSearchQuery);
+
+    if (releaseView === 'tracks') {
+      return baseRows.filter(
+        release =>
+          release.releaseType === 'single' ||
+          (release.totalTracks > 0 && release.totalTracks <= 1)
+      );
+    }
+
+    return baseRows.filter(
+      release => release.releaseType !== 'single' && release.totalTracks !== 1
+    );
+  }, [rows, filters, deferredSearchQuery, releaseView]);
 
   // Smart link gating
   const {
@@ -525,8 +536,44 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [handleNewRelease, canCreateManualReleases]
   );
 
-  const spotifyBadge = useMemo(
-    () => (
+  const spotifyBadge = useMemo(() => {
+    if (isConnected) {
+      return (
+        <button
+          type='button'
+          onClick={handleSync}
+          disabled={isSyncing}
+          className='group relative inline-flex items-center gap-1.5 rounded-md border border-[#1DB954]/28 bg-[#1DB954]/12 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-white transition-colors hover:bg-[#1DB954]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/45 focus-visible:ring-offset-2 disabled:opacity-60'
+          aria-label={
+            isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
+          }
+        >
+          <SocialIcon platform='spotify' className='h-4 w-4 text-white' />
+          <span>{artistName || 'Connected'}</span>
+          {/* Status dot - visible when not hovered/syncing */}
+          <span
+            className={cn(
+              'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
+              'group-hover:opacity-0 group-focus-visible:opacity-0',
+              isSyncing && 'opacity-0'
+            )}
+            aria-hidden='true'
+          />
+          {/* Refresh icon - visible on hover or when syncing */}
+          <Icon
+            name={isSyncing ? 'Loader2' : 'RefreshCw'}
+            className={cn(
+              'absolute right-2 h-4 w-4 opacity-0 transition-opacity duration-150',
+              'group-hover:opacity-100 group-focus-visible:opacity-100',
+              isSyncing && 'animate-spin opacity-100'
+            )}
+            aria-hidden='true'
+          />
+        </button>
+      );
+    }
+
+    return (
       <DspConnectionPill
         provider='spotify'
         connected={isConnected}
@@ -535,9 +582,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onSyncNow={isConnected ? handleSync : undefined}
         disabled={isSyncing}
       />
-    ),
-    [artistName, handleSync, isConnected, isSyncing, setSpotifySearchOpen]
-  );
+    );
+  }, [artistName, handleSync, isConnected, isSyncing, setSpotifySearchOpen]);
 
   const appleMusicBadge = useMemo(
     () => (
