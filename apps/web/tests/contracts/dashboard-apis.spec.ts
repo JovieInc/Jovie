@@ -365,10 +365,10 @@ describe('Dashboard API contracts', () => {
     });
 
     it('paginates subscribers with contract-safe response', async () => {
-      const tx = {
-        select: createSelectQueue([
-          [{ id: PROFILE_ID }],
-          [
+      let executeCallIndex = 0;
+      const executeResponses = [
+        {
+          rows: [
             {
               id: 'sub_1',
               email: 'fan@example.com',
@@ -378,8 +378,17 @@ describe('Dashboard API contracts', () => {
               channel: 'email',
             },
           ],
-          [{ total: 1 }],
-        ]),
+        },
+        { rows: [{ total: 1 }] },
+      ];
+
+      const tx = {
+        select: createSelectQueue([[{ id: PROFILE_ID }]]),
+        execute: async () => {
+          const result = executeResponses[executeCallIndex] ?? { rows: [] };
+          executeCallIndex += 1;
+          return result;
+        },
       };
 
       mockSession({ tx });
