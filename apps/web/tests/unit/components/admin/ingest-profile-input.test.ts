@@ -68,4 +68,31 @@ describe('mapProfileToContact', () => {
       },
     ]);
   });
+
+  it('maps displayName into first and last name for sidebar fields', () => {
+    const row: AdminCreatorProfileRow = {
+      id: 'profile-2',
+      username: 'taylorswift',
+      usernameNormalized: 'taylorswift',
+      avatarUrl: 'https://example.com/avatar.jpg',
+      displayName: 'Taylor Swift',
+      isVerified: true,
+      isFeatured: false,
+      marketingOptOut: false,
+      isClaimed: true,
+      claimToken: null,
+      claimTokenExpiresAt: null,
+      userId: 'user-1',
+      createdAt: null,
+      ingestionStatus: 'idle',
+      lastIngestionError: null,
+      socialLinks: [],
+    };
+
+    const contact = mapProfileToContact(row);
+
+    expect(contact?.firstName).toBe('Taylor');
+    expect(contact?.lastName).toBe('Swift');
+    expect(contact?.avatarUrl).toBe('https://example.com/avatar.jpg');
+  });
 });

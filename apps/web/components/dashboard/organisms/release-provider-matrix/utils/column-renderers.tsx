@@ -264,13 +264,17 @@ export function createRightMetaCellRenderer(
     const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
     return (
-      <div className='grid min-w-[260px] grid-cols-[minmax(0,220px)_48px] items-center justify-end gap-x-4 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
+      <div className='grid min-w-[220px] grid-cols-[minmax(0,1fr)_20px_44px] items-center justify-end gap-x-3 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
         <div className='min-w-0'>
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}
             lockReason={getSmartLinkLockReason?.(release.id)}
           />
+        </div>
+
+        <div className='flex w-4 items-center justify-center'>
+          <PopularityIcon popularity={release.spotifyPopularity} />
         </div>
 
         <span className='hidden w-12 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>

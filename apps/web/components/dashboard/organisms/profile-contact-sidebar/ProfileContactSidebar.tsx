@@ -1,7 +1,7 @@
 'use client';
 
-import { Label, SegmentControl } from '@jovie/ui';
-import { Plus } from 'lucide-react';
+import { Button, CommonDropdown, Label, SegmentControl } from '@jovie/ui';
+import { ExternalLink, Plus, Share2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
@@ -29,6 +29,7 @@ import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
+import { buildProfileShareDropdownItems } from './profileLinkShareMenu';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Tab options for the profile sidebar categories */
@@ -38,6 +39,12 @@ const PROFILE_TAB_OPTIONS = [
   { value: 'earnings' as const, label: 'Earn' },
   { value: 'about' as const, label: 'About' },
 ];
+
+const LINK_ACTION_CATEGORIES: ReadonlySet<CategoryOption> = new Set([
+  'social',
+  'dsp',
+  'earnings',
+]);
 
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
@@ -71,6 +78,10 @@ export function ProfileContactSidebar() {
       setSelectedCategory(resolvedCategory);
     }
   }, [resolvedCategory, selectedCategory]);
+
+  const supportsAddAction = LINK_ACTION_CATEGORIES.has(
+    resolvedCategory as CategoryOption
+  );
 
   // Handle display name change — save to server and instantly update sidebar
   const handleDisplayNameChange = useCallback(
@@ -305,6 +316,23 @@ export function ProfileContactSidebar() {
   } = previewData;
 
   const profileUrl = `${BASE_URL}${profilePath}`;
+  const profileShareItems = buildProfileShareDropdownItems({
+    profileUrl,
+    campaignSlug: `${username}-profile`,
+    artistName: displayName,
+    onCopy: (url, presetLabel) => {
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          toast.success(`${presetLabel} link copied`, {
+            description: 'Profile URL includes UTM parameters.',
+          });
+        })
+        .catch(() => {
+          toast.error('Unable to copy UTM link');
+        });
+    },
+  });
 
   const photoSettingsFooter =
     resolvedCategory !== 'about' ? (
@@ -349,7 +377,44 @@ export function ProfileContactSidebar() {
             <Label className='text-xs font-medium text-secondary-token'>
               Profile link
             </Label>
-            <CopyLinkInput url={profileUrl} size='sm' />
+            <div className='flex items-center gap-2'>
+              <CopyLinkInput
+                url={profileUrl}
+                size='md'
+                className='flex-1'
+                inputClassName='h-8 px-3 py-2'
+              />
+              <Button
+                type='button'
+                size='icon'
+                variant='ghost'
+                className='h-8 w-8 shrink-0'
+                onClick={() =>
+                  globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
+                }
+                aria-label='Open public profile'
+              >
+                <ExternalLink className='h-4 w-4' aria-hidden='true' />
+              </Button>
+              <CommonDropdown
+                variant='dropdown'
+                size='compact'
+                align='end'
+                side='bottom'
+                items={profileShareItems}
+                trigger={
+                  <Button
+                    type='button'
+                    size='icon'
+                    variant='ghost'
+                    className='h-8 w-8 shrink-0'
+                    aria-label='Open profile share options'
+                  >
+                    <Share2 className='h-4 w-4' aria-hidden='true' />
+                  </Button>
+                }
+              />
+            </div>
           </div>
         </div>
       }
@@ -363,18 +428,18 @@ export function ProfileContactSidebar() {
             className='flex-1'
             aria-label='Profile sidebar view'
           />
-          {(resolvedCategory === 'social' ||
-            resolvedCategory === 'dsp' ||
-            resolvedCategory === 'earnings') && (
-            <button
-              type='button'
-              onClick={() => handleAddLink(resolvedCategory)}
-              className='shrink-0 p-1 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
-              aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
-            >
-              <Plus className='h-4 w-4' />
-            </button>
-          )}
+          <div className='h-6 w-6 shrink-0'>
+            {supportsAddAction && (
+              <button
+                type='button'
+                onClick={() => handleAddLink(resolvedCategory)}
+                className='h-6 w-6 p-1 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
+                aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+              >
+                <Plus className='h-4 w-4' />
+              </button>
+            )}
+          </div>
         </div>
       }
       footer={photoSettingsFooter}

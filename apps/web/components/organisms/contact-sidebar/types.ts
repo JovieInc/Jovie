@@ -26,7 +26,6 @@ export interface ContactSidebarProps {
   readonly onSave?: (
     contact: Contact
   ) => void | Promise<void> | Promise<boolean>;
-  readonly isSaving?: boolean;
   /**
    * Optional externally provided drawer actions.
    * When omitted, the sidebar falls back to its built-in actions.

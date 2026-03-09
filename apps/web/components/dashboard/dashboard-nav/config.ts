@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Music,
   PieChart,
+  Search,
   Send,
   Settings,
   ShieldCheck,
@@ -134,6 +135,27 @@ export const adminNavigation: NavItem[] = [
     description: 'Internal metrics and operations',
   },
   {
+    name: 'Leads',
+    href: APP_ROUTES.ADMIN_LEADS,
+    id: 'admin_leads',
+    icon: Search,
+    description: 'Discover, qualify, and action growth leads',
+  },
+  {
+    name: 'Outreach',
+    href: APP_ROUTES.ADMIN_OUTREACH,
+    id: 'admin_outreach',
+    icon: MailCheck,
+    description: 'Run and review outreach workflows',
+  },
+  {
+    name: 'Campaigns',
+    href: APP_ROUTES.ADMIN_CAMPAIGNS,
+    id: 'admin_campaigns',
+    icon: Send,
+    description: 'Manage creator claim campaigns',
+  },
+  {
     name: 'Waitlist',
     href: APP_ROUTES.ADMIN_WAITLIST,
     id: 'admin_waitlist',
@@ -169,13 +191,6 @@ export const adminNavigation: NavItem[] = [
     description: 'Review user feedback',
   },
   {
-    name: 'Campaigns',
-    href: APP_ROUTES.ADMIN_CAMPAIGNS,
-    id: 'admin_campaigns',
-    icon: Send,
-    description: 'Manage creator claim campaigns',
-  },
-  {
     name: 'Activity',
     href: APP_ROUTES.ADMIN_ACTIVITY,
     id: 'admin_activity',
@@ -188,6 +203,40 @@ export const adminNavigation: NavItem[] = [
     id: 'admin_screenshots',
     icon: ImageIcon,
     description: 'View generated UI screenshots',
+  },
+];
+
+export interface AdminNavSection {
+  label: string;
+  items: NavItem[];
+}
+
+export const adminNavigationSections: AdminNavSection[] = [
+  {
+    label: 'Growth',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_leads')!,
+      adminNavigation.find(item => item.id === 'admin_outreach')!,
+      adminNavigation.find(item => item.id === 'admin_campaigns')!,
+      adminNavigation.find(item => item.id === 'admin_ingest')!,
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_waitlist')!,
+      adminNavigation.find(item => item.id === 'admin_creators')!,
+      adminNavigation.find(item => item.id === 'admin_users')!,
+      adminNavigation.find(item => item.id === 'admin_feedback')!,
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_overview')!,
+      adminNavigation.find(item => item.id === 'admin_activity')!,
+      adminNavigation.find(item => item.id === 'admin_screenshots')!,
+    ],
   },
 ];
 

@@ -1,506 +1,401 @@
 'use client';
 
-import { Bell, CalendarDays, DollarSign, Mail } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bell,
+  CalendarDays,
+  Heart,
+  Home,
+  Music,
+  Share2,
+  User,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
+import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { PhoneFrame } from './PhoneFrame';
 
-const AUTO_ADVANCE_MS = 3200;
+/* ------------------------------------------------------------------ */
+/*  Types & constants                                                  */
+/* ------------------------------------------------------------------ */
 
-const MOCK_ARTIST = {
-  name: 'Tim White',
-  handle: 'timwhite',
-  image:
-    'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
-  isVerified: true,
-} as const;
+type PanelId = 'profile' | 'tour' | 'listen' | 'tip';
 
-type PreviewTab = 'profile' | 'tour' | 'listen' | 'tip';
-
-const TABS: ReadonlyArray<{ id: PreviewTab; label: string }> = [
+const PANELS: ReadonlyArray<{ id: PanelId; label: string }> = [
   { id: 'profile', label: 'Profile' },
   { id: 'tour', label: 'Tour' },
   { id: 'listen', label: 'Listen' },
   { id: 'tip', label: 'Tip' },
 ];
 
-/* Social icon row — matches real profile exactly */
-const FULL_SOCIALS = [
-  { key: 'mail', icon: Mail },
-  { key: 'instagram', platform: 'instagram' as const },
-  { key: 'youtube', platform: 'youtube' as const },
-  { key: 'tiktok', platform: 'tiktok' as const },
-  { key: 'calendar', icon: CalendarDays },
-  { key: 'dollar', icon: DollarSign },
-] as const;
+const SOCIAL_PLATFORMS = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
 
-const MINI_SOCIALS = [
-  { key: 'mail', icon: Mail },
-  { key: 'calendar', icon: CalendarDays },
-  { key: 'dollar', icon: DollarSign },
-] as const;
+const TIP_AMOUNTS = [3, 5, 10] as const;
 
-function SocialRow({
-  items,
-}: {
-  items: ReadonlyArray<{
-    key: string;
-    icon?: React.ComponentType<{ className?: string }>;
-    platform?: string;
-  }>;
-}) {
+/* ------------------------------------------------------------------ */
+/*  Sidebar context data per panel                                     */
+/* ------------------------------------------------------------------ */
+
+const SIDEBAR_STATS: Record<PanelId, { label: string; value: string }[]> = {
+  profile: [
+    { label: 'Followers', value: '12.4K' },
+    { label: 'Streams', value: '1.2M' },
+    { label: 'Tips', value: '$842' },
+  ],
+  tour: [
+    { label: 'Upcoming', value: '3' },
+    { label: 'Cities', value: '8' },
+    { label: 'Sold out', value: '2' },
+  ],
+  listen: [
+    { label: 'Platforms', value: '6' },
+    { label: 'Monthly', value: '45K' },
+    { label: 'Top city', value: 'LA' },
+  ],
+  tip: [
+    { label: 'Tips', value: '214' },
+    { label: 'Avg tip', value: '$7' },
+    { label: 'This month', value: '$312' },
+  ],
+};
+
+const SIDEBAR_ACTIVITY: Record<PanelId, string[]> = {
+  profile: [
+    'New release added',
+    'Bio updated',
+    'Profile shared 24 times today',
+  ],
+  tour: [
+    'Atlanta show nearly sold out',
+    'New date added: Brooklyn',
+    'Nashville tickets on sale',
+  ],
+  listen: [
+    'Spotify streams up 18%',
+    'Added to 3 new playlists',
+    'Apple Music feature pending',
+  ],
+  tip: [
+    'New tip from @musicfan',
+    'Weekly tips up 22%',
+    'Top supporter: @superfan',
+  ],
+};
+
+/* ------------------------------------------------------------------ */
+/*  Panel content components                                           */
+/* ------------------------------------------------------------------ */
+
+function ProfilePanel() {
   return (
-    <div className='flex justify-center gap-3'>
-      {items.map(s => (
-        <div
-          key={s.key}
-          className='flex items-center justify-center w-10 h-10 rounded-full border border-subtle transition-colors'
-        >
-          {s.platform ? (
-            <SocialIcon
-              platform={s.platform as 'instagram'}
-              className='w-4 h-4 text-primary-token'
-            />
-          ) : s.icon ? (
-            <s.icon className='w-4 h-4 text-primary-token' />
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ─── Tab contents matching real product ─── */
-
-function ProfileContent() {
-  return (
-    <div className='flex flex-col items-center gap-5 px-5'>
-      <div className='flex flex-col items-center gap-1'>
-        <p className='text-[13px] text-secondary-token'>
-          Never miss a release.
-        </p>
-      </div>
-      <div
-        className='w-full flex items-center justify-center rounded-full py-3 text-[15px] font-semibold text-black'
-        style={{ backgroundColor: 'rgb(247,248,248)' }}
+    <div className='flex flex-col items-center gap-4 px-1'>
+      {/* CTA button — replicates ProfilePrimaryCTA visual output */}
+      <button
+        type='button'
+        className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-3.5 text-sm font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97]'
       >
         Turn on notifications
+      </button>
+
+      {/* Social icon row */}
+      <div className='flex items-center justify-center gap-2'>
+        {SOCIAL_PLATFORMS.map(platform => (
+          <button
+            key={platform}
+            type='button'
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent text-secondary-token transition-colors duration-150 hover:border-subtle hover:bg-surface-2'
+            aria-label={platform}
+          >
+            <SocialIcon platform={platform} size={18} aria-hidden />
+          </button>
+        ))}
       </div>
-      <SocialRow items={FULL_SOCIALS} />
     </div>
   );
 }
 
-function TourContent() {
+function TourPanel() {
   return (
-    <div className='flex flex-col items-center px-5'>
-      <h3 className='text-[28px] font-semibold tracking-tight text-primary-token self-start'>
-        Tour dates
-      </h3>
-      <p className='text-[13px] text-secondary-token self-start mt-0.5'>
-        No upcoming shows
-      </p>
+    <div className='flex flex-col items-center gap-3 px-1 py-2'>
       <div
-        className='w-full mt-4 rounded-2xl p-5 flex flex-col items-center text-center gap-3'
+        className='flex w-full flex-col items-center gap-3 rounded-xl p-6'
         style={{
-          backgroundColor: 'rgba(255,255,255,0.03)',
+          backgroundColor: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <CalendarDays className='w-6 h-6 text-tertiary-token' />
-        <p className='text-[15px] font-semibold text-primary-token'>
-          Not currently on tour
+        <CalendarDays className='h-8 w-8 text-tertiary-token' />
+        <p className='text-center text-[13px] text-secondary-token'>
+          No upcoming tour dates yet. Check back soon for live shows.
         </p>
-        <p className='text-[13px] text-secondary-token leading-relaxed'>
-          Tim White isn&apos;t on tour right now. Get notified when dates are
-          announced.
-        </p>
-        <div className='flex items-center gap-1.5 mt-1'>
-          <span className='w-4 h-4 rounded-full bg-[var(--linear-success)] flex items-center justify-center'>
-            <svg
-              width='10'
-              height='10'
-              viewBox='0 0 24 24'
-              fill='none'
-              stroke='white'
-              strokeWidth='3'
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              aria-hidden='true'
-            >
-              <title>Check</title>
-              <path d='M20 6L9 17l-5-5' />
-            </svg>
-          </span>
-          <span className='text-[13px] text-secondary-token'>
-            SMS notifications on
-          </span>
-        </div>
-        <div
-          className='w-full mt-2 flex items-center justify-center rounded-full py-3 text-[15px] font-semibold text-black'
-          style={{ backgroundColor: 'rgb(247,248,248)' }}
-        >
-          Listen Now
-        </div>
       </div>
-      <div className='mt-5'>
-        <SocialRow items={MINI_SOCIALS} />
-      </div>
+      <button
+        type='button'
+        className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-3.5 text-sm font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97]'
+      >
+        Listen Now
+      </button>
     </div>
   );
 }
 
-function ListenContent() {
+function ListenPanel() {
+  const dsps = [
+    { platform: 'spotify', label: 'Spotify' },
+    { platform: 'applemusic', label: 'Apple Music' },
+    { platform: 'youtube', label: 'YouTube' },
+  ] as const;
+
   return (
-    <div className='flex flex-col items-center gap-3 px-5'>
-      {/* DSP buttons — exact colors from production */}
-      {[
-        {
-          name: 'Open in Spotify',
-          bg: '#1DB954',
-          platform: 'spotify' as const,
-        },
-        {
-          name: 'Open in SoundCloud',
-          bg: '#FF5500',
-          platform: 'soundcloud' as const,
-        },
-        {
-          name: 'Open in YouTube Music',
-          bg: '#FF0000',
-          platform: 'youtube' as const,
-        },
-      ].map(dsp => (
-        <div
-          key={dsp.name}
-          className='w-full flex items-center justify-center gap-2.5 rounded-full py-3 text-[15px] font-semibold text-white'
-          style={{ backgroundColor: dsp.bg }}
+    <div className='flex flex-col gap-2 px-1'>
+      {dsps.map(dsp => (
+        <button
+          key={dsp.platform}
+          type='button'
+          className='inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-btn-primary px-4 py-3.5 text-sm font-semibold text-btn-primary-foreground shadow-sm transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97]'
         >
-          <SocialIcon platform={dsp.platform} className='w-4 h-4' />
-          {dsp.name}
-        </div>
+          <SocialIcon platform={dsp.platform} size={18} aria-hidden />
+          {dsp.label}
+        </button>
       ))}
-      <p className='text-[11px] text-tertiary-token mt-1'>
-        If you have the app installed, it will open automatically
-      </p>
-      <SocialRow items={MINI_SOCIALS} />
     </div>
   );
 }
 
-function TipContent() {
+function TipPanel() {
+  const [selected, setSelected] = useState(1); // default to $5
+
   return (
-    <div className='flex flex-col items-center gap-4 px-5'>
-      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token self-start'>
+    <div className='flex flex-col gap-2.5 px-1'>
+      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
-      <div className='grid grid-cols-3 gap-2.5 w-full'>
-        {[
-          { amt: '$3', selected: false },
-          { amt: '$5', selected: true },
-          { amt: '$7', selected: false },
-        ].map(({ amt, selected }) => (
-          <div
-            key={amt}
-            className='aspect-square rounded-2xl flex flex-col items-center justify-center gap-0.5'
-            style={{
-              backgroundColor: selected
-                ? 'rgb(247,248,248)'
-                : 'rgba(255,255,255,0.04)',
-              color: selected ? 'rgb(8,9,10)' : 'rgb(247,248,248)',
-              border: selected
-                ? '1px solid transparent'
-                : '1px solid rgba(255,255,255,0.06)',
-            }}
+      <div className='grid grid-cols-3 gap-2'>
+        {TIP_AMOUNTS.map((amount, i) => (
+          <button
+            key={amount}
+            type='button'
+            onClick={() => setSelected(i)}
+            aria-pressed={i === selected}
+            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border text-center transition-all duration-150 ease-out ${
+              i === selected
+                ? 'border-transparent bg-btn-primary text-btn-primary-foreground shadow-sm'
+                : 'border-default bg-surface-1 text-primary-token hover:border-strong hover:bg-surface-2'
+            }`}
           >
             <span
-              className='text-[9px] font-medium uppercase tracking-wider'
-              style={{
-                color: selected ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.4)',
-              }}
+              className={`text-[10px] font-medium uppercase tracking-wider ${
+                i === selected
+                  ? 'text-btn-primary-foreground/70'
+                  : 'text-secondary-token'
+              }`}
+              aria-hidden='true'
             >
               USD
             </span>
-            <span className='text-2xl font-semibold tabular-nums tracking-tight'>
-              {amt}
+            <span
+              className='text-xl font-semibold tabular-nums tracking-tight'
+              aria-hidden='true'
+            >
+              ${amount}
             </span>
-          </div>
+          </button>
         ))}
       </div>
-      <div
-        className='w-full flex items-center justify-center gap-2 rounded-full py-3 text-[15px] font-semibold text-black'
-        style={{ backgroundColor: 'rgb(247,248,248)' }}
-      >
-        <span className='text-[#3D95CE] font-bold text-sm'>V</span>
-        Continue with Venmo
-      </div>
-      <SocialRow items={MINI_SOCIALS} />
     </div>
   );
 }
 
-/* ─── Shared profile header ─── */
-
-function ProfileHeader({ subtitle }: { subtitle: string }) {
-  return (
-    <div className='flex flex-col items-center pt-10 pb-4 px-5'>
-      <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
-        <Avatar
-          src={MOCK_ARTIST.image}
-          alt={MOCK_ARTIST.name}
-          name={MOCK_ARTIST.name}
-          size='display-md'
-          priority
-          verified={false}
-        />
-      </div>
-      <div className='mt-3 text-center'>
-        <ArtistName
-          name={MOCK_ARTIST.name}
-          handle={MOCK_ARTIST.handle}
-          isVerified={MOCK_ARTIST.isVerified}
-          size='md'
-          showLink={false}
-          as='p'
-        />
-        <p className='mt-1 text-[11px] text-secondary-token tracking-[0.2em] uppercase'>
-          {subtitle}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-const SUBTITLES: Record<PreviewTab, string> = {
-  profile: 'Artist',
-  tour: 'Tour dates',
-  listen: 'Choose a Service',
-  tip: 'Tip with Venmo',
+const PANEL_CONTENT: Record<PanelId, React.ReactNode> = {
+  profile: <ProfilePanel />,
+  tour: <TourPanel />,
+  listen: <ListenPanel />,
+  tip: <TipPanel />,
 };
 
-export function HeroProfilePreview() {
-  const [activeTab, setActiveTab] = useState<PreviewTab>('profile');
-  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+/* ------------------------------------------------------------------ */
+/*  Main component                                                     */
+/* ------------------------------------------------------------------ */
 
-  const advanceTab = useCallback(() => {
-    setActiveTab(prev => {
-      const idx = TABS.findIndex(t => t.id === prev);
-      return TABS[(idx + 1) % TABS.length].id;
-    });
+export function HeroProfilePreview() {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = useCallback(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+
+    const rect = wrapper.getBoundingClientRect();
+    const wrapperTop = rect.top;
+    const wrapperHeight = rect.height;
+    const viewportHeight = window.innerHeight;
+
+    // How far into the wrapper have we scrolled?
+    // wrapperTop starts positive (below viewport top), goes negative as we scroll down
+    const scrolledInto = -wrapperTop;
+    // Each panel gets one viewport-height of scroll distance
+    const panelHeight = (wrapperHeight - viewportHeight) / PANELS.length;
+
+    if (panelHeight <= 0) return;
+
+    const rawIndex = scrolledInto / panelHeight;
+    const clampedIndex = Math.max(
+      0,
+      Math.min(PANELS.length - 1, Math.round(rawIndex))
+    );
+
+    setActiveIndex(clampedIndex);
   }, []);
 
   useEffect(() => {
-    if (!isAutoPlaying) return;
-    const el = containerRef.current;
-    if (!el) return;
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // initial check
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          timerRef.current = setInterval(advanceTab, AUTO_ADVANCE_MS);
-        } else if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
-      },
-      { threshold: 0.4 }
-    );
-
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isAutoPlaying, advanceTab]);
-
-  const handleTabClick = (id: PreviewTab) => {
-    setIsAutoPlaying(false);
-    setActiveTab(id);
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  };
+  const activePanel = PANELS[activeIndex].id;
 
   return (
-    <div ref={containerRef} className='relative flex flex-col items-center'>
-      <div className='relative flex items-start justify-center gap-8'>
-        {/* Left context — stats */}
-        <div
-          className='hidden lg:flex flex-col gap-3 mt-24 w-52 shrink-0'
-          aria-hidden='true'
-        >
-          {[
-            { label: 'Profile views', value: '2,847', change: '+18%' },
-            { label: 'Link clicks', value: '1,204', change: '+24%' },
-            { label: 'Email captures', value: '342', change: '+31%' },
-          ].map(stat => (
+    <div
+      ref={wrapperRef}
+      style={{ height: `${PANELS.length * 100}vh` }}
+      className='relative'
+    >
+      {/* Sticky container — phone + sidebars */}
+      <div className='sticky top-1/2 -translate-y-1/2 flex items-center justify-center gap-8 px-4'>
+        {/* Left sidebar — stats */}
+        <div className='hidden lg:flex flex-col gap-3 w-40'>
+          {SIDEBAR_STATS[activePanel].map(stat => (
             <div
               key={stat.label}
-              className='rounded-xl px-4 py-3'
+              className='flex flex-col gap-0.5 rounded-xl p-3 transition-all duration-300'
               style={{
-                backgroundColor: 'rgba(255,255,255,0.02)',
+                backgroundColor: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}
             >
-              <p className='text-[11px] font-medium text-tertiary-token'>
+              <span className='text-[10px] font-medium uppercase tracking-[0.1em] text-tertiary-token'>
                 {stat.label}
-              </p>
-              <div className='flex items-baseline gap-2 mt-1'>
-                <span className='text-lg font-semibold text-primary-token tabular-nums'>
-                  {stat.value}
-                </span>
-                <span className='text-[11px] font-medium text-[var(--linear-success)]'>
-                  {stat.change}
-                </span>
-              </div>
+              </span>
+              <span className='text-lg font-semibold text-primary-token tabular-nums'>
+                {stat.value}
+              </span>
             </div>
           ))}
         </div>
 
-        {/* Center — phone */}
-        <div className='flex flex-col items-center'>
-          <PhoneFrame>
-            {/* Nav bar — matches real product */}
-            <div className='relative z-10 flex items-center justify-between px-4 pt-9'>
-              {activeTab !== 'profile' && (
-                <div className='w-7 h-7 rounded-full flex items-center justify-center'>
-                  <svg
-                    width='16'
-                    height='16'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    className='text-primary-token'
-                    aria-hidden='true'
-                  >
-                    <title>Back</title>
-                    <path d='M19 12H5M12 19l-7-7 7-7' />
-                  </svg>
-                </div>
-              )}
-              {activeTab === 'profile' && (
-                <div className='w-7 h-7 flex items-center justify-center'>
-                  <svg
-                    width='18'
-                    height='18'
-                    viewBox='0 0 24 24'
-                    fill='currentColor'
-                    className='text-primary-token'
-                    aria-hidden='true'
-                  >
-                    <title>Jovie</title>
-                    <circle cx='12' cy='12' r='10' />
-                  </svg>
-                </div>
-              )}
-              <Bell className='w-4 h-4 text-primary-token' />
+        {/* Phone */}
+        <PhoneFrame>
+          {/* Nav bar */}
+          <div className='flex items-center justify-between px-4 pt-10 pb-2'>
+            <CircleIconButton size='xs' variant='ghost' ariaLabel='Back'>
+              <ArrowLeft className='h-4 w-4' />
+            </CircleIconButton>
+            <CircleIconButton
+              size='xs'
+              variant='ghost'
+              ariaLabel='Notifications'
+            >
+              <Bell className='h-4 w-4' />
+            </CircleIconButton>
+          </div>
+
+          {/* Artist header — always visible */}
+          <div className='flex flex-col items-center px-5 pb-3'>
+            <Avatar
+              src='/images/avatars/tim-white.jpg'
+              alt='Tim White'
+              name='Tim White'
+              size='lg'
+              rounded='full'
+              verified
+              priority
+            />
+            <div className='mt-2'>
+              <ArtistName
+                name='Tim White'
+                handle='timwhite'
+                isVerified
+                size='sm'
+                showLink={false}
+                as='p'
+              />
             </div>
+            <p className='mt-0.5 text-[11px] text-secondary-token'>Artist</p>
+          </div>
 
-            {/* Profile header — shared across all modes */}
-            <ProfileHeader subtitle={SUBTITLES[activeTab]} />
-
-            {/* Mode content — carousel slide */}
-            <div className='relative pb-6 overflow-hidden' style={{ flex: 1 }}>
-              <div
-                className='flex transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]'
+          {/* Panel indicator dots */}
+          <div className='flex items-center justify-center gap-1.5 pb-3'>
+            {PANELS.map((panel, i) => (
+              <span
+                key={panel.id}
+                className='block rounded-full transition-all duration-300'
                 style={{
-                  width: `${TABS.length * 100}%`,
-                  transform: `translateX(-${(TABS.findIndex(t => t.id === activeTab) * 100) / TABS.length}%)`,
-                }}
-              >
-                <div style={{ width: `${100 / TABS.length}%` }}>
-                  <ProfileContent />
-                </div>
-                <div style={{ width: `${100 / TABS.length}%` }}>
-                  <TourContent />
-                </div>
-                <div style={{ width: `${100 / TABS.length}%` }}>
-                  <ListenContent />
-                </div>
-                <div style={{ width: `${100 / TABS.length}%` }}>
-                  <TipContent />
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className='pb-3 text-center'>
-              <p className='text-[9px] uppercase tracking-[0.15em] text-tertiary-token/50'>
-                Powered by Jovie
-              </p>
-            </div>
-          </PhoneFrame>
-
-          {/* Carousel dots */}
-          <div className='flex mt-5 gap-2'>
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                type='button'
-                aria-label={tab.label}
-                onClick={() => handleTabClick(tab.id)}
-                className='relative w-2 h-2 rounded-full transition-all duration-300'
-                style={{
+                  width: i === activeIndex ? 16 : 6,
+                  height: 6,
                   backgroundColor:
-                    tab.id === activeTab
-                      ? 'rgba(255,255,255,0.7)'
-                      : 'rgba(255,255,255,0.15)',
-                  transform: tab.id === activeTab ? 'scale(1.25)' : 'scale(1)',
+                    i === activeIndex
+                      ? 'rgb(247,248,248)'
+                      : 'rgba(255,255,255,0.2)',
                 }}
               />
             ))}
           </div>
-        </div>
 
-        {/* Right context — activity */}
-        <div
-          className='hidden lg:flex flex-col gap-3 mt-24 w-52 shrink-0'
-          aria-hidden='true'
-        >
-          {[
-            {
-              action: 'New subscriber',
-              detail: 'alex@gmail.com',
-              time: '2m ago',
-            },
-            {
-              action: 'Spotify click',
-              detail: 'via Instagram',
-              time: '5m ago',
-            },
-            {
-              action: 'Tip received',
-              detail: '$5.00 via Venmo',
-              time: '12m ago',
-            },
-          ].map(item => (
+          {/* Scrolling content panels */}
+          <div className='relative flex-1 overflow-hidden px-4 pb-2'>
             <div
-              key={item.action}
-              className='rounded-xl px-4 py-3'
+              className='flex transition-transform duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
               style={{
-                backgroundColor: 'rgba(255,255,255,0.02)',
+                transform: `translateX(-${activeIndex * 100}%)`,
+              }}
+            >
+              {PANELS.map(panel => (
+                <div
+                  key={panel.id}
+                  className='w-full flex-shrink-0'
+                  style={{ minWidth: '100%' }}
+                >
+                  {PANEL_CONTENT[panel.id]}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom nav */}
+          <div className='flex items-center justify-around px-4 pb-3 pt-1'>
+            <CircleIconButton size='xs' variant='surface' ariaLabel='Home'>
+              <Home className='h-4 w-4' />
+            </CircleIconButton>
+            <CircleIconButton size='xs' variant='surface' ariaLabel='Music'>
+              <Music className='h-4 w-4' />
+            </CircleIconButton>
+            <CircleIconButton size='xs' variant='surface' ariaLabel='Favorites'>
+              <Heart className='h-4 w-4' />
+            </CircleIconButton>
+            <CircleIconButton size='xs' variant='surface' ariaLabel='Share'>
+              <Share2 className='h-4 w-4' />
+            </CircleIconButton>
+            <CircleIconButton size='xs' variant='surface' ariaLabel='Profile'>
+              <User className='h-4 w-4' />
+            </CircleIconButton>
+          </div>
+        </PhoneFrame>
+
+        {/* Right sidebar — activity */}
+        <div className='hidden lg:flex flex-col gap-3 w-44'>
+          {SIDEBAR_ACTIVITY[activePanel].map(item => (
+            <div
+              key={item}
+              className='rounded-xl p-3 text-[12px] text-secondary-token transition-all duration-300'
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.06)',
               }}
             >
-              <div className='flex items-center justify-between'>
-                <p className='text-[12px] font-medium text-primary-token'>
-                  {item.action}
-                </p>
-                <span className='text-[10px] text-tertiary-token'>
-                  {item.time}
-                </span>
-              </div>
-              <p className='mt-0.5 text-[11px] text-tertiary-token'>
-                {item.detail}
-              </p>
+              {item}
             </div>
           ))}
         </div>

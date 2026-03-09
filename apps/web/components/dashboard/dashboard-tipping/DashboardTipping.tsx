@@ -451,33 +451,31 @@ export function DashboardTipping() {
         </Dialog>
       </div>
 
-      {/* ── Connect Venmo (not connected) ──────────────── */}
+      {/* ── Cohesive empty state ───────────────────────── */}
       {!hasVenmoHandle && (
         <>
-          <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
-            <div className='flex items-center justify-between gap-3'>
-              <div className='flex items-start gap-3'>
-                <div
-                  className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10'
-                  aria-hidden='true'
-                >
-                  <Wallet className='h-4.5 w-4.5 text-accent-token' />
-                </div>
-                <div className='min-w-0'>
-                  <h3 className='text-[15px] font-[590] tracking-[-0.011em] text-primary-token'>
-                    Connect Venmo
-                  </h3>
-                  <p className='mt-0.5 text-[13px] leading-5 text-secondary-token'>
-                    Link your Venmo to start receiving tips from fans.
-                  </p>
-                </div>
+          <div className='rounded-xl border border-subtle bg-surface-1 px-6 py-12 sm:px-8 sm:py-14'>
+            <div className='mx-auto flex max-w-md flex-col items-center text-center'>
+              <div
+                className='mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10'
+                aria-hidden='true'
+              >
+                <Wallet className='h-5 w-5 text-accent-token' />
               </div>
+              <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
+                Connect Venmo to unlock earnings
+              </h2>
+              <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
+                Link your Venmo once to start receiving tips and reveal your
+                full earnings dashboard.
+              </p>
               <Button
                 onClick={() => setIsConnectOpen(true)}
                 variant='primary'
                 size='sm'
+                className='mt-5'
               >
-                Connect
+                Connect Venmo
               </Button>
             </div>
           </div>
@@ -493,63 +491,58 @@ export function DashboardTipping() {
         </>
       )}
 
-      {/* ── Activity & Sharing (blurred when not connected) */}
-      <div
-        className={cn(
-          'flex flex-col gap-5',
-          !hasVenmoHandle && 'pointer-events-none select-none blur-sm'
-        )}
-        aria-hidden={!hasVenmoHandle || undefined}
-        inert={!hasVenmoHandle || undefined}
-      >
-        {/* Section label */}
-        <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-          Activity
-        </p>
+      {/* ── Activity & Sharing ──────────────────────────── */}
+      {hasVenmoHandle && (
+        <div className='flex flex-col gap-5'>
+          {/* Section label */}
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            Activity
+          </p>
 
-        {/* Stat cards — 2 cols on mobile, 3 on sm+ */}
-        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
-          <StatCard
-            label='QR scans'
-            value={qrTipClicks}
-            description='Fans who scanned your QR'
-            icon={ScanLine}
-            iconChipClassName='bg-success-subtle'
-            iconClassName='text-success'
-          />
-          <StatCard
-            label='Link clicks'
-            value={linkTipClicks}
-            description='Fans who clicked your link'
-            icon={MousePointerClick}
-            iconChipClassName='bg-info-subtle'
-            iconClassName='text-info'
-          />
-          <StatCard
-            label='Total visits'
-            value={tipClicks}
-            description='QR + link combined'
-            icon={BarChart3}
-            iconChipClassName='bg-accent-subtle'
-            iconClassName='text-accent-token'
-          />
+          {/* Stat cards — 2 cols on mobile, 3 on sm+ */}
+          <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+            <StatCard
+              label='QR scans'
+              value={qrTipClicks}
+              description='Fans who scanned your QR'
+              icon={ScanLine}
+              iconChipClassName='bg-success-subtle'
+              iconClassName='text-success'
+            />
+            <StatCard
+              label='Link clicks'
+              value={linkTipClicks}
+              description='Fans who clicked your link'
+              icon={MousePointerClick}
+              iconChipClassName='bg-info-subtle'
+              iconClassName='text-info'
+            />
+            <StatCard
+              label='Total visits'
+              value={tipClicks}
+              description='QR + link combined'
+              icon={BarChart3}
+              iconChipClassName='bg-accent-subtle'
+              iconClassName='text-accent-token'
+            />
+          </div>
+
+          {/* Sharing tools */}
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            Share
+          </p>
+
+          <div className='grid gap-4 sm:grid-cols-2'>
+            <TipLinkSection
+              tipUrl={tipUrls.tipUrl}
+              tipRelativePathLink={tipUrls.tipRelativePathLink}
+            />
+          </div>
+
+          {/* QR Code generation & download */}
+          <EarningsTab />
         </div>
-
-        {/* Sharing tools */}
-        <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-          Share
-        </p>
-
-        <div className='grid gap-4 sm:grid-cols-2'>
-          <TipLinkSection
-            tipUrl={tipUrls.tipUrl}
-            tipRelativePathLink={tipUrls.tipRelativePathLink}
-          />
-        </div>
-
-        {/* QR Code generation & download */}
-        <EarningsTab />
-      </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,8 @@ const BIO_KEYWORDS = [
   'booking:',
   'management:',
   'for bookings',
+  'for inquiries',
+  'press contact',
 ];
 
 export interface RepresentationResult {

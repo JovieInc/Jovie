@@ -255,7 +255,6 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     await expectSidebarOpen();
     const firstNameInput = await screen.findByPlaceholderText('First');
     await user.type(firstNameInput, 'Alice');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
     await waitFor(() => {
       expect(saveContactSpy).toHaveBeenCalledWith(

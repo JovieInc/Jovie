@@ -108,18 +108,18 @@ export async function getAnalyticsData(
         }>(
           drizzleSql`
             with base_events as (
-              select *
+              select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfileId}
                 and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
             ),
             ranged_events as (
-              select *
+              select link_id, link_type, city, country, referrer
               from base_events
               where created_at >= ${sqlTimestamp(startDate)}
             ),
             recent_events as (
-              select *
+              select 1
               from base_events
               where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
@@ -328,12 +328,9 @@ export async function getUserDashboardAnalytics(
     ]);
 
     const appUserId = userRow?.id;
-    const userIsPro = Boolean(userRow?.isPro);
     if (!appUserId) {
       throw new TypeError('User not found for Clerk ID');
     }
-
-    const dynamicEnabled = userIsPro;
 
     if (!creatorProfile) {
       throw new TypeError('Creator profile not found');
@@ -373,18 +370,18 @@ export async function getUserDashboardAnalytics(
           }>(
             drizzleSql`
             with base_events as (
-              select *
+              select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
                 and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
             ),
             ranged_events as (
-              select *
+              select link_id, link_type, city, country, referrer
               from base_events
               where created_at >= ${sqlTimestamp(startDate)}
             ),
             recent_events as (
-              select *
+              select 1
               from base_events
               where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
@@ -507,10 +504,6 @@ export async function getUserDashboardAnalytics(
     };
 
     if (view === 'traffic') {
-      return base;
-    }
-
-    if (!dynamicEnabled) {
       return base;
     }
 

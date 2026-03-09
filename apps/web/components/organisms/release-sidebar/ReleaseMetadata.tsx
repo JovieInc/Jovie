@@ -6,8 +6,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  SimpleTooltip,
 } from '@jovie/ui';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Info } from 'lucide-react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
@@ -50,6 +51,35 @@ function PopularityScore({ value }: { readonly value: number }) {
 interface ReleaseMetadataProps {
   readonly release: Release;
   readonly onCanvasStatusChange?: (status: CanvasStatus) => void;
+}
+
+function formatCopyrightLine(line: string, symbol: '℗' | '©'): string {
+  const normalized = line.replace(/^[℗©\s]+/u, '').trim();
+  return `${symbol} ${normalized}`;
+}
+
+function CopyrightLabel({
+  symbol,
+  description,
+}: {
+  readonly symbol: '℗' | '©';
+  readonly description: string;
+}) {
+  return (
+    <span className='inline-flex items-center gap-1'>
+      <span>{symbol}</span>
+      <SimpleTooltip content={description} side='top'>
+        <span className='inline-flex items-center'>
+          <Info
+            size={12}
+            aria-hidden='true'
+            className='text-muted-foreground'
+          />
+          <span className='sr-only'>{description}</span>
+        </span>
+      </SimpleTooltip>
+    </span>
+  );
 }
 
 export function ReleaseMetadata({
@@ -128,24 +158,33 @@ export function ReleaseMetadata({
           )
         }
       />
-
-      {release.distributor && (
+      {release.copyrightLine && (
         <DrawerPropertyRow
-          label='Distributor'
+          label={
+            <CopyrightLabel
+              symbol='℗'
+              description='Sound recording copyright (phonogram rights)'
+            />
+          }
           value={
             <span className='text-[13px] text-secondary-token truncate'>
-              {release.distributor}
+              {formatCopyrightLine(release.copyrightLine, '℗')}
             </span>
           }
         />
       )}
 
-      {release.copyrightLine && (
+      {release.distributor && (
         <DrawerPropertyRow
-          label='℗'
+          label={
+            <CopyrightLabel
+              symbol='©'
+              description='Composition copyright (musical work)'
+            />
+          }
           value={
             <span className='text-[13px] text-secondary-token truncate'>
-              {release.copyrightLine}
+              {formatCopyrightLine(release.distributor, '©')}
             </span>
           }
         />

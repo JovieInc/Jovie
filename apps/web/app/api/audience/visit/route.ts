@@ -28,6 +28,19 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
+
+function isInternalTrafficReferrer(referrerUrl: string): boolean {
+  try {
+    const hostname = new URL(referrerUrl).hostname.toLowerCase();
+    return INTERNAL_HOST_SUFFIXES.some(
+      suffix => hostname === suffix || hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Check if a referrer URL is from the same origin as the request.
  * Used to filter out the HTTP Referer header on same-origin fetch() calls,
@@ -136,8 +149,12 @@ export async function POST(request: NextRequest) {
     const isSelfReferral = httpReferer
       ? isSameOriginReferrer(httpReferer, request.url)
       : false;
+    const fallbackReferrer = isSelfReferral ? undefined : httpReferer;
+    const rawReferrer = referrer ?? fallbackReferrer;
     const resolvedReferrer =
-      referrer ?? (isSelfReferral ? undefined : httpReferer);
+      rawReferrer && isInternalTrafficReferrer(rawReferrer)
+        ? undefined
+        : rawReferrer;
     const resolvedGeoCity =
       geoCity ?? request.headers.get('x-vercel-ip-city') ?? undefined;
     const resolvedGeoCountry =
