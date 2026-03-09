@@ -139,7 +139,7 @@ export async function fetchWithRedirects(
         redirect: 'manual',
         headers: {
           Accept: 'image/*,*/*;q=0.8',
-          'User-Agent': 'jovie-link-ingestion/1.0 (+https://meetjovie.com)',
+          'User-Agent': 'jovie-link-ingestion/1.0 (+https://jov.ie)',
         },
       });
 

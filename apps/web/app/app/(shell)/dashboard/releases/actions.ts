@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -8,8 +8,10 @@ import {
   unstable_cache,
 } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
@@ -41,21 +43,50 @@ import type {
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import {
   enqueueDspArtistDiscoveryJob,
   enqueueDspTrackEnrichmentJob,
   enqueueMusicFetchEnrichmentJob,
 } from '@/lib/ingestion/jobs';
+import type { LyricsFormat } from '@/lib/lyrics';
+import { formatLyrics } from '@/lib/lyrics';
 import {
+  checkAppleMusicRescanRateLimit,
   checkIsrcRescanRateLimit,
+  checkReleaseRefreshRateLimit,
   formatTimeRemaining,
 } from '@/lib/rate-limit';
 import { trackServerEvent } from '@/lib/server-analytics';
-import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
+import {
+  buildCanvasMetadata,
+  getCanvasStatusFromMetadata,
+} from '@/lib/services/canvas/service';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { slugify } from '@/lib/utils';
 import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
+
+const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
+  'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
+
+function isSpotifyIdUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const dbError = error as Error & { code?: string; constraint?: string };
+  const message = dbError.message.toLowerCase();
+
+  return (
+    dbError.code === '23505' &&
+    (dbError.constraint === 'creator_profiles_spotify_id_unique' ||
+      message.includes('creator_profiles_spotify_id_unique') ||
+      (message.includes('spotify_id') && message.includes('duplicate')))
+  );
+}
 
 function buildProviderLabels() {
   return Object.entries(PROVIDER_CONFIG).reduce(
@@ -74,7 +105,7 @@ async function requireProfile(profileId?: string): Promise<{
 }> {
   const data = await getDashboardData();
 
-  if (data.needsOnboarding) {
+  if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect('/onboarding');
   }
 
@@ -85,8 +116,9 @@ async function requireProfile(profileId?: string): Promise<{
     profile = data.creatorProfiles.find(p => p.id === profileId) ?? null;
   }
 
+  // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!profile) {
-    throw new TypeError('Missing creator profile');
+    redirect('/onboarding');
   }
 
   return {
@@ -165,18 +197,28 @@ function mapReleaseToViewModel(
       .filter(provider => provider.url !== ''),
     // Extended fields
     releaseType: release.releaseType,
+    isExplicit: release.isExplicit,
     upc: release.upc,
     label: release.label,
     totalTracks: release.totalTracks,
     totalDurationMs: release.trackSummary?.totalDurationMs ?? null,
     primaryIsrc: release.trackSummary?.primaryIsrc ?? null,
-    genres: extractGenres(release.metadata),
+    genres:
+      release.genres && release.genres.length > 0
+        ? release.genres
+        : extractGenres(release.metadata),
+    copyrightLine: release.copyrightLine ?? null,
+    distributor: release.distributor ?? null,
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
     originalArtworkUrl: (release.metadata as Record<string, unknown> | null)
       ?.originalArtworkUrl as string | undefined,
     hasVideoLinks: release.providerLinks.some(link =>
       (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
     ),
+    lyrics:
+      (
+        release.metadata as Record<string, unknown> | null
+      )?.lyrics?.toString() || undefined,
   };
 }
 
@@ -196,16 +238,16 @@ async function fetchReleaseMatrixCore(
 }
 
 /**
- * Load release matrix with caching (30s TTL)
+ * Core release matrix loading logic (cacheable).
  * Cache is invalidated on mutations (save/reset provider links, Spotify sync)
  */
-export async function loadReleaseMatrix(
+async function resolveReleaseMatrix(
   profileId?: string
 ): Promise<ReleaseViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`/sign-in?redirect_url=${APP_ROUTES.RELEASES}`);
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.RELEASES}`);
   }
 
   const profile = await requireProfile(profileId);
@@ -221,6 +263,12 @@ export async function loadReleaseMatrix(
   )();
 }
 
+/**
+ * Cached loader for release matrix.
+ * Uses React's cache() for request-level deduplication.
+ */
+export const loadReleaseMatrix = cache(resolveReleaseMatrix);
+
 export async function saveProviderOverride(params: {
   profileId: string;
   releaseId: string;
@@ -232,7 +280,7 @@ export async function saveProviderOverride(params: {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      throw new TypeError('Unauthorized');
+      throw new Error('Unauthorized');
     }
 
     const profile = await requireProfile();
@@ -277,9 +325,12 @@ export async function saveProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
 
-    // Invalidate cache and revalidate path
+    // Invalidate cache tag so next server fetch returns fresh data
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath(APP_ROUTES.RELEASES);
+
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+    // Query, and a path revalidation resets client-side state (closing the sidebar).
 
     return mapReleaseToViewModel(
       release,
@@ -305,7 +356,7 @@ export async function resetProviderOverride(params: {
   try {
     const { userId } = await getCachedAuth();
     if (!userId) {
-      throw new TypeError('Unauthorized');
+      throw new Error('Unauthorized');
     }
 
     const profile = await requireProfile();
@@ -339,9 +390,12 @@ export async function resetProviderOverride(params: {
 
     const providerLabels = buildProviderLabels();
 
-    // Invalidate cache and revalidate path
+    // Invalidate cache tag so next server fetch returns fresh data
     revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-    revalidatePath(APP_ROUTES.RELEASES);
+
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+    // Query, and a path revalidation resets client-side state (closing the sidebar).
 
     return mapReleaseToViewModel(
       release,
@@ -357,18 +411,160 @@ export async function resetProviderOverride(params: {
   }
 }
 
-/**
- * Refresh a single release from the database.
- * Re-fetches the release data (including provider links) without hitting Spotify API.
- */
-export async function refreshRelease(params: {
+export async function saveReleaseLyrics(params: {
+  profileId: string;
   releaseId: string;
+  lyrics: string;
 }): Promise<ReleaseViewModel> {
   noStore();
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  if (profile.id !== params.profileId) {
+    throw new TypeError('Profile mismatch');
+  }
+
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
+
+  await db
+    .update(discogReleases)
+    .set({
+      metadata: { ...metadata, lyrics: params.lyrics },
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(discogReleases.id, params.releaseId),
+        eq(discogReleases.creatorProfileId, profile.id)
+      )
+    );
+
+  const updated = await getReleaseById(params.releaseId);
+  if (!updated) {
+    throw new TypeError('Release not found');
+  }
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
+
+  return mapReleaseToViewModel(
+    updated,
+    buildProviderLabels(),
+    profile.id,
+    profile.handle
+  );
+}
+
+export async function saveCanvasStatus(params: {
+  profileId: string;
+  releaseId: string;
+  status: CanvasStatus;
+}): Promise<ReleaseViewModel> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+  if (profile.id !== params.profileId) {
+    throw new TypeError('Profile mismatch');
+  }
+
+  const release = await getReleaseById(params.releaseId);
+  if (release?.creatorProfileId !== profile.id) {
+    throw new TypeError('Release not found');
+  }
+
+  const metadata = (release.metadata as Record<string, unknown> | null) ?? {};
+  const nextMetadata: Record<string, unknown> = {
+    ...metadata,
+    ...buildCanvasMetadata(params.status),
+  };
+
+  if (params.status === 'not_set') {
+    delete nextMetadata.canvasVideoUrl;
+  }
+
+  await db
+    .update(discogReleases)
+    .set({
+      metadata: nextMetadata,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(discogReleases.id, params.releaseId),
+        eq(discogReleases.creatorProfileId, profile.id)
+      )
+    );
+
+  const updated = await getReleaseById(params.releaseId);
+  if (!updated) {
+    throw new TypeError('Release not found');
+  }
+
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
+
+  return mapReleaseToViewModel(
+    updated,
+    buildProviderLabels(),
+    profile.id,
+    profile.handle
+  );
+}
+
+export async function formatReleaseLyrics(params: {
+  profileId: string;
+  releaseId: string;
+  lyrics: string;
+  format?: LyricsFormat;
+}): Promise<{ release: ReleaseViewModel; changesSummary: string[] }> {
+  const { formatted, changesSummary } = formatLyrics(
+    params.lyrics,
+    params.format ?? 'apple-music'
+  );
+  const release = await saveReleaseLyrics({
+    profileId: params.profileId,
+    releaseId: params.releaseId,
+    lyrics: formatted,
+  });
+
+  return { release, changesSummary };
+}
+
+/**
+ * Refresh a single release from the database.
+ * Re-fetches the release data (including provider links) without hitting Spotify API.
+ * Rate limited: free 1/day, paid 1/hour per release.
+ */
+export async function refreshRelease(params: { releaseId: string }): Promise<{
+  release: ReleaseViewModel;
+  rateLimited: boolean;
+  retryAfter: string | null;
+}> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -378,14 +574,70 @@ export async function refreshRelease(params: {
     throw new TypeError('Release not found');
   }
 
+  // Check rate limit (plan-aware)
+  let plan: string | null = null;
+  try {
+    const ent = await getCurrentUserEntitlements();
+    plan = ent.plan;
+  } catch {
+    // Default to free tier on billing errors
+  }
+
+  const rateLimitResult = await checkReleaseRefreshRateLimit(
+    params.releaseId,
+    plan
+  );
+
+  if (!rateLimitResult.success) {
+    const providerLabels = buildProviderLabels();
+    return {
+      release: mapReleaseToViewModel(
+        release,
+        providerLabels,
+        profile.id,
+        profile.handle
+      ),
+      rateLimited: true,
+      retryAfter: formatTimeRemaining(rateLimitResult.reset),
+    };
+  }
+
+  if (profile.spotifyId) {
+    // Trigger a fresh Spotify sync and MusicFetch enrichment so refresh actions
+    // re-ingest live upstream data instead of only returning cached DB rows.
+    await syncReleasesFromSpotify(profile.id);
+
+    void Promise.resolve(
+      enqueueMusicFetchEnrichmentJob({
+        creatorProfileId: profile.id,
+        spotifyUrl: `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`,
+      })
+    ).catch(error => {
+      void captureError(
+        'MusicFetch enrichment enqueue failed on refresh',
+        error,
+        {
+          action: 'refreshRelease',
+          creatorProfileId: profile.id,
+          releaseId: params.releaseId,
+        }
+      );
+    });
+  }
+
+  const refreshedRelease = await getReleaseById(params.releaseId);
   const providerLabels = buildProviderLabels();
 
-  return mapReleaseToViewModel(
-    release,
-    providerLabels,
-    profile.id,
-    profile.handle
-  );
+  return {
+    release: mapReleaseToViewModel(
+      refreshedRelease ?? release,
+      providerLabels,
+      profile.id,
+      profile.handle
+    ),
+    rateLimited: false,
+    retryAfter: null,
+  };
 }
 
 /**
@@ -403,7 +655,7 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -471,9 +723,12 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
 
   const providerLabels = buildProviderLabels();
 
-  // Invalidate cache
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   void trackServerEvent('release_isrc_rescan', {
     profileId: profile.id,
@@ -495,6 +750,111 @@ export async function rescanIsrcLinks(params: { releaseId: string }): Promise<{
 }
 
 /**
+ * Rescan Apple Music links across all releases for the current profile.
+ * Rate limited: free 1/day, paid 1/hour per profile.
+ */
+export async function rescanAppleMusicLinks(): Promise<{
+  success: boolean;
+  rateLimited: boolean;
+  retryAfter: string | null;
+  linksFound: number;
+  message: string;
+}> {
+  noStore();
+
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const profile = await requireProfile();
+
+  // Check rate limit (plan-aware)
+  let plan: string | null = null;
+  try {
+    const ent = await getCurrentUserEntitlements();
+    plan = ent.plan;
+  } catch {
+    // Default to free tier on billing errors
+  }
+
+  const rateLimitResult = await checkAppleMusicRescanRateLimit(
+    profile.id,
+    plan
+  );
+
+  if (!rateLimitResult.success) {
+    return {
+      success: false,
+      rateLimited: true,
+      retryAfter: formatTimeRemaining(rateLimitResult.reset),
+      linksFound: 0,
+      message: `Apple Music refresh is rate limited. Try again in ${formatTimeRemaining(rateLimitResult.reset)}.`,
+    };
+  }
+
+  // Look up the Apple Music match for this profile
+  const [match] = await db
+    .select({
+      id: dspArtistMatches.id,
+      externalArtistId: dspArtistMatches.externalArtistId,
+      status: dspArtistMatches.status,
+    })
+    .from(dspArtistMatches)
+    .where(
+      and(
+        eq(dspArtistMatches.creatorProfileId, profile.id),
+        eq(dspArtistMatches.providerId, 'apple_music')
+      )
+    )
+    .limit(1);
+
+  if (
+    !match ||
+    (match.status !== 'confirmed' && match.status !== 'auto_confirmed')
+  ) {
+    return {
+      success: false,
+      rateLimited: false,
+      retryAfter: null,
+      linksFound: 0,
+      message: 'No Apple Music artist connected.',
+    };
+  }
+
+  const result = await processReleaseEnrichmentJobStandalone({
+    creatorProfileId: profile.id,
+    matchId: match.id,
+    providerId: 'apple_music',
+    externalArtistId: match.externalArtistId,
+  });
+
+  // Invalidate cache
+  revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  revalidatePath(APP_ROUTES.RELEASES);
+
+  void trackServerEvent('apple_music_rescan', {
+    profileId: profile.id,
+    linksFound: result.releasesEnriched,
+  });
+
+  return {
+    success: true,
+    rateLimited: false,
+    retryAfter: null,
+    linksFound: result.releasesEnriched,
+    message: (() => {
+      if (result.releasesEnriched === 0)
+        return 'No new Apple Music links found.';
+      const suffix = result.releasesEnriched === 1 ? '' : 's';
+      return `Found ${result.releasesEnriched} new Apple Music link${suffix}.`;
+    })(),
+  };
+}
+
+/**
  * Sync releases from Spotify
  */
 export async function syncFromSpotify(): Promise<{
@@ -506,7 +866,7 @@ export async function syncFromSpotify(): Promise<{
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -525,6 +885,8 @@ export async function syncFromSpotify(): Promise<{
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
   if (result.success) {
@@ -539,6 +901,25 @@ export async function syncFromSpotify(): Promise<{
       creatorProfileId: profile.id,
       spotifyArtistId: profile.spotifyId,
       targetProviders: ['apple_music'],
+    }).catch(error => {
+      void captureError('DSP artist discovery enqueue failed on sync', error, {
+        action: 'syncFromSpotify',
+        creatorProfileId: profile.id,
+      });
+    });
+
+    // Re-trigger MusicFetch enrichment to discover cross-platform DSP profiles
+    // This populates Deezer, Tidal, SoundCloud, YouTube Music IDs on the profile
+    void Promise.resolve(
+      enqueueMusicFetchEnrichmentJob({
+        creatorProfileId: profile.id,
+        spotifyUrl: `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`,
+      })
+    ).catch(error => {
+      void captureError('MusicFetch enrichment enqueue failed on sync', error, {
+        action: 'syncFromSpotify',
+        creatorProfileId: profile.id,
+      });
     });
 
     return {
@@ -578,17 +959,45 @@ export async function checkSpotifyConnection(): Promise<{
       return { connected: false, spotifyId: null, artistName: null };
     }
 
-    const settings = data.selectedProfile.settings as Record<
-      string,
-      unknown
-    > | null;
+    const profile = data.selectedProfile;
+    const settings = profile.settings as Record<string, unknown> | null;
     const artistName = (settings?.spotifyArtistName as string) ?? null;
 
-    return {
-      connected: !!data.selectedProfile.spotifyId,
-      spotifyId: data.selectedProfile.spotifyId ?? null,
-      artistName,
-    };
+    // Primary check: profile.spotifyId (set when user explicitly connects Spotify)
+    if (profile.spotifyId) {
+      return { connected: true, spotifyId: profile.spotifyId, artistName };
+    }
+
+    // Fallback: check dspArtistMatches for a confirmed Spotify match.
+    // Keeps this consistent with ConnectedDspList which checks both sources.
+    const [spotifyMatch] = await db
+      .select({
+        externalArtistId: dspArtistMatches.externalArtistId,
+        externalArtistName: dspArtistMatches.externalArtistName,
+        status: dspArtistMatches.status,
+      })
+      .from(dspArtistMatches)
+      .where(
+        and(
+          eq(dspArtistMatches.creatorProfileId, profile.id),
+          eq(dspArtistMatches.providerId, 'spotify')
+        )
+      )
+      .limit(1);
+
+    if (
+      spotifyMatch &&
+      (spotifyMatch.status === 'confirmed' ||
+        spotifyMatch.status === 'auto_confirmed')
+    ) {
+      return {
+        connected: true,
+        spotifyId: spotifyMatch.externalArtistId,
+        artistName: spotifyMatch.externalArtistName ?? artistName,
+      };
+    }
+
+    return { connected: false, spotifyId: null, artistName };
   } catch (error) {
     throwIfRedirect(error);
     return { connected: false, spotifyId: null, artistName: null };
@@ -598,12 +1007,76 @@ export async function checkSpotifyConnection(): Promise<{
 /**
  * Connect a Spotify artist to the profile and sync releases
  */
+/**
+ * Poll current release count and release data (uncached, for real-time import progress).
+ */
+export async function pollReleasesCount(): Promise<{
+  count: number;
+  releases: ReleaseViewModel[];
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const profile = await requireProfile();
+  const providerLabels = buildProviderLabels();
+  const releases = await getReleasesFromDb(profile.id);
+
+  return {
+    count: releases.length,
+    releases: releases.map(r =>
+      mapReleaseToViewModel(r, providerLabels, profile.id, profile.handle)
+    ),
+  };
+}
+
+/**
+ * Get Spotify import status from profile settings (uncached).
+ */
+export async function getSpotifyImportStatus(): Promise<{
+  status: 'idle' | 'importing' | 'complete' | 'failed';
+  releaseCount: number;
+}> {
+  noStore();
+  const { userId } = await getCachedAuth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const profile = await requireProfile();
+
+  const [row] = await db
+    .select({
+      settings: creatorProfiles.settings,
+      releaseCount: count(discogReleases.id),
+    })
+    .from(creatorProfiles)
+    .leftJoin(
+      discogReleases,
+      eq(discogReleases.creatorProfileId, creatorProfiles.id)
+    )
+    .where(eq(creatorProfiles.id, profile.id))
+    .groupBy(creatorProfiles.id)
+    .limit(1);
+
+  const settings = (row?.settings ?? {}) as Record<string, unknown>;
+  const status =
+    (settings.spotifyImportStatus as string) === 'importing'
+      ? 'importing'
+      : (settings.spotifyImportStatus as string) === 'complete'
+        ? 'complete'
+        : (settings.spotifyImportStatus as string) === 'failed'
+          ? 'failed'
+          : 'idle';
+
+  return { status, releaseCount: Number(row?.releaseCount ?? 0) };
+}
+
 export async function connectSpotifyArtist(params: {
   spotifyArtistId: string;
   spotifyArtistUrl: string;
   artistName: string;
 }): Promise<{
   success: boolean;
+  importing: boolean;
   message: string;
   imported: number;
   releases: ReleaseViewModel[];
@@ -612,11 +1085,10 @@ export async function connectSpotifyArtist(params: {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
-  const providerLabels = buildProviderLabels();
 
   // Get current settings to merge with new data
   const [currentProfile] = await db
@@ -630,94 +1102,159 @@ export async function connectSpotifyArtist(params: {
     unknown
   >;
 
-  // Update the profile with the Spotify artist ID, URL, and artist name in settings
-  await db
-    .update(creatorProfiles)
-    .set({
-      spotifyId: params.spotifyArtistId,
-      spotifyUrl: params.spotifyArtistUrl,
-      settings: {
-        ...currentSettings,
-        spotifyArtistName: params.artistName,
-      },
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, profile.id));
+  // Update the profile with Spotify ID and mark import as in-progress
+  try {
+    await db
+      .update(creatorProfiles)
+      .set({
+        spotifyId: params.spotifyArtistId,
+        spotifyUrl: params.spotifyArtistUrl,
+        settings: {
+          ...currentSettings,
+          spotifyArtistName: params.artistName,
+          spotifyImportStatus: 'importing',
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+  } catch (error) {
+    if (isSpotifyIdUniqueViolation(error)) {
+      return {
+        success: false,
+        importing: false,
+        message: SPOTIFY_ALREADY_CLAIMED_MESSAGE,
+        imported: 0,
+        releases: [],
+        artistName: params.artistName,
+      };
+    }
 
-  // Sync releases from the connected artist
-  const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
+    throw error;
+  }
 
-  revalidatePath(APP_ROUTES.RELEASES);
+  // Fire-and-forget: start import in background, return immediately
+  void (async () => {
+    try {
+      const result: SpotifyImportResult = await syncReleasesFromSpotify(
+        profile.id
+      );
 
-  // Map releases to view models
-  const releases = result.releases.map(release =>
-    mapReleaseToViewModel(release, providerLabels, profile.id, profile.handle)
-  );
+      // Update import status to complete or failed
+      const [latest] = await db
+        .select({ settings: creatorProfiles.settings })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, profile.id))
+        .limit(1);
+      const latestSettings = (latest?.settings ?? {}) as Record<
+        string,
+        unknown
+      >;
 
-  if (result.success) {
-    void trackServerEvent('releases_synced', {
-      profileId: profile.id,
-      imported: result.imported,
-      source: 'spotify',
-      isInitialConnect: true,
-    });
+      await db
+        .update(creatorProfiles)
+        .set({
+          settings: {
+            ...latestSettings,
+            spotifyImportStatus: result.success ? 'complete' : 'failed',
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
 
-    // Auto-trigger DSP artist discovery (Apple Music matching via ISRCs)
-    // Fire-and-forget: don't block the response on discovery
-    void enqueueDspArtistDiscoveryJob({
-      creatorProfileId: profile.id,
-      spotifyArtistId: params.spotifyArtistId,
-      targetProviders: ['apple_music'],
-    });
+      revalidateTag(`releases:${userId}:${profile.id}`, 'max');
 
-    // Auto-trigger MusicFetch enrichment (cross-platform DSP profiles + social links)
-    // Fire-and-forget: enrichment runs in background via ingestion job queue
-    // Normalize Spotify URL or construct from artist ID
-    const normalizedSpotifyUrl = (() => {
-      const raw = params.spotifyArtistUrl.trim();
-      try {
-        const parsed = new URL(raw);
-        const hostOk =
-          parsed.hostname === 'open.spotify.com' ||
-          parsed.hostname === 'spotify.com' ||
-          parsed.hostname.endsWith('.spotify.com');
-        if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-        if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
-        return parsed.toString();
-      } catch {
-        return null;
+      revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+      revalidatePath(APP_ROUTES.RELEASES);
+
+      if (result.success) {
+        void trackServerEvent('releases_synced', {
+          profileId: profile.id,
+          imported: result.imported,
+          source: 'spotify',
+          isInitialConnect: true,
+        });
+
+        // Auto-trigger DSP artist discovery
+        void enqueueDspArtistDiscoveryJob({
+          creatorProfileId: profile.id,
+          spotifyArtistId: params.spotifyArtistId,
+          targetProviders: ['apple_music'],
+        }).catch(err => {
+          void captureError(
+            'DSP artist discovery enqueue failed on connect',
+            err,
+            { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
+          );
+        });
+
+        // Auto-trigger MusicFetch enrichment
+        const normalizedSpotifyUrl = (() => {
+          const raw = params.spotifyArtistUrl.trim();
+          try {
+            const parsed = new URL(raw);
+            const hostOk =
+              parsed.hostname === 'open.spotify.com' ||
+              parsed.hostname === 'spotify.com' ||
+              parsed.hostname.endsWith('.spotify.com');
+            if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+            if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
+            return parsed.toString();
+          } catch {
+            return null;
+          }
+        })();
+
+        const spotifyUrlForEnrichment =
+          normalizedSpotifyUrl ??
+          `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
+
+        void enqueueMusicFetchEnrichmentJob({
+          creatorProfileId: profile.id,
+          spotifyUrl: spotifyUrlForEnrichment,
+        }).catch(err => {
+          void captureError('MusicFetch enrichment enqueue failed', err, {
+            action: 'connectSpotifyArtist',
+            creatorProfileId: profile.id,
+          });
+        });
       }
-    })();
+    } catch (error) {
+      // Mark import as failed on unexpected error
+      try {
+        const [latest] = await db
+          .select({ settings: creatorProfiles.settings })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.id, profile.id))
+          .limit(1);
+        const latestSettings = (latest?.settings ?? {}) as Record<
+          string,
+          unknown
+        >;
 
-    const spotifyUrlForEnrichment =
-      normalizedSpotifyUrl ??
-      `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
+        await db
+          .update(creatorProfiles)
+          .set({
+            settings: { ...latestSettings, spotifyImportStatus: 'failed' },
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, profile.id));
+      } catch {
+        // DB update best-effort in error path
+      }
 
-    void enqueueMusicFetchEnrichmentJob({
-      creatorProfileId: profile.id,
-      spotifyUrl: spotifyUrlForEnrichment,
-    }).catch(error => {
-      void captureError('MusicFetch enrichment enqueue failed', error, {
+      void captureError('Background Spotify import failed', error, {
         action: 'connectSpotifyArtist',
         creatorProfileId: profile.id,
       });
-      // Enrichment can be retried later; don't fail the connection
-    });
-
-    return {
-      success: true,
-      message: `Connected and synced ${result.imported} releases from Spotify.`,
-      imported: result.imported,
-      releases,
-      artistName: params.artistName,
-    };
-  }
+    }
+  })();
 
   return {
-    success: false,
-    message: result.errors[0] ?? 'Connected but failed to sync releases.',
+    success: true,
+    importing: true,
+    message: 'Importing releases from Spotify...',
     imported: 0,
-    releases,
+    releases: [],
     artistName: params.artistName,
   };
 }
@@ -743,6 +1280,8 @@ function mapTrackToViewModel(
     isrc: track.isrc,
     isExplicit: track.isExplicit,
     previewUrl: track.previewUrl,
+    audioUrl: track.audioUrl,
+    audioFormat: track.audioFormat,
     providers: Object.entries(providerLabels)
       .map(([key, label]) => {
         const providerKey = key as ProviderKey;
@@ -781,7 +1320,7 @@ export async function loadTracksForRelease(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -820,7 +1359,13 @@ export async function checkAppleMusicConnection(): Promise<{
   }
 
   try {
-    const profile = await requireProfile();
+    const data = await getDashboardData();
+
+    if (data.needsOnboarding || !data.selectedProfile) {
+      return { connected: false, artistName: null, artistId: null };
+    }
+
+    const profile = data.selectedProfile;
 
     const [match] = await db
       .select({
@@ -837,18 +1382,28 @@ export async function checkAppleMusicConnection(): Promise<{
       )
       .limit(1);
 
-    if (!match) {
-      return { connected: false, artistName: null, artistId: null };
+    if (
+      match &&
+      (match.status === 'confirmed' || match.status === 'auto_confirmed')
+    ) {
+      return {
+        connected: true,
+        artistName: match.externalArtistName,
+        artistId: match.externalArtistId,
+      };
     }
 
-    const isConnected =
-      match.status === 'confirmed' || match.status === 'auto_confirmed';
+    // Fallback: check profile.appleMusicId (set when connected directly).
+    // Keeps this consistent with ConnectedDspList which checks both sources.
+    if (profile.appleMusicId) {
+      return {
+        connected: true,
+        artistName: null,
+        artistId: profile.appleMusicId,
+      };
+    }
 
-    return {
-      connected: isConnected,
-      artistName: isConnected ? match.externalArtistName : null,
-      artistId: isConnected ? match.externalArtistId : null,
-    };
+    return { connected: false, artistName: null, artistId: null };
   } catch (error) {
     throwIfRedirect(error);
     return { connected: false, artistName: null, artistId: null };
@@ -871,7 +1426,7 @@ export async function connectAppleMusicArtist(params: {
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const externalArtistId = params.externalArtistId.trim();
@@ -1013,7 +1568,7 @@ export async function deleteRelease(
 
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1030,6 +1585,8 @@ export async function deleteRelease(
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
   revalidatePath(APP_ROUTES.RELEASES);
 
   void trackServerEvent('release_deleted', {
@@ -1052,7 +1609,7 @@ export async function uploadReleaseArtwork(
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1086,9 +1643,12 @@ export async function uploadReleaseArtwork(
 
   const result = await response.json();
 
-  // Invalidate cache
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  // Skip revalidatePath — the client handles cache updates via onReleaseChange,
+  // and a path revalidation resets client-side state (closing the sidebar).
 
   return {
     artworkUrl: result.artworkUrl,
@@ -1106,7 +1666,7 @@ export async function updateAllowArtworkDownloads(
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1154,7 +1714,7 @@ export async function revertReleaseArtwork(
   noStore();
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -1188,7 +1748,118 @@ export async function revertReleaseArtwork(
     .where(eq(discogReleases.id, releaseId));
 
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.RELEASES);
+
+  revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+  // Skip revalidatePath — the client handles cache updates via onReleaseChange,
+  // and a path revalidation resets client-side state (closing the sidebar).
 
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
+}
+
+/* ------------------------------------------------------------------ */
+/*  createRelease — manually add a release to the creator's discography */
+/* ------------------------------------------------------------------ */
+
+export async function createRelease(formData: {
+  title: string;
+  releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
+  releaseDate?: string | null;
+  artworkUrl?: string | null;
+  providerUrls?: Record<string, string>;
+}): Promise<{ success: boolean; message: string; releaseId?: string }> {
+  noStore();
+
+  const profile = await requireProfile();
+
+  const title = formData.title.trim();
+  if (!title) {
+    return { success: false, message: 'Title is required.' };
+  }
+
+  const slug = slugify(title);
+  if (!slug) {
+    return {
+      success: false,
+      message: 'Could not generate a valid slug from the title.',
+    };
+  }
+
+  const releaseDate = formData.releaseDate
+    ? new Date(formData.releaseDate)
+    : null;
+
+  try {
+    const [inserted] = await db
+      .insert(discogReleases)
+      .values({
+        creatorProfileId: profile.id,
+        title,
+        slug,
+        releaseType: formData.releaseType,
+        releaseDate,
+        artworkUrl: formData.artworkUrl ?? null,
+        sourceType: 'manual',
+        totalTracks: formData.releaseType === 'single' ? 1 : 0,
+      })
+      .returning({ id: discogReleases.id });
+
+    const releaseId = inserted.id;
+
+    // Upsert any provider URLs the user supplied
+    if (formData.providerUrls) {
+      const providerLabels = buildProviderLabels();
+      const entries = Object.entries(formData.providerUrls).filter(
+        ([, url]) => url.trim().length > 0
+      );
+
+      for (const [key, url] of entries) {
+        const provider = key as ProviderKey;
+        const providerLabel = providerLabels[provider];
+        if (!providerLabel) continue;
+        const trimmedUrl = url.trim();
+        const validation = validateProviderUrl(
+          trimmedUrl,
+          provider,
+          providerLabel
+        );
+        if (!validation.valid) continue;
+
+        await upsertProviderLink({
+          releaseId,
+          providerId: provider,
+          url: trimmedUrl,
+          sourceType: 'manual',
+        });
+      }
+    }
+
+    revalidatePath(APP_ROUTES.RELEASES);
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+
+    return {
+      success: true,
+      message: `Release "${title}" created.`,
+      releaseId,
+    };
+  } catch (error) {
+    throwIfRedirect(error);
+
+    // Handle duplicate slug
+    const dbError = error as Error & { code?: string };
+    if (dbError.code === '23505') {
+      return {
+        success: false,
+        message: `A release with the slug "${slug}" already exists. Please choose a different title.`,
+      };
+    }
+
+    void captureError('createRelease failed', error as Error, {
+      action: 'createRelease',
+      title,
+    });
+    return {
+      success: false,
+      message: 'Failed to create release. Please try again.',
+    };
+  }
 }

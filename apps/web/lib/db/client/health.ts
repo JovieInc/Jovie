@@ -4,12 +4,9 @@
  * Health check and performance monitoring functions for the database.
  */
 
-import { neon } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { env } from '@/lib/env-server';
 import { TABLE_NAMES } from '../config';
-import * as schema from '../schema';
 import {
   getDb,
   getInternalDb,
@@ -19,7 +16,7 @@ import {
 } from './connection';
 import { isActiveConnectionsRow, isTableExistsRow } from './guards';
 import { logDbError, logDbInfo } from './logging';
-import { DB_CONFIG, withRetry } from './retry';
+import { DB_CONFIG, isRetryableError, withRetry } from './retry';
 import type {
   ConnectionValidationResult,
   HealthCheckResult,
@@ -37,10 +34,18 @@ let lastTableExistenceDatabaseUrl: string | null = null;
 // 60 seconds TTL for table existence cache
 const TABLE_EXISTENCE_CACHE_TTL_MS = 60_000;
 
+// Timeout for tableExists queries (prevents hanging on cold starts / connection issues)
+// Neon cold starts can take 10-15s, so use a 15s timeout to avoid false negatives.
+const TABLE_EXISTS_TIMEOUT_MS = 15_000;
+
 /**
  * Check if a table exists in the database.
  * Uses a TTL-based cache for both positive and negative results to avoid
  * repeated database round-trips on cold start.
+ *
+ * Includes retry logic for transient connection errors (e.g., "Connection
+ * terminated unexpectedly") and a 15s timeout to prevent hanging on public
+ * profile routes while still allowing Neon cold starts. See JOV-1218.
  */
 export async function doesTableExist(tableName: string): Promise<boolean> {
   // Clear cache if database URL changes
@@ -62,15 +67,35 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
   try {
     const db = getDb();
 
-    const result = await db.execute(
-      drizzleSql<TableExistsRow>`
-        SELECT EXISTS (
-          SELECT 1
-          FROM information_schema.tables
-          WHERE table_schema = 'public'
-            AND table_name = ${tableName}
-        ) AS table_exists
-      `
+    // Wrap in withRetry + timeout to handle transient connection errors
+    // that previously caused "Connection terminated unexpectedly" on public
+    // profile routes (JOV-1218).
+    const result = await withRetry(
+      () =>
+        Promise.race([
+          db.execute(
+            drizzleSql<TableExistsRow>`
+              SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = ${tableName}
+              ) AS table_exists
+            `
+          ),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `tableExists timeout after ${TABLE_EXISTS_TIMEOUT_MS}ms`
+                  )
+                ),
+              TABLE_EXISTS_TIMEOUT_MS
+            )
+          ),
+        ]),
+      `tableExists(${tableName})`
     );
 
     // result.rows is TableExistsRow[] - rows is always defined, first element may be undefined
@@ -83,6 +108,14 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     return exists;
   } catch (error) {
     logDbError('tableExists', error, { tableName });
+    // For retryable errors, don't cache the negative result — the table
+    // likely exists but the connection failed transiently.
+    if (!isRetryableError(error)) {
+      tableExistenceCache.set(tableName, {
+        exists: false,
+        timestamp: Date.now(),
+      });
+    }
     return false;
   }
 }
@@ -117,8 +150,7 @@ export async function checkDbHealth(): Promise<HealthCheckResult> {
       await database.execute(drizzleSql`SELECT NOW() as current_time`);
       details.query = true;
 
-      // 3. Transaction test (skipped - neon-http driver does not support transactions)
-      // For compatibility, we mark this as true since basic operations work
+      // 3. Transaction test — WebSocket driver supports transactions
       details.transaction = true;
 
       // 4. Schema access test (try to query a table if it exists)
@@ -158,27 +190,23 @@ export async function checkDbHealth(): Promise<HealthCheckResult> {
 }
 
 /**
- * Lightweight connection validation for startup
+ * Lightweight connection validation for startup.
+ * Uses the canonical WebSocket pool — no separate driver needed.
  */
 export async function validateDbConnection(): Promise<ConnectionValidationResult> {
   const startTime = Date.now();
 
-  const connectionString = env.DATABASE_URL;
-
-  if (!connectionString) {
+  if (!env.DATABASE_URL) {
     return {
       connected: false,
       error: 'DATABASE_URL not configured',
     };
   }
 
-  // Use HTTP driver - stateless, no pool cleanup needed
-  const sql = neon(connectionString);
-  const tempDb = drizzle(sql, { schema });
-
   try {
+    const db = getDb();
     await withRetry(
-      () => tempDb.execute(drizzleSql`SELECT 1`),
+      () => db.execute(drizzleSql`SELECT 1`),
       'startupConnection'
     );
 
@@ -198,7 +226,6 @@ export async function validateDbConnection(): Promise<ConnectionValidationResult
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
-  // No cleanup needed - HTTP driver is stateless
 }
 
 /**
@@ -246,8 +273,7 @@ export async function checkDbPerformance(): Promise<PerformanceCheckResult> {
       );
     }
 
-    // 3. Transaction performance (skipped - neon-http driver does not support transactions)
-    // Use a simple query sequence instead to measure overhead
+    // 3. Sequential query performance (measures connection reuse overhead)
     const transactionStart = Date.now();
     await database.execute(drizzleSql`SELECT 'transaction_test'`);
     await database.execute(drizzleSql`SELECT NOW()`);

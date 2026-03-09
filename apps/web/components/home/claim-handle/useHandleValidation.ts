@@ -3,14 +3,11 @@
 /**
  * Handle Validation Hook
  *
- * Provides debounced handle availability checking using the shared
- * useAsyncValidation hook from TanStack Pacer.
- *
- * @see https://tanstack.com/pacer
+ * Simple debounced fetch for handle availability checking.
+ * No TanStack Pacer — just a plain setTimeout + AbortController.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { PACER_TIMING, useAsyncValidation } from '@/lib/pacer/hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface HandleValidationResult {
   handleError: string | null;
@@ -21,20 +18,25 @@ export interface HandleValidationResult {
   cancel: () => void;
 }
 
-interface HandleCheckResponse {
-  available: boolean;
-  error?: string;
-}
+/** Debounce before hitting the API */
+const DEBOUNCE_MS = 400;
+
+/** Abort fetch if it takes longer than this */
+const FETCH_TIMEOUT_MS = 5_000;
 
 /**
  * Hook for validating handle format and availability.
  *
- * Uses the shared useAsyncValidation hook to reduce code duplication
- * while maintaining the same API surface.
+ * Uses a plain debounced fetch with AbortController — no complex
+ * retry/cache machinery that can get stuck.
  */
 export function useHandleValidation(handle: string): HandleValidationResult {
   const [available, setAvailable] = useState<boolean | null>(null);
   const [availError, setAvailError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Client-side handle validation
   const handleError = useMemo(() => {
@@ -48,76 +50,103 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  // Use the shared async validation hook
-  const { validate, cancel, isValidating, isPending, result, error } =
-    useAsyncValidation<string, HandleCheckResponse>({
-      validatorFn: async (handleValue, signal) => {
-        const value = handleValue.toLowerCase();
+  const cancel = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setChecking(false);
+  }, []);
+
+  // Trigger availability check when handle changes
+  useEffect(() => {
+    // Reset state
+    setAvailError(null);
+
+    // Clear any pending check
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    abortRef.current?.abort();
+
+    // Nothing to check
+    if (!handle || handleError) {
+      setAvailable(null);
+      setChecking(false);
+      return;
+    }
+
+    // Show checking state immediately (before debounce fires)
+    setChecking(true);
+    setAvailable(null);
+
+    // Debounce the actual API call
+    debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      // Timeout the fetch
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+      try {
         const res = await fetch(
-          `/api/handle/check?handle=${encodeURIComponent(value)}`,
-          { signal }
+          `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
+          { signal: controller.signal }
         );
+
+        clearTimeout(timeoutId);
+
+        // Aborted while waiting
+        if (controller.signal.aborted) return;
+
         const json = await res
           .json()
           .catch(() => ({ available: false, error: 'Parse error' }));
 
         if (!res.ok) {
-          throw new Error(json?.error || 'Error checking availability');
+          setAvailable(null);
+          setAvailError(json?.error || 'Error checking availability');
+          setChecking(false);
+          return;
         }
 
-        return json as HandleCheckResponse;
-      },
-      wait: PACER_TIMING.VALIDATION_DEBOUNCE_MS,
-      enabled: !handleError && handle.length >= 3,
-      onSuccess: res => {
-        setAvailable(Boolean(res?.available));
+        setAvailable(Boolean(json?.available));
         setAvailError(null);
-      },
-      onError: err => {
+        setChecking(false);
+      } catch (err: unknown) {
+        clearTimeout(timeoutId);
+
+        // Aborts happen from user typing (effect cleanup) or fetch timeout.
+        // Either way, reset checking so the UI doesn't get stuck.
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setChecking(false);
+          return;
+        }
+
         setAvailable(null);
-        setAvailError(err.message === 'AbortError' ? null : err.message);
-      },
-    });
+        setAvailError('Network error — try again');
+        setChecking(false);
+      }
+    }, DEBOUNCE_MS);
 
-  // Sync result state
-  useEffect(() => {
-    if (result) {
-      setAvailable(Boolean(result.available));
-      setAvailError(null);
-    }
-  }, [result]);
-
-  // Sync error state
-  useEffect(() => {
-    if (error && error.name !== 'AbortError') {
-      setAvailable(null);
-      setAvailError(error.message || 'Network error');
-    }
-  }, [error]);
-
-  // Trigger validation when handle changes
-  useEffect(() => {
-    setAvailError(null);
-
-    if (!handle || handleError) {
-      cancel();
-      setAvailable(null);
-      return;
-    }
-
-    void validate(handle);
-  }, [handle, handleError, validate, cancel]);
-
-  // Wrap cancel to also reset state
-  const handleCancel = useCallback(() => {
-    cancel();
-  }, [cancel]);
+    // Cleanup on unmount or handle change
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      abortRef.current?.abort();
+    };
+  }, [handle, handleError]);
 
   return {
     handleError,
-    checkingAvail: isValidating || isPending,
+    checkingAvail: checking,
     available,
     availError,
-    cancel: handleCancel,
+    cancel,
   };
 }

@@ -60,6 +60,40 @@ export const usersCSVColumns: CSVColumn<AdminUserRow>[] = [
     accessor: 'deletedAt',
     // Date formatting is handled by the CSV utility
   },
+  {
+    header: 'User Status',
+    accessor: 'userStatus',
+  },
+  {
+    header: 'Profile Username',
+    accessor: 'profileUsername',
+    formatter: formatOptionalString,
+  },
+  {
+    header: 'Founder Welcome Sent At',
+    accessor: 'founderWelcomeSentAt',
+  },
+  {
+    header: 'Welcome Failed At',
+    accessor: 'welcomeFailedAt',
+  },
+  {
+    header: 'Outbound Suppressed At',
+    accessor: 'outboundSuppressedAt',
+  },
+  {
+    header: 'Suppression Failed At',
+    accessor: 'suppressionFailedAt',
+  },
+  {
+    header: 'Profile Origin',
+    accessor: 'profileOrigin',
+    formatter: formatOptionalString,
+  },
+  {
+    header: 'Profile Created At',
+    accessor: 'profileCreatedAt',
+  },
 ];
 
 /**

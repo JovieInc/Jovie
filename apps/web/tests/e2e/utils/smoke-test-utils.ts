@@ -250,9 +250,14 @@ export function setupPageMonitoring(page: Page): {
     statusText: () => string;
   }) => {
     const status = res.status();
-    if (status >= 400) {
+    const resUrl = res.url();
+    // Clerk handshake returns 400 in CI (dev-browser-missing) — this is expected
+    // and not a real failure. Exclude from diagnostics to avoid false positives.
+    const isClerkHandshake =
+      resUrl.includes('clerk') && resUrl.includes('handshake');
+    if (status >= 400 && !isClerkHandshake) {
       failedResponses.push({
-        url: res.url(),
+        url: resUrl,
         status,
         statusText: res.statusText(),
       });
@@ -486,10 +491,12 @@ export async function waitForNetworkIdle(
     return page.waitForLoadState('domcontentloaded', { timeout });
   });
 
-  // Small buffer for late responses
-  await page.waitForTimeout(
-    Math.min(idleTime, SMOKE_TIMEOUTS.HYDRATION_SETTLE)
-  );
+  // Buffer absorbed by domcontentloaded check — no fixed timeout needed
+  await page
+    .waitForLoadState('domcontentloaded', {
+      timeout: Math.min(idleTime * 2, 2000),
+    })
+    .catch(() => {});
 }
 
 /**
@@ -684,6 +691,23 @@ export async function smokeNavigateWithRetry(
         console.warn(`Navigation retry ${attempt} for ${url}`);
       },
     }
+  );
+}
+
+/**
+ * Check if an error is a transient infrastructure issue (server crash,
+ * network timeout, browser closed) rather than a real test failure.
+ */
+export function isTransientNavigationError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes('net::ERR_CONNECTION_REFUSED') ||
+    msg.includes('net::ERR_CONNECTION_RESET') ||
+    msg.includes('net::ERR_EMPTY_RESPONSE') ||
+    msg.includes('Target closed') ||
+    msg.includes('Target page, context or browser has been closed') ||
+    msg.includes('browser has disconnected') ||
+    msg.includes('Timeout')
   );
 }
 

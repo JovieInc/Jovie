@@ -20,11 +20,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   settings: 'Settings',
   appearance: 'Appearance',
   notifications: 'Notifications',
-  branding: 'Branding',
-  'ad-pixels': 'Ad pixels',
   billing: 'Billing',
-  'social-links': 'Social links',
-  'music-links': 'Music links',
 
   // Admin routes
   admin: 'Admin',
@@ -33,6 +29,7 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   users: 'Users',
   activity: 'Activity',
   campaigns: 'Campaigns',
+  ingest: 'Ingest',
 
   // Root routes
   app: 'Dashboard',

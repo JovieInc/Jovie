@@ -11,6 +11,9 @@ interface OnboardingCompleteStepProps {
   readonly copied: boolean;
   readonly onGoToDashboard: () => void;
   readonly onCopyLink: () => void;
+  readonly spotifyImportStatus: 'idle' | 'importing' | 'success' | 'error';
+  readonly spotifyImportStage: 0 | 1 | 2;
+  readonly spotifyImportMessage: string;
 }
 
 export function OnboardingCompleteStep({
@@ -21,7 +24,12 @@ export function OnboardingCompleteStep({
   copied,
   onGoToDashboard,
   onCopyLink,
+  spotifyImportStatus,
+  spotifyImportMessage,
+  spotifyImportStage,
 }: OnboardingCompleteStepProps) {
+  const isSpotifyImportInProgress = spotifyImportStatus === 'importing';
+
   return (
     <div className='flex flex-col items-center justify-center h-full'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
@@ -35,8 +43,35 @@ export function OnboardingCompleteStep({
           hrefText={`${displayDomain}/${handle}`}
         />
 
+        {spotifyImportStatus !== 'idle' && spotifyImportMessage ? (
+          <div className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-3'>
+            <div className='mb-2 flex items-center gap-2'>
+              <div className='h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2'>
+                <div
+                  className='h-full rounded-full bg-accent transition-all duration-500'
+                  style={{ width: `${((spotifyImportStage + 1) / 3) * 100}%` }}
+                />
+              </div>
+              <span className='text-[11px] text-secondary-token'>
+                {spotifyImportStage + 1}/3
+              </span>
+            </div>
+            <p className='text-center text-[13px] text-secondary-token'>
+              {spotifyImportMessage}
+            </p>
+          </div>
+        ) : null}
+
         <div className={FORM_LAYOUT.formInner}>
-          <AuthButton onClick={onGoToDashboard}>Go to Dashboard</AuthButton>
+          <AuthButton
+            onClick={onGoToDashboard}
+            disabled={isSpotifyImportInProgress}
+            aria-busy={isSpotifyImportInProgress}
+          >
+            {isSpotifyImportInProgress
+              ? 'Finishing setup...'
+              : 'Go to Dashboard'}
+          </AuthButton>
 
           <AuthButton onClick={onCopyLink} variant='secondary'>
             Copy Link

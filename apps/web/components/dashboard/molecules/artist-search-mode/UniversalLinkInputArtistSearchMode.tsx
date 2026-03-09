@@ -4,6 +4,7 @@ import { Input } from '@jovie/ui';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -108,7 +109,7 @@ export function UniversalLinkInputArtistSearchMode({
 
         <div className='absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2'>
           {state === 'loading' && (
-            <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+            <LoadingSpinner size='sm' tone='muted' label='Searching' />
           )}
           <button
             type='button'
@@ -122,7 +123,7 @@ export function UniversalLinkInputArtistSearchMode({
       </div>
 
       {showResults && (
-        <div className='absolute z-50 w-full rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-lg overflow-hidden'>
+        <div className='absolute z-50 w-full rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-card-elevated overflow-hidden'>
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
               {ARTIST_SEARCH_LOADING_KEYS.map(key => (
@@ -139,11 +140,13 @@ export function UniversalLinkInputArtistSearchMode({
 
           {state === 'empty' && (
             <div className='p-4 text-center'>
-              <p className='text-sm text-secondary-token'>No artists found</p>
+              <p className='text-[13px] text-secondary-token'>
+                No artists found
+              </p>
               <button
                 type='button'
                 onClick={exitSearchMode}
-                className='mt-2 text-xs text-accent hover:underline'
+                className='mt-2 text-[13px] text-accent hover:underline'
               >
                 Add link manually
               </button>
@@ -152,13 +155,13 @@ export function UniversalLinkInputArtistSearchMode({
 
           {state === 'error' && (
             <div className='p-4 text-center'>
-              <p className='text-sm text-destructive'>
+              <p className='text-[13px] text-destructive'>
                 {error || 'Search failed'}
               </p>
               <button
                 type='button'
                 onClick={exitSearchMode}
-                className='mt-2 text-xs text-accent hover:underline'
+                className='mt-2 text-[13px] text-accent hover:underline'
               >
                 Add link manually
               </button>
@@ -247,11 +250,11 @@ export function UniversalLinkInputArtistSearchMode({
                     </div>
 
                     <div className='flex-1 min-w-0'>
-                      <div className='font-medium text-primary-token truncate'>
+                      <div className='font-[510] text-primary-token truncate'>
                         {artist.name}
                       </div>
                       {artist.followers && (
-                        <div className='text-xs text-tertiary-token'>
+                        <div className='text-[13px] text-tertiary-token'>
                           {formatFollowers(artist.followers)}
                         </div>
                       )}

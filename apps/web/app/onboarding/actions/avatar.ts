@@ -25,6 +25,8 @@ const OAUTH_AVATAR_HOSTNAMES = [
   'gravatar.com', // Gravatar
   'www.gravatar.com', // Gravatar
   'cdn.discordapp.com', // Discord
+  'i.scdn.co', // Spotify CDN
+  'mosaic.scdn.co', // Spotify mosaic CDN
 ] as const;
 
 /**
@@ -99,10 +101,11 @@ function isVercelPreviewHostname(hostname: string): boolean {
 }
 
 /**
- * Returns a safe upload URL for the internal images API, based on a trusted origin.
- * Throws if the provided baseUrl is not in the allow-list of permitted hosts.
+ * Returns a safe upload URL for the internal images API.
+ * Uses NEXT_PUBLIC_APP_URL as a trusted origin instead of request headers.
  */
-function getSafeUploadUrl(baseUrl: string): string {
+export async function getSafeUploadUrl(): Promise<string> {
+  const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL;
   let parsed: URL;
   try {
     parsed = new URL(baseUrl);
@@ -133,8 +136,8 @@ function getSafeUploadUrl(baseUrl: string): string {
 async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
   const safeImageUrl = getSafeImageUrl(imageUrl);
   const source = await fetch(safeImageUrl, {
-    redirect: 'error', // Prevent SSRF via redirect to internal services
-    signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
+    redirect: 'follow', // OAuth providers (Google, GitHub) commonly redirect avatar URLs
+    signal: AbortSignal.timeout(15_000), // 15s timeout — cold starts + OAuth CDNs can be slow
   });
 
   if (!source.ok) {
@@ -172,7 +175,6 @@ async function fetchAvatarImage(imageUrl: string): Promise<AvatarFetchResult> {
  * Uploads avatar file to the API endpoint.
  */
 async function uploadAvatarFile(
-  baseUrl: string,
   buffer: ArrayBuffer,
   contentType: string,
   cookieHeader: string | null
@@ -181,7 +183,7 @@ async function uploadAvatarFile(
   const formData = new FormData();
   formData.append('file', file);
 
-  const uploadUrl = getSafeUploadUrl(baseUrl);
+  const uploadUrl = await getSafeUploadUrl();
   const upload = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
@@ -190,6 +192,9 @@ async function uploadAvatarFile(
   });
 
   if (!upload.ok) {
+    if (upload.status === 401) {
+      throw new Error('Upload failed: 401 UNAUTHORIZED');
+    }
     const errorBody = await upload.text().catch(() => 'Unknown error');
     throw new Error(`Upload failed: ${upload.status} - ${errorBody}`);
   }
@@ -211,66 +216,131 @@ async function uploadAvatarFile(
 }
 
 /**
+ * Exponential backoff with jitter for retry delays.
+ * Returns a promise that resolves after the computed delay.
+ */
+function backoffDelay(attempt: number): Promise<void> {
+  const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+  const jitter = Math.floor(Math.random() * baseDelay * 0.3);
+  return new Promise(resolve => setTimeout(resolve, baseDelay + jitter));
+}
+
+/**
  * Upload a remote avatar with retry mechanism.
  *
- * Implements exponential backoff retry for reliability.
- * Logs failures for monitoring and debugging.
+ * Separates the fetch and upload steps so that a successful image fetch
+ * is not repeated when only the upload fails. Uses exponential backoff
+ * with jitter for reliability. Intermediate failures are recorded as
+ * breadcrumbs; only final exhaustion is reported as a Sentry event.
  *
  * @returns Upload result or null if all retries fail
  */
-async function uploadRemoteAvatar(params: {
+export async function uploadRemoteAvatar(params: {
   imageUrl: string;
-  baseUrl: string;
   cookieHeader: string | null;
   maxRetries?: number;
 }): Promise<AvatarUploadResult | null> {
   const maxRetries = params.maxRetries ?? 3;
   let lastError: Error | null = null;
 
+  // Step 1: Fetch the remote image (retry separately from upload)
+  let fetchResult: AvatarFetchResult | null = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Exponential backoff: 0ms, 1000ms, 2000ms
       if (attempt > 0) {
-        const delay = Math.min(1000 * attempt, 5000);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await backoffDelay(attempt);
       }
 
-      const { buffer, contentType } = await fetchAvatarImage(params.imageUrl);
+      fetchResult = await fetchAvatarImage(params.imageUrl);
+      break;
+    } catch (error) {
+      lastError =
+        error instanceof Error ? error : new Error('Unknown fetch error');
+
+      // Don't retry abort errors — the request was intentionally cancelled
+      if (
+        lastError.name === 'AbortError' ||
+        lastError.message.includes('aborted')
+      ) {
+        return null;
+      }
+
+      // Don't retry for invalid content type — it won't change on retry
+      if (lastError.message.includes('Invalid content type')) {
+        Sentry.captureMessage('Avatar upload: invalid content type', {
+          level: 'warning',
+          extra: { errorMessage: lastError.message },
+        });
+        return null;
+      }
+
+      // Record intermediate failures as breadcrumbs (less noisy than events)
+      if (attempt < maxRetries - 1) {
+        Sentry.addBreadcrumb({
+          category: 'avatar',
+          message: `Avatar fetch attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}`,
+          level: 'info',
+        });
+      }
+    }
+  }
+
+  if (!fetchResult) {
+    if (lastError) {
+      Sentry.captureException(lastError, {
+        extra: { maxRetries, context: 'avatar_fetch_retries_exhausted' },
+      });
+    }
+    return null;
+  }
+
+  // Step 2: Upload the fetched image (retry separately — no need to re-fetch)
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      if (attempt > 0) {
+        await backoffDelay(attempt);
+      }
+
       const { blobUrl, photoId } = await uploadAvatarFile(
-        params.baseUrl,
-        buffer,
-        contentType,
+        fetchResult.buffer,
+        fetchResult.contentType,
         params.cookieHeader
       );
 
-      // Success
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
 
-      const errorMessage = lastError.message;
-
-      // Don't retry for invalid content type - it won't change
-      if (errorMessage.includes('Invalid content type')) {
-        Sentry.captureMessage('Avatar upload: invalid content type', {
-          level: 'warning',
-          extra: { errorMessage },
-        });
-        break;
+      // Don't retry abort errors
+      if (
+        lastError.name === 'AbortError' ||
+        lastError.message.includes('aborted')
+      ) {
+        return null;
       }
 
-      Sentry.captureMessage(
-        `Avatar upload attempt ${attempt + 1}/${maxRetries} failed`,
-        {
+      // Don't retry 401 errors — auth won't fix itself on retry
+      if (lastError.message.includes('401')) {
+        Sentry.addBreadcrumb({
+          category: 'avatar',
+          message: `Avatar upload auth failed: ${lastError.message}`,
           level: 'warning',
-          extra: { errorMessage },
-        }
-      );
+        });
+        return null;
+      }
+
+      if (attempt < maxRetries - 1) {
+        Sentry.addBreadcrumb({
+          category: 'avatar',
+          message: `Avatar upload attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}`,
+          level: 'info',
+        });
+      }
     }
   }
 
-  // All retries exhausted
+  // All upload retries exhausted
   if (lastError) {
     Sentry.captureException(lastError, {
       extra: { maxRetries, context: 'avatar_upload_retries_exhausted' },
@@ -286,21 +356,22 @@ async function uploadRemoteAvatar(params: {
 export async function handleBackgroundAvatarUpload(
   profileId: string,
   oauthAvatarUrl: string,
-  baseUrl: string,
   cookieHeader: string | null
 ): Promise<void> {
   try {
     const uploaded = await uploadRemoteAvatar({
       imageUrl: oauthAvatarUrl,
-      baseUrl,
       cookieHeader,
       maxRetries: 3,
     });
 
     if (!uploaded) {
-      Sentry.captureMessage('Avatar upload failed for profile', {
+      // Background avatar upload failures are expected (OAuth CDN issues, expired sessions)
+      // — log as breadcrumb instead of Sentry event to reduce noise
+      Sentry.addBreadcrumb({
+        category: 'avatar',
+        message: `Background avatar upload failed for profile ${profileId}`,
         level: 'warning',
-        extra: { profileId },
       });
       return;
     }
@@ -332,9 +403,17 @@ export async function handleBackgroundAvatarUpload(
         .where(eq(profilePhotos.id, uploaded.photoId));
     });
   } catch (avatarError) {
-    Sentry.captureException(avatarError, {
-      tags: { context: 'onboarding_avatar_upload', profileId },
-      level: 'warning',
-    });
+    // Don't report abort errors to Sentry
+    const isAbortError =
+      avatarError instanceof Error &&
+      (avatarError.name === 'AbortError' ||
+        avatarError.message.includes('aborted'));
+
+    if (!isAbortError) {
+      Sentry.captureException(avatarError, {
+        tags: { context: 'onboarding_avatar_upload', profileId },
+        level: 'warning',
+      });
+    }
   }
 }

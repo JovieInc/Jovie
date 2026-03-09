@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -72,12 +73,28 @@ export const waitlistInvites = pgTable(
   })
 );
 
+// Admin-configurable waitlist gating and auto-accept settings (singleton row)
+export const waitlistSettings = pgTable('waitlist_settings', {
+  id: integer('id').primaryKey().default(1),
+  gateEnabled: boolean('gate_enabled').default(true).notNull(),
+  autoAcceptEnabled: boolean('auto_accept_enabled').default(false).notNull(),
+  autoAcceptDailyLimit: integer('auto_accept_daily_limit').default(0).notNull(),
+  autoAcceptedToday: integer('auto_accepted_today').default(0).notNull(),
+  autoAcceptResetsAt: timestamp('auto_accept_resets_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Schema validations
 export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
 export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
 
 export const insertWaitlistInviteSchema = createInsertSchema(waitlistInvites);
 export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
+export const insertWaitlistSettingsSchema =
+  createInsertSchema(waitlistSettings);
+export const selectWaitlistSettingsSchema =
+  createSelectSchema(waitlistSettings);
 
 // Types
 export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
@@ -85,3 +102,4 @@ export type NewWaitlistEntry = typeof waitlistEntries.$inferInsert;
 
 export type WaitlistInvite = typeof waitlistInvites.$inferSelect;
 export type NewWaitlistInvite = typeof waitlistInvites.$inferInsert;
+export type WaitlistSettings = typeof waitlistSettings.$inferSelect;

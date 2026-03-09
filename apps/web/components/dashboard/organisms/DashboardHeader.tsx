@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -32,11 +33,11 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
-      className={cn('z-20 border-b border-subtle', className)}
+      className={cn('z-20', showDivider && 'border-b border-subtle', className)}
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
-        <h1 className='text-[22px] font-bold tracking-[-0.02em] text-primary-token leading-tight'>
+        <h1 className='text-[22px] font-[590] tracking-[-0.022em] text-primary-token leading-tight'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
@@ -50,7 +51,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[52px] w-full items-center gap-2 px-4 sm:flex'>
+      <div className='relative hidden h-12 w-full items-center gap-2 px-5 md:px-6 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -63,11 +64,15 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex-1 items-center gap-3 flex'>
+        <div className='flex-1 items-center flex text-[13px]'>
           {!breadcrumbSuffix && (
-            <span className='text-[13px] font-medium text-secondary-token'>
-              {currentLabel}
-            </span>
+            <>
+              <span className='text-tertiary-token'>Jovie</span>
+              <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
+              <span className='font-[510] text-primary-token'>
+                {currentLabel}
+              </span>
+            </>
           )}
           {breadcrumbSuffix}
         </div>

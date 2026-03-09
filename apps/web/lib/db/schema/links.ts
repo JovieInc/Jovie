@@ -44,6 +44,10 @@ export const socialLinks = pgTable(
     evidence: jsonb('evidence')
       .$type<{ sources?: string[]; signals?: string[] }>()
       .default({}),
+    verificationToken: text('verification_token'),
+    verificationStatus: text('verification_status').default('unverified'),
+    verificationCheckedAt: timestamp('verification_checked_at'),
+    verifiedAt: timestamp('verified_at'),
     version: integer('version').default(1).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -97,19 +101,25 @@ export const socialAccounts = pgTable(
 );
 
 // Wrapped links table (URL shortener/wrapper)
-export const wrappedLinks = pgTable('wrapped_links', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  shortId: text('short_id').notNull().unique(),
-  encryptedUrl: text('encrypted_url').notNull(),
-  kind: text('kind').notNull(),
-  domain: text('domain').notNull(),
-  category: text('category'),
-  titleAlias: text('title_alias'),
-  clickCount: integer('click_count').default(0),
-  createdBy: text('created_by'),
-  expiresAt: timestamp('expires_at'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const wrappedLinks = pgTable(
+  'wrapped_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    shortId: text('short_id').notNull().unique(),
+    encryptedUrl: text('encrypted_url').notNull(),
+    kind: text('kind').notNull(),
+    domain: text('domain').notNull(),
+    category: text('category'),
+    titleAlias: text('title_alias'),
+    clickCount: integer('click_count').default(0),
+    createdBy: text('created_by'),
+    expiresAt: timestamp('expires_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    createdByIdx: index('idx_wrapped_links_created_by').on(table.createdBy),
+  })
+);
 
 // Signed link access table (for secure link access tracking)
 export const signedLinkAccess = pgTable('signed_link_access', {

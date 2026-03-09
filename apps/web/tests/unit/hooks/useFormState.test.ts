@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { calculateBackoffDelay, useFormState } from '@/lib/hooks/useFormState';
 
@@ -61,6 +61,11 @@ describe('calculateBackoffDelay', () => {
 describe('useFormState', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    // Restore real timers if any test activated fake timers
     vi.useRealTimers();
   });
 
@@ -145,7 +150,9 @@ describe('useFormState', () => {
     });
 
     expect(result.current.canRetry).toBe(true);
-    expect(result.current.error).toBe('fail');
+    expect(result.current.error).toBe(
+      'Something went wrong. Please try again.'
+    );
 
     act(() => {
       result.current.reset();
@@ -223,7 +230,9 @@ describe('useFormState', () => {
       }
     });
 
-    expect(result.current.error).toBe('network failure');
+    expect(result.current.error).toBe(
+      'Something went wrong. Please try again.'
+    );
     expect(result.current.loading).toBe(false);
     expect(result.current.canRetry).toBe(true);
   });
@@ -241,7 +250,9 @@ describe('useFormState', () => {
       }
     });
 
-    expect(result.current.error).toBe('An error occurred');
+    expect(result.current.error).toBe(
+      'Something went wrong. Please try again.'
+    );
   });
 
   // --- Automatic retries ---

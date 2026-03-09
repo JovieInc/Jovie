@@ -1,69 +1,58 @@
 'use client';
 
-/**
- * ReleaseFields Component
- *
- * Read-only fields for release title and date display
- */
-
-import { Label } from '@jovie/ui';
-import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
-import { DrawerPropertyRow } from '@/components/molecules/drawer';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
-
 import { formatReleaseDate } from './utils';
 
+const RELEASE_TYPE_LABELS: Record<string, string> = {
+  single: 'Single',
+  ep: 'EP',
+  album: 'Album',
+  compilation: 'Compilation',
+  live: 'Live',
+  mixtape: 'Mixtape',
+  other: 'Other',
+};
+
 interface ReleaseFieldsProps {
-  readonly title: string;
   readonly releaseDate: string | undefined;
-  readonly smartLinkPath: string;
+  readonly releaseType?: string;
+  readonly totalTracks?: number;
+  readonly platformCount?: number;
 }
 
 export function ReleaseFields({
-  title,
   releaseDate,
-  smartLinkPath,
+  releaseType,
+  totalTracks,
+  platformCount,
 }: ReleaseFieldsProps) {
-  const smartLinkUrl = `${getBaseUrl()}${smartLinkPath}`;
+  const parts: string[] = [];
+  if (releaseType) {
+    parts.push(RELEASE_TYPE_LABELS[releaseType] ?? releaseType);
+  }
+  if (totalTracks != null && totalTracks > 0) {
+    parts.push(`${totalTracks} ${totalTracks === 1 ? 'track' : 'tracks'}`);
+  }
+  if (platformCount != null && platformCount > 0) {
+    parts.push(
+      `${platformCount} ${platformCount === 1 ? 'platform' : 'platforms'}`
+    );
+  }
 
   return (
-    <div className='space-y-3'>
-      {/* Title field - always read-only, 2 lines max with tooltip */}
-      <DrawerPropertyRow
-        label='Title'
-        value={
-          title ? (
-            <TruncatedText
-              lines={2}
-              className='font-medium text-primary-token min-h-10'
-              tooltipSide='bottom'
-            >
-              {title}
-            </TruncatedText>
-          ) : (
-            <span className='text-secondary-token italic min-h-10'>
-              Untitled
-            </span>
-          )
-        }
-      />
-
-      {/* Release date field (read-only) */}
-      <DrawerPropertyRow
-        label='Released'
-        value={
-          <span className={releaseDate ? '' : 'text-secondary-token italic'}>
+    <div className='space-y-0.5'>
+      <p className='text-xs text-secondary-token'>
+        {releaseDate ? (
+          <>
+            <span className='text-tertiary-token'>Released</span>{' '}
             {formatReleaseDate(releaseDate)}
-          </span>
-        }
-      />
-
-      {/* Smart link field with copy functionality */}
-      <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-        <Label className='text-xs text-tertiary-token'>Smart link</Label>
-        <CopyLinkInput url={smartLinkUrl} size='sm' />
-      </div>
+          </>
+        ) : (
+          <span className='italic'>No release date</span>
+        )}
+      </p>
+      {parts.length > 0 && (
+        <p className='text-[11px] text-tertiary-token'>{parts.join(' · ')}</p>
+      )}
     </div>
   );
 }

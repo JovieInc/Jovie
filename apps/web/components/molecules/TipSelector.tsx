@@ -78,7 +78,7 @@ export function TipSelector({
 
       <Button
         onClick={handleContinue}
-        className='w-full'
+        className='mt-4 w-full flex items-center justify-center gap-2.5 text-btn-primary-foreground'
         size='lg'
         disabled={isLoading}
         variant='primary'
@@ -88,6 +88,20 @@ export function TipSelector({
             : `Continue with $${selectedAmount} tip`
         }
       >
+        {paymentLabel && (
+          <svg
+            width='20'
+            height='20'
+            viewBox='0 0 24 24'
+            fill='currentColor'
+            className='shrink-0'
+            aria-hidden='true'
+            role='img'
+          >
+            <title>Venmo</title>
+            <path d='M19.04 2C19.7 3.19 20 4.41 20 5.97c0 4.87-4.16 11.19-7.54 15.64H5.2L2 3.28l6.29-.6 1.64 9.96c1.52-2.48 3.4-6.38 3.4-9.03 0-1.46-.25-2.45-.63-3.27L19.04 2z' />
+          </svg>
+        )}
         {continueLabel}
       </Button>
     </div>

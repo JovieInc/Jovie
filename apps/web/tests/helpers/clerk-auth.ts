@@ -3,6 +3,25 @@ import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
 /**
+ * Check if the test target is a production deployment (jov.ie).
+ * Used to gate heavy test suites that should only run against testing environments.
+ */
+export function isProductionTarget(): boolean {
+  const baseUrl = process.env.BASE_URL ?? '';
+  return baseUrl.includes('jov.ie');
+}
+
+/**
+ * Check if the test is running in a testing environment.
+ * Testing environments use +clerk_test emails or have Clerk testing tokens.
+ */
+export function isTestingEnvironment(): boolean {
+  const email = process.env.E2E_CLERK_USER_USERNAME ?? '';
+  const clerkSetup = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
+  return email.includes('+clerk_test') || clerkSetup;
+}
+
+/**
  * Custom error types for better test debugging
  */
 export class ClerkTestError extends Error {
@@ -206,6 +225,14 @@ export async function signInUser(
         throw new ClerkTestError(
           'Clerk failed to initialize. This may be due to network issues loading Clerk JS from CDN.',
           'CLERK_NOT_READY'
+        );
+      }
+
+      // Handle Clerk rejecting non-test emails for email_code strategy
+      if (msg.includes('test email') || msg.includes('clerk_test')) {
+        throw new ClerkTestError(
+          `Clerk requires +clerk_test email format for email_code strategy. Current email rejected: ${msg.slice(0, 100)}`,
+          'CLERK_SETUP_FAILED'
         );
       }
 

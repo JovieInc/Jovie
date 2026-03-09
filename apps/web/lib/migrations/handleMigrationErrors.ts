@@ -39,16 +39,38 @@ function extractMigrationErrorDetails(error: unknown): {
 }
 
 function isCreatorProfilesColumnMissing(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
   return (
-    message.includes('creator_profiles.') ||
-    (message.includes('column') && message.includes('creator_profiles'))
+    normalizedMessage.includes('creator_profiles.') ||
+    (normalizedMessage.includes('column') &&
+      normalizedMessage.includes('creator_profiles'))
   );
 }
 
 function isSocialLinksColumnMissing(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+
   return (
-    message.includes('social_links.state') ||
-    (message.includes('column') && message.includes('social_links'))
+    normalizedMessage.includes('social_links.state') ||
+    (normalizedMessage.includes('column') &&
+      normalizedMessage.includes('social_links'))
+  );
+}
+
+function isUserSettingsSchemaIssue(message: string): boolean {
+  const normalizedMessage = message.toLowerCase();
+  const referencesUserSettingsTable =
+    normalizedMessage.includes('from "user_settings"') ||
+    normalizedMessage.includes('from user_settings') ||
+    normalizedMessage.includes('relation "user_settings"') ||
+    normalizedMessage.includes('relation user_settings');
+
+  return (
+    normalizedMessage.includes('relation "user_settings" does not exist') ||
+    (normalizedMessage.includes('column') &&
+      normalizedMessage.includes('user_settings')) ||
+    (normalizedMessage.includes('failed query:') && referencesUserSettingsTable)
   );
 }
 
@@ -81,7 +103,7 @@ export function handleMigrationErrors(
       break;
     }
     case 'user_settings': {
-      if (hasMigrationErrorCode) {
+      if (hasMigrationErrorCode || isUserSettingsSchemaIssue(message)) {
         logMigrationWarning(
           '[Dashboard] user_settings migration in progress',
           context

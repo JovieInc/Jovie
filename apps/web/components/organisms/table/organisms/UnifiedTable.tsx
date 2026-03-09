@@ -12,7 +12,14 @@ import {
   useReactTable,
   type VisibilityState,
 } from '@tanstack/react-table';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
@@ -77,7 +84,7 @@ export interface UnifiedTableProps<TData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 44
+   * @default 40
    */
   readonly rowHeight?: number;
 
@@ -101,6 +108,14 @@ export interface UnifiedTableProps<TData> {
    * Click handler for row
    */
   readonly onRowClick?: (row: TData) => void;
+
+  /**
+   * Called when the row is shift-clicked (for range selection).
+   * The consumer should call rangeSelect from useRowSelection.
+   * @param rowIndex - The index of the clicked row
+   * @param rowData  - The row data
+   */
+  readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
 
   /**
    * Context menu handler for row
@@ -204,6 +219,27 @@ export interface UnifiedTableProps<TData> {
   readonly onColumnVisibilityChange?: OnChangeFn<VisibilityState>;
 
   /**
+   * Whether there are more pages to load (infinite scroll)
+   */
+  readonly hasNextPage?: boolean;
+
+  /**
+   * Whether the next page is currently being fetched
+   */
+  readonly isFetchingNextPage?: boolean;
+
+  /**
+   * Callback to load more data when scrolling near the bottom
+   */
+  readonly onLoadMore?: () => void;
+
+  /**
+   * Hide the column header row
+   * @default false
+   */
+  readonly hideHeader?: boolean;
+
+  /**
    * Set of expanded row IDs for expandable rows.
    * When provided with renderExpandedContent, enables row expansion.
    */
@@ -274,11 +310,12 @@ export function UnifiedTable<TData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 44,
+  rowHeight = 40,
   overscan = 5,
   renderRow,
   getRowId,
   onRowClick,
+  onRowShiftClick,
   onRowContextMenu,
   getContextMenuItems,
   getRowClassName,
@@ -297,12 +334,25 @@ export function UnifiedTable<TData>({
   enablePinning = false,
   columnVisibility,
   onColumnVisibilityChange,
+  hasNextPage,
+  isFetchingNextPage,
+  onLoadMore,
+  hideHeader = false,
   expandedRowIds,
   renderExpandedContent,
   getExpandableRowId,
 }: UnifiedTableProps<TData>) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+  const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
+  const setTableContainerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (tableContainerRef.current === node) return;
+      tableContainerRef.current = node;
+      setScrollRoot(node);
+    },
+    [setScrollRoot]
+  );
 
   // Internal focused row state (uncontrolled mode)
   const [internalFocusedIndex, setInternalFocusedIndex] = useState<number>(-1);
@@ -392,6 +442,7 @@ export function UnifiedTable<TData>({
       getGroupKey: groupingConfig?.getGroupKey ?? noopGetGroupKey,
       getGroupLabel: groupingConfig?.getGroupLabel ?? identityGetGroupLabel,
       enabled: groupingEnabled,
+      scrollRoot,
     });
 
   // Initialize virtualization
@@ -419,6 +470,25 @@ export function UnifiedTable<TData>({
     onRowClick,
   });
 
+  // Infinite scroll sentinel — fires onLoadMore when visible
+  const sentinelRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const scrollContainer = tableContainerRef.current;
+    if (!sentinel || !scrollContainer || !onLoadMore || !hasNextPage) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          onLoadMore();
+        }
+      },
+      { root: scrollContainer, rootMargin: '200px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [onLoadMore, hasNextPage, isFetchingNextPage]);
+
   // Calculate column count for skeleton
   const columnCount = useMemo(() => columns.length, [columns]);
 
@@ -432,12 +502,14 @@ export function UnifiedTable<TData>({
   if (isLoading) {
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Loading table data</caption>
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          {!hideHeader && (
+            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          )}
           <LoadingTableBody
             rows={skeletonRows}
             columns={columnCount}
@@ -452,12 +524,14 @@ export function UnifiedTable<TData>({
   if (rows.length === 0 && emptyState) {
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Empty table</caption>
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          {!hideHeader && (
+            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          )}
           <tbody>
             <tr>
               <td colSpan={columnCount} className='p-0'>
@@ -481,12 +555,14 @@ export function UnifiedTable<TData>({
 
     return (
       <div
-        ref={tableContainerRef}
+        ref={setTableContainerRef}
         className={cn('overflow-auto', containerClassName)}
       >
         <table className={tableClassName} style={{ minWidth }}>
           <caption className='sr-only'>Grouped table data</caption>
-          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          {!hideHeader && (
+            <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+          )}
           <GroupedTableBody
             groupedData={groupedData}
             observeGroupHeader={observeGroupHeader}
@@ -513,6 +589,7 @@ export function UnifiedTable<TData>({
                   onKeyDown={handleKeyDown}
                   onFocusChange={setFocusedIndex}
                   getRowClassName={getRowClassName}
+                  onRowShiftClick={onRowShiftClick}
                 />
               );
 
@@ -558,12 +635,14 @@ export function UnifiedTable<TData>({
   // Render table with data
   return (
     <div
-      ref={tableContainerRef}
+      ref={setTableContainerRef}
       className={cn('overflow-auto', containerClassName)}
     >
       <table className={tableClassName} style={{ minWidth }}>
         <caption className='sr-only'>Data table</caption>
-        <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+        {!hideHeader && (
+          <UnifiedTableHeader headerGroups={table.getHeaderGroups()} />
+        )}
         <VirtualizedTableBody
           rows={rows}
           shouldVirtualize={shouldVirtualize}
@@ -580,6 +659,7 @@ export function UnifiedTable<TData>({
           onRowContextMenu={onRowContextMenu}
           onKeyDown={handleKeyDown}
           getContextMenuItems={getContextMenuItems}
+          onRowShiftClick={onRowShiftClick}
           getRowClassName={getRowClassName}
           renderRow={renderRow}
           getRowId={getRowId}
@@ -588,6 +668,31 @@ export function UnifiedTable<TData>({
           getExpandableRowId={getExpandableRowId}
           columnCount={columnCount}
         />
+        {/* Infinite scroll sentinel + loading indicator */}
+        {onLoadMore && (
+          <tbody>
+            <tr ref={sentinelRef}>
+              <td style={{ height: 1, padding: 0, border: 'none' }} />
+            </tr>
+            {isFetchingNextPage && (
+              <tr>
+                <td
+                  colSpan={columnCount}
+                  className='py-3 text-center text-[11px] text-tertiary-token'
+                >
+                  <span className='inline-flex items-center gap-1.5'>
+                    <LoadingSpinner
+                      size='sm'
+                      tone='muted'
+                      label='Loading more'
+                    />
+                    {' Loading more...'}
+                  </span>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        )}
       </table>
     </div>
   );

@@ -1,22 +1,28 @@
 'use client';
 
+import { BarChart3, User } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
-  parseAsInteger,
   parseAsString,
   parseAsStringLiteral,
   useQueryState,
   useQueryStates,
 } from 'nuqs';
 import * as React from 'react';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
+import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import { AudienceFunnelMetrics } from './AudienceFunnelMetrics';
-import { AudienceHeaderBadge } from './dashboard-audience-table/AudienceHeaderBadge';
+import {
+  type AudiencePanelMode,
+  AudiencePanelProvider,
+  useAudiencePanel,
+} from './AudiencePanelContext';
 import type {
   AudienceFilters,
   AudienceView,
@@ -58,15 +64,20 @@ export interface DashboardAudienceClientProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
   readonly initialRows: AudienceMember[];
-  readonly total: number;
+  /** Null when the per-page COUNT query was skipped for performance (JOV-1262, JOV-1264). */
+  readonly total: number | null;
   readonly page: number;
   readonly pageSize: number;
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
   readonly profileUrl?: string;
   readonly profileId?: string;
-  readonly subscriberCount: number;
+  /** Null when the subscriber COUNT query was skipped for performance (JOV-1262). */
+  readonly subscriberCount: number | null;
+  /** Null when the audience COUNT query was skipped for performance (JOV-1262). */
+  readonly totalAudienceCount: number | null;
   readonly filters: AudienceFilters;
+  readonly tourDates?: TourDateForMatching[];
 }
 
 /**
@@ -74,26 +85,104 @@ export interface DashboardAudienceClientProps {
  * Reuses audienceSortFields from the centralized lib/nuqs module to avoid drift.
  */
 const audienceUrlParsers = {
-  page: parseAsInteger.withDefault(1),
-  pageSize: parseAsInteger.withDefault(20),
   sort: parseAsStringLiteral(audienceSortFields).withDefault('lastSeen'),
   direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
 };
+
+/** Header action buttons for toggling right panel between contact and analytics */
+function AudienceHeaderActions({
+  mode,
+  onToggle,
+}: {
+  readonly mode: AudiencePanelMode | null;
+  readonly onToggle: (panel: AudiencePanelMode) => void;
+}) {
+  return (
+    <div className='flex items-center gap-1'>
+      <DashboardHeaderActionButton
+        ariaLabel={
+          mode === 'contact' ? 'Close contact sidebar' : 'Open contact sidebar'
+        }
+        pressed={mode === 'contact'}
+        onClick={() => onToggle('contact')}
+        icon={<User className='h-4 w-4' />}
+      />
+      <DashboardHeaderActionButton
+        ariaLabel={
+          mode === 'analytics'
+            ? 'Close analytics sidebar'
+            : 'Open analytics sidebar'
+        }
+        pressed={mode === 'analytics'}
+        onClick={() => onToggle('analytics')}
+        icon={<BarChart3 className='h-4 w-4' />}
+      />
+    </div>
+  );
+}
 
 export function DashboardAudienceClient({
   mode,
   view,
   initialRows,
   total,
-  page,
-  pageSize,
   sort,
   direction,
   profileUrl,
   profileId,
   subscriberCount,
+  totalAudienceCount,
   filters: initialFilters,
+  tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
+  return (
+    <AudiencePanelProvider>
+      <DashboardAudienceClientInner
+        mode={mode}
+        view={view}
+        initialRows={initialRows}
+        total={total}
+        sort={sort}
+        direction={direction}
+        profileUrl={profileUrl}
+        profileId={profileId}
+        subscriberCount={subscriberCount}
+        totalAudienceCount={totalAudienceCount}
+        filters={initialFilters}
+        tourDates={tourDates}
+      />
+    </AudiencePanelProvider>
+  );
+}
+
+function DashboardAudienceClientInner({
+  mode,
+  view,
+  initialRows,
+  total,
+  sort,
+  direction,
+  profileUrl,
+  profileId,
+  subscriberCount,
+  totalAudienceCount,
+  filters: initialFilters,
+  tourDates,
+}: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
+  // Register header actions with both panel toggle buttons
+  const { setHeaderActions } = useSetHeaderActions();
+  const { mode: panelMode, toggle: togglePanel } = useAudiencePanel();
+
+  const headerActions = React.useMemo(
+    () => <AudienceHeaderActions mode={panelMode} onToggle={togglePanel} />,
+    [panelMode, togglePanel]
+  );
+
+  React.useEffect(() => {
+    setHeaderActions(headerActions);
+    return () => setHeaderActions(null);
+  }, [setHeaderActions, headerActions]);
+
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,
@@ -116,21 +205,24 @@ export function DashboardAudienceClient({
     })
   );
 
-  const handlePageChange = React.useCallback(
-    (nextPage: number) => {
-      const clampedPage = Math.max(1, Math.min(9999, Math.floor(nextPage)));
-      setUrlParams({ page: clampedPage });
-    },
-    [setUrlParams]
+  // Infinite query for audience data
+  const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    useAudienceInfiniteQuery({
+      profileId: profileId ?? '',
+      mode,
+      sort,
+      direction,
+      filters: initialFilters,
+      initialData: { rows: initialRows, total },
+    });
+
+  // Flatten pages into a single rows array
+  const rows = React.useMemo(
+    () => data?.pages.flatMap(p => p.rows) ?? initialRows,
+    [data?.pages, initialRows]
   );
 
-  const handlePageSizeChange = React.useCallback(
-    (nextPageSize: number) => {
-      const clampedSize = Math.max(1, Math.min(100, Math.floor(nextPageSize)));
-      setUrlParams({ pageSize: clampedSize, page: 1 });
-    },
-    [setUrlParams]
-  );
+  const totalCount = data?.pages[0]?.total ?? total;
 
   const handleSortChange = React.useCallback(
     (nextSort: string) => {
@@ -141,7 +233,6 @@ export function DashboardAudienceClient({
       setUrlParams({
         sort: nextSort as (typeof audienceUrlParsers.sort)['defaultValue'],
         direction: nextDirection,
-        page: 1,
       });
     },
     [sort, direction, setUrlParams]
@@ -149,10 +240,9 @@ export function DashboardAudienceClient({
 
   const handleViewChange = React.useCallback(
     (nextView: AudienceView) => {
-      // Reset to page 1, clear filters, and default sort when changing views
       setView(nextView);
       setSegments([]);
-      setUrlParams({ page: 1, sort: 'lastSeen', direction: 'desc' });
+      setUrlParams({ sort: 'lastSeen', direction: 'desc' });
     },
     [setView, setSegments, setUrlParams]
   );
@@ -160,24 +250,15 @@ export function DashboardAudienceClient({
   const handleFiltersChange = React.useCallback(
     (nextFilters: AudienceFilters) => {
       setSegments(nextFilters.segments);
-      setUrlParams({ page: 1 });
     },
-    [setSegments, setUrlParams]
+    [setSegments]
   );
 
-  // Push audience segment control into the breadcrumb header bar
-  const { setHeaderBadge } = useSetHeaderActions();
-
-  const headerBadge = React.useMemo(
-    () => <AudienceHeaderBadge view={view} onViewChange={handleViewChange} />,
-    [view, handleViewChange]
-  );
-
-  React.useEffect(() => {
-    setHeaderBadge(headerBadge);
-    return () => setHeaderBadge(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge is a stable context setter
-  }, [headerBadge]);
+  const handleLoadMore = React.useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <QueryErrorBoundary fallback={DashboardErrorFallback}>
@@ -185,28 +266,26 @@ export function DashboardAudienceClient({
         data-testid='dashboard-audience-client'
         className='flex h-full min-h-0 flex-col'
       >
-        <div className='shrink-0 px-4 pt-4 sm:px-6 sm:pt-5'>
-          <AudienceFunnelMetrics />
-        </div>
         <div className='flex-1 min-h-0 flex flex-col'>
           <DashboardAudienceTable
             mode={mode}
             view={view}
-            rows={initialRows}
-            total={total}
-            page={page}
-            pageSize={pageSize}
+            rows={rows}
+            total={totalCount}
             sort={sort}
             direction={direction}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
             onSortChange={handleSortChange}
             onViewChange={handleViewChange}
             onFiltersChange={handleFiltersChange}
             profileUrl={profileUrl}
             profileId={profileId}
             subscriberCount={subscriberCount}
+            totalAudienceCount={totalAudienceCount}
             filters={initialFilters}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+            onLoadMore={handleLoadMore}
+            tourDates={tourDates}
           />
         </div>
       </div>

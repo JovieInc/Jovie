@@ -44,20 +44,22 @@ export function AnalyticsCard({
               className={cn('h-4 w-4', iconClassName ?? 'text-accent-token')}
             />
           </div>
-          <dt className='text-xs font-medium text-secondary-token'>{title}</dt>
+          <dt className='text-[13px] font-[510] text-secondary-token'>
+            {title}
+          </dt>
           {headerRight ? (
             <div className='shrink-0 ml-auto'>{headerRight}</div>
           ) : null}
         </div>
 
-        <dd className='mt-2 text-3xl font-semibold tracking-tight text-primary-token tabular-nums leading-none'>
+        <dd className='mt-2 text-3xl font-[590] tracking-[-0.022em] text-primary-token tabular-nums leading-none'>
           {value}
         </dd>
 
         <div className='mt-2'>
           {children ??
             (metadata ? (
-              <dd className='text-xs text-tertiary-token'>{metadata}</dd>
+              <dd className='text-[13px] text-tertiary-token'>{metadata}</dd>
             ) : null)}
         </div>
       </dl>

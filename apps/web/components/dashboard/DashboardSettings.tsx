@@ -2,6 +2,7 @@
 
 import { memo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -22,15 +23,20 @@ export const DashboardSettings = memo(function DashboardSettings({
   // Feature flag check removed - settings always enabled
 
   if (!artist) {
-    return null; // This shouldn't happen given the server-side logic
+    return (
+      <div className='mx-auto max-w-3xl pt-2'>
+        <SettingsErrorState message='Unable to load your profile settings. Please refresh the page.' />
+      </div>
+    );
   }
 
   return (
-    <div className='mx-auto max-w-3xl'>
+    <div className='mx-auto max-w-3xl pt-2'>
       <SettingsPolished
         artist={artist}
         onArtistUpdate={setArtist}
         focusSection={focusSection}
+        isAdmin={dashboardData.isAdmin}
       />
     </div>
   );

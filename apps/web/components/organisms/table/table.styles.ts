@@ -5,30 +5,31 @@
 
 // Typography Scale - Visual Hierarchy
 export const typography = {
-  tableHeader: 'text-xs font-medium text-tertiary-token line-clamp-1',
-  cellPrimary: 'text-[13px] font-medium text-primary-token', // Main content
+  tableHeader:
+    'text-[11px] font-[510] text-tertiary-token uppercase tracking-[0.08em] line-clamp-1',
+  cellPrimary: 'text-[13px] font-[510] text-primary-token', // Main content
   cellSecondary: 'text-[13px] text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
-  rowNumber: 'text-xs tabular-nums text-tertiary-token', // Monospace numbers
-  groupHeader: 'text-sm font-semibold text-primary-token', // Group headers
+  rowNumber: 'text-[13px] tabular-nums text-tertiary-token', // Monospace numbers
+  groupHeader: 'text-[13px] font-[590] text-primary-token', // Group headers
 } as const;
 
 // Alignment & Spacing - Perfect Vertical Alignment
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: '44px', // Fixed height for consistent alignment (compact standard)
-  cellPadding: 'px-4 py-3', // Consistent padding for cells
+  rowHeight: '40px', // Fixed height for consistent alignment (Linear compact standard)
+  cellPadding: 'px-4 py-2.5', // Consistent padding for cells
   headerPadding: 'px-4 py-2', // Compact padding for headers
-  checkboxSize: 'h-4 w-4', // 16px checkbox
+  checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
-// Row Selection Colors
+// Row Selection Colors — aligned with Linear design tokens
 export const selection = {
-  unchecked: 'hover:bg-surface-2/50 transition-colors',
-  checked: 'bg-surface-2/70 hover:bg-surface-2',
-  selected: 'bg-primary/5 dark:bg-primary/10 border-l-2 border-primary',
-  hover: 'hover:bg-surface-2/50',
+  unchecked: 'hover:bg-white/[0.02] transition-colors duration-150',
+  checked: 'bg-white/[0.04] hover:bg-white/[0.06]',
+  selected: 'bg-white/[0.04]',
+  hover: 'hover:bg-white/[0.02]',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
@@ -45,11 +46,11 @@ export const zIndex = {
   rows: 'z-10',
 } as const;
 
-// Transition Timings (ease-out only)
+// Transition Timings — Linear uses 160ms cubic-bezier for bg
 export const transitions = {
-  fast: 'transition-all duration-100 ease-out',
-  standard: 'transition-all duration-200 ease-out',
-  slow: 'transition-all duration-300 ease-out',
+  fast: 'transition-colors duration-100 ease-out',
+  standard: 'transition-colors duration-150 ease-out',
+  slow: 'transition-colors duration-300 ease-out',
 } as const;
 
 // Column Widths (Standard)
@@ -65,20 +66,20 @@ export const columnWidths = {
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
 export const layoutStability = {
-  rowHeight: '44px',
+  rowHeight: '40px',
   headerHeight: '36px', // Compact header with py-2 padding
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
-  skeletonRowHeight: '44px', // Must match rowHeight
+  skeletonRowHeight: '40px', // Must match rowHeight
 } as const;
 
 // Border Styles
 export const borders = {
-  cell: 'border-b border-subtle',
+  cell: 'border-b border-subtle/50',
   header: 'border-b border-subtle',
-  groupHeader: 'border-b-2 border-subtle',
-  subtle: 'border-subtle',
+  groupHeader: 'border-b-2 border-subtle/60',
+  subtle: 'border-subtle/50',
 } as const;
 
 // Loading Skeleton Styles

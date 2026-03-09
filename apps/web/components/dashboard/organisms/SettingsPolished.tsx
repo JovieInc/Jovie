@@ -3,21 +3,23 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
+import { SettingsAdminSection } from '@/components/dashboard/organisms/SettingsAdminSection';
 import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
 import { SettingsAnalyticsSection } from '@/components/dashboard/organisms/SettingsAnalyticsSection';
 import { SettingsAudienceSection } from '@/components/dashboard/organisms/SettingsAudienceSection';
 import { SettingsBillingSection } from '@/components/dashboard/organisms/SettingsBillingSection';
 import { SettingsBrandingSection } from '@/components/dashboard/organisms/SettingsBrandingSection';
 import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
+import { SettingsPaymentsSection } from '@/components/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/components/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
-import { ConnectedDspList } from '@/components/dashboard/organisms/settings-artist-profile-section/ConnectedDspList';
-import { SocialsForm } from '@/components/dashboard/organisms/socials-form/SocialsForm';
-
 import { publicEnv } from '@/lib/env-public';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useBillingStatusQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
@@ -25,29 +27,35 @@ interface SettingsPolishedProps {
   readonly artist: Artist;
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
   readonly focusSection?: string;
+  readonly isAdmin?: boolean;
 }
 
 export function SettingsPolished({
   artist,
   onArtistUpdate,
   focusSection,
+  isAdmin = false,
 }: SettingsPolishedProps) {
   const router = useRouter();
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
+  const isGrowth = billingData?.plan === 'growth';
+  const isStripeConnectEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
+  );
 
   const renderAccountSection = useCallback(
     () => (
       <div className='space-y-0'>
         {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-          <AccountSettingsSection />
+          <AccountSettingsSection isGrowth={isGrowth} />
         ) : (
           <DashboardCard variant='settings'>
             <div className='text-center py-4'>
-              <h3 className='text-[14px] font-medium text-primary-token mb-3'>
+              <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
                 Account settings unavailable
               </h3>
-              <p className='text-sm text-secondary'>
+              <p className='text-[13px] text-secondary'>
                 Clerk is not configured (missing publishable key). Set
                 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
               </p>
@@ -56,7 +64,7 @@ export function SettingsPolished({
         )}
       </div>
     ),
-    []
+    [isGrowth]
   );
 
   // -- General (user-level) settings --
@@ -75,6 +83,16 @@ export function SettingsPolished({
         description: 'Subscription, payment methods, and invoices.',
         render: () => <SettingsBillingSection />,
       },
+      ...(isStripeConnectEnabled
+        ? [
+            {
+              id: 'payments',
+              title: 'Payments',
+              description: 'Connect Stripe to receive payments from fans.',
+              render: () => <SettingsPaymentsSection />,
+            },
+          ]
+        : []),
       {
         id: 'data-privacy',
         title: 'Data & Privacy',
@@ -82,7 +100,7 @@ export function SettingsPolished({
         render: () => <DataPrivacySection />,
       },
     ],
-    [renderAccountSection]
+    [renderAccountSection, isStripeConnectEnabled]
   );
 
   // -- Artist-level settings --
@@ -91,30 +109,20 @@ export function SettingsPolished({
       {
         id: 'artist-profile',
         title: 'Artist Profile',
-        description: 'Photo, display name, and username.',
+        description: 'Photo, display name, username, and branding.',
         render: () => (
-          <SettingsArtistProfileSection
-            artist={artist}
-            onArtistUpdate={onArtistUpdate}
-            onRefresh={() => router.refresh()}
-          />
-        ),
-      },
-      {
-        id: 'social-links',
-        title: 'Social Links',
-        description: 'Connect your social media profiles.',
-        render: () => <SocialsForm artist={artist} />,
-      },
-      {
-        id: 'music-links',
-        title: 'Music Links',
-        description: 'Streaming platforms and music profile links.',
-        render: () => (
-          <ConnectedDspList
-            profileId={artist.id}
-            spotifyId={artist.spotify_id}
-          />
+          <div className='space-y-6'>
+            <SettingsArtistProfileSection
+              artist={artist}
+              onArtistUpdate={onArtistUpdate}
+              onRefresh={() => router.refresh()}
+            />
+            <SettingsBrandingSection
+              artist={artist}
+              onArtistUpdate={onArtistUpdate}
+              isPro={isPro}
+            />
+          </div>
         ),
       },
       {
@@ -131,24 +139,6 @@ export function SettingsPolished({
         render: () => <SettingsTouringSection profileId={artist.id} />,
       },
       {
-        id: 'branding',
-        title: 'Branding',
-        description: 'Custom branding for your profile page.',
-        render: () => (
-          <SettingsBrandingSection
-            artist={artist}
-            onArtistUpdate={onArtistUpdate}
-            isPro={isPro}
-          />
-        ),
-      },
-      {
-        id: 'ad-pixels',
-        title: 'Ad Pixels',
-        description: 'Facebook, Google, and TikTok conversion tracking.',
-        render: () => <SettingsAdPixelsSection isPro={isPro} />,
-      },
-      {
         id: 'analytics',
         title: 'Analytics',
         description: 'Control how your visits appear in analytics.',
@@ -161,24 +151,53 @@ export function SettingsPolished({
         ),
       },
       {
-        id: 'audience',
-        title: 'Audience',
-        description: 'Fan verification and opt-in preferences.',
-        render: () => <SettingsAudienceSection />,
+        id: 'audience-tracking',
+        title: 'Audience & Tracking',
+        description:
+          'Fan verification, opt-in preferences, and conversion pixel tracking.',
+        render: () => (
+          <div className='space-y-6'>
+            <SettingsAudienceSection />
+            <SettingsAdPixelsSection isPro={isPro} />
+          </div>
+        ),
       },
     ],
     [artist, isPro, onArtistUpdate, router]
   );
 
-  const allSections = [...userSections, ...artistSections];
+  // -- Admin-only settings (only visible to admin users) --
+  const adminSections = useMemo(
+    () =>
+      isAdmin
+        ? [
+            {
+              id: 'admin',
+              title: 'Admin',
+              description:
+                'Platform administration: waitlist, campaigns, and system settings.',
+              render: () => <SettingsAdminSection />,
+            },
+          ]
+        : [],
+    [isAdmin]
+  );
+
+  const allSections = [...userSections, ...artistSections, ...adminSections];
 
   // When focusing a single section, show just that section
   if (focusSection) {
     const section = allSections.find(s => s.id === focusSection);
-    if (!section) return null;
+    if (!section) {
+      return (
+        <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
+          <SettingsErrorState message='This settings section could not be found.' />
+        </div>
+      );
+    }
 
     return (
-      <div className='space-y-6 pb-6 sm:pb-8' data-testid='settings-polished'>
+      <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
         <SettingsSection
           id={section.id}
           title={section.title}
@@ -195,9 +214,7 @@ export function SettingsPolished({
     <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
       {/* General settings */}
       <div className='space-y-6'>
-        <h3 className='text-[13px] font-medium text-secondary-token'>
-          General
-        </h3>
+        <h3 className='text-[13px] font-[510] text-secondary-token'>General</h3>
         {userSections.map(section => (
           <SettingsSection
             key={section.id}
@@ -213,7 +230,7 @@ export function SettingsPolished({
 
       {/* Artist settings */}
       <div className='space-y-6'>
-        <h3 className='text-[13px] font-medium text-secondary-token'>Artist</h3>
+        <h3 className='text-[13px] font-[510] text-secondary-token'>Artist</h3>
         {artistSections.map(section => (
           <SettingsSection
             key={section.id}
@@ -226,6 +243,24 @@ export function SettingsPolished({
           </SettingsSection>
         ))}
       </div>
+
+      {/* Admin settings - only visible to admin users */}
+      {adminSections.length > 0 && (
+        <div className='space-y-6'>
+          <h3 className='text-[13px] font-[510] text-secondary-token'>Admin</h3>
+          {adminSections.map(section => (
+            <SettingsSection
+              key={section.id}
+              id={section.id}
+              title={section.title}
+              description={section.description}
+              className='mt-6 first:mt-0'
+            >
+              {section.render()}
+            </SettingsSection>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -10,14 +10,14 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-// Mock Sentry
-vi.mock('@sentry/nextjs', () => ({
+// Mock Sentry lite wrapper
+vi.mock('@/lib/sentry/client-lite', () => ({
   addBreadcrumb: vi.fn(),
 }));
 
-import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
 import { UserJourneyTracker } from '@/lib/monitoring/user-journey';
+import { addBreadcrumb } from '@/lib/sentry/client-lite';
 
 describe('UserJourneyTracker', () => {
   beforeEach(() => {
@@ -26,6 +26,7 @@ describe('UserJourneyTracker', () => {
   });
 
   afterEach(() => {
+    vi.runOnlyPendingTimers();
     vi.useRealTimers();
   });
 
@@ -164,7 +165,7 @@ describe('UserJourneyTracker', () => {
       tracker.nextStep(); // step1
       tracker.nextStep(); // no more steps
 
-      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      expect(addBreadcrumb).toHaveBeenCalledWith({
         category: 'user-journey',
         message: 'Journey checkout has no more steps defined',
         level: 'warning',
@@ -229,7 +230,7 @@ describe('UserJourneyTracker', () => {
       tracker.start();
       tracker.goToStep('nonexistent');
 
-      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      expect(addBreadcrumb).toHaveBeenCalledWith({
         category: 'user-journey',
         message: 'Step nonexistent not found in journey checkout',
         level: 'warning',

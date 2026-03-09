@@ -41,7 +41,9 @@ function isValidRedirectUrl(url: string): boolean {
     if (!['http:', 'https:'].includes(parsed.protocol)) {
       return false;
     }
-    // Disallow javascript: URLs that might be URL-encoded
+    // Security: explicitly reject javascript: protocol to prevent XSS via redirect.
+    // This check is intentional and required even after the protocol allowlist above,
+    // because URL-encoded or mixed-case variants could bypass protocol parsing.
     if (url.toLowerCase().includes('javascript:')) {
       return false;
     }

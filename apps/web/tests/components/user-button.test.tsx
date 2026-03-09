@@ -182,7 +182,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     // Wait for dropdown menu to render
-    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -238,7 +238,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -286,7 +286,7 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByText('Adele Adkins'));
-    const upgradeButton = await screen.findByText('Upgrade to Pro');
+    const upgradeButton = await screen.findByText('Get Verified — $9/mo');
     await user.click(upgradeButton);
 
     await flushMicrotasks();
@@ -342,5 +342,24 @@ describe('UserButton billing actions', () => {
       'billing_manage_billing_redirected',
       expect.any(Object)
     );
+  });
+
+  it('renders a custom trigger while user data is still loading', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    mockUseUser.mockReturnValue({
+      isLoaded: false,
+      isSignedIn: false,
+      user: null,
+    } as any);
+
+    render(<UserButton trigger={<div>Jovie Menu</div>} />);
+
+    expect(screen.getByText('Jovie Menu')).toBeInTheDocument();
+    expect(document.querySelector('.animate-pulse')).toBeNull();
   });
 });

@@ -146,7 +146,7 @@ function AddProviderUrlPopover({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
         >
           <Icon
             name='Plus'
@@ -176,7 +176,7 @@ function AddProviderUrlPopover({
               style={{ backgroundColor: accent }}
               aria-hidden='true'
             />
-            <span className='text-xs font-medium text-primary-token'>
+            <span className='text-[13px] font-[510] text-primary-token'>
               Add {providerLabel} link
             </span>
           </div>
@@ -193,10 +193,12 @@ function AddProviderUrlPopover({
               }}
               disabled={isSaving}
               autoComplete='off'
-              className='text-xs'
+              className='text-[13px]'
             />
             {validationError && (
-              <p className='text-xs text-(--color-error)'>{validationError}</p>
+              <p className='text-[13px] text-(--color-error)'>
+                {validationError}
+              </p>
             )}
           </div>
           <div className='flex justify-end gap-2'>
@@ -208,7 +210,7 @@ function AddProviderUrlPopover({
                 setUrl('');
                 setOpen(false);
               }}
-              className='text-xs'
+              className='text-[13px]'
             >
               Cancel
             </Button>
@@ -217,7 +219,7 @@ function AddProviderUrlPopover({
               variant='primary'
               size='sm'
               disabled={!url.trim() || isSaving}
-              className='text-xs'
+              className='text-[13px]'
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -344,14 +346,18 @@ export const ProviderCell = memo(function ProviderCell({
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
-      await onCopy(path, label, testId);
-      setCopiedTestId(testId);
+      try {
+        await onCopy(path, label, testId);
+        setCopiedTestId(testId);
 
-      // Clear existing timeout before setting a new one
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
+        // Clear existing timeout before setting a new one
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
+      } catch (error) {
+        console.error('Failed to copy link:', error);
       }
-      copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
     },
     [onCopy]
   );
@@ -414,7 +420,7 @@ export const ProviderCell = memo(function ProviderCell({
     }
 
     return (
-      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-xs text-tertiary-token/50'>
+      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-tertiary-token/50'>
         —
       </span>
     );

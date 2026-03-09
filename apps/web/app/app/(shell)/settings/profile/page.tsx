@@ -10,11 +10,11 @@ export default async function SettingsProfilePage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/profile');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/profile`);
   }
 
   const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect('/onboarding');
   }
 

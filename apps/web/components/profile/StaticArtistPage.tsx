@@ -1,14 +1,17 @@
 import { Suspense } from 'react';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { AboutSection } from '@/components/profile/AboutSection';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import {
   ArtistNotificationsCTA,
   TwoStepNotificationsCTA,
 } from '@/components/profile/artist-notifications-cta';
+import { ContactSection } from '@/components/profile/ContactSection';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
+import { TourModePanel } from '@/components/profile/TourModePanel';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
@@ -23,7 +26,7 @@ const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
   [
     { keywords: ['spotify'], dspKey: 'spotify' },
     { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtube'], dspKey: 'youtube' },
+    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
     { keywords: ['soundcloud'], dspKey: 'soundcloud' },
     { keywords: ['bandcamp'], dspKey: 'bandcamp' },
     { keywords: ['tidal'], dspKey: 'tidal' },
@@ -78,7 +81,10 @@ interface StaticArtistPageProps {
   readonly contacts: PublicContact[];
   readonly subtitle: string;
   readonly showTipButton: boolean;
+  readonly isTipModeActive?: boolean;
   readonly showBackButton: boolean;
+  readonly showTourButton?: boolean;
+  readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly autoOpenCapture?: boolean;
   readonly primaryAction?: PrimaryAction;
@@ -92,6 +98,7 @@ interface StaticArtistPageProps {
   readonly subscribeTwoStep?: boolean;
   /** Artist genres for the about section */
   readonly genres?: string[] | null;
+  readonly tourDates?: TourDateViewModel[];
 }
 
 /**
@@ -144,22 +151,26 @@ interface RenderContentOptions {
   readonly mode: string;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  readonly contacts: PublicContact[];
   readonly mergedDSPs: AvailableDSP[];
   readonly primaryAction: PrimaryAction;
   readonly enableDynamicEngagement: boolean;
   readonly subscribeTwoStep: boolean;
   readonly genres?: string[] | null;
+  readonly tourDates: TourDateViewModel[];
 }
 
 function renderContent({
   mode,
   artist,
   socialLinks,
+  contacts,
   mergedDSPs,
   primaryAction,
   enableDynamicEngagement,
   subscribeTwoStep,
   genres,
+  tourDates,
 }: RenderContentOptions) {
   switch (mode) {
     case 'listen':
@@ -207,7 +218,7 @@ function renderContent({
     case 'subscribe':
       // Subscribe mode - show notification subscription form directly
       return (
-        <div className='space-y-4 py-4 sm:py-5'>
+        <div className='space-y-3 py-2 sm:py-3'>
           {subscribeTwoStep ? (
             <TwoStepNotificationsCTA artist={artist} />
           ) : (
@@ -216,8 +227,20 @@ function renderContent({
         </div>
       );
 
+    case 'contact':
+      return (
+        <ContactSection
+          contacts={contacts}
+          artistName={artist.name}
+          artistHandle={artist.handle}
+        />
+      );
+
     case 'about':
       return <AboutSection artist={artist} genres={genres} />;
+
+    case 'tour':
+      return <TourModePanel artist={artist} tourDates={tourDates} />;
 
     default: // 'profile' mode
       // spotifyPreferred is now read client-side in ProfilePrimaryCTA
@@ -238,7 +261,10 @@ export function StaticArtistPage({
   contacts,
   subtitle,
   showTipButton,
+  isTipModeActive = false,
   showBackButton,
+  showTourButton = false,
+  isTourModeActive = false,
   showFooter = true,
   autoOpenCapture,
   primaryAction = 'subscribe',
@@ -248,6 +274,7 @@ export function StaticArtistPage({
   allowPhotoDownloads = false,
   subscribeTwoStep = false,
   genres,
+  tourDates = [],
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
@@ -259,9 +286,12 @@ export function StaticArtistPage({
         socialLinks={socialLinks}
         contacts={contacts}
         subtitle={subtitle}
-        showSocialBar={mode !== 'listen'}
+        mode={mode}
         showTipButton={showTipButton}
+        isTipModeActive={isTipModeActive}
         showBackButton={showBackButton}
+        showTourButton={showTourButton}
+        isTourModeActive={isTourModeActive}
         showFooter={showFooter}
         showNotificationButton={true}
         photoDownloadSizes={photoDownloadSizes}
@@ -272,7 +302,7 @@ export function StaticArtistPage({
             <SubscriptionConfirmedBanner />
           </Suspense>
           {mode === 'profile' ? (
-            <div className='space-y-4'>
+            <div className='space-y-3'>
               {latestRelease && (
                 <LatestReleaseCard
                   release={latestRelease}
@@ -299,11 +329,13 @@ export function StaticArtistPage({
               mode,
               artist,
               socialLinks,
+              contacts,
               mergedDSPs,
               primaryAction,
               enableDynamicEngagement,
               subscribeTwoStep,
               genres,
+              tourDates,
             })
           )}
         </div>

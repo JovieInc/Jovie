@@ -12,7 +12,7 @@ const EMPTY_STATE_MESSAGES: Record<
   { title: string; description: string; icon: string }
 > = {
   all: {
-    title: 'No DSP matches found',
+    title: 'No platform matches found',
     description:
       "We haven't found any streaming platform matches for your profile yet. Check back soon!",
     icon: 'Music',
@@ -50,13 +50,13 @@ export function DspMatchEmptyState({ status }: DspMatchEmptyStateProps) {
 
   return (
     <div className='flex flex-col items-center justify-center gap-4 py-12 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-secondary-token'>
+      <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-surface-2 text-secondary-token'>
         <Icon name={icon} className='h-6 w-6' />
       </div>
 
       <div className='space-y-1'>
-        <h3 className='text-sm font-medium text-secondary-token'>{title}</h3>
-        <p className='text-sm text-secondary-token'>{description}</p>
+        <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
+        <p className='text-[13px] text-secondary-token'>{description}</p>
       </div>
     </div>
   );

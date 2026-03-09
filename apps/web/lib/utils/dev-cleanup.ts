@@ -11,6 +11,18 @@ interface ProcessWithOnce {
   once(event: ProcessCleanupEvent, listener: () => void): void;
 }
 
+function getProcessWithOnce(): ProcessWithOnce | null {
+  if (typeof process === 'undefined') {
+    return null;
+  }
+
+  if (typeof process.once !== 'function') {
+    return null;
+  }
+
+  return process;
+}
+
 declare global {
   var jovieDevCleanupRegistered: boolean | undefined;
 
@@ -20,14 +32,7 @@ declare global {
 }
 
 function isDevNodeRuntime(): boolean {
-  if (typeof process === 'undefined') {
-    return false;
-  }
-
-  return (
-    env.NODE_ENV !== 'production' &&
-    typeof (process as unknown as ProcessWithOnce).once === 'function'
-  );
+  return env.NODE_ENV !== 'production' && getProcessWithOnce() !== null;
 }
 
 function ensureRegistry(): Map<string, DevCleanupFn> {
@@ -44,8 +49,12 @@ export function registerDevCleanup(key: string, fn: DevCleanupFn): void {
   registry.set(key, fn);
 
   if (!globalThis.jovieDevCleanupRegistered) {
+    const proc = getProcessWithOnce();
+    if (!proc) {
+      return;
+    }
+
     globalThis.jovieDevCleanupRegistered = true;
-    const proc = process as unknown as ProcessWithOnce;
 
     const run = (reason: 'beforeExit' | 'SIGINT' | 'SIGTERM') => {
       void runDevCleanups(reason);

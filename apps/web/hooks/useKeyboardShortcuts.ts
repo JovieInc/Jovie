@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { isFormElement } from '@/lib/utils/keyboard';
 
 export interface ShortcutConfig {
   key: string;
@@ -50,6 +51,7 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
     const handler = (e: KeyboardEvent) => {
       // Build key string (e.g., "Meta+B", "Ctrl+Shift+A")
       const parts: string[] = [];
+      const hasModifier = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
 
       if (e.metaKey) parts.push('Meta');
       if (e.ctrlKey) parts.push('Ctrl');
@@ -58,6 +60,9 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
       parts.push(e.key);
 
       const key = parts.join('+');
+
+      // Suppress single-key shortcuts when typing in form fields
+      if (!hasModifier && isFormElement(e.target)) return;
 
       // Find matching shortcut that is enabled
       const match = shortcutsRef.current.find(

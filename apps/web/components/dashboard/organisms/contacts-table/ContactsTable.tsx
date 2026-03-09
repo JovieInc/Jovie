@@ -13,6 +13,7 @@ import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
+import { getContactRowContextMenuItems } from './row-actions';
 
 interface ContactsTableProps {
   readonly contacts: EditableContact[];
@@ -48,8 +49,6 @@ export const ContactsTable = memo(function ContactsTable({
       setSelectedContactId(newContact.id);
     }
   }, [contacts]);
-
-  const columns = useMemo(() => createContactColumns({ onDelete }), [onDelete]);
 
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -113,9 +112,25 @@ export const ContactsTable = memo(function ContactsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
   }, [headerActions]);
 
+  const columns = useMemo(
+    () =>
+      createContactColumns({
+        onDelete,
+      }),
+    [onDelete]
+  );
+
   const handleRowClick = useCallback((contact: EditableContact) => {
     setSelectedContactId(contact.id);
   }, []);
+
+  const getContextMenuItems = useCallback(
+    (contact: EditableContact) =>
+      getContactRowContextMenuItems(contact, {
+        onDelete,
+      }),
+    [onDelete]
+  );
 
   const handleClose = useCallback(() => {
     setSelectedContactId(null);
@@ -145,10 +160,8 @@ export const ContactsTable = memo(function ContactsTable({
 
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
-      // Selected row: solid bg with slightly deeper hover (override base hover:bg-surface-2/50)
-      return selectedContactId === contact.id
-        ? 'bg-surface-2 hover:bg-surface-2'
-        : '';
+      // Selected row: solid bg (override base hover)
+      return selectedContactId === contact.id ? 'bg-white/[0.04]' : '';
     },
     [selectedContactId]
   );
@@ -190,6 +203,7 @@ export const ContactsTable = memo(function ContactsTable({
               className='text-[13px]'
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
+              getContextMenuItems={getContextMenuItems}
             />
           )}
         </div>
@@ -197,7 +211,7 @@ export const ContactsTable = memo(function ContactsTable({
         {/* Footer - contact count */}
         {!isEmpty && (
           <div className='shrink-0 flex items-center border-t border-subtle px-4 py-1.5'>
-            <span className='text-xs text-tertiary-token tabular-nums'>
+            <span className='text-[13px] text-tertiary-token tabular-nums'>
               {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
             </span>
           </div>

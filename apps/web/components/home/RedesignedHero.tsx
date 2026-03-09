@@ -1,87 +1,67 @@
-import { HeroSpotifySearch } from './HeroSpotifySearch';
+import { ClaimHandleForm } from './claim-handle';
 
-/**
- * RedesignedHero - Clean, left-aligned hero section
- * Supports both light and dark mode via --linear-* CSS custom properties.
- */
 export function RedesignedHero() {
   return (
-    <section className='relative flex flex-1 flex-col justify-center overflow-hidden px-5 pb-16 sm:px-6 lg:px-[77px]'>
-      {/* Ambient glow — subtle depth cue behind content */}
+    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[max(16vh,100px)] pb-0'>
+      {/* Primary ambient glow — barely perceptible warmth */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{
-          background: 'var(--linear-hero-glow)',
+          background:
+            'radial-gradient(ellipse 80% 50% at 50% 25%, oklch(18% 0.015 260 / 0.2), transparent 65%)',
         }}
       />
 
-      <div className='relative w-full'>
-        {/* H1 - Left-aligned headline */}
-        <h1
-          className='text-balance'
-          style={{
-            maxWidth: '640px',
-            fontSize: 'clamp(32px, calc(16px + 3.5vw), 56px)',
-            fontWeight: 500,
-            lineHeight: 1.1,
-            letterSpacing: '-0.025em',
-            color: 'var(--linear-text-primary)',
-            fontFeatureSettings: '"cv01", "ss03", "rlig" 1, "calt" 1',
-            fontVariationSettings: '"opsz" 56',
-          }}
-        >
-          Your entire music career.
-          <br />
-          <span
+      <div className='relative w-full max-w-[var(--linear-content-max)] z-10'>
+        {/* Centered text block — Linear layout */}
+        <div className='hero-stagger flex flex-col items-center text-center max-w-2xl mx-auto'>
+          <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
+            Built for independent music artists
+          </span>
+          <h1
+            className='marketing-h1-linear text-[var(--linear-text-primary)]'
+            style={{ fontWeight: 590 }}
+          >
+            The link in bio your <br className='hidden sm:block' />
+            music deserves.
+          </h1>
+
+          <p className='mt-5 max-w-[460px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+            Sync Spotify once. Jovie builds a profile that captures emails,
+            directs streams, and earns tips — all on autopilot.
+          </p>
+
+          <div className='mt-8 w-full max-w-[480px]'>
+            <div
+              className='relative rounded-2xl p-2'
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.02)',
+                border: '1px solid var(--linear-border-subtle)',
+                boxShadow:
+                  '0 0 0 1px rgba(255,255,255,0.03), 0 8px 32px rgba(0,0,0,0.3)',
+              }}
+            >
+              <ClaimHandleForm />
+            </div>
+          </div>
+
+          <p
+            className='mt-4 flex items-center justify-center gap-2'
             style={{
-              background:
-                'linear-gradient(to right, var(--linear-hero-gradient-from), var(--linear-hero-gradient-to))',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
+              fontSize: '12px',
+              fontWeight: 450,
+              letterSpacing: '0.01em',
+              color: 'var(--linear-text-tertiary)',
             }}
           >
-            One intelligent link.
-          </span>
-        </h1>
-
-        {/* Subheading */}
-        <p
-          className='max-w-[460px] mt-6'
-          style={{
-            fontSize: '15px',
-            fontWeight: 400,
-            lineHeight: 1.65,
-            letterSpacing: '0.005em',
-            color: 'var(--linear-text-secondary)',
-          }}
-        >
-          Jovie builds your link-in-bio from Spotify in 30 seconds — with smart
-          links for every release, automatic email capture, and fan retargeting
-          built in.
-        </p>
-
-        {/* Spotify Search CTA */}
-        <div className='mt-10 max-w-[440px]'>
-          <HeroSpotifySearch />
+            <span
+              aria-hidden='true'
+              className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
+            />{' '}
+            Free to start. Live in 60 seconds.
+          </p>
         </div>
-
-        {/* Trust line */}
-        <p
-          className='mt-5 flex items-center gap-2'
-          style={{
-            fontSize: '13px',
-            letterSpacing: '0.01em',
-            color: 'var(--linear-text-tertiary)',
-          }}
-        >
-          <span
-            aria-hidden='true'
-            className='inline-block h-1.5 w-1.5 rounded-full bg-emerald-500/80'
-          />{' '}
-          Free forever. No credit card.
-        </p>
       </div>
     </section>
   );

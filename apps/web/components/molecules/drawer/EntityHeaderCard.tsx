@@ -32,17 +32,21 @@ export function EntityHeaderCard({
 }: EntityHeaderCardProps) {
   return (
     <div
-      className={cn('flex items-center gap-3', className)}
+      className={cn('flex items-center gap-4', className)}
       data-testid={testId}
     >
       {image}
       <div className='min-w-0 flex-1'>
-        <div className='flex items-center gap-1'>
-          <span className='truncate text-sm font-medium'>{title}</span>
+        <div className='flex items-center gap-1.5'>
+          <span className='truncate text-[15px] font-[590] text-primary-token'>
+            {title}
+          </span>
           {badge}
         </div>
         {subtitle && (
-          <div className='truncate text-xs text-sidebar-muted'>{subtitle}</div>
+          <div className='truncate text-[13px] text-secondary-token mt-0.5'>
+            {subtitle}
+          </div>
         )}
       </div>
     </div>

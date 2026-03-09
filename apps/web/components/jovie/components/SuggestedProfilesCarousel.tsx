@@ -17,7 +17,7 @@ import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 
-import { useSuggestedProfiles } from '../hooks/useSuggestedProfiles';
+import type { UseSuggestedProfilesReturn } from '../hooks/useSuggestedProfiles';
 
 // ============================================================================
 // Platform icon mapping (provider_id -> SocialIcon platform name)
@@ -26,9 +26,9 @@ import { useSuggestedProfiles } from '../hooks/useSuggestedProfiles';
 type SlideDirection = 'left' | 'right' | null;
 
 function confidenceBadgeClass(confidence: number): string {
-  if (confidence >= 0.8) return 'bg-emerald-500/15 text-emerald-400';
-  if (confidence >= 0.5) return 'bg-amber-500/15 text-amber-400';
-  return 'bg-red-500/15 text-red-400';
+  if (confidence >= 0.8) return 'bg-success-subtle text-success';
+  if (confidence >= 0.5) return 'bg-warning-subtle text-warning';
+  return 'bg-error-subtle text-error';
 }
 
 const ICON_PLATFORM_MAP: Record<string, string> = {
@@ -107,7 +107,7 @@ function ProfileReadyCard({
   return (
     <div
       className={cn(
-        'chat-card rounded-xl border border-white/[0.06] bg-surface-1 overflow-hidden',
+        'chat-card rounded-xl border border-subtle bg-surface-1 overflow-hidden',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -126,7 +126,7 @@ function ProfileReadyCard({
 
         {/* Header */}
         <div className='flex items-center gap-2 mb-4'>
-          <CheckCircle2 className='h-4 w-4 text-emerald-400' />
+          <CheckCircle2 className='h-4 w-4 text-success' />
           <p className='text-sm font-medium text-primary-token'>
             Your profile is live
           </p>
@@ -171,7 +171,7 @@ function ProfileReadyCard({
           rel='noopener noreferrer'
           className={cn(
             'flex w-full items-center justify-center gap-1.5 rounded-lg',
-            'bg-accent px-3 py-2.5 text-[13px] font-medium text-on-accent',
+            'bg-accent px-3 py-2.5 text-[13px] font-medium text-accent-foreground',
             'transition-colors hover:bg-accent/90',
             'focus:outline-none'
           )}
@@ -204,7 +204,7 @@ function SuggestionCard({
   return (
     <div
       className={cn(
-        'chat-card rounded-xl border border-white/[0.06] bg-surface-1 overflow-hidden',
+        'chat-card rounded-xl border border-subtle bg-surface-1 overflow-hidden',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -213,7 +213,7 @@ function SuggestionCard({
       <div className='p-4'>
         {/* Header with platform icon */}
         <div className='flex items-center gap-2.5 mb-3'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-[8px] border border-white/[0.04] bg-white/[0.04]'>
+          <div className='flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface-2'>
             {isAvatar ? (
               <Camera className='h-4 w-4 text-secondary-token' />
             ) : (
@@ -286,7 +286,7 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'border border-white/[0.06] px-3 py-3 text-[13px] font-medium sm:py-2',
+              'border border-subtle px-3 py-3 text-[13px] font-medium sm:py-2',
               'text-secondary-token transition-colors',
               'hover:bg-surface-2 hover:text-primary-token',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
@@ -306,7 +306,7 @@ function SuggestionCard({
             disabled={isActioning}
             className={cn(
               'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
-              'bg-accent px-3 py-3 text-[13px] font-medium text-on-accent sm:py-2',
+              'bg-accent px-3 py-3 text-[13px] font-medium text-accent-foreground sm:py-2',
               'transition-colors hover:bg-accent/90',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
               'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -329,31 +329,39 @@ function SuggestionCard({
 // Main Component
 // ============================================================================
 
-interface SuggestedProfilesCarouselProps {
-  readonly profileId: string;
-  readonly username?: string;
-  readonly displayName?: string;
-  readonly avatarUrl?: string | null;
-}
+type SuggestedProfilesCarouselProps = Readonly<
+  Pick<
+    UseSuggestedProfilesReturn,
+    | 'suggestions'
+    | 'isLoading'
+    | 'currentIndex'
+    | 'total'
+    | 'next'
+    | 'prev'
+    | 'confirm'
+    | 'reject'
+    | 'isActioning'
+  > & {
+    username?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  }
+>;
 
 export function SuggestedProfilesCarousel({
-  profileId,
+  suggestions,
+  isLoading,
+  currentIndex,
+  total,
+  next,
+  prev,
+  confirm,
+  reject,
+  isActioning,
   username,
   displayName,
   avatarUrl,
 }: SuggestedProfilesCarouselProps) {
-  const {
-    suggestions,
-    isLoading,
-    currentIndex,
-    total,
-    next,
-    prev,
-    confirm,
-    reject,
-    isActioning,
-  } = useSuggestedProfiles(profileId);
-
   const [slideDirection, setSlideDirection] = useState<SlideDirection>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 

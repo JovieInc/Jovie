@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  getOAuthErrorMessage,
   isCodeExpired,
   isSessionExists,
   isSignInSuggested,
@@ -86,12 +87,13 @@ export interface UseSignUpFlowReturn {
 
   // Suggestions based on errors
   shouldSuggestSignIn: boolean;
+  oauthFailureProvider: 'google' | null;
 
   // Actions
   startEmailFlow: (email: string) => Promise<boolean>;
   verifyCode: (code: string) => Promise<boolean>;
   resendCode: () => Promise<boolean>;
-  startOAuth: (provider: 'google' | 'spotify') => Promise<void>;
+  startOAuth: () => Promise<void>;
   goBack: () => void;
 }
 
@@ -112,10 +114,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
 
   // Sign-up specific state
   const [shouldSuggestSignIn, setShouldSuggestSignIn] = useState(false);
+  const [oauthFailureProvider, setOauthFailureProvider] = useState<
+    'google' | null
+  >(null);
 
   const clearError = useCallback(() => {
     base.clearError();
     setShouldSuggestSignIn(false);
+    setOauthFailureProvider(null);
   }, [base]);
 
   /**
@@ -272,41 +278,41 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
   }, [signUp, isLoaded, clearError, base]);
 
   /**
-   * Start OAuth flow (Google/Spotify)
+   * Start OAuth flow (Google)
    */
-  const startOAuth = useCallback(
-    async (provider: 'google' | 'spotify'): Promise<void> => {
-      if (!signUp || !isLoaded) return;
+  const startOAuth = useCallback(async (): Promise<void> => {
+    if (!signUp || !isLoaded) return;
 
-      clearError();
-      base.setLoadingState({ type: 'oauth', provider });
-      base.persistAuthMethod(provider);
-      base.storeRedirectUrl();
+    const provider = 'google';
 
-      try {
-        // Use current origin for OAuth callbacks so localhost, preview, and
-        // production all redirect correctly after the OAuth round-trip.
-        const oauthBase = getOAuthBaseUrl();
-        const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
-        await signUp.authenticateWithRedirect({
-          strategy: `oauth_${provider}`,
-          redirectUrl: `${oauthBase}/signup/sso-callback`,
-          redirectUrlComplete: `${oauthBase}${storedRedirect}`,
-        });
-      } catch (err) {
-        // If user already has a session, redirect to dashboard
-        if (isSessionExists(err)) {
-          base.router.push(APP_ROUTES.DASHBOARD);
-          return;
-        }
+    clearError();
+    base.setLoadingState({ type: 'oauth', provider });
+    base.persistAuthMethod(provider);
+    base.storeRedirectUrl();
 
-        const message = parseClerkError(err);
-        base.setError(message);
-        base.setLoadingState({ type: 'idle' });
+    try {
+      // Use current origin for OAuth callbacks so localhost, preview, and
+      // production all redirect correctly after the OAuth round-trip.
+      const oauthBase = getOAuthBaseUrl();
+      const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
+      await signUp.authenticateWithRedirect({
+        strategy: `oauth_${provider}`,
+        redirectUrl: `${oauthBase}/signup/sso-callback`,
+        redirectUrlComplete: `${oauthBase}${storedRedirect}`,
+      });
+    } catch (err) {
+      // If user already has a session, redirect to dashboard
+      if (isSessionExists(err)) {
+        base.router.push(APP_ROUTES.DASHBOARD);
+        return;
       }
-    },
-    [signUp, isLoaded, clearError, base]
-  );
+
+      const message = parseClerkError(err);
+      base.setError(getOAuthErrorMessage(message));
+      setOauthFailureProvider(provider);
+      base.setLoadingState({ type: 'idle' });
+    }
+  }, [signUp, isLoaded, clearError, base]);
 
   /**
    * Go back to previous step
@@ -328,6 +334,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
     error: base.error,
     clearError,
     shouldSuggestSignIn,
+    oauthFailureProvider,
     startEmailFlow,
     verifyCode,
     resendCode,

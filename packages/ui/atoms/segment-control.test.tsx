@@ -172,7 +172,7 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-sm');
+      expect(tab.className).toContain('text-[13px]');
       expect(tab.className).toContain('px-3');
     });
 
@@ -186,7 +186,7 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-xs');
+      expect(tab.className).toContain('text-[13px]');
       expect(tab.className).toContain('px-2.5');
     });
 
@@ -200,7 +200,7 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-base');
+      expect(tab.className).toContain('text-sm');
       expect(tab.className).toContain('px-4');
     });
   });
@@ -342,7 +342,7 @@ describe('SegmentControl', () => {
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
       expect(tab.className).toContain('focus-visible:outline-none');
-      expect(tab.className).toContain('focus-visible:bg-interactive-hover');
+      expect(tab.className).toContain('focus-visible:ring-2');
     });
 
     it('applies motion-safe transition', () => {

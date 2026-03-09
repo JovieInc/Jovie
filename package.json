@@ -8,7 +8,7 @@
     }
   },
   "engines": {
-    "node": ">=24.0.0",
+    "node": ">=22.13.0 <23",
     "pnpm": "9.15.4"
   },
   "packageManager": "pnpm@9.15.4",
@@ -17,6 +17,7 @@
       "parse5": "7.1.2",
       "jws": "4.0.1",
       "path-to-regexp": ">=8.0.0",
+      "express>path-to-regexp": "0.1.12",
       "esbuild": ">=0.25.0",
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.3",
@@ -30,9 +31,17 @@
       "diff": ">=8.0.3",
       "lodash": ">=4.17.23",
       "@isaacs/brace-expansion": ">=5.0.1",
+      "minimatch@^10.0.0": "10.2.4",
+      "minimatch@^9.0.0": "^9.0.7",
+      "minimatch@~3.1.0": "3.1.5",
+      "serialize-javascript": "^7.0.3",
+      "rollup": "^4.59.0",
+      "basic-ftp": "^5.2.0",
       "axios": "^1.13.5",
+      "ajv@^8.0.0": "^8.18.0",
       "undici": "^6.23.0",
-      "webpack": "5.105.0"
+      "webpack": "5.105.0",
+      "qs": "6.15.0"
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
@@ -43,9 +52,9 @@
     "dev:web": "turbo dev --filter=@jovie/web",
     "build": "turbo build",
     "build:web": "turbo build --filter=@jovie/web",
-    "lint": "turbo lint",
+    "lint": "node scripts/run-scoped-turbo-task.mjs lint",
     "lint:fix": "turbo lint:fix",
-    "typecheck": "turbo typecheck",
+    "typecheck": "node scripts/run-scoped-turbo-task.mjs typecheck",
     "test": "turbo test",
     "test:ci": "turbo test:ci",
     "test:fast": "turbo test:fast",
@@ -69,14 +78,15 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
-    "@commitlint/cli": "^20.4.1",
-    "@commitlint/config-conventional": "^20.4.1",
+    "@commitlint/cli": "^20.4.2",
+    "@commitlint/config-conventional": "^20.4.3",
+    "@playwright/test": "^1.58.2",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
     "knip": "^5.83.0",
     "lint-staged": "^16.2.6",
-    "turbo": "^2.8.8",
+    "turbo": "^2.8.9",
     "typescript": "^5"
   },
   "lint-staged": {

@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthLayout } from '@/components/auth';
+import { APP_ROUTES } from '@/constants/routes';
 
 export function WaitlistSuccessView() {
   return (
@@ -9,7 +10,7 @@ export function WaitlistSuccessView() {
       showLogo={false}
       showFooterPrompt={false}
       showLogoutButton
-      logoutRedirectUrl='/sign-in'
+      logoutRedirectUrl={APP_ROUTES.SIGNIN}
       formTitleClassName='text-lg font-medium text-primary-token mb-4 text-center'
     >
       <p className='text-sm text-secondary-token text-center'>

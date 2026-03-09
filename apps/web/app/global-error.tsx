@@ -1,7 +1,7 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
+import { captureException } from '@/lib/sentry/client-lite';
 import { getSentryMode, isSentryInitialized } from '@/lib/sentry/init';
 
 /**
@@ -31,7 +31,7 @@ export default function GlobalError({
 
     if (isInitialized) {
       try {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             digest: error.digest,
             sentryMode, // Include SDK mode for debugging

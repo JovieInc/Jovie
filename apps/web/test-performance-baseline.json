@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-03-08T00:00:00.000Z",
+  "metrics": {
+    "totalDuration": 87190,
+    "setupTime": 763,
+    "testExecutionTime": 79320,
+    "environmentTime": 231760,
+    "transformTime": 18370,
+    "collectTime": 0,
+    "prepareTime": 0,
+    "testResults": [],
+    "slowTests": [],
+    "performanceStats": {
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "average": 0,
+      "median": 0
+    }
+  },
+  "targets": {
+    "totalDuration": 60000,
+    "p95": 200,
+    "setupTime": 10000
+  }
+}

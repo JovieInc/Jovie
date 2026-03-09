@@ -6,12 +6,16 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
 import {
+  useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
+  useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
+  useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from '@/lib/queries';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type {
   DraftState,
@@ -43,6 +47,10 @@ export function useReleaseProviderMatrix({
     null
   );
   const [drafts, setDrafts] = useState<DraftState>({});
+  const [refreshingReleaseId, setRefreshingReleaseId] = useState<string | null>(
+    null
+  );
+  const [flashedReleaseId, setFlashedReleaseId] = useState<string | null>(null);
 
   // Get profileId from first release (all releases share same profileId)
   const profileId = releases[0]?.profileId ?? '';
@@ -53,6 +61,9 @@ export function useReleaseProviderMatrix({
   const syncMutation = useSyncReleasesFromSpotifyMutation(profileId);
   const refreshReleaseMutation = useRefreshReleaseMutation(profileId);
   const rescanIsrcMutation = useRescanIsrcLinksMutation(profileId);
+  const saveCanvasStatusMutation = useSaveCanvasStatusMutation(profileId);
+  const saveLyricsMutation = useSaveReleaseLyricsMutation(profileId);
+  const formatLyricsMutation = useFormatReleaseLyricsMutation(profileId);
 
   const isSaving =
     saveProviderMutation.isPending || resetProviderMutation.isPending;
@@ -79,12 +90,19 @@ export function useReleaseProviderMatrix({
   );
 
   const openEditor = useCallback((release: ReleaseViewModel) => {
-    setEditingRelease(release);
-    const nextDrafts: DraftState = {};
-    release.providers.forEach(provider => {
-      nextDrafts[provider.key] = provider.url ?? '';
+    // Toggle: clicking the same release closes the editor
+    setEditingRelease(current => {
+      if (current?.id === release.id) {
+        setDrafts({});
+        return null;
+      }
+      const nextDrafts: DraftState = {};
+      release.providers.forEach(provider => {
+        nextDrafts[provider.key] = provider.url ?? '';
+      });
+      setDrafts(nextDrafts);
+      return release;
     });
-    setDrafts(nextDrafts);
   }, []);
 
   const closeEditor = useCallback(() => {
@@ -92,14 +110,14 @@ export function useReleaseProviderMatrix({
     setDrafts({});
   }, []);
 
-  const updateRow = (updated: ReleaseViewModel) => {
+  const updateRow = useCallback((updated: ReleaseViewModel) => {
     setRawRows(prev =>
       prev.map(row => (row.id === updated.id ? { ...updated } : row))
     );
     setEditingRelease(current =>
       current?.id === updated.id ? { ...updated } : current
     );
-  };
+  }, []);
 
   const handleCopy = useCallback(
     async (path: string, label: string, testId: string) => {
@@ -242,14 +260,29 @@ export function useReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
   }, [syncMutation.mutate]);
 
+  const flashRelease = useCallback((releaseId: string) => {
+    setFlashedReleaseId(releaseId);
+    globalThis.setTimeout(() => {
+      setFlashedReleaseId(current => (current === releaseId ? null : current));
+    }, 1200);
+  }, []);
+
   // Refresh a single release from the database (no Spotify sync)
   const handleRefreshRelease = useCallback(
     (releaseId: string) => {
+      setRefreshingReleaseId(releaseId);
       refreshReleaseMutation.mutate(
         { releaseId },
         {
-          onSuccess: updated => {
-            updateRow(updated);
+          onSuccess: result => {
+            if (result.rateLimited) {
+              toast.error(
+                `Refresh is rate limited. Available again in ${result.retryAfter}.`
+              );
+              return;
+            }
+            updateRow(result.release);
+            flashRelease(result.release.id);
             toast.success('Release refreshed');
           },
           onError: error => {
@@ -260,11 +293,16 @@ export function useReleaseProviderMatrix({
             });
             toast.error('Failed to refresh release');
           },
+          onSettled: () => {
+            setRefreshingReleaseId(current =>
+              current === releaseId ? null : current
+            );
+          },
         }
       );
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mutate is stable from TanStack Query
-    [refreshReleaseMutation.mutate]
+    [refreshReleaseMutation.mutate, flashRelease]
   );
 
   // Rescan ISRC links for a single release
@@ -305,6 +343,77 @@ export function useReleaseProviderMatrix({
   );
 
   const isRescanningIsrc = rescanIsrcMutation.isPending;
+  const isLyricsSaving =
+    saveLyricsMutation.isPending || formatLyricsMutation.isPending;
+
+  const handleCanvasStatusUpdate = useCallback(
+    async (releaseId: string, status: CanvasStatus) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      updateRow({ ...release, canvasStatus: status });
+
+      try {
+        const updated = await saveCanvasStatusMutation.mutateAsync({
+          profileId: release.profileId,
+          releaseId,
+          status,
+        });
+        updateRow(updated);
+      } catch (error) {
+        updateRow(release);
+        captureError('Failed to update canvas status', error, {
+          context: 'release-mutation',
+          releaseId,
+          action: 'update-canvas-status',
+        });
+        toast.error('Unable to update canvas status');
+      }
+    },
+    [saveCanvasStatusMutation, updateRow]
+  );
+
+  const handleSaveLyrics = useCallback(
+    async (releaseId: string, lyrics: string) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return;
+
+      await saveLyricsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        lyrics,
+      });
+      toast.success('Lyrics saved');
+    },
+    [saveLyricsMutation]
+  );
+
+  const handleFormatLyrics = useCallback(
+    async (
+      releaseId: string,
+      lyrics: string,
+      format: import('@/lib/lyrics/types').LyricsFormat = 'apple-music'
+    ) => {
+      const release = rawRowsRef.current.find(r => r.id === releaseId);
+      if (!release) return [];
+
+      const result = await formatLyricsMutation.mutateAsync({
+        profileId: release.profileId,
+        releaseId,
+        lyrics,
+        format,
+      });
+
+      const labels: Record<string, string> = {
+        'apple-music': 'Apple Music',
+        deezer: 'Deezer',
+        genius: 'Genius',
+      };
+      toast.success(`Lyrics formatted for ${labels[format] ?? format}`);
+      return result.changesSummary;
+    },
+    [formatLyricsMutation]
+  );
 
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(
@@ -330,9 +439,15 @@ export function useReleaseProviderMatrix({
     handleReset,
     handleSync,
     handleRefreshRelease,
+    refreshingReleaseId,
+    flashedReleaseId,
     handleRescanIsrc,
     isRescanningIsrc,
+    handleCanvasStatusUpdate,
     handleAddUrl,
+    handleSaveLyrics,
+    handleFormatLyrics,
+    isLyricsSaving,
     setDrafts,
   };
 }

@@ -66,7 +66,8 @@ export interface UpdateLinkData {
 
 /**
  * List of Digital Streaming Platform (DSP) identifiers.
- * Includes 'youtube' since artists commonly use it for music content.
+ * Note: Regular YouTube is classified as social, not music.
+ * Only YouTube Music (music.youtube.com) is a DSP.
  */
 export const DSP_PLATFORMS = [
   'amazon-music',
@@ -82,7 +83,6 @@ export const DSP_PLATFORMS = [
   'tencent-music',
   'tencent_music',
   'tidal',
-  'youtube',
   'youtube-music',
   'youtube_music',
 ] as const;

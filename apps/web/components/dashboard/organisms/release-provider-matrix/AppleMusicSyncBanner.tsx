@@ -4,18 +4,19 @@
  * AppleMusicSyncBanner - Shows Apple Music match suggestions requiring action.
  *
  * Only renders for actionable states:
- * - Discovery in progress (scanning ISRCs)
  * - Suggested match awaiting confirmation
  * - No match found
  *
- * Confirmed/auto-confirmed matches are NOT shown here — the header pill
- * (DspConnectionPill) already communicates the connected state.
+ * Loading/confirmed/auto-confirmed matches are NOT shown here — the header pill
+ * (DspConnectionPill) already communicates the connected state, and we avoid
+ * flashing a loading banner on every page visit.
  */
 
 import { Button } from '@jovie/ui';
 import { useEffect, useMemo } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
@@ -39,7 +40,7 @@ interface AppleMusicSyncBannerProps {
   ) => void;
 }
 
-type SyncState = 'hidden' | 'loading' | 'suggested' | 'no_match';
+type SyncState = 'hidden' | 'suggested' | 'no_match';
 
 function determineSyncState(
   spotifyConnected: boolean,
@@ -48,8 +49,7 @@ function determineSyncState(
   appleMusicMatch: DspMatch | null,
   withAppleMusic: number
 ): SyncState {
-  if (!spotifyConnected || releasesCount === 0) return 'hidden';
-  if (isLoading) return 'loading';
+  if (!spotifyConnected || releasesCount === 0 || isLoading) return 'hidden';
   if (!appleMusicMatch) {
     return withAppleMusic > 0 ? 'hidden' : 'no_match';
   }
@@ -121,41 +121,18 @@ export function AppleMusicSyncBanner({
 
   if (syncState === 'hidden') return null;
 
-  if (syncState === 'loading') {
-    return (
-      <div
-        className={cn(
-          'flex items-center gap-3 rounded-lg border border-[#FA243C]/20 bg-[#FA243C]/5 px-4 py-3',
-          className
-        )}
-      >
-        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-[#FA243C]/10'>
-          <Icon
-            name='Loader2'
-            className='h-4 w-4 text-[#FA243C] animate-spin'
-            aria-hidden='true'
-          />
-        </div>
-        <p className='text-sm text-secondary-token'>Checking Apple Music...</p>
-      </div>
-    );
-  }
-
   if (syncState === 'no_match') {
     return (
-      <div
-        className={cn(
-          'flex items-center gap-3 rounded-lg border border-subtle bg-surface-1 px-4 py-3',
-          className
-        )}
+      <DashboardCard
+        variant='default'
+        padding='none'
+        className={cn('flex items-center gap-3 px-4 py-3', className)}
       >
-        <div className='flex h-8 w-8 items-center justify-center rounded-full bg-surface-2'>
-          <DspProviderIcon provider='apple_music' size='md' />
-        </div>
-        <p className='text-sm text-secondary-token'>
+        <DspProviderIcon provider='apple_music' size='md' />
+        <p className='text-[13px] text-secondary-token'>
           No matching Apple Music artist found
         </p>
-      </div>
+      </DashboardCard>
     );
   }
 
@@ -175,7 +152,7 @@ export function AppleMusicSyncBanner({
 
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2'>
-          <span className='min-w-0 truncate text-sm font-medium text-primary-token'>
+          <span className='min-w-0 truncate text-[13px] font-[510] text-primary-token'>
             {match.externalArtistName}
           </span>
           {match.externalArtistUrl && (
@@ -190,7 +167,7 @@ export function AppleMusicSyncBanner({
             </a>
           )}
         </div>
-        <p className='mt-0.5 text-xs text-secondary-token'>
+        <p className='mt-0.5 text-[11px] text-secondary-token'>
           Confirm to link your Apple Music releases.
         </p>
       </div>
@@ -203,7 +180,7 @@ export function AppleMusicSyncBanner({
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='text-xs'
+          className='text-[13px]'
         >
           {rejectMutation.isPending &&
           rejectMutation.variables?.matchId === match.id
@@ -217,7 +194,7 @@ export function AppleMusicSyncBanner({
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='text-xs bg-[#FA243C] hover:bg-[#FA243C]/90'
+          className='text-[13px] bg-[#FA243C] hover:bg-[#FA243C]/90'
         >
           {confirmMutation.isPending &&
           confirmMutation.variables?.matchId === match.id ? (

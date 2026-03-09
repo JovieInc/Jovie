@@ -29,6 +29,10 @@ function mapEventToTikTok(eventType: NormalizedEvent['eventType']): string {
       return 'SubmitForm';
     case 'scroll_depth':
       return 'ViewContent';
+    case 'tip_page_view':
+      return 'ViewContent';
+    case 'tip_intent':
+      return 'InitiateCheckout';
     default:
       return 'ViewContent';
   }
@@ -75,6 +79,8 @@ export async function forwardToTikTok(
         ...(event.utmSource && { utm_source: event.utmSource }),
         ...(event.utmMedium && { utm_medium: event.utmMedium }),
         ...(event.utmCampaign && { utm_campaign: event.utmCampaign }),
+        ...(event.tipAmount && { value: event.tipAmount, currency: 'USD' }),
+        ...(event.tipMethod && { payment_method: event.tipMethod }),
       },
     };
 

@@ -2,16 +2,16 @@ import { act, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  TablePanelProvider,
-  useSetTablePanel,
-  useTablePanel,
-} from '@/contexts/TablePanelContext';
+  RightPanelProvider,
+  useRightPanel,
+  useSetRightPanel,
+} from '@/contexts/RightPanelContext';
 
 /**
- * TablePanelContext Tests
+ * RightPanelContext Tests
  *
- * Validates the split-context pattern: dispatch consumers (useSetTablePanel)
- * must NOT re-render when state changes, while state consumers (useTablePanel)
+ * Validates the split-context pattern: dispatch consumers (useSetRightPanel)
+ * must NOT re-render when state changes, while state consumers (useRightPanel)
  * must re-render when panel changes.
  */
 
@@ -20,7 +20,7 @@ interface RenderCallbackProps {
 }
 
 function SetterConsumer({ onRender }: RenderCallbackProps) {
-  const setPanel = useSetTablePanel();
+  const setPanel = useSetRightPanel();
   onRender();
   return (
     <button type='button' onClick={() => setPanel(<div>panel</div>)}>
@@ -30,46 +30,46 @@ function SetterConsumer({ onRender }: RenderCallbackProps) {
 }
 
 function StateConsumer({ onRender }: RenderCallbackProps) {
-  const panel = useTablePanel();
+  const panel = useRightPanel();
   onRender();
   return <div data-testid='panel'>{panel}</div>;
 }
 
-describe('TablePanelContext', () => {
-  it('useSetTablePanel returns a stable setter reference', () => {
+describe('RightPanelContext', () => {
+  it('useSetRightPanel returns a stable setter reference', () => {
     const refs: Array<(node: React.ReactNode) => void> = [];
 
     function Capture() {
-      const setPanel = useSetTablePanel();
+      const setPanel = useSetRightPanel();
       refs.push(setPanel);
       return null;
     }
 
     const { rerender } = render(
-      <TablePanelProvider>
+      <RightPanelProvider>
         <Capture />
-      </TablePanelProvider>
+      </RightPanelProvider>
     );
 
     rerender(
-      <TablePanelProvider>
+      <RightPanelProvider>
         <Capture />
-      </TablePanelProvider>
+      </RightPanelProvider>
     );
 
     expect(refs).toHaveLength(2);
     expect(refs[0]).toBe(refs[1]);
   });
 
-  it('useSetTablePanel consumer does not re-render when panel changes', () => {
+  it('useSetRightPanel consumer does not re-render when panel changes', () => {
     const setterRenders = vi.fn();
     const stateRenders = vi.fn();
 
     render(
-      <TablePanelProvider>
+      <RightPanelProvider>
         <SetterConsumer onRender={setterRenders} />
         <StateConsumer onRender={stateRenders} />
-      </TablePanelProvider>
+      </RightPanelProvider>
     );
 
     // Both render once on mount
@@ -86,14 +86,14 @@ describe('TablePanelContext', () => {
     expect(stateRenders).toHaveBeenCalledTimes(2);
   });
 
-  it('useTablePanel consumer re-renders when panel changes', () => {
+  it('useRightPanel consumer re-renders when panel changes', () => {
     const stateRenders = vi.fn();
 
     render(
-      <TablePanelProvider>
+      <RightPanelProvider>
         <SetterConsumer onRender={() => {}} />
         <StateConsumer onRender={stateRenders} />
-      </TablePanelProvider>
+      </RightPanelProvider>
     );
 
     expect(stateRenders).toHaveBeenCalledTimes(1);
@@ -106,9 +106,9 @@ describe('TablePanelContext', () => {
     expect(screen.getByTestId('panel')).toHaveTextContent('panel');
   });
 
-  it('useSetTablePanel throws outside provider', () => {
+  it('useSetRightPanel throws outside provider', () => {
     expect(() => {
       render(<SetterConsumer onRender={() => {}} />);
-    }).toThrow('useSetTablePanel must be used within TablePanelProvider');
+    }).toThrow('useSetRightPanel must be used within RightPanelProvider');
   });
 });

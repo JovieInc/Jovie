@@ -14,15 +14,16 @@ echo "=============================================="
 echo ""
 
 # 0. CRITICAL: Verify Node.js version FIRST
-REQUIRED_NODE_MAJOR=24
+REQUIRED_NODE_MAJOR=$(cat "$PROJECT_DIR/.nvmrc" 2>/dev/null | cut -d. -f1)
+REQUIRED_NODE_MAJOR="${REQUIRED_NODE_MAJOR:-22}"
 CURRENT_NODE_VERSION=$(node --version 2>/dev/null || echo "not found")
 CURRENT_NODE_MAJOR=$(echo "$CURRENT_NODE_VERSION" | sed 's/v\([0-9]*\).*/\1/')
 
 if [ "$CURRENT_NODE_VERSION" = "not found" ]; then
   echo "ERROR: Node.js is not installed!"
   echo ""
-  echo "This project REQUIRES Node.js 24. Install it with:"
-  echo "  nvm install 24 && nvm use 24"
+  echo "This project REQUIRES Node.js ${REQUIRED_NODE_MAJOR}. Install it with:"
+  echo "  nvm install ${REQUIRED_NODE_MAJOR} && nvm use ${REQUIRED_NODE_MAJOR}"
   echo ""
   exit 1
 fi
@@ -31,10 +32,10 @@ if [ "$CURRENT_NODE_MAJOR" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
   echo "WARNING: Wrong Node.js version detected!"
   echo ""
   echo "  Current:  $CURRENT_NODE_VERSION"
-  echo "  Required: v24.0.0 or higher"
+  echo "  Required: v${REQUIRED_NODE_MAJOR}.x"
   echo ""
   echo "To fix, run:"
-  echo "  nvm install 24 && nvm use 24"
+  echo "  nvm install ${REQUIRED_NODE_MAJOR} && nvm use ${REQUIRED_NODE_MAJOR}"
   echo ""
   echo "Or if using .nvmrc:"
   echo "  nvm use"
@@ -44,6 +45,11 @@ if [ "$CURRENT_NODE_MAJOR" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
 fi
 
 echo "Setting up Claude Code environment..."
+
+if [ -x "$PROJECT_DIR/scripts/setup.sh" ]; then
+  echo "Running ./scripts/setup.sh to normalize this worktree..."
+  "$PROJECT_DIR/scripts/setup.sh"
+fi
 
 # 0.5. Install GitHub CLI if not available
 if ! command -v gh &> /dev/null; then
@@ -67,7 +73,8 @@ if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
   # Check if pnpm is available
   if ! command -v pnpm &> /dev/null; then
     echo "Installing pnpm..."
-    corepack enable 2>/dev/null || npm install -g pnpm@9.15.4
+    corepack enable 2>/dev/null
+    corepack prepare pnpm@9.15.4 --activate
   fi
 
   # Install with frozen lockfile for reproducibility
@@ -91,8 +98,8 @@ PNPM_VER=$(pnpm --version 2>/dev/null || echo 'not found')
 # Check if versions match requirements
 NODE_OK="[OK]"
 PNPM_OK="[OK]"
-if [ "$(echo "$NODE_VER" | sed 's/v\([0-9]*\).*/\1/')" -lt 24 ] 2>/dev/null; then
-  NODE_OK="[WRONG - need v24+]"
+if [ "$(echo "$NODE_VER" | sed 's/v\([0-9]*\).*/\1/')" -lt "$REQUIRED_NODE_MAJOR" ] 2>/dev/null; then
+  NODE_OK="[WRONG - need v${REQUIRED_NODE_MAJOR}+]"
 fi
 if [ "$PNPM_VER" != "9.15.4" ] && [ "$PNPM_VER" != "not found" ]; then
   PNPM_OK="[WRONG - need 9.15.4]"
@@ -118,7 +125,7 @@ echo "=============================================="
 echo "  - Use 'pnpm' not 'npm' or 'yarn'"
 echo "  - Run commands from repo root (not apps/web)"
 echo "  - Use 'pnpm --filter web <cmd>' for web-specific tasks"
-echo "  - See agents.md for full AI agent guidelines"
+echo "  - See AGENTS.md for full AI agent guidelines"
 echo "=============================================="
 echo ""
 echo "Claude Code environment ready."

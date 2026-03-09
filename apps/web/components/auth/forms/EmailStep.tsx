@@ -83,7 +83,7 @@ export function EmailStep({
     }
 
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
     if (!emailRegex.test(trimmed)) {
       setLocalError('Please enter a valid email address.');
       return false;
@@ -146,7 +146,7 @@ export function EmailStep({
 
         <AuthButton
           type='submit'
-          variant='secondary'
+          variant='primary'
           disabled={isLoading}
           aria-busy={isLoading}
           className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'

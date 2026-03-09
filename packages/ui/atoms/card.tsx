@@ -6,7 +6,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const cardVariants = cva(
-  'rounded-lg border border-subtle bg-surface-1 text-primary-token shadow-card transition-colors duration-normal ease-interactive',
+  'rounded-[var(--radius-lg)] border border-subtle bg-surface-1 text-primary-token shadow-card transition-colors duration-normal ease-interactive',
   {
     variants: {
       variant: {
@@ -74,7 +74,7 @@ const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
       <Comp
         ref={ref}
         className={cn(
-          'text-2xl font-semibold leading-none tracking-tight text-primary-token',
+          'text-base font-semibold leading-none tracking-tight text-primary-token',
           className
         )}
         {...props}
@@ -98,7 +98,7 @@ const CardDescription = React.forwardRef<
   return (
     <Comp
       ref={ref}
-      className={cn('text-sm text-secondary-token', className)}
+      className={cn('text-[13px] text-secondary-token', className)}
       {...props}
     />
   );
@@ -113,7 +113,7 @@ const CardContent = React.forwardRef<HTMLDivElement, CardContentProps>(
   ({ className, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : 'div';
 
-    return <Comp ref={ref} className={cn('p-6 pt-0', className)} {...props} />;
+    return <Comp ref={ref} className={cn('p-6 pt-2', className)} {...props} />;
   }
 );
 CardContent.displayName = 'CardContent';

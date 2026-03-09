@@ -24,8 +24,8 @@ async function ensureReleasesVisible(
 ): Promise<Locator | null> {
   await page.waitForLoadState('load').catch(() => {});
 
-  // Check for the "Connect your music" prompt which indicates no releases
-  const connectPrompt = page.getByText('Connect your music');
+  // Check for the "Connect Spotify" prompt which indicates no releases
+  const connectPrompt = page.getByText('Connect Spotify');
   if (
     await connectPrompt
       .isVisible({ timeout: TIMEOUTS.ELEMENT_CHECK })
@@ -114,6 +114,15 @@ test.describe('Releases dashboard', () => {
     page,
   }, testInfo) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
@@ -154,6 +163,15 @@ test.describe('Releases dashboard', () => {
     page,
   }, testInfo) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
@@ -181,6 +199,15 @@ test.describe('Releases dashboard', () => {
     page,
   }, testInfo) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
@@ -217,6 +244,15 @@ test.describe('Releases dashboard', () => {
     page,
   }, testInfo) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,
@@ -241,6 +277,15 @@ test.describe('Releases dashboard', () => {
     page,
   }, testInfo) => {
     test.setTimeout(TIMEOUTS.TEST_OVERALL);
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     await page.goto('/app/dashboard/releases', {
       waitUntil: 'domcontentloaded',
       timeout: TIMEOUTS.NAVIGATION,

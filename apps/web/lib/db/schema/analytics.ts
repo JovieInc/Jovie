@@ -2,6 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -19,6 +20,7 @@ import {
   currencyCodeEnum,
   linkTypeEnum,
   notificationChannelEnum,
+  tipStatusEnum,
 } from './enums';
 import { socialLinks } from './links';
 import { creatorProfiles } from './profiles';
@@ -76,6 +78,9 @@ export const audienceMembers = pgTable(
     creatorProfileLastSeenIdx: index(
       'audience_members_creator_profile_id_last_seen_at_idx'
     ).on(table.creatorProfileId, table.lastSeenAt),
+    creatorProfileTypeLastSeenIdx: index(
+      'audience_members_creator_profile_id_type_last_seen_at_idx'
+    ).on(table.creatorProfileId, table.type, table.lastSeenAt),
     creatorProfileUpdatedIdx: index(
       'audience_members_creator_profile_id_updated_at_idx'
     ).on(table.creatorProfileId, table.updatedAt),
@@ -133,6 +138,11 @@ export const clickEvents = pgTable(
     ).on(table.creatorProfileId, table.isBot, table.createdAt),
     createdAtIdx: index('click_events_created_at_idx').on(table.createdAt),
     // Performance index: analytics aggregation by link type
+    linkIdIdx: index('idx_click_events_link_id').on(table.linkId),
+    audienceMemberIdIdx: index('idx_click_events_audience_member_id').on(
+      table.audienceMemberId
+    ),
+
     linkTypeAnalyticsIndex: index('idx_click_events_link_type').on(
       table.creatorProfileId,
       table.linkType,
@@ -143,6 +153,28 @@ export const clickEvents = pgTable(
     nonBotClicksIdx: index('idx_click_events_non_bot')
       .on(table.creatorProfileId, table.createdAt)
       .where(drizzleSql`is_bot = false OR is_bot IS NULL`),
+  })
+);
+
+export const dailyProfileViews = pgTable(
+  'daily_profile_views',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    viewDate: date('view_date', { mode: 'string' }).notNull(),
+    viewCount: integer('view_count').default(0).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileViewDateUnique: uniqueIndex(
+      'daily_profile_views_creator_profile_id_view_date_unique'
+    ).on(table.creatorProfileId, table.viewDate),
+    creatorProfileViewDateIdx: index(
+      'daily_profile_views_creator_profile_id_view_date_idx'
+    ).on(table.creatorProfileId, table.viewDate),
   })
 );
 
@@ -268,12 +300,17 @@ export const tips = pgTable(
     amountCents: integer('amount_cents').notNull(),
     currency: currencyCodeEnum('currency').notNull().default('USD'),
     paymentIntentId: text('payment_intent_id').notNull().unique(),
+    stripeCheckoutSessionId: text('stripe_checkout_session_id'),
     contactEmail: text('contact_email'),
     contactPhone: text('contact_phone'),
+    tipperName: text('tipper_name'),
     message: text('message'),
     isAnonymous: boolean('is_anonymous').default(false),
+    status: tipStatusEnum('status').default('pending').notNull(),
+    platformFeeCents: integer('platform_fee_cents'),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
     creatorProfileIdx: index('tips_creator_profile_id_idx').on(
@@ -284,6 +321,9 @@ export const tips = pgTable(
       table.creatorProfileId,
       table.createdAt
     ),
+    checkoutSessionIdx: uniqueIndex(
+      'tips_stripe_checkout_session_id_unique'
+    ).on(table.stripeCheckoutSessionId),
   })
 );
 
@@ -307,6 +347,9 @@ export type NewAudienceMember = typeof audienceMembers.$inferInsert;
 
 export type ClickEvent = typeof clickEvents.$inferSelect;
 export type NewClickEvent = typeof clickEvents.$inferInsert;
+
+export type DailyProfileView = typeof dailyProfileViews.$inferSelect;
+export type NewDailyProfileView = typeof dailyProfileViews.$inferInsert;
 
 export type NotificationSubscription =
   typeof notificationSubscriptions.$inferSelect;

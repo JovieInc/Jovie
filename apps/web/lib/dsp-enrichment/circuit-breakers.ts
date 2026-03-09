@@ -40,10 +40,11 @@ export {
  * occasional service disruptions.
  */
 const APPLE_MUSIC_CONFIG: Partial<CircuitBreakerConfig> = {
-  failureThreshold: 5, // Open after 5 failures
-  resetTimeout: 30_000, // Try again after 30 seconds
+  failureThreshold: 10, // Open after 10 failures
+  resetTimeout: 60_000, // Try again after 60 seconds
   successThreshold: 2, // Need 2 successes to close
-  failureWindow: 60_000, // Count failures within 1 minute
+  failureWindow: 120_000, // Count failures within 2 minutes
+  minimumRequestCount: 20, // Need 20 requests before circuit can open
 };
 
 /**
@@ -51,10 +52,11 @@ const APPLE_MUSIC_CONFIG: Partial<CircuitBreakerConfig> = {
  * Deezer has moderate rate limits (50 req/sec) and generally stable service.
  */
 const DEEZER_CONFIG: Partial<CircuitBreakerConfig> = {
-  failureThreshold: 5, // Open after 5 failures
-  resetTimeout: 30_000, // Try again after 30 seconds
+  failureThreshold: 10, // Open after 10 failures
+  resetTimeout: 60_000, // Try again after 60 seconds
   successThreshold: 2, // Need 2 successes to close
-  failureWindow: 60_000, // Count failures within 1 minute
+  failureWindow: 120_000, // Count failures within 2 minutes
+  minimumRequestCount: 20, // Need 20 requests before circuit can open
 };
 
 /**
@@ -63,10 +65,11 @@ const DEEZER_CONFIG: Partial<CircuitBreakerConfig> = {
  * We use more conservative thresholds to avoid hammering their servers.
  */
 const MUSICBRAINZ_CONFIG: Partial<CircuitBreakerConfig> = {
-  failureThreshold: 3, // Open after 3 failures (more conservative)
-  resetTimeout: 60_000, // Try again after 60 seconds (longer cooldown)
+  failureThreshold: 5, // Open after 5 failures (conservative for free service)
+  resetTimeout: 90_000, // Try again after 90 seconds (longer cooldown)
   successThreshold: 2, // Need 2 successes to close
   failureWindow: 120_000, // Count failures within 2 minutes
+  minimumRequestCount: 10, // Need 10 requests before circuit can open
 };
 
 // ============================================================================
@@ -76,18 +79,27 @@ const MUSICBRAINZ_CONFIG: Partial<CircuitBreakerConfig> = {
 /**
  * Global circuit breaker for Apple Music API calls.
  */
-export const appleMusicCircuitBreaker = new CircuitBreaker(APPLE_MUSIC_CONFIG);
+export const appleMusicCircuitBreaker = new CircuitBreaker({
+  name: 'apple_music',
+  ...APPLE_MUSIC_CONFIG,
+});
 
 /**
  * Global circuit breaker for Deezer API calls.
  */
-export const deezerCircuitBreaker = new CircuitBreaker(DEEZER_CONFIG);
+export const deezerCircuitBreaker = new CircuitBreaker({
+  name: 'deezer',
+  ...DEEZER_CONFIG,
+});
 
 /**
  * Global circuit breaker for MusicBrainz API calls.
  * More conservative due to the free nature of the service.
  */
-export const musicBrainzCircuitBreaker = new CircuitBreaker(MUSICBRAINZ_CONFIG);
+export const musicBrainzCircuitBreaker = new CircuitBreaker({
+  name: 'musicbrainz',
+  ...MUSICBRAINZ_CONFIG,
+});
 
 // ============================================================================
 // Helper Functions

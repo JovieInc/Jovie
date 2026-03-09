@@ -18,6 +18,7 @@ import { discogTracks } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
+import { captureError } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
 
@@ -670,6 +671,45 @@ function discoverForProvider(
   }
 }
 
+async function processProviderDiscovery(
+  tx: DbOrTransaction,
+  providerId: DspProviderId,
+  localTracks: Awaited<ReturnType<typeof fetchLocalTracks>>,
+  localArtist: NonNullable<Awaited<ReturnType<typeof fetchLocalArtist>>>,
+  creatorProfileId: string,
+  result: DspArtistDiscoveryResult
+): Promise<void> {
+  try {
+    const discoveryPromise = discoverForProvider(
+      tx,
+      providerId,
+      localTracks,
+      localArtist,
+      creatorProfileId
+    );
+    if (!discoveryPromise) {
+      result.errors.push(`${providerId}: Unsupported provider`);
+      return;
+    }
+    const { match, status, error } = await discoveryPromise;
+    if (match && status) {
+      result.matches.push({
+        providerId,
+        status,
+        externalArtistId: match.externalArtistId,
+        externalArtistName: match.externalArtistName,
+        confidenceScore: match.confidenceScore,
+      });
+    } else if (error) {
+      result.errors.push(`${providerId}: ${error}`);
+    }
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    result.errors.push(`${providerId}: ${message}`);
+  }
+}
+
 /**
  * Process a DSP artist discovery job.
  */
@@ -703,37 +743,29 @@ export async function processDspArtistDiscoveryJob(
   }
 
   for (const providerId of targetProviders) {
-    try {
-      const discoveryPromise = discoverForProvider(
-        tx,
-        providerId,
-        localTracks,
-        localArtist,
-        creatorProfileId
-      );
+    await processProviderDiscovery(
+      tx,
+      providerId,
+      localTracks,
+      localArtist,
+      creatorProfileId,
+      result
+    );
+  }
 
-      if (!discoveryPromise) {
-        result.errors.push(`${providerId}: Unsupported provider`);
-        continue;
+  // If no matches were found but errors occurred, capture to Sentry so
+  // failed discovery jobs are visible in production monitoring.
+  if (result.matches.length === 0 && result.errors.length > 0) {
+    void captureError(
+      '[DSP Discovery] All providers failed for artist discovery',
+      new Error(result.errors.join('; ')),
+      {
+        creatorProfileId,
+        spotifyArtistId,
+        targetProviders,
+        errors: result.errors,
       }
-
-      const { match, status, error } = await discoveryPromise;
-      if (match && status) {
-        result.matches.push({
-          providerId,
-          status,
-          externalArtistId: match.externalArtistId,
-          externalArtistName: match.externalArtistName,
-          confidenceScore: match.confidenceScore,
-        });
-      } else if (error) {
-        result.errors.push(`${providerId}: ${error}`);
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unknown error occurred';
-      result.errors.push(`${providerId}: ${message}`);
-    }
+    );
   }
 
   return result;

@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { PanelRight, PanelRightOpen } from 'lucide-react';
+import { PanelRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
 export function DrawerToggleButton() {
   const { tableMeta } = useTableMeta();
@@ -14,18 +14,18 @@ export function DrawerToggleButton() {
     setIsOpen((tableMeta.rightPanelWidth ?? 0) > 0);
   }, [tableMeta.rightPanelWidth]);
 
-  const Icon = isOpen ? PanelRightOpen : PanelRight;
+  // Hide when drawer is open — the drawer's X button handles closing
+  if (isOpen) return null;
+
+  const Icon = PanelRight;
 
   return (
-    <Button
-      variant='ghost'
-      size='icon'
-      onClick={() => tableMeta.toggle?.()}
-      aria-label='Toggle contact details'
-      className='h-10 w-10 border-none'
+    <DashboardHeaderActionButton
+      ariaLabel='Toggle contact details'
+      pressed={isOpen}
       disabled={!tableMeta.toggle}
-    >
-      <Icon className='h-4 w-4' />
-    </Button>
+      onClick={() => tableMeta.toggle?.()}
+      icon={<Icon className='h-4 w-4' />}
+    />
   );
 }

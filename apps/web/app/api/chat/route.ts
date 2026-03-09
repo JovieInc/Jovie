@@ -7,7 +7,9 @@ import { and, count, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
-import { CHAT_MODEL } from '@/lib/constants/ai-models';
+import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { buildSystemPrompt } from '@/lib/chat/system-prompt';
+import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -18,7 +20,13 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
-import { CORS_HEADERS } from '@/lib/http/headers';
+import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
+import {
+  classifyIntent,
+  isDeterministicIntent,
+  routeIntent,
+} from '@/lib/intent-detection';
+import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import {
   checkAiChatRateLimitForPlan,
   createRateLimitHeaders,
@@ -28,10 +36,6 @@ import {
   getCanvasStatusFromMetadata,
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
-import {
-  SPOTIFY_CANVAS_SPEC,
-  TIKTOK_PREVIEW_SPEC,
-} from '@/lib/services/canvas/specs';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
@@ -45,25 +49,6 @@ const MAX_MESSAGE_LENGTH = 4000;
 
 /** Maximum allowed messages per request */
 const MAX_MESSAGES_PER_REQUEST = 50;
-
-/**
- * Editable profile fields by tier:
- * - Tier 1 (Safe): Non-destructive fields that can be freely edited
- * - Tier 2 (Careful): Fields that need confirmation before applying
- * - Tier 3 (Blocked): Cannot be edited via chat - requires settings page
- */
-const EDITABLE_FIELDS = {
-  tier1: ['displayName', 'bio'] as const,
-  tier2: [] as const,
-  blocked: ['username', 'spotifyId', 'genres'] as const,
-};
-
-type EditableField = (typeof EDITABLE_FIELDS.tier1)[number];
-
-const FIELD_DESCRIPTIONS: Record<EditableField, string> = {
-  displayName: 'Display name shown on your profile',
-  bio: 'Artist bio/description',
-};
 
 /**
  * Zod schema for validating client-provided artist context.
@@ -260,7 +245,8 @@ async function fetchReleasesForChat(
 async function resolveArtistContext(
   profileId: unknown,
   artistContextInput: unknown,
-  userId: string
+  userId: string,
+  corsHeaders: Record<string, string>
 ): Promise<
   | { context: ArtistContext; error?: never }
   | { context?: never; error: NextResponse }
@@ -271,7 +257,7 @@ async function resolveArtistContext(
       return {
         error: NextResponse.json(
           { error: 'Profile not found or unauthorized' },
-          { status: 404, headers: CORS_HEADERS }
+          { status: 404, headers: corsHeaders }
         ),
       };
     }
@@ -287,7 +273,7 @@ async function resolveArtistContext(
           error: 'Invalid artistContext format',
           details: parseResult.error.flatten().fieldErrors,
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400, headers: corsHeaders }
       ),
     };
   }
@@ -386,179 +372,6 @@ function sanitizeRetryAfterSeconds(value: unknown): number | null {
   return Math.min(normalized, 3600);
 }
 
-function buildSystemPrompt(
-  context: ArtistContext,
-  options?: { aiCanUseTools: boolean; aiDailyMessageLimit: number }
-): string {
-  const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-
-  return `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
-
-## About This Artist
-- **Name:** ${context.displayName} (@${context.username})
-- **Bio:** ${context.bio ?? 'Not set'}
-- **Genres:** ${context.genres.length > 0 ? context.genres.join(', ') : 'Not specified'}
-
-## Streaming Stats
-- **Spotify Followers:** ${context.spotifyFollowers?.toLocaleString() ?? 'Not connected'}
-- **Spotify Popularity:** ${context.spotifyPopularity ?? 'N/A'} / 100
-
-## Profile Analytics
-- **Profile Views:** ${context.profileViews.toLocaleString()}
-- **Has Social Links:** ${context.hasSocialLinks ? 'Yes' : 'No'}
-- **Has Music Links (DSPs):** ${context.hasMusicLinks ? 'Yes' : 'No'}
-
-## Tipping & Monetization
-- **Tip Link Clicks:** ${context.tippingStats.tipClicks}
-- **Tips Received:** ${context.tippingStats.tipsSubmitted}
-- **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
-- **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
-
-## Voice & Style (CRITICAL — follow strictly)
-- Be direct and concise. Most answers should be 1-3 sentences.
-- Never exceed 150 words unless the artist explicitly asks for detail or you are generating a bio.
-- Answer ONLY what was asked. Do not volunteer unrelated suggestions or observations.
-- No emoji. No exclamation marks unless genuinely warranted.
-- No marketing language, no cheerleading, no "Great question!" or "I'd love to help!" openers.
-- If the user asks to do something and you have a tool for it, call the tool immediately with minimal preamble.
-- Use bullet points only when listing 3+ items.
-- Use simple language, no jargon.
-
-### DO NOT
-- Suggest bio/links/genres/profile improvements unless specifically asked.
-- Greet the user with a profile review or stats summary they didn't ask for.
-- Pad responses with encouragement, motivational filler, or "let me know if you need anything else."
-- Repeat back what the user just said.
-
-### Guidelines
-- Be specific and data-driven when giving advice. Reference actual numbers, don't be vague.
-- Be honest about limitations. If you don't have enough data, say so.
-- Focus on actionable advice — give the artist something they can do.
-- Understand context: 0 profile views = just starting; 10K followers = has momentum.
-
-## What You Cannot Do
-- You cannot send emails, post content, or take actions on behalf of the artist
-- You cannot access external data or APIs
-- You cannot see their actual music or listen to tracks
-- You cannot guarantee results or make promises about outcomes
-
-## Profile Editing
-You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
-
-**Editable Fields:**
-- displayName: Their public display name
-- bio: Artist bio/description
-
-**Read-Only Fields:**
-- genres: Automatically synced from streaming platforms (Spotify, Apple Music, etc.) — cannot be edited manually
-
-**Blocked Fields (cannot edit via chat):**
-- username: Requires settings page
-- Connected accounts: Requires settings page
-
-**Profile Photo:**
-- Use the proposeAvatarUpload tool when the artist wants to change or update their profile photo. This renders an upload widget directly in the chat. Do not describe how to upload — just call the tool.
-- If they tell you they already updated their photo, acknowledge it briefly.
-
-**Social Links:**
-- Use the proposeSocialLink tool when the artist wants to add a social link or URL to their profile. Pass the full URL. If they only provide a handle (e.g. "@myhandle" for Instagram), construct the full URL (e.g. "https://instagram.com/myhandle") before calling the tool.
-- Do not add links without showing the confirmation preview first.
-
-When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
-
-## World-Class Bio Writing
-You have access to the writeWorldClassBio tool. Use it when the artist asks for a new biography, a rewrite for Spotify/Apple Music, or an AllMusic-quality narrative.
-- Pull in the artist's real platform signals and catalog context
-- Keep all claims factual and grounded in available data
-- Deliver a polished draft the artist can use directly or refine
-
-
-## Creative & Promotion Tools
-
-You also have tools to help with creative assets and promotion:
-
-**Spotify Canvas:**
-- Use the checkCanvasStatus tool to see which releases are missing canvas videos
-- All releases default to "not set" since Spotify has no public API for canvas detection
-- If the artist says they already have a canvas for a release, use markCanvasUploaded to update the status
-- Canvas is a 3-8 second looping video that plays behind tracks on Spotify mobile
-- You can help plan canvas generation from album artwork (AI removes text, upscales, and animates)
-- Specs: ${SPOTIFY_CANVAS_SPEC.minWidth}x${SPOTIFY_CANVAS_SPEC.minHeight}px minimum, 9:16 portrait, ${SPOTIFY_CANVAS_SPEC.minDurationSec}-${SPOTIFY_CANVAS_SPEC.maxDurationSec}s loop, H.264/MP4
-
-**Social Media Video Ads:**
-- Help artists plan video ads using their album art + song clips
-- Suggest promo text and strategy for different platforms
-- Consider QR codes linking to their Jovie page for tracking
-
-**TikTok Sound Previews:**
-- Help identify the best ${TIKTOK_PREVIEW_SPEC.durationSec}-second clip for TikTok previews
-- Consider hooks, drops, choruses, and viral moments
-- You can't listen to the audio, but you can advise based on song structure knowledge
-
-**Related Artists for Pitching:**
-- Use the suggestRelatedArtists tool to find similar artists
-- Useful for playlist pitching, ad targeting (Meta, TikTok), and collaboration
-- Base suggestions on genre, popularity tier, and audience overlap
-
-## Release Creation
-You can create new releases using the createRelease tool. This is useful for artists who:
-- Are not on Spotify and need to manually add their discography
-- Want to set up smart links for an upcoming release before it's live on streaming platforms
-- Have releases on platforms that aren't synced automatically
-
-When an artist asks to create a release, gather at minimum:
-- **Title** (required)
-- **Release type** (single, ep, album, compilation, live, mixtape, or other)
-
-Optional fields you can ask about:
-- **Release date** (when it was or will be released)
-- **Label** (record label name)
-- **UPC** (barcode, most artists won't know this)
-
-After creating the release, let the artist know they can add streaming links from the Releases page. The release will appear in their discography immediately.${
-    options && !options.aiCanUseTools
-      ? `
-
-## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), and add social links (proposeSocialLink). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`
-      : ''
-  }`;
-}
-
-/**
- * Creates the proposeProfileEdit tool for the AI to suggest profile changes.
- * This tool only returns a preview - actual changes require user confirmation.
- */
-function createProfileEditTool(context: ArtistContext) {
-  const profileEditSchema = z.object({
-    field: z.enum(['displayName', 'bio']).describe('The profile field to edit'),
-    newValue: z.string().describe('The new value for the field.'),
-    reason: z
-      .string()
-      .optional()
-      .describe('Brief explanation of why this change was suggested'),
-  });
-
-  return tool({
-    description:
-      'Propose a profile edit for the artist. Returns a preview that the user must confirm before it takes effect. Use this when the artist asks to update their display name or bio.',
-    inputSchema: profileEditSchema,
-    execute: async ({ field, newValue, reason }) => {
-      // Return preview data for the UI to render
-      return {
-        success: true,
-        preview: {
-          field,
-          fieldLabel: FIELD_DESCRIPTIONS[field],
-          currentValue: context[field],
-          newValue,
-          reason,
-        },
-      };
-    },
-  });
-}
-
 /**
  * Creates the proposeAvatarUpload tool that signals the client to render
  * an inline photo upload widget in the chat conversation.
@@ -610,6 +423,76 @@ function createSocialLinkTool() {
         normalizedUrl: detected.normalizedUrl,
         originalUrl: detected.originalUrl,
         suggestedTitle: detected.suggestedTitle,
+      };
+    },
+  });
+}
+
+/**
+ * Creates the proposeSocialLinkRemoval tool that fetches the artist's
+ * active social links and returns a confirmation card to remove one.
+ */
+function createSocialLinkRemovalTool(profileId: string | null) {
+  return tool({
+    description:
+      'Propose removing a social link from the artist profile. Use this when the artist asks to remove or delete a link. Returns a confirmation card with link details. You must specify the platform name (e.g. "instagram", "spotify", "twitter") to identify which link to remove.',
+    inputSchema: z.object({
+      platform: z
+        .string()
+        .describe(
+          'The platform name of the link to remove (e.g. "instagram", "spotify", "twitter", "tiktok"). Case-insensitive.'
+        ),
+    }),
+    execute: async ({ platform }) => {
+      if (!profileId) {
+        return {
+          success: false,
+          error: 'Profile ID required to remove links',
+        };
+      }
+
+      // Fetch active links for this profile
+      const activeLinks = await db
+        .select({
+          id: socialLinks.id,
+          platform: socialLinks.platform,
+          url: socialLinks.url,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, profileId),
+            eq(socialLinks.state, 'active')
+          )
+        );
+
+      if (activeLinks.length === 0) {
+        return {
+          success: false,
+          error: 'No social links found on your profile.',
+        };
+      }
+
+      // Find a matching link by platform (case-insensitive)
+      const normalizedPlatform = platform.toLowerCase();
+      const matchingLink = activeLinks.find(
+        l => l.platform.toLowerCase() === normalizedPlatform
+      );
+
+      if (!matchingLink) {
+        const available = activeLinks.map(l => l.platform).join(', ');
+        return {
+          success: false,
+          error: `No ${platform} link found. Available links: ${available}`,
+        };
+      }
+
+      return {
+        success: true,
+        action: 'remove_link' as const,
+        linkId: matchingLink.id,
+        platform: matchingLink.platform,
+        url: matchingLink.url,
       };
     },
   });
@@ -1109,14 +992,100 @@ function createWorldClassBioTool(
 }
 
 /**
+ * Creates the formatLyrics tool.
+ * Applies deterministic Apple Music formatting rules to raw lyrics text.
+ */
+function createLyricsFormatTool() {
+  return tool({
+    description:
+      'Format lyrics to Apple Music guidelines. Applies deterministic rules: removes section labels like [Verse]/[Chorus], straightens curly quotes, normalizes punctuation, collapses blank lines, and trims whitespace. Use when an artist asks to clean up or format lyrics.',
+    inputSchema: z.object({
+      lyrics: z
+        .string()
+        .min(1)
+        .max(10000)
+        .describe('Raw lyrics text to format for Apple Music'),
+    }),
+    execute: async ({ lyrics }) => {
+      const originalLineCount = lyrics.split('\n').length;
+      const { formatted, changesSummary } = formatLyricsForAppleMusic(lyrics);
+      const formattedLineCount = formatted.split('\n').length;
+
+      return {
+        success: true,
+        formatted,
+        changesSummary,
+        originalLineCount,
+        formattedLineCount,
+      };
+    },
+  });
+}
+
+/**
  * OPTIONS - CORS preflight handler
  */
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
+  const corsHeaders = createAuthenticatedCorsHeaders(
+    req.headers.get('origin'),
+    'POST, OPTIONS'
+  );
+
   return new NextResponse(null, {
     status: 204,
     headers: {
-      ...CORS_HEADERS,
+      ...corsHeaders,
       'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
+/**
+ * Creates the submitFeedback tool that saves user feedback to the database
+ * and notifies the team via Slack.
+ */
+function createSubmitFeedbackTool(clerkUserId: string) {
+  return tool({
+    description:
+      'Submit product feedback from the artist. Use this when the artist wants to share feedback, report a bug, or request a feature. Collect their feedback message first, then call this tool with the full text.',
+    inputSchema: z.object({
+      message: z
+        .string()
+        .min(5)
+        .max(2000)
+        .describe('The feedback message from the artist'),
+    }),
+    execute: async ({ message }) => {
+      const userRecord = await db.query.users.findFirst({
+        where: eq(users.clerkId, clerkUserId),
+        columns: { id: true, name: true, email: true },
+      });
+
+      const { createFeedbackItem } = await import('@/lib/feedback');
+      const { notifySlackFeedbackSubmission } = await import(
+        '@/lib/notifications/providers/slack'
+      );
+
+      await createFeedbackItem({
+        userId: userRecord?.id ?? null,
+        message,
+        source: 'chat',
+        context: {
+          pathname: '/app',
+          userAgent: null,
+          timestampIso: new Date().toISOString(),
+        },
+      });
+
+      await notifySlackFeedbackSubmission({
+        message,
+        name: userRecord?.name ?? 'Jovie user',
+        email: userRecord?.email,
+        source: 'chat',
+        pathname: '/app',
+      });
+
+      return { success: true };
     },
   });
 }
@@ -1125,10 +1094,15 @@ export async function OPTIONS() {
  * Build tools available on ALL plans (including Free).
  * These are basic profile management tools that don't require a paid plan.
  */
-function buildFreeChatTools() {
+function buildFreeChatTools(
+  resolvedProfileId: string | null,
+  clerkUserId: string
+) {
   return {
     proposeAvatarUpload: createAvatarUploadTool(),
     proposeSocialLink: createSocialLinkTool(),
+    proposeSocialLinkRemoval: createSocialLinkRemovalTool(resolvedProfileId),
+    submitFeedback: createSubmitFeedbackTool(clerkUserId),
   };
 }
 
@@ -1153,6 +1127,7 @@ function buildChatTools(
       resolvedProfileId
     ),
     markCanvasUploaded: createMarkCanvasUploadedTool(resolvedProfileId),
+    formatLyrics: createLyricsFormatTool(),
     ...(resolvedProfileId
       ? { createRelease: createReleaseTool(resolvedProfileId) }
       : {}),
@@ -1161,6 +1136,53 @@ function buildChatTools(
 
 function toNullableString(value: unknown): string | null {
   return value && typeof value === 'string' ? value : null;
+}
+
+/**
+ * Regex patterns for messages that can be handled by the lightweight model.
+ * These are simple, tool-invocation-oriented requests that don't need
+ * frontier-model reasoning.
+ */
+const SIMPLE_INTENT_PATTERNS = [
+  /^(?:change|update|set|edit|make)\s+(?:my\s+)?(?:display\s*name|name|bio)\s+(?:to|:)/i,
+  /^(?:add|connect|link)\s+(?:my\s+)?(?:instagram|twitter|x|tiktok|youtube|spotify|soundcloud|bandcamp|facebook|link|url|website)/i,
+  /^(?:upload|change|update|set)\s+(?:my\s+)?(?:photo|avatar|picture|profile\s*pic|pfp)/i,
+  /^(?:format|clean\s*up|fix)\s+(?:my\s+)?lyrics/i,
+  /^check\s+(?:my\s+)?canvas/i,
+  /^mark\s+\S+(?:\s+\S+)*\s+as\s+(?:uploaded|done|set)/i,
+] as const;
+
+/**
+ * Determines whether a request can be handled by the lightweight (Haiku) model.
+ *
+ * Returns true for:
+ * - Free-tier users (limited tools, simple Q&A)
+ * - Short conversations with clearly simple intents (profile edits, link adds)
+ */
+function canUseLightModel(
+  messages: UIMessage[],
+  aiCanUseTools: boolean
+): boolean {
+  // Free-plan users don't have advanced tools — always use the light model
+  if (!aiCanUseTools) return true;
+
+  // Only consider light model for short conversations
+  if (messages.length > 6) return false;
+
+  const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return false;
+
+  const text = lastUserMsg.parts
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('')
+    .trim();
+
+  // Short, clearly tool-oriented requests
+  return text.length < 200 && SIMPLE_INTENT_PATTERNS.some(p => p.test(text));
 }
 
 function isClientDisconnect(
@@ -1180,7 +1202,8 @@ function buildChatErrorResponse(
   messageCount: number,
   requestId: string,
   profileId: string | null,
-  conversationId: string | null
+  conversationId: string | null,
+  corsHeaders: Record<string, string>
 ) {
   Sentry.captureException(error, {
     tags: { feature: 'ai-chat' },
@@ -1202,19 +1225,23 @@ function buildChatErrorResponse(
       debugMessage: message,
       requestId,
     },
-    { status: 500, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+    { status: 500, headers: { ...corsHeaders, 'x-request-id': requestId } }
   );
 }
 
 export async function POST(req: Request) {
   const requestId = extractRequestId(req);
+  const corsHeaders = createAuthenticatedCorsHeaders(
+    req.headers.get('origin'),
+    'POST, OPTIONS'
+  );
 
   // Auth check - ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized', requestId },
-      { status: 401, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 401, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1239,7 +1266,7 @@ export async function POST(req: Request) {
       {
         status: 429,
         headers: {
-          ...CORS_HEADERS,
+          ...corsHeaders,
           ...createRateLimitHeaders(rateLimitResult),
           'x-request-id': requestId,
         },
@@ -1259,7 +1286,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body', requestId },
-      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1272,7 +1299,7 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json(
       { error: 'Missing profileId or artistContext', requestId },
-      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
@@ -1281,18 +1308,53 @@ export async function POST(req: Request) {
   if (messagesError) {
     return NextResponse.json(
       { error: messagesError, requestId },
-      { status: 400, headers: { ...CORS_HEADERS, 'x-request-id': requestId } }
+      { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
 
   // After validation, we know messages is a valid UIMessage array
   const uiMessages = messages as UIMessage[];
 
+  // --- Deterministic intent routing (skip AI for simple CRUD) ---
+  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
+  if (lastUserMsg) {
+    const userText = lastUserMsg.parts
+      .filter(
+        (p): p is { type: 'text'; text: string } =>
+          p.type === 'text' && typeof p.text === 'string'
+      )
+      .map(p => p.text)
+      .join('')
+      .trim();
+
+    const intent = classifyIntent(userText);
+    if (isDeterministicIntent(intent)) {
+      const resolvedProfileId = toNullableString(profileId);
+      const result = await routeIntent(intent, {
+        clerkUserId: userId,
+        profileId: resolvedProfileId,
+      });
+
+      if (result) {
+        return NextResponse.json(result, {
+          status: result.success ? 200 : 400,
+          headers: {
+            ...corsHeaders,
+            'x-request-id': requestId,
+            'x-intent-routed': 'true',
+            'x-intent-category': intent.category,
+          },
+        });
+      }
+    }
+  }
+
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(
     profileId,
     body.artistContext,
-    userId
+    userId,
+    corsHeaders
   );
   if (contextResult.error) {
     return contextResult.error;
@@ -1302,7 +1364,16 @@ export async function POST(req: Request) {
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
 
-  const systemPrompt = buildSystemPrompt(artistContext, {
+  let releases: ReleaseContext[] = [];
+  if (resolvedProfileId) {
+    try {
+      releases = await fetchReleasesForChat(resolvedProfileId);
+    } catch {
+      releases = [];
+    }
+  }
+
+  const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
     aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
   });
@@ -1310,24 +1381,35 @@ export async function POST(req: Request) {
   try {
     const modelMessages = await convertToModelMessages(uiMessages);
 
-    // Free tools (avatar upload, social links) available on ALL plans
-    const freeTools = buildFreeChatTools();
+    // Free tools (avatar upload, social links, link removal, feedback) available on ALL plans
+    const freeTools = buildFreeChatTools(resolvedProfileId, userId);
     // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
       ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }
       : freeTools;
 
+    const selectedModel = canUseLightModel(
+      uiMessages,
+      planLimits.booleans.aiCanUseTools
+    )
+      ? CHAT_MODEL_LIGHT
+      : CHAT_MODEL;
+
     const result = streamText({
-      model: gateway(CHAT_MODEL),
+      model: gateway(selectedModel),
       system: systemPrompt,
       messages: modelMessages,
       tools,
       abortSignal: req.signal,
+      providerOptions: {
+        anthropic: { cacheControl: true },
+      },
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: true,
         recordOutputs: true,
         functionId: 'jovie-chat',
+        metadata: { model: selectedModel },
       },
       onError: ({ error }) => {
         if (isClientDisconnect(error, req.signal)) return;
@@ -1347,7 +1429,7 @@ export async function POST(req: Request) {
 
     return result.toUIMessageStreamResponse({
       headers: {
-        ...CORS_HEADERS,
+        ...corsHeaders,
         'x-request-id': requestId,
       },
     });
@@ -1357,7 +1439,7 @@ export async function POST(req: Request) {
         JSON.stringify({ error: 'Client disconnected', requestId }),
         {
           status: 499,
-          headers: { ...CORS_HEADERS, 'x-request-id': requestId },
+          headers: { ...corsHeaders, 'x-request-id': requestId },
         }
       );
     }
@@ -1368,7 +1450,8 @@ export async function POST(req: Request) {
       uiMessages.length,
       requestId,
       resolvedProfileId,
-      resolvedConversationId
+      resolvedConversationId,
+      corsHeaders
     );
   }
 }

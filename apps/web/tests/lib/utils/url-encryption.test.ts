@@ -4,7 +4,28 @@
  */
 
 import crypto from 'crypto';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Pre-derive a fast test key to avoid expensive scryptSync (N=2^17) in every encrypt/decrypt
+const FAST_TEST_KEY = crypto.randomBytes(32);
+const originalScryptSync = crypto.scryptSync.bind(crypto);
+const scryptSpy = vi
+  .spyOn(crypto, 'scryptSync')
+  .mockImplementation((...args: unknown[]) => {
+    // If called with key length 32 and scrypt options (encryption key derivation), use fast key
+    if (
+      args[2] === 32 &&
+      typeof args[3] === 'object' &&
+      args[3] !== null &&
+      'N' in args[3]
+    ) {
+      return FAST_TEST_KEY;
+    }
+    return originalScryptSync(
+      ...(args as Parameters<typeof crypto.scryptSync>)
+    );
+  });
+
 import {
   type EncryptionResult,
   extractDomain,
@@ -21,10 +42,6 @@ import {
 } from '@/lib/utils/url-encryption.server';
 
 describe('URL Encryption', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe('encryptUrl', () => {
     it('should encrypt a URL and return encryption result', () => {
       const url = 'https://example.com/path?query=value';
@@ -65,6 +82,25 @@ describe('URL Encryption', () => {
       expect(decrypted).toBe(url);
     });
 
+    it('should use strong scrypt work factor parameters', () => {
+      scryptSpy.mockClear();
+
+      const result = encryptUrl('https://example.com/scrypt');
+      decryptUrl(result);
+
+      expect(scryptSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Buffer),
+        32,
+        expect.objectContaining({
+          N: 2 ** 17,
+          r: 8,
+          p: 1,
+          maxmem: 256 * 1024 * 1024,
+        })
+      );
+    });
+
     it('should throw error when cipher creation fails', () => {
       const url = 'https://example.com/fallback';
       const cipherSpy = vi
@@ -73,8 +109,12 @@ describe('URL Encryption', () => {
           throw new Error('cipher failure');
         });
 
-      expect(() => encryptUrl(url)).toThrow('Failed to encrypt URL');
-      expect(cipherSpy).toHaveBeenCalled();
+      try {
+        expect(() => encryptUrl(url)).toThrow('Failed to encrypt URL');
+        expect(cipherSpy).toHaveBeenCalled();
+      } finally {
+        cipherSpy.mockRestore();
+      }
     });
   });
 
@@ -104,9 +144,16 @@ describe('URL Encryption', () => {
     it('should throw error when encrypted payload is tampered', () => {
       const url = 'https://example.com/protected';
       const encrypted = encryptUrl(url);
+
+      // Tamper the auth tag to guarantee GCM authentication failure.
+      // Flipping a hex character in the auth tag is more reliable than
+      // modifying the ciphertext, which could coincidentally be a no-op
+      // if the last characters happen to match the replacement value.
+      const originalTag = encrypted.authTag;
+      const flippedChar = originalTag[0] === 'a' ? 'b' : 'a';
       const tampered: EncryptionResult = {
         ...encrypted,
-        encrypted: encrypted.encrypted.slice(0, -2) + 'aa',
+        authTag: flippedChar + originalTag.slice(1),
       };
 
       expect(() => decryptUrl(tampered)).toThrow();

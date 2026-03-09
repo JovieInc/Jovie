@@ -146,6 +146,7 @@ Each alert includes:
 1. **First Alert**: Team notification in Slack
 2. **Repeated Failures**: Consider on-call escalation
 3. **Critical Multi-Environment**: Immediate escalation required
+4. **Incident Process**: Follow `docs/ON_CALL_PROCESS.md` for triage, communication, and closure
 
 ## Maintenance
 

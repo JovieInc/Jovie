@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
-import { revalidateTag, updateTag } from 'next/cache';
+import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
+import { captureError } from '@/lib/error-tracking';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -23,29 +24,40 @@ function verifyBearerToken(authHeader: string | null, secret: string): boolean {
 }
 
 export async function POST(request: Request) {
-  const secret = env.REVALIDATE_SECRET;
+  try {
+    const secret = env.REVALIDATE_SECRET;
 
-  if (env.NODE_ENV === 'production' && !secret) {
+    if (env.NODE_ENV === 'production' && !secret) {
+      return NextResponse.json(
+        { error: 'Revalidation secret not configured' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (secret) {
+      const authHeader = request.headers.get('authorization');
+      if (!verifyBearerToken(authHeader, secret)) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
+    revalidateTag('featured-creators', 'max');
     return NextResponse.json(
-      { error: 'Revalidation secret not configured' },
+      { revalidated: true },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    await captureError('Featured creators revalidation failed', error, {
+      context: 'api-revalidate-featured-creators',
+      endpoint: '/api/revalidate/featured-creators',
+    });
+
+    return NextResponse.json(
+      { error: 'Revalidation failed' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
-
-  if (secret) {
-    const authHeader = request.headers.get('authorization');
-    if (!verifyBearerToken(authHeader, secret)) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-  }
-
-  updateTag('featured-creators');
-  revalidateTag('featured-creators', 'max');
-  return NextResponse.json(
-    { revalidated: true },
-    { headers: NO_STORE_HEADERS }
-  );
 }

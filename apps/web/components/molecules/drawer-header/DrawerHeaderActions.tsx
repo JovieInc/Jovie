@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, X } from 'lucide-react';
 import Link from 'next/link';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -24,6 +24,7 @@ export interface DrawerHeaderAction {
 export interface DrawerHeaderActionsProps {
   readonly primaryActions: DrawerHeaderAction[]; // Max 2, shown inline
   readonly overflowActions?: DrawerHeaderAction[]; // Rest in ellipsis menu
+  readonly onClose?: () => void;
 }
 
 /**
@@ -33,12 +34,13 @@ export interface DrawerHeaderActionsProps {
 export function DrawerHeaderActions({
   primaryActions,
   overflowActions = [],
+  onClose,
 }: DrawerHeaderActionsProps) {
   // Ensure max 2 primary actions
   const displayActions = primaryActions.slice(0, 2);
 
   // Convert overflow actions to menu items with defensive filtering
-  const menuItems: TableActionMenuItem[] = overflowActions
+  const baseMenuItems: TableActionMenuItem[] = overflowActions
     .filter(action => action?.id && action?.label)
     .map(action => ({
       id: action.id,
@@ -50,6 +52,19 @@ export function DrawerHeaderActions({
           ? () => globalThis.open(action.href, '_blank', 'noopener,noreferrer')
           : () => {}),
     }));
+
+  const menuItems: TableActionMenuItem[] = onClose
+    ? [
+        ...baseMenuItems,
+        ...(baseMenuItems.length > 0 ? [{ id: 'separator', label: '' }] : []),
+        {
+          id: 'close-drawer',
+          label: 'Close',
+          icon: X,
+          onClick: onClose,
+        },
+      ]
+    : baseMenuItems;
 
   return (
     <div className='flex items-center gap-1'>

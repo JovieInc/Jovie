@@ -62,6 +62,25 @@ export const LINKTREE_BRANDING_PATTERNS = [
 ];
 
 /**
+ * Patterns that indicate a Linktree verification badge.
+ * Verified profiles have a checkmark badge next to their name.
+ * Verification requires a paid plan + identity confirmation.
+ */
+export const LINKTREE_VERIFICATION_PATTERNS = [
+  // Aria labels for verification badge
+  /aria-label\s*=\s*["']verified["']/i,
+  /aria-label\s*=\s*["']verified\s+account["']/i,
+  /aria-label\s*=\s*["']verified\s+badge["']/i,
+  // Test IDs and data attributes used by Linktree's React components
+  /data-testid\s*=\s*["'].*verified.*badge["']/i,
+  /data-testid\s*=\s*["']ProfileVerifiedBadge["']/i,
+  // CSS class patterns for the verification badge
+  /class\s*=\s*["'][^"']*verified[_-]?badge[^"']*["']/i,
+  // SVG title element for verification checkmark
+  /<title[^>]*>\s*verified\s*<\/title>/i,
+];
+
+/**
  * Regex to extract href attributes from HTML.
  */
 export const HREF_REGEX = /href\s*=\s*["']([^"'#]+)["']/gi;

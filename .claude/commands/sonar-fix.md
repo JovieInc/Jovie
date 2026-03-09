@@ -1,10 +1,10 @@
 # SonarCloud Fix Command
 
-Automatically fetch, prioritize, and fix SonarCloud issues in a single PR with auto-merge.
+Automatically fetch, prioritize, and fix SonarCloud issues — shipping incremental PRs as fast as possible so CI runs in parallel.
 
 ## Instructions
 
-You are tasked with fixing the next logical batch of SonarCloud issues. Follow these steps:
+You are tasked with fixing SonarCloud issues. Ship each batch as its own PR immediately, then move to the next. Don't wait for CI.
 
 ### 1. Fetch Current SonarCloud Issues
 
@@ -20,7 +20,7 @@ If API unavailable, ask user to paste issues from: https://sonarcloud.io/project
 
 ### 2. Prioritize and Group Issues
 
-Group issues into a single PR batch using these criteria:
+Group issues into small, shippable batches:
 
 **Priority Order (fix highest first):**
 1. BLOCKER - Must fix immediately
@@ -29,22 +29,26 @@ Group issues into a single PR batch using these criteria:
 4. MINOR - Minor improvements
 5. INFO - Suggestions
 
-**Grouping Rules for Single PR:**
-- Same rule type (e.g., all cognitive complexity, all a11y issues)
-- Same component/directory when possible
-- Maximum 10-15 issues per PR to keep reviews manageable
+**Batching Rules (Ship Fast, Fail Fast):**
+- Group by rule type (e.g., all cognitive complexity, all a11y issues)
+- Maximum 5-7 issues per batch (smaller = faster CI feedback)
 - Never mix security fixes with style fixes
+- Each batch must stay within PR Discipline limits: **max 10 files, max 400 lines diff**
+- If a single rule type would exceed limits, split into sub-batches
 
 **Stop Conditions:**
 - If no issues remain, report "All SonarCloud issues resolved!"
 - If only INFO-level issues remain, ask user if they want to proceed
 
-### 3. Plan the Fixes
+### 3. Fix-Ship Loop
 
-For each issue in the batch:
-1. Read the affected file
+For each batch, repeat this cycle:
+
+#### 3a. Plan and Fix
+
+1. Read the affected files
 2. Understand the SonarCloud rule being violated
-3. Plan the minimal fix that resolves the issue
+3. Make the minimal fix that resolves each issue — no behavior changes
 
 **Common SonarCloud Rules:**
 | Rule | Fix |
@@ -59,109 +63,105 @@ For each issue in the batch:
 | S6859 (Regex precedence) | Add non-capturing groups |
 | S2201 (Unused return) | Use or remove the return value |
 
-### 4. Apply Fixes
+#### 3b. Size Gate
 
-For each issue:
-1. Make the minimal change to fix the issue
-2. Ensure no behavior changes
-3. Preserve existing formatting style
+Before committing, check the batch fits PR Discipline limits:
 
-### 5. Run Verification
+```bash
+git diff --stat | tail -1   # check file count and line count
+```
 
-Execute the /verify command:
+If >10 files or >400 lines changed, split this batch — commit only what fits, leave the rest for the next iteration.
+
+#### 3c. Verify
+
+Run /verify on the batch:
 - TypeScript compiles
 - Biome lint passes
 - Affected tests pass
 
-If verification fails, fix the issues before proceeding.
+If verification fails, fix before proceeding.
 
-### 6. Run Simplification
+#### 3d. Ship Immediately
 
-Execute the /simplify command:
-- Review changed files for additional cleanup opportunities
-- Apply only non-breaking simplifications
+```bash
+# Ensure on latest develop
+git checkout develop && git pull origin develop
 
-### 7. Create PR with Auto-Merge
+# Create feature branch
+git checkout -b fix/sonarcloud-{rule-or-category}-{batch-number}
 
-1. **Ensure on main branch:**
-   ```bash
-   git checkout main && git pull origin main
-   ```
+# Stage and commit
+git add <specific-files>
+git commit -m "fix: resolve SonarCloud {category} issues (batch {N})
 
-2. **Create feature branch:**
-   ```bash
-   git checkout -b fix/sonarcloud-{rule-or-category}
-   ```
-   Examples: `fix/sonarcloud-cognitive-complexity`, `fix/sonarcloud-unused-code`
+- {Brief description of fix 1}
+- {Brief description of fix 2}
 
-3. **Commit changes:**
-   ```bash
-   git add -A
-   git commit -m "fix: resolve SonarCloud {category} issues
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
-   - {Brief description of fix 1}
-   - {Brief description of fix 2}
-   ...
+# Push, create PR, enable auto-merge — then move on
+git push -u origin fix/sonarcloud-{rule-or-category}-{batch-number}
 
-   Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
-   ```
+gh pr create \
+  --title "fix: resolve SonarCloud {category} issues" \
+  --body "$(cat <<'EOF'
+## Summary
+Fixes {N} SonarCloud issues ({severity} priority):
+- {Issue 1 description}
+- {Issue 2 description}
 
-4. **Push and create PR with auto-merge:**
-   ```bash
-   git push -u origin fix/sonarcloud-{rule-or-category}
+## SonarCloud Rules Addressed
+- {Rule ID}: {Rule description}
 
-   gh pr create \
-     --title "fix: resolve SonarCloud {category} issues" \
-     --body "$(cat <<'EOF'
-   ## Summary
-   Fixes {N} SonarCloud issues ({severity} priority):
-   - {Issue 1 description}
-   - {Issue 2 description}
-   ...
+## Test plan
+- [x] TypeScript compiles
+- [x] Biome lint passes
+- [x] No behavior changes (code quality fixes only)
 
-   ## SonarCloud Rules Addressed
-   - {Rule ID}: {Rule description}
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+EOF
+)"
 
-   ## Test plan
-   - [x] TypeScript compiles
-   - [x] Biome lint passes
-   - [x] No behavior changes (code quality fixes only)
-
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
-   EOF
-   )"
-
-   # Enable auto-merge (squash)
-   gh pr merge --auto --squash
-   ```
-
-### 8. Summary Output
-
+gh pr merge --auto --squash
 ```
-✅ SonarCloud Issues Fixed
 
-📊 Batch Summary:
-   - Issues fixed: {N}
-   - Severity: {CRITICAL/MAJOR/MINOR}
-   - Category: {category}
+**Do NOT wait for CI.** Immediately return to develop and start the next batch.
 
-📁 Files Modified:
-   - {file1.tsx}
-   - {file2.ts}
+```bash
+git checkout develop
+```
 
-🔗 PR Created: {PR URL}
-   - Auto-merge: ENABLED
+#### 3e. Next Batch
 
-📋 Remaining Issues: {count}
-   - Next batch: {description of next priority issues}
+Repeat from step 3a with the next group of issues. Each PR ships independently — CI runs in parallel on all of them.
+
+### 4. Summary Output
+
+After all batches are shipped:
+
+```text
+SonarCloud Fix Run Complete
+
+PRs Created:
+  1. {PR URL} - {category} ({N} issues) - CI: pending
+  2. {PR URL} - {category} ({N} issues) - CI: pending
+  ...
+
+Total Issues Fixed: {N}
+Total PRs Created: {N}
+Remaining Issues: {count}
+  Next priority: {description of remaining issues}
 ```
 
 ## Important Notes
 
 - **Never change behavior** - Only fix code quality, not functionality
 - **One category per PR** - Keep PRs focused and reviewable
-- **Verify before commit** - All checks must pass
-- **Auto-merge requires CI** - PR will merge when all checks pass
+- **Ship fast, fail fast** - Push each batch immediately, don't wait for CI
+- **Size gates are hard limits** - Split if >10 files or >400 lines
+- **Verify before commit** - All local checks must pass per batch
+- **Auto-merge requires CI** - Each PR will merge independently when checks pass
 - **Skip flaky tests** - If CI fails on unrelated tests, document and proceed
 - **Ask when uncertain** - If a fix might change behavior, ask the user first
 

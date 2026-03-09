@@ -52,7 +52,7 @@ function shouldReportToSentry(issues: string[]): boolean {
 const VALIDATION_RETRY_CONFIG = {
   intervals: [100, 250, 500, 1000, 2000] as const,
   maxRetries: 5,
-  coldStartGracePeriod: 2000, // Don't report to Sentry if resolved within 2s
+  coldStartGracePeriod: 5000, // Don't report to Sentry if resolved within 5s (Doppler can take up to 4s on cold starts)
 } as const;
 
 /**
@@ -180,12 +180,41 @@ export async function register() {
       });
     }
 
-    // Validate Stripe billing config (separate from general env validation)
+    // Validate Stripe billing config with same retry logic as env validation
     try {
       const { validateStripeBillingConfig } = await import(
         '@/lib/stripe/startup-validation'
       );
-      validateStripeBillingConfig();
+      let stripeResult = validateStripeBillingConfig();
+
+      if (!stripeResult.healthy) {
+        for (let i = 0; i < VALIDATION_RETRY_CONFIG.maxRetries; i++) {
+          const delay = VALIDATION_RETRY_CONFIG.intervals[i];
+          console.log(
+            `[STARTUP] Stripe config unhealthy (attempt ${i + 1}/${VALIDATION_RETRY_CONFIG.maxRetries}), retrying after ${delay}ms...`
+          );
+          await new Promise(r => setTimeout(r, delay));
+          stripeResult = validateStripeBillingConfig();
+          if (stripeResult.healthy) {
+            console.log(`[STARTUP] Stripe config healthy on retry ${i + 2}`);
+            break;
+          }
+        }
+      }
+
+      if (!stripeResult.healthy && shouldReportToSentry(stripeResult.issues)) {
+        Sentry.captureMessage(
+          `Stripe billing config unhealthy after retries: ${stripeResult.issues.join(', ')}`,
+          {
+            level: 'warning',
+            tags: {
+              context: 'stripe_startup_validation',
+              vercel_env: process.env.VERCEL_ENV || 'unknown',
+            },
+            extra: { issues: stripeResult.issues },
+          }
+        );
+      }
     } catch (error) {
       console.error('[STARTUP] Stripe billing validation failed:', error);
       Sentry.captureException(error, {

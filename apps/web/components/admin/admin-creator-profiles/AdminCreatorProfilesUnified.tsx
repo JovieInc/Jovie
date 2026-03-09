@@ -6,23 +6,27 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
-import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import {
+  convertToCommonDropdownItems,
+  UnifiedTable,
+  useRowSelection,
+} from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { useAdminCreatorsInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { cn } from '@/lib/utils';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
+import { useDebouncedContactSave } from './useDebouncedContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 import { createCreatorProfileColumns } from './utils/column-definitions';
 
@@ -56,14 +60,13 @@ const ContactSidebar = dynamic(
       default: mod.ContactSidebar,
     })),
   {
-    loading: () => <div className='h-full w-full animate-pulse bg-surface-1' />,
+    loading: () => <div className='h-full w-full animate-pulse bg-surface-2' />,
     ssr: false,
   }
 );
 
 export function AdminCreatorProfilesUnified({
   profiles: initialProfiles,
-  page,
   pageSize,
   total,
   search,
@@ -103,26 +106,22 @@ export function AdminCreatorProfilesUnified({
     clearInviteProfile,
   } = useDialogState();
 
-  const {
-    totalPages,
-    canPrev,
-    canNext,
-    from,
-    to,
-    prevHref,
-    nextHref,
-    clearHref,
-    buildHref,
-  } = useAdminTablePaginationLinks({
-    basePath,
-    page,
-    pageSize,
-    search,
-    sort,
-    total,
-  });
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAdminCreatorsInfiniteQuery({
+      sort,
+      search,
+      pageSize,
+      initialData: { rows: profilesWithActions, total },
+    });
 
-  const filteredProfiles = profilesWithActions;
+  const filteredProfiles = useMemo(
+    () => data?.pages.flatMap(page => page.rows) ?? profilesWithActions,
+    [data, profilesWithActions]
+  );
+
+  const from = filteredProfiles.length > 0 ? 1 : 0;
+  const to = filteredProfiles.length;
+  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -187,10 +186,17 @@ export function AdminCreatorProfilesUnified({
 
   const { handleAvatarUpload } = useAvatarUpload();
 
-  const { isSaving, saveContact } = useContactSave({
+  const { saveContact, isSaving } = useContactSave({
     onSaveSuccess: updatedContact => {
       setDraftContact(updatedContact);
     },
+  });
+
+  useDebouncedContactSave({
+    effectiveContact,
+    sidebarOpen,
+    isSaving,
+    saveContact,
   });
 
   const { getContextMenuItems } = useContextMenuItems({
@@ -207,6 +213,7 @@ export function AdminCreatorProfilesUnified({
     handleBulkVerify,
     handleBulkUnverify,
     handleBulkFeature,
+    handleBulkRefreshMusicFetch,
     handleBulkDelete,
     handleClearSelection,
   } = useBulkActions({
@@ -308,7 +315,7 @@ export function AdminCreatorProfilesUnified({
   const columns = useMemo(
     () =>
       createCreatorProfileColumns({
-        page,
+        page: 1,
         pageSize,
         selectedIdsRef,
         headerCheckboxStateRef,
@@ -318,7 +325,6 @@ export function AdminCreatorProfilesUnified({
       }),
     /* eslint-enable react-hooks/refs */
     [
-      page,
       pageSize,
       // Note: selectedIds and headerCheckboxState are intentionally excluded
       // - they use refs to prevent column recreation on selection change
@@ -340,9 +346,9 @@ export function AdminCreatorProfilesUnified({
     const isSelected = profile.id === selectedIdRef.current;
 
     const getSelectionClass = () => {
-      if (isChecked) return 'bg-surface-2/70 hover:bg-surface-2';
-      if (isSelected) return 'bg-surface-2';
-      return 'hover:bg-surface-2/50';
+      if (isChecked) return 'bg-white/[0.04]';
+      if (isSelected) return 'bg-white/[0.04]';
+      return 'hover:bg-white/[0.02]';
     };
 
     return cn('group', getSelectionClass());
@@ -350,6 +356,18 @@ export function AdminCreatorProfilesUnified({
 
   // Register right panel with AuthShell instead of rendering inline.
   // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
+  const sidebarContextMenuItems = useMemo(() => {
+    const selectedProfile = selectedId
+      ? filteredProfiles.find(profile => profile.id === selectedId)
+      : null;
+
+    if (!selectedProfile) {
+      return [];
+    }
+
+    return convertToCommonDropdownItems(getContextMenuItems(selectedProfile));
+  }, [selectedId, filteredProfiles, getContextMenuItems]);
+
   const sidebarPanel = useMemo(
     () => (
       <ContactSidebar
@@ -359,8 +377,7 @@ export function AdminCreatorProfilesUnified({
         onClose={handleSidebarClose}
         onRefresh={handleSidebarRefresh}
         onContactChange={handleContactChange}
-        onSave={saveContact}
-        isSaving={isSaving}
+        contextMenuItems={sidebarContextMenuItems}
         onAvatarUpload={handleAvatarUpload}
       />
     ),
@@ -371,13 +388,12 @@ export function AdminCreatorProfilesUnified({
       handleSidebarClose,
       handleSidebarRefresh,
       handleContactChange,
-      saveContact,
-      isSaving,
+      sidebarContextMenuItems,
       handleAvatarUpload,
     ]
   );
 
-  useRegisterTablePanel(sidebarPanel);
+  useRegisterRightPanel(sidebarPanel);
 
   return (
     <>
@@ -404,26 +420,9 @@ export function AdminCreatorProfilesUnified({
               onBulkVerify={handleBulkVerify}
               onBulkUnverify={handleBulkUnverify}
               onBulkFeature={handleBulkFeature}
+              onBulkRefreshMusicFetch={handleBulkRefreshMusicFetch}
               onBulkDelete={handleBulkDelete}
               onClearSelection={handleClearSelection}
-            />
-          }
-          footer={
-            <AdminTablePagination
-              page={page}
-              totalPages={totalPages}
-              from={from}
-              to={to}
-              total={total}
-              canPrev={canPrev}
-              canNext={canNext}
-              prevHref={prevHref}
-              nextHref={nextHref}
-              pageSize={pageSize}
-              onPageSizeChange={nextPageSize => {
-                router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-              }}
-              entityLabel='profiles'
             />
           }
         >
@@ -452,6 +451,11 @@ export function AdminCreatorProfilesUnified({
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[13px]'
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => {
+                fetchNextPage().catch(() => {});
+              }}
             />
           )}
         </AdminTableShell>

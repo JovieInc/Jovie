@@ -11,6 +11,12 @@ const mockSetHeaderBadge = vi.fn();
 const mockSetHeaderActions = vi.fn();
 const mockSuccessNotification = vi.fn();
 const mockErrorNotification = vi.fn();
+const { mockSentryAddBreadcrumb, mockSentryCaptureMessage } = vi.hoisted(
+  () => ({
+    mockSentryAddBreadcrumb: vi.fn(),
+    mockSentryCaptureMessage: vi.fn(),
+  })
+);
 
 let mockSearchParams = new URLSearchParams();
 
@@ -22,6 +28,11 @@ vi.mock('next/navigation', () => ({
   }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/app/chat',
+}));
+
+vi.mock('@/lib/sentry/client-lite', () => ({
+  addBreadcrumb: mockSentryAddBreadcrumb,
+  captureMessage: mockSentryCaptureMessage,
 }));
 
 // Mock the HeaderActionsContext
@@ -42,12 +53,14 @@ vi.mock('@/components/jovie/JovieChat', () => ({
     onConversationCreate?: (id: string) => void;
     onTitleChange?: (title: string | null) => void;
     initialQuery?: string;
+    isFirstSession?: boolean;
   }) => {
     capturedOnTitleChange = props.onTitleChange;
     return React.createElement('div', {
       'data-testid': 'jovie-chat',
       'data-profile-id': props.profileId,
       'data-conversation-id': props.conversationId ?? '',
+      'data-is-first-session': props.isFirstSession ? 'true' : 'false',
     });
   },
 }));
@@ -72,9 +85,19 @@ vi.mock(
         previewData: null,
         setPreviewData: vi.fn(),
       }),
+      usePreviewPanelState: () => ({
+        isOpen: false,
+        open: vi.fn(),
+        close: vi.fn(),
+        toggle: vi.fn(),
+      }),
     };
   }
 );
+
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
+}));
 
 vi.mock('@/lib/queries/useDashboardSocialLinksQuery', () => ({
   useDashboardSocialLinksQuery: () => ({ data: [], isLoading: false }),
@@ -112,12 +135,22 @@ const baseDashboardData: DashboardData = {
     totalReceivedCents: 0,
     monthReceivedCents: 0,
   },
+  profileCompletion: {
+    percentage: 57,
+    completedCount: 4,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: true,
+  },
 };
 
-function renderChatPage(conversationId?: string) {
+function renderChatPage(conversationId?: string, isFirstSession?: boolean) {
   return fastRender(
     <DashboardDataProvider value={baseDashboardData}>
-      <ChatPageClient conversationId={conversationId} />
+      <ChatPageClient
+        conversationId={conversationId}
+        isFirstSession={isFirstSession}
+      />
     </DashboardDataProvider>
   );
 }
@@ -141,6 +174,18 @@ describe('ChatPageClient', () => {
     const { getByTestId } = renderChatPage('conv-123');
     const chat = getByTestId('jovie-chat');
     expect(chat.getAttribute('data-conversation-id')).toBe('conv-123');
+  });
+
+  it('marks no-conversation route as first session', () => {
+    const { getByTestId } = renderChatPage(undefined, true);
+    const chat = getByTestId('jovie-chat');
+    expect(chat.getAttribute('data-is-first-session')).toBe('true');
+  });
+
+  it('marks conversation route as not first session', () => {
+    const { getByTestId } = renderChatPage('conv-123');
+    const chat = getByTestId('jovie-chat');
+    expect(chat.getAttribute('data-is-first-session')).toBe('false');
   });
 
   it('passes onTitleChange callback to JovieChat', () => {
@@ -217,5 +262,38 @@ describe('ChatPageClient', () => {
 
     // Should show spinner, not JovieChat
     expect(container.querySelector('[data-testid="jovie-chat"]')).toBeNull();
+    expect(container.textContent).toContain('Finishing your dashboard setup…');
+    const retryButton = Array.from(container.querySelectorAll('button')).find(
+      button => button.textContent?.trim() === 'Retry'
+    );
+    expect(retryButton).toBeUndefined();
+    expect(mockSentryAddBreadcrumb).toHaveBeenCalled();
+  });
+
+  it('shows load failed message when dashboard load error exists', () => {
+    const dataWithoutProfile: DashboardData = {
+      ...baseDashboardData,
+      selectedProfile: null,
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message: 'DB timeout',
+        code: 'QUERY_TIMEOUT',
+        errorType: 'QueryTimeoutError',
+      },
+    };
+
+    const { container } = fastRender(
+      <DashboardDataProvider value={dataWithoutProfile}>
+        <ChatPageClient />
+      </DashboardDataProvider>
+    );
+
+    expect(container.textContent).toContain(
+      'We hit a problem loading your profile. Please retry in a moment.'
+    );
+    expect(mockSentryCaptureMessage).toHaveBeenCalledWith(
+      'Chat selectedProfile missing due to dashboard load failure',
+      expect.any(Object)
+    );
   });
 });

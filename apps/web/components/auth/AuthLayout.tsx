@@ -114,7 +114,7 @@ export function AuthLayout({
       className={cn(
         // Fixed positioning prevents iOS Safari rubber-band overscroll completely
         // max-w-[100dvw] prevents any content from causing horizontal scroll on mobile
-        'fixed inset-0 flex flex-col items-center bg-surface-0 text-primary-token overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw]',
+        'fixed inset-0 flex flex-col items-center bg-(--linear-bg-page) text-[var(--linear-text-primary)] overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw]',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
         // Vertical padding - reduced on mobile, increases on larger screens
@@ -162,7 +162,7 @@ export function AuthLayout({
       {/* Logo container - fixed dimensions to prevent layout shift between screens */}
       <div
         className={cn(
-          'mb-8 h-12 w-12 flex items-center justify-center',
+          'mb-8 h-8 w-8 flex items-center justify-center',
           'transition-opacity duration-200 ease-out',
           // Hide visually when keyboard visible or showLogo=false, but preserve space
           (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
@@ -180,7 +180,7 @@ export function AuthLayout({
               shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
             }
           >
-            <BrandLogo size={48} tone='auto' priority />
+            <BrandLogo size={32} tone='auto' priority />
           </span>
         </Link>
       </div>
@@ -207,20 +207,20 @@ export function AuthLayout({
           `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10`,
           // Smooth scroll target
           'scroll-mt-4',
-          // Prevent horizontal overflow from child elements
-          'overflow-x-clip'
+          // Allow step indicator to render without clipping
+          'overflow-visible'
         )}
       >
         {children}
       </div>
 
-      {/* Footer - hide when keyboard is visible */}
+      {/* Footer - hide when keyboard is visible, mt-auto pushes to bottom */}
       {showFooterPrompt && !isKeyboardVisible && (
-        <p className='mt-8 text-[13px] font-[450] text-tertiary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
+        <p className='mt-auto pt-8 text-[13px] font-[450] text-tertiary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-primary-token hover:underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-primary-token underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>

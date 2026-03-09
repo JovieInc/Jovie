@@ -24,7 +24,6 @@ export interface UseDashboardAudienceTableReturn {
   toggleSelect: (id: string) => void;
   toggleSelectAll: () => void;
   clearSelection: () => void;
-  totalPages: number;
   bulkActions: BulkAction[];
   handleCopyProfileLink: () => Promise<void>;
 }
@@ -33,21 +32,20 @@ export function useDashboardAudienceTable({
   mode,
   rows,
   total,
-  page,
-  pageSize,
   sort,
   direction,
   profileUrl,
 }: Omit<
   DashboardAudienceTableProps,
-  | 'onPageChange'
-  | 'onPageSizeChange'
   | 'onSortChange'
   | 'onViewChange'
   | 'onFiltersChange'
   | 'view'
   | 'subscriberCount'
   | 'filters'
+  | 'hasNextPage'
+  | 'isFetchingNextPage'
+  | 'onLoadMore'
 >): UseDashboardAudienceTableReturn {
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();
@@ -72,7 +70,7 @@ export function useDashboardAudienceTable({
   React.useEffect(() => {
     clearSelection();
     setSelectedMember(null);
-  }, [mode, page, pageSize, sort, direction, clearSelection]);
+  }, [mode, sort, direction, clearSelection]);
 
   React.useEffect(() => {
     const toggle = () => {
@@ -90,8 +88,6 @@ export function useDashboardAudienceTable({
       setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
     };
   }, [rows, selectedMember, setTableMeta]);
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const selectedRows = React.useMemo(
     () => rows.filter(row => selectedIds.has(row.id)),
@@ -210,7 +206,6 @@ export function useDashboardAudienceTable({
     toggleSelect,
     toggleSelectAll,
     clearSelection,
-    totalPages,
     bulkActions,
     handleCopyProfileLink,
   };

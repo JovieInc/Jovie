@@ -16,9 +16,17 @@ import {
 } from './constants';
 import type { ApproveStatus, Column } from './types';
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 interface UseWaitlistColumnsProps {
   readonly approveStatuses: Readonly<Record<string, ApproveStatus>>;
-  readonly onApprove: (entryId: string) => void;
+  readonly onApprove: (entry: Pick<WaitlistEntryRow, 'id' | 'status'>) => void;
 }
 
 export function useWaitlistColumns({
@@ -160,15 +168,7 @@ export function useWaitlistColumns({
         id: 'created',
         header: 'Created',
         cell: entry =>
-          entry.createdAt
-            ? new Intl.DateTimeFormat('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              }).format(entry.createdAt)
-            : '—',
+          entry.createdAt ? dateFormatter.format(entry.createdAt) : '—',
         width: 'w-[160px]',
         hideOnMobile: true,
       },
@@ -179,21 +179,23 @@ export function useWaitlistColumns({
           const isApproved =
             entry.status === 'invited' || entry.status === 'claimed';
           const approveStatus = approveStatuses[entry.id] ?? 'idle';
-          const isApproving = approveStatus === 'loading';
+          const isApproving = approveStatus === 'approving';
+          const isDisapproving = approveStatus === 'disapproving';
 
           return (
             <div className='flex items-center justify-end gap-2'>
               <Button
                 size='sm'
                 variant='secondary'
-                disabled={isApproved || isApproving}
+                disabled={isApproving || isDisapproving}
                 onClick={() => {
-                  void onApprove(entry.id);
+                  onApprove(entry);
                 }}
               >
                 {(() => {
-                  if (isApproved) return 'Approved';
                   if (isApproving) return 'Approving…';
+                  if (isDisapproving) return 'Disapproving…';
+                  if (isApproved) return 'Disapprove';
                   return 'Approve';
                 })()}
               </Button>

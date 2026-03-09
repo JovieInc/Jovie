@@ -2,10 +2,14 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
-  AdminActivitySection,
-  AdminActivitySectionSkeleton,
   AdminKpiSection,
   AdminKpiSectionSkeleton,
+  AdminOutreachSection,
+  AdminOutreachSectionSkeleton,
+  AdminPlatformStatsSection,
+  AdminPlatformStatsSectionSkeleton,
+  AdminSentrySection,
+  AdminSentrySectionSkeleton,
   AdminUsageSection,
   AdminUsageSectionSkeleton,
 } from './_components';
@@ -20,21 +24,36 @@ export default function AdminPage() {
   return (
     <PageShell>
       <PageContent>
-        <div className='space-y-8' data-testid='admin-dashboard-content'>
-          <header>
-            <h1 className='sr-only'>Admin Dashboard</h1>
-          </header>
-
+        <div
+          className='flex h-full flex-col gap-6'
+          data-testid='admin-dashboard-content'
+        >
+          {/* Row 1: Growth KPIs */}
           <Suspense fallback={<AdminKpiSectionSkeleton />}>
             <AdminKpiSection />
           </Suspense>
 
-          <Suspense fallback={<AdminUsageSectionSkeleton />}>
-            <AdminUsageSection />
+          <Suspense fallback={<AdminPlatformStatsSectionSkeleton />}>
+            <AdminPlatformStatsSection />
           </Suspense>
 
-          <Suspense fallback={<AdminActivitySectionSkeleton />}>
-            <AdminActivitySection />
+          {/* Row 2: Outreach pipeline + Reliability side by side */}
+          <div className='grid min-h-0 flex-1 gap-6 lg:grid-cols-3'>
+            <div className='lg:col-span-2'>
+              <Suspense fallback={<AdminOutreachSectionSkeleton />}>
+                <AdminOutreachSection />
+              </Suspense>
+            </div>
+            <div>
+              <Suspense fallback={<AdminUsageSectionSkeleton />}>
+                <AdminUsageSection />
+              </Suspense>
+            </div>
+          </div>
+
+          {/* Row 3: Sentry */}
+          <Suspense fallback={<AdminSentrySectionSkeleton />}>
+            <AdminSentrySection />
           </Suspense>
         </div>
       </PageContent>

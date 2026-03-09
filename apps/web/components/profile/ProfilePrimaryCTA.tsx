@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { CTAButton } from '@/components/atoms/CTAButton';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
+import { SubscriptionFormSkeleton } from '@/components/profile/artist-notifications-cta/shared';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
@@ -17,8 +18,9 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import { ListenDrawer } from './ListenDrawer';
 
 const ctaLoadingFallback = (
-  <div className='space-y-4 py-4 sm:py-5' aria-busy='true'>
-    <div className='h-12 w-full rounded-xl bg-surface-1 animate-pulse' />
+  <div className='space-y-3 py-2 sm:py-3'>
+    <div className='h-3 w-40 rounded skeleton' aria-hidden='true' />
+    <SubscriptionFormSkeleton />
   </div>
 );
 
@@ -112,13 +114,13 @@ export function ProfilePrimaryCTA({
   ) {
     if (subscribeTwoStep) {
       return (
-        <div className='space-y-4 py-4 sm:py-5'>
+        <div className='space-y-3 py-2 sm:py-3'>
           <TwoStepNotificationsCTA artist={artist} />
         </div>
       );
     }
     return (
-      <div className='space-y-4 py-4 sm:py-5'>
+      <div className='space-y-3 py-2 sm:py-3'>
         <ArtistNotificationsCTA
           artist={artist}
           variant='button'

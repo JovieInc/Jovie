@@ -4,6 +4,7 @@
  * Type definitions for the ContactSidebar component.
  */
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import type { Contact as BaseContact, ContactSidebarMode } from '@/types';
 
 export type Contact = BaseContact;
@@ -22,10 +23,11 @@ export interface ContactSidebarProps {
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
   readonly onContactChange?: (contact: Contact) => void;
-  readonly onSave?: (
-    contact: Contact
-  ) => void | Promise<void> | Promise<boolean>;
-  readonly isSaving?: boolean;
+  /**
+   * Optional externally provided drawer actions.
+   * When omitted, the sidebar falls back to its built-in actions.
+   */
+  readonly contextMenuItems?: CommonDropdownItem[];
   /**
    * Optional avatar upload handler. When provided and mode === 'admin',
    * the avatar becomes uploadable and this callback is used to obtain

@@ -134,7 +134,7 @@ grep -rn "useState\|useEffect\|useCallback" apps/web/app --include="*.tsx" | gre
 grep -l "'use client'" apps/web --include="*.tsx" --include="*.ts" -r | xargs grep -l "@/lib/db" 2>/dev/null
 ```
 
-### 2. Static Marketing Pages (CRITICAL - from agents.md)
+### 2. Static Marketing Pages (CRITICAL - from AGENTS.md)
 
 **Marketing routes MUST be fully static:** `app/(marketing)/**` and `app/(dynamic)/legal/**`
 

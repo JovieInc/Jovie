@@ -276,6 +276,13 @@ export const ALL_PLATFORMS = [
   // Payment/Tip Platforms
   // ========================================
   {
+    id: 'stripe',
+    name: 'Stripe Connect',
+    category: 'payment',
+    icon: 'stripe',
+    color: '635BFF',
+  },
+  {
     id: 'venmo',
     name: 'Venmo',
     category: 'payment',

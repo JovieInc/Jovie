@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
@@ -13,6 +14,7 @@ import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
 import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
 import { PRIMARY_DSP_IDS, useSocialsForm } from './useSocialsForm';
+import { VerificationModal } from './VerificationModal';
 
 /** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
 const CHIP_BG_ALPHA = 0x15 / 255;
@@ -54,16 +56,17 @@ const SUGGESTED_PLATFORM_IDS = [
   'youtube',
   'x',
   'facebook',
+  'venmo',
   'linkedin',
   'discord',
   'reddit',
-  'website',
 ] as const;
 
 const EXCLUDED_PLATFORM_IDS = new Set([
   'onlyfans',
   'twitter',
-  // Professional links (only 'website' remains)
+  // Professional / generic links — blocked
+  'website',
   'blog',
   'portfolio',
   'booking',
@@ -81,7 +84,7 @@ const EXCLUDED_PLATFORM_IDS = new Set([
 
 const SOCIAL_LINK_PLATFORM_CANDIDATES = ALL_PLATFORMS.filter(
   platform =>
-    (['social', 'creator', 'messaging', 'professional'].includes(
+    (['social', 'creator', 'messaging', 'professional', 'payment'].includes(
       platform.category
     ) ||
       (platform.category === 'music' && !PRIMARY_DSP_IDS.has(platform.id))) &&
@@ -124,9 +127,9 @@ const PLATFORM_PLACEHOLDERS = Object.fromEntries(
 
 PLATFORM_PLACEHOLDERS.x = 'https://x.com/yourhandle';
 PLATFORM_PLACEHOLDERS.twitter = 'https://x.com/yourhandle';
-PLATFORM_PLACEHOLDERS.website = 'https://yourwebsite.com';
 PLATFORM_PLACEHOLDERS.blog = 'https://yourblog.com';
 PLATFORM_PLACEHOLDERS.email = 'mailto:you@example.com';
+PLATFORM_PLACEHOLDERS.venmo = 'https://venmo.com/yourhandle';
 
 // Music DSP placeholders (canonical underscore IDs from ALL_PLATFORMS)
 PLATFORM_PLACEHOLDERS.youtube_music =
@@ -149,7 +152,9 @@ function getPlatformLabel(platform: string): string {
 
 /** Build dropdown items for the platform selector, grouped by category with search support. */
 function buildPlatformItems(
-  onSelect: (platformId: string) => void
+  onSelect: (platformId: string) => void,
+  currentPlatform: string,
+  usedPlatforms: Set<string>
 ): CommonDropdownItem[] {
   const items: CommonDropdownItem[] = [];
 
@@ -163,12 +168,14 @@ function buildPlatformItems(
       label: group.label,
     });
     for (const p of group.platforms) {
+      const alreadyUsed = usedPlatforms.has(p.id) && p.id !== currentPlatform;
       items.push({
         type: 'action',
         id: p.id,
-        label: p.name,
+        label: alreadyUsed ? `${p.name} (already added)` : p.name,
         icon: <SocialIcon platform={p.id} className='h-4 w-4' aria-hidden />,
         onClick: () => onSelect(p.id),
+        disabled: alreadyUsed,
       });
     }
   });
@@ -188,7 +195,14 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     scheduleNormalize,
     handleUrlBlur,
     addSocialLink,
+    verifyWebsite,
+    verifyingLinkId,
+    verificationError,
+    clearVerificationError,
   } = useSocialsForm({ artistId: artist.id });
+  const [verifyModalLinkId, setVerifyModalLinkId] = useState<string | null>(
+    null
+  );
   const {
     suggestions,
     isLoading: suggestionsLoading,
@@ -234,20 +248,35 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
     [focusUrlField, handleAddSocialLink, socialLinks.length]
   );
 
+  /** Set of platform IDs already used across social links (for duplicate prevention). */
+  const usedPlatforms = useMemo(() => {
+    const used = new Set<string>();
+    for (const link of socialLinks) {
+      if (link.platform) used.add(link.platform);
+    }
+    return used;
+  }, [socialLinks]);
+
   /** Memoize platform dropdown items per-row so onClick closures stay stable. */
   const platformItemsByIndex = useMemo(
     () =>
-      socialLinks.map((_, index) =>
-        buildPlatformItems(platformId =>
-          updateSocialLink(index, 'platform', platformId)
+      socialLinks.map((link, index) =>
+        buildPlatformItems(
+          platformId => updateSocialLink(index, 'platform', platformId),
+          link.platform,
+          usedPlatforms
         )
       ),
-    [socialLinks, updateSocialLink]
+    [socialLinks, updateSocialLink, usedPlatforms]
   );
 
   if (loading) {
     return (
-      <div className='rounded-lg border border-subtle divide-y divide-subtle'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='divide-y divide-subtle'
+      >
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div key={key} className='flex items-center gap-3 px-4 py-3'>
             <div className='h-8 w-8 rounded-md skeleton shrink-0' />
@@ -255,12 +284,17 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             <div className='flex-1 h-9 rounded-lg skeleton' />
           </div>
         ))}
-      </div>
+      </DashboardCard>
     );
   }
 
   return (
     <div className='space-y-5' data-testid='socials-form'>
+      <p className='text-[13px] text-secondary-token'>
+        Links are shown contextually on your public profile based on where
+        visitors come from. Not every link will display at all times.
+      </p>
+
       {!suggestionsLoading && suggestions.length > 0 && (
         <SocialLinkSuggestionRows
           suggestions={suggestions}
@@ -285,7 +319,11 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className='space-y-0'>
-          <div className='rounded-lg border border-subtle divide-y divide-subtle'>
+          <DashboardCard
+            variant='settings'
+            padding='none'
+            className='divide-y divide-subtle'
+          >
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
@@ -358,7 +396,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                 </Button>
               </div>
             ))}
-          </div>
+          </DashboardCard>
 
           <div className='flex flex-col gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
             <Button
@@ -384,17 +422,43 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
       {error && (
         <div className='bg-error-subtle border border-error rounded-lg p-3'>
-          <p className='text-sm text-error'>{error}</p>
+          <p className='text-[13px] text-error'>{error}</p>
         </div>
       )}
 
       {success && (
         <div className='bg-success-subtle border border-success rounded-lg p-3'>
-          <p className='text-sm text-success'>
+          <p className='text-[13px] text-success'>
             Social links saved successfully!
           </p>
         </div>
       )}
+
+      {(() => {
+        const modalLink = socialLinks.find(l => l.id === verifyModalLinkId);
+        if (!modalLink) return null;
+        let hostname = '';
+        try {
+          hostname = new URL(modalLink.url).hostname;
+        } catch {
+          hostname = modalLink.url;
+        }
+        return (
+          <VerificationModal
+            open={!!verifyModalLinkId}
+            onClose={() => {
+              setVerifyModalLinkId(null);
+              clearVerificationError();
+            }}
+            hostname={hostname}
+            verificationToken={modalLink.verificationToken ?? ''}
+            onVerify={() => verifyWebsite(modalLink.id)}
+            verifying={verifyingLinkId === modalLink.id}
+            verificationStatus={modalLink.verificationStatus ?? 'unverified'}
+            verificationError={verificationError}
+          />
+        );
+      })()}
     </div>
   );
 }

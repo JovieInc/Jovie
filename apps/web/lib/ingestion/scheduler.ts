@@ -2,6 +2,7 @@ import { and, sql as drizzleSql, eq, gte, inArray, lte } from 'drizzle-orm';
 import { type DbOrTransaction } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   beaconsPayloadSchema,
@@ -160,6 +161,16 @@ export async function handleIngestionJobFailure(
         message
       );
     }
+  }
+
+  if (!shouldRetry) {
+    await captureError('Ingestion job permanently failed', error, {
+      jobId: job.id,
+      jobType: job.jobType,
+      attempts: job.attempts,
+      maxAttempts,
+      reason,
+    });
   }
 
   await failJob(tx, job, message, { reason });

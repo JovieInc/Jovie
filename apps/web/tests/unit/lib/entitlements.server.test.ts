@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 const { mockCachedAuth, mockCachedCurrentUser } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
@@ -55,19 +52,19 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canBeVerified: false,
-      aiCanUseTools: false,
-      canCreateManualReleases: false,
+      aiCanUseTools: true,
+      canCreateManualReleases: true,
       canAccessFutureReleases: false,
-      canSendNotifications: false,
-      canEditSmartLinks: false,
-      analyticsRetentionDays: 7,
+      canSendNotifications: true,
+      canEditSmartLinks: true,
+      analyticsRetentionDays: 30,
       contactsLimit: 100,
-      smartLinksLimit: 25,
-      aiDailyMessageLimit: 5,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 25,
     });
   });
 
-  it('throws BillingUnavailableError when billing lookup fails', async () => {
+  it('degrades to free tier when billing lookup fails', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'user@example.com' },
@@ -78,12 +75,14 @@ describe('getCurrentUserEntitlements', () => {
       error: 'database connection failed',
     });
 
-    await expect(getCurrentUserEntitlements()).rejects.toThrow(
-      BillingUnavailableError
-    );
+    const e = await getCurrentUserEntitlements();
+    expect(e.plan).toBe('free');
+    expect(e.isPro).toBe(false);
+    expect(e.isAuthenticated).toBe(true);
+    expect(e.userId).toBe('user_123');
   });
 
-  it('BillingUnavailableError preserves admin status', async () => {
+  it('billing failure preserves admin status in degraded result', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_admin' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'admin@example.com' },
@@ -94,15 +93,11 @@ describe('getCurrentUserEntitlements', () => {
       error: 'timeout',
     });
 
-    try {
-      await getCurrentUserEntitlements();
-      expect.fail('Should have thrown');
-    } catch (error) {
-      expect(error).toBeInstanceOf(BillingUnavailableError);
-      const billingError = error as BillingUnavailableError;
-      expect(billingError.userId).toBe('user_admin');
-      expect(billingError.isAdmin).toBe(true);
-    }
+    const e = await getCurrentUserEntitlements();
+    expect(e.isAdmin).toBe(true);
+    expect(e.isAuthenticated).toBe(true);
+    expect(e.plan).toBe('free');
+    expect(e.userId).toBe('user_admin');
   });
 
   it('returns free entitlements when billing data is null (new user)', async () => {
@@ -123,7 +118,29 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.plan).toBe('free');
     expect(entitlements.isPro).toBe(false);
     expect(entitlements.contactsLimit).toBe(100);
-    expect(entitlements.analyticsRetentionDays).toBe(7);
+    expect(entitlements.analyticsRetentionDays).toBe(30);
+  });
+
+  it('returns free entitlements when billing lookup reports user not found', async () => {
+    mockCachedAuth.mockResolvedValue({ userId: 'user_new_missing_row' });
+    mockCachedCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'newmissing@example.com' },
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: false,
+      error: 'User not found',
+    });
+
+    const entitlements = await getCurrentUserEntitlements();
+
+    expect(entitlements.userId).toBe('user_new_missing_row');
+    expect(entitlements.isAuthenticated).toBe(true);
+    expect(entitlements.email).toBe('newmissing@example.com');
+    expect(entitlements.plan).toBe('free');
+    expect(entitlements.isPro).toBe(false);
+    expect(entitlements.contactsLimit).toBe(100);
+    expect(entitlements.analyticsRetentionDays).toBe(30);
   });
 
   it('maps billing data for a free user', async () => {
@@ -161,15 +178,15 @@ describe('getCurrentUserEntitlements', () => {
       canFilterSelfFromAnalytics: false,
       canAccessAdPixels: false,
       canBeVerified: false,
-      aiCanUseTools: false,
-      canCreateManualReleases: false,
+      aiCanUseTools: true,
+      canCreateManualReleases: true,
       canAccessFutureReleases: false,
-      canSendNotifications: false,
-      canEditSmartLinks: false,
-      analyticsRetentionDays: 7,
+      canSendNotifications: true,
+      canEditSmartLinks: true,
+      analyticsRetentionDays: 30,
       contactsLimit: 100,
-      smartLinksLimit: 25,
-      aiDailyMessageLimit: 5,
+      smartLinksLimit: null,
+      aiDailyMessageLimit: 25,
     });
   });
 
@@ -373,7 +390,7 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.canRemoveBranding).toBe(false);
     expect(entitlements.canExportContacts).toBe(false);
     expect(entitlements.contactsLimit).toBe(100);
-    expect(entitlements.analyticsRetentionDays).toBe(7);
+    expect(entitlements.analyticsRetentionDays).toBe(30);
   });
 
   it('forces free entitlements when isPro=false even if dbPlan says growth', async () => {
@@ -506,7 +523,7 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.email).toBe('db@example.com');
   });
 
-  it('BillingUnavailableError message says unknown when no cause', async () => {
+  it('billing failure without error field degrades to free tier', async () => {
     mockCachedAuth.mockResolvedValue({ userId: 'user_noCause' });
     mockCachedCurrentUser.mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'nocause@example.com' },
@@ -517,13 +534,11 @@ describe('getCurrentUserEntitlements', () => {
       // no error field
     });
 
-    try {
-      await getCurrentUserEntitlements();
-      expect.fail('Should have thrown');
-    } catch (error) {
-      expect(error).toBeInstanceOf(BillingUnavailableError);
-      expect((error as Error).message).toContain('unknown');
-    }
+    const e = await getCurrentUserEntitlements();
+    expect(e.plan).toBe('free');
+    expect(e.isPro).toBe(false);
+    expect(e.isAuthenticated).toBe(true);
+    expect(e.userId).toBe('user_noCause');
   });
 
   it('fetches admin and billing concurrently (not sequentially)', async () => {

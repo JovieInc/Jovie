@@ -1,22 +1,28 @@
 'use client';
 
-import DOMPurify from 'isomorphic-dompurify';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  COUNTRY_CODE_COOKIE,
   LISTEN_COOKIE,
 } from '@/constants/app';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
+import {
+  type AvailableDSP,
+  getAvailableDSPs,
+  sortDSPsForDevice,
+} from '@/lib/dsp';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { detectPlatformFromUA } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 export interface UseAnimatedListenInterfaceReturn {
   availableDSPs: AvailableDSP[];
   selectedDSP: string | null;
   prefersReducedMotion: boolean;
-  sanitizedLogos: Record<string, string>;
   handleDSPClick: (dsp: AvailableDSP) => Promise<void>;
 }
 
@@ -25,24 +31,38 @@ export function useAnimatedListenInterface(
   handle: string,
   enableDynamicEngagement: boolean
 ): UseAnimatedListenInterfaceReturn {
-  const [availableDSPs] = useState<AvailableDSP[]>(() =>
-    getAvailableDSPs(artist)
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
   );
+
+  const availableDSPs = useMemo(() => {
+    const countryCode =
+      typeof document === 'undefined'
+        ? null
+        : document.cookie
+            .split(';')
+            .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
+            ?.split('=')[1];
+
+    const userAgent =
+      typeof navigator === 'undefined' ? undefined : navigator.userAgent;
+    const detectedPlatform = detectPlatformFromUA(userAgent);
+    const platform =
+      detectedPlatform === 'ios' || detectedPlatform === 'android'
+        ? detectedPlatform
+        : 'desktop';
+
+    return sortDSPsForDevice(getAvailableDSPs(artist), {
+      countryCode: countryCode ?? null,
+      platform,
+      enableDevicePriority,
+    });
+  }, [artist, enableDevicePriority]);
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Sanitize SVG logos to prevent XSS
-  const sanitizedLogos = useMemo(() => {
-    const logos: Record<string, string> = {};
-    for (const dsp of availableDSPs) {
-      logos[dsp.key] = DOMPurify.sanitize(dsp.config.logoSvg, {
-        USE_PROFILES: { svg: true },
-      });
-    }
-    return logos;
-  }, [availableDSPs]);
 
   // Handle backspace key to go back
   useEffect(() => {
@@ -133,7 +153,6 @@ export function useAnimatedListenInterface(
     availableDSPs,
     selectedDSP,
     prefersReducedMotion,
-    sanitizedLogos,
     handleDSPClick,
   };
 }

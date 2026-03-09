@@ -7,17 +7,19 @@
  * Extracted to reduce cognitive complexity of the creator-ingest route.
  */
 
-import { randomUUID } from 'node:crypto';
 import { and, eq, max } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import type { DbOrTransaction } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureWarning } from '@/lib/error-tracking';
 import { calculateAndStoreFitScore } from '@/lib/fit-scoring';
+import type { SpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
+import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const CLAIM_TOKEN_EXPIRY_DAYS = 30;
 
 // Music platforms that should have empty link display text by default
 const MUSIC_PLATFORMS = [
@@ -46,21 +48,8 @@ export interface SocialPlatformContext {
   platformName: string;
   normalizedUrl: string;
   spotifyArtistName: string | null;
-}
-
-/**
- * Generate a claim token with expiration date
- */
-export function generateClaimToken(): {
-  claimToken: string;
-  claimTokenExpiresAt: Date;
-} {
-  const claimToken = randomUUID();
-  const claimTokenExpiresAt = new Date();
-  claimTokenExpiresAt.setDate(
-    claimTokenExpiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS
-  );
-  return { claimToken, claimTokenExpiresAt };
+  /** Full Spotify metadata when available (avatar, genres, followers, etc.) */
+  spotifyData: SpotifyArtistData | null;
 }
 
 /**
@@ -184,6 +173,10 @@ export async function handleExistingUnclaimedProfile(
       profileId: existing.id,
       error: linkError,
     });
+    await captureWarning('Failed to add link to existing profile', linkError, {
+      profileId: existing.id,
+      platform: platformId,
+    });
 
     return NextResponse.json(
       {
@@ -209,15 +202,25 @@ export async function createNewSocialProfile(
   finalHandle: string,
   context: SocialPlatformContext
 ): Promise<NextResponse> {
-  const { handle, platformId, platformName, normalizedUrl, spotifyArtistName } =
-    context;
+  const {
+    handle,
+    platformId,
+    platformName,
+    normalizedUrl,
+    spotifyArtistName,
+    spotifyData,
+  } = context;
 
-  const { claimToken, claimTokenExpiresAt } = generateClaimToken();
+  const {
+    token: claimToken,
+    tokenHash: claimTokenHash,
+    expiresAt: claimTokenExpiresAt,
+  } = await generateClaimTokenPair();
 
   // For Spotify artist IDs, use the fetched artist name if available
   const displayName =
     spotifyArtistName ||
-    (handle.startsWith('artist-') && platformId === 'spotify'
+    (handle.startsWith('artist_') && platformId === 'spotify'
       ? platformName
       : handle);
 
@@ -228,13 +231,19 @@ export async function createNewSocialProfile(
       username: finalHandle,
       usernameNormalized: finalHandle,
       displayName,
-      avatarUrl: null,
+      avatarUrl: spotifyData?.imageUrl ?? null,
+      bio: spotifyData?.bio ?? null,
+      spotifyId: spotifyData?.spotifyId ?? null,
+      spotifyUrl: spotifyData?.spotifyUrl ?? null,
+      genres: spotifyData?.genres ?? null,
+      spotifyFollowers: spotifyData?.followerCount ?? null,
+      spotifyPopularity: spotifyData?.popularity ?? null,
       isPublic: true,
       isVerified: false,
       isFeatured: false,
       marketingOptOut: false,
       isClaimed: false,
-      claimToken,
+      claimToken: claimTokenHash,
       claimTokenExpiresAt,
       settings: {},
       theme: {},
@@ -247,7 +256,6 @@ export async function createNewSocialProfile(
       id: creatorProfiles.id,
       username: creatorProfiles.username,
       usernameNormalized: creatorProfiles.usernameNormalized,
-      claimToken: creatorProfiles.claimToken,
     });
 
   if (!created) {
@@ -256,6 +264,8 @@ export async function createNewSocialProfile(
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
+
+  await invalidateProfileCache(created.usernameNormalized);
 
   // Add the social link
   const linkDisplayText = getLinkDisplayText(
@@ -276,6 +286,10 @@ export async function createNewSocialProfile(
     logger.warn('Failed to add link to new profile', {
       profileId: created.id,
       error: linkError,
+    });
+    await captureWarning('Failed to add link to new profile', linkError, {
+      profileId: created.id,
+      platform: platformId,
     });
   }
 
@@ -306,7 +320,7 @@ export async function createNewSocialProfile(
         id: created.id,
         username: created.username,
         usernameNormalized: created.usernameNormalized,
-        claimToken: created.claimToken,
+        claimToken,
       },
       links: 1,
       platform: platformName,

@@ -23,10 +23,20 @@ test.describe('Dashboard Access Control', () => {
   // Only run when E2E_ONBOARDING_FULL=1 and environment is properly configured
   const runFull = process.env.E2E_ONBOARDING_FULL === '1';
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     if (!runFull) {
       test.skip();
     }
+
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     // Validate required environment variables
     const requiredEnvVars = {
@@ -60,8 +70,8 @@ test.describe('Dashboard Access Control', () => {
     // Wait for Clerk to be ready
     await page.waitForFunction(
       () => {
-        // @ts-ignore
-        return window.Clerk && window.Clerk.isReady();
+        // @ts-ignore – Clerk v5 uses `loaded` (boolean getter) instead of `isReady()`
+        return window.Clerk && window.Clerk.loaded;
       },
       { timeout: 10_000 }
     );

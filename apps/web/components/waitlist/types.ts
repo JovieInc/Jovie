@@ -20,7 +20,6 @@ export const WAITLIST_STORAGE_KEYS = {
   spotifyArtistName: 'waitlist_spotify_artist_name',
   heardAbout: 'waitlist_heard_about',
   submitted: 'waitlist_submitted',
-  userId: 'waitlist_user_id',
 } as const;
 
 export const SOCIAL_PLATFORM_OPTIONS: Array<{

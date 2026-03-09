@@ -17,7 +17,15 @@ import {
   shift,
   useFloating,
 } from '@floating-ui/react';
-import { forwardRef, useCallback, useImperativeHandle, useMemo } from 'react';
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   getPlatformIconMetadata,
@@ -54,7 +62,7 @@ function HighlightedName({
   readonly matchIndices: number[];
 }) {
   if (matchIndices.length === 0) {
-    return <span className='font-medium'>{name}</span>;
+    return <span className='font-[510]'>{name}</span>;
   }
 
   const matchSet = new Set(matchIndices);
@@ -65,7 +73,7 @@ function HighlightedName({
   }));
 
   return (
-    <span className='font-medium'>
+    <span className='font-[510]'>
       {characters.map(character => (
         <span
           key={character.id}
@@ -102,7 +110,7 @@ function PlatformSuggestionItem({
       data-option-id={optionId}
       type='button'
       className={cn(
-        'flex w-full min-h-[44px] items-center justify-between gap-2.5 px-3 py-2.5 text-left text-sm text-primary-token transition',
+        'flex w-full min-h-[44px] items-center justify-between gap-2.5 px-3 py-2.5 text-left text-[13px] text-primary-token transition',
         active ? 'bg-surface-2' : 'hover:bg-surface-2',
         'active:scale-[0.99]'
       )}
@@ -129,11 +137,11 @@ function PlatformSuggestionItem({
           matchIndices={option.matchIndices}
         />
         {/* Simplified hint */}
-        <span className='text-xs text-tertiary-token'>{option.hint}</span>
+        <span className='text-[13px] text-tertiary-token'>{option.hint}</span>
       </span>
       {/* Only show Enter hint on active item */}
       {active && (
-        <span className='hidden text-xs text-tertiary-token sm:inline'>
+        <span className='hidden text-[13px] text-tertiary-token sm:inline'>
           Enter
         </span>
       )}
@@ -159,6 +167,7 @@ export const UniversalLinkInput = forwardRef<
       clearSignal = 0,
       chatEnabled = true,
       onChatSubmit,
+      voiceInputEnabled = false,
     },
     forwardedRef
   ) => {
@@ -172,9 +181,11 @@ export const UniversalLinkInput = forwardRef<
       platformSuggestions,
       shouldShowAutosuggest,
       isShortQuery,
+      inputMode,
       focusInput,
       handleUrlChange,
       handleKeyDown,
+      handleAdd,
       handleClear,
       handleArtistSearchSelect,
       handleExitSearchMode,
@@ -221,6 +232,137 @@ export const UniversalLinkInput = forwardRef<
     useImperativeHandle(forwardedRef, () => ({
       getInputElement: () => urlInputRef.current,
     }));
+
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const recordingTimerRef = useRef<ReturnType<
+      typeof globalThis.setInterval
+    > | null>(null);
+    const waveformTimerRef = useRef<ReturnType<
+      typeof globalThis.setInterval
+    > | null>(null);
+    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+    const [recordingDurationSeconds, setRecordingDurationSeconds] = useState(0);
+    const [waveformLevels, setWaveformLevels] = useState<number[]>([
+      0.35, 0.55, 0.75, 0.5, 0.68, 0.4, 0.62,
+    ]);
+
+    const clearRecordingTimers = useCallback(() => {
+      if (recordingTimerRef.current !== null) {
+        globalThis.clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      if (waveformTimerRef.current !== null) {
+        globalThis.clearInterval(waveformTimerRef.current);
+        waveformTimerRef.current = null;
+      }
+    }, []);
+
+    const stopRecordingSession = useCallback(() => {
+      clearRecordingTimers();
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+
+      for (const track of streamRef.current?.getTracks() ?? []) {
+        track.stop();
+      }
+      streamRef.current = null;
+      mediaRecorderRef.current = null;
+      setIsVoiceRecording(false);
+    }, [clearRecordingTimers]);
+
+    useEffect(() => {
+      return () => {
+        stopRecordingSession();
+      };
+    }, [stopRecordingSession]);
+
+    const handleVoiceInput = useCallback(async () => {
+      if (!voiceInputEnabled) return;
+      if (globalThis.window === undefined) return;
+      if (!navigator.mediaDevices?.getUserMedia) return;
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        streamRef.current = stream;
+
+        const recorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = recorder;
+        recorder.addEventListener('stop', () => {
+          for (const track of stream.getTracks()) {
+            track.stop();
+          }
+          streamRef.current = null;
+          mediaRecorderRef.current = null;
+        });
+
+        recorder.start();
+        setRecordingDurationSeconds(0);
+        setIsVoiceRecording(true);
+        recordingTimerRef.current = globalThis.setInterval(() => {
+          setRecordingDurationSeconds(current => current + 1);
+        }, 1000);
+        waveformTimerRef.current = globalThis.setInterval(() => {
+          setWaveformLevels(current =>
+            current.map(() => 0.3 + Math.random() * 0.7)
+          );
+        }, 200);
+      } catch {
+        // Ignore permission errors until voice feature is enabled.
+      }
+    }, [voiceInputEnabled]);
+
+    const recordingDurationLabel = useMemo(() => {
+      const minutes = Math.floor(recordingDurationSeconds / 60);
+      const seconds = recordingDurationSeconds % 60;
+      return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, [recordingDurationSeconds]);
+
+    const handleCancelVoiceRecording = useCallback(() => {
+      stopRecordingSession();
+      setRecordingDurationSeconds(0);
+    }, [stopRecordingSession]);
+
+    const handleSendVoiceRecording = useCallback(() => {
+      stopRecordingSession();
+      setRecordingDurationSeconds(0);
+      if (onChatSubmit) {
+        onChatSubmit(`[Voice message ${recordingDurationLabel}]`);
+      }
+    }, [onChatSubmit, recordingDurationLabel, stopRecordingSession]);
+
+    const canSubmit = useMemo(() => {
+      const trimmed = url.trim();
+      if (!trimmed) return false;
+      if (inputMode === 'chat') return true;
+      return !!detectedLink?.isValid;
+    }, [detectedLink?.isValid, inputMode, url]);
+
+    const handleSubmit = useCallback(() => {
+      const trimmed = url.trim();
+      if (!trimmed) return;
+
+      if (inputMode === 'chat' && onChatSubmit) {
+        onChatSubmit(trimmed);
+        handleClear();
+        return;
+      }
+
+      if (detectedLink?.isValid) {
+        handleAdd();
+      }
+    }, [
+      detectedLink?.isValid,
+      handleAdd,
+      handleClear,
+      inputMode,
+      onChatSubmit,
+      url,
+    ]);
 
     // Group platforms by category when showing popular platforms (short query)
     const groupedSuggestions = useMemo(() => {
@@ -275,6 +417,15 @@ export const UniversalLinkInput = forwardRef<
           onPlatformSelect={commitPlatformSelection}
           onArtistSearchSelect={handleArtistSearchSelect}
           onRestoreFocus={focusInput}
+          onSubmit={handleSubmit}
+          canSubmit={canSubmit}
+          voiceInputEnabled={voiceInputEnabled}
+          onVoiceInput={handleVoiceInput}
+          isVoiceRecording={isVoiceRecording}
+          recordingDurationLabel={recordingDurationLabel}
+          waveformLevels={waveformLevels}
+          onCancelVoiceRecording={handleCancelVoiceRecording}
+          onSendVoiceRecording={handleSendVoiceRecording}
           isDropdownOpen={shouldShowAutosuggest}
           onFocus={() => {
             const trimmed = url.trim();
@@ -360,7 +511,7 @@ export const UniversalLinkInput = forwardRef<
               <div
                 ref={refs.setFloating}
                 style={floatingStyles}
-                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-lg'
+                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-card-elevated'
                 onMouseDown={event => {
                   event.preventDefault();
                 }}
@@ -378,7 +529,7 @@ export const UniversalLinkInput = forwardRef<
                           {groupIndex > 0 && (
                             <div className='mx-3 my-1 border-t border-default' />
                           )}
-                          <div className='px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                          <div className='px-3 pb-1 pt-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                             {group.label}
                           </div>
                           {group.options.map((option, indexInGroup) => {

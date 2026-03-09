@@ -1,13 +1,25 @@
-import { and, asc, desc, sql as drizzleSql, eq, gt, gte } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gt,
+  gte,
+  type SQL,
+} from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
-  audienceMembers,
-  notificationSubscriptions,
-} from '@/lib/db/schema/analytics';
+  buildCursorCondition,
+  decodeCursor,
+  encodeCursor,
+} from '@/lib/db/queries/audience-cursor';
+import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
@@ -30,12 +42,20 @@ export interface AudienceServerData {
   mode: AudienceMode;
   view: AudienceView;
   rows: AudienceServerRow[];
-  total: number;
+  /** Null — exact COUNT queries are skipped per JOV-1262/JOV-1264. Use hasMore/nextCursor for pagination. */
+  total: number | null;
   page: number;
   pageSize: number;
   sort: string;
   direction: 'asc' | 'desc';
-  subscriberCount: number;
+  /** Opaque cursor token for the next page; null when no further pages. */
+  nextCursor: string | null;
+  /** True when more rows exist beyond the current page. */
+  hasMore: boolean;
+  /** Null — exact COUNT queries are skipped per JOV-1262 to avoid per-page DB overhead. */
+  subscriberCount: number | null;
+  /** Null — exact COUNT queries are skipped per JOV-1262 to avoid per-page DB overhead. */
+  totalAudienceCount: number | null;
 }
 
 /**
@@ -47,6 +67,9 @@ const DEFAULT_MEMBER_SORT = 'lastSeen' as const;
 const DEFAULT_SUBSCRIBER_SORT = 'createdAt' as const;
 
 const memberQuerySchema = z.object({
+  /** Opaque keyset cursor for next-page fetch. When present, page is ignored (JOV-1254). */
+  cursor: z.string().optional(),
+  /** @deprecated Use cursor instead. */
   page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
   pageSize: z.preprocess(
     val => Number(val ?? 10),
@@ -59,6 +82,9 @@ const memberQuerySchema = z.object({
 });
 
 const subscriberQuerySchema = z.object({
+  /** Opaque keyset cursor for next-page fetch. When present, page is ignored (JOV-1261). */
+  cursor: z.string().optional(),
+  /** @deprecated Use cursor instead. */
   page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
   pageSize: z.preprocess(
     val => Number(val ?? 10),
@@ -75,13 +101,6 @@ const MEMBER_SORT_COLUMNS = {
   type: audienceMembers.type,
   engagement: audienceMembers.engagementScore,
   createdAt: audienceMembers.firstSeenAt,
-} as const;
-
-const SUBSCRIBER_SORT_COLUMNS = {
-  email: notificationSubscriptions.email,
-  phone: notificationSubscriptions.phone,
-  country: notificationSubscriptions.countryCode,
-  createdAt: notificationSubscriptions.createdAt,
 } as const;
 
 /**
@@ -122,6 +141,12 @@ function transformMemberRow(member: {
   phone: string | null;
   spotifyConnected: boolean | null;
   purchaseCount: number;
+  tipAmountTotalCents: number | null;
+  tipCount: number | null;
+  ltvStreamingClicks: number | null;
+  ltvTipClickValueCents: number | null;
+  ltvMerchSalesCents: number | null;
+  ltvTicketSalesCents: number | null;
   tags: string[] | null;
   lastSeenAt: Date;
 }): AudienceServerRow {
@@ -142,6 +167,12 @@ function transformMemberRow(member: {
     phone: member.phone,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
+    tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
+    tipCount: member.tipCount ?? 0,
+    ltvStreamingClicks: member.ltvStreamingClicks ?? 0,
+    ltvTipClickValueCents: member.ltvTipClickValueCents ?? 0,
+    ltvMerchSalesCents: member.ltvMerchSalesCents ?? 0,
+    ltvTicketSalesCents: member.ltvTicketSalesCents ?? 0,
     tags: Array.isArray(member.tags) ? member.tags : [],
     deviceType: member.deviceType,
     lastSeenAt: toISOStringOrNull(member.lastSeenAt),
@@ -205,6 +236,7 @@ function normalizeUtmParams(value: unknown): AudienceUtmParams {
 
 /** Default member query params when validation fails */
 const DEFAULT_MEMBER_PARAMS = {
+  cursor: undefined,
   page: 1,
   pageSize: 10,
   sort: DEFAULT_MEMBER_SORT,
@@ -218,6 +250,7 @@ type SearchParams = Record<string, string | string[] | undefined>;
  */
 function parseMemberQueryParams(searchParams: SearchParams) {
   const parsed = memberQuerySchema.safeParse({
+    cursor: searchParams.cursor,
     page: searchParams.page,
     pageSize: searchParams.pageSize,
     sort: searchParams.sort ?? undefined,
@@ -251,6 +284,36 @@ function buildMemberSelectFields(includeDetails: boolean) {
     phone: audienceMembers.phone,
     spotifyConnected: audienceMembers.spotifyConnected,
     purchaseCount: audienceMembers.purchaseCount,
+    tipAmountTotalCents:
+      drizzleSql<number>`COALESCE(${tipAudience.tipAmountTotalCents}, 0)`.as(
+        'tip_amount_total_cents'
+      ),
+    tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
+      'tip_count'
+    ),
+    ltvStreamingClicks: drizzleSql<number>`(
+      SELECT COALESCE(COUNT(*), 0)
+      FROM ${clickEvents}
+      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+        AND ${clickEvents.linkType} = 'listen'
+        AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+    )`.as('ltv_streaming_clicks'),
+    ltvTipClickValueCents: drizzleSql<number>`(
+      SELECT COALESCE(
+        SUM(
+          CASE
+            WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+              THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
+            ELSE 0
+          END
+        ),
+        0
+      )
+      FROM ${clickEvents}
+      WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+    )`.as('ltv_tip_click_value_cents'),
+    ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
+    ltvTicketSalesCents: drizzleSql<number>`0`.as('ltv_ticket_sales_cents'),
     tags: audienceMembers.tags,
     lastSeenAt: audienceMembers.lastSeenAt,
   };
@@ -307,12 +370,13 @@ async function fetchMembersData(
     typeFilter?: AudienceMemberType;
     segmentFilter?: string[];
   }
-): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
+): Promise<
+  Omit<AudienceServerData, 'view' | 'subscriberCount' | 'totalAudienceCount'>
+> {
   const { includeDetails, memberId, typeFilter, segmentFilter } = options;
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
-  const offset = (safe.page - 1) * safe.pageSize;
 
   const ownershipFilter = buildOwnershipFilter(clerkUserId);
   const memberIdFilter = buildMemberIdFilter(memberId);
@@ -320,12 +384,30 @@ async function fetchMembersData(
     ? eq(audienceMembers.type, typeFilter)
     : drizzleSql<boolean>`true`;
   const segmentCondition = buildSegmentFilter(segmentFilter);
+
+  // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).
+  let cursorCondition: SQL<unknown> = drizzleSql`true`;
+  if (safe.cursor) {
+    const decoded = decodeCursor(safe.cursor);
+    if (decoded) {
+      const { v: cursorSortVal, id: cursorId } = decoded;
+      cursorCondition = buildCursorCondition(
+        safe.direction,
+        sortColumn,
+        audienceMembers.id,
+        cursorSortVal,
+        cursorId
+      );
+    }
+  }
+
   const whereClause = and(
     ownershipFilter,
     eq(audienceMembers.creatorProfileId, selectedProfileId),
     memberIdFilter,
     typeCondition,
-    segmentCondition
+    segmentCondition,
+    cursorCondition
   );
 
   const baseQuery = tx
@@ -336,33 +418,45 @@ async function fetchMembersData(
       eq(audienceMembers.creatorProfileId, creatorProfiles.id)
     )
     .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(whereClause);
-
-  const totalQuery = tx
-    .select({
-      total: drizzleSql`COALESCE(COUNT(${audienceMembers.id}), 0)`,
-    })
-    .from(audienceMembers)
-    .innerJoin(
-      creatorProfiles,
-      eq(audienceMembers.creatorProfileId, creatorProfiles.id)
+    .leftJoin(
+      tipAudience,
+      and(
+        eq(tipAudience.profileId, audienceMembers.creatorProfileId),
+        eq(tipAudience.email, audienceMembers.email)
+      )
     )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
     .where(whereClause);
 
-  const [rows, [{ total }]] = await Promise.all([
-    baseQuery.orderBy(orderFn(sortColumn)).limit(safe.pageSize).offset(offset),
-    totalQuery,
-  ]);
+  // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1260).
+  const rawRows = await baseQuery
+    .orderBy(orderFn(sortColumn), orderFn(audienceMembers.id))
+    .limit(safe.pageSize + 1);
+
+  const hasMore = rawRows.length > safe.pageSize;
+  const rows = hasMore ? rawRows.slice(0, safe.pageSize) : rawRows;
+
+  // Build next-page cursor from the last returned row.
+  let nextCursor: string | null = null;
+  if (hasMore && rows.length > 0) {
+    const lastRow = rows[rows.length - 1];
+    const rawSortVal = lastRow.lastSeenAt;
+    const sortValStr =
+      rawSortVal instanceof Date
+        ? rawSortVal.toISOString()
+        : String(rawSortVal ?? '');
+    nextCursor = encodeCursor(sortValStr, lastRow.id);
+  }
 
   return {
     mode: 'members',
     rows: rows.map(transformMemberRow),
-    total: Number(total ?? 0),
+    total: null,
     page: safe.page,
     pageSize: safe.pageSize,
     sort: safe.sort,
     direction: safe.direction,
+    nextCursor,
+    hasMore,
   };
 }
 
@@ -374,8 +468,11 @@ async function fetchSubscribersData(
   clerkUserId: string | null,
   selectedProfileId: string,
   searchParams: SearchParams
-): Promise<Omit<AudienceServerData, 'view' | 'subscriberCount'>> {
+): Promise<
+  Omit<AudienceServerData, 'view' | 'subscriberCount' | 'totalAudienceCount'>
+> {
   const parsed = subscriberQuerySchema.safeParse({
+    cursor: searchParams.cursor,
     page: searchParams.page,
     pageSize: searchParams.pageSize,
     sort: searchParams.sort ?? undefined,
@@ -385,70 +482,111 @@ async function fetchSubscribersData(
   const safe = parsed.success
     ? parsed.data
     : {
+        cursor: undefined,
         page: 1,
         pageSize: 10,
         sort: DEFAULT_SUBSCRIBER_SORT,
         direction: 'desc' as const,
       };
+  const SUBSCRIBER_SORT_COLUMN_SQL = {
+    email: 'ns.email',
+    phone: 'ns.phone',
+    country: 'ns.country_code',
+    createdAt: 'ns.created_at',
+  } as const;
 
-  const sortColumn = SUBSCRIBER_SORT_COLUMNS[safe.sort];
-  const orderFn = safe.direction === 'asc' ? asc : desc;
-  const offset = (safe.page - 1) * safe.pageSize;
+  const sortColSql =
+    SUBSCRIBER_SORT_COLUMN_SQL[
+      safe.sort as keyof typeof SUBSCRIBER_SORT_COLUMN_SQL
+    ] ?? 'ns.created_at';
+  const dir = safe.direction === 'asc' ? drizzleSql`ASC` : drizzleSql`DESC`;
 
-  const ownershipFilter = clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
+  // Ownership JOIN condition: when clerkUserId is available, verify the profile
+  // belongs to the authenticated user via the users → creatorProfiles chain.
+  const ownershipJoinFetch = clerkUserId
+    ? drizzleSql`AND u.clerk_id = ${clerkUserId}`
+    : drizzleSql``;
 
-  const baseQuery = tx
-    .select({
-      id: notificationSubscriptions.id,
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-      countryCode: notificationSubscriptions.countryCode,
-      createdAt: notificationSubscriptions.createdAt,
-      channel: notificationSubscriptions.channel,
-    })
-    .from(notificationSubscriptions)
-    .innerJoin(
-      creatorProfiles,
-      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
-      )
-    );
+  // Keyset cursor clause for subscribers (JOV-1261).
+  // Subscribers sort by (created_at, id) composite key for stable ordering.
+  let cursorClause = drizzleSql``;
+  if (safe.cursor) {
+    const decoded = decodeCursor(safe.cursor);
+    if (decoded) {
+      const cursorCreatedAt = decoded.v;
+      const cursorId = decoded.id;
+      if (safe.direction === 'desc') {
+        cursorClause = drizzleSql`
+          AND (ns.created_at < ${cursorCreatedAt}::timestamptz
+               OR (ns.created_at = ${cursorCreatedAt}::timestamptz AND ns.id < ${cursorId}))
+        `;
+      } else {
+        cursorClause = drizzleSql`
+          AND (ns.created_at > ${cursorCreatedAt}::timestamptz
+               OR (ns.created_at = ${cursorCreatedAt}::timestamptz AND ns.id > ${cursorId}))
+        `;
+      }
+    }
+  }
 
-  const totalQuery = tx
-    .select({
-      total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-    })
-    .from(notificationSubscriptions)
-    .innerJoin(
-      creatorProfiles,
-      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
-      )
-    );
+  // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1261).
+  const fetchLimit = safe.pageSize + 1;
 
-  const [rows, [{ total }]] = await Promise.all([
-    baseQuery.orderBy(orderFn(sortColumn)).limit(safe.pageSize).offset(offset),
-    totalQuery,
-  ]);
+  // Deduplicate by contact: keep the most recent subscription per unique
+  // phone/email using DISTINCT ON. The inner query must ORDER BY the distinct
+  // key first; the outer query then applies the user-requested sort + pagination.
+  const rowsResult = await tx.execute(drizzleSql`
+    SELECT ns.id, ns.email, ns.phone,
+           ns.country_code AS "countryCode",
+           ns.created_at  AS "createdAt",
+           ns.channel
+    FROM (
+      SELECT DISTINCT ON (COALESCE(ns_inner.phone, ns_inner.email))
+        ns_inner.id,
+        ns_inner.email,
+        ns_inner.phone,
+        ns_inner.country_code,
+        ns_inner.created_at,
+        ns_inner.channel
+      FROM notification_subscriptions ns_inner
+      INNER JOIN creator_profiles cp ON ns_inner.creator_profile_id = cp.id
+      INNER JOIN users u             ON cp.user_id = u.id
+      WHERE ns_inner.creator_profile_id = ${selectedProfileId}
+      ${ownershipJoinFetch}
+      ORDER BY COALESCE(ns_inner.phone, ns_inner.email), ns_inner.created_at DESC
+    ) ns
+    WHERE true ${cursorClause}
+    ORDER BY ${drizzleSql.raw(sortColSql)} ${dir}, ns.id ${dir}
+    LIMIT ${fetchLimit}
+  `);
+
+  const allRows = rowsResult.rows as Array<{
+    id: string;
+    email: string | null;
+    phone: string | null;
+    countryCode: string | null;
+    createdAt: Date | string;
+    channel: string;
+  }>;
+
+  const hasMore = allRows.length > safe.pageSize;
+  const rows = hasMore ? allRows.slice(0, safe.pageSize) : allRows;
+
+  // Build next-page cursor from the last returned row.
+  let nextCursor: string | null = null;
+  if (hasMore && rows.length > 0) {
+    const lastRow = rows[rows.length - 1];
+    const sortValStr = toISOStringOrNull(lastRow.createdAt) ?? '';
+    nextCursor = encodeCursor(sortValStr, lastRow.id);
+  }
 
   const normalizedRows: AudienceServerRow[] = rows.map(subscriber => {
     const country = subscriber.countryCode;
     const locationLabel = country ? formatCountryLabel(country) : 'Unknown';
     const createdAt = toISOStringOrNull(subscriber.createdAt);
-    const displayName = subscriber.email || subscriber.phone || 'Contact';
     const type = subscriber.channel === 'email' ? 'email' : 'sms';
+    const displayName =
+      type === 'email' ? 'Email Subscriber' : 'SMS Subscriber';
 
     return {
       id: subscriber.id,
@@ -467,6 +605,12 @@ async function fetchSubscribersData(
       phone: subscriber.phone,
       spotifyConnected: false,
       purchaseCount: 0,
+      tipAmountTotalCents: 0,
+      tipCount: 0,
+      ltvStreamingClicks: 0,
+      ltvTipClickValueCents: 0,
+      ltvMerchSalesCents: 0,
+      ltvTicketSalesCents: 0,
       tags: [],
       deviceType: null,
       lastSeenAt: createdAt,
@@ -476,44 +620,14 @@ async function fetchSubscribersData(
   return {
     mode: 'subscribers',
     rows: normalizedRows,
-    total: Number(total ?? 0),
+    total: null,
     page: safe.page,
     pageSize: safe.pageSize,
     sort: safe.sort,
     direction: safe.direction,
+    nextCursor,
+    hasMore,
   };
-}
-
-/**
- * Count total subscribers for a profile (lightweight query for UI state)
- */
-async function countSubscribers(
-  tx: DbSessionTx,
-  clerkUserId: string | null,
-  selectedProfileId: string
-): Promise<number> {
-  const ownershipFilter = clerkUserId
-    ? eq(users.clerkId, clerkUserId)
-    : drizzleSql<boolean>`true`;
-
-  const [{ total }] = await tx
-    .select({
-      total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
-    })
-    .from(notificationSubscriptions)
-    .innerJoin(
-      creatorProfiles,
-      eq(notificationSubscriptions.creatorProfileId, creatorProfiles.id)
-    )
-    .innerJoin(users, eq(creatorProfiles.userId, users.id))
-    .where(
-      and(
-        ownershipFilter,
-        eq(notificationSubscriptions.creatorProfileId, selectedProfileId)
-      )
-    );
-
-  return Number(total ?? 0);
 }
 
 function buildEmptyAudienceData(
@@ -524,12 +638,15 @@ function buildEmptyAudienceData(
     mode,
     view,
     rows: [],
-    total: 0,
+    total: null,
     page: 1,
     pageSize: 10,
     sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
     direction: 'desc',
-    subscriberCount: 0,
+    nextCursor: null,
+    hasMore: false,
+    subscriberCount: null,
+    totalAudienceCount: null,
   };
 }
 
@@ -591,9 +708,7 @@ export async function getAudienceServerData(params: {
   // All audience reads now go through authenticated RLS-protected sessions
   // RLS bypass capability has been removed for security hardening
   return await withDbSessionTx(async (tx, clerkUserId) => {
-    // Subscriber count and main data query are independent — run in parallel
-    // to eliminate the sequential waterfall.
-    const dataPromise = buildDataPromise(
+    const data = await buildDataPromise(
       tx,
       clerkUserId,
       selectedProfileId,
@@ -603,15 +718,14 @@ export async function getAudienceServerData(params: {
       { includeDetails, memberId, segments }
     );
 
-    const [subscriberCount, data] = await Promise.all([
-      countSubscribers(tx, clerkUserId, selectedProfileId),
-      dataPromise,
-    ]);
-
+    // Exact subscriber/audience counts are omitted per JOV-1262 —
+    // running COUNT(*) on every page load adds avoidable DB overhead.
+    // Clients use hasMore/nextCursor for pagination state instead.
     return {
       ...data,
       view,
-      subscriberCount,
+      subscriberCount: null,
+      totalAudienceCount: null,
     };
   });
 }

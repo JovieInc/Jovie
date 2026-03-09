@@ -125,6 +125,8 @@ export {
   type AdminRole,
   // Role management schemas
   adminRoleLiteral,
+  type BatchCreatorIngestPayload,
+  batchCreatorIngestSchema,
   type CreatorIngestPayload,
   // Creator ingestion schemas
   creatorIngestSchema,
@@ -139,6 +141,7 @@ export {
   type WaitlistInviteSendWindowConfig,
   type WaitlistPlan,
   type WaitlistRequestPayload,
+  type WaitlistSettingsUpdatePayload,
   waitlistApproveSchema,
   waitlistGoalSchema,
   // Waitlist schemas
@@ -148,6 +151,7 @@ export {
   waitlistPlanSchema,
   waitlistPlanValues,
   waitlistRequestSchema,
+  waitlistSettingsUpdateSchema,
 } from './admin';
 
 // =============================================================================

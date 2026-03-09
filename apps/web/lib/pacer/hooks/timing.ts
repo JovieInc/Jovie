@@ -13,6 +13,8 @@ export const PACER_TIMING = {
   SAVE_DEBOUNCE_MS: 500,
   /** Default throttle for event handlers */
   THROTTLE_MS: 100,
+  /** Minimum time between chat submissions */
+  CHAT_RATE_LIMIT_MS: 1000,
   /** Throttle for scroll/animation (60fps) */
   SCROLL_THROTTLE_MS: 16,
   /** Default timeout for validation requests */

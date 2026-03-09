@@ -2,7 +2,9 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
@@ -14,9 +16,16 @@ import type {
   CreatorContact as DbCreatorContact,
   DiscogRelease,
 } from '@/lib/db/schema';
-import { captureError, captureWarning } from '@/lib/error-tracking';
-import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
+import { captureError } from '@/lib/error-tracking';
+import {
+  checkGate,
+  FEATURE_FLAG_KEYS,
+  getSubscribeCTAVariant,
+} from '@/lib/feature-flags/server';
+import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
+import { getProfileOgImageUrl } from '@/lib/profile/og-image';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
+import { isDspPlatform } from '@/lib/services/social-links/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -108,29 +117,36 @@ function generateProfileStructuredData(
   return { musicGroupSchema, breadcrumbSchema };
 }
 
-/**
- * Calculate profile completion percentage based on filled fields.
- * Fields: displayName, bio, avatarUrl, spotifyUrl, appleMusicUrl, youtubeUrl,
- * and having at least one social link.
- */
 function calculateProfileCompletion(result: {
   displayName?: string | null;
-  bio?: string | null;
   avatarUrl?: string | null;
+  userEmail?: string | null;
   spotifyUrl?: string | null;
   appleMusicUrl?: string | null;
   youtubeUrl?: string | null;
-  socialLinks?: unknown[] | null;
+  socialLinks?: Array<{
+    platform?: string | null;
+    platformType?: string | null;
+  }> | null;
 }): number {
-  const fields = [
-    result.displayName,
-    result.bio,
-    result.avatarUrl,
-    result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl, // any DSP link
-    result.socialLinks && result.socialLinks.length > 0 ? true : null,
-  ];
-  const filled = fields.filter(Boolean).length;
-  return Math.round((filled / fields.length) * 100);
+  const hasMusicLinks =
+    Boolean(result.spotifyUrl || result.appleMusicUrl || result.youtubeUrl) ||
+    Boolean(
+      result.socialLinks?.some(link => {
+        const platform = link.platform?.toLowerCase();
+        return (
+          link.platformType === 'dsp' ||
+          (typeof platform === 'string' && isDspPlatform(platform))
+        );
+      })
+    );
+
+  return calculateRequiredProfileCompletion({
+    displayName: result.displayName,
+    avatarUrl: result.avatarUrl,
+    email: result.userEmail,
+    hasMusicLinks,
+  }).percentage;
 }
 
 /** Fetches profile and social links in a single database call. */
@@ -153,13 +169,8 @@ const fetchProfileAndLinks = async (
     // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
     // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
     if (!result || !result.isPublic) {
-      // Log when a profile query returns not_found to aid debugging production 404s
-      void captureWarning('[profile] Public profile not found or not public', {
-        username,
-        profileExists: !!result,
-        isPublicValue: result ? String(result.isPublic) : 'n/a',
-        isPublicType: result ? typeof result.isPublic : 'n/a',
-      });
+      // Expected 404 — profile not found or not public. No Sentry capture needed;
+      // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
       return {
         profile: null,
         links: [],
@@ -188,10 +199,15 @@ const fetchProfileAndLinks = async (
       apple_music_url: result.appleMusicUrl,
       youtube_url: result.youtubeUrl,
       spotify_id: result.spotifyId,
+      apple_music_id: result.appleMusicId ?? null,
+      youtube_music_id: result.youtubeMusicId ?? null,
+      deezer_id: result.deezerId ?? null,
+      tidal_id: result.tidalId ?? null,
+      soundcloud_id: result.soundcloudId ?? null,
       is_public: !!result.isPublic,
       is_verified: !!result.isVerified,
       is_claimed: !!result.isClaimed,
-      claim_token: null,
+      claim_token: null, // Hash stored in DB; raw token never exposed on public pages
       claimed_at: null,
       settings: result.settings,
       theme: result.theme,
@@ -273,20 +289,24 @@ const fetchProfileAndLinks = async (
 // Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 // Wrapped in try-catch to handle cache layer failures gracefully
 // IMPORTANT: Skip caching in test/development to avoid stale data in E2E tests
-// IMPORTANT: Only cache successful (status: 'ok') results. Caching not_found/error
-// results causes stale 404s that persist for up to 1 hour when a profile becomes
-// public (e.g., after onboarding completes for a waitlist profile).
+// IMPORTANT: Successful profile payloads get long TTL. not_found gets a short TTL
+// to reduce repeated probe traffic while still allowing new profiles to appear fast.
+// error responses are never cached.
 
-/** Custom error to pass non-cacheable results without embedding PII in error message. */
-class NoCacheError extends Error {
-  readonly data: Awaited<ReturnType<typeof fetchProfileAndLinks>>;
-  constructor(data: Awaited<ReturnType<typeof fetchProfileAndLinks>>) {
-    super('NoCacheError');
-    this.name = 'NoCacheError';
-    this.data = data;
-  }
-}
+const PROFILE_SUCCESS_CACHE_TTL_SECONDS = 3600; // 1 hour
 
+/**
+ * Cached profile fetcher. Only caches successful (status: 'ok') results.
+ *
+ * IMPORTANT: We intentionally do NOT use a negative cache (caching not_found
+ * results). The previous negative cache pattern used thrown errors to signal
+ * "don't cache this" to unstable_cache, but unstable_cache treats background
+ * revalidation failures by serving the stale value — causing not_found results
+ * to become permanently sticky even after the profile becomes available.
+ *
+ * Instead, not_found and error results are always fetched fresh. The Redis
+ * cache in getProfileWithLinks already provides request-level deduplication.
+ */
 const getCachedProfileAndLinks = async (username: string) => {
   // Skip Next.js cache in test/development environments
   if (
@@ -296,35 +316,37 @@ const getCachedProfileAndLinks = async (username: string) => {
     return fetchProfileAndLinks(username);
   }
 
+  // Fetch the profile data
+  const data = await fetchProfileAndLinks(username);
+
+  // Only cache successful results — not_found and error are always fresh
+  if (data.status !== 'ok') {
+    return data;
+  }
+
+  // Cache the successful result with unstable_cache for 1 hour
   try {
-    const result = await unstable_cache(
+    const cachedFetch = unstable_cache(
       async () => {
-        const data = await fetchProfileAndLinks(username);
-        // Only cache successful results to avoid stale 404s
-        // Non-ok results are passed through NoCacheError to avoid double-fetch
-        if (data.status !== 'ok') {
-          throw new NoCacheError(data);
+        // Re-fetch on revalidation
+        const freshData = await fetchProfileAndLinks(username);
+        if (freshData.status !== 'ok') {
+          // Profile was removed or errored — don't cache, throw to prevent
+          // stale success from being served
+          throw new Error(`Profile ${username} no longer available`);
         }
-        return data;
+        return freshData;
       },
       [`public-profile-${username}`],
       {
         tags: ['profiles-all', `profile:${username}`],
-        revalidate: 3600, // 1 hour
+        revalidate: PROFILE_SUCCESS_CACHE_TTL_SECONDS,
       }
-    )();
-    return result;
-  } catch (error) {
-    // If the error is our custom error for non-cacheable results, return embedded data
-    if (error instanceof NoCacheError) {
-      return error.data;
-    }
-    // Cache layer failure - fall back to direct fetch
-    void captureWarning('[profile] Cache layer failed, using direct fetch', {
-      error,
-      username,
-    });
-    return fetchProfileAndLinks(username);
+    );
+    return await cachedFetch();
+  } catch {
+    // Cache layer failure — return the fresh data we already have
+    return data;
   }
 };
 
@@ -334,12 +356,41 @@ const getProfileAndLinks = cache(async (username: string) => {
   return getCachedProfileAndLinks(username.toLowerCase());
 });
 
+const PROFILE_FLAG_CACHE_TTL_SECONDS = 5 * 60;
+
+const getCachedLatestReleaseGate = unstable_cache(
+  async () => {
+    return checkGate(null, FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD, false);
+  },
+  ['public-profile-latest-release-gate'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
+const getCachedSubscribeCTAVariant = unstable_cache(
+  async (profileId: string) => {
+    return getSubscribeCTAVariant(profileId);
+  },
+  ['public-profile-subscribe-cta-variant'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
 interface Props {
   readonly params: Promise<{
     readonly username: string;
   }>;
   readonly searchParams?: Promise<{
-    mode?: 'profile' | 'listen' | 'tip' | 'subscribe' | 'about';
+    mode?:
+      | 'profile'
+      | 'listen'
+      | 'tip'
+      | 'tour'
+      | 'subscribe'
+      | 'about'
+      | 'contact';
   }>;
 }
 
@@ -377,14 +428,6 @@ export default async function ArtistPage({
     latestRelease: fetchedLatestRelease,
   } = profileResult;
 
-  // Feature-flagged: latest release card is disabled by default (gate defaults to false)
-  const showLatestRelease = await checkGate(
-    null,
-    FEATURE_FLAG_KEYS.LATEST_RELEASE_CARD,
-    false
-  );
-  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
-
   if (status === 'error') {
     return (
       <div className='px-4 py-8'>
@@ -408,12 +451,14 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  // Evaluate two-step subscribe experiment per-artist (deterministic bucketing)
-  const subscribeTwoStep = await checkGate(
-    profile.id,
-    FEATURE_FLAG_KEYS.SUBSCRIBE_TWO_STEP,
-    false
-  );
+  // Cache Statsig decisions for public profile traffic to avoid per-request latency.
+  const [showLatestRelease, subscribeCTAVariant] = await Promise.all([
+    getCachedLatestReleaseGate(),
+    getCachedSubscribeCTAVariant(profile.id),
+  ]);
+
+  const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
+  const subscribeTwoStep = subscribeCTAVariant === 'two_step';
 
   const publicContacts: PublicContact[] = toPublicContacts(
     contacts,
@@ -422,9 +467,12 @@ export default async function ArtistPage({
 
   const subtitle = PAGE_SUBTITLES[mode] ?? PAGE_SUBTITLES.profile;
 
-  // Show tip button only in profile/default mode and when artist has venmo
+  const tourDates =
+    mode === 'tour' ? await loadUpcomingTourDates(profile.id) : [];
+
+  // Show tip button whenever artist has Venmo, and style active state in tip mode.
   const hasVenmoLink = links.some(link => link.platform === 'venmo');
-  const showTipButton = mode === 'profile' && hasVenmoLink;
+  const showTipButton = hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
   // Read profile photo download settings
@@ -463,6 +511,9 @@ export default async function ArtistPage({
       />
 
       <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      {!profile.is_claimed && (
+        <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
+      )}
       {/* Server-side pixel tracking */}
       <JoviePixel profileId={profile.id} />
       <StaticArtistPage
@@ -472,13 +523,17 @@ export default async function ArtistPage({
         contacts={publicContacts}
         subtitle={subtitle}
         showTipButton={showTipButton}
+        isTipModeActive={mode === 'tip'}
         showBackButton={showBackButton}
+        showTourButton={true}
+        isTourModeActive={mode === 'tour'}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
+        tourDates={tourDates}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>
@@ -522,7 +577,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     genres && genres.length > 0
       ? `. ${genres.slice(0, 3).join(', ')} artist`
       : '';
-  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more.`;
+  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more on Jovie.`;
 
   // Build dynamic keywords based on artist data
   const baseKeywords = [
@@ -568,10 +623,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       locale: 'en_US',
       images: [
         {
-          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
-          width: profile.avatar_url ? 400 : 1200,
-          height: profile.avatar_url ? 400 : 630,
-          alt: `${artistName} profile picture`,
+          url: getProfileOgImageUrl(profile.username),
+          width: 1200,
+          height: 630,
+          alt: `${artistName} profile card`,
         },
       ],
     },
@@ -583,8 +638,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       site: '@jovieapp',
       images: [
         {
-          url: profile.avatar_url || `${BASE_URL}/og/default.png`,
-          alt: `${artistName} profile picture`,
+          url: getProfileOgImageUrl(profile.username),
+          alt: `${artistName} profile card`,
         },
       ],
     },

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { httpUrlSchema } from '@/lib/validation/schemas/base';
 import { isValidSocialPlatform } from '@/types';
 
 /**
@@ -16,7 +17,7 @@ export const updateSocialLinksSchema = z.object({
           .min(1)
           .refine(isValidSocialPlatform, { message: 'Invalid platform' }),
         platformType: z.string().min(1).optional(),
-        url: z.string().min(1).max(2048),
+        url: httpUrlSchema,
         sortOrder: z.number().int().min(0).optional(),
         isActive: z.boolean().optional(),
         displayText: z.string().max(256).optional(),

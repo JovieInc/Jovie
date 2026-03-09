@@ -48,17 +48,19 @@ export const themeSchema = z
     z
       .object({
         preference: z.enum(['light', 'dark', 'system']),
+        highContrast: z.boolean().optional(),
       })
       .strict(),
     z
       .object({
         mode: z.enum(['light', 'dark', 'system']),
+        highContrast: z.boolean().optional(),
       })
       .strict(),
   ])
   .transform(value => {
     const preference = 'preference' in value ? value.preference : value.mode;
-    return { preference, mode: preference };
+    return { preference, mode: preference, highContrast: value.highContrast };
   });
 
 /**

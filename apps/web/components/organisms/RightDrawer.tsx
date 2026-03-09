@@ -7,6 +7,21 @@ import React, { useEffect, useRef } from 'react';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
 
+/**
+ * Lock body scroll when a mobile drawer is open to prevent
+ * background page from scrolling behind the overlay.
+ */
+function useBodyScrollLock(isOpen: boolean, isMobile: boolean) {
+  useEffect(() => {
+    if (!isMobile || !isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isMobile, isOpen]);
+}
+
 export interface RightDrawerProps
   extends Omit<
     React.HTMLAttributes<HTMLElement>,
@@ -34,6 +49,9 @@ export function RightDrawer({
   const asideRef = useRef<HTMLElement>(null);
   const isMobile = useBreakpointDown('lg');
 
+  // Prevent background scroll when mobile drawer is open
+  useBodyScrollLock(isOpen, isMobile);
+
   // Handle keyboard events at the document level when drawer is open
   useEffect(() => {
     if (!isOpen || !onKeyDown) return;
@@ -57,7 +75,9 @@ export function RightDrawer({
     contextMenuItems != null && contextMenuItems.length > 0;
 
   const innerContent = (
-    <div className='h-full overflow-y-auto overflow-x-hidden'>{children}</div>
+    <div className='h-full overflow-y-auto overflow-x-hidden overscroll-contain'>
+      {children}
+    </div>
   );
 
   const content = hasContextMenu ? (
@@ -79,7 +99,8 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
-          'bg-surface-2',
+          'bg-surface-2 overflow-hidden',
+          'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
           className
@@ -90,7 +111,7 @@ export function RightDrawer({
     );
   }
 
-  // Desktop: inline sidebar with width animation
+  // Desktop: inline sidebar with width-based collapse so adjacent content reclaims space
   return (
     <aside
       {...rest}
@@ -100,17 +121,19 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-2 border-l border-subtle',
+        'bg-surface-1 border-l border-subtle',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
           ? 'opacity-100 visible'
-          : 'opacity-0 pointer-events-none invisible w-0 border-l-0',
+          : 'opacity-0 pointer-events-none invisible',
         className
       )}
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
     >
-      {content}
+      <div className='flex flex-col h-full' style={{ minWidth: width }}>
+        {content}
+      </div>
     </aside>
   );
 }

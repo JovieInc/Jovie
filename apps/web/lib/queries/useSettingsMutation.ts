@@ -20,10 +20,11 @@ import { handleMutationError, handleMutationSuccess } from './mutation-utils';
  * Input type for settings updates.
  * Supports partial updates to different settings sections.
  */
-export interface SettingsUpdateInput {
+export type SettingsUpdateInput = {
   updates: {
     theme?: {
       preference: 'light' | 'dark' | 'system';
+      highContrast?: boolean;
     };
     settings?: {
       marketing_emails?: boolean;
@@ -34,7 +35,7 @@ export interface SettingsUpdateInput {
       require_double_opt_in?: boolean;
     };
   };
-}
+};
 
 /**
  * Response from the settings update API.
@@ -42,6 +43,11 @@ export interface SettingsUpdateInput {
 interface SettingsUpdateResponse {
   success?: boolean;
   error?: string;
+}
+
+interface SettingsMutationOptions {
+  /** Suppress success toasts for obvious visual changes (e.g. theme toggles). */
+  silentSuccess?: boolean;
 }
 
 const updateSettings = createMutationFn<
@@ -80,26 +86,30 @@ const updateSettings = createMutationFn<
  * }
  * ```
  */
-export function useUpdateSettingsMutation() {
+export function useUpdateSettingsMutation(
+  options: SettingsMutationOptions = {}
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: updateSettings,
 
     onSuccess: (_data, variables) => {
-      // Show appropriate success message based on what was updated
-      if (variables.updates.theme) {
-        handleMutationSuccess('Theme preference saved');
-      } else if (variables.updates.settings?.hide_branding !== undefined) {
-        handleMutationSuccess('Branding settings saved');
-      } else if (
-        variables.updates.settings?.exclude_self_from_analytics !== undefined
-      ) {
-        handleMutationSuccess('Analytics filter saved');
-      } else if (variables.updates.settings) {
-        handleMutationSuccess('Settings saved');
-      } else {
-        handleMutationSuccess('Changes saved');
+      if (!options.silentSuccess) {
+        // Show appropriate success message based on what was updated
+        if (variables.updates.theme) {
+          handleMutationSuccess('Theme preference saved');
+        } else if (variables.updates.settings?.hide_branding !== undefined) {
+          handleMutationSuccess('Branding settings saved');
+        } else if (
+          variables.updates.settings?.exclude_self_from_analytics !== undefined
+        ) {
+          handleMutationSuccess('Analytics filter saved');
+        } else if (variables.updates.settings) {
+          handleMutationSuccess('Settings saved');
+        } else {
+          handleMutationSuccess('Changes saved');
+        }
       }
 
       // Invalidate user settings queries to reflect changes
@@ -137,11 +147,43 @@ export function useUpdateSettingsMutation() {
  * ```
  */
 export function useThemeMutation() {
-  const mutation = useUpdateSettingsMutation();
+  const mutation = useUpdateSettingsMutation({ silentSuccess: true });
 
   return {
-    updateTheme: (preference: 'light' | 'dark' | 'system') => {
-      mutation.mutate({ updates: { theme: { preference } } });
+    updateTheme: (
+      preference: 'light' | 'dark' | 'system',
+      highContrast?: boolean
+    ) => {
+      mutation.mutate({
+        updates: { theme: { preference, highContrast: highContrast ?? false } },
+      });
+    },
+    isPending: mutation.isPending,
+    isError: mutation.isError,
+    error: mutation.error,
+  };
+}
+
+/**
+ * Convenience hook specifically for high contrast toggle.
+ *
+ * @example
+ * ```tsx
+ * const { setHighContrast, isPending } = useHighContrastMutation();
+ * setHighContrast(true, 'dark');
+ * ```
+ */
+export function useHighContrastMutation() {
+  const mutation = useUpdateSettingsMutation({ silentSuccess: true });
+
+  return {
+    setHighContrast: (
+      highContrast: boolean,
+      currentPreference: 'light' | 'dark' | 'system'
+    ) => {
+      mutation.mutate({
+        updates: { theme: { preference: currentPreference, highContrast } },
+      });
     },
     isPending: mutation.isPending,
     isError: mutation.isError,
@@ -168,8 +210,17 @@ export function useNotificationSettingsMutation() {
     [mutation]
   );
 
+  const updateNotificationsAsync = useCallback(
+    (settings: SettingsUpdateInput['updates']['settings']) => {
+      return mutation.mutateAsync({ updates: { settings } });
+    },
+    [mutation]
+  );
+
   return {
     updateNotifications,
+    /** Async variant for use with try/catch rollback patterns */
+    updateNotificationsAsync,
     isPending: mutation.isPending,
     isError: mutation.isError,
     error: mutation.error,

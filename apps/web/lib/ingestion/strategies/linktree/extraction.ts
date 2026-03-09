@@ -26,9 +26,16 @@ import {
   type LinktreePageProps,
   sanitizeAvatarUrl,
 } from './helpers';
-import { detectLinktreePaidTier } from './paid-tier';
+import {
+  detectLinktreePaidTier,
+  detectLinktreeVerification,
+} from './paid-tier';
 
-/** Schemes that should be blocked for security and relevance */
+/**
+ * Schemes that should be blocked for security and relevance.
+ * Security: javascript: and vbscript: are explicitly blocked to prevent XSS.
+ * The remaining schemes are blocked because they are not extractable web URLs.
+ */
 const BLOCKED_SCHEMES = [
   'javascript:',
   'mailto:',
@@ -173,6 +180,9 @@ export function extractLinktree(html: string): ExtractionResult {
   // Detect paid tier by checking for branding
   const hasPaidTier = detectLinktreePaidTier(html);
 
+  // Detect verification badge (stronger paid signal)
+  const isLinktreeVerified = detectLinktreeVerification(html, nextData);
+
   // Extract bio/description from Next.js data (using type assertions for optional fields)
   const pageProps = nextData?.props?.pageProps as
     | {
@@ -205,11 +215,12 @@ export function extractLinktree(html: string): ExtractionResult {
     hasPaidTier
   );
 
-  // Add bio and contact email to result
+  // Add bio, contact email, and verification to result
   return {
     ...result,
     sourcePlatform: 'linktree',
     bio,
     contactEmail,
+    isLinktreeVerified,
   };
 }

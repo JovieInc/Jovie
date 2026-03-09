@@ -152,8 +152,8 @@ const baseConfig = {
     '@jovie/use-client-directive': 'error',
     // Enforce readonly modifiers on React component props for type safety
     '@jovie/readonly-component-props': 'error',
-    // Database guardrails - Neon HTTP driver restrictions
-    '@jovie/no-db-transaction': 'error',
+    // Database guardrails - Neon WebSocket driver supports transactions for RLS
+    '@jovie/no-db-transaction': 'off',
     '@jovie/no-manual-db-pooling': 'error',
     // Route management - prevent hardcoded paths
     '@jovie/no-hardcoded-routes': 'error',
@@ -235,6 +235,36 @@ module.exports = [
     files: ['**/components/admin/**'],
     rules: {
       '@jovie/server-only-imports': 'off',
+    },
+  },
+
+  {
+    files: ['components/atoms/**/*.tsx'],
+    ignores: [
+      'components/atoms/AmountSelector.tsx',
+      'components/atoms/ProgressIndicator.tsx',
+      'components/atoms/SocialIcon.tsx',
+      'components/atoms/TruncatedText.tsx',
+      'components/atoms/CopyableMonospaceCell.tsx',
+      'components/atoms/TableErrorFallback.tsx',
+      'components/atoms/AvatarUploadOverlay.tsx',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.type='Identifier'][callee.name=/^use[A-Z]/]",
+          message:
+            'Hooks are not allowed in atoms. Move stateful logic to a molecule or organism and keep atoms props-driven.',
+        },
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.object.type='Identifier'][callee.object.name='React'][callee.property.type='Identifier'][callee.property.name=/^use[A-Z]/]",
+          message:
+            'Hooks are not allowed in atoms. Move stateful logic to a molecule or organism and keep atoms props-driven.',
+        },
+      ],
     },
   },
   // Stories and test files don't run in Next.js App Router

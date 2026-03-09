@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { CreditCard, Settings, User } from 'lucide-react';
 import Link from 'next/link';
+import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 
 export function AccountDashboard() {
@@ -59,7 +60,9 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href={APP_ROUTES.PROFILE}>Edit Profile</Link>
+              <Link href={APP_ROUTES.SETTINGS_ARTIST_PROFILE}>
+                Edit Profile
+              </Link>
             </Button>
           </div>
         </div>
@@ -125,7 +128,9 @@ export function AccountDashboard() {
             <Link href='/support'>Contact Support</Link>
           </Button>
           <Button variant='outline' size='sm' asChild>
-            <Link href='/docs'>View Documentation</Link>
+            <a href={DOCS_URL} target='_blank' rel='noopener noreferrer'>
+              View Documentation
+            </a>
           </Button>
         </div>
       </div>

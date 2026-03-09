@@ -215,7 +215,7 @@ describe('useBillingMutations', () => {
         expect(result.current.isError).toBe(true);
       });
 
-      expect(toast.error).toHaveBeenCalledWith('Please sign in to continue');
+      expect(toast.error).toHaveBeenCalledWith('Please sign in to continue.');
     });
   });
 
@@ -278,7 +278,7 @@ describe('useBillingMutations', () => {
       });
 
       expect(toast.error).toHaveBeenCalledWith(
-        'You do not have permission to do this'
+        'You do not have permission to do this.'
       );
     });
   });

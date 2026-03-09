@@ -233,111 +233,131 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
 
   describe('Optimistic Locking', () => {
     it('should retry once on optimistic lock failure', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
+      vi.useFakeTimers();
 
-      let selectCallCount = 0;
-      let updateCallCount = 0;
+      try {
+        const { updateUserBillingStatus } = await import(
+          '@/lib/stripe/customer-sync'
+        );
 
-      // Mock user - first call returns version 1, second call returns version 2
-      mockDbSelect.mockImplementation(() => ({
-        from: () => ({
-          where: () => ({
-            limit: () => {
-              selectCallCount++;
-              return Promise.resolve([
-                {
-                  id: 'uuid-123',
-                  isPro: false,
-                  stripeCustomerId: null,
-                  stripeSubscriptionId: null,
-                  billingVersion: selectCallCount, // Increments on each call
-                  lastBillingEventAt: null,
-                },
-              ]);
-            },
+        let selectCallCount = 0;
+        let updateCallCount = 0;
+
+        // Mock user - first call returns version 1, second call returns version 2
+        mockDbSelect.mockImplementation(() => ({
+          from: () => ({
+            where: () => ({
+              limit: () => {
+                selectCallCount++;
+                return Promise.resolve([
+                  {
+                    id: 'uuid-123',
+                    isPro: false,
+                    stripeCustomerId: null,
+                    stripeSubscriptionId: null,
+                    billingVersion: selectCallCount, // Increments on each call
+                    lastBillingEventAt: null,
+                  },
+                ]);
+              },
+            }),
           }),
-        }),
-      }));
+        }));
 
-      // Mock update - first fails (empty return), second succeeds
-      mockDbUpdate.mockImplementation(() => ({
-        set: () => ({
-          where: () => ({
-            returning: () => {
-              updateCallCount++;
-              if (updateCallCount === 1) {
-                // First attempt fails - optimistic lock
-                return Promise.resolve([]);
-              }
-              // Second attempt succeeds
-              return Promise.resolve([{ id: 'uuid-123', billingVersion: 3 }]);
-            },
+        // Mock update - first fails (empty return), second succeeds
+        mockDbUpdate.mockImplementation(() => ({
+          set: () => ({
+            where: () => ({
+              returning: () => {
+                updateCallCount++;
+                if (updateCallCount === 1) {
+                  // First attempt fails - optimistic lock
+                  return Promise.resolve([]);
+                }
+                // Second attempt succeeds
+                return Promise.resolve([{ id: 'uuid-123', billingVersion: 3 }]);
+              },
+            }),
           }),
-        }),
-      }));
+        }));
 
-      // Mock audit log insert
-      mockDbInsert.mockReturnValue({
-        values: () => Promise.resolve([{ id: 'audit-123' }]),
-      });
+        // Mock audit log insert
+        mockDbInsert.mockReturnValue({
+          values: () => Promise.resolve([{ id: 'audit-123' }]),
+        });
 
-      const result = await updateUserBillingStatus({
-        clerkUserId: 'user_test123',
-        isPro: true,
-        stripeCustomerId: 'cus_new',
-        stripeSubscriptionId: 'sub_new',
-        stripeEventId: 'evt_test',
-        eventType: 'subscription_created',
-      });
+        const resultPromise = updateUserBillingStatus({
+          clerkUserId: 'user_test123',
+          isPro: true,
+          stripeCustomerId: 'cus_new',
+          stripeSubscriptionId: 'sub_new',
+          stripeEventId: 'evt_test',
+          eventType: 'subscription_created',
+        });
 
-      expect(result.success).toBe(true);
-      expect(updateCallCount).toBe(2); // Should have retried once
+        await vi.runAllTimersAsync();
+
+        const result = await resultPromise;
+
+        expect(result.success).toBe(true);
+        expect(updateCallCount).toBe(2); // Should have retried once
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should fail after two optimistic lock failures', async () => {
-      const { updateUserBillingStatus } = await import(
-        '@/lib/stripe/customer-sync'
-      );
+      vi.useFakeTimers();
 
-      // Mock user
-      mockDbSelect.mockReturnValue({
-        from: () => ({
-          where: () => ({
-            limit: () =>
-              Promise.resolve([
-                {
-                  id: 'uuid-123',
-                  isPro: false,
-                  stripeCustomerId: null,
-                  stripeSubscriptionId: null,
-                  billingVersion: 1,
-                  lastBillingEventAt: null,
-                },
-              ]),
+      try {
+        const { updateUserBillingStatus } = await import(
+          '@/lib/stripe/customer-sync'
+        );
+
+        // Mock user
+        mockDbSelect.mockReturnValue({
+          from: () => ({
+            where: () => ({
+              limit: () =>
+                Promise.resolve([
+                  {
+                    id: 'uuid-123',
+                    isPro: false,
+                    stripeCustomerId: null,
+                    stripeSubscriptionId: null,
+                    billingVersion: 1,
+                    lastBillingEventAt: null,
+                  },
+                ]),
+            }),
           }),
-        }),
-      });
+        });
 
-      // Mock update - always fails (simulating high contention)
-      mockDbUpdate.mockReturnValue({
-        set: () => ({
-          where: () => ({
-            returning: () => Promise.resolve([]), // Empty = lock failed
+        // Mock update - always fails (simulating high contention)
+        mockDbUpdate.mockReturnValue({
+          set: () => ({
+            where: () => ({
+              returning: () => Promise.resolve([]), // Empty = lock failed
+            }),
           }),
-        }),
-      });
+        });
 
-      const result = await updateUserBillingStatus({
-        clerkUserId: 'user_test123',
-        isPro: true,
-        stripeEventId: 'evt_test',
-        eventType: 'subscription_created',
-      });
+        const resultPromise = updateUserBillingStatus({
+          clerkUserId: 'user_test123',
+          isPro: true,
+          stripeEventId: 'evt_test',
+          eventType: 'subscription_created',
+        });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Concurrent update conflict');
+        await vi.runAllTimersAsync();
+
+        const result = await resultPromise;
+
+        expect(result.success).toBe(false);
+        expect(result.error).toContain('Concurrent update conflict');
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

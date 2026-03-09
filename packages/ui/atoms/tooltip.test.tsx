@@ -180,15 +180,15 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('z-50');
-      expect(content.className).toContain('rounded-md');
-      expect(content.className).toContain('text-[11px]');
+      expect(content.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(content.className).toContain('text-[12px]');
     });
 
     it('applies theme-aware surface classes', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('bg-surface-3');
-      expect(content.className).toContain('text-primary-token');
+      expect(content.className).toContain('bg-(--linear-bg-surface-0)');
+      expect(content.className).toContain('text-(--linear-text-primary)');
     });
 
     it('applies animation classes', () => {

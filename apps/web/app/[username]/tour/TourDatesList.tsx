@@ -82,7 +82,7 @@ export function TourDatesList({ tourDates }: Readonly<TourDatesListProps>) {
   }, [tourDates, location]);
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-3'>
       {nearbyCount > 0 && !isLoading && (
         <p className='text-sm text-secondary-token'>
           {nearbyCount} {nearbyCount === 1 ? 'show' : 'shows'} near you

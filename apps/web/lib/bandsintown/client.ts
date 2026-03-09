@@ -97,9 +97,10 @@ function sanitizeEvent(event: BandsintownEvent): SanitizedEvent | null {
   const ticketUrl = ticketOffer?.url ?? event.url ?? null;
 
   // Determine ticket status from offers
-  const isSoldOut = event.offers?.some(
-    offer => offer.status?.toLowerCase() === 'sold out'
-  );
+  const isSoldOut = event.offers?.some(offer => {
+    const status = offer?.status;
+    return typeof status === 'string' && status.toLowerCase() === 'sold out';
+  });
 
   // Parse datetime - Bandsintown uses ISO format
   const startDate = new Date(event.datetime);
@@ -134,7 +135,7 @@ function sanitizeEvent(event: BandsintownEvent): SanitizedEvent | null {
     longitude: parseCoordinate(event.venue?.longitude),
     ticketUrl,
     ticketStatus: isSoldOut ? 'sold_out' : 'available',
-    rawData: event as unknown as Record<string, unknown>,
+    rawData: { ...event },
   };
 }
 

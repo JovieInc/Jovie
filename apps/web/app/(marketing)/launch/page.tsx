@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { AiDemo } from '@/components/home/AiDemo';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
@@ -6,9 +7,35 @@ import { HeroSpotifySearch } from '@/components/home/HeroSpotifySearch';
 import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { publicEnv } from '@/lib/env-public';
+import { captureWarning } from '@/lib/error-tracking';
+import { getProfileByUsername } from '@/lib/services/profile';
 
-// Fully static - no database dependency, instant cold starts
+// Marketing pages must remain fully static.
 export const revalidate = false;
+
+/** Fetch the /tim profile data for the subscribe preview mockup (JOV-888). */
+const getTimProfile = unstable_cache(
+  async () => {
+    try {
+      const profile = await getProfileByUsername('tim');
+      if (!profile) return null;
+      return {
+        name: profile.displayName ?? null,
+        tagline: profile.bio ?? null,
+        handle: profile.username,
+        avatarUrl: profile.avatarUrl ?? null,
+      };
+    } catch (error) {
+      void captureWarning('[launch] Failed to fetch /tim profile for mockup', {
+        error,
+      });
+      return null;
+    }
+  },
+  ['launch-tim-profile'],
+  { revalidate: 3600, tags: ['profile:tim'] }
+);
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — Your Entire Music Career. One Intelligent Link.`;
@@ -50,13 +77,13 @@ export async function generateMetadata(): Promise<Metadata> {
     formatDetection: { email: false, address: false, telephone: false },
     metadataBase: new URL(APP_URL),
     alternates: {
-      canonical: '/launch',
-      languages: { 'en-US': '/launch' },
+      canonical: APP_ROUTES.LAUNCH,
+      languages: { 'en-US': APP_ROUTES.LAUNCH },
     },
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: `${APP_URL}/launch`,
+      url: `${APP_URL}${APP_ROUTES.LAUNCH}`,
       title,
       description,
       siteName: APP_NAME,
@@ -100,13 +127,13 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     verification: {
-      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+      google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     },
     other: {
-      'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || '',
+      'msvalidate.01': publicEnv.NEXT_PUBLIC_BING_SITE_VERIFICATION ?? '',
       'yandex-verification':
-        process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION || '',
-      'p:domain_verify': process.env.NEXT_PUBLIC_PINTEREST_VERIFICATION || '',
+        publicEnv.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION ?? '',
+      'p:domain_verify': publicEnv.NEXT_PUBLIC_PINTEREST_VERIFICATION ?? '',
     },
   };
 }
@@ -235,27 +262,17 @@ function Divider() {
   return <hr className='border-t border-subtle' />;
 }
 
-export default function LaunchPage() {
+export default async function LaunchPage() {
+  const timProfile = await getTimProfile();
+
   return (
     <div className='relative min-h-screen'>
       <AuthRedirectHandler />
 
       {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
       {/* ═══ 1. HERO ═══ */}
       <section
@@ -446,7 +463,12 @@ export default function LaunchPage() {
 
       {/* ═══ 6. PROFILE MOCKUP ═══ */}
       <div className={`${WRAP} pb-16`}>
-        <ProfileMockup />
+        <ProfileMockup
+          name={timProfile?.name}
+          tagline={timProfile?.tagline}
+          handle={timProfile?.handle}
+          avatarUrl={timProfile?.avatarUrl}
+        />
       </div>
 
       {/* ═══ 7. SMART LINKS ═══ */}
@@ -1903,7 +1925,7 @@ export default function LaunchPage() {
           <span className='text-secondary-token'>No surprises.</span>
         </h2>
         <Link
-          href='/launch/pricing'
+          href={APP_ROUTES.LAUNCH_PRICING}
           className='marketing-cta focus-ring mt-8 inline-block'
         >
           View pricing

@@ -1,7 +1,7 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Drawer } from 'vaul';
 import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
@@ -24,8 +24,6 @@ export function ListenDrawer({
   dsps,
   enableDynamicEngagement = false,
 }: ListenDrawerProps) {
-  const historyPushedRef = useRef(false);
-
   // Fire synthetic analytics event when drawer opens for funnel parity
   useEffect(() => {
     if (!open) return;
@@ -34,30 +32,11 @@ export function ListenDrawer({
       handle: artist.handle,
     });
 
-    // Push history state so hardware back button closes the drawer
-    if (!historyPushedRef.current) {
-      globalThis.history.pushState({ listenDrawer: true }, '');
-      historyPushedRef.current = true;
-    }
+    return undefined;
+  }, [open, artist.handle]);
 
-    const handlePopState = () => {
-      if (historyPushedRef.current) {
-        historyPushedRef.current = false;
-        onOpenChange(false);
-      }
-    };
-
-    globalThis.addEventListener('popstate', handlePopState);
-    return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [open, artist.handle, onOpenChange]);
-
-  // Clean up history entry when drawer is closed by swipe/overlay tap
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen && historyPushedRef.current) {
-        historyPushedRef.current = false;
-        globalThis.history.back();
-      }
       onOpenChange(isOpen);
     },
     [onOpenChange]

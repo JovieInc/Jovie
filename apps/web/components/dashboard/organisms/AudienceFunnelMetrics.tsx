@@ -4,6 +4,8 @@ import { ChevronRight } from 'lucide-react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 
+const numberFormatter = new Intl.NumberFormat();
+
 function FunnelStep({
   label,
   value,
@@ -31,10 +33,10 @@ function FunnelStep({
 
   return (
     <div className='flex-1 min-w-0'>
-      <p className='text-[11px] font-medium uppercase tracking-wide text-tertiary-token truncate'>
+      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token truncate'>
         {label}
       </p>
-      <p className='mt-1 text-lg font-semibold tracking-tight text-primary-token tabular-nums'>
+      <p className='mt-1 text-lg font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
         {value}
       </p>
       {rate && (
@@ -60,7 +62,7 @@ export function AudienceFunnelMetrics() {
     view: 'traffic',
   });
 
-  const fmt = Intl.NumberFormat();
+  const fmt = numberFormatter;
 
   const profileViews = data?.profile_views ?? 0;
   const uniqueVisitors = data?.unique_users ?? 0;

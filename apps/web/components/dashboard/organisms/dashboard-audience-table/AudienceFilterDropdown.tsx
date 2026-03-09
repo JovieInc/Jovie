@@ -9,7 +9,16 @@ import {
   DropdownMenuTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
-import { Check, Clock, Filter, RefreshCw, Repeat, X, Zap } from 'lucide-react';
+import {
+  Check,
+  Clock,
+  Filter,
+  MapPin,
+  RefreshCw,
+  Repeat,
+  X,
+  Zap,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { AudienceFilters } from './types';
@@ -40,9 +49,19 @@ const SEGMENT_OPTIONS: readonly {
     label: 'Last 24h',
     icon: <Clock className='h-3.5 w-3.5' />,
   },
+  {
+    id: 'touringCity',
+    label: 'Touring City',
+    icon: <MapPin className='h-3.5 w-3.5' />,
+  },
 ];
 
-type SegmentId = 'highIntent' | 'returning' | 'frequent' | 'recent24h';
+type SegmentId =
+  | 'highIntent'
+  | 'returning'
+  | 'frequent'
+  | 'recent24h'
+  | 'touringCity';
 
 interface ActiveFilterPillProps {
   readonly groupLabel: string;
@@ -63,7 +82,7 @@ function ActiveFilterPill({
       <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
         <span className='text-tertiary-token'>{groupLabel}</span>
         <span className='text-tertiary-token'>is</span>
-        <span className='font-medium text-primary-token'>{displayValue}</span>
+        <span className='font-[510] text-primary-token'>{displayValue}</span>
       </div>
       <button
         type='button'
@@ -123,12 +142,12 @@ export function AudienceFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
+                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
                 buttonClassName
               )}
             >
               <Filter className='h-3.5 w-3.5' />
-              Filter
+              <span className='hidden sm:inline'>Filter</span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>
@@ -150,7 +169,7 @@ export function AudienceFilterDropdown({
                 }}
                 className={cn(
                   'justify-between',
-                  checked && 'bg-primary/5 dark:bg-primary/10'
+                  checked && 'bg-interactive-active'
                 )}
               >
                 <div className='flex items-center gap-2'>

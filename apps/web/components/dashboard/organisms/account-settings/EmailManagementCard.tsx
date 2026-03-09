@@ -11,6 +11,7 @@ import { Button, Input } from '@jovie/ui';
 import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 
 import type { ClerkEmailAddressResource, ClerkUserResource } from './types';
@@ -51,7 +52,11 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
   }
 
   return (
-    <div className='divide-y divide-subtle'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
       {/* Existing email rows */}
       {sortedEmails.map(email => {
         const isPrimary = email.id === primaryEmailId;
@@ -60,19 +65,19 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
         return (
           <div
             key={email.id}
-            className='flex items-center justify-between py-3'
+            className='flex items-center justify-between px-4 py-3'
           >
             <div className='flex items-center gap-3'>
               <div>
-                <p className='text-sm text-primary-token flex items-center gap-2'>
+                <p className='text-[13px] text-primary-token flex items-center gap-2'>
                   {email.emailAddress}
                   {isPrimary && (
-                    <span className='text-xs text-secondary-token'>
+                    <span className='text-[11px] text-secondary-token'>
                       Primary
                     </span>
                   )}
                 </p>
-                <p className='text-xs text-secondary-token flex items-center gap-1.5 mt-0.5'>
+                <p className='text-[11px] text-secondary-token flex items-center gap-1.5 mt-0.5'>
                   {isVerified ? (
                     <span className='inline-flex items-center gap-1 text-emerald-600'>
                       <CheckCircle className='h-3.5 w-3.5' />
@@ -116,7 +121,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
       })}
 
       {/* Add email row */}
-      <div className='py-3'>
+      <div className='px-4 py-3'>
         <form
           onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
           className='flex flex-col gap-3 sm:flex-row sm:items-end'
@@ -126,7 +131,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
               <div>
                 <label
                   htmlFor='verify-code'
-                  className='block text-sm text-primary-token mb-1.5'
+                  className='block text-[13px] text-primary-token mb-1.5'
                 >
                   Verification code
                 </label>
@@ -145,7 +150,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
               <div>
                 <label
                   htmlFor='new-email'
-                  className='block text-sm text-primary-token mb-1.5'
+                  className='block text-[13px] text-primary-token mb-1.5'
                 >
                   Add email address
                 </label>
@@ -160,7 +165,9 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
               </div>
             )}
             {emailError && (
-              <p className='text-sm text-destructive mt-1.5'>{emailError}</p>
+              <p className='text-[13px] text-destructive mt-1.5'>
+                {emailError}
+              </p>
             )}
           </div>
           <div className='flex gap-2 shrink-0'>
@@ -200,6 +207,6 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           if (emailToRemove) await handleRemoveEmail(emailToRemove);
         }}
       />
-    </div>
+    </DashboardCard>
   );
 }

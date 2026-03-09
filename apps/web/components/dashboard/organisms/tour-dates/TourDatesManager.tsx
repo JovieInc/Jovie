@@ -139,15 +139,15 @@ export function TourDatesManager({
         {isConnected && connectionStatus.artistName && (
           <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-2'>
             <div className='flex items-center gap-2'>
-              <div className='flex h-6 w-6 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/30'>
+              <div className='flex h-6 w-6 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/30'>
                 <Icon
                   name='Check'
                   className='h-4 w-4 text-teal-600 dark:text-teal-400'
                 />
               </div>
-              <span className='text-sm text-secondary-token'>
+              <span className='text-[13px] text-secondary-token'>
                 Connected to{' '}
-                <span className='font-medium text-primary-token'>
+                <span className='font-[510] text-primary-token'>
                   {connectionStatus.artistName}
                 </span>{' '}
                 on Bandsintown
@@ -196,7 +196,7 @@ export function TourDatesManager({
           ) : (
             <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
               <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
-              <p className='mt-4 text-sm text-secondary-token'>
+              <p className='mt-4 text-[13px] text-secondary-token'>
                 No tour dates found
               </p>
               {isConnected && (

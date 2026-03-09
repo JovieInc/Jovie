@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { AuthBackButton } from '@/components/auth';
+import { getValidationFailureKey } from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
 import {
-  OnboardingCompleteStep,
+  OnboardingDspStep,
   OnboardingHandleStep,
+  OnboardingProfileReviewStep,
 } from '@/components/dashboard/organisms/onboarding';
-import { BASE_URL, HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
-import { useClipboard } from '@/hooks/useClipboard';
 import { track } from '@/lib/analytics';
+import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
+
 import type { AppleStyleOnboardingFormProps } from './types';
 import { ONBOARDING_STEPS } from './types';
 import { useHandleValidation } from './useHandleValidation';
@@ -20,11 +23,14 @@ import { useStepNavigation } from './useStepNavigation';
 export function AppleStyleOnboardingForm({
   initialDisplayName = '',
   initialHandle = '',
+  isReservedHandle = false,
   userEmail = null,
   userId,
+  shouldAutoSubmitHandle = false,
 }: Readonly<AppleStyleOnboardingFormProps>) {
-  const PRODUCTION_PROFILE_DOMAIN = HOSTNAME;
-  const PRODUCTION_PROFILE_BASE_URL = BASE_URL;
+  const onboardingStartedAtRef = useRef(Date.now());
+  const previousStepIndexRef = useRef<number | null>(null);
+  const lastValidationFailureKeyRef = useRef<string | null>(null);
 
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [handleInput, setHandleInput] = useState(normalizedInitialHandle);
@@ -32,11 +38,7 @@ export function AppleStyleOnboardingForm({
   const [profileReadyHandle, setProfileReadyHandle] = useState(
     normalizedInitialHandle
   );
-  const { copy, isSuccess: copied } = useClipboard({ resetDelay: 2000 });
-
   const handleInputRef = useRef<HTMLInputElement | null>(null);
-
-  const displayDomain = PRODUCTION_PROFILE_DOMAIN;
 
   const { currentStepIndex, isTransitioning, goToNextStep, goBack } =
     useStepNavigation();
@@ -47,7 +49,15 @@ export function AppleStyleOnboardingForm({
       fullName,
     });
 
-  const { state, handleSubmit, isPendingSubmit } = useOnboardingSubmit({
+  const {
+    state,
+    handleSubmit,
+    isPendingSubmit,
+    spotifyImportState,
+    autoSubmitClaimed,
+    enrichedProfile,
+    setEnrichedProfile,
+  } = useOnboardingSubmit({
     userId,
     userEmail,
     fullName,
@@ -56,6 +66,9 @@ export function AppleStyleOnboardingForm({
     handleValidation,
     goToNextStep,
     setProfileReadyHandle,
+    shouldAutoSubmitHandle,
+    isReservedHandle,
+    onboardingStartedAtMs: onboardingStartedAtRef.current,
   });
 
   useEffect(() => {
@@ -68,19 +81,71 @@ export function AppleStyleOnboardingForm({
   }, [userId]);
 
   useEffect(() => {
+    const currentStep = ONBOARDING_STEPS[currentStepIndex];
+    const previousStepIndex = previousStepIndexRef.current;
+    const previousStep =
+      previousStepIndex === null ? null : ONBOARDING_STEPS[previousStepIndex];
+
+    if (currentStep) {
+      track('onboarding_step_transitioned', {
+        user_id: userId,
+        fromStep: previousStep?.id ?? null,
+        toStep: currentStep.id,
+        stepIndex: currentStepIndex,
+      });
+    }
+
+    previousStepIndexRef.current = currentStepIndex;
+  }, [currentStepIndex, userId]);
+
+  const handleSuggestionClick = useCallback(
+    (selectedSuggestion: string) => {
+      track('onboarding_handle_suggestion_selected', {
+        user_id: userId,
+        originalHandle: handleInput,
+        selectedSuggestion,
+      });
+      setHandleInput(selectedSuggestion);
+    },
+    [handleInput, userId]
+  );
+
+  useEffect(() => {
     if (currentStepIndex === 0 && handleInputRef.current) {
       handleInputRef.current.focus();
     }
   }, [currentStepIndex]);
 
+  useEffect(() => {
+    if (!handleInput || handleValidation.checking || !handleValidation.error) {
+      lastValidationFailureKeyRef.current = null;
+      return;
+    }
+
+    const failureKey = getValidationFailureKey(
+      handleInput,
+      handleValidation.error
+    );
+    if (lastValidationFailureKeyRef.current === failureKey) {
+      return;
+    }
+
+    track('onboarding_handle_validation_failed', {
+      user_id: userId,
+      handle: handleInput,
+      reason: handleValidation.error,
+    });
+    lastValidationFailureKeyRef.current = failureKey;
+  }, [handleInput, handleValidation.checking, handleValidation.error, userId]);
+
   const handleStepCtaDisabledReason = useMemo(() => {
-    if (state.isSubmitting) return 'Saving…';
+    if (state.isSubmitting) return 'Saving...';
     if (state.error) return state.error;
     if (!handleInput) return 'Enter a handle to continue';
     if (!handleValidation.clientValid) {
       return handleValidation.error || 'Handle is invalid';
     }
-    if (handleValidation.checking) return 'Checking availability…';
+    if (handleValidation.checking) return 'Checking availability...';
     if (!handleValidation.available) {
       return handleValidation.error || 'Handle is taken';
     }
@@ -105,21 +170,51 @@ export function AppleStyleOnboardingForm({
     validateHandle(handleInput);
   }, [handleInput, setHandleValidation, validateHandle]);
 
-  const copyProfileLink = useCallback(() => {
-    const targetHandle = profileReadyHandle || handle || handleInput;
-    const link = `${PRODUCTION_PROFILE_BASE_URL}/${targetHandle}`;
-    void copy(link);
-  }, [
-    PRODUCTION_PROFILE_BASE_URL,
-    copy,
-    handle,
-    handleInput,
-    profileReadyHandle,
-  ]);
-
   const goToDashboard = useCallback(() => {
-    globalThis.location.href = APP_ROUTES.DASHBOARD;
-  }, []);
+    if (globalThis.window === undefined) return;
+
+    const initialQuery = getOnboardingDashboardInitialQuery(
+      spotifyImportState.status
+    );
+    const dashboardUrl = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
+
+    globalThis.location.href = dashboardUrl;
+  }, [spotifyImportState.status]);
+
+  /**
+   * JOV-1340: DSP connection handler is now non-blocking.
+   * Enrichment runs in the background; user proceeds immediately.
+   */
+  const handleDspConnected = useCallback(
+    (
+      _releases: unknown,
+      artistName: string,
+      spotifyArtistId?: string,
+      spotifyUrl?: string
+    ) => {
+      track('onboarding_dsp_connected', {
+        user_id: userId,
+        artist_name: artistName,
+      });
+
+      // Fire-and-forget: enrich profile in background (JOV-1340)
+      if (spotifyArtistId && spotifyUrl) {
+        void enrichProfileFromDsp(spotifyArtistId, spotifyUrl)
+          .then(enriched => setEnrichedProfile(enriched))
+          .catch(() => {
+            // Enrichment failure is non-critical — user can fill in manually
+          });
+      }
+
+      goToNextStep();
+    },
+    [goToNextStep, userId, setEnrichedProfile]
+  );
+
+  const handleDspSkip = useCallback(() => {
+    track('onboarding_dsp_skipped', { user_id: userId });
+    goToNextStep();
+  }, [goToNextStep, userId]);
 
   const renderStepContent = () => {
     switch (currentStepIndex) {
@@ -129,6 +224,7 @@ export function AppleStyleOnboardingForm({
             title={ONBOARDING_STEPS[0].title}
             prompt={ONBOARDING_STEPS[0].prompt}
             handleInput={handleInput}
+            isReservedHandle={isReservedHandle}
             handleValidation={handleValidation}
             stateError={state.error}
             isSubmitting={state.isSubmitting}
@@ -137,20 +233,31 @@ export function AppleStyleOnboardingForm({
             inputRef={handleInputRef}
             onHandleChange={setHandleInput}
             onSubmit={handleSubmit}
+            onSuggestionClick={handleSuggestionClick}
             isPendingSubmit={isPendingSubmit}
+            autoSubmitClaimed={autoSubmitClaimed}
           />
         );
 
       case 1:
         return (
-          <OnboardingCompleteStep
+          <OnboardingDspStep
             title={ONBOARDING_STEPS[1].title}
             prompt={ONBOARDING_STEPS[1].prompt}
-            displayDomain={displayDomain}
+            onConnected={handleDspConnected}
+            onSkip={handleDspSkip}
+            isTransitioning={isTransitioning}
+          />
+        );
+
+      case 2:
+        return (
+          <OnboardingProfileReviewStep
+            title={ONBOARDING_STEPS[2].title}
+            prompt={ONBOARDING_STEPS[2].prompt}
+            enrichedProfile={enrichedProfile}
             handle={profileReadyHandle || handle}
-            copied={copied}
             onGoToDashboard={goToDashboard}
-            onCopyLink={copyProfileLink}
           />
         );
 

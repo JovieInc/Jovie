@@ -4,10 +4,11 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { APP_ROUTES } from '@/constants/routes';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
-const mockUsePathname = vi.fn(() => '/app/profile');
+const mockUsePathname = vi.fn(() => '/app/chat');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
   useParams: () => ({}),
@@ -34,7 +35,9 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
 vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   usePreviewPanelState: () => ({
     isOpen: false,
-    activeTab: null,
+    open: vi.fn(),
+    close: vi.fn(),
+    toggle: vi.fn(),
   }),
   usePreviewPanelData: () => ({
     data: null,
@@ -51,6 +54,10 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
 
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
+}));
+
+vi.mock('@/lib/queries/useReleasesQuery', () => ({
+  useReleasesQuery: () => ({ data: undefined, isLoading: false }),
 }));
 
 // Mock @jovie/ui Tooltip components
@@ -87,6 +94,13 @@ const baseDashboardData: DashboardData = {
     totalReceivedCents: 0,
     monthReceivedCents: 0,
   },
+  profileCompletion: {
+    percentage: 0,
+    completedCount: 0,
+    totalCount: 6,
+    steps: [],
+    profileIsLive: false,
+  },
 };
 
 function renderDashboardNav(
@@ -108,7 +122,7 @@ describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
     const { getByRole } = renderDashboardNav();
 
-    expect(getByRole('link', { name: 'Profile' })).toBeDefined();
+    expect(getByRole('button', { name: 'Profile' })).toBeDefined();
     expect(getByRole('link', { name: 'Releases' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
@@ -124,9 +138,9 @@ describe('DashboardNav', () => {
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    const profileLink = container.querySelector('[href="/app/profile"]');
-    expect(profileLink).toBeTruthy();
-    expect(profileLink?.className).toContain('justify-center');
+    const profileButton = container.querySelector('button[aria-pressed]');
+    expect(profileButton).toBeTruthy();
+    expect(profileButton?.className).toContain('justify-center');
   });
 
   it('differentiates primary and secondary nav styling', () => {
@@ -142,6 +156,20 @@ describe('DashboardNav', () => {
     const primaryGroup = primaryMenuParent?.parentElement;
 
     expect(primaryGroup?.className).toMatch(/space-y-/);
+  });
+
+  it('renders full admin navigation for admin users', () => {
+    const { getByRole } = renderDashboardNav({ isAdmin: true });
+
+    expect(getByRole('link', { name: 'Leads' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_LEADS
+    );
+    expect(getByRole('link', { name: 'Outreach' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_OUTREACH
+    );
+    expect(getByRole('link', { name: 'Ingest' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_INGEST
+    );
   });
 
   it('renders with different pathname', () => {

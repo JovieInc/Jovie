@@ -73,7 +73,7 @@ if [ "$is_test" = false ] && [[ "$file_path" =~ \.(ts|tsx|js|jsx)$ ]]; then
     if [ -f "$file_path" ]; then
       if grep -qE 'console\.(log|error|warn|info|debug)\(' "$file_path" 2>/dev/null; then
         echo "WARNING: console.* statements found in $file_path"
-        echo "Use Sentry logging instead (per agents.md Section 15):"
+        echo "Use Sentry logging instead (per AGENTS.md Section 15):"
         echo "  import * as Sentry from '@sentry/nextjs';"
         echo "  Sentry.captureException(error);"
         echo ""

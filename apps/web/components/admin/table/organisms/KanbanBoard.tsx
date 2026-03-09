@@ -1,6 +1,7 @@
 'use client';
 
 import { useVirtualizer } from '@tanstack/react-virtual';
+import type * as React from 'react';
 import { useCallback, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -147,6 +148,11 @@ function KanbanColumn<TData>({
   const containerRef = useRef<HTMLFieldSetElement>(null);
   const itemGap = 12; // 0.75rem to match `space-y-3` / `pb-3`
 
+  const accentStyle = useMemo<React.CSSProperties | undefined>(
+    () => (column.accent ? { backgroundColor: column.accent } : undefined),
+    [column.accent]
+  );
+
   const rowVirtualizer = useVirtualizer({
     count: column.items.length,
     getScrollElement: () => containerRef.current,
@@ -174,14 +180,14 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <div className='flex min-w-[320px] max-w-[400px] flex-1 flex-col rounded-lg border border-subtle bg-surface-1'>
+    <div className='flex min-w-[320px] max-w-[400px] flex-1 flex-col rounded-lg border border-subtle'>
       {/* Column Header */}
       <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
         <div className='flex items-center gap-2'>
-          {column.accent && (
+          {accentStyle && (
             <span
               className='h-2 w-2 rounded-full'
-              style={{ backgroundColor: column.accent }}
+              style={accentStyle}
               aria-hidden='true'
             />
           )}
@@ -213,11 +219,8 @@ function KanbanColumn<TData>({
           if (enableVirtualization) {
             return (
               <ul
-                className='m-0 list-none p-0'
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  position: 'relative',
-                }}
+                className='relative m-0 list-none p-0'
+                style={{ height: rowVirtualizer.getTotalSize() }}
               >
                 {rowVirtualizer.getVirtualItems().map(virtualRow => {
                   const item = column.items[virtualRow.index];
@@ -231,15 +234,11 @@ function KanbanColumn<TData>({
                       data-index={virtualRow.index}
                       ref={rowVirtualizer.measureElement}
                       className={cn(
-                        'pb-3',
+                        'absolute top-0 left-0 w-full pb-3',
                         onItemMove &&
                           'cursor-move transition-opacity hover:opacity-80'
                       )}
                       style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
                         transform: `translateY(${virtualRow.start}px)`,
                       }}
                       draggable={Boolean(onItemMove)}

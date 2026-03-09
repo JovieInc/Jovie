@@ -16,7 +16,7 @@ describe('Card', () => {
     render(<Card data-testid='card'>Card content</Card>);
     const card = screen.getByTestId('card');
     expect(card).toBeInTheDocument();
-    expect(card.className).toContain('rounded-lg');
+    expect(card.className).toContain('rounded-[var(--radius-lg)]');
     expect(card.className).toContain('border-subtle');
     expect(card.className).toContain('bg-surface-1');
   });
@@ -52,7 +52,7 @@ describe('Card', () => {
     );
     const article = screen.getByTestId('article');
     expect(article.tagName).toBe('ARTICLE');
-    expect(article.className).toContain('rounded-lg');
+    expect(article.className).toContain('rounded-[var(--radius-lg)]');
   });
 
   it('supports asChild with section element', () => {
@@ -74,7 +74,7 @@ describe('Card', () => {
     );
     const card = screen.getByTestId('card');
     expect(card.className).toContain('custom-class');
-    expect(card.className).toContain('rounded-lg');
+    expect(card.className).toContain('rounded-[var(--radius-lg)]');
   });
 
   it('passes through HTML attributes', () => {
@@ -126,7 +126,7 @@ describe('CardTitle', () => {
     render(<CardTitle>Title text</CardTitle>);
     const title = screen.getByRole('heading', { level: 3 });
     expect(title).toBeInTheDocument();
-    expect(title.className).toContain('text-2xl');
+    expect(title.className).toContain('text-base');
     expect(title.className).toContain('font-semibold');
     expect(title.className).toContain('text-primary-token');
   });
@@ -149,7 +149,7 @@ describe('CardTitle', () => {
     );
     const title = screen.getByRole('heading', { level: 1 });
     expect(title).toBeInTheDocument();
-    expect(title.className).toContain('text-2xl');
+    expect(title.className).toContain('text-base');
   });
 
   it('supports asChild with non-heading elements', () => {
@@ -169,7 +169,7 @@ describe('CardDescription', () => {
     render(<CardDescription>Description text</CardDescription>);
     const description = screen.getByText('Description text');
     expect(description.tagName).toBe('P');
-    expect(description.className).toContain('text-sm');
+    expect(description.className).toContain('text-[13px]');
     expect(description.className).toContain('text-secondary-token');
   });
 
@@ -191,7 +191,7 @@ describe('CardDescription', () => {
     );
     const description = screen.getByTestId('div-description');
     expect(description.tagName).toBe('DIV');
-    expect(description.className).toContain('text-sm');
+    expect(description.className).toContain('text-[13px]');
   });
 });
 
@@ -201,7 +201,7 @@ describe('CardContent', () => {
     const content = screen.getByTestId('content');
     expect(content).toBeInTheDocument();
     expect(content.className).toContain('p-6');
-    expect(content.className).toContain('pt-0');
+    expect(content.className).toContain('pt-2');
   });
 
   it('forwards refs correctly', () => {
@@ -319,8 +319,8 @@ describe('Card composition', () => {
     expect(footer.tagName).toBe('FOOTER');
 
     // Verify classes are still applied
-    expect(article.className).toContain('rounded-lg');
+    expect(article.className).toContain('rounded-[var(--radius-lg)]');
     expect(header.className).toContain('flex');
-    expect(title.className).toContain('text-2xl');
+    expect(title.className).toContain('text-base');
   });
 });

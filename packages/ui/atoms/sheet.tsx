@@ -20,7 +20,7 @@ export const SheetClose = SheetPrimitive.Close;
 export const SheetPortal = SheetPrimitive.Portal;
 
 export const SheetOverlay = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Overlay>,
+  React.ComponentRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Overlay
@@ -34,7 +34,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   [
-    'fixed z-50 gap-4 bg-surface-2 p-6 text-primary-token shadow-lg',
+    'fixed z-50 gap-4 bg-surface-1 p-6 text-primary-token shadow-lg',
     'transition ease-in-out',
     'data-[state=open]:animate-in data-[state=closed]:animate-out',
     'data-[state=closed]:duration-300 data-[state=open]:duration-500',
@@ -83,7 +83,7 @@ export interface SheetContentProps
 }
 
 export const SheetContent = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Content>,
+  React.ComponentRef<typeof SheetPrimitive.Content>,
   SheetContentProps
 >(
   (
@@ -134,7 +134,7 @@ export const SheetHeader = ({
   ...props
 }: SheetHeaderProps) => (
   <div
-    className={cn(headerStyles.base, 'space-y-2', className)}
+    className={cn(headerStyles.base, className)}
     data-testid={testId}
     {...props}
   />
@@ -163,7 +163,7 @@ export const SheetFooter = ({
 SheetFooter.displayName = 'SheetFooter';
 
 export const SheetTitle = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Title>,
+  React.ComponentRef<typeof SheetPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Title
@@ -176,7 +176,7 @@ export const SheetTitle = React.forwardRef<
 SheetTitle.displayName = SheetPrimitive.Title.displayName;
 
 export const SheetDescription = React.forwardRef<
-  React.ElementRef<typeof SheetPrimitive.Description>,
+  React.ComponentRef<typeof SheetPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>
 >(({ className, ...props }, ref) => (
   <SheetPrimitive.Description

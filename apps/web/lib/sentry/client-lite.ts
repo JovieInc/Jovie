@@ -173,3 +173,28 @@ export function getSentryClient() {
  * This should be used regardless of SDK variant for navigation tracking.
  */
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+
+// ---------------------------------------------------------------------------
+// Re-exported Sentry API functions
+//
+// Client components should import these from '@/lib/sentry/client-lite' instead
+// of `import * as Sentry from '@sentry/nextjs'` to avoid pulling the full SDK
+// into every client bundle. The functions below are thin re-exports — they call
+// into whichever Sentry client is already initialised (lite or full).
+// ---------------------------------------------------------------------------
+
+/**
+ * Capture an exception in Sentry.
+ * Re-exported so client components don't need a wildcard Sentry import.
+ */
+export const captureException = Sentry.captureException;
+
+/**
+ * Capture a plain-text message in Sentry.
+ */
+export const captureMessage = Sentry.captureMessage;
+
+/**
+ * Add a breadcrumb to the current Sentry scope.
+ */
+export const addBreadcrumb = Sentry.addBreadcrumb;

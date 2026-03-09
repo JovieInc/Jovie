@@ -16,6 +16,9 @@ const stableReset = vi.fn();
 const stableSync = vi.fn();
 const stableRefresh = vi.fn();
 const stableRescan = vi.fn();
+const stableSaveLyricsAsync = vi.fn();
+const stableFormatLyricsAsync = vi.fn();
+const stableSaveCanvasStatusAsync = vi.fn();
 
 function makeMockMutation(mutateFn: ReturnType<typeof vi.fn>) {
   return {
@@ -43,6 +46,18 @@ vi.mock('@/lib/queries', () => ({
   useSyncReleasesFromSpotifyMutation: () => makeMockMutation(stableSync),
   useRefreshReleaseMutation: () => makeMockMutation(stableRefresh),
   useRescanIsrcLinksMutation: () => makeMockMutation(stableRescan),
+  useSaveCanvasStatusMutation: () => ({
+    ...makeMockMutation(vi.fn()),
+    mutateAsync: stableSaveCanvasStatusAsync,
+  }),
+  useSaveReleaseLyricsMutation: () => ({
+    ...makeMockMutation(vi.fn()),
+    mutateAsync: stableSaveLyricsAsync,
+  }),
+  useFormatReleaseLyricsMutation: () => ({
+    ...makeMockMutation(vi.fn()),
+    mutateAsync: stableFormatLyricsAsync,
+  }),
 }));
 
 vi.mock('sonner', () => ({
@@ -64,7 +79,7 @@ vi.mock('@/hooks/useClipboard', () => ({
 }));
 
 vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://test.jovie.com',
+  getBaseUrl: () => 'https://test.jov.ie',
 }));
 
 // ── Import after mocks ──
@@ -93,6 +108,7 @@ function makeRelease(overrides?: Partial<ReleaseOverrides>) {
     slug: 'test-release',
     smartLinkPath: '/r/test-release',
     releaseType: 'single' as const,
+    isExplicit: false,
     totalTracks: 1,
     providers: [
       {
@@ -343,6 +359,57 @@ describe('useReleaseProviderMatrix', () => {
           onError: expect.any(Function),
         })
       );
+    });
+
+    it('tracks refreshing state during refresh lifecycle', () => {
+      const { result } = renderHook(() =>
+        useReleaseProviderMatrix(defaultProps)
+      );
+
+      act(() => {
+        result.current.handleRefreshRelease('release-1');
+      });
+
+      expect(result.current.refreshingReleaseId).toBe('release-1');
+
+      const options = stableRefresh.mock.calls[0]?.[1];
+      expect(options).toBeDefined();
+
+      act(() => {
+        options?.onSettled?.();
+      });
+
+      expect(result.current.refreshingReleaseId).toBeNull();
+    });
+
+    it('sets flashed release id after refresh success', () => {
+      vi.useFakeTimers();
+      const { result } = renderHook(() =>
+        useReleaseProviderMatrix(defaultProps)
+      );
+
+      act(() => {
+        result.current.handleRefreshRelease('release-1');
+      });
+
+      const options = stableRefresh.mock.calls[0]?.[1];
+
+      act(() => {
+        options?.onSuccess?.({
+          release: makeRelease({ id: 'release-1' }),
+          rateLimited: false,
+          retryAfter: '',
+        });
+      });
+
+      expect(result.current.flashedReleaseId).toBe('release-1');
+
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
+
+      expect(result.current.flashedReleaseId).toBeNull();
+      vi.useRealTimers();
     });
 
     it('handleRescanIsrc calls rescanIsrcMutation.mutate', () => {

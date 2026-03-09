@@ -18,8 +18,18 @@ import {
   getCheckoutErrorResponse,
 } from '@/lib/stripe/checkout-helpers';
 import { createCheckoutSession } from '@/lib/stripe/client';
-import { getActivePriceIds, getPriceMappingDetails } from '@/lib/stripe/config';
+import {
+  getActivePriceIds,
+  getPriceMappingDetails,
+  isGrowthPlanEnabled,
+  isGrowthPriceId,
+} from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
+import {
+  isTransientStripeError,
+  StripeRetryExhaustedError,
+  withStripeRetry,
+} from '@/lib/stripe/retry';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -74,6 +84,50 @@ async function validatePriceId(priceId: string): Promise<NextResponse | null> {
   return null;
 }
 
+function jsonServiceUnavailable() {
+  return NextResponse.json(
+    {
+      error:
+        'Payment service is temporarily unavailable. Please try again in a moment.',
+    },
+    { status: 503, headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' } }
+  );
+}
+
+async function handleCheckoutError(error: unknown): Promise<NextResponse> {
+  const retryContext =
+    error instanceof StripeRetryExhaustedError
+      ? {
+          retryAttempts: error.attempts,
+          retryOperation: error.operation,
+          retryExhausted: true,
+        }
+      : {};
+
+  await captureCriticalError('Stripe checkout session creation failed', error, {
+    route: '/api/stripe/checkout',
+    method: 'POST',
+    ...retryContext,
+  });
+
+  if (error instanceof StripeRetryExhaustedError) {
+    return jsonServiceUnavailable();
+  }
+
+  if (error instanceof Error) {
+    const knownError = getCheckoutErrorResponse(error);
+    if (knownError) {
+      return jsonError(knownError.message, knownError.status);
+    }
+  }
+
+  if (isTransientStripeError(error)) {
+    return jsonServiceUnavailable();
+  }
+
+  return jsonError('Failed to create checkout session', 500);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -91,6 +145,10 @@ export async function POST(request: NextRequest) {
     const priceError = await validatePriceId(priceId);
     if (priceError) return priceError;
 
+    if (!isGrowthPlanEnabled() && isGrowthPriceId(priceId)) {
+      return jsonError('Growth plan is not currently available', 403);
+    }
+
     const priceDetails = getPriceMappingDetails(priceId);
     logger.info('Creating checkout session for:', {
       userId,
@@ -99,16 +157,22 @@ export async function POST(request: NextRequest) {
       description: priceDetails?.description,
     });
 
-    const customerResult = await ensureStripeCustomer();
-    if (!customerResult.success || !customerResult.customerId) {
-      logger.error('Failed to ensure Stripe customer:', customerResult.error);
-      return jsonError('Failed to create customer', 500);
-    }
+    const customerId = await withStripeRetry(
+      'ensureStripeCustomer',
+      async () => {
+        const result = await ensureStripeCustomer();
+        if (!result.success || !result.customerId) {
+          throw new Error(result.error ?? 'Failed to create customer');
+        }
+        return result.customerId;
+      }
+    );
 
-    if (priceDetails?.plan) {
-      const subscriptionCheck = await checkExistingPlanSubscription(
-        customerResult.customerId,
-        priceDetails.plan
+    const selectedPlan = priceDetails?.plan;
+    if (selectedPlan) {
+      const subscriptionCheck = await withStripeRetry(
+        'checkExistingPlanSubscription',
+        () => checkExistingPlanSubscription(customerId, selectedPlan)
       );
 
       if (subscriptionCheck.alreadySubscribed) {
@@ -126,21 +190,25 @@ export async function POST(request: NextRequest) {
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
 
-    const session = await createCheckoutSession({
-      customerId: customerResult.customerId,
-      priceId,
-      userId,
-      successUrl: `${baseUrl}/billing/success`,
-      cancelUrl: `${baseUrl}/billing/cancel`,
-      idempotencyKey: `checkout:${userId}:${priceId}:${idempotencyBucket}`,
-      referralCode,
-    });
+    const idempotencyKey = `checkout:${userId}:${priceId}:${idempotencyBucket}`;
+
+    const session = await withStripeRetry('createCheckoutSession', () =>
+      createCheckoutSession({
+        customerId,
+        priceId,
+        userId,
+        successUrl: `${baseUrl}/billing/success`,
+        cancelUrl: `${baseUrl}/billing/cancel`,
+        idempotencyKey,
+        referralCode,
+      })
+    );
 
     logger.info('Checkout session created:', {
       sessionId: session.id,
       userId,
       priceId,
-      customerId: customerResult.customerId,
+      customerId,
       url: session.url,
     });
 
@@ -150,20 +218,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     logger.error('Error creating checkout session:', error);
-    await captureCriticalError(
-      'Stripe checkout session creation failed',
-      error,
-      { route: '/api/stripe/checkout', method: 'POST' }
-    );
-
-    if (error instanceof Error) {
-      const knownError = getCheckoutErrorResponse(error);
-      if (knownError) {
-        return jsonError(knownError.message, knownError.status);
-      }
-    }
-
-    return jsonError('Failed to create checkout session', 500);
+    return handleCheckoutError(error);
   }
 }
 

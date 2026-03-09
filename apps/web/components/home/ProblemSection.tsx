@@ -25,7 +25,6 @@ export function ProblemSection() {
       className='section-spacing-linear'
       style={{
         backgroundColor: 'var(--linear-bg-page)',
-        borderTop: '1px solid var(--linear-border-subtle)',
       }}
     >
       <Container size='homepage'>

@@ -111,7 +111,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-xs',
+            'w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-[13px]',
             'text-primary-token placeholder:text-tertiary-token',
             'focus-visible:outline-none focus-visible:ring-0'
           )}
@@ -162,7 +162,7 @@ function ActiveFilterPill({
         )}
         <span className='text-tertiary-token'>{groupLabel}</span>
         <span className='text-tertiary-token'>is</span>
-        <span className='font-medium text-primary-token'>{displayValue}</span>
+        <span className='font-[510] text-primary-token'>{displayValue}</span>
       </div>
       <button
         type='button'
@@ -297,7 +297,7 @@ function VirtualizedLabelList({
   if (options.length === 0) {
     return (
       <div className='flex-1 overflow-y-auto p-1'>
-        <div className='py-6 text-center text-xs text-tertiary-token'>
+        <div className='py-6 text-center text-[13px] text-tertiary-token'>
           {emptyMessage}
         </div>
       </div>
@@ -492,7 +492,7 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-surface-2 hover:text-primary-token',
+                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
                 buttonClassName
               )}
             >
@@ -505,7 +505,7 @@ export function ReleaseFilterDropdown({
         <DropdownMenuContent
           align='start'
           sideOffset={4}
-          className='min-w-[200px] max-h-[320px] overflow-hidden flex flex-col'
+          className='min-w-[200px] max-w-[calc(100vw-16px)] max-h-[320px] overflow-hidden flex flex-col'
           onCloseAutoFocus={e => e.preventDefault()}
         >
           {/* Main Menu Search */}
@@ -523,7 +523,7 @@ export function ReleaseFilterDropdown({
           {/* Categories List */}
           <div className='flex-1 overflow-y-auto p-1'>
             {filteredCategories.length === 0 ? (
-              <div className='py-6 text-center text-xs text-tertiary-token'>
+              <div className='py-6 text-center text-[13px] text-tertiary-token'>
                 No filters found
               </div>
             ) : (
@@ -575,7 +575,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'>
+                          <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-[510] text-primary'>
                             {labelFilterCount}
                           </span>
                         )}
@@ -584,7 +584,8 @@ export function ReleaseFilterDropdown({
                     <DropdownMenuSubContent
                       sideOffset={4}
                       alignOffset={-4}
-                      className='min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+                      collisionPadding={8}
+                      className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
                     >
                       <SearchInput
                         value={labelSearch}

@@ -34,8 +34,9 @@ import {
  */
 const PLAN_HIERARCHY: Record<PlanType, number> = {
   free: 0,
-  pro: 1,
-  growth: 2,
+  founding: 1,
+  pro: 2,
+  growth: 3,
 };
 
 /**
@@ -115,6 +116,15 @@ interface SubscriptionWithPeriod extends Stripe.Subscription {
   current_period_start: number;
 }
 
+function hasSubscriptionPeriodFields(
+  subscription: Stripe.Subscription
+): subscription is SubscriptionWithPeriod {
+  const periodEnd = Reflect.get(subscription, 'current_period_end');
+  const periodStart = Reflect.get(subscription, 'current_period_start');
+
+  return typeof periodEnd === 'number' && typeof periodStart === 'number';
+}
+
 /**
  * Get the active subscription for a customer
  */
@@ -132,8 +142,15 @@ export async function getActiveSubscription(
     const sub = subscriptions.data[0];
     if (!sub) return null;
 
-    // Cast to include period fields (they exist on the object, just not always in types)
-    return sub as SubscriptionWithPeriod;
+    if (!hasSubscriptionPeriodFields(sub)) {
+      logger.warn('Subscription missing period fields', {
+        customerId,
+        subscriptionId: sub.id,
+      });
+      return null;
+    }
+
+    return sub;
   } catch (error) {
     captureError('Error fetching active subscription', error, { customerId });
     return null;
@@ -307,8 +324,16 @@ export async function executePlanChange(
         expand: ['items.data.price'],
       }
     );
-    // Cast through unknown since Stripe SDK response wrapper type differs from base type
-    const subscription = subscriptionRaw as unknown as SubscriptionWithPeriod;
+    if (!hasSubscriptionPeriodFields(subscriptionRaw)) {
+      return {
+        success: false,
+        error: 'Subscription payload missing billing period fields',
+        isScheduledChange: false,
+        effectiveDate: new Date(),
+      };
+    }
+
+    const subscription = subscriptionRaw;
 
     if (subscription?.status !== 'active') {
       return {

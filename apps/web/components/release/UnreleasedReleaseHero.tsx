@@ -8,19 +8,24 @@
  */
 
 import { Bell } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
-import { Icon } from '@/components/atoms/Icon';
+import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import type { Artist } from '@/types/db';
+import { PreSaveActions } from './PreSaveActions';
 import { ReleaseCountdown } from './ReleaseCountdown';
 import { ReleaseNotificationsProvider } from './ReleaseNotificationsProvider';
 
 interface UnreleasedReleaseHeroProps {
   readonly release: {
+    readonly id: string;
+    readonly slug: string;
     readonly title: string;
     readonly artworkUrl: string | null;
     readonly releaseDate: Date;
+    readonly trackId: string | null;
+    readonly hasSpotify: boolean;
+    readonly hasAppleMusic: boolean;
   };
   readonly artist: {
     readonly id: string;
@@ -58,59 +63,59 @@ export function UnreleasedReleaseHero({
 
   return (
     <ReleaseNotificationsProvider artist={artistData}>
-      <div className='min-h-dvh bg-black text-white'>
+      <div className='min-h-dvh bg-base text-foreground'>
         {/* Ambient glow */}
         <div className='pointer-events-none fixed inset-0'>
-          <div className='absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03] blur-[120px]' />
+          <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
         </div>
 
         <main className='relative z-10 flex min-h-dvh flex-col items-center px-6'>
           <div className='min-h-6 flex-1' />
 
-          <div className='w-full max-w-[272px]'>
+          <div className='w-full max-w-[17rem]'>
             {/* Release Artwork */}
-            <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-white/[0.04] shadow-2xl shadow-black/60 ring-1 ring-white/[0.08]'>
-              {release.artworkUrl ? (
-                <Image
-                  src={release.artworkUrl}
-                  alt={`${release.title} artwork`}
-                  fill
-                  className='object-cover'
-                  sizes='272px'
-                  priority
-                />
-              ) : (
-                <div className='flex h-full w-full items-center justify-center'>
-                  <Icon
-                    name='Disc3'
-                    className='size-16 text-white/20'
-                    aria-hidden='true'
-                  />
-                </div>
-              )}
+            <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
+              <ImageWithFallback
+                src={release.artworkUrl}
+                alt={`${release.title} artwork`}
+                fill
+                className='object-cover'
+                sizes='272px'
+                priority
+                fallbackVariant='release'
+              />
             </div>
 
             {/* Release Info */}
             <div className='mt-4 text-center'>
-              <h1 className='text-[17px] font-semibold leading-snug tracking-tight'>
+              <h1 className='text-lg font-semibold leading-snug tracking-tight'>
                 {release.title}
               </h1>
               <Link
                 href={`/${artist.handle}`}
-                className='mt-1 block text-[13px] text-white/50 transition-colors hover:text-white/70'
+                className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
               >
                 {artist.name}
               </Link>
             </div>
 
             {/* Countdown Timer */}
-            <div className='mt-5 rounded-xl bg-white/[0.05] p-4 ring-1 ring-inset ring-white/[0.06]'>
+            <div className='mt-5 rounded-xl bg-surface-1/50 p-4 ring-1 ring-inset ring-white/[0.05]'>
               <ReleaseCountdown releaseDate={release.releaseDate} />
             </div>
 
+            <PreSaveActions
+              releaseId={release.id}
+              trackId={release.trackId}
+              username={artist.handle}
+              slug={release.slug}
+              hasSpotify={release.hasSpotify}
+              hasAppleMusic={release.hasAppleMusic}
+            />
+
             {/* Notify Me CTA */}
             <div className='mt-4 space-y-2.5'>
-              <div className='flex items-center justify-center gap-1.5 text-[13px] text-white/50'>
+              <div className='text-muted-foreground flex items-center justify-center gap-1.5 text-sm'>
                 <Bell className='size-3.5' aria-hidden='true' />
                 <span>Get notified when it drops</span>
               </div>
@@ -128,7 +133,7 @@ export function UnreleasedReleaseHero({
           <footer className='shrink-0 pb-5 text-center'>
             <Link
               href='/'
-              className='inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-white/20 transition-colors hover:text-white/35'
+              className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
             >
               <span>Powered by</span>
               <span className='font-semibold'>Jovie</span>

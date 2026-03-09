@@ -1,12 +1,14 @@
 'use client';
 
 import { TooltipProvider } from '@jovie/ui';
+import { PacerProvider } from '@tanstack/react-pacer';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
-import { PacerProvider } from '@/lib/pacer';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';
@@ -25,8 +27,15 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
 
 function ThemeKeyboardShortcut() {
   const { resolvedTheme, setTheme } = useTheme();
+  const isLightModeEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
+    false
+  );
 
   useEffect(() => {
+    // Only register theme keyboard shortcut when light mode feature flag is on
+    if (!isLightModeEnabled) return;
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -41,7 +50,7 @@ function ThemeKeyboardShortcut() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resolvedTheme, setTheme]);
+  }, [resolvedTheme, setTheme, isLightModeEnabled]);
 
   return null;
 }
@@ -69,16 +78,24 @@ export interface CoreProvidersProps {
 function CoreProvidersInner({
   children,
   enableAnalytics,
+  enableMonitoring,
+  usePacer,
   initialThemeMode,
 }: {
   children: React.ReactNode;
   enableAnalytics: boolean;
+  enableMonitoring: boolean;
+  usePacer: boolean;
   initialThemeMode: ThemeMode;
 }) {
   // Handle chunk load errors gracefully (common with version mismatches)
   useChunkErrorHandler();
 
   useEffect(() => {
+    if (!enableMonitoring) {
+      return;
+    }
+
     // Log startup info
     logger.group('Jovie App');
     logger.info('Booting client providers', {
@@ -127,7 +144,28 @@ function CoreProvidersInner({
       isUnmounted = true;
       cleanupWebVitals?.();
     };
-  }, []);
+  }, [enableMonitoring]);
+
+  const content = (
+    <ThemeProvider
+      attribute='class'
+      defaultTheme={initialThemeMode}
+      enableSystem
+      disableTransitionOnChange
+      storageKey='jovie-theme'
+    >
+      <ThemeKeyboardShortcut />
+      <TooltipProvider delayDuration={1200}>
+        <LazyProviders enableAnalytics={enableAnalytics}>
+          {children}
+        </LazyProviders>
+      </TooltipProvider>
+    </ThemeProvider>
+  );
+
+  if (!usePacer) {
+    return content;
+  }
 
   return (
     <PacerProvider
@@ -151,20 +189,7 @@ function CoreProvidersInner({
         },
       }}
     >
-      <ThemeProvider
-        attribute='class'
-        defaultTheme={initialThemeMode}
-        enableSystem
-        disableTransitionOnChange
-        storageKey='jovie-theme'
-      >
-        <ThemeKeyboardShortcut />
-        <TooltipProvider delayDuration={1200}>
-          <LazyProviders enableAnalytics={enableAnalytics}>
-            {children}
-          </LazyProviders>
-        </TooltipProvider>
-      </ThemeProvider>
+      {content}
     </PacerProvider>
   );
 }
@@ -175,17 +200,35 @@ const MARKETING_PREFIXES = [
   '/changelog',
   '/engagement-engine',
   '/investors',
-  '/link-in-bio',
   '/pricing',
   '/support',
   '/waitlist',
 ] as const;
+
+const FULL_PROVIDER_PREFIXES = [
+  '/app',
+  '/account',
+  '/artist-selection',
+  '/billing',
+  '/sso-callback',
+  '/onboarding',
+] as const;
+
+type CoreProviderVariant = 'full' | 'public';
+
+export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
+  return FULL_PROVIDER_PREFIXES.some(prefix => pathname.startsWith(prefix))
+    ? 'full'
+    : 'public';
+}
 
 export function CoreProviders({
   children,
   initialThemeMode = 'dark',
 }: CoreProvidersProps) {
   const pathname = usePathname() ?? '';
+  const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
+  const isPublicVariant = variant === 'public';
   const enableAnalytics = useMemo(
     () =>
       pathname !== '/' &&
@@ -193,18 +236,24 @@ export function CoreProviders({
     [pathname]
   );
 
-  return (
-    <React.StrictMode>
-      <NuqsProvider>
-        <QueryProvider>
-          <CoreProvidersInner
-            enableAnalytics={enableAnalytics}
-            initialThemeMode={initialThemeMode}
-          >
-            {children}
-          </CoreProvidersInner>
-        </QueryProvider>
-      </NuqsProvider>
-    </React.StrictMode>
+  const providers = (
+    <NuqsProvider>
+      <QueryProvider>
+        <CoreProvidersInner
+          enableAnalytics={enableAnalytics}
+          enableMonitoring={!isPublicVariant}
+          initialThemeMode={initialThemeMode}
+          usePacer={!isPublicVariant}
+        >
+          {children}
+        </CoreProvidersInner>
+      </QueryProvider>
+    </NuqsProvider>
   );
+
+  if (isPublicVariant) {
+    return providers;
+  }
+
+  return <React.StrictMode>{providers}</React.StrictMode>;
 }

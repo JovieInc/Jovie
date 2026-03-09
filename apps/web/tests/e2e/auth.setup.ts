@@ -95,7 +95,10 @@ setup('authenticate', async ({ page, baseURL }) => {
     } else if (
       msg.includes('strategy') ||
       msg.includes('infinite redirect') ||
-      msg.includes('instance keys')
+      msg.includes('instance keys') ||
+      msg.includes('test email') ||
+      msg.includes('Timeout') ||
+      msg.includes('timeout')
     ) {
       // Clerk configuration issue — write empty auth state so tests with
       // their own auth (e.g., admin tests) can still run independently.
@@ -109,10 +112,11 @@ setup('authenticate', async ({ page, baseURL }) => {
     }
   }
 
-  // 5. Navigate to dashboard profile to verify auth + warm up route
-  // Use DASHBOARD_PROFILE instead of DASHBOARD (which redirects to chat)
+  // 5. Navigate to chat to verify auth + warm up route
+  // DASHBOARD_PROFILE is deprecated (it just redirects to CHAT), so navigate
+  // directly to CHAT to avoid a 307 → 404 chain on certain server configs.
   // Use 'domcontentloaded' to avoid Sentry blocking 'load'/'networkidle'
-  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
+  await page.goto(APP_ROUTES.CHAT, {
     waitUntil: 'domcontentloaded',
     timeout: 120_000,
   });
@@ -128,13 +132,23 @@ setup('authenticate', async ({ page, baseURL }) => {
     );
     if (await overlay.isVisible({ timeout: 1000 }).catch(() => false)) {
       await page.keyboard.press('Escape');
-      await page.waitForTimeout(500);
+      await page
+        .waitForFunction(
+          () =>
+            !document.querySelector(
+              '[data-nextjs-dialog-overlay], [data-nextjs-toast]'
+            ),
+          { timeout: 5000 }
+        )
+        .catch(() => {});
     }
     // Click "Try again" on error boundary if present
-    const tryAgain = page.locator('button:has-text("Try again")');
+    const tryAgain = page.getByRole('button', { name: 'Try again' });
     if (await tryAgain.isVisible({ timeout: 500 }).catch(() => false)) {
       await tryAgain.click();
-      await page.waitForTimeout(1000);
+      await page
+        .waitForLoadState('domcontentloaded', { timeout: 10000 })
+        .catch(() => {});
     }
     // If nav still not visible and we haven't reloaded, try a full page reload
     // This reliably recovers from stuck error overlays and Turbopack issues

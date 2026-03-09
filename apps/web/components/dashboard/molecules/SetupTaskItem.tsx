@@ -18,10 +18,10 @@ export function SetupTaskItem({
   action,
 }: SetupTaskItemProps): React.ReactElement {
   return (
-    <li className='flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-1/70 p-4 shadow-sm'>
+    <li className='flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-1/70 p-4 shadow-card'>
       <div className='flex items-center gap-2'>
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-[510] ${
             complete
               ? 'bg-surface-1 text-secondary-token ring-1 ring-inset ring-subtle'
               : 'bg-accent/15 text-accent ring-1 ring-inset ring-interactive/20'
@@ -30,7 +30,7 @@ export function SetupTaskItem({
         >
           {complete ? '✓' : index}
         </div>
-        <p className='truncate text-sm font-semibold text-primary-token'>
+        <p className='truncate text-[13px] font-[590] text-primary-token'>
           {title}
         </p>
       </div>

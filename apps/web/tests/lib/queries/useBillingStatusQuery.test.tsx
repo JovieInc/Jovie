@@ -62,6 +62,8 @@ describe('useBillingStatusQuery', () => {
         plan: 'pro_monthly',
         hasStripeCustomer: true,
         stripeSubscriptionId: 'sub_456',
+        stale: false,
+        staleReason: null,
       });
     });
 
@@ -87,6 +89,8 @@ describe('useBillingStatusQuery', () => {
         plan: null,
         hasStripeCustomer: false,
         stripeSubscriptionId: null,
+        stale: false,
+        staleReason: null,
       });
     });
 
@@ -107,6 +111,8 @@ describe('useBillingStatusQuery', () => {
         plan: null,
         hasStripeCustomer: false,
         stripeSubscriptionId: null,
+        stale: false,
+        staleReason: null,
       });
     });
 
@@ -178,7 +184,7 @@ describe('useBillingStatusQuery', () => {
       // Rerender - should use cached data within 1 min
       rerender();
 
-      await new Promise(r => setTimeout(r, 10));
+      await Promise.resolve();
 
       expect(mockFetch.mock.calls.length).toBe(firstCallCount);
     });
@@ -266,9 +272,14 @@ describe('useBillingStatusQuery', () => {
 
       const { result } = renderHook(() => useIsPro(), { wrapper });
 
-      await waitFor(() => {
-        expect(result.current.isError).toBe(true);
-      });
+      // Query-level retryDelay (1s exponential) takes precedence over
+      // QueryClient default retryDelay:0, so we need a longer timeout.
+      await waitFor(
+        () => {
+          expect(result.current.isError).toBe(true);
+        },
+        { timeout: 5000 }
+      );
     });
   });
 

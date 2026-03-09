@@ -1,26 +1,31 @@
 'use client';
 
 /**
- * ProfileSidebarHeader Component
+ * ProfileSidebarHeader
  *
- * Header section of the profile sidebar with action buttons.
- * Uses the shared DrawerHeader shell for consistent styling.
+ * Provides title and action buttons for the profile sidebar header.
+ * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
  */
 
 import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { BASE_URL } from '@/constants/domains';
 
-interface ProfileSidebarHeaderProps {
+interface UseProfileHeaderResult {
+  title: ReactNode;
+  actions: ReactNode;
+}
+
+interface UseProfileHeaderPartsProps {
   readonly username: string;
   readonly displayName: string;
   readonly profilePath: string;
-  readonly onClose: () => void;
+  readonly onClose?: () => void;
 }
 
 function generateVCard(
@@ -38,12 +43,16 @@ function generateVCard(
   ].join('\r\n');
 }
 
-export function ProfileSidebarHeader({
+/**
+ * Hook that returns the title and actions for the profile sidebar header.
+ * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
+ */
+export function useProfileHeaderParts({
   username,
   displayName,
   profilePath,
   onClose,
-}: ProfileSidebarHeaderProps) {
+}: UseProfileHeaderPartsProps): UseProfileHeaderResult {
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -53,7 +62,6 @@ export function ProfileSidebarHeader({
     };
   }, []);
 
-  // Use BASE_URL to ensure profile links always point to the profile domain
   const profileUrl = `${BASE_URL}${profilePath}`;
 
   const handleCopyUrl = async () => {
@@ -93,7 +101,6 @@ export function ProfileSidebarHeader({
     toast.success('QR code downloaded');
   };
 
-  // Primary actions: Copy (close is handled by DrawerHeader)
   const primaryActions: DrawerHeaderAction[] = [
     {
       id: 'copy',
@@ -105,7 +112,6 @@ export function ProfileSidebarHeader({
     },
   ];
 
-  // Overflow actions: Open, vCard, QR code
   const overflowActions: DrawerHeaderAction[] = [
     {
       id: 'open',
@@ -127,16 +133,15 @@ export function ProfileSidebarHeader({
     },
   ];
 
-  return (
-    <DrawerHeader
-      title='Profile details'
+  const title: ReactNode = 'Profile';
+
+  const actions = (
+    <DrawerHeaderActions
+      primaryActions={primaryActions}
+      overflowActions={overflowActions}
       onClose={onClose}
-      actions={
-        <DrawerHeaderActions
-          primaryActions={primaryActions}
-          overflowActions={overflowActions}
-        />
-      }
     />
   );
+
+  return { title, actions };
 }

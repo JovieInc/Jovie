@@ -13,8 +13,8 @@ describe('HeaderNav flyout interactions', () => {
     render(<HeaderNav />);
 
     expect(
-      screen.getAllByRole('link', { name: 'Pricing' })[0]
-    ).toBeInTheDocument();
+      screen.queryByRole('link', { name: 'Pricing' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
 });

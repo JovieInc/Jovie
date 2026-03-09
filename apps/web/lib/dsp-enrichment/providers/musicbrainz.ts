@@ -9,7 +9,7 @@ import { musicBrainzCircuitBreaker } from '../circuit-breakers';
 import type { MusicBrainzArtist, MusicBrainzRecording } from '../types';
 
 const MUSICBRAINZ_API_BASE = 'https://musicbrainz.org/ws/2';
-const USER_AGENT = 'Jovie/1.0.0 (https://jovie.fm)';
+const USER_AGENT = 'Jovie/1.0.0 (https://jov.ie)';
 const REQUEST_TIMEOUT_MS = 10_000;
 const RATE_LIMIT_DELAY_MS = 1100;
 
@@ -35,7 +35,8 @@ function isNonRetryableError(error: unknown): boolean {
 }
 
 function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
-  const jitter = Math.random() * 0.3 + 0.85;
+  const jitter =
+    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 0.3 + 0.85;
   return baseDelayMs * Math.pow(2, attempt) * jitter;
 }
 

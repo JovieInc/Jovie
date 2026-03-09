@@ -32,7 +32,14 @@ export interface ForwardingResult {
  */
 export interface NormalizedEvent {
   eventId: string;
-  eventType: 'page_view' | 'link_click' | 'form_submit' | 'scroll_depth';
+  eventType:
+    | 'page_view'
+    | 'link_click'
+    | 'form_submit'
+    | 'scroll_depth'
+    | 'subscribe'
+    | 'tip_page_view'
+    | 'tip_intent';
   eventTime: number; // Unix timestamp in seconds
   sourceUrl: string;
   referrer?: string;
@@ -52,6 +59,14 @@ export interface NormalizedEvent {
   linkId?: string;
   linkUrl?: string;
   formType?: string;
+
+  // Tip-specific data
+  tipAmount?: number;
+  tipMethod?: string;
+
+  // Hashed PII for improved ad platform matching (SHA-256 hex)
+  hashedEmail?: string;
+  hashedPhone?: string;
 }
 
 /**
@@ -64,7 +79,12 @@ export interface PlatformConfig {
 }
 
 /**
- * Normalize a pixel event for forwarding
+ * Transforms a PixelEvent database record into a normalized format suitable for
+ * forwarding to advertising platforms (e.g. Facebook, Google, TikTok).
+ *
+ * @param event PixelEvent record from the database, including event metadata and eventData.
+ * @returns A NormalizedEvent object containing standardized fields used by the
+ *          pixel forwarding logic.
  */
 export function normalizeEvent(event: PixelEvent): NormalizedEvent {
   const eventData = event.eventData as Record<string, unknown> | null;
@@ -84,11 +104,18 @@ export function normalizeEvent(event: PixelEvent): NormalizedEvent {
     linkId: (eventData?.linkId as string) || undefined,
     linkUrl: (eventData?.linkUrl as string) || undefined,
     formType: (eventData?.formType as string) || undefined,
+    tipAmount: (eventData?.tipAmount as number) || undefined,
+    tipMethod: (eventData?.tipMethod as string) || undefined,
   };
 }
 
 /**
- * Extract platform config from creator pixel settings
+ * Extract enabled platform configurations from a CreatorPixel record.
+ *
+ * For each supported platform (facebook, google, tiktok), this function checks
+ * that the platform has all required credentials configured and is marked as
+ * enabled on the CreatorPixel. If so, it returns a {@link PlatformConfig}
+ * object for that platform; otherwise, the corresponding entry is `null`.
  */
 export function extractPlatformConfigs(config: CreatorPixel): {
   facebook: PlatformConfig | null;

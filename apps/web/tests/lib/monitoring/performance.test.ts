@@ -10,12 +10,12 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-// Mock Sentry
-vi.mock('@sentry/nextjs', () => ({
+// Mock Sentry lite wrapper
+vi.mock('@/lib/sentry/client-lite', () => ({
   captureException: vi.fn(),
 }));
 
-import * as Sentry from '@sentry/nextjs';
+import { captureException } from '@/lib/sentry/client-lite';
 
 // Mock PerformanceObserver
 const mockObserve = vi.fn();
@@ -128,7 +128,7 @@ describe('PerformanceTracker', () => {
       // Should not throw
       expect(() => tracker.trackPageLoad('/test-page')).not.toThrow();
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(testError, {
+      expect(captureException).toHaveBeenCalledWith(testError, {
         extra: { context: 'navigation_timing_observer' },
       });
     });
@@ -189,7 +189,7 @@ describe('PerformanceTracker', () => {
 
       expect(() => tracker.trackResourceLoad()).not.toThrow();
 
-      expect(Sentry.captureException).toHaveBeenCalledWith(testError, {
+      expect(captureException).toHaveBeenCalledWith(testError, {
         extra: { context: 'resource_timing_observer' },
       });
     });

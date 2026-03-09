@@ -141,7 +141,7 @@ export function CountrySelector({
           <ChevronDown className='w-3.5 h-3.5 text-tertiary-token' />
         </button>
       </PopoverTrigger>
-      <PopoverContent align='start' sideOffset={4} className='w-64 p-1'>
+      <PopoverContent align='start' sideOffset={4} className='w-64'>
         <div className='max-h-64 overflow-y-auto'>
           {COUNTRY_OPTIONS.map(option => (
             <CountryOptionButton

@@ -1,0 +1,191 @@
+name: Main CI health monitor
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  monitor:
+    name: Detect stalled or failing CI on main
+    runs-on: ubuntu-latest
+    outputs:
+      should_alert: ${{ steps.evaluate.outputs.should_alert }}
+      summary: ${{ steps.evaluate.outputs.summary }}
+      details: ${{ steps.evaluate.outputs.details }}
+      run_url: ${{ steps.evaluate.outputs.run_url }}
+    steps:
+      - name: Evaluate main CI health
+        id: evaluate
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        env:
+          STUCK_THRESHOLD_MINUTES: '15'
+          NO_SUCCESS_THRESHOLD_HOURS: '3'
+        with:
+          script: |
+            const thresholdMinutes = Number(process.env.STUCK_THRESHOLD_MINUTES ?? '15');
+            const noSuccessHours = Number(process.env.NO_SUCCESS_THRESHOLD_HOURS ?? '3');
+            const now = Date.now();
+
+            const runsResponse = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'ci.yml',
+              branch: 'main',
+              event: 'push',
+              per_page: 50,
+            });
+
+            const runs = runsResponse.data.workflow_runs ?? [];
+            if (runs.length === 0) {
+              core.setOutput('should_alert', 'false');
+              core.setOutput('summary', 'No CI runs found on main.');
+              core.setOutput('details', 'The monitor did not find any `ci.yml` push runs on main.');
+              core.setOutput('run_url', `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/ci.yml`);
+              return;
+            }
+
+            const staleRun = runs.find((run) => {
+              if (!(run.status === 'queued' || run.status === 'in_progress')) {
+                return false;
+              }
+
+              const startedAt = run.run_started_at ?? run.created_at;
+              if (!startedAt) {
+                return false;
+              }
+
+              const ageMinutes = (now - Date.parse(startedAt)) / (1000 * 60);
+              return ageMinutes > thresholdMinutes;
+            });
+
+            const latestSuccess = runs.find((run) => run.status === 'completed' && run.conclusion === 'success');
+            const latestFailure = runs.find((run) =>
+              run.status === 'completed' &&
+              ['failure', 'timed_out', 'cancelled', 'startup_failure', 'action_required'].includes(run.conclusion ?? '')
+            );
+
+            const failedForTooLong = (() => {
+              if (!latestFailure) {
+                return false;
+              }
+
+              const failedAt = latestFailure.updated_at ?? latestFailure.created_at;
+              if (!failedAt) {
+                return false;
+              }
+
+              const failedAgeMinutes = (now - Date.parse(failedAt)) / (1000 * 60);
+              if (failedAgeMinutes <= thresholdMinutes) {
+                return false;
+              }
+
+              if (!latestSuccess) {
+                return true;
+              }
+
+              return Date.parse(latestSuccess.created_at) < Date.parse(latestFailure.created_at);
+            })();
+
+            const successCutoff = latestSuccess?.updated_at ?? latestSuccess?.created_at;
+            let mergedCount = 0;
+
+            const pulls = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'closed',
+              base: 'main',
+              sort: 'updated',
+              direction: 'desc',
+              per_page: 100,
+            });
+
+            for (const pull of pulls) {
+              if (!pull.merged_at) {
+                continue;
+              }
+
+              const mergedAt = Date.parse(pull.merged_at);
+              if (Number.isNaN(mergedAt)) {
+                continue;
+              }
+
+              if (successCutoff && mergedAt <= Date.parse(successCutoff)) {
+                continue;
+              }
+
+              const ageHours = (now - mergedAt) / (1000 * 60 * 60);
+              if (ageHours > noSuccessHours * 2) {
+                continue;
+              }
+
+              mergedCount += 1;
+            }
+
+            const noSuccessForTooLong = (() => {
+              if (!successCutoff) {
+                return mergedCount > 0;
+              }
+
+              const successAgeHours = (now - Date.parse(successCutoff)) / (1000 * 60 * 60);
+              return successAgeHours > noSuccessHours && mergedCount > 0;
+            })();
+
+            const reasons = [];
+            if (staleRun) {
+              reasons.push(`CI run #${staleRun.run_number} has been ${staleRun.status} for more than ${thresholdMinutes} minutes.`);
+            }
+
+            if (failedForTooLong && latestFailure) {
+              reasons.push(`Latest main CI run #${latestFailure.run_number} is ${latestFailure.conclusion} and unresolved for more than ${thresholdMinutes} minutes.`);
+            }
+
+            if (noSuccessForTooLong) {
+              reasons.push(`No successful main CI in over ${noSuccessHours} hours while ${mergedCount} merged PR(s) are waiting.`);
+            }
+
+            const shouldAlert = reasons.length > 0;
+            const runUrl = staleRun?.html_url ?? latestFailure?.html_url ?? `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/workflows/ci.yml`;
+
+            core.setOutput('should_alert', shouldAlert ? 'true' : 'false');
+            core.setOutput('summary', shouldAlert ? 'Main CI health issue detected.' : 'Main CI is healthy.');
+            core.setOutput('details', shouldAlert ? reasons.join('\n') : 'No stale, failed, or blocked main CI conditions were detected.');
+            core.setOutput('run_url', runUrl);
+
+      - name: Slack alert (main CI unhealthy)
+        if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'CI Monitor'
+          custom_payload: |
+            {
+              "text": "🚨 Main CI health monitor detected an issue",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Repository", "value": "${{ github.repository }}", "short": true },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Summary", "value": "${{ steps.evaluate.outputs.summary }}", "short": false },
+                    { "title": "Details", "value": "${{ steps.evaluate.outputs.details }}", "short": false },
+                    { "title": "Run", "value": "<${{ steps.evaluate.outputs.run_url }}|View failing or stale run>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Fail job when unhealthy
+        if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
+        run: |
+          echo "${{ steps.evaluate.outputs.summary }}"
+          echo "${{ steps.evaluate.outputs.details }}"
+          exit 1

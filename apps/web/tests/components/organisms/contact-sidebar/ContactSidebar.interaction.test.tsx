@@ -1,22 +1,74 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Contact } from '@/types/contact';
 
-// Mock RightDrawer — just render children
-vi.mock('@/components/organisms/RightDrawer', () => ({
-  RightDrawer: ({
+// Mock @jovie/ui — ContactSidebar uses SegmentControl and Button directly.
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
+  return {
+    ...actual,
+    Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
+      <button type='button' {...props}>
+        {children}
+      </button>
+    ),
+    SegmentControl: ({
+      value,
+      onValueChange,
+      options,
+    }: {
+      value: string;
+      onValueChange: (value: string) => void;
+      options: Array<{ value: string; label: string }>;
+    }) => (
+      <div>
+        {options.map(option => (
+          <button
+            key={option.value}
+            type='button'
+            aria-selected={value === option.value}
+            role='tab'
+            onClick={() => onValueChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
+  };
+});
+
+// Mock drawer components — EntitySidebarShell renders children with empty state support.
+vi.mock('@/components/molecules/drawer', () => ({
+  EntitySidebarShell: ({
     children,
+    isEmpty,
+    emptyMessage,
+    entityHeader,
+    tabs,
     'data-testid': testId,
   }: {
-    children: React.ReactNode;
+    children?: React.ReactNode;
+    isEmpty?: boolean;
+    emptyMessage?: string;
+    entityHeader?: React.ReactNode;
+    tabs?: React.ReactNode;
     'data-testid'?: string;
     [key: string]: unknown;
-  }) => <div data-testid={testId}>{children}</div>,
-}));
-
-// Mock drawer components
-vi.mock('@/components/molecules/drawer', () => ({
+  }) =>
+    isEmpty ? (
+      <div data-testid={testId}>
+        <p data-testid='empty-state'>{emptyMessage}</p>
+      </div>
+    ) : (
+      <div data-testid={testId}>
+        {entityHeader}
+        {tabs}
+        {children}
+      </div>
+    ),
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
@@ -50,21 +102,9 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerLinkSectionSkeleton: () => null,
 }));
 
-// Mock ContactSidebarHeader — simple stub
+// Mock ContactSidebarHeader — useContactHeaderParts hook
 vi.mock('@/components/organisms/contact-sidebar/ContactSidebarHeader', () => ({
-  ContactSidebarHeader: ({
-    contact,
-  }: {
-    contact: Contact | null;
-    [key: string]: unknown;
-  }) => (
-    <div data-testid='sidebar-header'>
-      {contact
-        ? `${contact.firstName ?? ''} ${contact.lastName ?? ''}`.trim() ||
-          contact.username
-        : 'Contact'}
-    </div>
-  ),
+  useContactHeaderParts: () => ({ title: 'Contact', actions: null }),
 }));
 
 // Mock ContactAvatar — simple stub
@@ -77,6 +117,11 @@ vi.mock('@/components/organisms/contact-sidebar/ContactAvatar', () => ({
   }) => <div data-testid='contact-avatar'>{fullName}</div>,
 }));
 
+// Mock SocialIcon
+vi.mock('@/components/atoms/SocialIcon', () => ({
+  SocialIcon: () => <span data-testid='social-icon' />,
+}));
+
 // Mock table utility
 vi.mock('@/components/organisms/table', () => ({
   convertToCommonDropdownItems: (items: unknown[]) => items,
@@ -87,9 +132,9 @@ vi.mock('sonner', () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
 
-// Mock layout constants
-vi.mock('@/lib/constants/layout', () => ({
-  SIDEBAR_WIDTH: 360,
+vi.mock('@/lib/utils/platform-detection', () => ({
+  detectPlatform: () => ({ platform: 'website', icon: 'globe' }),
+  getBaseUrl: () => 'https://jov.ie',
 }));
 
 // Lazy import after mocks
@@ -105,7 +150,6 @@ const mockContact: Contact = {
   displayName: 'John Doe',
   avatarUrl: null,
   isVerified: false,
-  website: 'https://example.com',
   socialLinks: [{ id: '1', label: 'Twitter', url: 'https://twitter.com/test' }],
 };
 
@@ -119,10 +163,11 @@ describe('ContactSidebar', () => {
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
   });
 
-  it('renders header with contact name', () => {
+  it('renders sidebar when contact is provided', () => {
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
-    expect(screen.getByTestId('sidebar-header')).toHaveTextContent('John Doe');
+    expect(screen.getByTestId('contact-sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
   });
 
   it('tab switching between Details and Social works', async () => {
@@ -143,8 +188,8 @@ describe('ContactSidebar', () => {
     expect(socialTab).toHaveAttribute('aria-selected', 'true');
     expect(detailsTab).toHaveAttribute('aria-selected', 'false');
 
-    // Social content visible — Website label
-    expect(screen.getByText('Website')).toBeInTheDocument();
+    // Social content visible — Social links section
+    expect(screen.getByText('Social links')).toBeInTheDocument();
     // Avatar still visible above tabs
     expect(screen.getByTestId('contact-avatar')).toBeInTheDocument();
   });
@@ -153,17 +198,15 @@ describe('ContactSidebar', () => {
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     expect(screen.getByTestId('contact-avatar')).toHaveTextContent('John Doe');
-    expect(screen.getByPlaceholderText('First')).toHaveValue('John');
-    expect(screen.getByPlaceholderText('Last')).toHaveValue('Doe');
+    expect(screen.getByPlaceholderText('Full name')).toHaveValue('John Doe');
   });
 
-  it('Social tab shows website and social links', async () => {
+  it('Social tab shows social links', async () => {
     const user = userEvent.setup();
     render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
 
     await user.click(screen.getByRole('tab', { name: /social/i }));
 
-    expect(screen.getByDisplayValue('https://example.com')).toBeInTheDocument();
     expect(screen.getByText('Social links')).toBeInTheDocument();
   });
 
@@ -180,7 +223,14 @@ describe('ContactSidebar', () => {
 
     // Should render without throwing
     expect(screen.getByTestId('contact-sidebar')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('First')).toHaveValue('');
-    expect(screen.getByPlaceholderText('Last')).toHaveValue('');
+    expect(screen.getByPlaceholderText('Full name')).toHaveValue('sparse');
+  });
+
+  it('does not render a Save changes button in admin mode', () => {
+    render(<ContactSidebar contact={mockContact} mode='admin' isOpen={true} />);
+
+    expect(
+      screen.queryByRole('button', { name: /save changes/i })
+    ).not.toBeInTheDocument();
   });
 });

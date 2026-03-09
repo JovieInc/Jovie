@@ -39,7 +39,7 @@ const INLINE_SCRIPT_HASHES = {
    * Hash may need updating when next-themes version or ThemeProvider config changes.
    * Config: attribute='class', storageKey='jovie-theme', enableSystem=true
    */
-  nextThemes: "'sha256-iK+F03M7k3TWfO9vSjPo8wTaJ5NWMGiY6ghQMBSGTkU='",
+  nextThemes: "'sha256-72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA='",
 };
 
 /**
@@ -82,7 +82,6 @@ const STATIC_CSP_PARTS = {
   imgSrc: [
     "img-src 'self' data: blob:",
     'https://i.scdn.co',
-    'https://res.cloudinary.com',
     'https://images.clerk.dev',
     'https://img.clerk.com',
     'https://images.unsplash.com',
@@ -93,6 +92,7 @@ const STATIC_CSP_PARTS = {
     'https://*.mzstatic.com',
     'https://vercel.live',
     'https://vercel.com',
+    'https://*.bcbits.com',
   ].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)

@@ -41,20 +41,15 @@ fi
 
 # Check if we're in a git repo and can detect new migrations
 if git rev-parse --git-dir > /dev/null 2>&1; then
-  # Get the git root directory
-  GIT_ROOT=$(git rev-parse --show-toplevel)
-  # Get the current directory relative to git root
-  CURRENT_DIR=$(pwd | sed "s|^$GIT_ROOT/||" | sed "s|^$GIT_ROOT$||")
+  # Get the current directory relative to git root (cross-platform compatible)
+  # git rev-parse --show-prefix always returns forward-slash paths relative to git root
+  GIT_PREFIX=$(git rev-parse --show-prefix | tr -d '\r')
 
   # Get migrations that don't exist on the base branch
   for file in "${SQL_FILES[@]}"; do
     filename=$(basename "$file")
-    # Construct git-root-relative path
-    if [ -n "$CURRENT_DIR" ]; then
-      GIT_PATH="$CURRENT_DIR/$MIGRATIONS_DIR/$filename"
-    else
-      GIT_PATH="$MIGRATIONS_DIR/$filename"
-    fi
+    # Construct git-root-relative path using --show-prefix (works on Windows)
+    GIT_PATH="${GIT_PREFIX}${MIGRATIONS_DIR}/${filename}"
 
     # Check if this file exists on the base branch
     if ! git cat-file -e "$BASE_BRANCH:$GIT_PATH" 2>/dev/null; then
@@ -81,7 +76,7 @@ fi
 JOURNAL_TAGS=()
 while IFS= read -r tag; do
   [ -n "$tag" ] && JOURNAL_TAGS+=("$tag")
-done < <(jq -r '.entries[].tag' "$JOURNAL_FILE" 2>/dev/null || true)
+done < <(jq -r '.entries[].tag' "$JOURNAL_FILE" 2>/dev/null | tr -d '\r' || true)
 
 if [ ${#JOURNAL_TAGS[@]} -eq 0 ]; then
   echo -e "${RED}❌ No entries found in journal file${NC}"

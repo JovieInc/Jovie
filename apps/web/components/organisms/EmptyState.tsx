@@ -214,7 +214,7 @@ export function EmptyState({
 
       <h3
         id={headingId}
-        className={cn('mb-1 text-sm font-medium', styles.heading)}
+        className={cn('mb-1 text-[13px] font-medium', styles.heading)}
       >
         {heading}
       </h3>

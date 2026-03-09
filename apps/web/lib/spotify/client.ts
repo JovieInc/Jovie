@@ -57,6 +57,21 @@ interface SpotifySearchResponse {
   };
 }
 
+interface SpotifyPlaylistTrackItem {
+  track: {
+    id: string;
+    artists: Array<{ id: string }>;
+  } | null;
+}
+
+interface SpotifyPlaylistTracksResponse {
+  items: SpotifyPlaylistTrackItem[];
+  total: number;
+  limit: number;
+  offset: number;
+  next: string | null;
+}
+
 interface SpotifyErrorResponse {
   error: {
     status: number;
@@ -387,6 +402,35 @@ class SpotifyClientManager {
   }
 
   /**
+   * Get multiple artists by Spotify IDs (max 50 per request).
+   * Uses the batch /artists?ids= endpoint.
+   *
+   * @param artistIds - Array of Spotify artist IDs
+   * @returns Array of sanitized artist data (nulls filtered out)
+   */
+  async getArtists(artistIds: string[]): Promise<SanitizedArtist[]> {
+    if (artistIds.length === 0) return [];
+
+    const allArtists: SanitizedArtist[] = [];
+
+    // Spotify allows max 50 artists per request
+    for (let i = 0; i < artistIds.length; i += 50) {
+      const chunk = artistIds.slice(i, i + 50);
+      const response = await this.request<{
+        artists: (RawSpotifyArtist | null)[];
+      }>(`/artists?ids=${chunk.join(',')}`);
+
+      for (const artist of response.artists) {
+        if (artist) {
+          allArtists.push(sanitizeArtistData(artist));
+        }
+      }
+    }
+
+    return allArtists;
+  }
+
+  /**
    * Check if an artist exists on Spotify.
    *
    * @param artistId - Spotify artist ID (already validated)
@@ -407,6 +451,46 @@ class SpotifyClientManager {
       }
       throw error;
     }
+  }
+
+  /**
+   * Get all unique artist IDs from a playlist's tracks.
+   *
+   * Paginates through all tracks and collects unique artist IDs.
+   * Skips local/unavailable tracks (where track is null).
+   *
+   * @param playlistId - Spotify playlist ID (already validated)
+   * @returns Deduplicated array of Spotify artist IDs
+   */
+  async getPlaylistArtistIds(playlistId: string): Promise<string[]> {
+    const artistIds = new Set<string>();
+    const fields = 'items(track(artists(id))),total,next,limit,offset';
+    const limit = 100;
+
+    let url: string | null =
+      `/playlists/${playlistId}/tracks?fields=${encodeURIComponent(fields)}&limit=${limit}`;
+
+    const maxPages = 100; // Safety cap: 10,000 tracks
+    let page = 0;
+
+    while (url && page < maxPages) {
+      const response: SpotifyPlaylistTracksResponse =
+        await this.request<SpotifyPlaylistTracksResponse>(url);
+
+      for (const item of response.items) {
+        if (!item.track) continue;
+        for (const artist of item.track.artists) {
+          if (artist.id) {
+            artistIds.add(artist.id);
+          }
+        }
+      }
+
+      url = response.next;
+      page++;
+    }
+
+    return Array.from(artistIds);
   }
 
   /**
@@ -483,5 +567,48 @@ export async function getSpotifyArtist(
   } catch (error) {
     captureError('[Spotify] Get artist failed', error);
     return null;
+  }
+}
+
+/**
+ * Get multiple artists from Spotify using the batch endpoint.
+ *
+ * @param artistIds - Array of Spotify artist IDs
+ * @returns Sanitized artist data array (missing artists filtered out)
+ */
+export async function getSpotifyArtistsBatch(
+  artistIds: string[]
+): Promise<SanitizedArtist[]> {
+  if (!spotifyClient.isAvailable() || artistIds.length === 0) {
+    return [];
+  }
+
+  try {
+    return await spotifyClient.getArtists(artistIds);
+  } catch (error) {
+    captureError('[Spotify] Get artists batch failed', error);
+    return [];
+  }
+}
+
+/**
+ * Get all unique artist IDs from a Spotify playlist.
+ *
+ * @param playlistId - Spotify playlist ID
+ * @returns Deduplicated array of Spotify artist IDs, or empty array if unavailable
+ */
+export async function getPlaylistArtistIds(
+  playlistId: string
+): Promise<string[]> {
+  if (!spotifyClient.isAvailable()) {
+    captureWarning('[Spotify] Not available - returning empty results');
+    return [];
+  }
+
+  try {
+    return await spotifyClient.getPlaylistArtistIds(playlistId);
+  } catch (error) {
+    captureError('[Spotify] Get playlist artist IDs failed', error);
+    return [];
   }
 }

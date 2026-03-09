@@ -4,9 +4,12 @@ import type { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
+import {
+  formatVerifiedPriceLabel,
+  getPreferredVerifiedPrice,
+} from '@/lib/billing/verified-upgrade';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
-  type PricingOption,
   useCheckoutMutation,
   usePortalMutation,
   usePricingOptionsQuery,
@@ -18,8 +21,6 @@ type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
 const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
 } as const;
-
-const MONTHLY_INTERVALS = new Set(['month', 'monthly']);
 
 export interface UserMenuLoadingState {
   signOut: boolean;
@@ -67,6 +68,16 @@ export function useUserMenuActions({
     [signOutLoading, portalMutation.isPending, checkoutMutation.isPending]
   );
 
+  const selectedPrice = useMemo(
+    () => getPreferredVerifiedPrice(pricingData?.options ?? []),
+    [pricingData?.options]
+  );
+
+  const upgradeLabel = useMemo(
+    () => `Get Verified — ${formatVerifiedPriceLabel(selectedPrice)}`,
+    [selectedPrice]
+  );
+
   const navigateTo = (href?: string) => {
     if (!href) return;
     router.push(href);
@@ -104,10 +115,7 @@ export function useUserMenuActions({
         pricing = result.data;
       }
 
-      const monthPrice = pricing?.options?.find((option: PricingOption) =>
-        MONTHLY_INTERVALS.has(option.interval)
-      );
-      const selectedPrice = monthPrice ?? pricing?.options?.[0];
+      const selectedPrice = getPreferredVerifiedPrice(pricing?.options ?? []);
 
       if (!selectedPrice?.priceId) {
         throw new TypeError('Pricing option missing');
@@ -214,5 +222,6 @@ export function useUserMenuActions({
     handleManageBilling: () => void handleManageBilling(),
     handleSignOut: () => void handleSignOut(),
     loading: derivedLoading,
+    upgradeLabel,
   } as const;
 }

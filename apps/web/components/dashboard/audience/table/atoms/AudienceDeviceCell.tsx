@@ -16,7 +16,7 @@ export function AudienceDeviceCell({
   const deviceIndicator = getDeviceIndicator(deviceType);
 
   return (
-    <div className={cn('text-xs', className)}>
+    <div className={cn('text-[13px]', className)}>
       {deviceIndicator ? (
         <Icon
           name={deviceIndicator.iconName}

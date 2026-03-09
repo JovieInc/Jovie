@@ -1,16 +1,8 @@
 'use client';
 
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  SegmentControl,
-  Separator,
-} from '@jovie/ui';
+import { Badge, Button, Card, CardContent, Separator } from '@jovie/ui';
 import { Check, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
-import { parseAsStringLiteral, useQueryState } from 'nuqs';
 import { useState } from 'react';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import type { PricingOption } from '@/lib/queries';
@@ -101,10 +93,7 @@ export function PlanComparisonSection({
   readonly currentPlan: string | null;
   readonly defaultPriceId: string | undefined;
 }) {
-  const [billingInterval, setBillingInterval] = useQueryState(
-    'interval',
-    parseAsStringLiteral(['month', 'year'] as const).withDefault('month')
-  );
+  const billingInterval = 'month' as const;
   const [growthModalOpen, setGrowthModalOpen] = useState(false);
   const activePlan = currentPlan ?? 'free';
 
@@ -117,33 +106,13 @@ export function PlanComparisonSection({
     >
       <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
         <div>
-          <h2 className='text-xl font-semibold text-primary-token'>
+          <h2 className='text-xl font-[590] text-primary-token'>
             Compare Plans
           </h2>
-          <p className='text-sm text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Choose the plan that fits your needs
           </p>
         </div>
-        <SegmentControl
-          value={billingInterval}
-          onValueChange={setBillingInterval}
-          options={[
-            { value: 'month' as const, label: 'Monthly' },
-            {
-              value: 'year' as const,
-              label: (
-                <span className='flex items-center gap-1.5'>
-                  Yearly
-                  <Badge variant='success' size='sm'>
-                    Save 17%
-                  </Badge>
-                </span>
-              ),
-            },
-          ]}
-          aria-label='Billing interval'
-          size='md'
-        />
       </div>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
@@ -175,12 +144,12 @@ export function PlanComparisonSection({
               key={planKey}
               className={cn(
                 'relative flex flex-col transition-shadow duration-200',
-                isCurrentPlan && 'ring-2 ring-[var(--color-accent)] shadow-md'
+                isCurrentPlan && 'ring-2 ring-[var(--color-accent)] shadow-card'
               )}
             >
               {isCurrentPlan && (
                 <div className='absolute -top-3 left-1/2 z-10 -translate-x-1/2'>
-                  <Badge variant='primary' size='sm'>
+                  <Badge variant='default' size='sm'>
                     Current Plan
                   </Badge>
                 </div>
@@ -189,10 +158,10 @@ export function PlanComparisonSection({
               <CardContent className='flex flex-1 flex-col p-6'>
                 {/* Plan header */}
                 <div>
-                  <h3 className='text-lg font-semibold text-primary-token'>
+                  <h3 className='text-lg font-[590] text-primary-token'>
                     {planData.name}
                   </h3>
-                  <p className='text-sm text-tertiary-token'>
+                  <p className='text-[13px] text-tertiary-token'>
                     {planData.tagline}
                   </p>
                 </div>
@@ -200,15 +169,15 @@ export function PlanComparisonSection({
                 {/* Price */}
                 <div className='mt-4 flex items-baseline gap-1'>
                   {priceDisplay === null ? (
-                    <span className='text-sm font-medium text-tertiary-token'>
+                    <span className='text-[13px] font-[510] text-tertiary-token'>
                       Coming soon
                     </span>
                   ) : (
                     <>
-                      <span className='text-3xl font-bold text-primary-token'>
+                      <span className='text-3xl font-[590] text-primary-token'>
                         {priceDisplay}
                       </span>
-                      <span className='text-sm text-secondary-token'>
+                      <span className='text-[13px] text-secondary-token'>
                         {intervalLabel}
                       </span>
                     </>
@@ -234,7 +203,7 @@ export function PlanComparisonSection({
                   {planData.features.map(feature => (
                     <li
                       key={feature.label}
-                      className='flex items-start gap-2.5 text-sm'
+                      className='flex items-start gap-2.5 text-[13px]'
                     >
                       <Check className='mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400' />
                       <span className='text-secondary-token'>

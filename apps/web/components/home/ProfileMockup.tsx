@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const RELEASES = [
@@ -25,7 +26,36 @@ const RELEASES = [
 
 const CTA_INTERVAL = 5000;
 
-export function ProfileMockup() {
+/** Fallback values used when no profile data is provided */
+const FALLBACK = {
+  name: 'Tim White',
+  tagline: 'Indie / Alternative · Los Angeles',
+  handle: 'tim',
+  avatarUrl: null as string | null,
+} as const;
+
+export interface ProfileMockupProps {
+  /** Display name from the real profile */
+  readonly name?: string | null;
+  /** Tagline/bio snippet from the real profile */
+  readonly tagline?: string | null;
+  /** Username handle (shown in the URL bar) */
+  readonly handle?: string | null;
+  /** Avatar image URL from the real profile */
+  readonly avatarUrl?: string | null;
+}
+
+export function ProfileMockup({
+  name,
+  tagline,
+  handle,
+  avatarUrl,
+}: ProfileMockupProps = {}) {
+  const displayName = name || FALLBACK.name;
+  const displayTagline = tagline || FALLBACK.tagline;
+  const displayHandle = handle || FALLBACK.handle;
+  const displayAvatar = avatarUrl || FALLBACK.avatarUrl;
+
   const [isListen, setIsListen] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const barRef = useRef<HTMLProgressElement>(null);
@@ -85,8 +115,8 @@ export function ProfileMockup() {
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
         </div>
-        <div className='flex-1 text-center text-xs text-[var(--linear-text-tertiary)]'>
-          jov.ie/tim
+        <div className='flex-1 text-center text-xs text-[color:var(--linear-text-tertiary)]'>
+          jov.ie/{displayHandle}
         </div>
       </div>
 
@@ -94,19 +124,31 @@ export function ProfileMockup() {
       <div className='px-5 pt-6 pb-5'>
         {/* Avatar + info */}
         <div className='flex items-center gap-3.5 mb-5'>
-          <div
-            className='w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold text-[var(--linear-text-primary)] shrink-0'
-            style={{ background: 'linear-gradient(135deg, #2a1f3d, #1a1a2e)' }}
-            aria-hidden='true'
-          >
-            T
-          </div>
-          <div>
-            <div className='text-base font-semibold text-[var(--linear-text-primary)] mb-0.5'>
-              Tim White
+          {displayAvatar ? (
+            <Image
+              src={displayAvatar}
+              alt={displayName}
+              width={64}
+              height={64}
+              className='w-16 h-16 rounded-full object-cover shrink-0'
+            />
+          ) : (
+            <div
+              className='w-16 h-16 rounded-full flex items-center justify-center text-2xl font-semibold text-[color:var(--linear-text-primary)] shrink-0'
+              style={{
+                background: 'linear-gradient(135deg, #2a1f3d, #1a1a2e)',
+              }}
+              aria-hidden='true'
+            >
+              {displayName.charAt(0).toUpperCase()}
             </div>
-            <div className='text-[13px] text-[var(--linear-text-tertiary)]'>
-              Indie / Alternative · Los Angeles
+          )}
+          <div>
+            <div className='text-base font-semibold text-[color:var(--linear-text-primary)] mb-0.5'>
+              {displayName}
+            </div>
+            <div className='text-[13px] text-[color:var(--linear-text-tertiary)]'>
+              {displayTagline}
             </div>
           </div>
         </div>
@@ -121,10 +163,10 @@ export function ProfileMockup() {
                 aria-hidden='true'
               />
               <div className='min-w-0'>
-                <div className='text-[13px] font-medium text-[var(--linear-text-primary)] truncate'>
+                <div className='text-[13px] font-medium text-[color:var(--linear-text-primary)] truncate'>
                   {release.title}
                 </div>
-                <div className='text-xs text-[var(--linear-text-tertiary)]'>
+                <div className='text-xs text-[color:var(--linear-text-tertiary)]'>
                   {release.type} · {release.meta}
                 </div>
               </div>
@@ -146,7 +188,7 @@ export function ProfileMockup() {
               color: '#111111',
             }}
           >
-            Get updates from Tim White
+            Get updates from {displayName}
           </div>
 
           {/* Listen CTA */}
@@ -184,7 +226,7 @@ export function ProfileMockup() {
         </div>
 
         {/* Label */}
-        <div className='mt-2 text-center text-[11px] text-[var(--linear-text-tertiary)] transition-opacity duration-500'>
+        <div className='mt-2 text-center text-[11px] text-[color:var(--linear-text-tertiary)] transition-opacity duration-500'>
           {isListen
             ? 'Return visitor · preferred streaming platform'
             : 'New visitor · email / sms capture'}

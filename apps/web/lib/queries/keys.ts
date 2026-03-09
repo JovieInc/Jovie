@@ -232,6 +232,10 @@ export const queryKeys = {
     preview: (threshold: number, limit: number) =>
       [...queryKeys.campaign.all, 'preview', { threshold, limit }] as const,
     stats: () => [...queryKeys.campaign.all, 'stats'] as const,
+    overview: () => [...queryKeys.campaign.all, 'overview'] as const,
+    invites: (params: { limit: number; offset: number }) =>
+      [...queryKeys.campaign.all, 'invites', params] as const,
+    settings: () => [...queryKeys.campaign.all, 'settings'] as const,
   },
 
   // AI Insights
@@ -258,12 +262,38 @@ export const queryKeys = {
       ] as const,
     conversation: (id: string) =>
       [...queryKeys.chat.all, 'conversation', id] as const,
+    usage: () => [...queryKeys.chat.all, 'usage'] as const,
+  },
+
+  // Audience infinite scroll
+  audience: {
+    all: ['audience'] as const,
+    members: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.audience.all,
+        'members',
+        profileId,
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+    subscribers: (profileId: string, filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.audience.all,
+        'subscribers',
+        profileId,
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
   },
 
   // Ad pixel settings
   pixels: {
     all: ['pixels'] as const,
     settings: () => [...queryKeys.pixels.all, 'settings'] as const,
+  },
+
+  // Earnings / tipping data
+  earnings: {
+    all: ['earnings'] as const,
+    stats: () => [...queryKeys.earnings.all, 'stats'] as const,
   },
 } as const;
 

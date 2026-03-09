@@ -1,6 +1,17 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+  TooltipShortcut,
+} from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -57,31 +68,12 @@ export interface ExportCSVButtonProps<T extends object> {
    * @default 'Export data to CSV file'
    */
   readonly ariaLabel?: string;
+  /**
+   * Tooltip label shown on hover. When provided, wraps the button in TooltipShortcut.
+   */
+  readonly tooltipLabel?: string;
 }
 
-/**
- * A reusable button component for exporting data to CSV format.
- * Supports async data fetching, loading states, and customizable styling.
- *
- * @example
- * // Basic usage with static data
- * <ExportCSVButton
- *   getData={() => tableData}
- *   filename="users"
- * />
- *
- * @example
- * // With custom columns and async data
- * <ExportCSVButton
- *   getData={async () => await fetchAllUsers()}
- *   columns={[
- *     { header: 'Name', accessor: 'fullName' },
- *     { header: 'Email', accessor: 'email' },
- *     { header: 'Status', accessor: 'isActive', formatter: (v) => v ? 'Active' : 'Inactive' }
- *   ]}
- *   filename="users-export"
- * />
- */
 export function ExportCSVButton<T extends object>({
   getData,
   columns,
@@ -92,35 +84,53 @@ export function ExportCSVButton<T extends object>({
   size = 'sm',
   label = 'Export CSV',
   ariaLabel = 'Export data to CSV file',
+  tooltipLabel,
 }: ExportCSVButtonProps<T>) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [pendingData, setPendingData] = useState<T[] | null>(null);
   const { error: showError, success: showSuccess } = useNotifications();
 
-  const handleExport = useCallback(async () => {
+  const handleOpenConfirmation = useCallback(async () => {
     if (isExporting || disabled) return;
 
     setIsExporting(true);
 
     try {
-      // Get data (may be async)
       const data = await Promise.resolve(getData());
 
-      // Validate data
       if (!data || data.length === 0) {
         showError('No data available to export');
         return;
       }
 
-      // Generate CSV blob
-      const blob = toCSVBlob(data, { columns });
+      setPendingData(data);
+      setIsDialogOpen(true);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to prepare CSV export';
+      showError(message);
+    } finally {
+      setIsExporting(false);
+    }
+  }, [disabled, getData, isExporting, showError]);
 
-      // Generate timestamped filename
+  const handleConfirmExport = useCallback(async () => {
+    if (isExporting || disabled || !pendingData) return;
+
+    setIsExporting(true);
+
+    try {
+      const blob = toCSVBlob(pendingData, { columns });
       const timestampedFilename = generateTimestampedFilename(filename, 'csv');
 
-      // Trigger download
       downloadCSVBlob(blob, timestampedFilename);
+      showSuccess(
+        `Exported ${pendingData.length} rows to ${timestampedFilename}`
+      );
 
-      showSuccess(`Exported ${data.length} rows to ${timestampedFilename}`);
+      setIsDialogOpen(false);
+      setPendingData(null);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to export CSV';
@@ -129,20 +139,31 @@ export function ExportCSVButton<T extends object>({
       setIsExporting(false);
     }
   }, [
-    getData,
     columns,
-    filename,
     disabled,
+    filename,
     isExporting,
+    pendingData,
     showError,
     showSuccess,
   ]);
 
-  return (
+  const handleOpenChange = useCallback((open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setPendingData(null);
+    }
+  }, []);
+
+  const columnCount =
+    columns?.length ??
+    (pendingData?.[0] ? Object.keys(pendingData[0]).length : 0);
+
+  const button = (
     <Button
       variant={variant}
       size={size}
-      onClick={handleExport}
+      onClick={handleOpenConfirmation}
       disabled={disabled || isExporting}
       className={cn('gap-2 rounded-lg border-subtle hover:bg-base', className)}
       aria-label={ariaLabel}
@@ -155,5 +176,52 @@ export function ExportCSVButton<T extends object>({
       )}
       <span>{isExporting ? 'Exporting...' : label}</span>
     </Button>
+  );
+
+  return (
+    <>
+      {tooltipLabel ? (
+        <TooltipShortcut label={tooltipLabel} side='bottom'>
+          {button}
+        </TooltipShortcut>
+      ) : (
+        button
+      )}
+
+      <AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm CSV export</AlertDialogTitle>
+            <AlertDialogDescription>
+              Review your export details before downloading.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <dl className='space-y-2 text-[13px] text-secondary-token'>
+            <div className='flex items-center justify-between gap-4'>
+              <dt>Rows</dt>
+              <dd className='font-[510] text-primary-token'>
+                {pendingData?.length ?? 0}
+              </dd>
+            </div>
+            <div className='flex items-center justify-between gap-4'>
+              <dt>Columns</dt>
+              <dd className='font-[510] text-primary-token'>{columnCount}</dd>
+            </div>
+          </dl>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isExporting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmExport}
+              disabled={isExporting || !pendingData}
+              variant='primary'
+            >
+              {isExporting ? 'Exporting...' : 'Download CSV'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

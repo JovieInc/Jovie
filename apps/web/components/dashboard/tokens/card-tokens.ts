@@ -44,7 +44,7 @@ export const cardTokens = {
   // Border radius variations - Linear-style precision
   radius: {
     none: 'rounded-none',
-    minimal: 'rounded-md', // 6px
+    minimal: 'rounded-[6px]', // 6px
     small: 'rounded-lg', // 8px
     default: 'rounded-xl', // 12px
     large: 'rounded-2xl', // 16px

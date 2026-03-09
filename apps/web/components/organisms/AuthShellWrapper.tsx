@@ -11,7 +11,8 @@ import {
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { HeaderChatUsageIndicator } from '@/components/dashboard/atoms/HeaderChatUsageIndicator';
+import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
@@ -21,7 +22,7 @@ import {
   KeyboardShortcutsProvider,
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';
@@ -49,9 +50,33 @@ export function useTableMeta(): TableMetaContextValue {
   return ctx;
 }
 
+/**
+ * TableMetaProvider - Provides TableMetaContext for use in Storybook and tests.
+ * Use this when you need to render components that call useTableMeta()
+ * without the full AuthShellWrapper (e.g., in Storybook stories).
+ */
+export function TableMetaProvider({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  const [tableMeta, setTableMeta] = useState<TableMeta>({
+    rowCount: null,
+    toggle: null,
+  });
+  const value = useMemo(
+    () => ({ tableMeta, setTableMeta }),
+    [tableMeta, setTableMeta]
+  );
+  return (
+    <TableMetaContext.Provider value={value}>
+      {children}
+    </TableMetaContext.Provider>
+  );
+}
+
 export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
+  readonly previewPanelDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
@@ -70,10 +95,12 @@ function KeyboardShortcutsHandler() {
 function AuthShellWrapperInner({
   persistSidebarCollapsed,
   sidebarDefaultOpen,
+  previewPanelDefaultOpen,
   children,
 }: Readonly<{
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
+  previewPanelDefaultOpen?: boolean;
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig();
@@ -86,19 +113,26 @@ function AuthShellWrapperInner({
     toggle: null,
   });
 
-  // Preview panel is available on all dashboard routes and the artist-profile settings page
+  // Preview panel data hydration is available on dashboard routes and artist-profile settings
   const previewEnabled =
     config.section === 'dashboard' || config.isArtistProfileSettings;
+  const shouldDefaultOpenPreviewPanel =
+    config.section === 'dashboard' && previewPanelDefaultOpen;
 
   // Determine header action: use custom actions from context if available,
   // otherwise fall back to default based on route type
   const defaultHeaderAction = useMemo(
-    () => (config.isTableRoute ? <DrawerToggleButton /> : null),
+    () => (
+      <>
+        <HeaderChatUsageIndicator />
+        <HeaderProfileProgress />
+        {config.isTableRoute && <DrawerToggleButton />}
+      </>
+    ),
     [config.isTableRoute]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
-  // This matches the previewPanel pattern on line 140.
   const rawHeaderAction =
     headerActionsContext?.headerActions ?? defaultHeaderAction;
   const headerAction = rawHeaderAction ? (
@@ -135,8 +169,12 @@ function AuthShellWrapperInner({
 
   return (
     <TableMetaContext.Provider value={tableMetaContextValue}>
-      <TablePanelProvider>
-        <PreviewPanelProvider enabled={previewEnabled}>
+      <RightPanelProvider>
+        <PreviewPanelProvider
+          key={config.section}
+          defaultOpen={shouldDefaultOpenPreviewPanel}
+          enabled={previewEnabled}
+        >
           <AuthShell
             section={config.section}
             breadcrumbs={config.breadcrumbs}
@@ -144,13 +182,6 @@ function AuthShellWrapperInner({
             headerAction={headerAction}
             showMobileTabs={config.showMobileTabs}
             isTableRoute={config.isTableRoute}
-            previewPanel={
-              previewEnabled ? (
-                <ErrorBoundary fallback={null}>
-                  <ProfileContactSidebar />
-                </ErrorBoundary>
-              ) : undefined
-            }
             onSidebarOpenChange={
               persistSidebarCollapsed ? handleSidebarOpenChange : undefined
             }
@@ -159,7 +190,7 @@ function AuthShellWrapperInner({
             {children}
           </AuthShell>
         </PreviewPanelProvider>
-      </TablePanelProvider>
+      </RightPanelProvider>
     </TableMetaContext.Provider>
   );
 }
@@ -179,6 +210,7 @@ function AuthShellWrapperInner({
 export function AuthShellWrapper({
   persistSidebarCollapsed,
   sidebarDefaultOpen,
+  previewPanelDefaultOpen,
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
@@ -187,6 +219,7 @@ export function AuthShellWrapper({
         <AuthShellWrapperInner
           persistSidebarCollapsed={persistSidebarCollapsed}
           sidebarDefaultOpen={sidebarDefaultOpen}
+          previewPanelDefaultOpen={previewPanelDefaultOpen}
         >
           {children}
         </AuthShellWrapperInner>

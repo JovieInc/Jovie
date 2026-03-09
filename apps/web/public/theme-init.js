@@ -1,6 +1,8 @@
 (function () {
   try {
     if (typeof globalThis.matchMedia !== 'function') return;
+    // Guard against null localStorage (private browsing, restricted contexts)
+    if (typeof localStorage === 'undefined' || !localStorage) return;
     var ls = localStorage.getItem('jovie-theme');
     var mql = globalThis.matchMedia('(prefers-color-scheme: dark)');
     var systemPref = mql.matches ? 'dark' : 'light';
@@ -8,6 +10,16 @@
     var root = document.documentElement;
     if (pref === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
+
+    // Update theme-color meta tag to match active theme (PWA system bar color)
+    var themeColor = pref === 'dark' ? '#0a0a0a' : '#ffffff';
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', themeColor);
+
+    // High contrast mode (independent of light/dark)
+    var hc = localStorage.getItem('jovie-high-contrast');
+    if (hc === 'true') root.classList.add('high-contrast');
+    else root.classList.remove('high-contrast');
   } catch {
     // Theme detection failed - defaults will apply
   }

@@ -12,10 +12,15 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import {
+  buildSocialLinksVerificationSelect,
+  getSocialLinksVerificationColumnSupport,
+} from '@/lib/db/queries/social-links-verification';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
 
 /**
  * Minimal link shape for initializing DashboardLinks client from the server.
@@ -50,6 +55,9 @@ export interface ProfileSocialLink {
     signals?: string[];
     linkType?: string | null;
   } | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
+  verifiedAt?: string | null;
   /** Optimistic locking version for concurrent edit detection */
   version?: number;
 }
@@ -87,6 +95,9 @@ export async function getProfileSocialLinks(
 
     return await withDbSession(async clerkUserId => {
       // Query against creatorProfiles with ownership check and left-join links
+      const hasVerificationColumns =
+        await getSocialLinksVerificationColumnSupport(db);
+
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -102,6 +113,7 @@ export async function getProfileSocialLinks(
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          ...buildSocialLinksVerificationSelect(hasVerificationColumns),
           version: socialLinks.version,
         })
         .from(creatorProfiles)
@@ -113,7 +125,19 @@ export async function getProfileSocialLinks(
         .where(
           and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
         )
-        .orderBy(socialLinks.sortOrder);
+        .orderBy(socialLinks.sortOrder)
+        .catch(error => {
+          const migrationResult = handleMigrationErrors(error, {
+            userId: clerkUserId,
+            operation: 'social_links_count',
+          });
+
+          if (!migrationResult.shouldRetry) {
+            return [];
+          }
+
+          throw error;
+        });
 
       // If the profile does not belong to the user, rows will be empty
       // Map only existing link rows (filter out null linkId from left join)
@@ -147,6 +171,14 @@ export async function getProfileSocialLinks(
               sources?: string[];
               signals?: string[];
             } | null,
+            verificationStatus:
+              (r.verificationStatus as
+                | 'unverified'
+                | 'pending'
+                | 'verified'
+                | null) ?? 'unverified',
+            verificationToken: r.verificationToken ?? null,
+            verifiedAt: r.verifiedAt?.toISOString() ?? null,
             version: r.version ?? 1,
           };
         })

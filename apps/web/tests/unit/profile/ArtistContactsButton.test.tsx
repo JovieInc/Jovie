@@ -16,6 +16,11 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+// Mock as mobile so drawer behavior is tested (desktop renders a link instead)
+vi.mock('@/hooks/useBreakpoint', () => ({
+  useBreakpointDown: () => true,
+}));
+
 function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {
   return {
     id: 'contact-1',
@@ -58,6 +63,53 @@ describe('ArtistContactsButton', () => {
     expect(navigate).not.toHaveBeenCalled();
     // Verify drawer content is visible
     expect(screen.getByText(/bookings/i)).toBeInTheDocument();
+  });
+
+  it('renders mailto and tel links in the contact drawer actions', () => {
+    const contacts: PublicContact[] = [
+      makeContact({
+        channels: [
+          {
+            type: 'email',
+            encoded: encodeContactPayload({
+              type: 'email',
+              value: 'agent@example.com',
+              subject: 'Booking - Test Artist',
+              contactId: 'contact-1',
+            }),
+            preferred: true,
+          },
+          {
+            type: 'phone',
+            encoded: encodeContactPayload({
+              type: 'phone',
+              value: '+1 (555) 010-1234',
+              contactId: 'contact-1',
+            }),
+            preferred: false,
+          },
+        ],
+      }),
+    ];
+
+    render(
+      <ArtistContactsButton
+        contacts={contacts}
+        artistHandle='test'
+        artistName='Test Artist'
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('contacts-trigger'));
+
+    const channelActions = screen.getAllByTestId(
+      'contact-drawer-channel-action'
+    );
+    expect(channelActions[0]).toHaveAttribute(
+      'href',
+      'mailto:agent@example.com?subject=Booking%20-%20Test%20Artist'
+    );
+    expect(channelActions[1]).toHaveAttribute('href', 'tel:+15550101234');
   });
 
   it('opens drawer when multiple contacts are provided', () => {

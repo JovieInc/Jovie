@@ -35,6 +35,10 @@ export interface JovieChatProps {
   readonly avatarUrl?: string | null;
   /** Artist username for profile links */
   readonly username?: string;
+  /** Whether the user is in their first post-onboarding chat session */
+  readonly isFirstSession?: boolean;
+  /** Optional latest release title for contextual first-session prompts */
+  readonly latestReleaseTitle?: string | null;
 }
 
 export type ChatErrorType = 'network' | 'rate_limit' | 'server' | 'unknown';
@@ -50,9 +54,6 @@ export interface ChatError {
 
 /** Maximum allowed message length */
 export const MAX_MESSAGE_LENGTH = 4000;
-
-/** Minimum time between message submissions (ms) */
-export const SUBMIT_THROTTLE_MS = 1000;
 
 export interface SocialLinkToolResult {
   readonly success: boolean;
@@ -119,12 +120,14 @@ export const TOOL_LABELS: Record<string, string> = {
   proposeProfileEdit: 'Editing profile...',
   proposeAvatarUpload: 'Preparing photo upload...',
   proposeSocialLink: 'Adding link...',
+  proposeSocialLinkRemoval: 'Removing link...',
   checkCanvasStatus: 'Checking canvas status...',
   suggestRelatedArtists: 'Finding related artists...',
   generateCanvasPlan: 'Planning canvas video...',
   createPromoStrategy: 'Building promo strategy...',
   markCanvasUploaded: 'Updating canvas status...',
   createRelease: 'Creating release...',
+  submitFeedback: 'Submitting feedback...',
 };
 
 /** A chat suggestion card with icon, label, and prompt */
@@ -156,5 +159,37 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
     label: 'Change profile photo',
     prompt: 'Help me change my profile photo.',
     accent: 'purple',
+  },
+] as const;
+
+/**
+ * Special feedback suggestion shown in both suggestion lists.
+ * Sends a real prompt that the AI handles via the submitFeedback tool.
+ */
+export const FEEDBACK_SUGGESTION: ChatSuggestion = {
+  icon: 'MessageSquare',
+  label: 'Share feedback',
+  prompt: "I'd like to share some feedback about Jovie.",
+  accent: 'orange',
+};
+
+export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
+  {
+    icon: 'Link2',
+    label: 'Set up a link for my latest release',
+    prompt: 'Set up a link for my latest release.',
+    accent: 'blue',
+  },
+  {
+    icon: 'Eye',
+    label: 'Preview my profile',
+    prompt: 'Preview my profile.',
+    accent: 'purple',
+  },
+  {
+    icon: 'DollarSign',
+    label: 'How do I get paid?',
+    prompt: 'How do I get paid?',
+    accent: 'green',
   },
 ] as const;

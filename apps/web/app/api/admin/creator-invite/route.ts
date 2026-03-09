@@ -70,7 +70,6 @@ export async function POST(request: Request) {
         username: creatorProfiles.username,
         displayName: creatorProfiles.displayName,
         isClaimed: creatorProfiles.isClaimed,
-        claimToken: creatorProfiles.claimToken,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, creatorProfileId))
@@ -89,14 +88,6 @@ export async function POST(request: Request) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-
-    if (!profile.claimToken) {
-      return NextResponse.json(
-        { error: 'Profile does not have a claim token' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-
     // Create the invite record and optionally enqueue for sending
     const result = await withSystemIngestionSession(async tx => {
       // Create the invite record

@@ -390,6 +390,7 @@ describe('@critical clerk-sync.ts', () => {
       expect(result).toEqual({ success: true });
       expect(mockCaptureWarning).toHaveBeenCalledWith(
         'User not found in DB for Clerk deletion',
+        undefined,
         expect.objectContaining({ clerkUserId: 'user_gone' })
       );
     });

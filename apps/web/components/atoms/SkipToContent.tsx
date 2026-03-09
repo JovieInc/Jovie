@@ -32,10 +32,10 @@ export function SkipToContent({
         // Visible when focused
         'focus:not-sr-only',
         // Styling when visible
-        'focus:fixed focus:left-4 focus:top-4 focus:z-[9999]',
-        'focus:rounded-md focus:bg-btn-primary focus:px-4 focus:py-2',
-        'focus:text-btn-primary-foreground focus-visible:outline-none focus-visible:ring-2',
-        'focus-visible:ring-focus focus-visible:ring-offset-2',
+        'focus:fixed focus:left-4 focus:top-4 focus:z-50',
+        'focus:rounded-md focus:bg-surface-1 focus:px-4 focus:py-2',
+        'focus:text-sm focus:text-primary-token focus:shadow-lg',
+        'focus:ring-2 focus:ring-accent',
         className
       )}
     >

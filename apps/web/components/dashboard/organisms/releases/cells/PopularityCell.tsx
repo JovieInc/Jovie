@@ -42,12 +42,12 @@ export const PopularityCell = memo(function PopularityCell({
             </div>
           </button>
         ) : (
-          <span className='text-xs text-tertiary-token'>-</span>
+          <span className='text-[11px] text-tertiary-token'>-</span>
         )}
       </TooltipTrigger>
       {isValidPopularity && (
-        <TooltipContent side='top' className='text-xs'>
-          <span className='font-medium'>{displayPopularity}</span>
+        <TooltipContent side='top' className='text-[11px]'>
+          <span className='font-[510]'>{displayPopularity}</span>
           <span className='text-secondary-token'>/100 popularity</span>
         </TooltipContent>
       )}

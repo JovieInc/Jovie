@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
+import {
+  convertHeicToJpeg,
+  isHeicLikeMimeType,
+} from '@/lib/images/heic-conversion';
 import type { FileUIPart } from '../types';
 
 /** Maximum number of images per message. */
@@ -40,10 +44,7 @@ export interface UseChatImageAttachmentsReturn {
 }
 
 function generateId(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2, 10);
+  return crypto.randomUUID();
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -101,12 +102,26 @@ export function useChatImageAttachments({
         }
 
         try {
-          const dataUrl = await readFileAsDataUrl(file);
-          const previewUrl = URL.createObjectURL(file);
+          // Convert HEIC/HEIF to JPEG before sending to the AI model,
+          // which only supports JPEG, PNG, GIF, and WebP (JOV-749).
+          let processedFile = file;
+          if (isHeicLikeMimeType(file.type)) {
+            try {
+              processedFile = await convertHeicToJpeg(file);
+            } catch {
+              onError(
+                'Could not process this HEIC photo. Please try a JPEG or PNG image.'
+              );
+              continue;
+            }
+          }
+
+          const dataUrl = await readFileAsDataUrl(processedFile);
+          const previewUrl = URL.createObjectURL(processedFile);
           results.push({
             id: generateId(),
-            name: file.name,
-            mediaType: file.type,
+            name: processedFile.name,
+            mediaType: processedFile.type,
             previewUrl,
             dataUrl,
           });

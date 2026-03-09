@@ -5,7 +5,6 @@ export { AuthGoogleIcon } from './AuthGoogleIcon';
 export { AuthInput } from './AuthInput';
 export { AuthLink } from './AuthLink';
 export { AuthLinkPreviewCard } from './AuthLinkPreviewCard';
-export { AuthSpotifyIcon } from './AuthSpotifyIcon';
 export { AuthTextInput } from './AuthTextInput';
 export { FormError } from './FormError';
 export { OtpInput } from './otp-input';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { type QueryClient, useQuery } from '@tanstack/react-query';
 import { queryKeys } from './keys';
 
 export interface EnvHealthResponse {
@@ -48,13 +48,22 @@ async function fetchEnvHealth(): Promise<EnvHealthResponse> {
  *     ]
  *   : [];
  */
-export function useEnvHealthQuery({ enabled = false }: { enabled?: boolean }) {
-  return useQuery({
-    queryKey: queryKeys.health.env(),
-    queryFn: fetchEnvHealth,
-    enabled,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    retry: false, // Don't retry health checks - they may fail intentionally
-  });
+export function useEnvHealthQuery({
+  enabled = false,
+  queryClient,
+}: {
+  enabled?: boolean;
+  queryClient?: QueryClient;
+}) {
+  return useQuery(
+    {
+      queryKey: queryKeys.health.env(),
+      queryFn: fetchEnvHealth,
+      enabled,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: false, // Don't retry health checks - they may fail intentionally
+    },
+    queryClient
+  );
 }

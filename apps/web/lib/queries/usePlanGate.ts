@@ -86,6 +86,8 @@ export function usePlanGate(): PlanGateEntitlements {
     planKey = 'growth';
   } else if (plan === 'pro') {
     planKey = 'pro';
+  } else if (plan === 'founding') {
+    planKey = 'founding';
   } else {
     planKey = 'free';
   }

@@ -45,20 +45,20 @@ describe('Input', () => {
     it('applies default variant classes', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-default');
-      expect(input.className).toContain('bg-surface-input');
+      expect(input.className).toContain('border-(--linear-border-subtle)');
+      expect(input.className).toContain('bg-(--linear-bg-surface-1)');
     });
 
     it('applies error variant classes', () => {
       render(<Input variant='error' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-destructive');
+      expect(input.className).toContain('border-(--linear-error)');
     });
 
     it('applies success variant classes', () => {
       render(<Input variant='success' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-green-500');
+      expect(input.className).toContain('border-success');
     });
 
     it('applies sm size classes', () => {
@@ -71,28 +71,28 @@ describe('Input', () => {
     it('applies md size classes by default', () => {
       render(<Input data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-10');
+      expect(input.className).toContain('h-8');
       expect(input.className).toContain('text-[13px]');
     });
 
     it('applies lg size classes', () => {
       render(<Input inputSize='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-[68px]');
+      expect(input.className).toContain('h-10');
       expect(input.className).toContain('text-[13px]');
     });
 
     it('supports size prop as alias for inputSize', () => {
       render(<Input size='lg' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('h-[68px]');
+      expect(input.className).toContain('h-10');
     });
 
     it('merges custom className', () => {
       render(<Input className='custom-class' data-testid='input' />);
       const input = screen.getByTestId('input');
       expect(input.className).toContain('custom-class');
-      expect(input.className).toContain('border-default');
+      expect(input.className).toContain('border-(--linear-border-subtle)');
     });
   });
 
@@ -154,7 +154,7 @@ describe('Input', () => {
     it('applies error variant when error prop is provided', () => {
       render(<Input error='Invalid email' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-destructive');
+      expect(input.className).toContain('border-(--linear-error)');
     });
 
     it('sets aria-invalid when error is present', () => {
@@ -177,14 +177,14 @@ describe('Input', () => {
     it('applies invalid validation state', () => {
       render(<Input validationState='invalid' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-destructive');
+      expect(input.className).toContain('border-(--linear-error)');
       expect(input).toHaveAttribute('aria-invalid', 'true');
     });
 
     it('applies valid validation state', () => {
       render(<Input validationState='valid' data-testid='input' />);
       const input = screen.getByTestId('input');
-      expect(input.className).toContain('border-green-500');
+      expect(input.className).toContain('border-success');
     });
 
     it('applies pending validation state', () => {

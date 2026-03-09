@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { cacheQuery } from '@/lib/db/cache';
 import { CircuitOpenError } from '@/lib/dsp-enrichment/circuit-breakers';
 import {
   extractImageUrls,
@@ -8,6 +9,11 @@ import {
   searchArtist,
 } from '@/lib/dsp-enrichment/providers/apple-music';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
+import {
+  appleMusicSearchLimiter,
+  createRateLimitHeaders,
+  getClientIP,
+} from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 
@@ -18,6 +24,7 @@ const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
+const APPLE_MUSIC_SEARCH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
 
 interface AppleMusicArtistResult {
   id: string;
@@ -25,88 +32,6 @@ interface AppleMusicArtistResult {
   url: string;
   imageUrl?: string;
   genres?: string[];
-}
-
-// Simple in-memory cache
-const searchCache = new Map<
-  string,
-  { data: AppleMusicArtistResult[]; timestamp: number }
->();
-const CACHE_DURATION = 5 * 60 * 1000;
-const MAX_CACHE_SIZE = 100;
-
-// In-memory rate limiting per IP
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60 * 1000;
-const RATE_LIMIT_MAX = 30;
-const MAX_RATE_LIMIT_ENTRIES = 500;
-
-function cleanupRateLimitMap(): void {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitMap.entries()) {
-    if (now > entry.resetAt) {
-      rateLimitMap.delete(ip);
-    }
-  }
-  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
-    const entries = Array.from(rateLimitMap.entries());
-    entries.sort((a, b) => a[1].resetAt - b[1].resetAt);
-    const toDelete = entries.slice(0, entries.length - MAX_RATE_LIMIT_ENTRIES);
-    toDelete.forEach(([ip]) => rateLimitMap.delete(ip));
-  }
-}
-
-function cleanupSearchCache(): void {
-  const now = Date.now();
-  for (const [key, entry] of searchCache.entries()) {
-    if (now - entry.timestamp > CACHE_DURATION) {
-      searchCache.delete(key);
-    }
-  }
-  if (searchCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(searchCache.entries());
-    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-    const toDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
-    toDelete.forEach(([key]) => searchCache.delete(key));
-  }
-}
-
-function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get('cf-connecting-ip') ||
-    request.headers.get('x-real-ip') ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  );
-}
-
-function checkRateLimit(ip: string): {
-  limited: boolean;
-  remaining: number;
-  resetAt: number;
-} {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return {
-      limited: false,
-      remaining: RATE_LIMIT_MAX - 1,
-      resetAt: now + RATE_LIMIT_WINDOW,
-    };
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return { limited: true, remaining: 0, resetAt: entry.resetAt };
-  }
-
-  entry.count++;
-  return {
-    limited: false,
-    remaining: RATE_LIMIT_MAX - entry.count,
-    resetAt: entry.resetAt,
-  };
 }
 
 function parseLimit(
@@ -126,13 +51,6 @@ function parseLimit(
  */
 export async function GET(request: NextRequest) {
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json(
-      { error: 'Unauthorized', code: 'UNAUTHORIZED' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
   const { searchParams } = request.nextUrl;
   const q = searchParams.get('q')?.trim();
   const limitParam = searchParams.get('limit');
@@ -173,57 +91,46 @@ export async function GET(request: NextRequest) {
 
   const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
 
-  const clientIp = getClientIp(request);
-  const rateLimit = checkRateLimit(clientIp);
-
+  const hasUser = !!userId;
+  const identifier = hasUser ? `user:${userId}` : `ip:${getClientIP(request)}`;
+  const rateLimitResult = await appleMusicSearchLimiter.limit(identifier);
   const rateLimitHeaders = {
     ...NO_STORE_HEADERS,
-    'X-RateLimit-Limit': String(RATE_LIMIT_MAX),
-    'X-RateLimit-Remaining': String(rateLimit.remaining),
-    'X-RateLimit-Reset': String(Math.ceil(rateLimit.resetAt / 1000)),
+    ...createRateLimitHeaders(rateLimitResult),
   } as const;
 
-  if (rateLimit.limited) {
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: 'Too many requests', code: 'RATE_LIMITED' },
       {
         status: 429,
-        headers: {
-          ...rateLimitHeaders,
-          'Retry-After': String(
-            Math.ceil((rateLimit.resetAt - Date.now()) / 1000)
-          ),
-        },
+        headers: rateLimitHeaders,
       }
     );
   }
 
-  const cacheKey = `${q.toLowerCase()}:${limit}`;
-  const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cached.data, { headers: rateLimitHeaders });
-  }
+  const cacheKey = `apple-music:search:${q.toLowerCase()}:${limit}`;
 
   try {
-    const artists = await searchArtist(q, {}, limit);
-
-    const results: AppleMusicArtistResult[] = artists.map(artist => {
-      const images = extractImageUrls(artist.attributes?.artwork);
-      return {
-        id: artist.id,
-        name: artist.attributes?.name ?? 'Unknown Artist',
-        url:
-          artist.attributes?.url ??
-          `https://music.apple.com/artist/${artist.id}`,
-        imageUrl: images?.medium ?? images?.small ?? undefined,
-        genres: artist.attributes?.genreNames ?? undefined,
-      };
-    });
-
-    searchCache.set(cacheKey, {
-      data: results,
-      timestamp: Date.now(),
-    });
+    const results = await cacheQuery<AppleMusicArtistResult[]>(
+      cacheKey,
+      async () => {
+        const artists = await searchArtist(q, {}, limit);
+        return artists.map(artist => {
+          const images = extractImageUrls(artist.attributes?.artwork);
+          return {
+            id: artist.id,
+            name: artist.attributes?.name ?? 'Unknown Artist',
+            url:
+              artist.attributes?.url ??
+              `https://music.apple.com/artist/${artist.id}`,
+            imageUrl: images?.medium ?? images?.small ?? undefined,
+            genres: artist.attributes?.genreNames ?? undefined,
+          };
+        });
+      },
+      { ttlSeconds: APPLE_MUSIC_SEARCH_CACHE_TTL_SECONDS }
+    );
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
@@ -263,17 +170,5 @@ export async function GET(request: NextRequest) {
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
     );
-  } finally {
-    // Probabilistic cleanup (10% of requests) to amortize cost.
-    // Full cleanup on every request is O(n log n) due to sorting;
-    // force cleanup when maps exceed size limits.
-    if (
-      Math.random() < 0.1 ||
-      searchCache.size > MAX_CACHE_SIZE ||
-      rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES
-    ) {
-      cleanupSearchCache();
-      cleanupRateLimitMap();
-    }
   }
 }

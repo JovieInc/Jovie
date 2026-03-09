@@ -102,6 +102,8 @@ export const chatAuditLog = pgTable(
     conversationIdIdx: index('idx_chat_audit_log_conversation_id').on(
       table.conversationId
     ),
+    messageIdIdx: index('idx_chat_audit_log_message_id').on(table.messageId),
+
     actionIdx: index('idx_chat_audit_log_action').on(table.action),
     createdAtIdx: index('idx_chat_audit_log_created_at').on(table.createdAt),
   })

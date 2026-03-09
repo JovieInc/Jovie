@@ -1,11 +1,8 @@
 'use client';
 
-import { Card, CardContent } from '@jovie/ui';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
-import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
@@ -39,7 +36,6 @@ export function SignInForm() {
   } = useSignInFlow();
 
   const searchParams = useSearchParams();
-  const [lastAuthMethod] = useLastAuthMethod();
   const hasHandledEmailParam = useRef(false);
   const isClerkStalled = useLoadingStall(isLoaded);
 
@@ -68,16 +64,14 @@ export function SignInForm() {
   };
 
   return (
-    <Card className='shadow-none border-0 bg-transparent p-0'>
-      <CardContent className='space-y-3 p-0'>
+    <div className='w-full'>
+      <div className='space-y-3'>
         {/* Method selection step */}
         {step === 'method' && (
           <MethodSelector
             onEmailClick={handleEmailClick}
-            onGoogleClick={() => startOAuth('google')}
-            onSpotifyClick={() => startOAuth('spotify')}
+            onGoogleClick={startOAuth}
             loadingState={loadingState}
-            lastMethod={lastAuthMethod}
             mode='signin'
             error={step === 'method' ? error : null}
           />
@@ -127,16 +121,10 @@ export function SignInForm() {
         {/* Sign up suggestion when account not found */}
         {shouldSuggestSignUp && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
-            No account found.{' '}
-            <Link
-              href='/signup'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
-            >
-              Sign up instead
-            </Link>
+            No account found with that email.
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

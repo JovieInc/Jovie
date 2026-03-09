@@ -7,12 +7,17 @@ import {
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
+  COUNTRY_CODE_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequired,
+} from '@/lib/cookies/consent-regions';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildContentSecurityPolicy,
@@ -107,7 +112,9 @@ function categorizePath(pathname: string): PathCategory {
   const isAuthCallbackPath =
     pathname === '/sso-callback' ||
     pathname === '/signup/sso-callback' ||
-    pathname === '/signin/sso-callback';
+    pathname === '/signin/sso-callback' ||
+    pathname === '/sign-up/sso-callback' ||
+    pathname === '/sign-in/sso-callback';
 
   // Dashboard paths (used for app subdomain rewrites)
   const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
@@ -328,6 +335,19 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       );
     }
 
+    // Auth callback routes must pass through untouched so Clerk can
+    // complete the handshake and exchange tokens successfully.
+    if (pathInfo.isAuthCallbackPath) {
+      return buildFinalResponse(
+        req,
+        NextResponse.next({ request: { headers: requestHeaders } }),
+        pathInfo,
+        startTime,
+        userId,
+        nonce
+      );
+    }
+
     // ========================================================================
     // Authenticated user handling - SINGLE getUserState call
     // ========================================================================
@@ -339,7 +359,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     let userState: ProxyUserState | null = null;
 
     // Only page routes need user state — API routes don't make routing decisions
-    const needsUserState = !pathname.startsWith('/api/');
+    const needsUserState =
+      !pathname.startsWith('/api/') && !pathInfo.isAuthCallbackPath;
 
     // Skip the getUserState call for RSC prefetch requests when the user is
     // already known-active from the in-memory cache. Active users don't need
@@ -422,10 +443,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (
-        (pathname === '/signin' || pathname === '/signup') &&
-        !isRSCPrefetch
-      ) {
+      } else if (pathInfo.isAuthPath && !isRSCPrefetch) {
+        // Redirect authenticated users away from any auth page (/signin, /sign-in,
+        // /signup, /sign-up). Uses isAuthPath to cover all variants consistently.
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else {
         // Single domain: no rewrites needed, routes are at their canonical paths
@@ -487,6 +507,37 @@ function buildFinalResponse(
         );
       }
     }
+  }
+
+  const countryCode =
+    req.headers.get('x-vercel-ip-country') ?? req.headers.get('cf-ipcountry');
+  const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? null;
+  const requiresCookieConsent = isCookieBannerRequired(normalizedCountryCode);
+  const currentCookieRequirement = req.cookies.get(
+    COOKIE_BANNER_REQUIRED_COOKIE
+  )?.value;
+  const currentCountryCode =
+    req.cookies.get(COUNTRY_CODE_COOKIE)?.value ?? null;
+  const nextCookieRequirement = requiresCookieConsent ? '1' : '0';
+
+  if (normalizedCountryCode && currentCountryCode !== normalizedCountryCode) {
+    res.cookies.set(COUNTRY_CODE_COOKIE, normalizedCountryCode, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    });
+  }
+
+  if (currentCookieRequirement !== nextCookieRequirement) {
+    res.cookies.set(COOKIE_BANNER_REQUIRED_COOKIE, nextCookieRequirement, {
+      httpOnly: false, // Readable by client JS so CookieBannerSection can check without headers()
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30,
+      path: '/',
+    });
   }
 
   // Set audience tracking cookies

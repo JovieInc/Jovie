@@ -13,8 +13,13 @@ type ArtistPageShellProps = {
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
+  /** Current profile mode — controls social-bar visibility for conversion optimization */
+  readonly mode?: string;
   readonly showTipButton?: boolean;
+  readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
+  readonly showTourButton?: boolean;
+  readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly maxWidthClass?: string;
   readonly showNotificationButton?: boolean;
@@ -32,8 +37,12 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   subtitle,
   children,
   showSocialBar = true,
+  mode,
   showTipButton = false,
+  isTipModeActive = false,
   showBackButton = false,
+  showTourButton = false,
+  isTourModeActive = false,
   showFooter = true,
   maxWidthClass = 'w-full max-w-md',
   showNotificationButton = false,
@@ -47,8 +56,12 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       contacts={contacts}
       subtitle={subtitle}
       showSocialBar={showSocialBar}
+      mode={mode}
       showTipButton={showTipButton}
+      isTipModeActive={isTipModeActive}
       showBackButton={showBackButton}
+      showTourButton={showTourButton}
+      isTourModeActive={isTourModeActive}
       showFooter={showFooter}
       showNotificationButton={showNotificationButton}
       maxWidthClass={maxWidthClass}

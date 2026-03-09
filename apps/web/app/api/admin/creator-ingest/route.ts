@@ -25,7 +25,7 @@ import {
   handleExistingUnclaimedProfile,
   type SocialPlatformContext,
 } from '@/lib/ingestion/flows/social-platform-flow';
-import { fetchSpotifyArtistName } from '@/lib/ingestion/flows/spotify-integration';
+import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   isValidHandle,
@@ -36,7 +36,7 @@ import {
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
-import { detectPlatform } from '@/lib/utils/platform-detection';
+import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import { creatorIngestSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
@@ -196,15 +196,34 @@ async function processSocialPlatformIngestion(
 
   const { handle, normalizedHandle } = handleResult;
   const platformId = detected.platform.id;
-  const spotifyArtistName = await fetchSpotifyArtistName(handle, platformId);
+  const spotifyData = await fetchSpotifyArtistData(handle, platformId);
+
+  // For Spotify artists, derive the username from the artist name
+  // instead of the opaque Spotify artist ID (e.g. "fisher" not "artist_5yMCA6...")
+  let effectiveHandle = handle;
+  let effectiveNormalizedHandle = normalizedHandle;
+  if (spotifyData?.name) {
+    const artistHandle = spotifyData.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replaceAll(/[\u0300-\u036f]/g, '')
+      .replaceAll(/[^a-z0-9_]/g, '')
+      .slice(0, 30);
+    const normalized = normalizeHandle(artistHandle);
+    if (isValidHandle(normalized)) {
+      effectiveHandle = artistHandle;
+      effectiveNormalizedHandle = normalized;
+    }
+  }
 
   const socialContext: SocialPlatformContext = {
-    handle,
-    normalizedHandle,
+    handle: effectiveHandle,
+    normalizedHandle: effectiveNormalizedHandle,
     platformId,
     platformName: detected.platform.name,
     normalizedUrl: detected.normalizedUrl,
-    spotifyArtistName,
+    spotifyArtistName: spotifyData?.name ?? null,
+    spotifyData,
   };
 
   return withSystemIngestionSession(async tx => {
@@ -215,12 +234,15 @@ async function processSocialPlatformIngestion(
         usernameNormalized: creatorProfiles.usernameNormalized,
       })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, normalizedHandle))
+      .where(eq(creatorProfiles.usernameNormalized, effectiveNormalizedHandle))
       .limit(1);
 
-    let finalHandle = normalizedHandle;
+    let finalHandle = effectiveNormalizedHandle;
     if (existing?.isClaimed) {
-      const altHandle = await findAvailableHandle(tx, normalizedHandle);
+      const altHandle = await findAvailableHandle(
+        tx,
+        effectiveNormalizedHandle
+      );
       if (!altHandle) {
         return NextResponse.json(
           {
@@ -254,33 +276,69 @@ async function processSocialPlatformIngestion(
  * - Claim token generated at creation time
  * - Error persistence for admin visibility
  */
-export async function POST(request: Request) {
-  try {
-    const entitlements = await getCurrentUserEntitlements();
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json(
+async function resolveAdminEntitlements(_route: string): Promise<
+  | {
+      ok: true;
+      entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>;
+    }
+  | { ok: false; response: NextResponse }
+> {
+  // getCurrentUserEntitlements degrades gracefully on billing failure.
+  // Admin status is fetched independently and preserved even when billing is down.
+  const entitlements = await getCurrentUserEntitlements();
+
+  if (!entitlements.isAuthenticated || !entitlements.userId) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
 
-    if (!entitlements.isAdmin) {
-      return NextResponse.json(
+  if (!entitlements.isAdmin) {
+    return {
+      ok: false,
+      response: NextResponse.json(
         { error: 'Forbidden' },
         { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
+      ),
+    };
+  }
 
-    // Defensive check - userId should be defined after auth guards
-    const adminUserId = entitlements.userId;
-    if (!adminUserId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  return { ok: true, entitlements };
+}
 
-    // Rate limiting - prevents excessive external API calls from rapid ingestion
+function handleIngestError(error: unknown): NextResponse {
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+  const isDuplicateKey =
+    errorMessage.includes('unique constraint') ||
+    errorMessage.includes('duplicate key');
+
+  if (isDuplicateKey) {
+    return NextResponse.json(
+      { error: 'A creator profile with that handle already exists' },
+      { status: 409, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return NextResponse.json(
+    { error: 'Failed to ingest profile', details: errorMessage },
+    { status: 500, headers: NO_STORE_HEADERS }
+  );
+}
+
+export async function POST(request: Request) {
+  try {
+    const authResult = await resolveAdminEntitlements(
+      '/api/admin/creator-ingest'
+    );
+    if (!authResult.ok) return authResult.response;
+
+    const adminUserId = authResult.entitlements.userId!;
+
     const rateLimitResult = await checkAdminCreatorIngestRateLimit(adminUserId);
     if (!rateLimitResult.success) {
       const retryAfter = Math.max(
@@ -307,11 +365,9 @@ export async function POST(request: Request) {
       route: 'POST /api/admin/creator-ingest',
       headers: NO_STORE_HEADERS,
     });
-    if (!parsedBody.ok) {
-      return parsedBody.response;
-    }
-    const body = parsedBody.data;
-    const parsed = creatorIngestSchema.safeParse(body);
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const parsed = creatorIngestSchema.safeParse(parsedBody.data);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.flatten() },
@@ -319,16 +375,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const inputUrl = parsed.data.url;
-
-    // Detect platform from URL
+    const inputUrl = normalizeUrl(parsed.data.url);
     const detected = detectPlatform(inputUrl);
-
-    // Check if this is a full-extraction platform (Linktree/Laylo)
     const { isLinktree, isLaylo, linktreeValidatedUrl } =
       detectFullExtractionPlatform(inputUrl);
 
-    // Route to appropriate handler
     if (isLinktree || isLaylo) {
       return processFullExtractionPlatform(
         inputUrl,
@@ -339,11 +390,8 @@ export async function POST(request: Request) {
 
     return processSocialPlatformIngestion(inputUrl, detected);
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Unknown error';
-
     logger.error('Admin ingestion failed', {
-      error: errorMessage,
+      error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
       raw: error,
       route: 'creator-ingest',
@@ -353,20 +401,6 @@ export async function POST(request: Request) {
       method: 'POST',
     });
 
-    // Check for unique constraint violation (race condition fallback)
-    if (
-      errorMessage.includes('unique constraint') ||
-      errorMessage.includes('duplicate key')
-    ) {
-      return NextResponse.json(
-        { error: 'A creator profile with that handle already exists' },
-        { status: 409, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to ingest profile', details: errorMessage },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
+    return handleIngestError(error);
   }
 }

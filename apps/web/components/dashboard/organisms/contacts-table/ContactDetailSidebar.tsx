@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Badge,
   Input,
   Label,
   Select,
@@ -12,10 +13,8 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
-import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import {
   CONTACT_ROLE_OPTIONS,
   CONTACT_TERRITORY_PRESETS,
@@ -25,7 +24,7 @@ import {
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { cn } from '@/lib/utils';
 import type { ContactChannel, ContactRole } from '@/types/contacts';
-import { ContactDetailHeader } from './ContactDetailHeader';
+import { useContactDetailHeaderParts } from './ContactDetailHeader';
 
 function getPreferredChannelLabel(
   channel: ContactChannel | null | undefined
@@ -70,7 +69,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   // Use a ref so the debounced timeout always calls the latest onSave,
   // avoiding stale closures when contact state updates between scheduling and firing.
   const onSaveRef = useRef(onSave);
-  onSaveRef.current = onSave;
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
   // Debounced save: coalesces rapid edits into a single save call
   const debouncedSave = useCallback(() => {
@@ -208,27 +209,23 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     [contact, onUpdate, debouncedSave]
   );
 
-  if (!contact) {
-    return (
-      <RightDrawer
-        isOpen={isOpen}
-        width={SIDEBAR_WIDTH}
-        ariaLabel='Contact details'
-      >
-        <div className='flex h-full items-center justify-center p-4'>
-          <p className='text-sm text-tertiary-token'>
-            Select a contact to view details
-          </p>
-        </div>
-      </RightDrawer>
-    );
-  }
+  const { title: headerTitle, actions: headerActions } =
+    useContactDetailHeaderParts({
+      role: contact?.role ?? 'other',
+      customLabel: contact?.customLabel,
+      email: contact?.email,
+      onDelete,
+      onClose: handleClose,
+    });
 
-  const roleLabel = getContactRoleLabel(contact.role, contact.customLabel);
-  const { summary: territorySummary } = summarizeTerritories(
-    contact.territories
-  );
-  const hasEmailAndPhone = Boolean(contact.email) && Boolean(contact.phone);
+  const hasContact = Boolean(contact);
+  const roleLabel = contact
+    ? getContactRoleLabel(contact.role, contact.customLabel)
+    : '';
+  const territorySummary = contact
+    ? summarizeTerritories(contact.territories).summary
+    : '';
+  const hasEmailAndPhone = Boolean(contact?.email) && Boolean(contact?.phone);
 
   const renderEditableField = (
     field: EditableField,
@@ -246,7 +243,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     if (isEditing) {
       return (
         <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-          <Label className='text-xs text-secondary-token'>{label}</Label>
+          <Label className='text-[13px] text-secondary-token'>{label}</Label>
           <Input
             ref={inputRef}
             value={editValue}
@@ -254,7 +251,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             onBlur={saveField}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className='h-8 text-xs'
+            className='h-8 text-[13px]'
           />
         </div>
       );
@@ -266,8 +263,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
         onClick={() => startEditing(field)}
         className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8 w-full text-left rounded-md -mx-2 px-2 hover:bg-surface-2 transition-colors cursor-pointer'
       >
-        <span className='text-xs text-secondary-token'>{label}</span>
-        <span className='text-xs text-primary-token hover:text-primary-token transition-colors truncate'>
+        <span className='text-[13px] text-secondary-token'>{label}</span>
+        <span className='text-[13px] text-primary-token hover:text-primary-token transition-colors truncate'>
           {displayValue}
         </span>
       </button>
@@ -275,135 +272,140 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   };
 
   return (
-    <RightDrawer
+    <EntitySidebarShell
       isOpen={isOpen}
-      width={SIDEBAR_WIDTH}
       ariaLabel='Contact details'
+      title={headerTitle}
+      onClose={handleClose}
+      headerActions={headerActions}
+      isEmpty={!hasContact}
+      emptyMessage='Select a contact to view details'
     >
-      <ContactDetailHeader
-        role={contact.role}
-        customLabel={contact.customLabel}
-        email={contact.email}
-        onClose={handleClose}
-        onDelete={onDelete}
-      />
-
-      <div className='flex-1 overflow-auto px-3 py-3 space-y-5'>
-        {/* Role Section */}
-        <DrawerSection title='Role'>
-          <div className='space-y-2'>
-            <Label className='text-xs text-secondary-token'>Contact type</Label>
-            <Select value={contact.role} onValueChange={handleRoleChange}>
-              <SelectTrigger className='h-9 text-xs rounded-lg border border-subtle bg-surface-1 px-3'>
-                <SelectValue>{roleLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent className='rounded-lg border border-subtle bg-surface-1 shadow-lg p-1'>
-                {CONTACT_ROLE_OPTIONS.map(option => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className='rounded-md px-2.5 py-2 text-sm font-medium text-secondary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token'
-                  >
-                    <div className='flex items-center gap-2'>
-                      <Icon
-                        name={option.iconName}
-                        className='h-4 w-4 text-tertiary-token'
-                      />
-                      <span>{option.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </DrawerSection>
-
-        {/* Contact Info Section */}
-        <DrawerSection title='Contact Info'>
-          <div className='space-y-3'>
-            {renderEditableField(
-              'personName',
-              'Name',
-              contact.personName,
-              'Contact name'
-            )}
-            {renderEditableField(
-              'companyName',
-              'Company',
-              contact.companyName,
-              'Company name'
-            )}
-            {renderEditableField('email', 'Email', contact.email, 'Email')}
-            {renderEditableField('phone', 'Phone', contact.phone, 'Phone')}
-          </div>
-        </DrawerSection>
-
-        {/* Preferred Channel */}
-        {hasEmailAndPhone && (
-          <DrawerSection title='Preferred Contact'>
+      {contact && (
+        <>
+          {/* Role Section */}
+          <DrawerSection title='Role'>
             <div className='space-y-2'>
-              <Label className='text-xs text-secondary-token'>
-                Default action
+              <Label className='text-[13px] text-secondary-token'>
+                Contact type
               </Label>
-              <Select
-                value={contact.preferredChannel || ''}
-                onValueChange={handlePreferredChannelChange}
-              >
-                <SelectTrigger className='h-9 text-xs'>
-                  <SelectValue placeholder='Select preferred channel'>
-                    {getPreferredChannelLabel(contact.preferredChannel)}
-                  </SelectValue>
+              <Select value={contact.role} onValueChange={handleRoleChange}>
+                <SelectTrigger className='h-9 text-[13px] rounded-lg border border-subtle bg-surface-1 px-3'>
+                  <SelectValue>{roleLabel}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='email'>Email</SelectItem>
-                  <SelectItem value='phone'>Phone</SelectItem>
+                <SelectContent className='p-1'>
+                  {CONTACT_ROLE_OPTIONS.map(option => (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token'
+                    >
+                      <div className='flex items-center gap-2'>
+                        <Icon
+                          name={option.iconName}
+                          className='h-4 w-4 text-tertiary-token'
+                        />
+                        <span>{option.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </DrawerSection>
-        )}
 
-        {/* Territories Section */}
-        <DrawerSection title='Territories'>
-          <div className='space-y-3'>
-            <DrawerPropertyRow label='Coverage' value={territorySummary} />
-            <div className='flex flex-wrap gap-1.5'>
-              {CONTACT_TERRITORY_PRESETS.map(territory => {
-                const isSelected = contact.territories.includes(territory);
-                return (
-                  <button
-                    key={territory}
-                    type='button'
-                    onClick={() => handleTerritoryToggle(territory)}
-                    className={cn(
-                      'px-2 py-1 text-xs rounded-md border transition-colors',
-                      isSelected
-                        ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-surface-2 text-secondary-token border-subtle hover:bg-surface-3'
-                    )}
-                  >
-                    {territory}
-                  </button>
-                );
-              })}
+          {/* Contact Info Section */}
+          <DrawerSection title='Contact Info'>
+            <div className='space-y-3'>
+              {renderEditableField(
+                'personName',
+                'Name',
+                contact.personName,
+                'Contact name'
+              )}
+              {renderEditableField(
+                'companyName',
+                'Company',
+                contact.companyName,
+                'Company name'
+              )}
+              {renderEditableField('email', 'Email', contact.email, 'Email')}
+              {renderEditableField('phone', 'Phone', contact.phone, 'Phone')}
             </div>
-          </div>
-        </DrawerSection>
+          </DrawerSection>
 
-        {/* Error display */}
-        {contact.error && (
-          <div className='rounded-md border border-error/30 bg-error-subtle p-3'>
-            <p className='text-xs text-destructive'>{contact.error}</p>
-          </div>
-        )}
+          {/* Preferred Channel */}
+          {hasEmailAndPhone && (
+            <DrawerSection title='Preferred Contact'>
+              <div className='space-y-2'>
+                <Label className='text-[13px] text-secondary-token'>
+                  Default action
+                </Label>
+                <Select
+                  value={contact.preferredChannel || ''}
+                  onValueChange={handlePreferredChannelChange}
+                >
+                  <SelectTrigger className='h-9 text-[13px]'>
+                    <SelectValue placeholder='Select preferred channel'>
+                      {getPreferredChannelLabel(contact.preferredChannel)}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='email'>Email</SelectItem>
+                    <SelectItem value='phone'>Phone</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </DrawerSection>
+          )}
 
-        {/* Saving indicator */}
-        {contact.isSaving && (
-          <div className='text-xs text-tertiary-token text-center'>
-            Saving...
-          </div>
-        )}
-      </div>
-    </RightDrawer>
+          {/* Territories Section */}
+          <DrawerSection title='Territories'>
+            <div className='space-y-3'>
+              <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
+                <span className='text-[13px] text-secondary-token'>
+                  Coverage
+                </span>
+                <Badge size='sm'>{territorySummary}</Badge>
+              </div>
+              <div className='flex flex-wrap gap-1.5'>
+                {CONTACT_TERRITORY_PRESETS.map(territory => {
+                  const isSelected = contact.territories.includes(territory);
+                  return (
+                    <button
+                      key={territory}
+                      type='button'
+                      onClick={() => handleTerritoryToggle(territory)}
+                      className={cn(
+                        'px-2 py-1 text-[13px] rounded-md border transition-colors',
+                        isSelected
+                          ? 'bg-primary text-primary-foreground border-primary'
+                          : 'bg-surface-2 text-secondary-token border-subtle hover:bg-surface-3'
+                      )}
+                    >
+                      {territory}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </DrawerSection>
+
+          {/* Error display */}
+          {contact.error && (
+            <div className='rounded-md border border-error/30 bg-error-subtle p-3'>
+              <p className='text-[13px] text-destructive'>{contact.error}</p>
+            </div>
+          )}
+
+          {/* Saving indicator */}
+          {contact.isSaving && (
+            <div className='text-[13px] text-tertiary-token text-center'>
+              Saving...
+            </div>
+          )}
+        </>
+      )}
+    </EntitySidebarShell>
   );
 });

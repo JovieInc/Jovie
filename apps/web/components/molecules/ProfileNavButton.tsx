@@ -15,6 +15,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +46,7 @@ export function ProfileNavButton({
 }: ProfileNavButtonProps) {
   const [open, setOpen] = React.useState<boolean>(false);
   const { isSignedIn } = useAuthSafe();
+  const isMdUp = useBreakpoint('md');
 
   const profileUrl = `${BASE_URL}/${artistHandle}`;
 
@@ -90,21 +92,19 @@ export function ProfileNavButton({
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuItem
-            onSelect={() => {
-              try {
-                const isMdUp =
-                  globalThis.matchMedia('(min-width: 768px)').matches;
-                if (isMdUp) {
+          {isMdUp && (
+            <DropdownMenuItem
+              onSelect={() => {
+                try {
                   globalThis.dispatchEvent(
                     new CustomEvent('jovie:open-profile-qr')
                   );
-                }
-              } catch {}
-            }}
-          >
-            View on mobile
-          </DropdownMenuItem>
+                } catch {}
+              }}
+            >
+              View on mobile
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuItem
             onSelect={() => {
@@ -118,7 +118,7 @@ export function ProfileNavButton({
 
           {hideBranding ? null : (
             <DropdownMenuItem asChild>
-              <Link href='/signup'>Claim your profile</Link>
+              <Link href={APP_ROUTES.SIGNUP}>Claim your profile</Link>
             </DropdownMenuItem>
           )}
 
@@ -127,7 +127,7 @@ export function ProfileNavButton({
             <DropdownMenuSubContent sideOffset={8}>
               <DropdownMenuItem asChild>
                 <Link
-                  href='/legal/privacy'
+                  href={APP_ROUTES.LEGAL_PRIVACY}
                   target='_blank'
                   rel='noopener noreferrer'
                 >
@@ -136,7 +136,7 @@ export function ProfileNavButton({
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link
-                  href='/legal/terms'
+                  href={APP_ROUTES.LEGAL_TERMS}
                   target='_blank'
                   rel='noopener noreferrer'
                 >

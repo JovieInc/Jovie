@@ -1,8 +1,10 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
 import type { Artist } from '@/types/db';
@@ -18,45 +20,32 @@ export function SettingsBrandingSection({
   onArtistUpdate,
   isPro = true,
 }: SettingsBrandingSectionProps) {
-  const [hideBranding, setHideBranding] = useState(
-    artist.settings?.hide_branding ?? false
-  );
+  const { updateBrandingAsync } = useBrandingSettingsMutation();
 
-  const { updateBrandingAsync, isPending } = useBrandingSettingsMutation();
-
-  const handleBrandingToggle = async (enabled: boolean) => {
-    // Save previous value for rollback on error
-    const previousValue = hideBranding;
-    const previousArtistSettings = artist.settings?.hide_branding;
-
-    // Optimistic update
-    setHideBranding(enabled);
-    if (onArtistUpdate) {
-      onArtistUpdate({
+  const handleOptimisticUpdate = useCallback(
+    (enabled: boolean) => {
+      onArtistUpdate?.({
         ...artist,
         settings: {
           ...artist.settings,
           hide_branding: enabled,
         },
       });
-    }
+    },
+    [artist, onArtistUpdate]
+  );
 
-    try {
-      await updateBrandingAsync(enabled);
-    } catch {
-      // Rollback on error - the hook already shows an error toast
-      setHideBranding(previousValue);
-      if (onArtistUpdate) {
-        onArtistUpdate({
-          ...artist,
-          settings: {
-            ...artist.settings,
-            hide_branding: previousArtistSettings,
-          },
-        });
-      }
-    }
-  };
+  const {
+    checked: hideBranding,
+    handleToggle,
+    isPending,
+    saveStatus,
+  } = useOptimisticToggle({
+    initialValue: artist.settings?.hide_branding ?? false,
+    mutateAsync: updateBrandingAsync,
+    onOptimisticUpdate: handleOptimisticUpdate,
+    errorMessage: 'Failed to update branding settings.',
+  });
 
   return (
     <DashboardCard
@@ -64,12 +53,13 @@ export function SettingsBrandingSection({
       padding='none'
       className='divide-y divide-subtle'
     >
+      <SettingsStatusPill status={saveStatus} className='px-4 pt-3' />
       <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Hide Jovie Branding'
           description='Remove Jovie branding from your profile page for a fully custom experience.'
           checked={hideBranding}
-          onCheckedChange={handleBrandingToggle}
+          onCheckedChange={handleToggle}
           disabled={isPending}
           ariaLabel='Hide Jovie branding'
           gated={!isPro}
@@ -79,7 +69,7 @@ export function SettingsBrandingSection({
       {isPro && hideBranding && (
         <div className='px-4 py-3 flex items-center gap-3'>
           <Sparkles className='h-4 w-4 text-emerald-500 shrink-0' />
-          <p className='text-sm text-emerald-600 dark:text-emerald-400'>
+          <p className='text-[13px] text-emerald-600 dark:text-emerald-400'>
             Branding is hidden on your profile.
           </p>
         </div>

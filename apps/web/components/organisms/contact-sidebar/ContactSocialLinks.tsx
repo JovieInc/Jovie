@@ -57,7 +57,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
       className='p-3'
     >
       {contact.socialLinks.length > 0 && (
-        <div className='divide-y divide-subtle/50'>
+        <div className='space-y-0.5'>
           {contact.socialLinks.map((link: SocialLink, index: number) => {
             const username =
               extractUsernameFromUrl(link.url) ??
@@ -75,6 +75,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
                 icon={<SocialIcon platform={platformId} className='h-4 w-4' />}
                 label={displayUsername || platformId}
                 url={link.url}
+                deepLinkPlatform={platformId}
                 isEditable
                 isRemoving={removingLinkIndex === index}
                 onRemove={() => onRemoveLink(index)}

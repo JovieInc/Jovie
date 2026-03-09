@@ -20,6 +20,7 @@ import {
 import { Loader2, RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import {
   DrawerLinkSection,
@@ -77,6 +78,13 @@ const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   boomplay: null,
   iheartradio: null,
   tiktok: null,
+};
+
+// Maps ProviderKey to SocialIcon platform name for providers without a DspProviderId
+const PROVIDER_TO_SOCIAL_ICON: Partial<Record<ProviderKey, string>> = {
+  bandcamp: 'bandcamp',
+  beatport: 'beatport',
+  tiktok: 'tiktok',
 };
 
 const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
@@ -166,9 +174,10 @@ export function ReleaseDspLinks({
   }, [isRescanDisabled, onRescanIsrc]);
 
   // Get list of providers that don't have links yet (for the add dropdown)
-  const availableProviders = Object.entries(providerConfig).filter(
-    ([key]) => !release.providers.some(p => p.key === key)
-  ) as [ProviderKey, { label: string; accent: string }][];
+  const providerKeys = Object.keys(providerConfig) as ProviderKey[];
+  const availableProviders = providerKeys
+    .filter(key => !release.providers.some(p => p.key === key))
+    .map(key => [key, providerConfig[key]] as const);
 
   let rescanTooltip = 'Scan ISRC for links';
   if (isRescanningIsrc) {
@@ -199,33 +208,45 @@ export function ReleaseDspLinks({
 
   return (
     <DrawerLinkSection
-      title='DSP Links'
+      title='Links'
       onAdd={
         isEditable && availableProviders.length > 0
           ? () => onSetIsAddingLink(true)
           : undefined
       }
-      addLabel='Add DSP link'
+      addLabel='Add platform link'
       headerActions={rescanButton}
       isEmpty={release.providers.length === 0 && !isAddingLink}
-      emptyMessage='No DSP links yet.'
+      emptyMessage='No platform links yet.'
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='divide-y divide-subtle/50'>
+        <div className='space-y-0.5'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const dspId = PROVIDER_TO_DSP[provider.key];
             const isManual = provider.source === 'manual';
 
-            const icon = dspId ? (
-              <DspProviderIcon provider={dspId} size='sm' />
-            ) : (
-              <span
-                className='h-4 w-4 rounded-full shrink-0'
-                style={{ backgroundColor: config?.accent }}
-              />
-            );
+            const socialIconPlatform = PROVIDER_TO_SOCIAL_ICON[provider.key];
+            let icon: React.ReactNode;
+            if (dspId) {
+              icon = <DspProviderIcon provider={dspId} size='sm' />;
+            } else if (socialIconPlatform) {
+              icon = (
+                <SocialIcon
+                  platform={socialIconPlatform}
+                  className='h-4 w-4'
+                  aria-label={config?.label || provider.key}
+                />
+              );
+            } else {
+              icon = (
+                <span
+                  className='h-4 w-4 rounded-full shrink-0'
+                  style={{ backgroundColor: config?.accent }}
+                />
+              );
+            }
 
             return (
               <SidebarLinkRow
@@ -233,6 +254,7 @@ export function ReleaseDspLinks({
                 icon={icon}
                 label={config?.label || provider.key}
                 url={provider.url}
+                deepLinkPlatform={provider.key}
                 badge={isManual ? 'Custom' : undefined}
                 isEditable={isEditable}
                 isRemoving={isRemovingDspLink === provider.key}
@@ -253,34 +275,58 @@ export function ReleaseDspLinks({
           ].join(' ')}
         >
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-xs text-tertiary-token'>Provider</Label>
+            <Label className='text-[11px] text-tertiary-token'>Provider</Label>
             <Select
               value={selectedProvider ?? ''}
-              onValueChange={(value: string) =>
-                onSetSelectedProvider(value as ProviderKey)
-              }
+              onValueChange={(value: string) => {
+                if (value in providerConfig) {
+                  onSetSelectedProvider(value as ProviderKey);
+                }
+              }}
             >
               <SelectTrigger className='w-full'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
-                {availableProviders.map(([key, config]) => (
-                  <SelectItem key={key} value={key}>
-                    <div className='flex items-center gap-2'>
+                {availableProviders.map(([key, config]) => {
+                  const dspId = PROVIDER_TO_DSP[key];
+                  const socialIcon = PROVIDER_TO_SOCIAL_ICON[key];
+                  let optionIcon: React.ReactNode;
+
+                  if (dspId) {
+                    optionIcon = <DspProviderIcon provider={dspId} size='sm' />;
+                  } else if (socialIcon) {
+                    optionIcon = (
+                      <SocialIcon
+                        platform={socialIcon}
+                        className='h-4 w-4'
+                        aria-hidden
+                      />
+                    );
+                  } else {
+                    optionIcon = (
                       <span
                         className='h-2 w-2 rounded-full'
                         style={{ backgroundColor: config.accent }}
                         aria-hidden='true'
                       />
-                      {config.label}
-                    </div>
-                  </SelectItem>
-                ))}
+                    );
+                  }
+
+                  return (
+                    <SelectItem key={key} value={key}>
+                      <div className='flex items-center gap-2'>
+                        {optionIcon}
+                        {config.label}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-xs text-tertiary-token'>URL</Label>
+            <Label className='text-[11px] text-tertiary-token'>URL</Label>
             <Input
               type='url'
               value={newLinkUrl}

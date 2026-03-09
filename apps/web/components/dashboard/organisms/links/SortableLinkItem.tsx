@@ -18,7 +18,7 @@ import {
 import { compactUrlDisplay } from './utils';
 
 const SWIPE_ACTION_CLASS =
-  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-medium transition-colors active:opacity-80';
+  'flex h-full flex-col items-center justify-center gap-1 px-4 text-white text-xs font-[510] transition-colors active:opacity-80';
 
 /**
  * Determine the pill state based on visibility and validity.
@@ -36,11 +36,18 @@ function getPillState(
  * Determine the badge text based on visibility, state, and recency.
  */
 function getBadgeText(
+  link: DetectedLink,
   visible: boolean,
   pillState: LinkPillState,
   isLastAdded: boolean
 ): string | undefined {
   if (!visible) return 'Hidden';
+  const verificationStatus = (
+    link as unknown as { verificationStatus?: string | null }
+  ).verificationStatus;
+  if (link.platform.id === 'website' && verificationStatus === 'verified') {
+    return 'Verified';
+  }
   if (pillState === 'error') return 'Needs fix';
   if (isLastAdded) return 'New';
   return undefined;
@@ -132,7 +139,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
   const secondaryText = identity.startsWith('@') ? identity : undefined;
 
   const pillState = getPillState(visible, link.isValid);
-  const badgeText = getBadgeText(visible, pillState, isLastAdded);
+  const badgeText = getBadgeText(link, visible, pillState, isLastAdded);
 
   const menuItems: LinkPillMenuItem[] = [
     {

@@ -10,10 +10,8 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
-import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
-import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
+import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
 class AdminUnauthorizedError extends Error {
   constructor(message: string = 'Unauthorized') {
@@ -24,7 +22,6 @@ class AdminUnauthorizedError extends Error {
 
 function isAllowedAvatarHost(hostname: string): boolean {
   const allowedHosts = [
-    'res.cloudinary.com',
     'images.clerk.dev',
     'img.clerk.com',
     'images.unsplash.com',
@@ -90,7 +87,28 @@ export async function toggleCreatorVerifiedAction(
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.id, profileId))
-    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+    .returning({
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      displayName: creatorProfiles.displayName,
+      userId: creatorProfiles.userId,
+    });
+
+  if (isVerified && updatedProfile?.userId) {
+    const [creatorUser] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, updatedProfile.userId))
+      .limit(1);
+
+    if (creatorUser?.email) {
+      const firstName =
+        updatedProfile.displayName?.trim().split(' ')[0] ?? 'Hey there';
+      await sendVerificationApprovedEmail({
+        to: creatorUser.email,
+        firstName,
+      });
+    }
+  }
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath(APP_ROUTES.ADMIN);
@@ -124,39 +142,41 @@ export async function bulkRerunCreatorIngestionAction(
     throw new TypeError('Too many profileIds');
   }
 
-  const queuedCount = await withSystemIngestionSession(async tx => {
-    const profiles = await tx
-      .select({
-        id: creatorProfiles.id,
-        username: creatorProfiles.username,
-        usernameNormalized: creatorProfiles.usernameNormalized,
-      })
-      .from(creatorProfiles)
-      .where(inArray(creatorProfiles.id, profileIds));
+  const profiles = await db
+    .select({
+      id: creatorProfiles.id,
+      spotifyId: creatorProfiles.spotifyId,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+    })
+    .from(creatorProfiles)
+    .where(inArray(creatorProfiles.id, profileIds));
 
-    if (profiles.length === 0) {
-      return 0;
-    }
+  const BATCH_SIZE = 25;
+  let queuedCount = 0;
 
+  for (let index = 0; index < profiles.length; index += BATCH_SIZE) {
+    const batch = profiles.slice(index, index + BATCH_SIZE);
     const jobIds = await Promise.all(
-      profiles.map(async profile => {
-        const handle = profile.usernameNormalized ?? profile.username;
-        const sourceUrl = normalizeUrl(`https://linktr.ee/${handle}`);
+      batch.map(async profile => {
+        const spotifyUrl = profile.spotifyUrl?.trim()
+          ? profile.spotifyUrl
+          : profile.spotifyId
+            ? `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`
+            : null;
 
-        return enqueueLinktreeIngestionJob({
+        if (!spotifyUrl) {
+          return null;
+        }
+
+        return enqueueMusicFetchEnrichmentJob({
           creatorProfileId: profile.id,
-          sourceUrl,
+          spotifyUrl,
         });
       })
     );
 
-    await IngestionStatusManager.markPendingBulk(
-      tx,
-      profiles.map(p => p.id)
-    );
-
-    return jobIds.filter(Boolean).length;
-  });
+    queuedCount += jobIds.filter(Boolean).length;
+  }
 
   revalidatePath(APP_ROUTES.ADMIN);
   revalidatePath(APP_ROUTES.ADMIN_CREATORS);

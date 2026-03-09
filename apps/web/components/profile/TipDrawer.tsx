@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Drawer } from 'vaul';
 import { TipSelector } from '@/components/molecules/TipSelector';
 import { track } from '@/lib/analytics';
@@ -38,8 +39,6 @@ export function TipDrawer({
   venmoUsername,
   amounts = [3, 5, 7],
 }: TipDrawerProps) {
-  const historyPushedRef = useRef(false);
-
   useEffect(() => {
     if (!open) return;
 
@@ -47,28 +46,18 @@ export function TipDrawer({
       handle: artistHandle,
     });
 
-    if (!historyPushedRef.current) {
-      globalThis.history.pushState({ tipDrawer: true }, '');
-      historyPushedRef.current = true;
+    // Fire tip_page_view pixel event for retargeting
+    // @ts-expect-error - joviePixel is set by JoviePixel component
+    if (globalThis.joviePixel?.track) {
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      globalThis.joviePixel.track('tip_page_view');
     }
 
-    const handlePopState = () => {
-      if (historyPushedRef.current) {
-        historyPushedRef.current = false;
-        onOpenChange(false);
-      }
-    };
-
-    globalThis.addEventListener('popstate', handlePopState);
-    return () => globalThis.removeEventListener('popstate', handlePopState);
-  }, [open, artistHandle, onOpenChange]);
+    return undefined;
+  }, [open, artistHandle]);
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
-      if (!isOpen && historyPushedRef.current) {
-        historyPushedRef.current = false;
-        globalThis.history.back();
-      }
       onOpenChange(isOpen);
     },
     [onOpenChange]
@@ -76,16 +65,44 @@ export function TipDrawer({
 
   const handleAmountSelected = useCallback(
     (amount: number) => {
-      if (!isAllowedVenmoUrl(venmoLink)) return;
+      if (!isAllowedVenmoUrl(venmoLink)) {
+        track('tip_handoff_failed', {
+          reason: 'invalid_venmo_url',
+          handle: artistHandle,
+          venmoLink,
+        });
+        toast.error('Unable to open Venmo. The payment link is not valid.');
+        return;
+      }
 
       const sep = venmoLink.includes('?') ? '&' : '?';
       const url = `${venmoLink}${sep}utm_amount=${amount}&utm_username=${encodeURIComponent(
         venmoUsername ?? ''
       )}`;
 
-      globalThis.open(url, '_blank', 'noopener,noreferrer');
+      // Fire tip_intent pixel event for retargeting
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      if (globalThis.joviePixel?.track) {
+        // @ts-expect-error - joviePixel is set by JoviePixel component
+        globalThis.joviePixel.track('tip_intent', {
+          tipAmount: amount,
+          tipMethod: 'venmo',
+        });
+      }
+
+      const win = globalThis.open(url, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        track('tip_handoff_failed', {
+          reason: 'popup_blocked',
+          handle: artistHandle,
+          amount,
+        });
+        toast.error(
+          'Venmo could not be opened. Please allow pop-ups and try again.'
+        );
+      }
     },
-    [venmoLink, venmoUsername]
+    [venmoLink, venmoUsername, artistHandle]
   );
 
   return (

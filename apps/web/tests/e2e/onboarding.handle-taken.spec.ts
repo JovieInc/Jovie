@@ -24,6 +24,15 @@ test.describe('Onboarding Handle Taken Prevention', () => {
   const runWithRealAPI = process.env.E2E_ONBOARDING_HANDLE_TAKEN === '1';
 
   test.beforeEach(async ({ page }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     if (runWithRealAPI) {
       // Validate required environment variables when using real API
       const requiredEnvVars = {
@@ -100,8 +109,8 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       // Wait for Clerk to be ready
       await page.waitForFunction(
         () => {
-          // @ts-ignore
-          return window.Clerk && window.Clerk.isReady();
+          // @ts-ignore – Clerk v5 uses `loaded` (boolean getter) instead of `isReady()`
+          return window.Clerk && window.Clerk.loaded;
         },
         { timeout: 10_000 }
       );
@@ -110,16 +119,11 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
     }
 
-    const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Enter your desired handle'
-    );
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // Enter a known taken handle from seed data
     await handleInput.fill('musicmaker');
-
-    // Wait for handle availability check to complete
-    await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     // Verify error message is displayed
     await expect(page.locator('text="Handle already taken"')).toBeVisible({
@@ -138,7 +142,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Now try with a different taken handle to ensure consistency
     await handleInput.fill('existinguser');
-    await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     // Verify error message is still displayed
     await expect(page.locator('text="Handle already taken"')).toBeVisible({
@@ -156,14 +159,11 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     test.setTimeout(30_000);
 
     // Get the handle input field
-    const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Enter your desired handle'
-    );
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // First enter a taken handle
     await handleInput.fill('musicmaker');
-    await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     // Verify submit button is disabled
     const submitButton = runWithRealAPI
@@ -174,9 +174,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     // Now switch to an available handle
     const uniqueHandle = `e2e-${Date.now().toString(36)}`;
     await handleInput.fill(uniqueHandle);
-
-    // Wait for handle availability check to complete
-    await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     if (runWithRealAPI) {
       // Verify green checkmark is visible
@@ -205,9 +202,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     test.setTimeout(30_000);
 
     // Get the handle input field
-    const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Enter your desired handle'
-    );
+    const handleInput = page.getByRole('textbox', { name: /handle/i });
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // Simulate rapid typing sequence: available -> taken -> available
@@ -229,7 +224,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     }
 
     // Wait for debouncing to complete
-    await page.waitForTimeout(runWithRealAPI ? 800 : 900);
 
     // Final state should match the last typed value (available)
     const lastHandle = typingSequence[typingSequence.length - 1];

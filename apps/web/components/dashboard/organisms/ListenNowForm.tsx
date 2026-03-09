@@ -161,7 +161,9 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       {success && (
         <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
-          <p className='text-sm text-success'>Links updated successfully!</p>
+          <p className='text-[13px] text-success'>
+            Links updated successfully!
+          </p>
         </div>
       )}
     </form>

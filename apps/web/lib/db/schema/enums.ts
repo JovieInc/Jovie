@@ -194,6 +194,18 @@ export const socialSuggestionStatusEnum = pgEnum('social_suggestion_status', [
   'expired',
 ]);
 
+export const outreachStatusEnum = pgEnum('outreach_status', [
+  'pending',
+  'dm_generated',
+  'dm_sent',
+  'responded',
+]);
+
+export const outreachChannelEnum = pgEnum('outreach_channel', [
+  'instagram',
+  'twitter',
+]);
+
 // Audience & Analytics Enums
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',
@@ -289,6 +301,8 @@ export const pixelEventTypeEnum = pgEnum('pixel_event_type', [
   'link_click',
   'form_submit',
   'scroll_depth',
+  'tip_page_view',
+  'tip_intent',
 ]);
 
 export const pixelForwardStatusEnum = pgEnum('pixel_forward_status', [
@@ -366,6 +380,46 @@ export const insightRunStatusEnum = pgEnum('insight_run_status', [
   'processing',
   'completed',
   'failed',
+]);
+
+// Lead Pipeline Enums
+export const leadStatusEnum = pgEnum('lead_status', [
+  'discovered',
+  'qualified',
+  'disqualified',
+  'approved',
+  'ingested',
+  'rejected',
+]);
+
+export const leadDiscoverySourceEnum = pgEnum('lead_discovery_source', [
+  'google_cse',
+  'manual',
+]);
+
+export const leadOutreachRouteEnum = pgEnum('lead_outreach_route', [
+  'email',
+  'dm',
+  'both',
+  'manual_review',
+  'skipped',
+]);
+
+export const leadOutreachStatusEnum = pgEnum('lead_outreach_status', [
+  'pending',
+  'queued',
+  'sent',
+  'failed',
+  'dm_sent',
+  'dismissed',
+]);
+
+// Tip Status Enum
+export const tipStatusEnum = pgEnum('tip_status', [
+  'pending',
+  'completed',
+  'failed',
+  'refunded',
 ]);
 
 // Referral Program Enums

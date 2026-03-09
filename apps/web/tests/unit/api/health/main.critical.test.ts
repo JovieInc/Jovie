@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockHealthLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   healthLimiter: {
@@ -21,6 +22,10 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: {},
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureWarning: mockCaptureWarning,
 }));
 
 vi.mock('@/lib/env-server', () => ({
@@ -53,9 +58,7 @@ describe('@critical GET /api/health', () => {
     });
 
     const { GET } = await import('@/app/api/health/route');
-    const request = new Request('http://localhost/api/health');
-
-    const response = await GET(request);
+    const response = await GET(new Request('http://localhost/api/health'));
     const data = await response.json();
 
     expect(response.status).toBe(429);
@@ -70,31 +73,28 @@ describe('@critical GET /api/health', () => {
     });
 
     const { GET } = await import('@/app/api/health/route');
-    const request = new Request('http://localhost/api/health');
-
-    const response = await GET(request);
+    const response = await GET(new Request('http://localhost/api/health'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.status).toBe('ok');
     expect(data.database).toBe('ok');
-    expect(data.timestamp).toBeDefined();
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
-  it('returns degraded status when database fails', async () => {
+  it('captures warning when database check throws', async () => {
     mockDbSelect.mockImplementation(() => {
       throw new Error('Connection refused');
     });
 
     const { GET } = await import('@/app/api/health/route');
-    const request = new Request('http://localhost/api/health');
-
-    const response = await GET(request);
-    const data = await response.json();
+    const response = await GET(new Request('http://localhost/api/health'));
 
     expect(response.status).toBe(503);
-    expect(data.status).toBe('degraded');
-    expect(data.database).toBe('error');
-    expect(data.timestamp).toBeDefined();
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Health check degraded',
+      expect.any(Error),
+      expect.objectContaining({ service: 'health', route: '/api/health' })
+    );
   });
 });

@@ -36,15 +36,21 @@ export const publicEnv = {
   get NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY() {
     return process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || undefined;
   },
-  get NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME() {
-    return process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || undefined;
-  },
   // Feature flags
   get NEXT_PUBLIC_FEATURE_TIPS() {
     return process.env.NEXT_PUBLIC_FEATURE_TIPS || undefined;
   },
   get NEXT_PUBLIC_SHOW_OPERATOR_BANNER() {
     return process.env.NEXT_PUBLIC_SHOW_OPERATOR_BANNER || undefined;
+  },
+  get NEXT_PUBLIC_FEATURE_VOICE_INPUT() {
+    return process.env.NEXT_PUBLIC_FEATURE_VOICE_INPUT || undefined;
+  },
+  get NEXT_PUBLIC_FEATURE_GROWTH_PLAN() {
+    return process.env.NEXT_PUBLIC_FEATURE_GROWTH_PLAN || undefined;
+  },
+  get NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION() {
+    return process.env.NEXT_PUBLIC_FEATURE_SEE_IT_IN_ACTION || undefined;
   },
   // SEO verification
   get NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION() {
@@ -62,6 +68,9 @@ export const publicEnv = {
   // Sentry client-side
   get NEXT_PUBLIC_SENTRY_DSN() {
     return process.env.NEXT_PUBLIC_SENTRY_DSN || undefined;
+  },
+  get NEXT_PUBLIC_SENTRY_DSN_DEV() {
+    return process.env.NEXT_PUBLIC_SENTRY_DSN_DEV || undefined;
   },
   get NEXT_PUBLIC_SENTRY_CSP_REPORT_URI() {
     return process.env.NEXT_PUBLIC_SENTRY_CSP_REPORT_URI || undefined;

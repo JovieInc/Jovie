@@ -1,8 +1,10 @@
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { AudiencePanelProvider } from '@/components/dashboard/organisms/AudiencePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AudienceMember } from '@/types';
 
 /**
@@ -77,6 +79,10 @@ vi.mock('@/components/dashboard/organisms/audience-member-sidebar', () => ({
   AudienceMemberSidebar: () => null,
 }));
 
+vi.mock('@/components/dashboard/organisms/AnalyticsSidebar', () => ({
+  AnalyticsSidebar: () => null,
+}));
+
 vi.mock(
   '@/components/dashboard/audience/table/atoms/AudienceMobileCard',
   () => ({ AudienceMobileCard: () => null })
@@ -88,8 +94,8 @@ vi.mock('@/components/organisms/EmptyState', () => ({
   ),
 }));
 
-vi.mock('@/hooks/useRegisterTablePanel', () => ({
-  useRegisterTablePanel: vi.fn(),
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
 }));
 
 vi.mock(
@@ -105,7 +111,6 @@ vi.mock('@/components/organisms/table', () => ({
     capturedTableData = data ?? [];
     return <table data-testid='unified-table' />;
   },
-  TablePaginationFooter: () => null,
   convertToCommonDropdownItems: vi.fn(() => []),
   ExportCSVButton: () => null,
   useRowSelection: () => ({
@@ -136,11 +141,18 @@ function renderWithProviders(
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>
 ) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(ui, {
     wrapper: ({ children }) => (
-      <TooltipProvider>
-        <TablePanelProvider>{children}</TablePanelProvider>
-      </TooltipProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <RightPanelProvider>
+            <AudiencePanelProvider>{children}</AudiencePanelProvider>
+          </RightPanelProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
     ),
     ...options,
   });
@@ -164,6 +176,8 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
     phone: i % 3 === 1 ? `+1555000${String(i).padStart(4, '0')}` : null,
     spotifyConnected: i % 5 === 0,
     purchaseCount: Math.floor(Math.random() * 10),
+    tipAmountTotalCents: Math.floor(Math.random() * 5000),
+    tipCount: Math.floor(Math.random() * 10),
     tags: ['fan'],
     deviceType: i % 2 === 0 ? 'mobile' : 'desktop',
     lastSeenAt: new Date().toISOString(),
@@ -176,12 +190,8 @@ const defaultProps = {
   mode: 'members' as const,
   view: 'all' as const,
   total: 0,
-  page: 1,
-  pageSize: 50,
   sort: 'lastSeen',
   direction: 'desc' as const,
-  onPageChange: vi.fn(),
-  onPageSizeChange: vi.fn(),
   onSortChange: vi.fn(),
   onViewChange: vi.fn(),
   onFiltersChange: vi.fn(),

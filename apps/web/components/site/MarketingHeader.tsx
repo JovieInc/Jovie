@@ -11,6 +11,7 @@
 
 import { usePathname } from 'next/navigation';
 import { Header } from '@/components/site/Header';
+import { APP_ROUTES } from '@/constants/routes';
 import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 
 export interface MarketingHeaderProps
@@ -38,16 +39,13 @@ export function MarketingHeader({
     wait: PACER_TIMING.SCROLL_THROTTLE_MS,
   });
   const resolvedHideNav = hideNav ?? pathname === '/investors';
-  // Show pricing link on all pages including homepage (was hidden as pseudo feature flag)
-  const hidePricingLink = false;
 
   // Anchor nav links for the /launch landing page
   const launchNavLinks =
-    pathname === '/launch'
+    pathname === APP_ROUTES.LAUNCH
       ? [
           { href: '#how-it-works', label: 'How it works' },
           { href: '#features', label: 'Features' },
-          { href: '/launch/pricing', label: 'Pricing' },
         ]
       : undefined;
 
@@ -57,7 +55,6 @@ export function MarketingHeader({
       logoSize={logoSize}
       logoVariant='word'
       hideNav={resolvedHideNav}
-      hidePricingLink={hidePricingLink}
       containerSize='homepage'
       className='border-b'
       navLinks={launchNavLinks}

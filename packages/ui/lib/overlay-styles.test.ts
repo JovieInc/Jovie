@@ -17,7 +17,7 @@ describe('overlay-styles', () => {
       expect(overlayStyles.base).toContain('fixed');
       expect(overlayStyles.base).toContain('inset-0');
       expect(overlayStyles.base).toContain('z-50');
-      expect(overlayStyles.base).toContain('bg-black/80');
+      expect(overlayStyles.base).toContain('bg-black/40');
     });
 
     it('animation includes open/close fade transitions', () => {
@@ -54,7 +54,9 @@ describe('overlay-styles', () => {
 
     it('surface includes border and background', () => {
       expect(centeredContentStyles.surface).toContain('border');
-      expect(centeredContentStyles.surface).toContain('bg-surface-2');
+      expect(centeredContentStyles.surface).toContain(
+        'bg-(--linear-bg-surface-0)'
+      );
     });
 
     it('animation includes fade and zoom transitions', () => {
@@ -65,8 +67,9 @@ describe('overlay-styles', () => {
     });
 
     it('rounded uses responsive border radius', () => {
-      expect(centeredContentStyles.rounded).toContain('rounded-xl');
-      expect(centeredContentStyles.rounded).toContain('sm:rounded-2xl');
+      expect(centeredContentStyles.rounded).toContain(
+        'rounded-(--linear-radius-md)'
+      );
     });
 
     it('reducedMotion provides motion-reduce fallback', () => {
@@ -100,22 +103,24 @@ describe('overlay-styles', () => {
 
   describe('footerStyles', () => {
     it('base includes responsive flex layout', () => {
-      expect(footerStyles.base).toContain('flex-col-reverse');
-      expect(footerStyles.base).toContain('sm:flex-row');
+      expect(footerStyles.base).toContain('flex');
+      expect(footerStyles.base).toContain('justify-end');
     });
   });
 
   describe('titleStyles', () => {
     it('base includes font sizing', () => {
-      expect(titleStyles.base).toContain('text-lg');
-      expect(titleStyles.base).toContain('font-semibold');
+      expect(titleStyles.base).toContain('text-[15px]');
+      expect(titleStyles.base).toContain('font-[510]');
     });
   });
 
   describe('descriptionStyles', () => {
     it('base includes muted text color', () => {
-      expect(descriptionStyles.base).toContain('text-sm');
-      expect(descriptionStyles.base).toContain('text-secondary-token');
+      expect(descriptionStyles.base).toContain('text-[13px]');
+      expect(descriptionStyles.base).toContain(
+        'text-(--linear-text-secondary)'
+      );
     });
   });
 });

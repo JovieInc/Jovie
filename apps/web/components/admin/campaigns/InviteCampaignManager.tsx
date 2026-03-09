@@ -12,13 +12,17 @@ import {
   Button,
   Input,
 } from '@jovie/ui';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
   type SendCampaignInvitesResponse,
+  useCampaignInvitesQuery,
+  useCampaignOverviewQuery,
   useCampaignPreviewQuery,
+  useCampaignSettings,
   useCampaignStatsQuery,
+  useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
 } from '@/lib/queries/useCampaignInvites';
 
@@ -37,6 +41,16 @@ const DEFAULT_THROTTLING: ThrottlingConfig = {
 /** Threshold for showing confirmation modal */
 const LARGE_BATCH_THRESHOLD = 25;
 
+function formatEngagementStatus(engagement: {
+  clicked: boolean;
+  clickCount: number;
+  opened: boolean;
+}): string {
+  if (engagement.clicked) return `Clicked (${engagement.clickCount})`;
+  if (engagement.opened) return 'Opened';
+  return 'No events';
+}
+
 export function InviteCampaignManager() {
   const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
   const [limit, setLimit] = useState(20);
@@ -45,6 +59,20 @@ export function InviteCampaignManager() {
   const [sendResult, setSendResult] =
     useState<SendCampaignInvitesResponse | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [settingsSaved, setSettingsSaved] = useState(false);
+
+  // Load persisted settings on mount
+  const { data: savedSettings } = useCampaignSettings();
+  const saveCampaignSettings = useSaveCampaignSettings();
+
+  useEffect(() => {
+    if (savedSettings?.settings) {
+      const s = savedSettings.settings;
+      setFitScoreThreshold(s.fitScoreThreshold);
+      setLimit(s.batchLimit);
+      setThrottling(s.throttlingConfig);
+    }
+  }, [savedSettings]);
 
   // TanStack Query for preview data
   const {
@@ -60,6 +88,11 @@ export function InviteCampaignManager() {
   // TanStack Query for campaign stats
   const { data: stats, isLoading: isLoadingStats } = useCampaignStatsQuery();
 
+  const { data: inviteList, isLoading: isLoadingInvites } =
+    useCampaignInvitesQuery({ limit: 10, offset: 0 });
+
+  const { data: campaignOverview } = useCampaignOverviewQuery();
+
   // TanStack Query mutation for sending invites
   const sendInvitesMutation = useSendCampaignInvitesMutation();
   const { mutateAsync: sendInvites } = sendInvitesMutation;
@@ -67,6 +100,17 @@ export function InviteCampaignManager() {
   const handleRefreshClick = useCallback(() => {
     refetchPreview();
   }, [refetchPreview]);
+
+  const handleSaveSettings = useCallback(async () => {
+    setSettingsSaved(false);
+    await saveCampaignSettings.mutateAsync({
+      fitScoreThreshold,
+      batchLimit: limit,
+      throttlingConfig: throttling,
+    });
+    setSettingsSaved(true);
+    setTimeout(() => setSettingsSaved(false), 3000);
+  }, [saveCampaignSettings, fitScoreThreshold, limit, throttling]);
 
   const handleConfirmSend = useCallback(async () => {
     setShowConfirmModal(false);
@@ -116,7 +160,7 @@ export function InviteCampaignManager() {
   return (
     <div className='space-y-8' data-testid='admin-campaigns-content'>
       {/* Campaign Results Dashboard */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <div className='flex items-center justify-between mb-4'>
           <h2 className='text-lg font-semibold text-primary-token'>
             Campaign Results
@@ -132,37 +176,37 @@ export function InviteCampaignManager() {
         {stats && (
           <div className='grid gap-4 md:grid-cols-3 lg:grid-cols-6'>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-bold text-primary-token'>
+              <p className='text-2xl font-semibold tabular-nums text-primary-token'>
                 {stats.campaign.total}
               </p>
               <p className='text-xs text-secondary-token'>Total Invites</p>
             </div>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-bold text-amber-600'>
+              <p className='text-2xl font-semibold tabular-nums text-warning'>
                 {stats.campaign.pending}
               </p>
               <p className='text-xs text-secondary-token'>Pending</p>
             </div>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-bold text-blue-600'>
+              <p className='text-2xl font-semibold tabular-nums text-info'>
                 {stats.campaign.sending}
               </p>
               <p className='text-xs text-secondary-token'>Sending</p>
             </div>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-bold text-green-600'>
+              <p className='text-2xl font-semibold tabular-nums text-success'>
                 {stats.campaign.sent}
               </p>
               <p className='text-xs text-secondary-token'>Sent</p>
             </div>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-bold text-destructive'>
+              <p className='text-2xl font-semibold tabular-nums text-destructive'>
                 {stats.campaign.failed}
               </p>
               <p className='text-xs text-secondary-token'>Failed</p>
             </div>
             <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-bold text-purple-600'>
+              <p className='text-2xl font-semibold tabular-nums text-accent'>
                 {stats.campaign.claimed}
               </p>
               <p className='text-xs text-secondary-token'>Claimed</p>
@@ -173,54 +217,43 @@ export function InviteCampaignManager() {
 
       {/* Job Queue Status */}
       {stats?.jobQueue && hasActiveJobs && (
-        <section className='rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-6'>
+        <section className='rounded-lg border border-info/20 bg-info/5 p-6'>
           <div className='flex items-center gap-2 mb-4'>
-            <Icon
-              name='Loader2'
-              className='h-5 w-5 animate-spin text-blue-600'
-            />
-            <h2 className='text-lg font-semibold text-blue-700 dark:text-blue-300'>
+            <Icon name='Loader2' className='h-5 w-5 animate-spin text-info' />
+            <h2 className='text-lg font-semibold text-info'>
               Job Queue Active
             </h2>
           </div>
 
           <div className='grid gap-4 md:grid-cols-4'>
             <div>
-              <p className='text-2xl font-bold text-blue-700 dark:text-blue-300'>
+              <p className='text-2xl font-semibold tabular-nums text-info'>
                 {stats.jobQueue.pending}
               </p>
-              <p className='text-xs text-blue-600 dark:text-blue-400'>
-                Jobs Pending
-              </p>
+              <p className='text-xs text-info'>Jobs Pending</p>
             </div>
             <div>
-              <p className='text-2xl font-bold text-blue-700 dark:text-blue-300'>
+              <p className='text-2xl font-semibold tabular-nums text-info'>
                 {stats.jobQueue.processing}
               </p>
-              <p className='text-xs text-blue-600 dark:text-blue-400'>
-                Processing
-              </p>
+              <p className='text-xs text-info'>Processing</p>
             </div>
             <div>
-              <p className='text-2xl font-bold text-green-600'>
+              <p className='text-2xl font-semibold tabular-nums text-success'>
                 {stats.jobQueue.succeeded}
               </p>
-              <p className='text-xs text-blue-600 dark:text-blue-400'>
-                Succeeded
-              </p>
+              <p className='text-xs text-info'>Succeeded</p>
             </div>
             <div>
-              <p className='text-2xl font-bold text-blue-700 dark:text-blue-300'>
+              <p className='text-2xl font-semibold tabular-nums text-info'>
                 ~{stats.jobQueue.estimatedMinutesRemaining} min
               </p>
-              <p className='text-xs text-blue-600 dark:text-blue-400'>
-                Est. Remaining
-              </p>
+              <p className='text-xs text-info'>Est. Remaining</p>
             </div>
           </div>
 
           {stats.jobQueue.nextRunAt && (
-            <p className='mt-4 text-xs text-blue-600 dark:text-blue-400'>
+            <p className='mt-4 text-xs text-info'>
               Next job scheduled:{' '}
               {new Date(stats.jobQueue.nextRunAt).toLocaleTimeString(
                 undefined,
@@ -236,7 +269,7 @@ export function InviteCampaignManager() {
       )}
 
       {/* Targeting Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Targeting
         </h2>
@@ -296,7 +329,7 @@ export function InviteCampaignManager() {
       </section>
 
       {/* Throttling Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Throttling & Anti-Spam
         </h2>
@@ -374,20 +407,161 @@ export function InviteCampaignManager() {
           </div>
         </div>
 
-        <div className='mt-4 flex items-start gap-2 rounded-lg bg-amber-500/10 px-4 py-3'>
+        <div className='mt-4 flex items-start gap-2 rounded-lg bg-warning/10 px-4 py-3'>
           <Icon
             name='AlertTriangle'
-            className='h-3.5 w-3.5 text-amber-600 mt-0.5'
+            className='h-3.5 w-3.5 text-warning mt-0.5'
           />
-          <p className='text-xs text-amber-700 dark:text-amber-400'>
+          <p className='text-xs text-warning'>
             Delays are randomized between min and max to appear human-like. Stay
             under 50/hour to avoid spam filters.
           </p>
         </div>
+
+        <div className='mt-4 flex items-center gap-3'>
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={handleSaveSettings}
+            disabled={saveCampaignSettings.isPending}
+          >
+            {saveCampaignSettings.isPending ? (
+              <>
+                <Icon
+                  name='Loader2'
+                  className='mr-2 h-3.5 w-3.5 animate-spin'
+                />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Icon name='Save' className='mr-2 h-3.5 w-3.5' />
+                Save Settings
+              </>
+            )}
+          </Button>
+          {settingsSaved && (
+            <span className='flex items-center gap-1 text-xs text-success'>
+              <Icon name='CheckCircle' className='h-3.5 w-3.5' />
+              Settings saved
+            </span>
+          )}
+          {saveCampaignSettings.error && (
+            <span className='text-xs text-destructive'>
+              {saveCampaignSettings.error.message}
+            </span>
+          )}
+        </div>
+      </section>
+
+      <section className='rounded-lg border border-subtle p-6'>
+        <div className='flex items-center justify-between mb-4'>
+          <h2 className='text-lg font-semibold text-primary-token'>
+            Claim Funnel
+          </h2>
+        </div>
+
+        <div className='grid gap-4 md:grid-cols-4'>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-semibold tabular-nums text-primary-token'>
+              {campaignOverview?.invites.sent ?? 0}
+            </p>
+            <p className='text-xs text-secondary-token'>Invites sent</p>
+          </div>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-semibold tabular-nums text-info'>
+              {campaignOverview?.engagement.uniqueClicks ?? 0}
+            </p>
+            <p className='text-xs text-secondary-token'>
+              Unique click-throughs
+            </p>
+          </div>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-semibold tabular-nums text-success'>
+              {campaignOverview?.conversion.profilesClaimed ?? 0}
+            </p>
+            <p className='text-xs text-secondary-token'>Profiles claimed</p>
+          </div>
+          <div className='rounded-lg bg-surface-2 px-4 py-3'>
+            <p className='text-2xl font-semibold tabular-nums text-accent'>
+              {(campaignOverview?.conversion.claimRate ?? 0).toFixed(1)}%
+            </p>
+            <p className='text-xs text-secondary-token'>
+              Claim conversion rate
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className='rounded-lg border border-subtle p-6'>
+        <div className='mb-4 flex items-center justify-between'>
+          <h2 className='text-lg font-semibold text-primary-token'>
+            Recent Invite Activity
+          </h2>
+          {isLoadingInvites && (
+            <Icon
+              name='Loader2'
+              className='h-3.5 w-3.5 animate-spin text-secondary-token'
+            />
+          )}
+        </div>
+
+        {inviteList && inviteList.invites.length > 0 ? (
+          <div className='overflow-hidden rounded-lg border border-subtle'>
+            <table className='w-full text-sm'>
+              <thead className='bg-surface-2'>
+                <tr>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Creator
+                  </th>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Status
+                  </th>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Engagement
+                  </th>
+                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    Claimed
+                  </th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-subtle'>
+                {inviteList.invites.map(invite => (
+                  <tr key={invite.id}>
+                    <td className='px-4 py-2 text-primary-token'>
+                      @{invite.profile.username}
+                    </td>
+                    <td className='px-4 py-2 text-secondary-token capitalize'>
+                      {invite.status}
+                    </td>
+                    <td className='px-4 py-2 text-secondary-token'>
+                      {formatEngagementStatus(invite.engagement)}
+                    </td>
+                    <td className='px-4 py-2'>
+                      <span
+                        className={
+                          invite.profile.isClaimed
+                            ? 'text-success'
+                            : 'text-secondary-token'
+                        }
+                      >
+                        {invite.profile.isClaimed ? 'Yes' : 'No'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className='text-sm text-secondary-token'>
+            No invite activity yet.
+          </p>
+        )}
       </section>
 
       {/* Preview Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <div className='flex items-center justify-between mb-4'>
           <h2 className='text-lg font-semibold text-primary-token'>Preview</h2>
           <Button
@@ -417,7 +591,7 @@ export function InviteCampaignManager() {
             {/* Stats */}
             <div className='grid gap-4 md:grid-cols-3'>
               <div className='rounded-lg bg-surface-2 px-4 py-3'>
-                <p className='text-2xl font-bold text-primary-token'>
+                <p className='text-2xl font-semibold tabular-nums text-primary-token'>
                   {preview.totalEligible}
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -425,7 +599,7 @@ export function InviteCampaignManager() {
                 </p>
               </div>
               <div className='rounded-lg bg-surface-2 px-4 py-3'>
-                <p className='text-2xl font-bold text-green-600'>
+                <p className='text-2xl font-semibold tabular-nums text-success'>
                   {preview.sample.withEmails}
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -433,7 +607,7 @@ export function InviteCampaignManager() {
                 </p>
               </div>
               <div className='rounded-lg bg-surface-2 px-4 py-3'>
-                <p className='text-2xl font-bold text-amber-600'>
+                <p className='text-2xl font-semibold tabular-nums text-warning'>
                   {preview.sample.withoutEmails}
                 </p>
                 <p className='text-xs text-secondary-token'>Missing email</p>
@@ -468,7 +642,7 @@ export function InviteCampaignManager() {
                             @{profile.username}
                           </td>
                           <td className='px-4 py-2'>
-                            <span className='inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'>
+                            <span className='inline-flex items-center rounded-full bg-info/10 px-2 py-0.5 text-xs font-medium text-info'>
                               {profile.fitScore ?? 'N/A'}
                             </span>
                           </td>
@@ -487,16 +661,16 @@ export function InviteCampaignManager() {
       </section>
 
       {/* Send Section */}
-      <section className='rounded-lg border border-subtle bg-surface-1 p-6'>
+      <section className='rounded-lg border border-subtle p-6'>
         <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Send Invites
         </h2>
 
         {sendResult?.ok && (
-          <div className='mb-4 flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3'>
+          <div className='mb-4 flex items-center gap-2 rounded-lg bg-success/10 px-4 py-3'>
             <Icon name='CheckCircle' className='h-3.5 w-3.5 text-success' />
             <div>
-              <p className='text-sm font-medium text-green-700 dark:text-green-300'>
+              <p className='text-sm font-medium text-success'>
                 Successfully queued {sendResult.jobsEnqueued} invites!
               </p>
               <p className='text-xs text-success'>
@@ -565,13 +739,13 @@ export function InviteCampaignManager() {
               to complete.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className='mt-4 rounded-lg bg-amber-500/10 px-4 py-3'>
+          <div className='mt-4 rounded-lg bg-warning/10 px-4 py-3'>
             <div className='flex items-start gap-2'>
               <Icon
                 name='AlertTriangle'
-                className='h-3.5 w-3.5 text-amber-600 mt-0.5'
+                className='h-3.5 w-3.5 text-warning mt-0.5'
               />
-              <p className='text-xs text-amber-700 dark:text-amber-400'>
+              <p className='text-xs text-warning'>
                 This action cannot be undone. Emails will be queued and sent
                 gradually to avoid spam filters.
               </p>

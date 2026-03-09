@@ -3,6 +3,7 @@
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { UnifiedTable } from '@/components/organisms/table';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
@@ -43,12 +44,20 @@ interface ReleaseTableProps {
   readonly showTracks?: boolean;
   /** Group releases by year with sticky headers */
   readonly groupByYear?: boolean;
+  /** Release currently being refreshed for loading shimmer feedback */
+  readonly refreshingReleaseId?: string | null;
+  /** Release that should briefly flash after refresh success */
+  readonly flashedReleaseId?: string | null;
+  /** Currently selected release ID for active row highlighting */
+  readonly selectedReleaseId?: string | null;
+  readonly selectedTrackId?: string | null;
   /** Check if a release's smart link is locked behind the pro gate */
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
   /** Get the reason a smartlink is locked ('scheduled' | 'cap' | null) */
   readonly getSmartLinkLockReason?: (
     releaseId: string
   ) => 'scheduled' | 'cap' | null;
+  readonly onTrackClick?: (trackData: TrackSidebarData) => void;
 }
 
 const columnHelper = createColumnHelper<ReleaseViewModel>();
@@ -78,8 +87,13 @@ export function ReleaseTable({
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
+  selectedReleaseId,
+  selectedTrackId,
+  refreshingReleaseId,
+  flashedReleaseId,
   isSmartLinkLocked,
   getSmartLinkLockReason,
+  onTrackClick,
 }: ReleaseTableProps) {
   // Mobile detection - render list view on small screens
   const isMobile = useBreakpointDown('md');
@@ -115,13 +129,40 @@ export function ReleaseTable({
   const getRowClassName = useCallback(
     (row: ReleaseViewModel) => {
       const isRowExpanded = showTracks && isExpanded(row.id);
+      const isSelected = selectedReleaseId === row.id;
+      const isRefreshing = refreshingReleaseId === row.id;
+      const isFlashed = flashedReleaseId === row.id;
 
-      if (isRowExpanded) {
-        return 'bg-surface-2/30 hover:bg-surface-2/50';
+      let baseClassName: string;
+      if (isSelected) {
+        baseClassName =
+          'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)';
+      } else if (isRowExpanded) {
+        baseClassName =
+          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1)';
+      } else {
+        baseClassName =
+          'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out';
       }
-      return 'hover:bg-surface-2/50';
+
+      const refreshClassName = isRefreshing
+        ? 'relative overflow-hidden skeleton'
+        : '';
+      const flashClassName = isFlashed
+        ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
+        : '';
+
+      return [baseClassName, refreshClassName, flashClassName]
+        .filter(Boolean)
+        .join(' ');
     },
-    [showTracks, isExpanded]
+    [
+      showTracks,
+      isExpanded,
+      selectedReleaseId,
+      refreshingReleaseId,
+      flashedReleaseId,
+    ]
   );
 
   // Keyboard navigation callback - open sidebar for focused row
@@ -158,7 +199,7 @@ export function ReleaseTable({
         : createReleaseCellRenderer(artistName),
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
-      enableSorting: true,
+      enableSorting: false,
     });
 
     const rightMetaColumn = columnHelper.display({
@@ -169,8 +210,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 300,
-      minSize: 200,
+      size: 280,
+      minSize: 240,
       meta: { className: 'hidden sm:table-cell' },
     });
 
@@ -213,7 +254,8 @@ export function ReleaseTable({
     return {
       getGroupKey: (release: ReleaseViewModel) => {
         if (!release.releaseDate) return 'Unknown';
-        return new Date(release.releaseDate).getFullYear().toString();
+        const year = new Date(release.releaseDate).getFullYear();
+        return Number.isNaN(year) ? 'Unknown' : year.toString();
       },
       getGroupLabel: (year: string) => year,
     };
@@ -230,10 +272,13 @@ export function ReleaseTable({
       return (
         <TrackRowsContainer
           tracks={tracks}
+          release={release}
           providerConfig={providerConfig}
           allProviders={allProviders}
           columnCount={columnCount}
           columnVisibility={tanstackColumnVisibility}
+          onTrackClick={onTrackClick}
+          selectedTrackId={selectedTrackId}
         />
       );
     },
@@ -243,6 +288,8 @@ export function ReleaseTable({
       providerConfig,
       allProviders,
       tanstackColumnVisibility,
+      onTrackClick,
+      selectedTrackId,
     ]
   );
 
@@ -259,11 +306,11 @@ export function ReleaseTable({
   if (isMobile) {
     if (releases.length === 0) {
       return (
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
           <Icon name='Disc3' className='h-6 w-6' />
           <div>
-            <div className='font-medium'>No releases</div>
-            <div className='text-xs'>
+            <div className='font-[510]'>No releases</div>
+            <div className='text-[11px]'>
               Your releases will appear here once synced.
             </div>
           </div>
@@ -298,7 +345,8 @@ export function ReleaseTable({
       enableVirtualization={shouldVirtualize && !groupByYear}
       rowHeight={rowHeight}
       minWidth={minWidth}
-      className='text-[13px]'
+      hideHeader
+      className='text-[13px] text-(--linear-text-primary)'
       containerClassName='h-full'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
@@ -307,11 +355,11 @@ export function ReleaseTable({
       renderExpandedContent={showTracks ? renderExpandedContent : undefined}
       getExpandableRowId={getExpandableRowId}
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
           <Icon name='Disc3' className='h-6 w-6' />
           <div>
-            <div className='font-medium'>No releases</div>
-            <div className='text-xs'>
+            <div className='font-[510]'>No releases</div>
+            <div className='text-[11px]'>
               Your releases will appear here once synced.
             </div>
           </div>

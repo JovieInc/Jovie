@@ -3,11 +3,11 @@
 import { and, asc, count, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
-  revalidatePath,
   revalidateTag,
   unstable_cache,
 } from 'next/cache';
-import { APP_ROUTES } from '@/constants/routes';
+import { cache } from 'react';
+
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -106,10 +106,10 @@ async function fetchContactsCore(
 }
 
 /**
- * Get profile contacts with caching (30s TTL)
- * Cache is invalidated on mutations (save, delete)
+ * Core contacts loading logic (cacheable).
+ * Cache is invalidated on mutations (save, delete).
  */
-export async function getProfileContactsForOwner(
+async function resolveProfileContactsForOwner(
   profileId: string
 ): Promise<DashboardContact[]> {
   const { userId } = await getCachedAuth();
@@ -127,6 +127,12 @@ export async function getProfileContactsForOwner(
     }
   )();
 }
+
+/**
+ * Cached loader for profile contacts.
+ * Uses React's cache() for request-level deduplication.
+ */
+export const getProfileContactsForOwner = cache(resolveProfileContactsForOwner);
 
 export async function saveContact(
   input: DashboardContactInput
@@ -227,7 +233,8 @@ export async function saveContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${sanitized.profileId}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_CONTACTS);
+  // Skip revalidatePath — the mutation hook handles cache updates via local
+  // state, and a path revalidation resets client-side state (closing the sidebar).
 
   return result;
 }
@@ -268,5 +275,6 @@ export async function deleteContact(
 
   // Invalidate contacts cache after transaction completes
   revalidateTag(`contacts:${userId}:${profileId}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_CONTACTS);
+  // Skip revalidatePath — the mutation hook handles cache updates via local
+  // state, and a path revalidation resets client-side state (closing the sidebar).
 }

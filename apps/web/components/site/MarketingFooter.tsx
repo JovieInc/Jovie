@@ -3,19 +3,19 @@
 import { usePathname } from 'next/navigation';
 import { Footer } from '@/components/site/Footer';
 
-// Pages that use minimal footer (MVP phase)
+/** Paths that use a compact footer (no product/company/legal columns). */
 const MINIMAL_FOOTER_PATHS = new Set(['/', '/investors']);
 
+/**
+ * Unified marketing footer — always renders the icon logo.
+ * Homepage and investors get the compact (minimal) variant;
+ * every other marketing page gets the full (regular) variant.
+ */
 export function MarketingFooter() {
   const pathname = usePathname();
+  const variant = MINIMAL_FOOTER_PATHS.has(pathname) ? 'minimal' : 'regular';
 
-  // Use minimal footer on homepage and investors page during MVP
-  if (MINIMAL_FOOTER_PATHS.has(pathname)) {
-    return <Footer version='minimal' containerSize='homepage' />;
-  }
-
-  // Use regular footer with Linear styling (handled internally by Footer)
   return (
-    <Footer version='regular' brandingMark='icon' containerSize='homepage' />
+    <Footer version={variant} brandingMark='icon' containerSize='homepage' />
   );
 }

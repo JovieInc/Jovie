@@ -234,13 +234,13 @@ export interface DemoRelease {
 export const RELEASES: DemoRelease[] = [
   {
     id: '1',
-    title: 'Signals',
-    type: 'Album',
-    date: 'Feb 2024',
-    trackCount: 12,
+    title: 'The Deep End',
+    type: 'Single',
+    date: 'Feb 2017',
+    trackCount: 1,
     hasSmartLink: true,
     gradient: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
-    platforms: ['Spotify', 'Apple Music', 'YouTube Music', 'Tidal'],
+    platforms: ['Spotify', 'Apple Music', 'YouTube Music', 'Deezer'],
   },
   {
     id: '2',
@@ -289,75 +289,228 @@ export const RELEASES: DemoRelease[] = [
 export interface DemoLink {
   id: string;
   platform: string;
+  platformKey: string;
   type: 'music' | 'social';
   url: string;
   clicks: number;
   active: boolean;
-  icon: string; // emoji placeholder
 }
 
 export const LINKS: DemoLink[] = [
   {
     id: '1',
     platform: 'Spotify',
+    platformKey: 'spotify',
     type: 'music',
     url: 'open.spotify.com/artist/timwhite',
     clicks: 1_126,
     active: true,
-    icon: '🎵',
   },
   {
     id: '2',
     platform: 'Apple Music',
+    platformKey: 'applemusic',
     type: 'music',
     url: 'music.apple.com/artist/timwhite',
     clicks: 684,
     active: true,
-    icon: '🎵',
   },
   {
     id: '3',
     platform: 'YouTube Music',
+    platformKey: 'youtubemusic',
     type: 'music',
     url: 'music.youtube.com/timwhite',
     clicks: 412,
     active: true,
-    icon: '🎵',
   },
   {
     id: '4',
     platform: 'Instagram',
+    platformKey: 'instagram',
     type: 'social',
     url: 'instagram.com/timwhitemusic',
     clicks: 328,
     active: true,
-    icon: '📸',
   },
   {
     id: '5',
     platform: 'TikTok',
+    platformKey: 'tiktok',
     type: 'social',
     url: 'tiktok.com/@timwhitemusic',
     clicks: 291,
     active: true,
-    icon: '🎬',
   },
   {
     id: '6',
     platform: 'Twitter',
+    platformKey: 'x',
     type: 'social',
     url: 'twitter.com/timwhitemusic',
     clicks: 156,
     active: true,
-    icon: '🐦',
   },
   {
     id: '7',
     platform: 'SoundCloud',
+    platformKey: 'soundcloud',
     type: 'music',
     url: 'soundcloud.com/timwhitemusic',
     clicks: 89,
     active: false,
-    icon: '☁️',
   },
 ];
+
+// ── Smart link release automation ───────────────────────────────────────────
+
+export interface ReleaseAutomationRelease {
+  title: string;
+  artist: string;
+  date: string;
+  gradient: string;
+}
+
+export interface ReleaseAutomationPlatformHealth {
+  name: string;
+  status: 'Live' | 'Syncing';
+}
+
+export interface ReleaseAutomationActivity {
+  id: string;
+  title: string;
+  detail: string;
+}
+
+export const RELEASE_AUTOMATION_RELEASE: ReleaseAutomationRelease = {
+  title: 'Afterglow (Deluxe)',
+  artist: 'Tim White',
+  date: 'Feb 23, 2026',
+  gradient: 'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
+};
+
+export const RELEASE_AUTOMATION_PLATFORM_HEALTH: ReleaseAutomationPlatformHealth[] =
+  [
+    { name: 'Spotify', status: 'Live' },
+    { name: 'Apple Music', status: 'Live' },
+    { name: 'YouTube Music', status: 'Syncing' },
+    { name: 'Amazon Music', status: 'Live' },
+  ];
+
+export const RELEASE_AUTOMATION_ACTIVITY: ReleaseAutomationActivity[] = [
+  {
+    id: 'distribution',
+    title: 'Distribution webhook received',
+    detail: 'Metadata validated · ISRC + UPC matched',
+  },
+  {
+    id: 'smartlink',
+    title: 'Smartlink published automatically',
+    detail: 'Short URL generated and queued for social posting',
+  },
+];
+
+// ── Smartlink thread + kanban ───────────────────────────────────────────────
+
+export interface SmartlinkThreadItem {
+  id: string;
+  iconType: 'link' | 'disc' | 'zap' | 'check';
+  iconColor: string;
+  label: string;
+  detail?: string;
+  time: string;
+}
+
+export const SMARTLINK_THREAD: SmartlinkThreadItem[] = [
+  {
+    id: 'connect',
+    iconType: 'link',
+    iconColor: '#1DB954',
+    label: 'Spotify connected',
+    detail: 'Artist profile linked · 4 releases synced',
+    time: '2m ago',
+  },
+  {
+    id: 'detect',
+    iconType: 'disc',
+    iconColor: '#6C7AFF',
+    label: 'New release detected: Afterglow (Deluxe)',
+    detail: 'ISRC matched · artwork downloaded · 14 tracks',
+    time: '1m ago',
+  },
+  {
+    id: 'generate',
+    iconType: 'zap',
+    iconColor: '#F5A623',
+    label: 'Smartlink generated — 4 platforms verified',
+    detail: 'Spotify · Apple Music · YouTube Music · Amazon Music',
+    time: '45s ago',
+  },
+  {
+    id: 'publish',
+    iconType: 'check',
+    iconColor: '#4EC98C',
+    label: 'Links published to jov.ie/novalane/afterglow',
+    time: '32s ago',
+  },
+];
+
+export interface SmartlinkKanbanCard {
+  id: string;
+  title: string;
+  artist: string;
+  gradient: string;
+  platformCount: number;
+  status: 'Syncing' | 'Live' | 'Archived';
+}
+
+export const SMARTLINK_KANBAN_COLUMNS = [
+  {
+    title: 'Upcoming',
+    cards: [
+      {
+        id: 'k1',
+        title: 'Afterglow (Deluxe)',
+        artist: 'Tim White',
+        gradient:
+          'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
+        platformCount: 4,
+        status: 'Syncing' as const,
+      },
+    ],
+  },
+  {
+    title: 'Live',
+    cards: [
+      {
+        id: 'k2',
+        title: 'Signals',
+        artist: 'Tim White',
+        gradient: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
+        platformCount: 4,
+        status: 'Live' as const,
+      },
+      {
+        id: 'k3',
+        title: 'Neon Nights',
+        artist: 'Tim White',
+        gradient: 'linear-gradient(135deg, #1a2a3a, #2d4a5a)',
+        platformCount: 3,
+        status: 'Live' as const,
+      },
+    ],
+  },
+  {
+    title: 'Archived',
+    cards: [
+      {
+        id: 'k4',
+        title: 'The Sound',
+        artist: 'Tim White',
+        gradient: 'linear-gradient(135deg, #3a1a1a, #6b2d2d)',
+        platformCount: 2,
+        status: 'Archived' as const,
+      },
+    ],
+  },
+] as const;

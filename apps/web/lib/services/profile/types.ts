@@ -24,6 +24,7 @@ export type ProfileSummary = Pick<
   | 'avatarUrl'
   | 'isPublic'
   | 'isClaimed'
+  | 'claimToken'
   | 'isVerified'
 >;
 
@@ -45,9 +46,15 @@ export type ProfileData = Pick<
   | 'appleMusicUrl'
   | 'youtubeUrl'
   | 'spotifyId'
+  | 'appleMusicId'
+  | 'youtubeMusicId'
+  | 'deezerId'
+  | 'tidalId'
+  | 'soundcloudId'
   | 'isPublic'
   | 'isVerified'
   | 'isClaimed'
+  | 'claimToken'
   | 'isFeatured'
   | 'marketingOptOut'
   | 'settings'
@@ -68,6 +75,7 @@ export type ProfileData = Pick<
 export type ProfileWithUser = ProfileData & {
   userIsPro: boolean | null;
   userClerkId: string | null;
+  userEmail: string | null;
 };
 
 /**

@@ -15,14 +15,27 @@ export interface PreviewPanelLink {
   url: string;
   platform: string;
   isVisible: boolean;
+  verificationStatus?: 'unverified' | 'pending' | 'verified';
 }
 
 export interface PreviewPanelData {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  bio: string | null;
+  genres: string[] | null;
   links: PreviewPanelLink[];
   profilePath: string;
+  dspConnections: {
+    spotify: {
+      connected: boolean;
+      artistName: string | null;
+    };
+    appleMusic: {
+      connected: boolean;
+      artistName: string | null;
+    };
+  };
 }
 
 // Split contexts to prevent cascading re-renders:
@@ -62,17 +75,20 @@ export function PreviewPanelProvider({
   defaultOpen = false,
   enabled = true,
 }: Readonly<PreviewPanelProviderProps>) {
-  // Check if screen is large (md breakpoint: 768px)
-  const [isLargeScreen, setIsLargeScreen] = useState(() => {
-    if (globalThis.window?.matchMedia === undefined) return true; // SSR/test default
-    return globalThis.window.matchMedia('(min-width: 768px)').matches;
-  });
+  // Check if screen is large (md breakpoint: 768px).
+  // Default to false during SSR to avoid hydration mismatch on mobile devices
+  // (server would render panel open, client would compute closed).
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
 
-  // Update isLargeScreen on resize
+  // After mount, read the actual screen size and listen for changes.
+  // This ensures SSR and client initial render match (both start with isOpen=false),
+  // then the effect opens the panel on large screens if defaultOpen is true.
   useEffect(() => {
     if (globalThis.window?.matchMedia === undefined) return;
 
     const mediaQuery = globalThis.window.matchMedia('(min-width: 768px)');
+    setIsLargeScreen(mediaQuery.matches);
+
     const handleChange = (e: MediaQueryListEvent) => {
       setIsLargeScreen(e.matches);
     };
@@ -81,18 +97,21 @@ export function PreviewPanelProvider({
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  // Use defaultOpen on large screens, false on small screens
-  const initialOpen = defaultOpen && isLargeScreen;
-  const [isOpen, setIsOpen] = useState(initialOpen);
+  // Start closed to match SSR; the effect below opens on large screens after hydration
+  const [isOpen, setIsOpen] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewPanelData | null>(null);
 
-  // Update open state when screen size changes
+  // Open panel after mount on large screens when defaultOpen is requested.
+  // Also close when switching to a small screen.
   useEffect(() => {
-    if (defaultOpen && !isLargeScreen && isOpen) {
-      // Close drawer when switching to small screen
+    if (defaultOpen && isLargeScreen) {
+      setIsOpen(true);
+    } else if (!isLargeScreen && isOpen) {
       setIsOpen(false);
     }
-  }, [isLargeScreen, defaultOpen, isOpen]);
+    // Intentionally omit isOpen to avoid re-triggering when user manually closes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLargeScreen, defaultOpen]);
 
   const open = useCallback(() => {
     if (!enabled) return;

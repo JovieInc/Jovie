@@ -55,15 +55,29 @@ vi.mock('@/lib/redis', () => ({
   getRedis: vi.fn().mockReturnValue(null),
 }));
 
+// Mock retry to skip exponential backoff delays — just execute the operation once
+vi.mock('@/lib/db/client/retry', () => ({
+  withRetry: vi.fn(async (operation: () => Promise<unknown>) => operation()),
+  isRetryableError: vi.fn().mockReturnValue(false),
+}));
+
 // Mock waitlist as enabled for proxy-state tests (tests waitlist behavior)
 vi.mock('@/lib/auth/waitlist-config', () => ({
   isWaitlistEnabled: vi.fn().mockReturnValue(true),
 }));
 
+// Import once — clear in-memory cache between tests via invalidateProxyUserStateCache
+import {
+  getUserState,
+  invalidateProxyUserStateCache,
+} from '@/lib/auth/proxy-state';
+
 describe('proxy-state.ts', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.resetModules();
+  beforeEach(async () => {
+    mockDbSelect.mockClear();
+    // Clear the module's in-memory cache to prevent cross-test contamination
+    await invalidateProxyUserStateCache('clerk_123');
+    await invalidateProxyUserStateCache('clerk_test_user');
   });
 
   describe('getUserState', () => {
@@ -78,7 +92,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
@@ -99,7 +112,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
@@ -127,7 +139,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
@@ -155,7 +166,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
@@ -183,7 +193,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
@@ -204,6 +213,11 @@ describe('proxy-state.ts', () => {
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileAvatarUrl: 'https://example.com/avatar.jpg',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -211,13 +225,44 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
         needsWaitlist: false,
         needsOnboarding: false,
         isActive: true,
+      });
+    });
+
+    it('returns needsOnboarding when profile has onboardingCompletedAt but missing username', async () => {
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          leftJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  dbUserId: 'db-user-123',
+                  userStatus: 'active',
+                  profileId: 'profile-123',
+                  profileComplete: new Date(),
+                  profileUsername: null,
+                  profileUsernameNormalized: null,
+                  profileDisplayName: 'Test User',
+                  profileAvatarUrl: 'https://example.com/avatar.jpg',
+                  profileIsPublic: true,
+                },
+              ]),
+            }),
+          }),
+        }),
+      });
+
+      const result = await getUserState('clerk_123');
+
+      expect(result).toEqual({
+        needsWaitlist: false,
+        needsOnboarding: true,
+        isActive: false,
       });
     });
 
@@ -232,6 +277,11 @@ describe('proxy-state.ts', () => {
                   userStatus: 'waitlist_approved',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileAvatarUrl: 'https://example.com/avatar.jpg',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -239,7 +289,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result.isActive).toBe(true);
@@ -256,6 +305,11 @@ describe('proxy-state.ts', () => {
                   userStatus: 'profile_claimed',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileAvatarUrl: 'https://example.com/avatar.jpg',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -263,7 +317,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result.isActive).toBe(true);
@@ -280,6 +333,11 @@ describe('proxy-state.ts', () => {
                   userStatus: 'onboarding_incomplete',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileAvatarUrl: 'https://example.com/avatar.jpg',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -287,7 +345,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result.isActive).toBe(true);
@@ -309,7 +366,6 @@ describe('proxy-state.ts', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       // Should return safe fallback (require waitlist)
@@ -338,7 +394,6 @@ describe('proxy-state.ts', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       await getUserState('clerk_test_user');
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -374,7 +429,6 @@ describe('proxy-state.ts', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       expect(result).toEqual({
@@ -414,6 +468,11 @@ describe('proxy-state.ts', () => {
                   userStatus: 'active',
                   profileId: 'profile-123',
                   profileComplete: new Date(),
+                  profileUsername: 'testuser',
+                  profileUsernameNormalized: 'testuser',
+                  profileDisplayName: 'Test User',
+                  profileAvatarUrl: 'https://example.com/avatar.jpg',
+                  profileIsPublic: true,
                 },
               ]),
             }),
@@ -421,7 +480,6 @@ describe('proxy-state.ts', () => {
         }),
       });
 
-      const { getUserState } = await import('@/lib/auth/proxy-state');
       const result = await getUserState('clerk_123');
 
       // Type checks

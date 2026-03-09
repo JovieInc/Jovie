@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { validateDbConnection } from '@/lib/db';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
@@ -73,11 +74,19 @@ export async function GET() {
       integrations: {
         auth: envInfo.hasClerk,
         payments: envInfo.hasStripe,
-        images: envInfo.hasCloudinary,
+        images: envInfo.hasVercelBlob,
       },
     },
     ...(issues.length > 0 && { issues }),
   };
+
+  if (!isHealthy) {
+    void captureWarning('Deploy health check unhealthy', undefined, {
+      service: 'deploy',
+      route: '/api/health/deploy',
+      issues,
+    });
+  }
 
   return NextResponse.json(response, {
     status: isHealthy ? 200 : 503,

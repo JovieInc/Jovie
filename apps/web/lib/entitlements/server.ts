@@ -4,6 +4,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import {
+  ENTITLEMENT_REGISTRY,
   getEntitlements,
   hasAdvancedFeatures,
   isProPlan,
@@ -20,27 +21,18 @@ const UNAUTHENTICATED_ENTITLEMENTS: UserEntitlements = {
   plan: 'free',
   isPro: false,
   hasAdvancedFeatures: false,
-  canRemoveBranding: false,
-  canExportContacts: false,
-  canAccessAdvancedAnalytics: false,
-  canFilterSelfFromAnalytics: false,
-  canAccessAdPixels: false,
-  canBeVerified: false,
-  aiCanUseTools: false,
-  canCreateManualReleases: false,
-  canAccessFutureReleases: false,
-  canSendNotifications: false,
-  canEditSmartLinks: false,
-  analyticsRetentionDays: 7,
-  contactsLimit: 100,
-  smartLinksLimit: 25,
-  aiDailyMessageLimit: 5,
+  ...ENTITLEMENT_REGISTRY.free.booleans,
+  ...ENTITLEMENT_REGISTRY.free.limits,
 };
 
 /**
- * Error thrown when billing data cannot be retrieved for an authenticated user.
- * Callers should catch this and show a retry/error state rather than
- * silently defaulting to free-tier entitlements.
+ * Error class retained for backwards compatibility.
+ *
+ * `getCurrentUserEntitlements` no longer throws this error -- it degrades
+ * gracefully to free-tier entitlements when billing is unavailable.
+ * Admin status is fetched independently (Redis-cached) and preserved.
+ *
+ * @deprecated No longer thrown in production. Will be removed in a future release.
  */
 export class BillingUnavailableError extends Error {
   constructor(
@@ -51,6 +43,10 @@ export class BillingUnavailableError extends Error {
     super(`Billing data unavailable for user ${userId}: ${cause ?? 'unknown'}`);
     this.name = 'BillingUnavailableError';
   }
+}
+
+function isMissingBillingRecord(error?: string): boolean {
+  return error === 'User not found';
 }
 
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
@@ -76,13 +72,33 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   ]);
 
   if (!billing.success) {
-    // Billing lookup failed — throw so callers surface an error state
-    // instead of silently revoking pro features for paying users.
-    logger.warn('Billing lookup failed in entitlements (transient)', {
+    if (isMissingBillingRecord(billing.error)) {
+      return {
+        ...UNAUTHENTICATED_ENTITLEMENTS,
+        userId,
+        email: clerkEmail,
+        isAuthenticated: true,
+        isAdmin: adminStatus,
+      };
+    }
+
+    // Billing lookup failed (transient DB/connection error).
+    // Degrade gracefully to free-tier entitlements instead of throwing.
+    // This prevents unhandled BillingUnavailableError from crashing API
+    // routes and dashboard pages. Pro users temporarily lose features
+    // during the outage, but the app remains functional. The underlying
+    // DB failure is already captured upstream in fetchUserBillingData.
+    logger.warn('Billing lookup failed, degrading to free tier', {
       userId,
       error: billing.error,
     });
-    throw new BillingUnavailableError(userId, adminStatus, billing.error);
+    return {
+      ...UNAUTHENTICATED_ENTITLEMENTS,
+      userId,
+      email: clerkEmail,
+      isAuthenticated: true,
+      isAdmin: adminStatus,
+    };
   }
 
   if (!billing.data) {

@@ -1,4 +1,5 @@
 import type { AudienceMode } from '@/components/dashboard/audience/table/types';
+import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 
 export type { AudienceMode };
@@ -12,9 +13,10 @@ export type AudienceSegment =
   | 'highIntent'
   | 'returning'
   | 'frequent'
-  | 'recent24h';
+  | 'recent24h'
+  | 'touringCity';
 
-/** Filter state for audience table — mirrors ReleaseFilters pattern */
+/** Filter state for audience table -- mirrors ReleaseFilters pattern */
 export interface AudienceFilters {
   readonly segments: AudienceSegment[];
 }
@@ -28,20 +30,25 @@ export interface DashboardAudienceTableProps {
   readonly mode: AudienceMode;
   readonly view: AudienceView;
   readonly rows: AudienceRow[];
-  readonly total: number;
-  readonly page: number;
-  readonly pageSize: number;
+  /** Null when the per-page COUNT query was skipped for performance (JOV-1262, JOV-1264). */
+  readonly total: number | null;
   readonly sort: string;
   readonly direction: 'asc' | 'desc';
-  readonly onPageChange: (page: number) => void;
-  readonly onPageSizeChange: (pageSize: number) => void;
   readonly onSortChange: (sort: string) => void;
   readonly onViewChange: (view: AudienceView) => void;
   readonly onFiltersChange: (filters: AudienceFilters) => void;
   readonly profileUrl?: string;
   readonly profileId?: string;
-  readonly subscriberCount: number;
+  /** Null when the subscriber COUNT query was skipped for performance (JOV-1262). */
+  readonly subscriberCount: number | null;
+  /** Null when the audience COUNT query was skipped for performance (JOV-1262). */
+  readonly totalAudienceCount?: number | null;
   readonly filters: AudienceFilters;
+  readonly hasNextPage?: boolean;
+  readonly isFetchingNextPage?: boolean;
+  readonly onLoadMore?: () => void;
+  /** Upcoming tour dates for touring city flagging */
+  readonly tourDates?: TourDateForMatching[];
 }
 
 export interface BulkAction {

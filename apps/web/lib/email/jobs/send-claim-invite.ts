@@ -16,6 +16,7 @@ import {
 } from '@/lib/email/templates/claim-invite';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
+import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -73,6 +74,7 @@ export async function processSendClaimInviteJob(
       email: creatorClaimInvites.email,
       status: creatorClaimInvites.status,
       creatorProfileId: creatorClaimInvites.creatorProfileId,
+      meta: creatorClaimInvites.meta,
     })
     .from(creatorClaimInvites)
     .where(eq(creatorClaimInvites.id, payload.inviteId))
@@ -142,18 +144,22 @@ export async function processSendClaimInviteJob(
     };
   }
 
-  if (!profile.claimToken) {
-    await tx
-      .update(creatorClaimInvites)
-      .set({
-        status: 'failed',
-        error: 'Profile has no claim token',
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorClaimInvites.id, invite.id));
+  // Always generate a fresh token pair per email send.
+  // The raw token is never stored at rest — only the hash is persisted in the DB.
+  const {
+    token: claimToken,
+    tokenHash,
+    expiresAt,
+  } = await generateClaimTokenPair();
 
-    throw new Error(`Profile has no claim token: ${profile.id}`);
-  }
+  await tx
+    .update(creatorProfiles)
+    .set({
+      claimToken: tokenHash,
+      claimTokenExpiresAt: expiresAt,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
 
   // Check if the email is suppressed (user unsubscribed or bounced)
   const suppressionCheck = await isEmailSuppressed(invite.email);
@@ -194,7 +200,7 @@ export async function processSendClaimInviteJob(
   const templateData: ClaimInviteTemplateData = {
     creatorName: profile.displayName || profile.username,
     username: profile.username,
-    claimToken: profile.claimToken,
+    claimToken,
     avatarUrl: profile.avatarUrl,
     fitScore: profile.fitScore,
     recipientEmail: invite.email,

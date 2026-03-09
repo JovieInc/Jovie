@@ -26,6 +26,43 @@ const INTENT_DOT_STYLES: Record<AudienceIntentLevel, string> = {
   low: 'bg-zinc-400',
 };
 
+const MOBILE_SOURCE_MAP: Record<string, string> = {
+  'x.com': 'X',
+  'twitter.com': 'X',
+  'instagram.com': 'Instagram',
+  'facebook.com': 'Facebook',
+  'tiktok.com': 'TikTok',
+  'youtube.com': 'YouTube',
+  'spotify.com': 'Spotify',
+  'google.com': 'Google',
+  'reddit.com': 'Reddit',
+  'linkedin.com': 'LinkedIn',
+  't.co': 'X',
+  'l.facebook.com': 'Facebook',
+  'l.instagram.com': 'Instagram',
+};
+
+const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
+
+function normalizeSourceLabel(source: string): string {
+  const normalized = source.trim().toLowerCase();
+  return (
+    MOBILE_SOURCE_MAP[normalized] ??
+    normalized.charAt(0).toUpperCase() + normalized.slice(1)
+  );
+}
+
+function isInternalReferrer(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.replace('www.', '').toLowerCase();
+    return INTERNAL_HOST_SUFFIXES.some(
+      suffix => hostname === suffix || hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * AudienceMobileCard - Clean, Apple-esque card for audience members on mobile.
  *
@@ -47,7 +84,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       className={cn(
         'w-full text-left flex items-start gap-3 px-4 py-3.5 transition-colors duration-150',
         isSelected ? 'bg-surface-2/70' : 'active:bg-surface-2/40',
-        isHighIntent && 'font-medium'
+        isHighIntent && 'font-[510]'
       )}
       onClick={() => onTap(member)}
       aria-label={`View details for ${displayName}`}
@@ -75,12 +112,12 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         <div className='flex items-baseline justify-between gap-2'>
           <TruncatedText
             lines={1}
-            className='font-semibold text-[15px] leading-tight text-primary-token'
+            className='font-[590] text-[15px] leading-tight text-primary-token'
           >
             {displayName}
           </TruncatedText>
           {mode === 'members' && member.lastSeenAt && (
-            <span className='flex-shrink-0 text-xs text-tertiary-token tabular-nums'>
+            <span className='flex-shrink-0 text-[11px] text-tertiary-token tabular-nums'>
               {formatTimeAgo(member.lastSeenAt)}
             </span>
           )}
@@ -111,9 +148,14 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
   const utmSource = member.utmParams?.source;
   let source = 'Direct';
   if (utmSource) {
-    source = utmSource.charAt(0).toUpperCase() + utmSource.slice(1);
+    source = normalizeSourceLabel(utmSource);
   } else if (member.referrerHistory.length > 0) {
-    source = parseSourceForMobile(member.referrerHistory[0].url);
+    const externalReferrer = member.referrerHistory.find(
+      entry => !isInternalReferrer(entry.url)
+    );
+    source = externalReferrer
+      ? parseSourceForMobile(externalReferrer.url)
+      : 'Direct';
   }
   const lastAction =
     member.latestActions.length > 0 ? member.latestActions[0].label : null;
@@ -121,7 +163,7 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
   return (
     <div className='mt-0.5 space-y-0.5'>
       {/* Intent + Returning badge row */}
-      <p className='text-xs flex items-center gap-1.5'>
+      <p className='text-[11px] flex items-center gap-1.5'>
         <span
           className={cn(
             'inline-block size-1.5 rounded-full',
@@ -129,13 +171,13 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
           )}
           aria-hidden='true'
         />
-        <span className={cn('font-medium', INTENT_STYLES[member.intentLevel])}>
+        <span className={cn('font-[510]', INTENT_STYLES[member.intentLevel])}>
           {member.intentLevel.charAt(0).toUpperCase() +
             member.intentLevel.slice(1)}
         </span>
         <DotSeparator />
         {isReturning ? (
-          <span className='text-secondary-token font-medium'>Returning</span>
+          <span className='text-secondary-token font-[510]'>Returning</span>
         ) : (
           <span className='text-tertiary-token/70'>New</span>
         )}
@@ -155,18 +197,9 @@ function parseSourceForMobile(url: string): string {
   try {
     const parsed = new URL(url);
     const utmSource = parsed.searchParams.get('utm_source');
-    if (utmSource) return utmSource;
-    const hostname = parsed.hostname.replace('www.', '');
-    const domainMap: Record<string, string> = {
-      'x.com': 'X',
-      'twitter.com': 'X',
-      'instagram.com': 'IG',
-      'facebook.com': 'FB',
-      'tiktok.com': 'TikTok',
-      'youtube.com': 'YT',
-      't.co': 'X',
-    };
-    return domainMap[hostname] ?? hostname;
+    if (utmSource) return normalizeSourceLabel(utmSource);
+    const hostname = parsed.hostname.replace('www.', '').toLowerCase();
+    return MOBILE_SOURCE_MAP[hostname] ?? hostname;
   } catch {
     return url || 'Direct';
   }
@@ -174,15 +207,17 @@ function parseSourceForMobile(url: string): string {
 
 /** Subtitle lines for subscribers mode */
 function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
+  const subscriberLabel =
+    member.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber';
   return (
     <div className='mt-0.5 space-y-0.5'>
-      {member.email && (
+      {(member.email || member.phone) && (
         <p className='text-[13px] leading-snug text-secondary-token truncate'>
-          {member.email}
+          {subscriberLabel}
         </p>
       )}
       {member.lastSeenAt && (
-        <p className='text-xs text-tertiary-token'>
+        <p className='text-[11px] text-tertiary-token'>
           Subscribed {formatTimeAgo(member.lastSeenAt)}
         </p>
       )}

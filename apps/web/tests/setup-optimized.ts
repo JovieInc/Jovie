@@ -36,6 +36,106 @@ vi.mock('react', async () => {
 // `server-only` throws when imported in non-Next runtimes; tests should noop it.
 vi.mock('server-only', () => ({}));
 
+// Mock @sentry/nextjs globally to prevent heavy SDK initialization (~50-70KB)
+// from causing test timeouts. Route handlers import @/lib/error-tracking which
+// transitively loads Sentry, taking >10s in jsdom. Individual test files that
+// need specific Sentry behavior can override this with their own vi.mock().
+vi.mock('@sentry/nextjs', () => {
+  const noop = vi.fn();
+  const noopLogger = {
+    log: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
+    disable: vi.fn(),
+    enable: vi.fn(),
+    isEnabled: vi.fn(() => false),
+  };
+  return {
+    captureException: vi.fn(),
+    captureMessage: vi.fn(),
+    captureRequestError: vi.fn(),
+    captureRouterTransitionStart: vi.fn(),
+    addBreadcrumb: vi.fn(),
+    withScope: vi.fn((cb: (scope: unknown) => void) =>
+      cb({ setTag: noop, setExtra: noop, setLevel: noop })
+    ),
+    setTag: vi.fn(),
+    setExtra: vi.fn(),
+    setUser: vi.fn(),
+    setContext: vi.fn(),
+    init: vi.fn(),
+    startSpan: vi.fn((_options: unknown, cb: () => unknown) => cb()),
+    getClient: vi.fn(() => undefined),
+    getCurrentScope: vi.fn(() => ({
+      setTag: noop,
+      setExtra: noop,
+      setLevel: noop,
+    })),
+    logger: noopLogger,
+    breadcrumbsIntegration: vi.fn(() => ({})),
+    replayIntegration: vi.fn(() => ({})),
+    vercelAIIntegration: vi.fn(() => ({})),
+    diagnoseSdkConnectivity: vi.fn(),
+  };
+});
+
+// Mock @/lib/sentry/client-lite globally — client components now import Sentry
+// helpers from the lite wrapper instead of `@sentry/nextjs` directly.
+vi.mock('@/lib/sentry/client-lite', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  onRouterTransitionStart: vi.fn(),
+  initLiteSentry: vi.fn(() => false),
+  isLiteSentryInitialized: vi.fn(() => false),
+  getSentryClient: vi.fn(() => undefined),
+  getLiteClientConfig: vi.fn(() => ({})),
+}));
+
+// Mock next/navigation — commonly needed in tests that import components using
+// useRouter, usePathname, or useSearchParams. Missing mocks cause slow dynamic
+// import resolution that degrades p95 performance.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+// Mock next/headers — avoids errors when server components call cookies() or
+// headers() outside of a real Next.js request context.
+vi.mock('next/headers', () => ({
+  headers: () => new Headers(),
+  cookies: () => ({
+    get: vi.fn(() => undefined),
+    getAll: vi.fn(() => []),
+    has: vi.fn(() => false),
+    set: vi.fn(),
+    delete: vi.fn(),
+  }),
+}));
+
+// Mock next/cache — revalidatePath/revalidateTag are no-ops in unit tests;
+// calling the real implementations outside Next.js throws an invariant error.
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+  revalidateTag: vi.fn(),
+  unstable_cache: vi.fn((fn: (...args: unknown[]) => unknown) => fn),
+  unstable_noStore: vi.fn(),
+}));
+
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {
   cleanup();

@@ -6,6 +6,9 @@ import { Copyright } from '@/components/atoms/Copyright';
 import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
+import { APP_ROUTES } from '@/constants/routes';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/utils';
 
@@ -37,10 +40,15 @@ export function Footer({
   showThemeToggle = false,
   themeShortcutKey,
   className = '',
-  brandingMark = 'wordmark',
+  brandingMark = 'icon',
   containerSize = 'lg',
   links,
 }: FooterProps) {
+  const isLightModeEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
+    false
+  );
+  const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
   const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 
@@ -60,7 +68,7 @@ export function Footer({
             variant={config.colorVariant}
             size='sm'
             showCTA={false}
-            mark='wordmark'
+            mark='text'
           />
         </div>
 
@@ -89,16 +97,14 @@ export function Footer({
 
   if (variant === 'regular') {
     const productLinks = [
-      { href: '/link-in-bio', label: 'Profile' },
-      { href: '/pricing', label: 'Pricing' },
       ...FEATURES.map(f => ({ href: f.href, label: f.title })),
     ];
 
     const companyLinks = [{ href: '/support', label: 'Support' }];
 
     const legalLinks = [
-      { href: '/legal/privacy', label: 'Privacy Policy' },
-      { href: '/legal/terms', label: 'Terms of Service' },
+      { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy Policy' },
+      { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms of Service' },
     ];
 
     return (
@@ -235,10 +241,13 @@ export function Footer({
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
-                className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] order-2 sm:order-1'
-                style={{ color: 'rgb(98, 102, 109)' }}
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-40 order-2 sm:order-1'
+                style={{
+                  color:
+                    'var(--linear-text-quaternary, var(--linear-text-tertiary))',
+                }}
               />
-              {showThemeToggle && (
+              {effectiveShowThemeToggle && (
                 <div className='flex items-center gap-3 order-1 sm:order-2'>
                   <div className='flex items-center sm:hidden'>
                     <ThemeToggle
@@ -293,14 +302,13 @@ export function Footer({
             >
               <Copyright
                 variant={config.colorVariant}
-                className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em]'
-                style={{ color: 'rgb(98, 102, 109)' }}
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-40'
+                style={{
+                  color:
+                    'var(--linear-text-quaternary, var(--linear-text-tertiary))',
+                }}
               />
-              {variant === 'minimal' && (
-                <p className='text-[10px] leading-4 font-normal tracking-tight text-quaternary-token'>
-                  Made for musicians, by musicians
-                </p>
-              )}
+              {/* Removed "Made for musicians" tagline — tightened per JOV-1094 */}
             </div>
 
             <div
@@ -313,14 +321,14 @@ export function Footer({
                       key={link.href}
                       href={link.href}
                       className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)]'
-                      style={{ color: 'rgb(98, 102, 109)' }}
+                      style={{ color: 'var(--linear-text-tertiary)' }}
                     >
                       {link.label}
                     </Link>
                   ))}
                 </nav>
               )}
-              {showThemeToggle && (
+              {effectiveShowThemeToggle && (
                 <>
                   <div className='flex items-center md:hidden'>
                     <ThemeToggle

@@ -80,6 +80,7 @@ export function useActivityFeedQuery({
     enabled,
     staleTime: 60_000, // 1 minute
     gcTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
     refetchInterval: 5 * 60 * 1000, // 5 minutes (matches legacy polling)
     refetchIntervalInBackground: false, // Only poll when tab is active
     retry: 3,

@@ -271,10 +271,13 @@ export {
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
 export {
+  useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
   useRescanIsrcLinksMutation,
   useResetProviderOverrideMutation,
+  useSaveCanvasStatusMutation,
   useSaveProviderOverrideMutation,
+  useSaveReleaseLyricsMutation,
   useSyncReleasesFromSpotifyMutation,
 } from './useReleaseMutations';
 // Release queries and mutations
@@ -283,6 +286,7 @@ export { useReleasesQuery } from './useReleasesQuery';
 export {
   type SettingsUpdateInput,
   useAnalyticsFilterMutation,
+  useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
   useUpdateSettingsMutation,

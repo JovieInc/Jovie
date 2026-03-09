@@ -1,15 +1,18 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DashboardRefreshButton } from '@/components/dashboard/molecules/DashboardRefreshButton';
+import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
+import { captureException } from '@/lib/sentry/client-lite';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';
 
+const numberFormatter = new Intl.NumberFormat();
 const LOADING_SKELETON_COUNT = 5;
 const LOADING_SKELETON_KEYS = Array.from(
   { length: LOADING_SKELETON_COUNT },
@@ -42,7 +45,7 @@ function StatCard({
 }) {
   if (loading) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
+      <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
         <LoadingSkeleton
           height='h-3'
           width='w-20'
@@ -50,14 +53,14 @@ function StatCard({
           className='mb-3'
         />
         <LoadingSkeleton height='h-7' width='w-16' rounded='sm' />
-      </div>
+      </DashboardCard>
     );
   }
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
+    <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
       <p className='text-[13px] text-secondary-token'>{label}</p>
-      <p className='mt-1 text-2xl font-semibold tracking-tight text-primary-token tabular-nums'>
+      <p className='mt-1 text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
         {value}
       </p>
       {meta && (
@@ -65,7 +68,7 @@ function StatCard({
           {meta}
         </p>
       )}
-    </div>
+    </DashboardCard>
   );
 }
 
@@ -93,12 +96,10 @@ function ListSection({
   readonly emptyMessage: string;
 }) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'>
+    <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
       <div className='mb-3 flex items-center gap-2'>
         <Icon className='h-4 w-4 text-tertiary-token' />
-        <h3 className='text-[13px] font-medium text-secondary-token'>
-          {title}
-        </h3>
+        <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
       </div>
 
       {loading && (
@@ -119,14 +120,14 @@ function ListSection({
               className='flex items-center justify-between group'
             >
               <div className='flex items-center gap-2 min-w-0 flex-1'>
-                <span className='text-[11px] font-medium text-tertiary-token w-4 tabular-nums'>
+                <span className='text-[11px] font-[510] text-tertiary-token w-4 tabular-nums'>
                   {index + 1}
                 </span>
                 <span className='text-[13px] text-secondary-token group-hover:text-primary-token transition-colors truncate'>
                   {item.label}
                 </span>
               </div>
-              <span className='text-[13px] font-medium text-primary-token tabular-nums ml-2'>
+              <span className='text-[13px] font-[510] text-primary-token tabular-nums ml-2'>
                 {item.value}
               </span>
             </li>
@@ -138,7 +139,7 @@ function ListSection({
           {emptyMessage}
         </p>
       )}
-    </div>
+    </DashboardCard>
   );
 }
 
@@ -164,9 +165,13 @@ export function DashboardAnalytics() {
 
   const { analyticsRetentionDays } = usePlanGate();
 
-  if (!artist) return null;
+  if (!artist) {
+    return (
+      <PageErrorState message='Unable to load analytics. Your profile data is unavailable — please refresh the page.' />
+    );
+  }
 
-  const fmt = Intl.NumberFormat();
+  const fmt = numberFormatter;
 
   return (
     <div className='max-w-5xl space-y-8'>
@@ -181,7 +186,7 @@ export function DashboardAnalytics() {
             onRefresh={() => router.refresh()}
             onRefreshed={() => {
               refresh().catch(refreshError => {
-                Sentry.captureException(refreshError);
+                captureException(refreshError);
               });
             }}
           />
@@ -220,7 +225,7 @@ export function DashboardAnalytics() {
             loading={loading}
           />
           <StatCard
-            label='Subscribers'
+            label='Followers'
             value={fmt.format(data?.subscribers ?? 0)}
             meta={
               (data?.unique_users ?? 0) > 0
@@ -239,7 +244,7 @@ export function DashboardAnalytics() {
               <StatCard
                 label='Capture Rate'
                 value={`${data.capture_rate ?? 0}%`}
-                meta='Visitors to subscribers'
+                meta='Visitors to followers'
               />
               <StatCard
                 label='Listen Clicks'

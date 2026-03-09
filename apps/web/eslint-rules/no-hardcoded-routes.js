@@ -48,7 +48,8 @@ module.exports = {
     schema: [],
   },
   create(context) {
-    const filename = context.filename;
+    // Normalize path separators so Windows backslashes match forward-slash patterns
+    const filename = context.filename.replaceAll('\\', '/');
 
     // Skip allowed files
     if (ALLOWED_FILES.some(pattern => filename.includes(pattern))) {

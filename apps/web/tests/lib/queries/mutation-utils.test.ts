@@ -34,21 +34,21 @@ describe('mutation-utils', () => {
     it('returns specific message for 401 unauthorized', () => {
       const error = new FetchError('Unauthorized', 401);
       expect(getErrorMessage(error, 'Fallback')).toBe(
-        'Please sign in to continue'
+        'Please sign in to continue.'
       );
     });
 
     it('returns specific message for 403 forbidden', () => {
       const error = new FetchError('Forbidden', 403);
       expect(getErrorMessage(error, 'Fallback')).toBe(
-        'You do not have permission to do this'
+        'You do not have permission to do this.'
       );
     });
 
     it('returns specific message for 404 not found', () => {
       const error = new FetchError('Not Found', 404);
       expect(getErrorMessage(error, 'Fallback')).toBe(
-        'The requested resource was not found'
+        'The requested resource was not found.'
       );
     });
 
@@ -110,7 +110,7 @@ describe('mutation-utils', () => {
       const error = new FetchError('Unauthorized', 401);
       handleMutationError(error, 'Profile update failed');
 
-      expect(toast.error).toHaveBeenCalledWith('Please sign in to continue');
+      expect(toast.error).toHaveBeenCalledWith('Please sign in to continue.');
     });
 
     it('shows toast with fallback message when error has no specific mapping', () => {

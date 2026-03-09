@@ -43,7 +43,9 @@ export interface ProcessCampaignsResult {
 }
 
 /**
- * Claim invite data needed for sending follow-up emails
+ * Claim invite data needed for sending follow-up emails.
+ * Note: claimToken is no longer stored in meta — a fresh token pair
+ * is generated at send time by processSendClaimInviteJob.
  */
 interface ClaimInviteData {
   invite: { id: string; email: string };
@@ -52,7 +54,6 @@ interface ClaimInviteData {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
-    claimToken: string;
   };
 }
 
@@ -275,7 +276,7 @@ async function batchFetchClaimInvites(
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
       avatarUrl: creatorProfiles.avatarUrl,
-      claimToken: creatorProfiles.claimToken,
+      meta: creatorClaimInvites.meta,
     })
     .from(creatorClaimInvites)
     .innerJoin(
@@ -294,7 +295,6 @@ async function batchFetchClaimInvites(
   for (const row of rows) {
     // Keep only the most recent invite per subject (rows are ordered DESC by sentAt)
     if (result.has(row.creatorProfileId)) continue;
-    if (!row.claimToken) continue;
 
     result.set(row.creatorProfileId, {
       invite: { id: row.inviteId, email: row.email },
@@ -303,7 +303,6 @@ async function batchFetchClaimInvites(
         username: row.username,
         displayName: row.displayName,
         avatarUrl: row.avatarUrl,
-        claimToken: row.claimToken,
       },
     });
   }

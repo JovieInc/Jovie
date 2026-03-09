@@ -1,26 +1,29 @@
 'use client';
 
 import { useChat } from '@ai-sdk/react';
-import * as Sentry from '@sentry/nextjs';
+import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport } from 'ai';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-import { useThrottledCallback } from '@/lib/pacer';
+import { matchCommand } from '@/lib/chat/command-registry';
+import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
+import { FetchError } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
 import {
   useAddMessagesMutation,
   useCreateConversationMutation,
 } from '@/lib/queries/useChatMutations';
+import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
 
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
-import { MAX_MESSAGE_LENGTH, SUBMIT_THROTTLE_MS } from '../types';
+import { MAX_MESSAGE_LENGTH } from '../types';
 import {
   extractErrorMetadata,
   getErrorType,
   getMessageText,
-  getUserFriendlyMessage,
+  getPreferredErrorMessage,
 } from '../utils';
 
 interface UseJovieChatOptions {
@@ -30,6 +33,8 @@ interface UseJovieChatOptions {
   readonly artistContext?: ArtistContext; // NOSONAR - kept for backward compatibility
   readonly conversationId?: string | null;
   readonly onConversationCreate?: (conversationId: string) => void;
+  /** Artist username — used by deterministic commands (e.g. "preview my profile") */
+  readonly username?: string;
 }
 
 /**
@@ -57,12 +62,16 @@ export function useJovieChat({
   artistContext, // NOSONAR - kept for backward compatibility
   conversationId,
   onConversationCreate,
+  username,
 }: UseJovieChatOptions) {
+  const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
+  const hasHydratedRef = useRef<string | null>(null);
   const [input, setInput] = useState('');
   const [chatError, setChatError] = useState<ChatError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRateLimitHint, setShowRateLimitHint] = useState(false);
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversationId ?? null);
@@ -70,6 +79,16 @@ export function useJovieChat({
     userMessage: string;
     assistantMessage: string;
     toolCalls?: Record<string, unknown>[];
+  } | null>(null);
+  const pendingInitialSendRef = useRef<{
+    text: string;
+    files?: FileUIPart[];
+  } | null>(null);
+  /** Deferred navigation callback — called only after the AI stream completes
+   *  to prevent component remount from killing the in-flight response (JOV-1233). */
+  const deferredNavigationRef = useRef<{
+    callback: (conversationId: string) => void;
+    conversationId: string;
   } | null>(null);
   const queryClient = useQueryClient();
 
@@ -135,7 +154,7 @@ export function useJovieChat({
   const { messages, sendMessage, status, setMessages } = useChat({
     transport,
     onError: error => {
-      Sentry.captureException(error, {
+      captureException(error, {
         tags: {
           feature: 'ai-chat',
           source: 'useJovieChat',
@@ -152,9 +171,7 @@ export function useJovieChat({
 
       setChatError({
         type: errorType,
-        message:
-          metadata.message ||
-          getUserFriendlyMessage(errorType, metadata.retryAfter),
+        message: getPreferredErrorMessage(error, errorType, metadata),
         retryAfter: metadata.retryAfter,
         errorCode: metadata.errorCode,
         requestId: metadata.requestId,
@@ -166,19 +183,46 @@ export function useJovieChat({
         setInput(lastAttemptedMessageRef.current);
       }
 
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chat.usage(),
+      });
+
+      // Clear pending messages ref so the persistence effect doesn't
+      // keep trying to find an assistant message that will never arrive
+      pendingMessagesRef.current = null;
       setIsSubmitting(false);
+
+      // Fire deferred navigation on error too so the URL updates (JOV-1233)
+      if (deferredNavigationRef.current) {
+        const { callback, conversationId: navId } =
+          deferredNavigationRef.current;
+        deferredNavigationRef.current = null;
+        callback(navId);
+      }
     },
   });
 
-  // Sync initial messages when loaded
+  // Sync initial messages when loaded — but only once per conversation to avoid
+  // overwriting freshly streamed messages when the effect re-fires after
+  // persistence refetch updates initialMessages.
   useEffect(() => {
-    if (initialMessages && initialMessages.length > 0) {
-      setMessages(initialMessages);
-    }
-  }, [initialMessages, setMessages]);
+    if (status !== 'ready') return;
+    if (!initialMessages || initialMessages.length === 0) return;
+    if (hasHydratedRef.current === activeConversationId) return;
+
+    setMessages(initialMessages);
+    hasHydratedRef.current = activeConversationId;
+  }, [initialMessages, setMessages, status, activeConversationId]);
 
   const isLoading = status === 'streaming' || status === 'submitted';
   const hasMessages = messages.length > 0;
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.chat.usage(),
+    });
+  }, [status, queryClient]);
 
   // Derive the conversation title from the query data
   const conversationTitle = existingConversation?.conversation?.title ?? null;
@@ -207,6 +251,23 @@ export function useJovieChat({
     return () => clearTimeout(timer);
   }, [titlePollingSince]);
 
+  // Safety timeout: if isSubmitting stays true for more than 30 seconds,
+  // force-clear it to prevent the input from being permanently blocked.
+  // This guards against edge cases where the status/persistence effects
+  // fail to clear the flag (e.g. stream silently drops, component re-mounts).
+  useEffect(() => {
+    if (!isSubmitting) return;
+
+    const safetyTimer = globalThis.setTimeout(() => {
+      setIsSubmitting(false);
+      pendingMessagesRef.current = null;
+    }, 30_000);
+
+    return () => {
+      globalThis.clearTimeout(safetyTimer);
+    };
+  }, [isSubmitting]);
+
   // Clear error when user starts typing
   useEffect(() => {
     if (input && chatError) {
@@ -218,6 +279,24 @@ export function useJovieChat({
   useEffect(() => {
     setActiveConversationId(conversationId ?? null);
   }, [conversationId]);
+
+  // Ensure the first message in a new chat is sent only after activeConversationId
+  // has been committed, so transport includes conversationId on the request.
+  // Navigation is deferred until the stream completes to prevent the component
+  // remount from killing the in-flight AI response (JOV-1233).
+  useEffect(() => {
+    if (!activeConversationId || !pendingInitialSendRef.current) return;
+
+    const pendingPayload = pendingInitialSendRef.current;
+    pendingInitialSendRef.current = null;
+
+    sendMessage({
+      text: pendingPayload.text,
+      ...(pendingPayload.files && pendingPayload.files.length > 0
+        ? { files: pendingPayload.files }
+        : {}),
+    });
+  }, [activeConversationId, sendMessage]);
 
   // Save messages to database when streaming completes.
   // FIX: Don't clear pendingMessagesRef unless we successfully extracted the
@@ -298,18 +377,33 @@ export function useJovieChat({
           }
         },
         onError: err => {
-          Sentry.captureException(err, {
-            tags: {
-              feature: 'ai-chat',
-              source: 'useJovieChat',
-              errorType: 'message-persistence',
-            },
-            extra: {
-              profileId: profileId ?? null,
-              conversationId: activeConversationId,
-              messageCount: messagesToPersist.length,
-            },
-          });
+          const isTransient = err instanceof FetchError && err.isRetryable();
+
+          if (isTransient) {
+            addBreadcrumb({
+              category: 'ai-chat',
+              message: `Message persistence failed after retries: ${err.message}`,
+              level: 'warning',
+              data: {
+                status: (err as FetchError).status,
+                profileId: profileId ?? null,
+                conversationId: activeConversationId,
+              },
+            });
+          } else {
+            captureException(err, {
+              tags: {
+                feature: 'ai-chat',
+                source: 'useJovieChat',
+                errorType: 'message-persistence',
+              },
+              extra: {
+                profileId: profileId ?? null,
+                conversationId: activeConversationId,
+                messageCount: messagesToPersist.length,
+              },
+            });
+          }
           console.error('[useJovieChat] Failed to save messages:', err);
           setChatError({
             type: 'server',
@@ -325,6 +419,15 @@ export function useJovieChat({
     // Successfully extracted and dispatched — clear pending
     pendingMessagesRef.current = null;
     setIsSubmitting(false);
+
+    // Fire deferred navigation now that the stream is complete and messages are persisted.
+    // This prevents the route change from killing the in-flight AI response (JOV-1233).
+    if (deferredNavigationRef.current) {
+      const { callback, conversationId: navConversationId } =
+        deferredNavigationRef.current;
+      deferredNavigationRef.current = null;
+      callback(navConversationId);
+    }
   }, [
     status,
     activeConversationId,
@@ -333,6 +436,134 @@ export function useJovieChat({
     messages,
     profileId,
   ]);
+
+  // Extracted helper: create a new conversation and set up pending refs.
+  // Returns true on success, false on failure (error state already set).
+  const handleCreateConversation = useCallback(
+    async (
+      trimmedText: string,
+      payload: { text: string; files?: FileUIPart[] }
+    ): Promise<boolean> => {
+      try {
+        const result = await createConversationMutation.mutateAsync({
+          initialMessage: trimmedText || '(image attachment)',
+        });
+        setActiveConversationId(result.conversation.id);
+
+        // User message already persisted via initialMessage in conversation creation.
+        // Only store pending ref to persist the assistant response.
+        pendingMessagesRef.current = {
+          userMessage: '', // Empty - already persisted via initialMessage
+          assistantMessage: '', // Will be filled when response completes
+        };
+
+        // Store the send payload for the effect that fires after activeConversationId updates.
+        pendingInitialSendRef.current = payload;
+
+        // Defer navigation until the AI stream completes (status === 'ready').
+        // Navigating earlier would remount the component and kill the stream (JOV-1233).
+        if (onConversationCreate) {
+          deferredNavigationRef.current = {
+            callback: onConversationCreate,
+            conversationId: result.conversation.id,
+          };
+        }
+
+        setInput('');
+
+        // Reset textarea height
+        if (inputRef.current) {
+          inputRef.current.style.height = 'auto';
+        }
+
+        return true;
+      } catch (err) {
+        // Transient server errors (5xx, timeout, rate-limit) were already
+        // retried by TanStack Query. Only log a breadcrumb to reduce Sentry
+        // noise for temporary outages (JOV-1352).
+        const isTransient = err instanceof FetchError && err.isRetryable();
+
+        if (isTransient) {
+          addBreadcrumb({
+            category: 'ai-chat',
+            message: `Conversation create failed after retries: ${err.message}`,
+            level: 'warning',
+            data: {
+              status: (err as FetchError).status,
+              profileId: profileId ?? null,
+            },
+          });
+        } else {
+          captureException(err, {
+            tags: {
+              feature: 'ai-chat',
+              source: 'useJovieChat',
+              errorType: 'conversation-create',
+            },
+            extra: {
+              profileId: profileId ?? null,
+              conversationId: activeConversationId,
+            },
+          });
+        }
+        console.error('[useJovieChat] Failed to create conversation:', err);
+        setChatError({
+          type: 'server',
+          message:
+            'We could not start a new conversation right now. Please try again.',
+          errorCode: 'CONVERSATION_CREATE_FAILED',
+          failedMessage: trimmedText,
+        });
+        setIsSubmitting(false);
+        return false;
+      }
+    },
+    [
+      createConversationMutation,
+      onConversationCreate,
+      setActiveConversationId,
+      profileId,
+      activeConversationId,
+      setInput,
+      setChatError,
+      setIsSubmitting,
+    ]
+  );
+
+  /** Reset textarea height to auto. */
+  const resetTextareaHeight = useCallback(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto';
+    }
+  }, []);
+
+  /** Try to handle text as a deterministic command. Returns true if handled. */
+  const tryHandleCommand = useCallback(
+    (trimmedText: string): boolean => {
+      const commandCtx = { username, router };
+      const command = matchCommand(trimmedText, commandCtx);
+      if (!command) return false;
+
+      const userMsg = {
+        id: `cmd-user-${Date.now()}`,
+        role: 'user' as const,
+        parts: [{ type: 'text' as const, text: trimmedText }],
+        createdAt: new Date(),
+      };
+      const assistantMsg = {
+        id: `cmd-assistant-${Date.now()}`,
+        role: 'assistant' as const,
+        parts: [{ type: 'text' as const, text: command.confirmationMessage }],
+        createdAt: new Date(),
+      };
+      setMessages(prev => [...prev, userMsg, assistantMsg]);
+      setInput('');
+      resetTextareaHeight();
+      command.execute(commandCtx);
+      return true;
+    },
+    [username, router, setMessages, setInput, resetTextareaHeight]
+  );
 
   // Core submit logic
   const doSubmit = useCallback(
@@ -352,6 +583,14 @@ export function useJovieChat({
 
       const trimmedText = text.trim();
 
+      // Check for deterministic commands before hitting AI
+      if (!hasFiles && tryHandleCommand(trimmedText)) return;
+
+      const payload = {
+        text: trimmedText,
+        ...(hasFiles ? { files } : {}),
+      };
+
       // Store the message before sending (in case of error)
       lastAttemptedMessageRef.current = trimmedText;
 
@@ -365,64 +604,25 @@ export function useJovieChat({
           assistantMessage: '', // Will be filled when response completes
         };
       } else {
-        // No active conversation, create one first
-        try {
-          const result = await createConversationMutation.mutateAsync({
-            initialMessage: trimmedText || '(image attachment)',
-          });
-          setActiveConversationId(result.conversation.id);
-          onConversationCreate?.(result.conversation.id);
-
-          // User message already persisted via initialMessage in conversation creation.
-          // Only store pending ref to persist the assistant response.
-          pendingMessagesRef.current = {
-            userMessage: '', // Empty - already persisted via initialMessage
-            assistantMessage: '', // Will be filled when response completes
-          };
-        } catch (err) {
-          Sentry.captureException(err, {
-            tags: {
-              feature: 'ai-chat',
-              source: 'useJovieChat',
-              errorType: 'conversation-create',
-            },
-            extra: {
-              profileId: profileId ?? null,
-              conversationId: activeConversationId,
-            },
-          });
-          console.error('[useJovieChat] Failed to create conversation:', err);
-          setChatError({
-            type: 'server',
-            message:
-              'We could not start a new conversation right now. Please try again.',
-            errorCode: 'CONVERSATION_CREATE_FAILED',
-            failedMessage: trimmedText,
-          });
-          setIsSubmitting(false);
-          return;
-        }
+        // No active conversation — create one first, then return
+        // (sendMessage is dispatched by the effect watching activeConversationId)
+        const created = await handleCreateConversation(trimmedText, payload);
+        if (!created) return;
+        return;
       }
 
-      sendMessage({
-        text: trimmedText,
-        ...(hasFiles ? { files } : {}),
-      });
+      sendMessage(payload);
       setInput('');
-
-      // Reset textarea height
-      if (inputRef.current) {
-        inputRef.current.style.height = 'auto';
-      }
+      resetTextareaHeight();
     },
     [
       isLoading,
       isSubmitting,
       sendMessage,
       activeConversationId,
-      createConversationMutation,
-      onConversationCreate,
-      profileId,
+      handleCreateConversation,
+      tryHandleCommand,
+      resetTextareaHeight,
     ]
   );
 
@@ -434,26 +634,50 @@ export function useJovieChat({
     }
   }, [chatError, doSubmit]);
 
-  // Throttled submit to prevent rapid submissions
-  const throttledSubmit = useThrottledCallback(doSubmit, {
-    wait: SUBMIT_THROTTLE_MS,
-    leading: true,
-    trailing: false,
-  });
+  const rateLimitedSubmitter = useAsyncRateLimiter(
+    async ({ text, files }: { text: string; files?: FileUIPart[] }) => {
+      await doSubmit(text, files);
+    },
+    {
+      limit: 1,
+      window: PACER_TIMING.CHAT_RATE_LIMIT_MS,
+      onReject: () => {
+        setShowRateLimitHint(true);
+        setChatError({
+          type: 'rate_limit',
+          message:
+            'You’re sending messages too quickly. Please wait a moment and try again.',
+          failedMessage: input,
+        });
+      },
+    }
+  );
+
+  useEffect(() => {
+    if (!showRateLimitHint) return;
+
+    const timer = setTimeout(() => {
+      setShowRateLimitHint(false);
+    }, PACER_TIMING.CHAT_RATE_LIMIT_MS);
+
+    return () => clearTimeout(timer);
+  }, [showRateLimitHint]);
+
+  const isRateLimited = showRateLimitHint;
 
   const handleSubmit = useCallback(
     (e?: React.FormEvent, files?: FileUIPart[]) => {
       e?.preventDefault();
-      throttledSubmit(input, files);
+      rateLimitedSubmitter.maybeExecute({ text: input, files });
     },
-    [input, throttledSubmit]
+    [input, rateLimitedSubmitter]
   );
 
   const handleSuggestedPrompt = useCallback(
     (prompt: string) => {
-      doSubmit(prompt);
+      rateLimitedSubmitter.maybeExecute({ text: prompt });
     },
-    [doSubmit]
+    [rateLimitedSubmitter]
   );
 
   return {
@@ -479,5 +703,6 @@ export function useJovieChat({
     /** Programmatic message submission (for imperative use without input state) */
     submitMessage: doSubmit,
     setChatError,
+    isRateLimited,
   };
 }

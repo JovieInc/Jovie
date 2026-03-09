@@ -1,7 +1,18 @@
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
+
+// Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
+// so that Vite's @fs handler can locate files when the path contains spaces.
+const realRoot = (() => {
+  try {
+    return fs.realpathSync(path.resolve(__dirname));
+  } catch {
+    return path.resolve(__dirname);
+  }
+})();
 
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.
@@ -18,9 +29,17 @@ const isCI = process.env.CI === 'true';
  */
 export default defineConfig({
   plugins: [react()],
+  // Allow Vite's @fs handler to serve files from the real path (handles
+  // Windows short-name paths like TIMWHI~1 that contain spaces when expanded).
+  server: {
+    fs: {
+      allow: [realRoot, path.resolve(realRoot, '../..'), '..', 'C:/'],
+      strict: false,
+    },
+  },
   test: {
-    // Use optimized setup file
-    setupFiles: ['./tests/setup-optimized.ts'],
+    // Use optimized setup file (resolved to real path for Windows compatibility)
+    setupFiles: [path.resolve(realRoot, 'tests/setup-optimized.ts')],
 
     // Optimized environment settings
     environment: 'jsdom',
@@ -54,8 +73,8 @@ export default defineConfig({
     maxConcurrency: isCI ? 1 : undefined,
 
     // Timeouts
-    testTimeout: 10000,
-    hookTimeout: 10000,
+    testTimeout: 5000,
+    hookTimeout: 5000,
     teardownTimeout: 5000,
 
     // Coverage disabled by default for speed (enable with --coverage flag)

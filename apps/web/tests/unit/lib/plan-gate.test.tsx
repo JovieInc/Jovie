@@ -14,7 +14,13 @@ vi.stubGlobal('fetch', mockFetch);
 function createWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: {
+        retry: false,
+        // Ensure any query-level retries resolve immediately in tests
+        // (billingStatusQueryOptions has its own retry fn that overrides
+        // retry:false, so we set retryDelay:0 to avoid 1s exponential delay)
+        retryDelay: 0,
+      },
     },
   });
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -62,7 +68,7 @@ describe('usePlanGate', () => {
     expect(result.current.canFilterSelfFromAnalytics).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
     expect(result.current.isError).toBe(false);
   });
@@ -113,7 +119,9 @@ describe('usePlanGate', () => {
   });
 
   it('exposes isError when billing fetch fails', async () => {
-    mockFetch.mockResolvedValueOnce(
+    // Use mockResolvedValue (not Once) to handle the built-in retry in
+    // billingStatusQueryOptions (retry: failureCount < 1 = one retry attempt).
+    mockFetch.mockResolvedValue(
       new Response('Service Unavailable', {
         status: 503,
         statusText: 'Service Unavailable',
@@ -124,14 +132,19 @@ describe('usePlanGate', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     expect(result.current.isError).toBe(true);
     // Should default to free limits when error occurs
     expect(result.current.isPro).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
 });

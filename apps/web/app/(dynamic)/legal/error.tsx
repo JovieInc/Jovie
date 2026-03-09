@@ -9,7 +9,7 @@ export default function LegalError({ error, reset }: ErrorProps) {
       error={error}
       reset={reset}
       context='Legal'
-      message='We encountered an error loading this document. Please try again or contact support@meetjovie.com if the issue persists.'
+      message='We encountered an error loading this document. Please try again or contact support@jov.ie if the issue persists.'
     />
   );
 }

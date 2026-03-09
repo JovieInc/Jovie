@@ -96,6 +96,13 @@ export function isProductionEnvironment(hostname: string): boolean {
 }
 
 // ============================================================================
+// External Links
+// ============================================================================
+
+/** Documentation site (hosted externally) */
+export const DOCS_URL = 'https://docs.jov.ie';
+
+// ============================================================================
 // Email Addresses (using company domain)
 // ============================================================================
 

@@ -1,0 +1,121 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
+import { playwright } from '@vitest/browser-playwright';
+import { defineConfig } from 'vitest/config';
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  plugins: [
+    storybookTest({
+      configDir: path.join(dirname, '.storybook'),
+      tags: {
+        exclude: ['no-vitest'],
+      },
+    }),
+  ],
+  test: {
+    name: 'storybook',
+    browser: {
+      enabled: true,
+      provider: playwright(),
+      headless: true,
+      instances: [{ browser: 'chromium' }],
+    },
+    setupFiles: ['./.storybook/vitest.setup.ts'],
+    // Retry once in CI to handle transient Vite browser-mode module serving failures
+    // (Storybook's internal React 18 compat chunk occasionally fails to load)
+    retry: process.env.CI ? 2 : 0,
+  },
+  resolve: {
+    dedupe: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+    ],
+  },
+  optimizeDeps: {
+    include: [
+      // React core
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+      'react-dom/client',
+      // Storybook / Next.js framework
+      '@storybook/nextjs-vite',
+      'next-themes',
+      'sonner',
+      // UI libraries
+      'clsx',
+      'tailwind-merge',
+      'class-variance-authority',
+      'lucide-react',
+      'motion/react',
+      'vaul',
+      'react-error-boundary',
+      'react-hook-form',
+      // Radix UI primitives
+      '@radix-ui/react-slot',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-label',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-radio-group',
+      '@radix-ui/react-select',
+      '@radix-ui/react-separator',
+      '@radix-ui/react-switch',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-tooltip',
+      '@radix-ui/react-context-menu',
+      // Data / state
+      '@tanstack/react-query',
+      '@tanstack/react-pacer',
+      '@tanstack/react-table',
+      '@tanstack/react-virtual',
+      // Next.js internals
+      'next/link',
+      'next/dynamic',
+      'next/image',
+      'next/navigation',
+      'next/script',
+      'next/dist/client/components/redirect-error',
+      // Drag-and-drop
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+      // UI extras
+      '@floating-ui/react',
+      '@headlessui/react',
+      'cmdk',
+      'nuqs',
+      'nuqs/adapters/next/app',
+      'recharts',
+      // Auth / analytics
+      '@clerk/nextjs',
+      '@vercel/analytics/react',
+      // AI SDK (used by chat components)
+      '@ai-sdk/react',
+      // Form + context menu (pulled in via @jovie/ui barrel exports)
+      'react-hook-form',
+      '@radix-ui/react-context-menu',
+      // Server-side deps (referenced by stories indirectly)
+      '@sentry/nextjs',
+      'isomorphic-dompurify',
+      'drizzle-orm',
+      'drizzle-orm/pg-core',
+      'drizzle-orm/neon-http',
+      'drizzle-zod',
+      'zod',
+      '@upstash/ratelimit',
+      '@upstash/redis',
+      '@neondatabase/serverless',
+      'jose',
+      'stripe',
+    ],
+  },
+});

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { LINKS } from './mock-data';
 
 /**
  * Link management demo showing social & music links with click counts.
+ * Uses real SocialIcon components instead of emoji placeholders.
  */
 export function DashboardLinksDemo() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,42 +29,16 @@ export function DashboardLinksDemo() {
 
   return (
     <div ref={containerRef}>
-      <div
-        className='overflow-hidden rounded-lg'
-        style={{
-          border: '1px solid var(--linear-border-subtle)',
-          backgroundColor: 'var(--linear-bg-surface-0)',
-        }}
-      >
+      <div className='overflow-hidden rounded-lg border border-subtle bg-surface-0'>
         {/* Header */}
-        <div
-          className='flex items-center justify-between px-4 py-3'
-          style={{
-            backgroundColor: 'var(--linear-bg-surface-1)',
-            borderBottom: '1px solid var(--linear-border-subtle)',
-          }}
-        >
+        <div className='flex items-center justify-between border-b border-subtle bg-surface-1 px-4 py-3'>
           <div className='flex items-center gap-4'>
-            <span
-              className='text-xs font-medium'
-              style={{ color: 'var(--linear-text-primary)' }}
-            >
+            <span className='text-xs font-medium text-primary-token'>
               Music Links
             </span>
-            <span
-              className='text-xs'
-              style={{ color: 'var(--linear-text-tertiary)' }}
-            >
-              Social Links
-            </span>
+            <span className='text-xs text-tertiary-token'>Social Links</span>
           </div>
-          <div
-            className='rounded-md px-2.5 py-1 text-[11px] font-medium'
-            style={{
-              backgroundColor: 'var(--linear-btn-primary-bg)',
-              color: 'var(--linear-btn-primary-fg)',
-            }}
-          >
+          <div className='rounded-md bg-btn-primary px-2.5 py-1 text-[11px] font-medium text-btn-primary-foreground'>
             + Add link
           </div>
         </div>
@@ -86,25 +62,23 @@ export function DashboardLinksDemo() {
               {/* Drag handle */}
               <div
                 className='flex flex-col gap-[2px] opacity-30'
-                style={{ color: 'var(--linear-text-tertiary)' }}
+                style={{ color: 'var(--color-text-tertiary-token)' }}
               >
-                <span className='text-[8px] leading-none'>⋮⋮</span>
+                <span className='text-[8px] leading-none'>&#8942;&#8942;</span>
               </div>
 
               {/* Platform icon & name */}
               <div className='flex min-w-0 flex-1 items-center gap-2.5'>
-                <span className='text-sm'>{link.icon}</span>
+                <SocialIcon
+                  platform={link.platformKey}
+                  className='h-4 w-4 shrink-0 text-secondary-token'
+                  aria-hidden
+                />
                 <div className='min-w-0'>
-                  <p
-                    className='text-xs font-medium'
-                    style={{ color: 'var(--linear-text-primary)' }}
-                  >
+                  <p className='text-xs font-medium text-primary-token'>
                     {link.platform}
                   </p>
-                  <p
-                    className='truncate text-[10px]'
-                    style={{ color: 'var(--linear-text-tertiary)' }}
-                  >
+                  <p className='truncate text-[10px] text-tertiary-token'>
                     {link.url}
                   </p>
                 </div>
@@ -112,10 +86,7 @@ export function DashboardLinksDemo() {
 
               {/* Click sparkline */}
               <div className='hidden items-center gap-2 sm:flex'>
-                <div
-                  className='h-3 w-16 overflow-hidden rounded-full'
-                  style={{ backgroundColor: 'var(--linear-bg-surface-2)' }}
-                >
+                <div className='h-3 w-16 overflow-hidden rounded-full bg-surface-2'>
                   <div
                     className='h-full rounded-full'
                     style={{
@@ -128,10 +99,7 @@ export function DashboardLinksDemo() {
                     }}
                   />
                 </div>
-                <span
-                  className='w-10 text-right text-[11px] tabular-nums'
-                  style={{ color: 'var(--linear-text-tertiary)' }}
-                >
+                <span className='w-10 text-right text-[11px] tabular-nums text-tertiary-token'>
                   {link.clicks.toLocaleString()}
                 </span>
               </div>
@@ -141,8 +109,8 @@ export function DashboardLinksDemo() {
                 className='h-4 w-7 shrink-0 rounded-full'
                 style={{
                   backgroundColor: link.active
-                    ? 'var(--linear-success)'
-                    : 'var(--linear-bg-surface-2)',
+                    ? 'var(--color-success)'
+                    : 'var(--color-bg-surface-2)',
                   position: 'relative',
                   transition: 'background-color 0.2s',
                 }}
@@ -153,7 +121,7 @@ export function DashboardLinksDemo() {
                     left: link.active ? 14 : 2,
                     backgroundColor: '#fff',
                     transition: 'left 0.2s',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                    boxShadow: 'var(--linear-shadow-button)',
                   }}
                 />
               </div>

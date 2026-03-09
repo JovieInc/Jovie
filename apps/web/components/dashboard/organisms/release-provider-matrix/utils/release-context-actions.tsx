@@ -1,5 +1,6 @@
 import { Icon } from '@/components/atoms/Icon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
+import { buildCopyMenuItems } from '@/components/ui/CopyableField';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
@@ -78,37 +79,17 @@ export function getReleaseContextMenuItems({
           }),
         ]),
     { type: 'separator' },
-    {
-      id: 'copy-release-id',
-      label: 'Copy release ID',
-      icon: menuIcon('Hash'),
-      onClick: () => {
-        navigator.clipboard.writeText(release.id);
-      },
-    },
+    ...buildCopyMenuItems([
+      { id: 'release-id', label: 'Release ID', value: release.id },
+      release.lyrics?.trim()
+        ? { id: 'lyrics', label: 'Lyrics', value: release.lyrics.trim() }
+        : null,
+      release.upc ? { id: 'upc', label: 'UPC', value: release.upc } : null,
+      release.primaryIsrc
+        ? { id: 'isrc', label: 'ISRC', value: release.primaryIsrc }
+        : null,
+    ]),
   ];
-
-  if (release.upc) {
-    items.push({
-      id: 'copy-upc',
-      label: 'Copy UPC',
-      icon: menuIcon('Hash'),
-      onClick: () => {
-        navigator.clipboard.writeText(release.upc!);
-      },
-    });
-  }
-
-  if (release.primaryIsrc) {
-    items.push({
-      id: 'copy-isrc',
-      label: 'Copy ISRC',
-      icon: menuIcon('Hash'),
-      onClick: () => {
-        navigator.clipboard.writeText(release.primaryIsrc!);
-      },
-    });
-  }
 
   const supportedProviders = new Set<ProviderKey>([
     'spotify',

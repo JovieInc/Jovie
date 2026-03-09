@@ -9,6 +9,7 @@ import type {
   ProviderLink,
   ReleaseViewModel,
 } from '@/lib/discography/types';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export type Release = ReleaseViewModel;
 
@@ -32,6 +33,8 @@ export interface ReleaseSidebarProps {
   readonly artistName?: string | null;
   readonly onClose?: () => void;
   readonly onRefresh?: () => void;
+  /** Whether a release refresh operation is currently in progress */
+  readonly isRefreshing?: boolean;
   readonly onReleaseChange?: (release: Release) => void;
   readonly onSave?: (release: Release) => void | Promise<void>;
   readonly isSaving?: boolean;
@@ -69,6 +72,21 @@ export interface ReleaseSidebarProps {
    * Whether an ISRC rescan is currently in progress
    */
   readonly isRescanningIsrc?: boolean;
+  /** Persist release lyrics in metadata */
+  readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  /** Persist canvas status in metadata */
+  readonly onCanvasStatusUpdate?: (
+    releaseId: string,
+    status: CanvasStatus
+  ) => Promise<void>;
+  /** Format lyrics for the specified platform */
+  readonly onFormatLyrics?: (
+    releaseId: string,
+    lyrics: string,
+    format: import('@/lib/lyrics/types').LyricsFormat
+  ) => Promise<string[]>;
+  /** Whether lyrics operations are currently pending */
+  readonly isLyricsSaving?: boolean;
   /**
    * Whether album art downloads are allowed on public pages.
    * Controls the visibility of the "Allow album art downloads" setting.
@@ -79,4 +97,20 @@ export interface ReleaseSidebarProps {
    * Used for free-plan users who can view but not modify their smartlinks.
    */
   readonly readOnly?: boolean;
+  readonly onTrackClick?: (track: {
+    id: string;
+    title: string;
+    slug: string;
+    smartLinkPath: string;
+    trackNumber: number;
+    discNumber: number;
+    durationMs: number | null;
+    isrc: string | null;
+    isExplicit: boolean;
+    providers: Array<{ key: string; label: string; url: string }>;
+    releaseId: string;
+    previewUrl?: string | null;
+    audioUrl?: string | null;
+    audioFormat?: string | null;
+  }) => void;
 }

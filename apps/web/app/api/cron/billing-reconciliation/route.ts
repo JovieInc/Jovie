@@ -14,10 +14,8 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import type Stripe from 'stripe';
 import {
   BATCH_SIZE,
-  fetchAllSubscriptionsMap,
   fetchUserBatch,
   processSingleUser,
   type ReconciliationStats,
@@ -29,15 +27,13 @@ import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
-import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
 // Safety limit: process max 5000 users per run
 const MAX_BATCHES = 50;
-
-// Populated by reconcileUsersWithSubscriptions(), consumed by
-// reconcileProUsersWithoutSubscription() within the same request.
-let _customerSubscriptionsMap: Map<string, Stripe.Subscription[]> | null = null;
+const FIRST_PASS_CONCURRENCY = 5;
+const SECOND_PASS_REPAIR_CONCURRENCY = 5;
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
@@ -127,45 +123,16 @@ export async function GET(request: Request) {
 }
 
 /**
- * Build a secondary index from the subscriptions map keyed by customer ID.
- * Each customer may have multiple subscriptions.
- */
-function buildCustomerSubscriptionsMap(
-  subscriptionsMap: Map<string, Stripe.Subscription>
-): Map<string, Stripe.Subscription[]> {
-  const customerMap = new Map<string, Stripe.Subscription[]>();
-
-  for (const subscription of subscriptionsMap.values()) {
-    const customerId =
-      typeof subscription.customer === 'string'
-        ? subscription.customer
-        : subscription.customer.id;
-
-    const existing = customerMap.get(customerId);
-    if (existing) {
-      existing.push(subscription);
-    } else {
-      customerMap.set(customerId, [subscription]);
-    }
-  }
-
-  return customerMap;
-}
-
-/**
  * Reconcile users who have a subscription ID stored in DB
  * Uses cursor-based pagination to handle >100 users.
  *
- * A single bulk Stripe API call fetches all subscriptions up-front so that
- * individual user processing only requires an in-memory map lookup.
+ * Each user's subscription is looked up individually via Stripe's retrieve
+ * API rather than fetching the entire subscription corpus.
  */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
   errors: string[]
 ): Promise<void> {
-  // Fetch ALL subscriptions from Stripe once
-  const subscriptionsMap = await fetchAllSubscriptionsMap(stripe);
-
   let lastUserId: string | null = null;
   let batchCount = 0;
 
@@ -175,22 +142,39 @@ async function reconcileUsersWithSubscriptions(
     const batch = await fetchUserBatch(db, lastUserId);
     if (batch.length === 0) break;
 
-    for (const user of batch) {
-      stats.usersChecked++;
-      lastUserId = user.id;
+    // Update cursor to last user in batch before parallel processing
+    lastUserId = batch[batch.length - 1].id;
 
-      try {
-        const result = await processSingleUser(
-          db,
-          stripe,
-          user,
-          subscriptionsMap
-        );
-        updateStatsFromResult(stats, errors, user.id, result);
-      } catch (error) {
-        stats.errors++;
-        const message = error instanceof Error ? error.message : String(error);
-        errors.push(`Error processing user ${user.id}: ${message}`);
+    // Process users with bounded concurrency to avoid Stripe rate limits
+    for (
+      let chunkStart = 0;
+      chunkStart < batch.length;
+      chunkStart += FIRST_PASS_CONCURRENCY
+    ) {
+      const userChunk = batch.slice(
+        chunkStart,
+        chunkStart + FIRST_PASS_CONCURRENCY
+      );
+
+      const results = await Promise.allSettled(
+        userChunk.map(user => processSingleUser(db, stripe, user))
+      );
+
+      for (let i = 0; i < results.length; i++) {
+        stats.usersChecked++;
+        const result = results[i];
+        const user = userChunk[i];
+
+        if (result.status === 'fulfilled') {
+          updateStatsFromResult(stats, errors, user.id, result.value);
+        } else {
+          stats.errors++;
+          const message =
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason);
+          errors.push(`Error processing user ${user.id}: ${message}`);
+        }
       }
     }
 
@@ -203,18 +187,14 @@ async function reconcileUsersWithSubscriptions(
       usersChecked: stats.usersChecked,
     });
   }
-
-  // Build customer-keyed index and attach to module-level variable so that
-  // reconcileProUsersWithoutSubscription() can reuse the same data.
-  _customerSubscriptionsMap = buildCustomerSubscriptionsMap(subscriptionsMap);
 }
 
 /**
  * Reconcile users marked as Pro but without a subscription ID
  * This shouldn't happen normally but could due to bugs or manual edits.
  *
- * Uses the customer-keyed subscriptions map built during
- * reconcileUsersWithSubscriptions() to avoid per-user Stripe API calls.
+ * For each user with a Stripe customer ID, fetches their subscriptions
+ * directly from Stripe rather than scanning the full corpus.
  */
 async function reconcileProUsersWithoutSubscription(
   stats: ReconciliationStats,
@@ -234,79 +214,116 @@ async function reconcileProUsersWithoutSubscription(
     )
     .limit(50);
 
-  const customerMap = _customerSubscriptionsMap;
+  for (
+    let chunkStart = 0;
+    chunkStart < proUsersWithoutSub.length;
+    chunkStart += SECOND_PASS_REPAIR_CONCURRENCY
+  ) {
+    const userChunk = proUsersWithoutSub.slice(
+      chunkStart,
+      chunkStart + SECOND_PASS_REPAIR_CONCURRENCY
+    );
 
-  for (const user of proUsersWithoutSub) {
-    stats.usersChecked++;
-
-    try {
-      // If they have a customer ID, check for active subscriptions
-      if (user.stripeCustomerId) {
-        // Look up subscriptions from the pre-fetched customer map
-        const customerSubs = customerMap?.get(user.stripeCustomerId);
-        const activeSubscription = customerSubs?.find(
-          s => s.status === 'active'
-        );
-
-        if (activeSubscription) {
-          // They have an active subscription - link it
-          stats.mismatches++;
-
-          await db
-            .update(users)
-            .set({
-              stripeSubscriptionId: activeSubscription.id,
-              billingUpdatedAt: new Date(),
-              billingVersion: drizzleSql`${users.billingVersion} + 1`,
-            })
-            .where(eq(users.id, user.id));
-
-          // Log to audit
-          await db.insert(billingAuditLog).values({
+    const results = await Promise.allSettled(
+      userChunk.map(async user => {
+        try {
+          return {
             userId: user.id,
-            eventType: 'reconciliation_fix',
-            previousState: { stripeSubscriptionId: null },
-            newState: { stripeSubscriptionId: activeSubscription.id },
-            source: 'reconciliation',
-            metadata: {
-              reason: 'linked_active_subscription',
-            },
-          });
-
-          stats.fixed++;
-          continue;
+            result: await repairProUserWithoutSubscription(user),
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          throw new Error(`user ${user.id}: ${message}`);
         }
+      })
+    );
+
+    for (const result of results) {
+      stats.usersChecked++;
+
+      if (result.status === 'fulfilled') {
+        stats.mismatches += result.value.result.mismatches;
+        stats.fixed += result.value.result.fixed;
+        continue;
       }
 
-      // No active subscription found - they shouldn't be Pro
-      stats.mismatches++;
-
-      const result = await updateUserBillingStatus({
-        clerkUserId: user.clerkId,
-        isPro: false,
-        eventType: 'reconciliation_fix',
-        source: 'reconciliation',
-        metadata: {
-          reason: 'pro_without_subscription',
-          hadCustomerId: !!user.stripeCustomerId,
-        },
-      });
-
-      if (result.success) {
-        stats.fixed++;
-        logger.info(
-          `[billing-reconciliation] Downgraded user ${user.id}: Pro without subscription`
-        );
-      } else {
-        stats.errors++;
-        errors.push(`Failed to fix Pro user ${user.id}: ${result.error}`);
-      }
-    } catch (error) {
       stats.errors++;
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Error processing Pro user ${user.id}: ${message}`);
+      const message =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      errors.push(`Error processing Pro user repair: ${message}`);
     }
   }
+}
+
+async function repairProUserWithoutSubscription(user: {
+  id: string;
+  stripeCustomerId: string | null;
+}): Promise<{ mismatches: number; fixed: number }> {
+  if (user.stripeCustomerId) {
+    // Targeted lookup: fetch only this customer's subscriptions
+    const customerSubs = await stripe.subscriptions.list({
+      customer: user.stripeCustomerId,
+      status: 'all',
+      limit: 10,
+    });
+    const activeSubscription = customerSubs.data.find(subscription =>
+      isActiveSubscription(subscription.status)
+    );
+
+    if (activeSubscription) {
+      // They have an active subscription - link it
+      await db.transaction(async tx => {
+        await tx
+          .update(users)
+          .set({
+            stripeSubscriptionId: activeSubscription.id,
+            billingUpdatedAt: new Date(),
+            billingVersion: drizzleSql`${users.billingVersion} + 1`,
+          })
+          .where(eq(users.id, user.id));
+        await tx.insert(billingAuditLog).values({
+          userId: user.id,
+          eventType: 'reconciliation_fix',
+          previousState: { stripeSubscriptionId: null },
+          newState: { stripeSubscriptionId: activeSubscription.id },
+          source: 'reconciliation',
+          metadata: {
+            reason: 'linked_active_subscription',
+          },
+        });
+      });
+
+      return { mismatches: 1, fixed: 1 };
+    }
+  }
+
+  // No active subscription found - they shouldn't be Pro
+  await db.transaction(async tx => {
+    await tx
+      .update(users)
+      .set({
+        isPro: false,
+        stripeSubscriptionId: null,
+        billingUpdatedAt: new Date(),
+        billingVersion: drizzleSql`${users.billingVersion} + 1`,
+      })
+      .where(eq(users.id, user.id));
+    await tx.insert(billingAuditLog).values({
+      userId: user.id,
+      eventType: 'reconciliation_fix',
+      previousState: { stripeSubscriptionId: null },
+      newState: { isPro: false },
+      source: 'reconciliation',
+      metadata: {
+        reason: 'no_active_subscription',
+      },
+    });
+  });
+
+  return { mismatches: 1, fixed: 1 };
 }
 
 /**

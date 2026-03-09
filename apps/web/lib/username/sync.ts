@@ -5,6 +5,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export type UsernameValidationErrorCode = 'INVALID_USERNAME' | 'USERNAME_TAKEN';
@@ -22,7 +23,7 @@ interface UsernameUpdateOutcome {
   normalized: string;
   changed: boolean;
   conflict: boolean;
-  canonicalUsername: string;
+  previousCanonicalUsername: string | null;
 }
 
 async function updateCanonicalUsernameInternal(
@@ -57,7 +58,10 @@ async function updateCanonicalUsernameInternal(
       }
 
       const [profile] = await tx
-        .select()
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.userId, userRow.id))
         .limit(1);
@@ -66,14 +70,14 @@ async function updateCanonicalUsernameInternal(
         throw new Error('Creator profile not found');
       }
 
-      const canonicalUsername = profile.usernameNormalized;
+      const previousCanonicalUsername = profile.usernameNormalized;
 
-      if (canonicalUsername === normalized) {
+      if (previousCanonicalUsername === normalized) {
         return {
           normalized,
           changed: false,
           conflict: false,
-          canonicalUsername,
+          previousCanonicalUsername,
         };
       }
 
@@ -88,7 +92,7 @@ async function updateCanonicalUsernameInternal(
           normalized,
           changed: false,
           conflict: true,
-          canonicalUsername,
+          previousCanonicalUsername,
         };
       }
 
@@ -105,7 +109,7 @@ async function updateCanonicalUsernameInternal(
         normalized,
         changed: true,
         conflict: false,
-        canonicalUsername: normalized,
+        previousCanonicalUsername,
       };
     },
     { clerkUserId }
@@ -137,9 +141,19 @@ export async function syncCanonicalUsernameFromApp(
 
   // Invalidate caches if username changed
   if (outcome.changed) {
-    // Note: We don't have the old username without a Clerk lookup,
-    // but invalidateUsernameChange handles undefined oldUsername gracefully
-    await invalidateUsernameChange(outcome.canonicalUsername, undefined);
+    await invalidateUsernameChange(
+      outcome.normalized,
+      outcome.previousCanonicalUsername
+    );
+
+    // Invalidate handle-availability cache for both old and new handles.
+    // This ensures old handle availability and new handle reservation update quickly.
+    await Promise.all([
+      invalidateHandleCache(outcome.normalized),
+      outcome.previousCanonicalUsername
+        ? invalidateHandleCache(outcome.previousCanonicalUsername)
+        : Promise.resolve(),
+    ]);
   }
 }
 

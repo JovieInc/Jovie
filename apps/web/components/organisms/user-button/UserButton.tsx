@@ -5,8 +5,10 @@ import { Button, CommonDropdown } from '@jovie/ui';
 import dynamic from 'next/dynamic';
 import { useCallback } from 'react';
 import { Badge } from '@/components/atoms/Badge';
+import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
+import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import type { UserButtonProps } from './types';
@@ -38,6 +40,7 @@ interface BuildDropdownItemsParams {
   handleSettings: () => void;
   handleManageBilling: () => void;
   handleUpgrade: () => void;
+  upgradeLabel: string;
   handleSignOut: () => void;
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
@@ -54,6 +57,7 @@ function buildDropdownItems({
   handleSettings,
   handleManageBilling,
   handleUpgrade,
+  upgradeLabel,
   handleSignOut,
   setIsFeedbackOpen,
   handleOpenShortcuts,
@@ -121,7 +125,7 @@ function buildDropdownItems({
       id: 'keyboard-shortcuts',
       label: 'Keyboard shortcuts',
       onClick: handleOpenShortcuts,
-      shortcut: '⌘ /',
+      shortcut: `${GLYPH_CMD} /`,
     });
   }
 
@@ -132,21 +136,21 @@ function buildDropdownItems({
       id: 'privacy-policy',
       label: 'Privacy Policy',
       onClick: () =>
-        window.open('/legal/privacy', '_blank', 'noopener,noreferrer'),
+        window.open(APP_ROUTES.LEGAL_PRIVACY, '_blank', 'noopener,noreferrer'),
     },
     {
       type: 'action',
       id: 'terms-of-service',
       label: 'Terms of Service',
       onClick: () =>
-        window.open('/legal/terms', '_blank', 'noopener,noreferrer'),
+        window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
     },
     {
       type: 'action',
       id: 'cookie-policy',
       label: 'Cookie Policy',
       onClick: () =>
-        window.open('/legal/cookies', '_blank', 'noopener,noreferrer'),
+        window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
     }
   );
 
@@ -185,7 +189,7 @@ function buildDropdownItems({
     items.push({
       type: 'action',
       id: 'upgrade',
-      label: loading.upgrade ? 'Opening…' : 'Upgrade to Pro',
+      label: loading.upgrade ? 'Opening…' : upgradeLabel,
       onClick: handleUpgrade,
       disabled: loading.upgrade,
       className: 'disabled:cursor-not-allowed disabled:opacity-70',
@@ -208,7 +212,7 @@ function buildDropdownItems({
       onClick: handleSignOut,
       disabled: loading.signOut,
       className: 'disabled:cursor-not-allowed disabled:opacity-60',
-      shortcut: '⌥ ⇧ Q',
+      shortcut: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
     }
   );
 
@@ -223,12 +227,25 @@ export function UserButton({
   trigger,
 }: UserButtonProps) {
   const keyboardShortcuts = useKeyboardShortcutsSafe();
-  const handleFeedbackSubmit = useCallback((feedback: string) => {
+  const handleFeedbackSubmit = useCallback(async (feedback: string) => {
+    const trimmedFeedback = feedback.trim();
+
     track('feedback_submitted', {
-      feedback: feedback.trim(),
+      feedback: trimmedFeedback,
       source: 'dashboard_sidebar',
       method: 'custom_modal',
-      character_count: feedback.trim().length,
+      character_count: trimmedFeedback.length,
+    });
+
+    await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: trimmedFeedback,
+        source: 'dashboard_sidebar',
+        pathname:
+          globalThis.window === undefined ? null : globalThis.location.pathname,
+      }),
     });
   }, []);
   const {
@@ -257,6 +274,21 @@ export function UserButton({
 
   // Handle loading state or no user
   if (!isLoaded || !user) {
+    if (trigger) {
+      return (
+        <CommonDropdown
+          variant='dropdown'
+          items={[]}
+          trigger={trigger}
+          align='start'
+          open={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          disabled
+          contentClassName='w-[220px]'
+        />
+      );
+    }
+
     return showUserInfo ? (
       <div className='flex w-full items-center gap-2 rounded-md px-2 py-1'>
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
@@ -280,6 +312,7 @@ export function UserButton({
     handleSettings,
     handleManageBilling,
     handleUpgrade,
+    upgradeLabel: menuActions.upgradeLabel,
     handleSignOut,
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,

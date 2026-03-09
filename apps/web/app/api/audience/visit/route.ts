@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   checkVisitRateLimit,
@@ -9,7 +9,7 @@ import {
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
-import { audienceMembers } from '@/lib/db/schema/analytics';
+import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -27,6 +27,37 @@ import {
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+const INTERNAL_HOST_SUFFIXES = ['jov.ie', 'jovie.fm'];
+
+function isInternalTrafficReferrer(referrerUrl: string): boolean {
+  try {
+    const hostname = new URL(referrerUrl).hostname.toLowerCase();
+    return INTERNAL_HOST_SUFFIXES.some(
+      suffix => hostname === suffix || hostname.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a referrer URL is from the same origin as the request.
+ * Used to filter out the HTTP Referer header on same-origin fetch() calls,
+ * which would incorrectly record the app's own URL as the traffic source.
+ */
+function isSameOriginReferrer(
+  referrerUrl: string,
+  requestUrl: string
+): boolean {
+  try {
+    const referrerHost = new URL(referrerUrl).hostname;
+    const requestHost = new URL(requestUrl).hostname;
+    return referrerHost === requestHost;
+  } catch {
+    return false;
+  }
+}
 
 function inferDeviceType(
   userAgent: string | null
@@ -111,8 +142,19 @@ export async function POST(request: NextRequest) {
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
     const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
+    // Use the client-provided referrer (document.referrer) if available.
+    // The HTTP Referer header on same-origin fetch() is the current page URL,
+    // NOT the external referrer, so we filter out self-referrals from the fallback.
+    const httpReferer = request.headers.get('referer') ?? undefined;
+    const isSelfReferral = httpReferer
+      ? isSameOriginReferrer(httpReferer, request.url)
+      : false;
+    const fallbackReferrer = isSelfReferral ? undefined : httpReferer;
+    const rawReferrer = referrer ?? fallbackReferrer;
     const resolvedReferrer =
-      referrer ?? request.headers.get('referer') ?? undefined;
+      rawReferrer && isInternalTrafficReferrer(rawReferrer)
+        ? undefined
+        : rawReferrer;
     const resolvedGeoCity =
       geoCity ?? request.headers.get('x-vercel-ip-city') ?? undefined;
     const resolvedGeoCountry =
@@ -170,6 +212,28 @@ export async function POST(request: NextRequest) {
       : [];
 
     await withSystemIngestionSession(async tx => {
+      const viewDate = now.toISOString().slice(0, 10);
+
+      await tx
+        .insert(dailyProfileViews)
+        .values({
+          creatorProfileId: profileId,
+          viewDate,
+          viewCount: 1,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: [
+            dailyProfileViews.creatorProfileId,
+            dailyProfileViews.viewDate,
+          ],
+          set: {
+            viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+            updatedAt: now,
+          },
+        });
+
       const [existing] = await tx
         .select({
           id: audienceMembers.id,

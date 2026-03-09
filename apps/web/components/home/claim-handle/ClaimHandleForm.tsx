@@ -1,6 +1,5 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -12,7 +11,6 @@ import {
   useState,
 } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { BASE_URL } from '@/constants/app';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
@@ -21,230 +19,67 @@ import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
-const getFormErrors = ({
-  formSubmitted,
-  handleError,
-  availError,
-  available,
-}: {
-  formSubmitted: boolean;
-  handleError: string | null;
-  availError: string | null;
-  available: boolean | null;
-}) => {
-  const errors: Record<string, string> = {};
-
-  if (!formSubmitted) {
-    return errors;
-  }
-
-  if (handleError) {
-    errors.handle = handleError;
-  } else if (availError) {
-    errors.handle = availError;
-  } else if (available === false) {
-    errors.handle = 'Handle already taken';
-  }
-
-  return errors;
-};
-
-const getValidationState = ({
-  handle,
-  unavailable,
-  available,
-  checkingAvail,
-}: {
-  handle: string;
-  unavailable: boolean;
-  available: boolean | null;
-  checkingAvail: boolean;
-}) => {
-  if (!handle) return null;
-  if (unavailable) return 'invalid';
-  if (available === true) return 'valid';
-  if (checkingAvail) return 'pending';
-  return null;
-};
-
-const getInputClassName = ({
-  isShaking,
-  available,
-}: {
-  isShaking: boolean;
-  available: boolean | null;
-}) =>
-  cn(
-    isShaking && 'jv-shake',
-    available === true && 'jv-available',
-    'transition-all duration-150 hover:shadow-lg focus-within:shadow-lg'
-  );
-
-const getButtonContent = ({
-  showChecking,
-  navigating,
-  available,
-  handle,
-}: {
-  showChecking: boolean;
-  navigating: boolean;
-  available: boolean | null;
-  handle: string;
-}): ReactNode => {
-  if (showChecking) {
-    return (
-      <>
-        <LoadingSpinner size='sm' className='text-white' />
-        <span>Checking availability…</span>
-      </>
-    );
-  }
-
-  if (navigating) {
-    return (
-      <>
-        <LoadingSpinner size='sm' className='text-white' />
-        <span>Creating your profile…</span>
-      </>
-    );
-  }
-
-  if (available === true) {
-    return (
-      <>
-        <span>Claim @{handle}</span>
-        <ChevronRight
-          className='w-4 h-4 transition-transform group-hover:translate-x-1'
-          aria-hidden='true'
-        />
-      </>
-    );
-  }
-
-  return 'Request Early Access';
-};
-
 export function ClaimHandleForm({
   onHandleChange,
 }: Readonly<ClaimHandleFormProps>) {
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
-  const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const shakeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const displayDomain = BASE_URL.replace(/^https?:\/\//, '');
 
   const [handle, setHandle] = useState('');
   const [navigating, setNavigating] = useState(false);
-  const [isShaking, setIsShaking] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
 
   const { handleError, checkingAvail, available, availError } =
     useHandleValidation(handle);
 
-  // Notify parent component about handle changes
   useEffect(() => {
-    if (onHandleChange) {
-      onHandleChange(handle);
-    }
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('jovie-hero-handle-change', {
-          detail: { handle },
-        })
-      );
-    }
+    onHandleChange?.(handle);
   }, [handle, onHandleChange]);
 
-  // Optimistic prefetch when handle becomes available
   useEffect(() => {
     if (available === true && handle) {
-      const target = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
-      router.prefetch(target);
+      router.prefetch(
+        `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
+      );
     }
   }, [available, handle, router]);
 
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (shakeTimeoutRef.current) {
-        clearTimeout(shakeTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const onSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    (e: React.FormEvent) => {
       e.preventDefault();
       setFormSubmitted(true);
 
-      if (handleError || checkingAvail || available !== true) {
-        setIsShaking(true);
-        if (shakeTimeoutRef.current) {
-          clearTimeout(shakeTimeoutRef.current);
-        }
-        shakeTimeoutRef.current = setTimeout(() => {
-          setIsShaking(false);
-          shakeTimeoutRef.current = null;
-        }, 180);
-
-        if (inputRef.current) {
-          inputRef.current.focus();
-        }
-        return;
+      // Store handle state if it exists, otherwise just direct to signup
+      if (handle) {
+        try {
+          sessionStorage.setItem(
+            'pendingClaim',
+            JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
+          );
+        } catch {}
       }
 
-      try {
-        sessionStorage.setItem(
-          'pendingClaim',
-          JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
-        );
-      } catch {}
-
-      const target = `/onboarding?handle=${encodeURIComponent(
-        handle.toLowerCase()
-      )}`;
+      const target = handle
+        ? `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
+        : '/signup';
 
       setNavigating(true);
 
-      const loadingMessage = document.getElementById('loading-announcement');
-      if (loadingMessage) {
-        loadingMessage.textContent = 'Creating your profile. Please wait...';
-      }
-
       if (!isSignedIn) {
-        // Send to signup with redirect_url pointing to onboarding with the handle.
-        // This preserves the handle through the auth flow so onboarding can pre-fill it.
-        const onboardingUrl = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
-        router.push(
-          `/signup?redirect_url=${encodeURIComponent(onboardingUrl)}`
-        );
+        router.push(`/signup?redirect_url=${encodeURIComponent(target)}`);
         return;
       }
 
       router.push(target);
     },
-    [available, checkingAvail, handle, handleError, isSignedIn, router]
+    [handle, isSignedIn, router]
   );
 
   const showChecking = checkingAvail;
   const unavailable = available === false || !!handleError || !!availError;
-  const canSubmit = available === true && !checkingAvail && !navigating;
-  const btnDisabled = !canSubmit;
-
-  const fieldId = 'handle-input';
-  const helperId = `${fieldId}-hint`;
-
-  const formErrors = useMemo(() => {
-    return getFormErrors({
-      formSubmitted,
-      handleError,
-      availError,
-      available,
-    });
-  }, [formSubmitted, handleError, availError, available]);
 
   const helperState = useHelperState({
     handle,
@@ -256,100 +91,169 @@ export function ClaimHandleForm({
   });
 
   const helperToneClass = HELPER_TONE_CLASSES[helperState.tone];
-  const helperAriaLive = helperState.tone === 'error' ? 'assertive' : 'polite';
+
+  const buttonContent = useMemo((): ReactNode => {
+    if (navigating) {
+      return (
+        <>
+          <LoadingSpinner size='sm' tone='inverse' label='Creating' />
+          <span>Creating…</span>
+        </>
+      );
+    }
+    if (available === true) {
+      return (
+        <>
+          <span>Claim @{handle}</span>
+          <ChevronRight
+            className='h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5'
+            aria-hidden='true'
+          />
+        </>
+      );
+    }
+    return 'Claim';
+  }, [navigating, available, handle]);
+
+  const isAvailable = available === true;
+  // Only block during navigation — never gate on availability check.
+  // Availability is informational; server validates during onboarding.
+  const hasClientError = !!handleError;
+  const isDisabled = navigating || hasClientError;
 
   return (
-    <form ref={formRef} onSubmit={onSubmit} className='space-y-4' noValidate>
+    <form onSubmit={onSubmit} className='w-full' noValidate>
+      {/* Input row */}
       <div
-        className='sr-only'
-        aria-live='assertive'
-        aria-atomic='true'
-        id='loading-announcement'
-      ></div>
-
-      <ErrorSummary
-        errors={formErrors}
-        onFocusField={fieldName => {
-          if (fieldName === 'handle' && inputRef.current) {
-            inputRef.current.focus();
-          }
+        className={cn(
+          'claim-input-row',
+          'relative flex w-full items-center gap-2 rounded-[14px] p-1.5',
+          'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          isAvailable && 'claim-input-row--available'
+        )}
+        style={{
+          minHeight: 52,
+          background: 'rgba(255,255,255,0.03)',
+          border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
+          boxShadow: [
+            'inset 0 1px 2px rgba(0,0,0,0.2)',
+            isAvailable
+              ? '0 0 20px rgba(74,222,128,0.06)'
+              : '0 1px 2px rgba(0,0,0,0.1)',
+          ].join(', '),
         }}
-      />
-
-      <div className='space-y-2'>
-        <label
-          htmlFor={fieldId}
-          className='text-sm font-semibold text-primary-token'
-        >
-          Choose your handle
-        </label>
-
-        <div className='relative'>
-          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-secondary-token'>
+      >
+        <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
+          {/* Domain prefix — etched, permanent feel */}
+          <span
+            className='shrink-0 select-none font-mono'
+            style={{
+              fontSize: '13px',
+              fontWeight: 400,
+              color: 'var(--linear-text-quaternary)',
+              letterSpacing: '-0.02em',
+              opacity: 0.7,
+            }}
+          >
             {displayDomain}/
           </span>
-          <Input
+
+          <input
             ref={inputRef}
-            id={fieldId}
+            id='handle-input'
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='your-handle'
+            placeholder='your-name'
             required
             autoCapitalize='none'
             autoCorrect='off'
-            aria-describedby={helperState.text ? helperId : undefined}
-            validationState={getValidationState({
-              handle,
-              unavailable,
-              available,
-              checkingAvail,
-            })}
-            className={cn(
-              getInputClassName({ isShaking, available }),
-              'text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-500 dark:placeholder:text-zinc-400 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
-            )}
-            statusIcon={
-              <HandleStatusIcon
-                showChecking={showChecking}
-                handle={handle}
-                available={available}
-                handleError={handleError}
-                unavailable={unavailable}
-              />
-            }
+            autoComplete='off'
+            aria-label='Choose your handle'
+            aria-describedby={helperState.text ? 'handle-hint' : undefined}
+            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-40 placeholder:text-[var(--linear-text-tertiary)]'
+            style={{
+              fontSize: '13px',
+              fontWeight: 450,
+              letterSpacing: '-0.01em',
+              color: isAvailable
+                ? 'rgb(74,222,128)'
+                : 'var(--linear-text-primary)',
+            }}
+          />
+
+          <HandleStatusIcon
+            showChecking={showChecking}
+            handle={handle}
+            available={available}
+            handleError={handleError}
+            unavailable={unavailable}
           />
         </div>
 
-        {helperState.text && (
-          <div id='handle-preview-text' className='min-h-5'>
-            <p
-              id={helperId}
-              className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
-              aria-live={helperAriaLive}
-            >
-              {helperState.text}
-            </p>
-          </div>
-        )}
+        <button
+          type='submit'
+          disabled={isDisabled}
+          className={cn(
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[10px] px-4 sm:px-5 transition-all duration-200 focus-ring-themed',
+            isDisabled
+              ? 'cursor-not-allowed opacity-40'
+              : 'hover:brightness-110 active:scale-[0.98]'
+          )}
+          style={{
+            height: 36,
+            fontSize: '13px',
+            fontWeight: 500,
+            letterSpacing: '-0.01em',
+            background: isDisabled
+              ? 'rgba(255,255,255,0.06)'
+              : 'rgb(237,238,238)',
+            color: isDisabled ? 'var(--linear-text-quaternary)' : 'rgb(8,9,10)',
+            boxShadow: isDisabled
+              ? 'none'
+              : '0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+          }}
+        >
+          <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
+            {buttonContent}
+          </span>
+        </button>
       </div>
 
-      <Button
-        type='submit'
-        variant='primary'
-        size='lg'
-        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 group h-[54px]! px-6! text-base font-semibold tracking-wide bg-linear-to-br! from-blue-600/95! via-indigo-600/85! to-cyan-500/90! text-white! shadow-[0_18px_35px_rgba(15,23,42,0.25)]'
-        disabled={btnDisabled || !handle}
-      >
-        <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>
-          {getButtonContent({
-            showChecking,
-            navigating,
-            available,
-            handle,
-          })}
-        </span>
-      </Button>
+      {/* Helper text — minimal, surgical */}
+      {helperState.text && (
+        <p
+          id='handle-hint'
+          className={cn(
+            'mt-2.5 pl-1 transition-colors duration-200',
+            helperToneClass
+          )}
+          aria-live={helperState.tone === 'error' ? 'assertive' : 'polite'}
+          style={{
+            fontSize: '11px',
+            lineHeight: '16px',
+            letterSpacing: '0.01em',
+            fontWeight: 400,
+          }}
+        >
+          {helperState.text}
+        </p>
+      )}
+
+      {/* Error summary for form validation */}
+      {formSubmitted && handleError && (
+        <p
+          className='mt-1.5 pl-1'
+          style={{
+            fontSize: '11px',
+            color: 'var(--linear-warning)',
+            fontWeight: 400,
+          }}
+          role='alert'
+        >
+          {handleError}
+        </p>
+      )}
     </form>
   );
 }

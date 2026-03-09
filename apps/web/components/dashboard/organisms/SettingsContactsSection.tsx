@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { AlertCircle, Plus, UserPlus } from 'lucide-react';
+import { Badge, Button } from '@jovie/ui';
+import { Plus, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -9,9 +9,11 @@ import {
   type EditableContact,
   useContactsManager,
 } from '@/components/dashboard/hooks/useContactsManager';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { ContactDetailSidebar } from '@/components/dashboard/organisms/contacts-table/ContactDetailSidebar';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   getContactRoleLabel,
   summarizeTerritories,
@@ -47,17 +49,10 @@ export function SettingsContactsSection({
 
   if (isError) {
     return (
-      <DashboardCard variant='settings'>
-        <div className='flex flex-col items-center justify-center gap-2 py-8'>
-          <AlertCircle className='h-6 w-6 text-destructive' />
-          <p className='text-sm text-secondary-token'>
-            Failed to load contacts.
-          </p>
-          <Button variant='ghost' size='sm' onClick={() => refetch()}>
-            Try again
-          </Button>
-        </div>
-      </DashboardCard>
+      <SettingsErrorState
+        message='Failed to load contacts.'
+        onRetry={() => refetch()}
+      />
     );
   }
 
@@ -161,59 +156,71 @@ function ContactsListInner({
     : '';
 
   const isEmpty = contacts.length === 0;
+  const isSidebarOpen = Boolean(selectedContact);
+
+  const sidebarPanel = useMemo(
+    () => (
+      <ContactDetailSidebar
+        contact={selectedContact}
+        isOpen={isSidebarOpen}
+        onClose={handleClose}
+        onUpdate={handleUpdate}
+        onSave={handleSaveSelected}
+        onDelete={handleDeleteSelected}
+      />
+    ),
+    [
+      selectedContact,
+      isSidebarOpen,
+      handleClose,
+      handleUpdate,
+      handleSaveSelected,
+      handleDeleteSelected,
+    ]
+  );
+
+  useRegisterRightPanel(sidebarPanel);
 
   return (
     <>
-      <div className='flex items-stretch'>
-        <DashboardCard variant='settings' className='flex-1 min-w-0'>
-          <div className='space-y-3'>
-            <div className='flex items-center justify-between'>
-              <p className='text-sm text-secondary-token'>
-                Manage bookings, management, and press contacts for {artistName}
-                .
-              </p>
-              <Button
-                variant='ghost'
-                size='sm'
-                onClick={handleAddContact}
-                className='gap-1.5 text-secondary-token hover:text-primary-token'
-              >
-                <Plus className='h-4 w-4' />
-                Add contact
-              </Button>
-            </div>
-
-            {isEmpty ? (
-              <div className='text-center py-6'>
-                <UserPlus className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
-                <p className='text-sm text-secondary-token'>
-                  No contacts yet. Add your first contact to get started.
-                </p>
-              </div>
-            ) : (
-              <div className='divide-y divide-subtle'>
-                {contacts.map(contact => (
-                  <ContactRow
-                    key={contact.id}
-                    contact={contact}
-                    isSelected={selectedContactId === contact.id}
-                    onClick={() => handleRowClick(contact)}
-                  />
-                ))}
-              </div>
-            )}
+      <DashboardCard variant='settings'>
+        <div className='space-y-3'>
+          <div className='flex items-center justify-between'>
+            <p className='text-[13px] text-secondary-token'>
+              Manage bookings, management, and press contacts for {artistName}.
+            </p>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={handleAddContact}
+              className='gap-1.5 text-secondary-token hover:text-primary-token'
+            >
+              <Plus className='h-4 w-4' />
+              Add contact
+            </Button>
           </div>
-        </DashboardCard>
 
-        <ContactDetailSidebar
-          contact={selectedContact}
-          isOpen={Boolean(selectedContact)}
-          onClose={handleClose}
-          onUpdate={handleUpdate}
-          onSave={handleSaveSelected}
-          onDelete={handleDeleteSelected}
-        />
-      </div>
+          {isEmpty ? (
+            <div className='text-center py-6'>
+              <UserPlus className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
+              <p className='text-[13px] text-secondary-token'>
+                No contacts yet. Add your first contact to get started.
+              </p>
+            </div>
+          ) : (
+            <div className='divide-y divide-subtle'>
+              {contacts.map(contact => (
+                <ContactRow
+                  key={contact.id}
+                  contact={contact}
+                  isSelected={selectedContactId === contact.id}
+                  onClick={() => handleRowClick(contact)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </DashboardCard>
 
       <ConfirmDialog
         open={Boolean(pendingDeleteContact)}
@@ -249,32 +256,32 @@ function ContactRow({
       type='button'
       onClick={onClick}
       className={`flex items-center gap-3 w-full text-left py-3 px-2 -mx-2 rounded-md transition-colors cursor-pointer ${
-        isSelected ? 'bg-surface-2' : 'hover:bg-surface-2/50'
+        isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'
       }`}
     >
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-xs font-medium text-tertiary-token uppercase tracking-wide'>
+          <span className='text-[11px] font-[510] text-tertiary-token uppercase tracking-[0.08em]'>
             {roleLabel}
           </span>
         </div>
         <div className='flex items-center gap-2 mt-0.5'>
           {contact.personName && (
-            <span className='text-sm text-primary-token truncate'>
+            <span className='text-[13px] text-primary-token truncate'>
               {contact.personName}
             </span>
           )}
           {contact.email && (
-            <span className='text-xs text-secondary-token truncate'>
+            <span className='text-[11px] text-secondary-token truncate'>
               {contact.email}
             </span>
           )}
         </div>
       </div>
       {territorySummary && (
-        <span className='text-xs text-tertiary-token shrink-0'>
+        <Badge size='sm' className='shrink-0'>
           {territorySummary}
-        </span>
+        </Badge>
       )}
     </button>
   );

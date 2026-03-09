@@ -11,6 +11,7 @@
  */
 
 import { Button } from '@jovie/ui';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   AlertCircle,
   ChevronDown,
@@ -107,7 +108,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
                 : 'bg-surface-2 text-primary-token'
             )}
           >
-            <div className='whitespace-pre-wrap text-sm leading-relaxed'>
+            <div className='whitespace-pre-wrap text-[13px] leading-relaxed'>
               {textContent}
             </div>
           </div>
@@ -177,7 +178,7 @@ export const InlineChatArea = forwardRef<
   InlineChatAreaRef,
   InlineChatAreaProps
 >(({ artistContext, profileId, expanded = false, onExpandedChange }, ref) => {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Use shared hook — handles persistence, error handling, and conversation management
   const {
@@ -193,6 +194,15 @@ export const InlineChatArea = forwardRef<
     artistContext,
   });
 
+  // Virtualizer for inline chat messages
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 60,
+    overscan: 5,
+    measureElement: el => el.getBoundingClientRect().height,
+  });
+
   // Auto-expand when messages arrive
   useEffect(() => {
     if (hasMessages && !expanded) {
@@ -202,10 +212,13 @@ export const InlineChatArea = forwardRef<
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messagesEndRef.current && expanded) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0 && expanded) {
+      virtualizer.scrollToIndex(messages.length - 1, {
+        align: 'end',
+        behavior: 'smooth',
+      });
     }
-  }, [messages, expanded]);
+  }, [messages.length, expanded, virtualizer]);
 
   // Expose submitMessage method via ref
   useImperativeHandle(
@@ -237,9 +250,11 @@ export const InlineChatArea = forwardRef<
       >
         <div className='flex items-center gap-2'>
           <BrandLogo size={16} tone='auto' />
-          <span className='text-sm font-medium text-primary-token'>Jovie</span>
+          <span className='text-[13px] font-[510] text-primary-token'>
+            Jovie
+          </span>
           {messages.length > 0 && (
-            <span className='text-xs text-tertiary-token'>
+            <span className='text-[11px] text-tertiary-token'>
               ({messages.length} messages)
             </span>
           )}
@@ -254,59 +269,82 @@ export const InlineChatArea = forwardRef<
       {/* Messages area - collapsible */}
       {expanded && (
         <div className='border-t border-subtle'>
-          <div className='max-h-80 overflow-y-auto px-4 py-4'>
-            <div className='space-y-4'>
-              {messages.map(message => (
-                <InlineChatMessage
-                  key={message.id}
-                  message={message}
-                  profileId={profileId}
-                />
-              ))}
-
-              {/* Loading indicator */}
-              {isLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div className='flex gap-3'>
-                  <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-                    <BrandLogo size={14} tone='auto' />
+          <div
+            ref={scrollContainerRef}
+            className='max-h-80 overflow-y-auto px-4 py-4'
+          >
+            <div
+              style={{
+                position: 'relative',
+                height: virtualizer.getTotalSize(),
+              }}
+            >
+              {virtualizer.getVirtualItems().map(virtualItem => {
+                const message = messages[virtualItem.index];
+                return (
+                  <div
+                    key={message.id}
+                    data-index={virtualItem.index}
+                    ref={virtualizer.measureElement}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                  >
+                    <div className='pb-4'>
+                      <InlineChatMessage
+                        message={message}
+                        profileId={profileId}
+                      />
+                    </div>
                   </div>
-                  <div className='rounded-2xl bg-surface-2 px-3 py-2'>
-                    <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
-                  </div>
-                </div>
-              )}
-
-              {/* Error display */}
-              {chatError && (
-                <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-3'>
-                  {chatError.type === 'network' ? (
-                    <WifiOff className='mt-0.5 h-4 w-4 shrink-0 text-error' />
-                  ) : (
-                    <AlertCircle className='mt-0.5 h-4 w-4 shrink-0 text-error' />
-                  )}
-                  <div className='flex-1'>
-                    <p className='text-sm text-primary-token'>
-                      {chatError.message}
-                    </p>
-                    {chatError.failedMessage && !chatError.retryAfter && (
-                      <Button
-                        type='button'
-                        variant='secondary'
-                        size='sm'
-                        onClick={handleRetry}
-                        disabled={isLoading || isSubmitting}
-                        className='mt-2 h-7 gap-1.5 text-xs'
-                      >
-                        <RefreshCw className='h-3 w-3' />
-                        Try again
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
+                );
+              })}
             </div>
+
+            {/* Loading indicator — rendered outside virtualizer */}
+            {isLoading && messages[messages.length - 1]?.role === 'user' && (
+              <div className='flex gap-3 pb-4'>
+                <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                  <BrandLogo size={14} tone='auto' />
+                </div>
+                <div className='rounded-2xl bg-surface-2 px-3 py-2'>
+                  <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
+                </div>
+              </div>
+            )}
+
+            {/* Error display */}
+            {chatError && (
+              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-3'>
+                {chatError.type === 'network' ? (
+                  <WifiOff className='mt-0.5 h-4 w-4 shrink-0 text-error' />
+                ) : (
+                  <AlertCircle className='mt-0.5 h-4 w-4 shrink-0 text-error' />
+                )}
+                <div className='flex-1'>
+                  <p className='text-[13px] text-primary-token'>
+                    {chatError.message}
+                  </p>
+                  {chatError.failedMessage && !chatError.retryAfter && (
+                    <Button
+                      type='button'
+                      variant='secondary'
+                      size='sm'
+                      onClick={handleRetry}
+                      disabled={isLoading || isSubmitting}
+                      className='mt-2 h-7 gap-1.5 text-[11px]'
+                    >
+                      <RefreshCw className='h-3 w-3' />
+                      Try again
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

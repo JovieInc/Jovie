@@ -32,6 +32,7 @@ export interface ContentData {
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
+  releaseId?: string | null;
   creator: {
     id: string;
     displayName: string | null;
@@ -57,6 +58,7 @@ export interface CachedContentData {
   releaseType?: string | null;
   totalTracks?: number | null;
   previewUrl?: string | null;
+  releaseId?: string | null;
 }
 
 /**
@@ -71,6 +73,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       usernameNormalized: creatorProfiles.usernameNormalized,
       avatarUrl: creatorProfiles.avatarUrl,
       settings: creatorProfiles.settings,
+      isClaimed: creatorProfiles.isClaimed,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
@@ -165,6 +168,7 @@ const fetchContentBySlug = async (
       artworkSizes,
       releaseType: release.releaseType,
       totalTracks: release.totalTracks,
+      releaseId: release.id,
     };
   }
 
@@ -220,6 +224,7 @@ const fetchContentBySlug = async (
       releaseDate: toISOStringOrNull(releaseData?.releaseDate),
       providerLinks: links,
       previewUrl: track.previewUrl,
+      releaseId: track.releaseId,
     };
   }
 

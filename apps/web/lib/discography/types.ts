@@ -83,18 +83,27 @@ export interface ReleaseViewModel {
   >;
   // Extended fields for table display
   releaseType: ReleaseType;
+  isExplicit: boolean;
   upc?: string | null;
   label?: string | null;
   totalTracks: number;
   totalDurationMs?: number | null;
   primaryIsrc?: string | null;
   genres?: string[];
+  /** ℗ phonographic copyright line */
+  copyrightLine?: string | null;
+  /** © copyright / distributor line */
+  distributor?: string | null;
   /** Spotify Canvas video status for this release */
   canvasStatus?: CanvasStatus;
   /** Original DSP-ingested artwork URL (available when user has uploaded custom art) */
   originalArtworkUrl?: string;
   /** Whether this release has short-form video provider links (TikTok, Reels, Shorts) */
   hasVideoLinks?: boolean;
+  /** Editable lyrics text stored in release metadata */
+  lyrics?: string;
+  /** Preview audio URL (typically from the primary track) */
+  previewUrl?: string | null;
 }
 
 /** Track view model for display in expandable release rows */
@@ -110,6 +119,8 @@ export interface TrackViewModel {
   isrc: string | null;
   isExplicit: boolean;
   previewUrl: string | null;
+  audioUrl: string | null;
+  audioFormat: string | null;
   providers: Array<
     ProviderLink & {
       label: string;

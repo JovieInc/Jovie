@@ -158,27 +158,6 @@ const checkStripePairConsistency: ValidationRule = ({ server }) => {
 };
 
 /**
- * Validation rule: Check Cloudinary configuration completeness
- */
-const checkCloudinaryConfig: ValidationRule = ({ server }) => {
-  const cloudinaryKeys = [
-    server.CLOUDINARY_API_KEY,
-    server.CLOUDINARY_API_SECRET,
-    publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  ];
-  const cloudinaryKeysPresent = cloudinaryKeys.filter(Boolean).length;
-
-  if (cloudinaryKeysPresent > 0 && cloudinaryKeysPresent < 3) {
-    return {
-      type: 'warning',
-      message:
-        'Incomplete Cloudinary configuration - need all of API_KEY, API_SECRET, and CLOUD_NAME',
-    };
-  }
-  return null;
-};
-
-/**
  * Validation rule: Check URL encryption key in production/preview
  */
 const checkUrlEncryptionKey: ValidationRule = ({ server, vercelEnv }) => {
@@ -231,7 +210,6 @@ export const RUNTIME_VALIDATION_RULES: ValidationRule[] = [
   checkStripeSecretFormat,
   checkStripePublishableFormat,
   checkStripePairConsistency,
-  checkCloudinaryConfig,
   checkUrlEncryptionKey,
   checkAiGatewayApiKey,
 ];

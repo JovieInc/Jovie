@@ -1,9 +1,12 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { getSessionSetupSql } from '@/lib/auth/session';
 import { db } from '@/lib/db';
+import { cacheQuery } from '@/lib/db/cache';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
   clickEvents,
+  dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
@@ -106,18 +109,18 @@ export async function getAnalyticsData(
         }>(
           drizzleSql`
             with base_events as (
-              select *
+              select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfileId}
                 and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
             ),
             ranged_events as (
-              select *
+              select link_id, link_type, city, country, referrer
               from base_events
               where created_at >= ${sqlTimestamp(startDate)}
             ),
             recent_events as (
-              select *
+              select 1
               from base_events
               where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
@@ -230,30 +233,38 @@ export async function getUserAnalytics(
   clerkUserId: string,
   range: AnalyticsRange = '30d'
 ) {
-  // Single JOIN query to get user and profile in one round-trip
-  const result = await db
-    .select({
-      creatorProfileId: creatorProfiles.id,
-      profileViews: creatorProfiles.profileViews,
-    })
-    .from(users)
-    .innerJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
-    .where(eq(users.clerkId, clerkUserId))
-    .limit(1);
+  // Run inside a transaction to ensure the RLS session variable is set on the
+  // same connection that queries the users table (which has RLS enabled).
+  return db.transaction(async tx => {
+    await tx.execute(getSessionSetupSql(clerkUserId));
 
-  const row = result[0];
-  if (!row) {
-    throw new TypeError('User or creator profile not found for Clerk ID');
-  }
+    // Single JOIN query to get user and profile in one round-trip
+    const result = await tx
+      .select({
+        creatorProfileId: creatorProfiles.id,
+        profileViews: creatorProfiles.profileViews,
+      })
+      .from(users)
+      .innerJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
 
-  const analytics = await getAnalyticsData(row.creatorProfileId, range);
+    const row = result[0];
+    if (!row) {
+      throw new TypeError('User or creator profile not found for Clerk ID');
+    }
 
-  return {
-    ...analytics,
-    // Profile page visits increment creator_profiles.profile_views.
-    // The click_events table tracks link clicks; it is not a reliable proxy for views.
-    profileViewsInRange: row.profileViews ?? 0,
-  };
+    // getAnalyticsData only touches click_events (no RLS) and uses the global
+    // db connection, so it doesn't need to run inside this transaction.
+    const analytics = await getAnalyticsData(row.creatorProfileId, range);
+
+    return {
+      ...analytics,
+      // Profile page visits increment creator_profiles.profile_views.
+      // The click_events table tracks link clicks; it is not a reliable proxy for views.
+      profileViewsInRange: row.profileViews ?? 0,
+    };
+  });
 }
 
 function toStartDate(range: AnalyticsRange): Date {
@@ -288,79 +299,101 @@ export async function getUserDashboardAnalytics(
   range: AnalyticsRange,
   view: DashboardAnalyticsView
 ): Promise<DashboardAnalyticsResponse> {
-  const [userRow, creatorProfile] = await Promise.all([
-    db
-      .select({ id: users.id, isPro: users.isPro })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1)
-      .then(results => results[0]),
-    db
-      .select({
-        id: creatorProfiles.id,
-      })
-      .from(creatorProfiles)
-      .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1)
-      .then(results => results[0]),
-  ]);
+  // Run all queries inside a single transaction so that:
+  // 1. The RLS session variable (app.clerk_user_id) is set on the SAME connection
+  //    that executes the analytics query. Without a transaction, the connection pool
+  //    may dispatch set_config and the subsequent SELECT to different connections,
+  //    causing RLS-protected tables (audience_members, notification_subscriptions,
+  //    users) to return 0 rows — the root cause of JOV-1349.
+  // 2. All CTEs see a consistent snapshot of the data.
+  return db.transaction(async tx => {
+    // Set the RLS session variable on this transaction's connection
+    await tx.execute(getSessionSetupSql(clerkUserId));
 
-  const appUserId = userRow?.id;
-  const userIsPro = Boolean(userRow?.isPro);
-  if (!appUserId) {
-    throw new TypeError('User not found for Clerk ID');
-  }
+    const [userRow, creatorProfile] = await Promise.all([
+      tx
+        .select({ id: users.id, isPro: users.isPro })
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1)
+        .then(results => results[0]),
+      tx
+        .select({
+          id: creatorProfiles.id,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1)
+        .then(results => results[0]),
+    ]);
 
-  const dynamicEnabled = userIsPro;
+    const appUserId = userRow?.id;
+    if (!appUserId) {
+      throw new TypeError('User not found for Clerk ID');
+    }
 
-  if (!creatorProfile) {
-    throw new TypeError('Creator profile not found');
-  }
+    if (!creatorProfile) {
+      throw new TypeError('Creator profile not found');
+    }
 
-  const startDate = toStartDate(range);
-  const recentThreshold = new Date();
-  recentThreshold.setDate(recentThreshold.getDate() - 7);
-  // Consolidated dashboard analytics into one SQL round trip (previously eight queries).
-  // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
-  // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
-  // Dashboard queries have a 10s timeout.
-  const aggregates = await dashboardQuery(
-    () =>
-      db
-        .execute<{
-          top_cities: JsonArray<{ city: string | null; count: number }>;
-          top_countries: JsonArray<{ country: string | null; count: number }>;
-          top_referrers: JsonArray<{ referrer: string | null; count: number }>;
-          total_views: AggregateValue;
-          unique_users: AggregateValue;
-          total_clicks: AggregateValue;
-          spotify_clicks: AggregateValue;
-          social_clicks: AggregateValue;
-          recent_clicks: AggregateValue;
-          listen_clicks: AggregateValue;
-          subscribers: AggregateValue;
-          identified_users: AggregateValue;
-          top_links: JsonArray<{
-            id: string | null;
-            url: string | null;
-            clicks: number;
-          }>;
-        }>(
-          drizzleSql`
+    const startDate = toStartDate(range);
+    const recentThreshold = new Date();
+    recentThreshold.setDate(recentThreshold.getDate() - 7);
+    // Consolidated dashboard analytics into one SQL round trip (previously eight queries).
+    // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
+    // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
+    // Dashboard queries have a 20s timeout.
+    //
+    // Top-list aggregates (cities, countries, referrers, links) are cached for 5 minutes
+    // (JOV-1270). The heavy group-by work over raw click_events is identical for all
+    // concurrent requests from the same artist+range, so we share a single DB round-trip.
+    // The aggregates query filters only on creatorProfile.id and touches no RLS-protected
+    // tables, so it runs against the module-level db pool (not the RLS transaction).
+    const aggregates = await cacheQuery(
+      `analytics:dashboard:${creatorProfile.id}:${range}`,
+      () =>
+        dashboardQuery(() =>
+          db
+            .execute<{
+              top_cities: JsonArray<{ city: string | null; count: number }>;
+              top_countries: JsonArray<{
+                country: string | null;
+                count: number;
+              }>;
+              top_referrers: JsonArray<{
+                referrer: string | null;
+                count: number;
+              }>;
+              total_views: AggregateValue;
+              unique_users: AggregateValue;
+              total_clicks: AggregateValue;
+              spotify_clicks: AggregateValue;
+              social_clicks: AggregateValue;
+              recent_clicks: AggregateValue;
+              listen_clicks: AggregateValue;
+              subscribers: AggregateValue;
+              identified_users: AggregateValue;
+              top_links: JsonArray<{
+                id: string | null;
+                url: string | null;
+                clicks: number;
+              }>;
+            }>(
+              drizzleSql`
             with base_events as (
-              select *
+              select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
               where ${clickEvents.creatorProfileId} = ${creatorProfile.id}
                 and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
             ),
             ranged_events as (
-              select *
+              select link_id, link_type, city, country, referrer
               from base_events
               where created_at >= ${sqlTimestamp(startDate)}
             ),
             recent_events as (
-              select *
+              select 1
               from base_events
               where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
@@ -407,7 +440,6 @@ export async function getUserDashboardAnalytics(
               from ${audienceMembers}
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
-                and ${audienceMembers.fingerprint} is not null
             ),
             audience_identified as (
               select 1
@@ -417,12 +449,10 @@ export async function getUserDashboardAnalytics(
                 and ${audienceMembers.email} is not null
             ),
             audience_views as (
-              -- visits is a lifetime counter; this sums visits for members
-              -- active in the range (an approximation, not exact per-range count)
-              select coalesce(sum(${audienceMembers.visits}), 0) as total_views
-              from ${audienceMembers}
-              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
-                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
+              select coalesce(sum(${dailyProfileViews.viewCount}), 0) as total_views
+              from ${dailyProfileViews}
+              where ${dailyProfileViews.creatorProfileId} = ${creatorProfile.id}
+                and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
             )
             select
               (select total_views from audience_views) as total_views,
@@ -440,84 +470,73 @@ export async function getUserDashboardAnalytics(
               coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
             ;
           `
-        )
-        .then(res => res.rows?.[0]),
-    'getUserDashboardAnalytics'
-  );
+            )
+            .then(res => res.rows?.[0])
+        ),
+      { ttlSeconds: 300 }
+    );
 
-  // Use SUM(visits) from audience_members active in the date range instead of
-  // the all-time creatorProfile.profileViews counter, which suffers from Redis
-  // batching delays and is not range-filtered.
-  //
-  // NOTE: audience_members.visits is a lifetime cumulative counter (incremented
-  // on every visit). Filtering by lastSeenAt >= startDate selects *members*
-  // active in the range, but their visits count includes all historical visits.
-  // This is an acceptable approximation — it's strictly better than the previous
-  // all-time counter and matches the "active audience" mental model. A precise
-  // per-range count would require a per-visit events table (future enhancement).
-  const totalViews = Number(aggregates?.total_views ?? 0);
-  const subscribers = Number(aggregates?.subscribers ?? 0);
+    const totalViews = Number(aggregates?.total_views ?? 0);
+    const subscribers = Number(aggregates?.subscribers ?? 0);
 
-  const base: DashboardAnalyticsResponse = {
-    view,
-    profile_views: totalViews,
-    unique_users: Number(aggregates?.unique_users ?? 0),
-    subscribers,
-    top_cities: parseJsonArray<{ city: string | null; count: number }>(
-      aggregates?.top_cities ?? []
-    )
-      .filter(row => Boolean(row.city))
-      .map(row => ({ city: row.city as string, count: Number(row.count) })),
-    top_countries: parseJsonArray<{ country: string | null; count: number }>(
-      aggregates?.top_countries ?? []
-    )
-      .filter(row => Boolean(row.country))
-      .map(row => ({
-        country: row.country as string,
+    const base: DashboardAnalyticsResponse = {
+      view,
+      profile_views: totalViews,
+      unique_users: Number(aggregates?.unique_users ?? 0),
+      subscribers,
+      top_cities: parseJsonArray<{ city: string | null; count: number }>(
+        aggregates?.top_cities ?? []
+      )
+        .filter(row => Boolean(row.city))
+        .map(row => ({ city: row.city as string, count: Number(row.count) })),
+      top_countries: parseJsonArray<{ country: string | null; count: number }>(
+        aggregates?.top_countries ?? []
+      )
+        .filter(row => Boolean(row.country))
+        .map(row => ({
+          country: row.country as string,
+          count: Number(row.count),
+        })),
+      top_referrers: parseJsonArray<{
+        referrer: string | null;
+        count: number;
+      }>(aggregates?.top_referrers ?? []).map(row => ({
+        referrer: row.referrer ?? '',
         count: Number(row.count),
       })),
-    top_referrers: parseJsonArray<{ referrer: string | null; count: number }>(
-      aggregates?.top_referrers ?? []
-    ).map(row => ({
-      referrer: row.referrer ?? '',
-      count: Number(row.count),
-    })),
-    top_links: parseJsonArray<{
-      id: string | null;
-      url: string | null;
-      clicks: number;
-    }>(aggregates?.top_links ?? []).map(row => ({
-      id: row.id ?? 'unknown',
-      url: row.url ?? '',
-      clicks: Number(row.clicks),
-    })),
-  };
+      top_links: parseJsonArray<{
+        id: string | null;
+        url: string | null;
+        clicks: number;
+      }>(aggregates?.top_links ?? []).map(row => ({
+        id: row.id ?? 'unknown',
+        url: row.url ?? '',
+        clicks: Number(row.clicks),
+      })),
+    };
 
-  if (view === 'traffic') {
-    return base;
-  }
+    if (view === 'traffic') {
+      return base;
+    }
 
-  if (!dynamicEnabled) {
-    return base;
-  }
+    const uniqueUsers = Number(aggregates?.unique_users ?? 0);
 
-  const uniqueUsers = Number(aggregates?.unique_users ?? 0);
+    // Calculate capture rate: (subscribers / unique_users) * 100
+    // Only calculate if we have unique users to avoid division by zero
+    const captureRate =
+      uniqueUsers > 0 ? Math.round((subscribers / uniqueUsers) * 1000) / 10 : 0;
 
-  // Calculate capture rate: (subscribers / unique_users) * 100
-  // Only calculate if we have unique users to avoid division by zero
-  const captureRate =
-    uniqueUsers > 0 ? Math.round((subscribers / uniqueUsers) * 1000) / 10 : 0;
-
-  return {
-    ...base,
-    total_clicks: Number(aggregates?.total_clicks ?? 0),
-    spotify_clicks: Number(aggregates?.spotify_clicks ?? 0),
-    social_clicks: Number(aggregates?.social_clicks ?? 0),
-    recent_clicks: Number(aggregates?.recent_clicks ?? 0),
-    listen_clicks: Number(aggregates?.listen_clicks ?? 0),
-    identified_users: Number(aggregates?.identified_users ?? 0),
-    capture_rate: captureRate,
-  };
+    return {
+      ...base,
+      total_clicks: Number(aggregates?.total_clicks ?? 0),
+      spotify_clicks: Number(aggregates?.spotify_clicks ?? 0),
+      social_clicks: Number(aggregates?.social_clicks ?? 0),
+      recent_clicks: Number(aggregates?.recent_clicks ?? 0),
+      listen_clicks: Number(aggregates?.listen_clicks ?? 0),
+      identified_users: Number(aggregates?.identified_users ?? 0),
+      capture_rate: captureRate,
+    };
+  });
 }
 
 // Function to record a click event

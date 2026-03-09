@@ -11,7 +11,7 @@ import { checkContent } from './content-filter';
 
 export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 30;
-export const USERNAME_PATTERN = /^[a-zA-Z0-9-]+$/;
+export const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 /**
  * Comprehensive list of reserved usernames.
@@ -43,7 +43,6 @@ export const RESERVED_USERNAMES = [
   'mail',
   'changelog',
   'engagement-engine',
-  'link-in-bio',
 
   // Legal/company pages
   'about',
@@ -238,27 +237,27 @@ export function validateUsernameCore(
     );
   }
 
-  // Check pattern (alphanumeric and hyphen only)
+  // Check pattern (alphanumeric, hyphens, underscores, dots)
   if (!USERNAME_PATTERN.test(normalized)) {
     return createValidationError(
       'INVALID_CHARS',
-      'Handle can only contain letters, numbers, and hyphens'
+      'Handle can only contain letters, numbers, hyphens, underscores, and dots'
     );
   }
 
-  // Check if starts with number or hyphen
-  if (/^[0-9-]/.test(normalized)) {
+  // Check if starts with number, hyphen, underscore, or dot
+  if (/^[0-9._-]/.test(normalized)) {
     return createValidationError(
       'STARTS_WITH_NUMBER_OR_HYPHEN',
       'Handle must start with a letter'
     );
   }
 
-  // Check if ends with hyphen
-  if (normalized.endsWith('-')) {
+  // Check if ends with hyphen, underscore, or dot
+  if (/[._-]$/.test(normalized)) {
     return createValidationError(
       'ENDS_WITH_HYPHEN',
-      'Handle cannot end with a hyphen'
+      'Handle cannot end with a hyphen, underscore, or dot'
     );
   }
 

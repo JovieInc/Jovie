@@ -11,9 +11,9 @@ const InviteCampaignManager = dynamic(
   {
     loading: () => (
       <div className='space-y-4 animate-pulse'>
-        <div className='h-10 w-48 rounded-md bg-surface-1' />
-        <div className='h-64 w-full rounded-md bg-surface-1' />
-        <div className='h-10 w-32 rounded-md bg-surface-1' />
+        <div className='h-10 w-48 rounded-md skeleton' />
+        <div className='h-64 w-full rounded-md skeleton' />
+        <div className='h-10 w-32 rounded-md skeleton' />
       </div>
     ),
   }
@@ -28,12 +28,9 @@ export const runtime = 'nodejs';
 export default function AdminCampaignsPage() {
   return (
     <PageShell>
-      <PageContent className='mx-auto max-w-4xl'>
-        <div className='mb-8'>
-          <h1 className='text-2xl font-bold text-primary-token'>
-            Invite Campaigns
-          </h1>
-          <p className='mt-2 text-sm text-secondary-token'>
+      <PageContent>
+        <div className='mb-6'>
+          <p className='text-sm text-secondary-token'>
             Send claim invites to unclaimed creator profiles. Emails are
             throttled and randomized to avoid spam filters.
           </p>

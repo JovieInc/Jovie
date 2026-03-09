@@ -131,7 +131,7 @@ describe('Input', () => {
       render(<Input validationState='valid' placeholder='Valid' />);
       const input = screen.getByPlaceholderText('Valid');
       // Valid state applies success border styling
-      expect(input).toHaveClass('border-green-500');
+      expect(input).toHaveClass('border-success');
     });
 
     it('shows invalid state with aria-invalid', () => {

@@ -9,6 +9,7 @@
 
 import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
+import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
 import {
   ScheduledReleasePage,
@@ -26,6 +27,7 @@ import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
+import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
@@ -156,7 +158,7 @@ function generateMusicStructuredData(
 
 interface PageProps {
   readonly params: Promise<{ username: string; slug: string }>;
-  readonly searchParams: Promise<{ dsp?: string }>;
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -189,16 +191,17 @@ type Content = NonNullable<Awaited<ReturnType<typeof getContentBySlug>>>;
 async function resolveContentOrRedirect(
   creator: Creator,
   slug: string,
-  dsp: string | undefined
+  searchParams: URLSearchParams
 ): Promise<Content> {
   const content = await getContentBySlug(creator.id, slug);
   if (content) return content;
 
   const redirectInfo = await findRedirectByOldSlug(creator.id, slug);
   if (redirectInfo) {
-    const dspQuery = dsp ? `?dsp=${encodeURIComponent(dsp)}` : '';
+    const queryString = searchParams.toString();
+    const suffix = queryString ? `?${queryString}` : '';
     permanentRedirect(
-      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${dspQuery}`
+      `/${creator.usernameNormalized}/${redirectInfo.currentSlug}${suffix}`
     );
   }
   notFound();
@@ -211,7 +214,8 @@ async function resolveContentOrRedirect(
 function handleDspRedirect(
   dsp: string,
   content: Content,
-  creator: Creator
+  creator: Creator,
+  utmParams: ReturnType<typeof extractUTMParams>
 ): never {
   const providerKey = dsp as ProviderKey;
 
@@ -230,9 +234,10 @@ function handleDspRedirect(
     profileId: creator.id,
     provider: providerKey,
     contentTitle: content.title,
+    utmParams,
   });
 
-  redirect(targetUrl);
+  redirect(appendUTMParamsToUrl(targetUrl, utmParams));
 }
 
 export default async function ContentSmartLinkPage({
@@ -240,7 +245,21 @@ export default async function ContentSmartLinkPage({
   searchParams,
 }: Readonly<PageProps>) {
   const { username, slug } = await params;
-  const { dsp } = await searchParams;
+  const allSearchParams = await searchParams;
+  const dspParam = allSearchParams.dsp;
+  const dsp = typeof dspParam === 'string' ? dspParam : undefined;
+  const noredirectParam = allSearchParams.noredirect;
+  const noredirect =
+    typeof noredirectParam === 'string' ? noredirectParam : undefined;
+  const requestSearchParams = new URLSearchParams(
+    Object.entries(allSearchParams).flatMap(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map(v => [key, v]);
+      }
+      return typeof value === 'string' ? [[key, value]] : [];
+    })
+  );
+  const utmParams = extractUTMParams(requestSearchParams);
 
   if (!username || !slug) {
     notFound();
@@ -253,11 +272,15 @@ export default async function ContentSmartLinkPage({
     notFound();
   }
 
-  const content = await resolveContentOrRedirect(creator, slug, dsp);
+  const content = await resolveContentOrRedirect(
+    creator,
+    slug,
+    requestSearchParams
+  );
 
   // If DSP is specified, redirect immediately
   if (dsp) {
-    handleDspRedirect(dsp, content, creator);
+    handleDspRedirect(dsp, content, creator, utmParams);
   }
 
   // Build provider data for the landing page
@@ -339,53 +362,130 @@ export default async function ContentSmartLinkPage({
         }}
       />
 
-      {isUnreleased && showUnreleasedHero ? (
-        <UnreleasedReleaseHero
-          release={{
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-            releaseDate: content.releaseDate!,
-          }}
-          artist={{
-            id: creator.id,
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-          }}
-        />
-      ) : isUnreleased ? (
-        <ScheduledReleasePage
-          release={{
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-          }}
-          artist={{
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-          }}
-        />
-      ) : (
-        <ReleaseLandingPage
-          release={{
-            title: content.title,
-            artworkUrl: content.artworkUrl,
-            releaseDate: toISOStringOrNull(content.releaseDate),
-          }}
-          artist={{
-            name: creator.displayName ?? creator.username,
-            handle: creator.usernameNormalized,
-            avatarUrl: creator.avatarUrl,
-          }}
-          providers={allProviders}
-          artworkSizes={content.artworkSizes}
-          allowDownloads={
-            (creator.settings as Record<string, unknown> | null)
-              ?.allowArtworkDownloads === true
-          }
-          soundsUrl={soundsUrl}
+      {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
+      {!isUnreleased && noredirect !== '1' && (
+        <PreferredDspRedirect
+          providerLinks={content.providerLinks}
+          redirectBasePath={`/${creator.usernameNormalized}/${content.slug}`}
         />
       )}
+
+      <ContentPageBody
+        isUnreleased={!!isUnreleased}
+        showUnreleasedHero={showUnreleasedHero}
+        content={content}
+        creator={creator}
+        allProviders={allProviders}
+        utmParams={utmParams}
+        soundsUrl={soundsUrl}
+      />
     </>
+  );
+}
+
+function ContentPageBody({
+  isUnreleased,
+  showUnreleasedHero,
+  content,
+  creator,
+  allProviders,
+  utmParams,
+  soundsUrl,
+}: Readonly<{
+  isUnreleased: boolean;
+  showUnreleasedHero: boolean;
+  content: Content;
+  creator: Creator;
+  allProviders: Array<{
+    key: ProviderKey;
+    label: string;
+    accent: string;
+    url: string | null;
+  }>;
+  utmParams: ReturnType<typeof extractUTMParams>;
+  soundsUrl: string | null;
+}>) {
+  const artistName = creator.displayName ?? creator.username;
+
+  if (isUnreleased && showUnreleasedHero) {
+    return (
+      <UnreleasedReleaseHero
+        release={{
+          id:
+            content.type === 'release'
+              ? content.id
+              : (content.releaseId ?? content.id),
+          trackId: content.type === 'track' ? content.id : null,
+          slug: content.slug,
+          title: content.title,
+          artworkUrl: content.artworkUrl,
+          releaseDate: content.releaseDate!,
+          hasSpotify: content.providerLinks.some(
+            link => link.providerId === 'spotify'
+          ),
+          hasAppleMusic: content.providerLinks.some(
+            link => link.providerId === 'apple_music'
+          ),
+        }}
+        artist={{
+          id: creator.id,
+          name: artistName,
+          handle: creator.usernameNormalized,
+          avatarUrl: creator.avatarUrl,
+        }}
+      />
+    );
+  }
+
+  if (isUnreleased) {
+    return (
+      <ScheduledReleasePage
+        release={{
+          title: content.title,
+          artworkUrl: content.artworkUrl,
+        }}
+        artist={{
+          name: artistName,
+          handle: creator.usernameNormalized,
+        }}
+      />
+    );
+  }
+
+  return (
+    <ReleaseLandingPage
+      release={{
+        title: content.title,
+        artworkUrl: content.artworkUrl,
+        releaseDate: toISOStringOrNull(content.releaseDate),
+      }}
+      artist={{
+        name: artistName,
+        handle: creator.usernameNormalized,
+        avatarUrl: creator.avatarUrl,
+      }}
+      providers={allProviders}
+      utmParams={utmParams}
+      artworkSizes={content.artworkSizes}
+      allowDownloads={
+        (creator.settings as Record<string, unknown> | null)
+          ?.allowArtworkDownloads === true
+      }
+      soundsUrl={soundsUrl}
+      tracking={{
+        contentType: content.type,
+        contentId: content.id,
+        smartLinkSlug: content.slug,
+      }}
+      claimBanner={
+        creator.isClaimed
+          ? null
+          : {
+              profileId: creator.id,
+              username: creator.usernameNormalized,
+            }
+      }
+    />
   );
 }
 
@@ -447,7 +547,7 @@ function buildContentDescription(
     : '';
 
   if (isUnreleased) {
-    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops!`;
+    return `"${content.title}"${releaseYear} by ${artistName} is coming soon. Get notified when it drops on Jovie.`;
   }
 
   const streamingPlatforms =
@@ -462,7 +562,7 @@ function buildContentDescription(
           .join(', ')
       : 'Spotify, Apple Music';
 
-  return `Listen to "${content.title}"${releaseYear} by ${artistName}. Available on ${streamingPlatforms} and more streaming platforms.`;
+  return `Listen to "${content.title}"${releaseYear} by ${artistName} on Jovie. Available on ${streamingPlatforms} and more.`;
 }
 
 export async function generateMetadata({

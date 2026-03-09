@@ -17,6 +17,7 @@ interface OnboardingHandleStepProps {
   readonly title: string;
   readonly prompt?: string;
   readonly handleInput: string;
+  readonly isReservedHandle?: boolean;
   readonly handleValidation: HandleValidationState;
   readonly stateError: string | null;
   readonly isSubmitting: boolean;
@@ -25,7 +26,9 @@ interface OnboardingHandleStepProps {
   readonly inputRef: React.RefObject<HTMLInputElement | null>;
   readonly onHandleChange: (value: string) => void;
   readonly onSubmit: (e?: React.FormEvent) => void;
+  readonly onSuggestionClick?: (value: string) => void;
   readonly isPendingSubmit?: boolean;
+  readonly autoSubmitClaimed?: boolean;
 }
 
 function ValidationIcon({
@@ -103,36 +106,60 @@ function ButtonContent({
   isSubmitting,
   isPendingSubmit,
   isChecking,
+  autoSubmitClaimed,
 }: {
   readonly isSubmitting: boolean;
   readonly isPendingSubmit: boolean;
   readonly isChecking: boolean;
+  readonly autoSubmitClaimed: boolean;
 }) {
-  if (isSubmitting) {
+  const isLoading = isSubmitting || (isPendingSubmit && isChecking);
+  const buttonLabel = isSubmitting
+    ? 'Saving…'
+    : isLoading
+      ? 'Checking…'
+      : 'Continue';
+
+  if (autoSubmitClaimed) {
     return (
-      <div className='flex items-center justify-center space-x-2'>
-        <LoadingSpinner size='sm' className='text-current' />
-        <span>Saving…</span>
-      </div>
+      <span className='inline-flex items-center justify-center gap-2'>
+        <svg
+          viewBox='0 0 20 20'
+          fill='none'
+          aria-hidden='true'
+          className='h-4 w-4 animate-in zoom-in duration-300'
+        >
+          <circle cx='10' cy='10' r='9' stroke='currentColor' strokeWidth='2' />
+          <path
+            d='M6 10.2l2.6 2.6L14 7.4'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+          />
+        </svg>
+        <span>Claimed!</span>
+      </span>
     );
   }
 
-  if (isPendingSubmit && isChecking) {
-    return (
-      <div className='flex items-center justify-center space-x-2'>
+  return (
+    <span className='inline-flex items-center justify-center gap-2'>
+      <span
+        className={`inline-flex transition-opacity duration-150 ${isLoading ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}
+      >
         <LoadingSpinner size='sm' className='text-current' />
-        <span>Checking…</span>
-      </div>
-    );
-  }
-
-  return <>Continue</>;
+      </span>
+      <span>{buttonLabel}</span>
+    </span>
+  );
 }
 
 export function OnboardingHandleStep({
   title,
   prompt,
   handleInput,
+  isReservedHandle = false,
   handleValidation,
   stateError,
   isSubmitting,
@@ -141,16 +168,26 @@ export function OnboardingHandleStep({
   inputRef,
   onHandleChange,
   onSubmit,
+  onSuggestionClick,
   isPendingSubmit = false,
+  autoSubmitClaimed = false,
 }: OnboardingHandleStepProps) {
   function renderValidationStatus(): React.ReactNode {
+    if (autoSubmitClaimed && handleInput) {
+      return (
+        <div className='text-success text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+          @{handleInput} claimed.
+        </div>
+      );
+    }
+
     if (!handleInput || stateError) return null;
     // Checking state is shown via spinner icon in the input — no text needed
     if (handleValidation.checking) return null;
     if (handleValidation.clientValid && handleValidation.available) return null;
     if (handleValidation.error) {
       return (
-        <div className='text-error text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+        <div className='text-error text-[13px] animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
           Not available
         </div>
       );
@@ -164,6 +201,17 @@ export function OnboardingHandleStep({
         <div className={FORM_LAYOUT.headerSection}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
+          {isReservedHandle ? (
+            <div className='flex flex-col items-center gap-2 rounded-2xl border border-subtle bg-surface-1 px-5 py-5 text-center mt-4'>
+              <p className='text-2xl font-[590] tracking-[-0.022em] text-primary-token sm:text-3xl'>
+                @{handleInput}
+              </p>
+              <p className='text-[13px] text-secondary-token'>
+                We reserved this for you. Edit below if you prefer something
+                else.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <form className={FORM_LAYOUT.formInner} onSubmit={onSubmit}>
@@ -177,7 +225,7 @@ export function OnboardingHandleStep({
                   : 'border-subtle',
               ].join(' ')}
             >
-              <span className='text-sm text-secondary-token whitespace-nowrap'>
+              <span className='text-[13px] text-secondary-token whitespace-nowrap'>
                 @
               </span>
               <input
@@ -219,6 +267,25 @@ export function OnboardingHandleStep({
             <output className={FORM_LAYOUT.errorContainer} aria-live='polite'>
               {renderValidationStatus()}
             </output>
+
+            {handleValidation.suggestions.length > 0 && (
+              <div className='mt-2 flex flex-wrap justify-center gap-2'>
+                {handleValidation.suggestions.map(suggestion => (
+                  <button
+                    key={suggestion}
+                    type='button'
+                    onClick={() =>
+                      onSuggestionClick
+                        ? onSuggestionClick(suggestion)
+                        : onHandleChange(suggestion)
+                    }
+                    className='rounded-full border border-subtle px-3 py-1 text-[11px] text-secondary-token hover:text-primary-token hover:border-accent transition-colors'
+                  >
+                    @{suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <AuthButton
@@ -230,6 +297,7 @@ export function OnboardingHandleStep({
               isSubmitting={isSubmitting}
               isPendingSubmit={isPendingSubmit}
               isChecking={handleValidation.checking}
+              autoSubmitClaimed={autoSubmitClaimed}
             />
           </AuthButton>
         </form>

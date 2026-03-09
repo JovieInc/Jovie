@@ -1,10 +1,14 @@
 'use client';
 
-import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import type { CellContext, ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/components/admin/table/AdminTableHeader';
 import { UnifiedTable } from '@/components/organisms/table';
 import type {
   AdminActivityItem,
@@ -72,7 +76,7 @@ interface ActivityTableUnifiedProps {
 }
 
 /** Standard row class for activity table */
-const getRowClassName = () => 'group hover:bg-surface-2/50';
+const getRowClassName = () => 'group hover:bg-white/[0.02]';
 
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
@@ -118,39 +122,40 @@ export function ActivityTableUnified({
   );
 
   return (
-    <Card
-      className='h-full border-subtle bg-surface-1/80'
+    <div
+      className='h-full border border-subtle bg-surface-1'
       data-testid='admin-activity-content'
     >
-      <CardHeader className='space-y-1'>
-        <CardTitle className='text-lg'>Recent activity</CardTitle>
+      <AdminTableHeader
+        title='Activity'
+        subtitle='Monitor operational actions and recent system outcomes.'
+      />
+      <AdminTableSubheader>
         <p className='text-xs text-secondary-token'>Last 7 days.</p>
-      </CardHeader>
-      <CardContent className='px-0 pt-0'>
-        <div className='overflow-x-auto'>
-          <UnifiedTable
-            data={items}
-            columns={columns}
-            isLoading={false}
-            emptyState={
-              <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                <Activity className='h-6 w-6' />
-                <div>
-                  <div className='font-medium'>No recent activity</div>
-                  <div className='text-xs'>
-                    Activity from the last 7 days will appear here.
-                  </div>
+      </AdminTableSubheader>
+      <div className='overflow-x-auto'>
+        <UnifiedTable
+          data={items}
+          columns={columns}
+          isLoading={false}
+          emptyState={
+            <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+              <Activity className='h-6 w-6' />
+              <div>
+                <div className='font-medium'>No recent activity</div>
+                <div className='text-xs'>
+                  Activity from the last 7 days will appear here.
                 </div>
               </div>
-            }
-            getRowId={row => row.id}
-            getRowClassName={getRowClassName}
-            enableVirtualization={true}
-            minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-            className='text-[13px]'
-          />
-        </div>
-      </CardContent>
-    </Card>
+            </div>
+          }
+          getRowId={row => row.id}
+          getRowClassName={getRowClassName}
+          enableVirtualization={true}
+          minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+          className='text-[13px]'
+        />
+      </div>
+    </div>
   );
 }

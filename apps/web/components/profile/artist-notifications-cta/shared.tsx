@@ -1,6 +1,8 @@
 import { Skeleton } from '@jovie/ui';
-import { Bell, Mail } from 'lucide-react';
+import { CheckCircle2, Mail } from 'lucide-react';
+import Link from 'next/link';
 import type { CSSProperties } from 'react';
+import type { NotificationSubscriptionState } from '@/types/notifications';
 
 /** Prevents synthetic font weight rendering for better typography */
 export const noFontSynthesisStyle: CSSProperties = {
@@ -24,22 +26,51 @@ export function SubscriptionFormSkeleton() {
   );
 }
 
+function getChannelLabel(
+  subscribedChannels?: NotificationSubscriptionState
+): string {
+  const hasEmail = Boolean(subscribedChannels?.email);
+  const hasSms = Boolean(subscribedChannels?.sms);
+
+  if (hasEmail && hasSms) return 'Email & SMS notifications on';
+  if (hasEmail) return 'Email notifications on';
+  if (hasSms) return 'SMS notifications on';
+  return 'Notifications on';
+}
+
 /**
- * Success state - shown when user has subscribed
+ * Success state - shown when user has subscribed.
+ * Displays channel-specific status badge + Listen Now CTA.
  */
 export function SubscriptionSuccess({
   artistName,
-}: Readonly<{ artistName: string }>) {
+  handle,
+  subscribedChannels,
+}: Readonly<{
+  artistName: string;
+  handle?: string;
+  subscribedChannels?: NotificationSubscriptionState;
+}>) {
+  const channelLabel = getChannelLabel(subscribedChannels);
+
   return (
-    <div className='space-y-1'>
-      <div className='inline-flex items-center justify-center w-full px-8 py-4 rounded-xl bg-btn-primary text-btn-primary-foreground shadow-lg transition-colors duration-200'>
-        <Bell className='w-5 h-5 mr-2 text-accent-bright' aria-hidden='true' />
-        <span className='font-semibold'>You&apos;re in</span>
-      </div>
-      <p className='text-xs text-center text-secondary-token'>
-        You&apos;ll get a heads-up when {artistName} releases new music,
-        announces tours &amp; more. Tap the bell to manage your alerts.
+    <div className='space-y-3'>
+      <p className='flex items-center justify-center gap-1.5 text-sm text-secondary-token'>
+        <CheckCircle2
+          className='h-4 w-4 shrink-0 text-green-600 dark:text-green-400'
+          aria-hidden='true'
+        />
+        <span>{channelLabel}</span>
       </p>
+      {handle ? (
+        <Link
+          href={`/${handle}?mode=listen`}
+          prefetch
+          className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl bg-btn-primary text-btn-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:opacity-95 focus-ring-transparent-offset'
+        >
+          Listen Now
+        </Link>
+      ) : null}
     </div>
   );
 }
@@ -55,8 +86,8 @@ export function SubscriptionPendingConfirmation() {
         <span className='font-semibold'>Check your email</span>
       </div>
       <p className='text-xs text-center text-secondary-token'>
-        We sent a confirmation link to your email. Click it to start receiving
-        updates from this artist.
+        We sent a confirmation link to your email. Click it to turn on
+        notifications from this artist.
       </p>
     </div>
   );

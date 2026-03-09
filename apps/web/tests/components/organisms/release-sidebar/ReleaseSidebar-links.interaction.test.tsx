@@ -1,52 +1,126 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock RightDrawer
-vi.mock('@/components/organisms/RightDrawer', () => ({
-  RightDrawer: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) => <div data-testid='right-drawer'>{children}</div>,
-}));
+// ReleaseSidebar directly uses SegmentControl from @jovie/ui for tab navigation.
+// All other sub-components that use additional @jovie/ui parts are mocked below,
+// so only SegmentControl needs to be provided here.
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('@jovie/ui');
+  return {
+    ...actual,
+    SegmentControl: ({
+      value,
+      onValueChange,
+      options,
+    }: {
+      value: string;
+      onValueChange: (value: string) => void;
+      options: Array<{ value: string; label: string }>;
+    }) => (
+      <div>
+        {options.map(option => (
+          <button
+            key={option.value}
+            type='button'
+            aria-selected={value === option.value}
+            role='tab'
+            onClick={() => onValueChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    ),
+    // ContextMenu components are imported transitively by AlbumArtworkContextMenu
+    // (which is mocked below, but the module still loads), so provide passthroughs.
+    ContextMenu: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuContent: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuItem: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuLabel: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    ContextMenuSeparator: () => <hr />,
+    ContextMenuTrigger: ({ children }: { children?: React.ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
 
-// Mock drawer components
+// Mock drawer molecules — EntitySidebarShell renders children with empty state support.
 vi.mock('@/components/molecules/drawer', () => ({
+  EntitySidebarShell: ({
+    children,
+    isEmpty,
+    emptyMessage,
+    entityHeader,
+    tabs,
+    footer,
+  }: {
+    children?: React.ReactNode;
+    isEmpty?: boolean;
+    emptyMessage?: string;
+    entityHeader?: React.ReactNode;
+    tabs?: React.ReactNode;
+    footer?: React.ReactNode;
+    [key: string]: unknown;
+  }) =>
+    isEmpty ? (
+      <p data-testid='empty-state'>{emptyMessage}</p>
+    ) : (
+      <div data-testid='right-drawer'>
+        {entityHeader}
+        {tabs}
+        {children}
+        {footer}
+      </div>
+    ),
+  EntityHeaderCard: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   DrawerEmptyState: ({ message }: { message: string }) => (
     <p data-testid='empty-state'>{message}</p>
   ),
-  DrawerLinkSection: ({
-    title,
-    children,
-  }: {
-    title: string;
-    children?: React.ReactNode;
-    [key: string]: unknown;
-  }) => (
-    <div data-testid='link-section'>
-      <span>{title}</span>
-      {children}
-    </div>
+  DrawerSection: ({ children }: { children?: React.ReactNode }) => (
+    <section>{children}</section>
   ),
-  SidebarLinkRow: ({
-    label,
-    url,
-  }: {
-    label?: string;
-    url?: string;
-    [key: string]: unknown;
-  }) => <div data-testid='link-row'>{label ?? url}</div>,
+  DrawerLinkSection: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SidebarLinkRow: () => null,
+  DrawerAsyncToggle: ({ label }: { label: string }) => (
+    <div data-testid='async-toggle'>{label}</div>
+  ),
 }));
 
-// Mock sub-components that are not under test
+// Mock sub-components that are not under test — useReleaseHeaderParts hook
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  ReleaseSidebarHeader: () => <div data-testid='sidebar-header'>Header</div>,
+  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseArtwork', () => ({
-  ReleaseArtwork: () => <div data-testid='artwork'>Artwork</div>,
+vi.mock('next/image', () => ({
+  default: (props: { alt: string }) => <img alt={props.alt} />,
+}));
+
+vi.mock('@/components/atoms/Icon', () => ({
+  Icon: () => <span data-testid='icon' />,
+}));
+
+vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+  AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid='artwork-menu'>{children}</div>
+  ),
+  buildArtworkSizes: () => ({}),
+}));
+
+vi.mock('@/components/organisms/AvatarUploadable', () => ({
+  AvatarUploadable: () => <div data-testid='artwork'>Artwork</div>,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/ReleaseFields', () => ({
@@ -61,8 +135,12 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseMetadata', () => ({
   ReleaseMetadata: () => <div data-testid='metadata'>Metadata</div>,
 }));
 
-vi.mock('@/components/organisms/release-sidebar/ReleaseSettings', () => ({
-  ReleaseSettings: () => <div data-testid='settings'>Settings</div>,
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  updateAllowArtworkDownloads: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/components/organisms/release-sidebar/ReleaseLyricsSection', () => ({
+  ReleaseLyricsSection: () => <div data-testid='lyrics'>Lyrics</div>,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/TrackDetailPanel', () => ({
@@ -73,17 +151,31 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
 }));
 
-// Mock utilities
+vi.mock(
+  '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
+  () => ({
+    ReleaseSmartLinkSection: () => (
+      <div data-testid='smart-link-section'>Smart Link Content</div>
+    ),
+  })
+);
+
+vi.mock(
+  '@/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics',
+  () => ({
+    ReleaseSmartLinkAnalytics: () => (
+      <div data-testid='analytics'>Analytics</div>
+    ),
+  })
+);
+
+// Utilities
 vi.mock('sonner', () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/lib/constants/layout', () => ({
-  SIDEBAR_WIDTH: 360,
-}));
-
 vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://jovie.com',
+  getBaseUrl: () => 'https://jov.ie',
 }));
 
 vi.mock('@/lib/utm', () => ({
@@ -107,6 +199,7 @@ const mockRelease = {
   spotifyPopularity: 72,
   providers: [],
   releaseType: 'single' as const,
+  isExplicit: false,
   upc: '123456789012',
   label: 'Test Label',
   totalTracks: 1,
@@ -123,6 +216,10 @@ const defaultProps = {
 };
 
 describe('ReleaseSidebar Links tab', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('shows empty state when no release selected', () => {
     render(<ReleaseSidebar release={null} {...defaultProps} />);
 
@@ -131,56 +228,69 @@ describe('ReleaseSidebar Links tab', () => {
     );
   });
 
-  it('tab switching between Catalog, Links, Details works', async () => {
+  it('tab switching between Track list, Links, Details, and Lyrics works', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Catalog tab active by default — Fields and Tracks visible
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
+    // Track list tab active by default — Tracks visible
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /links/i }));
+    await user.click(screen.getByRole('tab', { name: /platforms/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
-    expect(screen.queryByTestId('fields')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
 
     // Switch to Details tab
     await user.click(screen.getByRole('tab', { name: /details/i }));
+    expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
+    expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
+    expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
-    // Switch back to Catalog
-    await user.click(screen.getByRole('tab', { name: /catalog/i }));
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
+    // Switch to Lyrics tab
+    await user.click(screen.getByRole('tab', { name: /lyrics/i }));
+    expect(screen.getByTestId('lyrics')).toBeInTheDocument();
+    expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
+
+    // Switch back to Track list
+    await user.click(screen.getByRole('tab', { name: /tracks/i }));
+    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
   });
 
-  it('tab resets to Catalog when release changes', async () => {
+  it('preserves active tab when release changes', async () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <ReleaseSidebar release={mockRelease} {...defaultProps} />
     );
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /links/i }));
+    await user.click(screen.getByRole('tab', { name: /platforms/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
 
     // Change release
     const newRelease = { ...mockRelease, id: 'release_2' };
     rerender(<ReleaseSidebar release={newRelease} {...defaultProps} />);
 
-    // Should reset to Catalog
-    expect(screen.getByTestId('fields')).toBeInTheDocument();
-    expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
+    // Should preserve the Links tab for workflow continuity
+    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
   });
 
-  it('Links tab renders DSP links component', async () => {
+  it('Links tab renders DSP links section', async () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    await user.click(screen.getByRole('tab', { name: /links/i }));
-    expect(screen.getByTestId('dsp-links')).toHaveTextContent(
-      'DSP Links Content'
+    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+  });
+
+  it('smart link section renders in header area', async () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    // Smart link is always visible in the header when a release is selected
+    expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
+      'Smart Link Content'
     );
   });
 });

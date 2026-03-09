@@ -16,10 +16,13 @@ export type LinktreePageProps = {
       readonly user?: {
         readonly fullName?: string | null;
         readonly profilePicture?: { url?: string | null } | null;
+        readonly isVerified?: boolean | null;
       };
       readonly account?: {
         displayName?: string | null;
         profilePicture?: string | null;
+        isVerified?: boolean | null;
+        verified?: boolean | null;
       };
       readonly page?: { links?: unknown };
       readonly data?: { links?: unknown };

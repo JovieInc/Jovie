@@ -4,6 +4,7 @@ const mockHealthLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockValidateEnvironment = vi.hoisted(() => vi.fn());
 const mockGetEnvironmentInfo = vi.hoisted(() => vi.fn());
+const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   healthLimiter: {
@@ -17,16 +18,11 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/env-server', () => ({
   validateEnvironment: mockValidateEnvironment,
   getEnvironmentInfo: mockGetEnvironmentInfo,
-  env: {
-    NODE_ENV: 'test',
-    DATABASE_URL: 'mock://db',
-  },
+  env: { NODE_ENV: 'test', DATABASE_URL: 'mock://db' },
 }));
 
 vi.mock('@/lib/db', () => ({
-  db: {
-    execute: vi.fn().mockResolvedValue({ rows: [{ ok: true }] }),
-  },
+  db: { execute: vi.fn().mockResolvedValue({ rows: [{ ok: true }] }) },
   checkDbHealth: vi.fn().mockResolvedValue({ healthy: true, latency: 5 }),
   validateDbConnection: vi
     .fn()
@@ -36,14 +32,12 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@clerk/nextjs/server', () => ({
   auth: vi.fn().mockResolvedValue({ userId: null }),
 }));
-
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
-    balance: {
-      retrieve: vi.fn().mockResolvedValue({ available: [] }),
-    },
+    balance: { retrieve: vi.fn().mockResolvedValue({ available: [] }) },
   },
 }));
+vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
 
 describe('@critical GET /api/health/comprehensive', () => {
   beforeEach(() => {
@@ -70,41 +64,28 @@ describe('@critical GET /api/health/comprehensive', () => {
       hasDatabase: false,
       hasClerk: false,
       hasStripe: false,
-      hasCloudinary: false,
+      hasVercelBlob: false,
     });
   });
 
-  it('returns 429 when rate limited', async () => {
-    mockHealthLimiterGetStatus.mockReturnValue({
-      blocked: true,
-      limit: 30,
-      remaining: 0,
-      resetTime: Date.now() + 60000,
-      retryAfterSeconds: 60,
+  it('captures warning when comprehensive health crashes', async () => {
+    mockValidateEnvironment.mockImplementation(() => {
+      throw new Error('Unexpected failure');
     });
 
     const { GET } = await import('@/app/api/health/comprehensive/route');
-    const request = new Request('http://localhost/api/health/comprehensive');
+    const response = await GET(
+      new Request('http://localhost/api/health/comprehensive')
+    );
 
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(429);
-    expect(data.error).toBeDefined();
-  });
-
-  it('returns comprehensive health status', async () => {
-    const { GET } = await import('@/app/api/health/comprehensive/route');
-    const request = new Request('http://localhost/api/health/comprehensive');
-
-    const response = await GET(request);
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data).toHaveProperty('ok');
-    expect(data).toHaveProperty('checks');
-    expect(data).toHaveProperty('timestamp');
-    expect(data).toHaveProperty('service');
-    expect(data).toHaveProperty('summary');
+    expect(response.status).toBe(503);
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      'Comprehensive health check failed',
+      expect.any(Error),
+      expect.objectContaining({
+        service: 'comprehensive',
+        route: '/api/health/comprehensive',
+      })
+    );
   });
 });

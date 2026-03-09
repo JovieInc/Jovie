@@ -6,6 +6,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { cancelSubscription } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -15,9 +16,12 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST() {
+  let userId: string | null = null;
+  let subscriptionId: string | null = null;
+
   try {
     // Check authentication
-    const { userId } = await auth();
+    ({ userId } = await auth());
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -39,6 +43,7 @@ export async function POST() {
     }
 
     const { stripeSubscriptionId, isPro } = billingResult.data;
+    subscriptionId = stripeSubscriptionId;
 
     // Verify user has an active subscription
     if (!isPro || !stripeSubscriptionId) {
@@ -67,6 +72,15 @@ export async function POST() {
     );
   } catch (error) {
     logger.error('Error cancelling subscription:', error);
+    void captureCriticalError(
+      'Stripe subscription cancellation failed',
+      error,
+      {
+        route: '/api/stripe/cancel',
+        userId,
+        subscriptionId,
+      }
+    );
 
     return NextResponse.json(
       { error: 'Failed to cancel subscription' },

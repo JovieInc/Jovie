@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { ALL_PLATFORMS } from '@/constants/platforms';
 import { useProfileMutation } from '@/lib/queries';
 import {
@@ -221,10 +222,14 @@ export function useMusicLinksForm({
   // -- Additional link handlers --
 
   const addAdditionalLink = useCallback((platform?: string) => {
-    setAdditionalLinks(prev => [
-      ...prev,
-      { id: '', platform: platform || 'soundcloud', url: '' },
-    ]);
+    setAdditionalLinks(prev => {
+      const target = platform || 'soundcloud';
+      if (prev.some(link => link.platform === target)) {
+        toast.error('This platform is already connected');
+        return prev;
+      }
+      return [...prev, { id: '', platform: target, url: '' }];
+    });
   }, []);
 
   const removeAdditionalLink = useCallback((index: number) => {
@@ -234,6 +239,16 @@ export function useMusicLinksForm({
   const updateAdditionalLink = useCallback(
     (index: number, field: keyof AdditionalDSPLink, value: string) => {
       setAdditionalLinks(prev => {
+        // Prevent switching to a platform that's already used by another row
+        if (field === 'platform') {
+          const isDuplicate = prev.some(
+            (link, i) => i !== index && link.platform === value
+          );
+          if (isDuplicate) {
+            toast.error('This platform is already connected');
+            return prev;
+          }
+        }
         const updated = [...prev];
         updated[index] = { ...updated[index], [field]: value };
         return updated;
@@ -281,6 +296,20 @@ export function useMusicLinksForm({
       e.preventDefault();
       setError(undefined);
       setSuccess(false);
+
+      // Check for duplicate platforms in additional links
+      const seenPlatforms = new Set<string>();
+      for (const link of additionalLinks) {
+        if (!link.url.trim()) continue;
+        if (seenPlatforms.has(link.platform)) {
+          toast.error('This platform is already connected');
+          setError(
+            `Duplicate platform: ${link.platform}. Each platform can only be added once.`
+          );
+          return;
+        }
+        seenPlatforms.add(link.platform);
+      }
 
       try {
         // 1. Save primary DSPs to profile

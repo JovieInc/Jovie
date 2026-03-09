@@ -1,37 +1,30 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
-const { codecovWebpackPlugin } = require('@codecov/webpack-plugin');
-
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
-
-// Bundle analyzer for performance optimization
-const withBundleAnalyzer = require('@next/bundle-analyzer')({
-  enabled: process.env.ANALYZE === 'true',
-});
 
 const nextConfig = {
   // Transpile workspace packages for proper module resolution
   transpilePackages: ['@jovie/ui'],
   turbopack: {
-    // Resolve aliases matching tsconfig paths for consistent module resolution
-    resolveAlias: {
-      '@/*': './*',
-      '@/components/*': './components/*',
-      '@/atoms/*': './components/atoms/*',
-      '@/molecules/*': './components/molecules/*',
-      '@/organisms/*': './components/organisms/*',
-      '@/lib/*': './lib/*',
-      '@/types/*': './types/*',
-    },
-    // Prioritize common extensions for faster resolution
+    // Path aliases are automatically resolved from tsconfig.json paths.
+    // Do NOT add resolveAlias entries for @/* — that conflicts with
+    // tsconfig resolution and causes "Could not parse module" errors
+    // for server-only files (JOV-1062, JOV-1063).
     resolveExtensions: ['.tsx', '.ts', '.jsx', '.js', '.mjs', '.json'],
   },
   // React Compiler: auto-memoization to eliminate render loops and manual useMemo/useCallback
   reactCompiler: true,
   typescript: {
-    ignoreBuildErrors: false,
+    // CI sets NEXT_IGNORE_TYPECHECK=1 — skip during build since typecheck runs separately
+    ignoreBuildErrors: !!process.env.NEXT_IGNORE_TYPECHECK,
   },
+  eslint: {
+    // CI sets NEXT_IGNORE_ESLINT=1 — skip during build since lint runs separately
+    ignoreDuringBuilds: !!process.env.NEXT_IGNORE_ESLINT,
+  },
+  // Never ship source maps to browsers (Sentry plugin uploads them separately)
+  productionBrowserSourceMaps: false,
   output: 'standalone',
   // Monorepo root for standalone output file tracing (prevents lockfile detection warnings)
   outputFileTracingRoot: path.join(__dirname, '../../'),
@@ -52,7 +45,19 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'res.cloudinary.com',
+        hostname: '*.scdn.co',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.spotifycdn.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.dzcdn.net',
         port: '',
         pathname: '/**',
       },
@@ -188,8 +193,7 @@ const nextConfig = {
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
-        source:
-          '/(pricing|support|investors|engagement-engine|link-in-bio|blog|changelog)',
+        source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
         headers: [...securityHeaders, cacheHeaders.immutable],
       },
       {
@@ -230,6 +234,12 @@ const nextConfig = {
     ];
 
     return [
+      // Pricing page hidden for founding member launch (JOV-1050)
+      {
+        source: '/pricing',
+        destination: '/',
+        permanent: false,
+      },
       // Legal page redirects
       {
         source: '/privacy',
@@ -321,6 +331,9 @@ const nextConfig = {
       '@radix-ui/react-slot',
       '@radix-ui/react-alert-dialog',
       '@radix-ui/react-radio-group',
+      'recharts',
+      '@tanstack/react-pacer',
+      '@sentry/nextjs',
       'clsx',
       'class-variance-authority',
       '@dnd-kit/core',
@@ -345,122 +358,25 @@ const nextConfig = {
       process.env.NODE_ENV === 'production' &&
       process.env.VERCEL_ENV !== 'preview',
   },
-  // Webpack optimizations
-  webpack: (config, { dev, isServer }) => {
-    if (!dev && !isServer) {
-      // Optimize bundle size with improved cache strategy
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          maxSize: 200000, // Smaller chunks reduce serialized cache payloads.
-          minSize: 20000,
-          cacheGroups: {
-            framework: {
-              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
-              name: 'framework',
-              chunks: 'all',
-              priority: 40,
-              enforce: true,
-            },
-            icons: {
-              test: /[\\/]node_modules[\\/](simple-icons|lucide-react)[\\/]/,
-              name: 'icons',
-              chunks: 'all',
-              priority: 30,
-              maxSize: 180000,
-            },
-            motion: {
-              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
-              name: 'motion',
-              chunks: 'all',
-              priority: 25,
-              maxSize: 180000,
-            },
-            charts: {
-              test: /[\\/]node_modules[\\/]recharts[\\/]/,
-              name: 'charts',
-              chunks: 'all',
-              priority: 25,
-              maxSize: 180000,
-            },
-            vendors: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-              reuseExistingChunk: true,
-              maxSize: 200000,
-            },
-            common: {
-              name: 'common',
-              minChunks: 2,
-              chunks: 'all',
-              priority: 5,
-              maxSize: 200000,
-            },
-          },
-        },
-      };
-    }
-
-    // Exclude PostHog Node.js from Edge Runtime bundles
-    if (!isServer) {
-      config.externals = config.externals || [];
-      config.externals.push({
-        'posthog-node': 'commonjs posthog-node',
-      });
-    }
-
-    // Exclude Storybook files from production builds
-    if (!dev) {
-      config.module.rules.push({
-        test: /\.stories\.(js|jsx|ts|tsx|mdx)$/,
-        use: 'ignore-loader',
-      });
-    }
-
-    // Alias '@jovie/ui' to local package sources so imports resolve in dev/build
-    // Note: tsconfig paths handle this for TypeScript, but webpack needs explicit alias
-    config.resolve = config.resolve || {};
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
-      ['@jovie/ui']: path.resolve(__dirname, '../../packages/ui'),
-    };
-
-    // Codecov Bundle Analysis plugin - uploads bundle stats during CI builds
-    config.plugins.push(
-      codecovWebpackPlugin({
-        enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
-        bundleName: 'jovie-web',
-        uploadToken: process.env.CODECOV_TOKEN,
-      })
-    );
-
-    return config;
-  },
 };
 
-// Enable Vercel Toolbar in all environments (including production).
-// The toolbar is only visible to authenticated Vercel team members.
-// Requires 'unsafe-eval' in CSP because the toolbar runtime uses eval().
-// Set NEXT_DISABLE_TOOLBAR=1 to opt out.
-const enableVercelToolbar = !process.env.NEXT_DISABLE_TOOLBAR;
+// Enable Vercel Toolbar in non-production environments only.
+// Disabled in production to eliminate unnecessary JS bundles and 'unsafe-eval' CSP requirements.
+// Set NEXT_DISABLE_TOOLBAR=1 to opt out in non-production environments.
+const enableVercelToolbar =
+  process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
 const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: bundle analyzer -> vercel toolbar
-module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
+// Apply plugins in order: vercel toolbar -> sentry
+module.exports = withVercelToolbar(nextConfig);
 
 // Injected content via Sentry wizard below
 
 const { withSentryConfig } = require('@sentry/nextjs');
 
 module.exports = withSentryConfig(module.exports, {
-  // For all available options, see:
-  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
-
   org: 'jovie',
   project: 'jovie-web',
 
@@ -478,14 +394,4 @@ module.exports = withSentryConfig(module.exports, {
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
   tunnelRoute: '/monitoring',
-
-  // Webpack-specific options (new location for deprecated top-level options)
-  webpack: {
-    // Automatically tree-shake Sentry logger statements to reduce bundle size
-    treeshake: {
-      removeDebugLogging: true,
-    },
-    // Enables automatic instrumentation of Vercel Cron Monitors
-    automaticVercelMonitors: true,
-  },
 });

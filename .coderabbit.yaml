@@ -6,9 +6,13 @@ early_access: true
 
 reviews:
   profile: assertive
-  request_changes_workflow: true
+  request_changes_workflow: false
   high_level_summary: true
   collapse_walkthrough: true
+
+  finishing_touches:
+    unit_tests:
+      enabled: true
 
   tools:
     biome:
@@ -147,6 +151,34 @@ reviews:
         - Check for proper session handling
         - Ensure no hardcoded credentials or tokens
 
+    - path: "apps/web/app/(marketing)/**"
+      instructions: |
+        Marketing pages must remain fully static.
+        - `export const revalidate = false` is required
+        - Flag any use of `headers()`, `cookies()`, or `cache: 'no-store'`
+        - Flag JSON-LD implemented with `dangerouslySetInnerHTML` plus lint suppression
+        - Prefer `<script type="application/ld+json">{safeJsonLdStringify(data)}</script>` for structured data
+
+    - path: "apps/web/app/**/layout.tsx"
+      instructions: |
+        Layout review:
+        - Global singleton UI must only mount from `apps/web/app/layout.tsx`
+        - Flag `CookieBannerSection`, toast providers, modal providers, or analytics providers in nested layouts
+
+    - path: "apps/web/app/**/*.{ts,tsx}"
+      instructions: |
+        Routing review:
+        - Do not allow hardcoded `/app/dashboard/*` literals in app code
+        - Require imports from `apps/web/constants/routes.ts`
+        - Legacy compatibility paths still need named constants rather than inline strings
+
+    - path: "apps/web/components/**/*.{ts,tsx}"
+      instructions: |
+        Routing review:
+        - Do not allow hardcoded `/app/dashboard/*` literals in component code
+        - Require imports from `apps/web/constants/routes.ts`
+        - Legacy compatibility paths still need named constants rather than inline strings
+
     # === PAYMENT RULES ===
     - path: "app/api/stripe/**"
       instructions: |
@@ -158,10 +190,9 @@ reviews:
     # === MIDDLEWARE ===
     - path: "middleware.ts"
       instructions: |
-        Middleware affects all routes.
-        - Verify route matching is correct
-        - Check for performance implications
-        - Ensure proper Clerk middleware usage
+        This repo should not add middleware.ts directly.
+        - Flag creation or edits unless the PR explicitly justifies a human-reviewed exception
+        - Prefer `apps/web/proxy.ts`
 
     # === CORE FLOWS ===
     - path: "app/onboarding/**"
@@ -190,22 +221,112 @@ chat:
 
 code_generation:
   unit_tests:
-    enabled: true
     path_instructions:
-      - path: "**/*.ts"
+      - path: "apps/web/lib/**/*.{ts,tsx}"
         instructions: |
-          Use vitest for testing framework.
-          Follow existing patterns in tests/ directory.
-          Use @testing-library/react for React component tests.
-          Mock external services with vi.mock().
+          Use vitest as the test framework. Import from 'vitest' explicitly (describe, it, expect, vi).
+          Place test files co-located as `<filename>.test.ts` next to the source, OR in `apps/web/tests/lib/` mirroring the source structure.
+          Mock external services (Clerk, Stripe, Neon DB) with vi.mock().
+          Use vi.fn() for function mocks, never jest.fn().
+          Target <200ms per test. Prefer fewer, stronger assertions over many weak ones.
           Include edge cases and error scenarios.
-          Place tests in tests/ mirroring the source structure.
-      - path: "app/api/**"
+          Never use db.transaction() — the Neon HTTP driver doesn't support it.
+          For database code, mock with vi.mock('@/lib/db') — never hit a real database.
+          CRITICAL: All string assertions must be extracted from the actual source code. Never infer or guess user-facing text. Read the source file and copy the exact strings used in the code.
+
+      - path: "apps/web/components/**/*.tsx"
+        instructions: |
+          Use vitest with @testing-library/react for component tests.
+          Place test files in `apps/web/tests/components/` mirroring the component path.
+          Use render() from @testing-library/react, query with screen.getByRole/getByText.
+          Test user interactions with @testing-library/user-event (not fireEvent).
+          Mock hooks and server actions with vi.mock().
+          Do NOT test implementation details (internal state, refs). Test behavior and output.
+          For components using 'use client', ensure the test file imports are compatible.
+
+      - path: "apps/web/hooks/**/*.ts"
+        instructions: |
+          Use vitest with @testing-library/react's renderHook() for custom hook tests.
+          Place test files co-located as `<hookName>.test.ts` next to the source, OR in `apps/web/tests/hooks/` mirroring the source structure.
+          Test return values, state transitions, and cleanup behavior.
+          Mock browser APIs (IntersectionObserver, matchMedia, etc.) when needed.
+
+      - path: "apps/web/app/api/**/*.ts"
         instructions: |
           Test API routes with proper request/response mocking.
-          Include auth scenarios (authenticated, unauthenticated, wrong user).
-          Test error handling and edge cases.
-      - path: "lib/db/**"
+          Always test three auth scenarios: authenticated, unauthenticated (no session), wrong user (403).
+          Mock auth() from @clerk/nextjs/server with vi.mock().
+          Validate request body parsing with zod schema edge cases.
+          Test error handling: invalid input, missing fields, server errors.
+          Verify correct HTTP status codes (200, 400, 401, 403, 404, 500).
+
+      - path: "apps/web/lib/db/**/*.ts"
         instructions: |
-          Mock database with vi.mock() for unit tests.
-          Test query builders and business logic separately.
+          Mock the database layer with vi.mock('@/lib/db').
+          Test query builder logic and business logic separately.
+          Never use db.transaction() — Neon HTTP driver is incompatible.
+          Test data serialization (Dates must use .toISOString() at server/client boundary).
+
+      - path: "packages/ui/**/*.tsx"
+        instructions: |
+          Use vitest with @testing-library/react.
+          Place tests co-located in the same directory as the component.
+          Test accessibility: ensure proper ARIA attributes and keyboard navigation.
+          These are shared components — test the public API (props), not internals.
+
+      - path: "**/*.{ts,tsx}"
+        instructions: |
+          Fallback for files outside the specific paths above.
+          Use vitest as the test framework. Import from 'vitest' explicitly (describe, it, expect, vi).
+          Place test files co-located as `<filename>.test.ts` next to the source.
+          Use vi.fn() for function mocks, never jest.fn().
+          Target <200ms per test. Include edge cases and error scenarios.
+
+  docstrings:
+    language: en-US
+    path_instructions:
+      - path: "apps/web/lib/**/*.{ts,tsx}"
+        instructions: |
+          Use JSDoc format (/** ... */) for all exported functions, types, and constants.
+          Include @param tags for each parameter with a short description.
+          Include @returns tag describing the return value and its type when not obvious.
+          For error-returning functions, document possible error codes/shapes.
+          Focus on the "why" not the "what" — explain intent, not implementation.
+          Keep descriptions concise (1-2 sentences max for the summary line).
+          Do NOT add docstrings to trivial getters/setters or obvious one-liners.
+
+      - path: "apps/web/components/**/*.tsx"
+        instructions: |
+          Use JSDoc format on exported React components.
+          Document the component's purpose and when to use it (1-2 sentences).
+          Use @param or @property tags for non-obvious props only — skip self-evident ones like `className`.
+          Do NOT document internal helper components that aren't exported.
+
+      - path: "apps/web/hooks/**/*.ts"
+        instructions: |
+          Use JSDoc on all exported hooks.
+          Document what the hook manages, its return value shape, and any side effects.
+          Include @example blocks for hooks with non-obvious usage patterns.
+
+      - path: "apps/web/app/api/**/*.ts"
+        instructions: |
+          Document each API route handler (GET, POST, PUT, DELETE) with:
+          - Purpose of the endpoint
+          - Auth requirements
+          - Expected request body shape (if applicable)
+          - Response shape and status codes
+          Use JSDoc format.
+
+      - path: "apps/web/lib/db/**/*.ts"
+        instructions: |
+          Document exported query functions with JSDoc.
+          Include @param tags for filter/query parameters.
+          Document return types, especially when returning joined/transformed data.
+          Note any Neon-specific constraints (no transactions, HTTP driver).
+
+      - path: "packages/ui/**/*.tsx"
+        instructions: |
+          Use JSDoc on all exported UI components.
+          Document the component's purpose, visual behavior, and key props.
+          Include @example for components with complex prop combinations.
+          These are shared library components — good docs are critical for consumers.

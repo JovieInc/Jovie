@@ -2,6 +2,16 @@
 
 A modern artist profile and link-in-bio platform built with Next.js, Clerk authentication, Neon PostgreSQL, and Drizzle ORM.
 
+## Security & trust
+
+Jovie tracks OpenSSF security posture in-repository and is working toward an OpenSSF Best Practices badge.
+
+- Best Practices plan: `docs/security/OPENSSF_BEST_PRACTICES.md`
+- Badge submission checklist: `docs/security/CII_BADGE_SUBMISSION_CHECKLIST.md`
+- Vulnerability reporting: `SECURITY.md`
+
+> Maintainers: once bestpractices.dev enrollment is complete, add the issued badge URL and project ID here.
+
 ## Tech Stack
 
 Jovie uses a modern, secure stack designed for scalability, type safety, and exceptional developer experience:
@@ -417,6 +427,12 @@ This project has evolved through several migrations:
 - **Issues** - [GitHub Issues](https://github.com/JovieInc/Jovie/issues)
 - **Doppler Setup** - [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md)
 - **CI/CD** - [.github/workflows/README.md](.github/workflows/README.md)
+
+## Security
+
+- **Security Policy** - [SECURITY.md](SECURITY.md)
+- **Security Reviews** - [docs/security/](docs/security)
+- **OpenSSF Best Practices Plan** - [docs/security/OPENSSF_BEST_PRACTICES.md](docs/security/OPENSSF_BEST_PRACTICES.md)
 
 ## License
 

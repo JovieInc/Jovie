@@ -56,7 +56,7 @@ export function AccessibleStepWrapper({
             );
           })}
         </div>
-        <span className='text-xs text-secondary-token'>
+        <span className='shrink-0 whitespace-nowrap text-xs text-secondary-token'>
           Step {currentStep} of {totalSteps}
         </span>
       </div>

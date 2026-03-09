@@ -4,6 +4,80 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
+// ─── Campaign Settings ────────────────────────────────────────────────────────
+
+export interface ThrottlingConfig {
+  minDelayMs: number;
+  maxDelayMs: number;
+  maxPerHour: number;
+}
+
+export interface CampaignSettingsData {
+  fitScoreThreshold: number;
+  batchLimit: number;
+  throttlingConfig: ThrottlingConfig;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface CampaignSettingsResponse {
+  ok: boolean;
+  settings: CampaignSettingsData;
+}
+
+export interface UpdateCampaignSettingsInput {
+  fitScoreThreshold?: number;
+  batchLimit?: number;
+  throttlingConfig?: ThrottlingConfig;
+}
+
+async function fetchCampaignSettings(
+  signal?: AbortSignal
+): Promise<CampaignSettingsResponse> {
+  return fetchWithTimeout<CampaignSettingsResponse>(
+    '/api/admin/campaigns/settings',
+    { signal }
+  );
+}
+
+async function saveCampaignSettings(
+  input: UpdateCampaignSettingsInput
+): Promise<CampaignSettingsResponse> {
+  return fetchWithTimeout<CampaignSettingsResponse>(
+    '/api/admin/campaigns/settings',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export function useCampaignSettings({
+  enabled = true,
+}: {
+  enabled?: boolean;
+} = {}) {
+  return useQuery({
+    queryKey: queryKeys.campaign.settings(),
+    queryFn: ({ signal }) => fetchCampaignSettings(signal),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+}
+
+export function useSaveCampaignSettings() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: saveCampaignSettings,
+    onSuccess: data => {
+      queryClient.setQueryData(queryKeys.campaign.settings(), data);
+    },
+  });
+}
+
 const MINUTE = 60 * 1000;
 const SECONDS = 1000;
 
@@ -68,6 +142,68 @@ export interface CampaignStatsResponse {
   campaign: CampaignStats;
   jobQueue: JobQueueStats;
   updatedAt: string;
+}
+
+export interface CampaignInviteListItem {
+  id: string;
+  email: string;
+  status: string;
+  createdAt: string;
+  sentAt: string | null;
+  profile: {
+    id: string;
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    fitScore: number | null;
+    isClaimed: boolean;
+  };
+  engagement: {
+    opened: boolean;
+    openedAt: string | null;
+    clicked: boolean;
+    clickedAt: string | null;
+    clickCount: number;
+  };
+}
+
+export interface CampaignOverviewResponse {
+  ok: boolean;
+  range: '7d' | '30d' | '90d' | 'all';
+  invites: {
+    total: number;
+    pending: number;
+    scheduled: number;
+    sending: number;
+    sent: number;
+    bounced: number;
+    failed: number;
+    unsubscribed: number;
+  };
+  engagement: {
+    totalOpens: number;
+    uniqueOpens: number;
+    totalClicks: number;
+    uniqueClicks: number;
+    openRate: number;
+    clickRate: number;
+    clickToOpenRate: number;
+  };
+  conversion: {
+    profilesClaimed: number;
+    claimRate: number;
+  };
+  updatedAt: string;
+}
+export interface CampaignInviteListResponse {
+  ok: boolean;
+  invites: CampaignInviteListItem[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
 }
 
 // Re-export campaign keys for backwards compatibility
@@ -174,6 +310,28 @@ async function fetchCampaignStats(
   );
 }
 
+async function fetchCampaignOverview(
+  signal?: AbortSignal
+): Promise<CampaignOverviewResponse> {
+  return fetchWithTimeout<CampaignOverviewResponse>(
+    '/api/admin/campaigns/stats',
+    {
+      signal,
+    }
+  );
+}
+
+async function fetchCampaignInvites(
+  limit: number,
+  offset: number,
+  signal?: AbortSignal
+): Promise<CampaignInviteListResponse> {
+  return fetchWithTimeout<CampaignInviteListResponse>(
+    `/api/admin/campaigns/invites?limit=${limit}&offset=${offset}`,
+    { signal }
+  );
+}
+
 /**
  * TanStack Query hook for fetching campaign statistics.
  * Polls every 30 seconds when there are pending jobs.
@@ -202,5 +360,39 @@ export function useCampaignStatsQuery({
       }
       return false;
     },
+    // Pause polling when the tab is hidden to avoid unnecessary background traffic
+    refetchIntervalInBackground: false,
+  });
+}
+
+export function useCampaignOverviewQuery({
+  enabled = true,
+}: {
+  enabled?: boolean;
+} = {}) {
+  return useQuery({
+    queryKey: campaignQueryKeys.overview(),
+    queryFn: ({ signal }) => fetchCampaignOverview(signal),
+    enabled,
+    staleTime: 30 * SECONDS,
+    gcTime: 5 * MINUTE,
+  });
+}
+
+export function useCampaignInvitesQuery({
+  limit = 25,
+  offset = 0,
+  enabled = true,
+}: {
+  limit?: number;
+  offset?: number;
+  enabled?: boolean;
+} = {}) {
+  return useQuery({
+    queryKey: campaignQueryKeys.invites({ limit, offset }),
+    queryFn: ({ signal }) => fetchCampaignInvites(limit, offset, signal),
+    enabled,
+    staleTime: 30 * SECONDS,
+    gcTime: 5 * MINUTE,
   });
 }

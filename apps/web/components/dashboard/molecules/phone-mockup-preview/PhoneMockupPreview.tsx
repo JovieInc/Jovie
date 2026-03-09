@@ -33,7 +33,7 @@ export function PhoneMockupPreview({
           'relative w-full max-w-[300px] mx-auto',
           'aspect-9/19 rounded-4xl',
           'bg-surface-2 border border-default',
-          'shadow-lg',
+          'shadow-card-elevated',
           'overflow-hidden'
         )}
       >
@@ -57,7 +57,7 @@ export function PhoneMockupPreview({
                   'border-4 border-white/20',
                   'bg-surface-1',
                   'overflow-hidden',
-                  'shadow-lg',
+                  'shadow-card-elevated',
                   'transition-all duration-300',
                   isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 )}
@@ -72,7 +72,7 @@ export function PhoneMockupPreview({
                   />
                 ) : (
                   <div className='w-full h-full flex items-center justify-center bg-surface-2'>
-                    <span className='text-2xl font-bold text-primary-token'>
+                    <span className='text-2xl font-[590] text-primary-token'>
                       {username.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -82,7 +82,7 @@ export function PhoneMockupPreview({
               {/* Username */}
               <h1
                 className={cn(
-                  'text-xl font-bold text-white text-center',
+                  'text-xl font-[590] text-white text-center',
                   'transition-all duration-300',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
@@ -95,7 +95,7 @@ export function PhoneMockupPreview({
               {/* Bio */}
               <p
                 className={cn(
-                  'text-sm text-white/80 text-center mt-1 max-w-xs',
+                  'text-[14px] text-white/80 text-center mt-1 max-w-xs',
                   'transition-all duration-300 delay-100',
                   isLoaded
                     ? 'opacity-100 translate-y-0'
@@ -149,7 +149,7 @@ export function PhoneMockupPreview({
                       'relative block p-4 rounded-xl',
                       'bg-surface-1 hover:bg-surface-2',
                       'border border-default',
-                      'shadow-sm hover:shadow-md',
+                      'shadow-card hover:shadow-card-elevated',
                       'transition-all duration-200',
                       'overflow-hidden',
                       activeLink === link.id && 'ring-2 ring-primary-500/20'
@@ -161,7 +161,7 @@ export function PhoneMockupPreview({
                           'shrink-0 w-10 h-10 rounded-lg',
                           'flex items-center justify-center',
                           'bg-surface-0',
-                          'shadow-sm',
+                          'shadow-card',
                           'text-primary-token',
                           'transition-all duration-200'
                         )}
@@ -177,10 +177,10 @@ export function PhoneMockupPreview({
                       </div>
 
                       <div className='min-w-0 flex-1'>
-                        <h3 className='text-sm font-medium text-primary-token truncate'>
+                        <h3 className='text-[13px] font-[510] text-primary-token truncate'>
                           {link.title || getPlatformName(link.platform)}
                         </h3>
-                        <p className='text-xs text-secondary-token truncate'>
+                        <p className='text-[13px] text-secondary-token truncate'>
                           {link.url
                             .replace(/^https?:\/\//, '')
                             .replace(/\/$/, '')}
@@ -235,10 +235,10 @@ export function PhoneMockupPreview({
                       />
                     </svg>
                   </div>
-                  <h3 className='text-sm font-medium text-primary-token mb-1'>
+                  <h3 className='text-[13px] font-[510] text-primary-token mb-1'>
                     No links yet
                   </h3>
-                  <p className='text-sm text-secondary-token'>
+                  <p className='text-[13px] text-secondary-token'>
                     Add your first link to see it here
                   </p>
                 </div>

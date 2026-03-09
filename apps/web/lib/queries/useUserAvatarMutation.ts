@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useMutation } from '@tanstack/react-query';
 import { FetchError } from './fetch';
 
@@ -69,7 +70,21 @@ export function useUserAvatarMutation(
       onSuccess?.(blobUrl);
     },
     onError: error => {
-      onError?.(error instanceof Error ? error : new Error('Upload failed'));
+      const normalizedError =
+        error instanceof Error ? error : new Error('Upload failed');
+
+      // Don't report abort errors to Sentry — these happen when users navigate away
+      const isAbortError =
+        normalizedError.name === 'AbortError' ||
+        normalizedError.message.includes('aborted');
+
+      if (!isAbortError) {
+        Sentry.captureException(normalizedError, {
+          tags: { category: 'avatar_upload', source: 'useUserAvatarMutation' },
+        });
+      }
+
+      onError?.(normalizedError);
     },
     retry: false, // Don't retry uploads
   });

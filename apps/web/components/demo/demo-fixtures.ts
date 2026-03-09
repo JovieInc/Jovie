@@ -1,0 +1,348 @@
+import type { DemoAssignee, DemoRelease, ReleaseLabel } from './demo-types';
+
+// ── Assignees ──
+
+export const DEMO_ASSIGNEES: DemoAssignee[] = [
+  { id: 'a1', name: 'Sora Vale', initials: 'SV', color: '#6C7AFF' },
+  { id: 'a2', name: 'Kai Nomura', initials: 'KN', color: '#F5A623' },
+  { id: 'a3', name: 'Mira Chen', initials: 'MC', color: '#4EC98C' },
+  { id: 'a4', name: 'Ren Takashi', initials: 'RT', color: '#E1306C' },
+  { id: 'a5', name: 'Leo Park', initials: 'LP', color: '#1DB954' },
+];
+
+// ── Labels ──
+
+export const DEMO_LABELS: ReleaseLabel[] = [
+  { id: 'l1', name: 'Production', color: '#6C7AFF' },
+  { id: 'l2', name: 'Marketing', color: '#F5A623' },
+  { id: 'l3', name: 'Distribution', color: '#4EC98C' },
+  { id: 'l4', name: 'Mastering', color: '#E1306C' },
+  { id: 'l5', name: 'Pre-save', color: '#1DB954' },
+  { id: 'l6', name: 'Collaboration', color: '#9B59B6' },
+];
+
+// Helper to pick labels by index
+const L = (...indices: number[]) => indices.map(i => DEMO_LABELS[i]);
+
+// ── Releases ──
+
+export const DEMO_RELEASES: DemoRelease[] = [
+  // ─── Live ───
+  {
+    id: 'rel-01',
+    displayId: 'REL-131',
+    title: 'Night Drive',
+    artist: 'Sora Vale',
+    type: 'Album',
+    releaseDate: '2026-02-18',
+    status: 'live',
+    priority: 'none',
+    labels: L(2),
+    assignee: DEMO_ASSIGNEES[0],
+    trackCount: 12,
+    streams: 284_000,
+    gradient: 'linear-gradient(135deg, #2a1f3d, #4a2d6b)',
+    note: 'All providers synced and storefronts are live.',
+    links: [
+      { id: 'sp-01', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-01', provider: 'Apple Music', status: 'connected', url: '#' },
+      { id: 'yt-01', provider: 'YouTube Music', status: 'connected', url: '#' },
+    ],
+    createdAt: '2026-01-05',
+  },
+  {
+    id: 'rel-02',
+    displayId: 'REL-122',
+    title: 'Neon Nights',
+    artist: 'Sora Vale',
+    type: 'EP',
+    releaseDate: '2025-10-15',
+    status: 'live',
+    priority: 'none',
+    labels: L(2, 4),
+    assignee: DEMO_ASSIGNEES[0],
+    trackCount: 5,
+    streams: 156_000,
+    gradient: 'linear-gradient(135deg, #1a2a3a, #2d4a5a)',
+    note: 'Performing well on Spotify playlists.',
+    links: [
+      { id: 'sp-02', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-02', provider: 'Apple Music', status: 'connected', url: '#' },
+      { id: 'yt-02', provider: 'YouTube Music', status: 'connected', url: '#' },
+    ],
+    createdAt: '2025-09-01',
+  },
+  {
+    id: 'rel-03',
+    displayId: 'REL-118',
+    title: 'The Sound',
+    artist: 'Sora Vale',
+    type: 'Single',
+    releaseDate: '2025-03-22',
+    status: 'live',
+    priority: 'low',
+    labels: [],
+    assignee: DEMO_ASSIGNEES[2],
+    trackCount: 1,
+    streams: 89_000,
+    gradient: 'linear-gradient(135deg, #3a1a1a, #6b2d2d)',
+    note: 'Steady streaming. No action needed.',
+    links: [
+      { id: 'sp-03', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-03', provider: 'Apple Music', status: 'connected', url: '#' },
+    ],
+    createdAt: '2025-02-15',
+  },
+  {
+    id: 'rel-04',
+    displayId: 'REL-105',
+    title: 'Quiet Hours',
+    artist: 'Sora Vale',
+    type: 'EP',
+    releaseDate: '2024-08-10',
+    status: 'live',
+    priority: 'none',
+    labels: L(3),
+    assignee: DEMO_ASSIGNEES[0],
+    trackCount: 4,
+    streams: 42_000,
+    gradient: 'linear-gradient(135deg, #1a3a2a, #2d5a4a)',
+    note: 'Catalog release. SoundCloud link inactive.',
+    links: [
+      { id: 'sp-04', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-04', provider: 'Apple Music', status: 'connected', url: '#' },
+      { id: 'sc-04', provider: 'SoundCloud', status: 'stale' },
+    ],
+    createdAt: '2024-07-01',
+  },
+
+  // ─── Syncing ───
+  {
+    id: 'rel-05',
+    displayId: 'REL-142',
+    title: 'Static Skies',
+    artist: 'Sora Vale',
+    type: 'Album',
+    releaseDate: '2026-01-30',
+    status: 'syncing',
+    priority: 'high',
+    labels: L(0, 2),
+    assignee: DEMO_ASSIGNEES[1],
+    trackCount: 10,
+    streams: 0,
+    gradient: 'linear-gradient(135deg, #1a1a3a, #2d2d6b)',
+    note: 'Apple Music link is missing and requires attention.',
+    links: [
+      { id: 'sp-05', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-05', provider: 'Apple Music', status: 'missing' },
+      { id: 'yt-05', provider: 'YouTube Music', status: 'connected', url: '#' },
+    ],
+    createdAt: '2025-12-20',
+  },
+  {
+    id: 'rel-06',
+    displayId: 'REL-139',
+    title: 'Afterglow (Deluxe)',
+    artist: 'Sora Vale & Kai Nomura',
+    type: 'Album',
+    releaseDate: '2026-02-23',
+    status: 'syncing',
+    priority: 'urgent',
+    labels: L(0, 2, 5),
+    assignee: DEMO_ASSIGNEES[1],
+    trackCount: 14,
+    streams: 0,
+    gradient: 'linear-gradient(140deg, #4433a8 0%, #2c6ec9 50%, #19a99b 100%)',
+    note: 'YouTube Music still syncing. Expected within 24h.',
+    links: [
+      { id: 'sp-06', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-06', provider: 'Apple Music', status: 'connected', url: '#' },
+      { id: 'yt-06', provider: 'YouTube Music', status: 'stale' },
+      { id: 'az-06', provider: 'Amazon Music', status: 'connected', url: '#' },
+    ],
+    createdAt: '2026-01-15',
+  },
+
+  // ─── Scheduled ───
+  {
+    id: 'rel-07',
+    displayId: 'REL-145',
+    title: 'Midnight Express',
+    artist: 'Sora Vale',
+    type: 'Single',
+    releaseDate: '2026-03-14',
+    status: 'scheduled',
+    priority: 'medium',
+    labels: L(1, 4),
+    assignee: DEMO_ASSIGNEES[3],
+    trackCount: 1,
+    streams: 0,
+    gradient: 'linear-gradient(135deg, #0d1b2a, #1b2838)',
+    note: 'Pre-save campaign active. Release in 2 weeks.',
+    links: [
+      { id: 'sp-07', provider: 'Spotify', status: 'connected', url: '#' },
+      { id: 'am-07', provider: 'Apple Music', status: 'connected', url: '#' },
+      { id: 'yt-07', provider: 'YouTube Music', status: 'missing' },
+    ],
+    createdAt: '2026-02-01',
+  },
+  {
+    id: 'rel-08',
+    displayId: 'REL-148',
+    title: 'Solar Flare',
+    artist: 'Sora Vale ft. Leo Park',
+    type: 'Single',
+    releaseDate: '2026-04-01',
+    status: 'scheduled',
+    priority: 'low',
+    labels: L(1, 5),
+    assignee: DEMO_ASSIGNEES[4],
+    trackCount: 1,
+    streams: 0,
+    gradient: 'linear-gradient(135deg, #3a3a1a, #5a5a2d)',
+    note: 'Collaboration single. Metadata review pending.',
+    links: [
+      { id: 'sp-08', provider: 'Spotify', status: 'missing' },
+      { id: 'am-08', provider: 'Apple Music', status: 'missing' },
+    ],
+    createdAt: '2026-02-10',
+  },
+
+  // ─── Draft ───
+  {
+    id: 'rel-09',
+    displayId: 'REL-150',
+    title: 'Manual Sunset',
+    artist: 'Sora Vale',
+    type: 'EP',
+    releaseDate: 'TBD',
+    status: 'draft',
+    priority: 'medium',
+    labels: L(0, 3),
+    assignee: DEMO_ASSIGNEES[0],
+    trackCount: 6,
+    streams: 0,
+    gradient: 'linear-gradient(135deg, #2a2a2a, #444444)',
+    note: 'Draft release. Waiting on final masters from studio.',
+    links: [
+      { id: 'sp-09', provider: 'Spotify', status: 'missing' },
+      { id: 'am-09', provider: 'Apple Music', status: 'missing' },
+      { id: 'yt-09', provider: 'YouTube Music', status: 'missing' },
+    ],
+    createdAt: '2026-02-20',
+  },
+  {
+    id: 'rel-10',
+    displayId: 'REL-153',
+    title: 'Echoes',
+    artist: 'Sora Vale',
+    type: 'Album',
+    releaseDate: 'TBD',
+    status: 'draft',
+    priority: 'low',
+    labels: L(0),
+    assignee: DEMO_ASSIGNEES[2],
+    trackCount: 8,
+    streams: 0,
+    gradient: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+    note: 'Early concept. Track listing being finalized.',
+    links: [],
+    createdAt: '2026-02-22',
+  },
+  {
+    id: 'rel-11',
+    displayId: 'REL-155',
+    title: 'Somewhere Between',
+    artist: 'Sora Vale & Mira Chen',
+    type: 'Single',
+    releaseDate: 'TBD',
+    status: 'draft',
+    priority: 'none',
+    labels: L(5),
+    assignee: DEMO_ASSIGNEES[2],
+    trackCount: 1,
+    streams: 0,
+    gradient: 'linear-gradient(135deg, #2d1b69, #11998e)',
+    note: 'Collab idea. No timeline set yet.',
+    links: [],
+    createdAt: '2026-02-24',
+  },
+
+  // ─── Archived ───
+  {
+    id: 'rel-12',
+    displayId: 'REL-089',
+    title: 'First Light',
+    artist: 'Sora Vale',
+    type: 'Single',
+    releaseDate: '2024-01-15',
+    status: 'archived',
+    priority: 'none',
+    labels: [],
+    assignee: DEMO_ASSIGNEES[0],
+    trackCount: 1,
+    streams: 12_000,
+    gradient: 'linear-gradient(135deg, #3a3a1a, #5a5a2d)',
+    note: 'First release. Archived after distributor migration.',
+    links: [
+      { id: 'sp-12', provider: 'Spotify', status: 'connected', url: '#' },
+    ],
+    createdAt: '2023-12-01',
+  },
+  {
+    id: 'rel-13',
+    displayId: 'REL-072',
+    title: 'Demo Tape Vol. 1',
+    artist: 'Sora Vale',
+    type: 'EP',
+    releaseDate: '2023-06-20',
+    status: 'archived',
+    priority: 'none',
+    labels: [],
+    assignee: DEMO_ASSIGNEES[0],
+    trackCount: 3,
+    streams: 5_400,
+    gradient: 'linear-gradient(135deg, #2a2a2a, #3d3d3d)',
+    note: 'Early demos. Removed from most platforms.',
+    links: [
+      { id: 'sc-13', provider: 'SoundCloud', status: 'connected', url: '#' },
+    ],
+    createdAt: '2023-05-15',
+  },
+];
+
+// ── Activity timeline (shared by all releases in the detail drawer) ──
+
+export interface DemoActivity {
+  readonly id: string;
+  readonly action: string;
+  readonly detail: string;
+  readonly time: string;
+}
+
+export const DEMO_ACTIVITY_TEMPLATE: DemoActivity[] = [
+  {
+    id: 'act-1',
+    action: 'Release created',
+    detail: 'Initial metadata added',
+    time: '3d ago',
+  },
+  {
+    id: 'act-2',
+    action: 'Spotify synced',
+    detail: 'ISRC matched, artwork verified',
+    time: '2d ago',
+  },
+  {
+    id: 'act-3',
+    action: 'Apple Music linked',
+    detail: 'UPC matched automatically',
+    time: '1d ago',
+  },
+  {
+    id: 'act-4',
+    action: 'Smart link published',
+    detail: 'Short URL generated',
+    time: '12h ago',
+  },
+];

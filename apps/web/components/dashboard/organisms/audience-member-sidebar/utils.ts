@@ -39,12 +39,19 @@ export function formatActionLabel(label: string): string {
  */
 export function resolveAudienceActionIcon(label: string): string {
   const normalized = label.trim().toLowerCase();
+  if (normalized.includes('sms')) return 'MessageSquare';
+  if (normalized.includes('email') && normalized.includes('open'))
+    return 'MailOpen';
+  if (normalized.includes('unsubscrib')) return 'BellOff';
   if (normalized.includes('visit')) return 'Eye';
   if (normalized.includes('view')) return 'Eye';
   if (normalized.includes('tip')) return 'HandCoins';
   if (normalized.includes('purchase')) return 'CreditCard';
   if (normalized.includes('subscribe')) return 'Bell';
   if (normalized.includes('follow')) return 'UserPlus';
+  if (normalized.includes('spotify') || normalized.includes('listen'))
+    return 'Headphones';
+  if (normalized.includes('apple music')) return 'Music';
   if (normalized.includes('click')) return 'MousePointerClick';
   if (normalized.includes('link')) return 'Link';
   return 'Sparkles';

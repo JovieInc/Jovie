@@ -1,37 +1,21 @@
-import { MetricsChartClient } from '@/components/admin/MetricsChartClient';
+import { Skeleton } from '@jovie/ui';
 import { ReliabilityCard } from '@/components/admin/ReliabilityCard';
-import {
-  getAdminReliabilitySummary,
-  getAdminUsageSeries,
-} from '@/lib/admin/overview';
+import { getAdminReliabilitySummary } from '@/lib/admin/overview';
 
 export async function AdminUsageSection() {
-  const [usageSeries, reliabilitySummary] = await Promise.all([
-    getAdminUsageSeries(14),
-    getAdminReliabilitySummary(),
-  ]);
+  const reliabilitySummary = await getAdminReliabilitySummary();
 
   return (
-    <section
-      id='usage'
-      className='grid gap-6 lg:grid-cols-3'
-      data-testid='admin-usage-section'
-    >
-      <div className='lg:col-span-2'>
-        <MetricsChartClient points={usageSeries} />
-      </div>
-      <div id='errors' className='h-full'>
-        <ReliabilityCard summary={reliabilitySummary} />
-      </div>
+    <section id='errors' data-testid='admin-usage-section'>
+      <ReliabilityCard summary={reliabilitySummary} />
     </section>
   );
 }
 
 export function AdminUsageSectionSkeleton() {
   return (
-    <section id='usage' className='grid gap-6 lg:grid-cols-3'>
-      <div className='lg:col-span-2 h-64 rounded-xl skeleton' />
-      <div id='errors' className='h-64 rounded-xl skeleton' />
+    <section id='errors'>
+      <Skeleton className='h-full min-h-[180px] rounded-xl' />
     </section>
   );
 }

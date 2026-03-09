@@ -1,24 +1,34 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
   usePreviewPanelData,
+  usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
+import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { useClipboard } from '@/hooks/useClipboard';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
+import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
+  readonly isFirstSession?: boolean;
+  readonly appleMusicConnected?: boolean;
+  readonly appleMusicArtistName?: string | null;
 }
 
 /**
@@ -34,14 +44,40 @@ function ChatTitleBadge({ title }: { readonly title: string }) {
   );
 }
 
-export function ChatPageClient({ conversationId }: ChatPageClientProps) {
-  const { selectedProfile } = useDashboardData();
+export function ChatPageClient({
+  conversationId,
+  isFirstSession = false,
+  appleMusicConnected = false,
+  appleMusicArtistName = null,
+}: ChatPageClientProps) {
+  const {
+    selectedProfile,
+    creatorProfiles,
+    needsOnboarding,
+    dashboardLoadError,
+  } = useDashboardData();
   const { setPreviewData } = usePreviewPanelData();
+  const { open: openPreviewPanel } = usePreviewPanelState();
   const router = useRouter();
   const searchParams = useSearchParams();
   const notifications = useNotifications();
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+  const [autoRetryCount, setAutoRetryCount] = useState(0);
+
+  const hasProfilesButNoSelection =
+    creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
+  const hasDashboardLoadFailure = Boolean(dashboardLoadError);
+  const isProfileSetupRace =
+    hasProfilesButNoSelection && !hasDashboardLoadFailure;
+  const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
+
+  // Register ProfileContactSidebar in the unified right panel system
+  useRegisterRightPanel(
+    <ErrorBoundary fallback={null}>
+      <ProfileContactSidebar />
+    </ErrorBoundary>
+  );
 
   // Fetch social links for the selected profile
   const profileId = selectedProfile?.id ?? '';
@@ -63,14 +99,42 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   // Hydrate preview panel with profile data and links
   useEffect(() => {
     if (!selectedProfile) return;
+    const profileSettings = selectedProfile.settings as Record<
+      string,
+      unknown
+    > | null;
     setPreviewData({
       username: selectedProfile.username,
       displayName: selectedProfile.displayName ?? selectedProfile.username,
       avatarUrl: selectedProfile.avatarUrl ?? null,
+      bio: selectedProfile.bio ?? null,
+      genres: selectedProfile.genres ?? null,
       links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
+      dspConnections: {
+        spotify: {
+          connected: Boolean(selectedProfile.spotifyId),
+          artistName:
+            (profileSettings?.spotifyArtistName as string | null) ?? null,
+        },
+        appleMusic: {
+          connected: appleMusicConnected,
+          artistName: appleMusicArtistName,
+        },
+      },
     });
-  }, [selectedProfile, previewLinks, setPreviewData]);
+  }, [
+    selectedProfile,
+    previewLinks,
+    setPreviewData,
+    appleMusicConnected,
+    appleMusicArtistName,
+  ]);
+
+  const { copy: copySessionId, isSuccess: sessionIdCopied } = useClipboard({
+    onSuccess: () => notifications.success('Session ID copied'),
+    onError: () => notifications.error('Could not copy session ID'),
+  });
 
   const handleCopyConversationId = useCallback(async () => {
     if (!conversationId) {
@@ -79,34 +143,35 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
       );
       return;
     }
-
-    try {
-      await navigator.clipboard.writeText(conversationId);
-      notifications.success('Session ID copied');
-    } catch {
-      notifications.error('Could not copy session ID');
-    }
-  }, [conversationId, notifications]);
+    copySessionId(conversationId);
+  }, [conversationId, notifications, copySessionId]);
 
   const headerActions = useMemo(
     () => (
       <>
         {conversationId && (
-          <SimpleTooltip content='Copy session ID'>
-            <CircleIconButton
-              size='sm'
-              variant='outline'
-              ariaLabel='Copy session ID'
+          <SimpleTooltip
+            content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
+          >
+            <DashboardHeaderActionButton
+              ariaLabel={
+                sessionIdCopied ? 'Session ID copied' : 'Copy session ID'
+              }
               onClick={handleCopyConversationId}
-            >
-              <Copy aria-hidden='true' className='size-4' />
-            </CircleIconButton>
+              icon={
+                sessionIdCopied ? (
+                  <Check aria-hidden='true' className='size-4' />
+                ) : (
+                  <Copy aria-hidden='true' className='size-4' />
+                )
+              }
+            />
           </SimpleTooltip>
         )}
         <PreviewToggleButton />
       </>
     ),
-    [conversationId, handleCopyConversationId]
+    [conversationId, sessionIdCopied, handleCopyConversationId]
   );
 
   const handleConversationCreate = useCallback(
@@ -140,6 +205,13 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
     };
   }, [headerActions, setHeaderBadge, setHeaderActions]);
 
+  // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
+  useEffect(() => {
+    if (searchParams.get('panel') === 'profile') {
+      openPreviewPanel();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- only on mount
+
   // Pick up ?q= param (e.g. from profile page chat fallback) and pre-fill the input.
   // We pass it as initialQuery so JovieChat can auto-submit it.
   const rawQuery = searchParams.get('q');
@@ -156,37 +228,148 @@ export function ChatPageClient({ conversationId }: ChatPageClientProps) {
   // Profile unavailable — show actionable error instead of infinite spinner.
   // This happens when billing/entitlements fail or the DB query times out,
   // causing getDashboardData to return selectedProfile: null.
+  useEffect(() => {
+    if (selectedProfile) {
+      setAutoRetryCount(0);
+      return;
+    }
+
+    const wasLikelyJustOnboarded =
+      searchParams.get('from') === 'onboarding' ||
+      searchParams.get('onboarding') === 'complete';
+
+    addBreadcrumb({
+      category: 'dashboard.chat',
+      level: hasDashboardLoadFailure ? 'error' : 'warning',
+      message: 'ChatPageClient rendered with null selectedProfile',
+      data: {
+        hasDashboardLoadFailure,
+        dashboardLoadError,
+        needsOnboarding,
+        creatorProfilesCount: creatorProfiles.length,
+        hasProfilesButNoSelection,
+        isProfileSetupRace,
+        wasLikelyJustOnboarded,
+        hasSpotifyConnectedProfile: creatorProfiles.some(profile =>
+          Boolean(profile.spotifyId)
+        ),
+        conversationId: conversationId ?? null,
+      },
+    });
+
+    if (hasDashboardLoadFailure) {
+      captureMessage(
+        'Chat selectedProfile missing due to dashboard load failure',
+        {
+          level: 'error',
+          tags: {
+            category: 'dashboard.chat',
+            state: 'profile_load_failed',
+          },
+          extra: {
+            dashboardLoadError,
+            needsOnboarding,
+            creatorProfilesCount: creatorProfiles.length,
+            hasProfilesButNoSelection,
+            conversationId: conversationId ?? null,
+          },
+        }
+      );
+      return;
+    }
+
+    if (!canAutoRetry) {
+      return;
+    }
+
+    const retryTimeout = globalThis.setTimeout(() => {
+      setAutoRetryCount(previous => previous + 1);
+      router.refresh();
+    }, 3000);
+
+    return () => {
+      globalThis.clearTimeout(retryTimeout);
+    };
+  }, [
+    canAutoRetry,
+    conversationId,
+    creatorProfiles,
+    dashboardLoadError,
+    hasDashboardLoadFailure,
+    hasProfilesButNoSelection,
+    isProfileSetupRace,
+    needsOnboarding,
+    router,
+    searchParams,
+    selectedProfile,
+  ]);
+
   if (!selectedProfile) {
+    const profileMessage = isProfileSetupRace
+      ? 'Finishing your dashboard setup…'
+      : 'We hit a problem loading your profile. Please retry in a moment.';
+
     return (
       <div className='flex h-full items-center justify-center'>
         <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
-          <AlertCircle className='h-8 w-8 text-tertiary-token' />
-          <p className='text-sm text-secondary-token'>
-            Could not load your profile. This is usually temporary.
-          </p>
-          <button
-            type='button'
-            onClick={() => globalThis.location.reload()}
-            className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
-          >
-            <RefreshCw className='h-4 w-4' />
-            Retry
-          </button>
+          {isProfileSetupRace ? (
+            <LoadingSpinner size='lg' tone='muted' />
+          ) : (
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+          )}
+          <p className='text-sm text-secondary-token'>{profileMessage}</p>
+          {isProfileSetupRace && canAutoRetry && (
+            <p className='text-xs text-tertiary-token'>
+              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
+            </p>
+          )}
+          {!isProfileSetupRace && (
+            <button
+              type='button'
+              onClick={() => router.refresh()}
+              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <JovieChat
-      profileId={selectedProfile.id}
-      conversationId={conversationId}
-      onConversationCreate={handleConversationCreate}
-      onTitleChange={handleTitleChange}
-      initialQuery={initialQuery ?? undefined}
-      displayName={selectedProfile.displayName ?? undefined}
-      avatarUrl={selectedProfile.avatarUrl}
-      username={selectedProfile.username ?? undefined}
-    />
+    <ErrorBoundary
+      fallback={
+        <div className='flex h-full items-center justify-center'>
+          <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            <p className='text-sm text-secondary-token'>
+              Something went wrong loading chat. Please try again.
+            </p>
+            <button
+              type='button'
+              onClick={() => router.refresh()}
+              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+            >
+              <RefreshCw className='h-4 w-4' />
+              Retry
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <JovieChat
+        profileId={selectedProfile.id}
+        conversationId={conversationId}
+        onConversationCreate={handleConversationCreate}
+        onTitleChange={handleTitleChange}
+        initialQuery={initialQuery ?? undefined}
+        displayName={selectedProfile.displayName ?? undefined}
+        avatarUrl={selectedProfile.avatarUrl}
+        username={selectedProfile.username ?? undefined}
+        isFirstSession={isFirstSession}
+      />
+    </ErrorBoundary>
   );
 }

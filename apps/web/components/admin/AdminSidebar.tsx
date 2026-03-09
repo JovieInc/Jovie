@@ -4,9 +4,15 @@ import {
   Activity,
   AlertTriangle,
   BarChart2,
+  Download,
+  Eye,
   ImageIcon,
   LayoutDashboard,
   Mail,
+  MessageCircle,
+  MessageSquare,
+  Search,
+  Send,
   ShieldCheck,
   User,
   UserPlus,
@@ -34,14 +40,25 @@ const navItems = [
   { label: 'Overview', href: APP_ROUTES.ADMIN, icon: LayoutDashboard },
   { label: 'Waitlist', href: APP_ROUTES.ADMIN_WAITLIST, icon: UserPlus },
   { label: 'Creators', href: APP_ROUTES.ADMIN_CREATORS, icon: Users },
+  { label: 'Ingest', href: APP_ROUTES.ADMIN_INGEST, icon: Download },
   { label: 'Campaigns', href: `${APP_ROUTES.ADMIN}/campaigns`, icon: Mail },
   { label: 'Users', href: APP_ROUTES.ADMIN_USERS, icon: User },
+  { label: 'Feedback', href: APP_ROUTES.ADMIN_FEEDBACK, icon: MessageSquare },
   { label: 'Usage', href: `${APP_ROUTES.ADMIN}#usage`, icon: BarChart2 },
   {
     label: 'Reliability',
     href: `${APP_ROUTES.ADMIN}#errors`,
     icon: ShieldCheck,
   },
+  { label: 'Leads', href: APP_ROUTES.ADMIN_LEADS, icon: Search },
+  { label: 'Outreach', href: APP_ROUTES.ADMIN_OUTREACH, icon: Send },
+  { label: 'Email Queue', href: APP_ROUTES.ADMIN_OUTREACH_EMAIL, icon: Mail },
+  {
+    label: 'DM Queue',
+    href: APP_ROUTES.ADMIN_OUTREACH_DM,
+    icon: MessageCircle,
+  },
+  { label: 'Manual Review', href: APP_ROUTES.ADMIN_OUTREACH_REVIEW, icon: Eye },
   { label: 'Activity', href: APP_ROUTES.ADMIN_ACTIVITY, icon: Activity },
   {
     label: 'Screenshots',
@@ -96,10 +113,7 @@ export function AdminSidebar({ className }: Readonly<AdminSidebarProps>) {
       </SidebarHeader>
 
       <SidebarContent>
-        <nav
-          aria-label='Admin navigation'
-          className='flex flex-1 flex-col overflow-hidden'
-        >
+        <nav aria-label='Admin navigation' className='flex flex-1 flex-col'>
           <SidebarMenu>
             {navItems.map(item => {
               const isActive = item.href === activeHref;

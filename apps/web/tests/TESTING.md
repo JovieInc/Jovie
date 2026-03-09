@@ -5,8 +5,8 @@
 | Tier | Tests | When | Time Target |
 |------|-------|------|-------------|
 | **Smoke** | Homepage, auth pages, protected routes, 404 | Every PR | < 10 min |
-| **Full E2E** | All E2E specs including billing, visual | Main branch, `testing` label | 20-30 min |
-| **Nightly** | Visual regression, a11y audit, synthetic golden path | Scheduled | Unlimited |
+| **Full E2E** | All E2E specs including billing and golden-path flows | Main branch, `testing` label | 20-30 min |
+| **Nightly** | Extended accessibility and synthetic golden path checks | Scheduled | Unlimited |
 
 ## Running Tests
 
@@ -58,9 +58,8 @@ Smoke tests are designed for **fast PR feedback** (< 10 min target):
 These run on main branch and PRs with `testing` label:
 
 - `billing.spec.ts` - Billing routes (/billing, /account, etc.)
-- `onboarding-*.spec.ts` - Onboarding flows
-- `profile.public.spec.ts` - Detailed profile features
-- `visual-regression.spec.ts` - Screenshot comparisons
+- `onboarding.spec.ts` - Onboarding flows (happy path, existing user, taken handle)
+- `profile.spec.ts` - Public profile rendering, modes, drawers, deep links
 - `axe-audit.spec.ts` - Accessibility tests
 
 ## Adding New Tests
@@ -77,7 +76,6 @@ Add to smoke **only if**:
 
 Add to full suite for:
 - Feature detail tests
-- Visual regression
 - Accessibility audits
 - Edge cases and error states
 - Tests requiring database writes
@@ -143,3 +141,24 @@ PR created
 - Target: < 10 min
 - If over budget, move tests to full suite
 - Consolidate redundant tests
+
+
+## UI Test Strategy (Flake Resistance)
+
+> Strategy note: UI tests intentionally avoid layout- and copy-coupled assertions.
+
+### We test
+
+- Core logic and data transformations (unit + integration)
+- Golden-path E2E user journeys
+- Auth and billing flows
+- Musicfetch integration behavior
+- Structural accessibility (roles, semantic hierarchy, keyboard reachability)
+
+### We do not test in CI
+
+- Exact CSS values (padding, margin, font-size, pixel colors)
+- Screenshot or visual diff checks that fail on copy/content updates
+- Assertions coupled to marketing headline text or frequently changing copy
+
+When UI polish needs validation, rely on manual QA and product screenshot workflows instead of deploy-blocking assertions.

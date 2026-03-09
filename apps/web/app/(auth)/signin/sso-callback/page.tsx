@@ -1,6 +1,7 @@
 'use client';
 
 import { SsoCallbackHandler } from '@/components/auth/SsoCallbackHandler';
+import { APP_ROUTES } from '@/constants/routes';
 
 /**
  * SSO callback page for sign-in OAuth flows.
@@ -10,8 +11,8 @@ export default function SignInSsoCallbackPage() {
   return (
     <div className='flex items-center justify-center min-h-[200px]'>
       <SsoCallbackHandler
-        signInFallbackRedirectUrl='/app'
-        signUpFallbackRedirectUrl='/app'
+        signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
+        signUpFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -9,17 +9,19 @@ import { users } from '@/lib/db/schema/auth';
 import { chatAuditLog } from '@/lib/db/schema/chat';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
+import { httpUrlSchema } from '@/lib/validation/schemas/base';
 
 const confirmLinkSchema = z.object({
   profileId: z.string().uuid(),
   platform: z.string().min(1),
-  url: z.string().min(1).max(2048),
-  normalizedUrl: z.string().min(1).max(2048),
+  url: httpUrlSchema,
+  normalizedUrl: httpUrlSchema,
 });
 
 /**
@@ -102,20 +104,47 @@ export async function POST(req: Request) {
       );
     }
 
-    // Insert the social link
-    await db.insert(socialLinks).values({
-      creatorProfileId: profileId,
-      platform: detected.platform.id,
-      platformType: detected.platform.category,
-      url: detected.normalizedUrl,
-      displayText: null,
-      sortOrder: 0,
-      isActive: true,
-      state: 'active',
-      confidence: '1.00',
-      sourceType: 'manual',
-      version: 1,
-    });
+    // Check for existing link with same platform (prevent duplicates)
+    const [existingLink] = await db
+      .select({ id: socialLinks.id })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, profileId),
+          eq(socialLinks.platform, detected.platform.id)
+        )
+      )
+      .limit(1);
+
+    if (existingLink) {
+      // Update existing link URL instead of creating duplicate
+      await db
+        .update(socialLinks)
+        .set({
+          url: detected.normalizedUrl,
+          isActive: true,
+          state: 'active',
+          updatedAt: new Date(),
+        })
+        .where(eq(socialLinks.id, existingLink.id));
+    } else {
+      // Insert new social link
+      await db.insert(socialLinks).values({
+        creatorProfileId: profileId,
+        platform: detected.platform.id,
+        platformType: detected.platform.category,
+        url: detected.normalizedUrl,
+        displayText: null,
+        sortOrder: 0,
+        isActive: true,
+        state: 'active',
+        confidence: '1.00',
+        sourceType: 'manual',
+        version: 1,
+      });
+    }
+
+    await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
 
     // Audit log
     const ipAddress = getClientIP(req);

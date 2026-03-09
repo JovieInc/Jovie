@@ -66,7 +66,7 @@ export const LinkActions = memo(function LinkActions({
           className='opacity-0 group-hover:opacity-70 group-focus-within:opacity-100 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-100 active:scale-[0.97]'
           aria-label='Drag to reorder'
         >
-          <span className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-surface-2/80 text-secondary-token ring-1 ring-subtle shadow-sm'>
+          <span className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-surface-2/80 text-secondary-token ring-1 ring-subtle shadow-card'>
             <Icon name='GripVertical' className='h-3.5 w-3.5' />
           </span>
         </button>
@@ -95,7 +95,7 @@ export const LinkActions = memo(function LinkActions({
             role='menu'
             aria-label='Link actions menu'
             tabIndex={-1}
-            className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-sm shadow-lg focus-visible:outline-none'
+            className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-[13px] shadow-card-elevated focus-visible:outline-none'
             onKeyDown={handleKeyDown}
           >
             {menuItems.map((item, index) => (

@@ -18,7 +18,7 @@ export function InsightActions({ insightId }: InsightActionsProps) {
         size='sm'
         disabled={isPending}
         onClick={() => mutate({ insightId, status: 'dismissed' })}
-        className='h-7 gap-1.5 px-2 text-xs text-tertiary-token hover:text-secondary-token'
+        className='h-7 gap-1.5 px-2 text-[13px] text-tertiary-token hover:text-secondary-token'
       >
         <X className='h-3 w-3' />
         Dismiss
@@ -28,7 +28,7 @@ export function InsightActions({ insightId }: InsightActionsProps) {
         size='sm'
         disabled={isPending}
         onClick={() => mutate({ insightId, status: 'acted_on' })}
-        className='h-7 gap-1.5 px-2 text-xs text-accent-token hover:text-accent-token/80'
+        className='h-7 gap-1.5 px-2 text-[13px] text-accent-token hover:text-accent-token/80'
       >
         <Check className='h-3 w-3' />
         Done

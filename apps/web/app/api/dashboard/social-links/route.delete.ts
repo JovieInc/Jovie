@@ -4,6 +4,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateSocialLinksCache } from '@/lib/cache';
 import { getAuthenticatedProfile } from '@/lib/db/queries/shared';
 import { socialLinks } from '@/lib/db/schema/links';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -108,6 +109,7 @@ export async function DELETE(req: Request) {
           .where(eq(socialLinks.id, linkId));
       }
 
+      await syncPrimaryMusicUrlsFromSocialLinks(tx, profileId);
       await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
 
       return NextResponse.json(

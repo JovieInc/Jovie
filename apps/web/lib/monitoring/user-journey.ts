@@ -1,7 +1,7 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { track } from '@/lib/analytics';
+import { addBreadcrumb } from '@/lib/sentry/client-lite';
 
 declare global {
   var jovieOnboardingJourneyListeners:
@@ -53,7 +53,7 @@ export class UserJourneyTracker {
     this.currentStep++;
 
     if (this.currentStep >= this.steps.length) {
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'user-journey',
         message: `Journey ${this.journeyName} has no more steps defined`,
         level: 'warning',
@@ -109,7 +109,7 @@ export class UserJourneyTracker {
     const stepIndex = this.steps.indexOf(stepName);
 
     if (stepIndex === -1) {
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'user-journey',
         message: `Step ${stepName} not found in journey ${this.journeyName}`,
         level: 'warning',

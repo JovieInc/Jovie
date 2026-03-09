@@ -2,7 +2,7 @@
  * Database Session Helpers
  *
  * Helper functions for database sessions and RLS.
- * Note: Neon HTTP driver does not support transactions.
+ * The Neon WebSocket driver supports transactions for RLS isolation.
  */
 
 import { sql as drizzleSql } from 'drizzle-orm';
@@ -35,12 +35,16 @@ export async function withDb<T>(
 /**
  * Set session user ID for RLS policies with retry logic.
  *
- * Uses set_config with is_local=false (session-scoped) instead of SET LOCAL,
- * because SET LOCAL is a no-op outside a transaction block and the Neon HTTP
- * driver does not support transactions. Session-scoped settings persist for
- * the lifetime of the connection (one HTTP request with Neon HTTP).
+ * Uses set_config with is_local=false (session-scoped) so the setting
+ * persists for the lifetime of the connection. For transaction-scoped
+ * isolation, wrap in db.transaction() with is_local=true instead.
  */
 export async function setSessionUser(userId: string): Promise<void> {
+  if (!userId) {
+    logDbInfo('setSessionUser', 'Skipping RLS setup — no userId provided');
+    return;
+  }
+
   try {
     await withRetry(async () => {
       let db = getInternalDb();
@@ -48,12 +52,17 @@ export async function setSessionUser(userId: string): Promise<void> {
         db = initializeDb();
         setInternalDb(db);
       }
-      // Set both RLS session variables in a single round-trip.
+      // Set the RLS session variable in a single round-trip.
       // is_local=false so the setting takes effect for the current connection
       // rather than requiring a transaction block that doesn't exist.
-      await db.execute(
-        drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`
-      );
+      try {
+        await db.execute(
+          drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
+        );
+      } catch (error) {
+        logDbError('setSessionUser_set_config_failed', error, { userId });
+        await db.execute(drizzleSql`SET app.clerk_user_id = ${userId}`);
+      }
     }, 'setSessionUser');
 
     logDbInfo('setSessionUser', 'Session user set successfully', { userId });

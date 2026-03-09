@@ -3,7 +3,7 @@
  * Validates timeout behavior for analytics queries
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   apiQuery,
   dashboardQuery,
@@ -15,9 +15,19 @@ import {
 } from '@/lib/db/query-timeout';
 
 describe('Query Timeout', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
   describe('QUERY_TIMEOUTS', () => {
     it('should have correct default timeout values', () => {
-      expect(QUERY_TIMEOUTS.dashboard).toBe(10000); // 10 seconds
+      expect(QUERY_TIMEOUTS.dashboard).toBe(20000); // 20 seconds
       expect(QUERY_TIMEOUTS.api).toBe(5000); // 5 seconds
       expect(QUERY_TIMEOUTS.default).toBe(5000); // 5 seconds
     });
@@ -29,7 +39,9 @@ describe('Query Timeout', () => {
         setTimeout(() => resolve('success'), 10);
       });
 
-      const result = await withTimeout(fastPromise, 1000, 'Test query');
+      const resultPromise = withTimeout(fastPromise, 1000, 'Test query');
+      vi.advanceTimersByTime(10);
+      const result = await resultPromise;
 
       expect(result).toBe('success');
     });
@@ -39,9 +51,9 @@ describe('Query Timeout', () => {
         setTimeout(() => resolve('success'), 500);
       });
 
-      await expect(withTimeout(slowPromise, 50, 'Slow query')).rejects.toThrow(
-        QueryTimeoutError
-      );
+      const resultPromise = withTimeout(slowPromise, 50, 'Slow query');
+      vi.advanceTimersByTime(51);
+      await expect(resultPromise).rejects.toThrow(QueryTimeoutError);
     });
 
     it('should include context in timeout error message', async () => {
@@ -49,8 +61,11 @@ describe('Query Timeout', () => {
         setTimeout(() => resolve('success'), 500);
       });
 
+      const resultPromise = withTimeout(slowPromise, 50, 'My analytics query');
+      vi.advanceTimersByTime(51);
+
       try {
-        await withTimeout(slowPromise, 50, 'My analytics query');
+        await resultPromise;
         expect.fail('Should have thrown');
       } catch (error) {
         expect(error).toBeInstanceOf(QueryTimeoutError);
@@ -69,14 +84,12 @@ describe('Query Timeout', () => {
   });
 
   describe('dashboardQuery', () => {
-    it('should use dashboard timeout (10s)', async () => {
-      const startTime = Date.now();
+    it('should use dashboard timeout (20s)', async () => {
       const fastQuery = async () => 'result';
 
       const result = await dashboardQuery(fastQuery, 'Test dashboard query');
 
       expect(result).toBe('result');
-      expect(Date.now() - startTime).toBeLessThan(1000);
     });
 
     it('should timeout slow dashboard queries', async () => {
@@ -85,10 +98,9 @@ describe('Query Timeout', () => {
         return 'result';
       };
 
-      // Use a shorter timeout for testing
-      await expect(
-        withTimeout(slowQuery(), 50, 'Dashboard query')
-      ).rejects.toThrow(QueryTimeoutError);
+      const resultPromise = withTimeout(slowQuery(), 50, 'Dashboard query');
+      vi.advanceTimersByTime(51);
+      await expect(resultPromise).rejects.toThrow(QueryTimeoutError);
     });
   });
 

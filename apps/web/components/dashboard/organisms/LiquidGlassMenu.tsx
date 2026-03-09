@@ -1,6 +1,6 @@
 'use client';
 
-import { MoreHorizontal, Search } from 'lucide-react';
+import { LogOut, MoreHorizontal, Search } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -31,6 +31,7 @@ export interface LiquidGlassMenuProps {
   /** Optional admin items - shown in a separate section with header */
   readonly adminItems?: LiquidGlassMenuItem[];
   readonly onSearchClick?: () => void;
+  readonly onSignOut?: () => void;
   readonly className?: string;
 }
 
@@ -159,7 +160,7 @@ function Badge({
   return (
     <span
       className={cn(
-        'flex items-center justify-center font-semibold rounded-full bg-[#0ea5e9] text-white',
+        'flex items-center justify-center font-[510] rounded-full bg-accent text-white',
         sizeClasses
       )}
     >
@@ -181,7 +182,7 @@ function MenuItemLink({
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+        'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[510] transition-all duration-150',
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'
@@ -210,6 +211,7 @@ export function LiquidGlassMenu({
   expandedItems,
   adminItems,
   onSearchClick,
+  onSignOut,
   className,
 }: LiquidGlassMenuProps): React.JSX.Element {
   const pathname = usePathname();
@@ -240,7 +242,7 @@ export function LiquidGlassMenu({
       {/* Expanded menu overlay */}
       <div
         className={cn(
-          'absolute inset-x-0 bottom-0 transition-all duration-300 ease-out',
+          'absolute inset-x-0 bottom-full transition-all duration-300 ease-out',
           isExpanded
             ? 'opacity-100 pointer-events-auto'
             : 'opacity-0 pointer-events-none'
@@ -272,7 +274,7 @@ export function LiquidGlassMenu({
           <GlassBlur intense />
 
           <nav
-            className='relative z-10 py-2'
+            className='relative z-10 py-2 max-h-[70svh] overflow-y-auto overscroll-contain'
             aria-label='Expanded navigation menu'
           >
             {/* Menu items */}
@@ -289,7 +291,7 @@ export function LiquidGlassMenu({
               {hasAdminItems && (
                 <>
                   <div className='my-2 mx-1 border-t border-default/30' />
-                  <p className='px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
+                  <p className='px-3 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                     Admin
                   </p>
                   {adminItems.map(item => (
@@ -299,6 +301,24 @@ export function LiquidGlassMenu({
                       active={isActive(item.href)}
                     />
                   ))}
+                </>
+              )}
+
+              {/* Sign out */}
+              {onSignOut && (
+                <>
+                  <div className='my-2 mx-1 border-t border-default/30' />
+                  <button
+                    type='button'
+                    onClick={onSignOut}
+                    className='flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-[510] text-secondary-token transition-all duration-150 hover:text-primary-token hover:bg-bg-surface-2/50 active:scale-[0.98]'
+                  >
+                    <LogOut
+                      className='size-5 shrink-0 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                    <span className='flex-1 text-left'>Sign out</span>
+                  </button>
                 </>
               )}
             </div>
@@ -349,7 +369,7 @@ export function LiquidGlassMenu({
                 <span
                   className={cn(
                     'text-[10px] leading-tight',
-                    active ? 'font-semibold' : 'font-medium'
+                    active ? 'font-[590]' : 'font-[510]'
                   )}
                 >
                   {item.label}
@@ -380,7 +400,7 @@ export function LiquidGlassMenu({
             <span
               className={cn(
                 'text-[10px] leading-tight',
-                isExpanded ? 'font-semibold' : 'font-medium'
+                isExpanded ? 'font-[590]' : 'font-[510]'
               )}
             >
               More
@@ -396,7 +416,7 @@ export function LiquidGlassMenu({
               className='relative flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1.5 rounded-xl text-tertiary-token hover:text-secondary-token transition-all duration-150 active:scale-95'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
-              <span className='text-[10px] leading-tight font-medium'>
+              <span className='text-[10px] leading-tight font-[510]'>
                 Search
               </span>
             </button>

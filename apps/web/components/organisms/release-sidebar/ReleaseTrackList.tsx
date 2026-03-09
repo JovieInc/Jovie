@@ -17,8 +17,9 @@ import {
   Copy,
   ExternalLink,
   Link2,
-  Loader2,
   MoreHorizontal,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,6 +30,7 @@ import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release } from './types';
+import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 /** Track shape returned by the API route for sidebar tracklist + actions. */
 type SidebarTrack = Pick<
@@ -43,6 +45,9 @@ type SidebarTrack = Pick<
   | 'durationMs'
   | 'isrc'
   | 'isExplicit'
+  | 'previewUrl'
+  | 'audioUrl'
+  | 'audioFormat'
   | 'providers'
 >;
 
@@ -72,6 +77,7 @@ export function ReleaseTrackList({
   release,
   onTrackClick,
 }: ReleaseTrackListProps) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
   const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -133,7 +139,7 @@ export function ReleaseTrackList({
         }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token hover:text-secondary-token transition-colors'
+        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token hover:text-secondary-token transition-colors'
       >
         <span>Tracklist ({release.totalTracks})</span>
         {isExpanded ? (
@@ -146,19 +152,37 @@ export function ReleaseTrackList({
       {isExpanded && (
         <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
           {isLoading && (
-            <div className='flex items-center justify-center py-4'>
-              <Loader2 className='h-4 w-4 animate-spin text-tertiary-token' />
+            <div className='space-y-0.5'>
+              {Array.from({ length: Math.min(release.totalTracks, 6) }).map(
+                (_, i) => (
+                  <div
+                    key={`skeleton-${
+                      // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholder
+                      i
+                    }`}
+                    className='flex items-start gap-2 px-1 py-1.5'
+                  >
+                    <div className='w-6 shrink-0 pt-0.5'>
+                      <div className='ml-auto h-3 w-4 rounded skeleton' />
+                    </div>
+                    <div className='min-w-0 flex-1 space-y-1'>
+                      <div className='h-3.5 w-3/4 rounded skeleton' />
+                      <div className='h-2.5 w-1/3 rounded skeleton' />
+                    </div>
+                  </div>
+                )
+              )}
             </div>
           )}
 
           {!isLoading && hasError && (
-            <p className='py-2 text-xs text-error'>
+            <p className='py-2 text-[13px] text-error'>
               Failed to load tracks. Collapse and expand to retry.
             </p>
           )}
 
           {!isLoading && !hasError && tracks?.length === 0 && (
-            <p className='py-2 text-xs text-tertiary-token'>
+            <p className='py-2 text-[13px] text-tertiary-token'>
               No track data available.
             </p>
           )}
@@ -168,7 +192,13 @@ export function ReleaseTrackList({
             tracks &&
             tracks.length > 0 &&
             tracks.map(track => (
-              <TrackItem key={track.id} track={track} onClick={onTrackClick} />
+              <TrackItem
+                key={track.id}
+                track={track}
+                onClick={onTrackClick}
+                playbackState={playbackState}
+                onToggleTrack={toggleTrack}
+              />
             ))}
         </div>
       )}
@@ -179,9 +209,22 @@ export function ReleaseTrackList({
 function TrackItem({
   track,
   onClick,
+  playbackState,
+  onToggleTrack,
 }: {
   readonly track: SidebarTrack;
   readonly onClick?: (track: SidebarTrack) => void;
+  readonly playbackState: {
+    activeTrackId: string | null;
+    isPlaying: boolean;
+    currentTime: number;
+    duration: number;
+  };
+  readonly onToggleTrack: (track: {
+    id: string;
+    title: string;
+    audioUrl: string;
+  }) => Promise<void>;
 }) {
   const trackLabel =
     track.discNumber > 1
@@ -210,55 +253,114 @@ function TrackItem({
   }, [track.smartLinkPath]);
 
   const streamingProviders = track.providers.filter(p => p.url);
+  const playableUrl = track.audioUrl ?? track.previewUrl;
+  const isActiveTrack = playbackState.activeTrackId === track.id;
+  const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
+  const progressDuration = isActiveTrack ? playbackState.duration : 0;
+  const progressCurrentTime = isActiveTrack ? playbackState.currentTime : 0;
+  const progressPercent =
+    progressDuration > 0
+      ? Math.min(
+          100,
+          Math.max(0, (progressCurrentTime / progressDuration) * 100)
+        )
+      : 0;
+
+  const handleTogglePlayback = useCallback(() => {
+    if (!playableUrl) return;
+
+    onToggleTrack({
+      id: track.id,
+      title: track.title,
+      audioUrl: playableUrl,
+    }).catch(() => {
+      toast.error('Unable to play this track right now');
+    });
+  }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 hover:bg-surface-2/50 transition-colors'>
+    <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-surface-2/50'>
       {/* Track number */}
-      <span className='w-6 shrink-0 pt-0.5 text-right text-xs tabular-nums text-tertiary-token'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[11px] tabular-nums text-tertiary-token'>
         {trackLabel}.
       </span>
 
-      {/* Track details - clickable */}
-      <button
-        type='button'
-        onClick={handleClick}
-        className='min-w-0 flex-1 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
-      >
-        <div className='flex items-center gap-1.5'>
-          <TruncatedText
-            lines={1}
-            className='text-xs text-primary-token hover:underline'
-            tooltipSide='top'
-          >
-            {track.title}
-          </TruncatedText>
-          {track.isExplicit && (
-            <Badge
-              variant='secondary'
-              className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+      {/* Track details */}
+      <div className='min-w-0 flex-1'>
+        <button
+          type='button'
+          onClick={handleClick}
+          className='w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
+        >
+          <div className='flex items-center gap-1.5'>
+            <TruncatedText
+              lines={1}
+              className='text-[13px] text-primary-token hover:underline'
+              tooltipSide='top'
             >
-              E
-            </Badge>
-          )}
-        </div>
+              {track.title}
+            </TruncatedText>
+            {track.isExplicit && (
+              <Badge
+                variant='secondary'
+                className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+              >
+                E
+              </Badge>
+            )}
+          </div>
 
-        {/* Duration + ISRC row */}
-        <div className='mt-0.5 flex items-center gap-2 text-[11px] text-tertiary-token'>
-          {track.durationMs != null && (
-            <span className='tabular-nums'>
-              {formatDuration(track.durationMs)}
-            </span>
-          )}
-          {track.isrc && (
-            <>
-              {track.durationMs != null && (
-                <span className='text-tertiary-token/50'>|</span>
-              )}
-              <span className='font-mono text-[10px]'>{track.isrc}</span>
-            </>
-          )}
-        </div>
-      </button>
+          {/* Duration + ISRC row */}
+          <div className='mt-0.5 flex items-center gap-2 text-[11px] text-tertiary-token'>
+            {track.durationMs != null && (
+              <span className='tabular-nums'>
+                {formatDuration(track.durationMs)}
+              </span>
+            )}
+            {track.isrc && (
+              <>
+                {track.durationMs != null && (
+                  <span className='text-tertiary-token/50'>|</span>
+                )}
+                <span className='font-mono text-[10px]'>{track.isrc}</span>
+              </>
+            )}
+          </div>
+        </button>
+
+        {playableUrl && (
+          <div className='mt-2 space-y-1.5'>
+            <div className='flex items-center gap-2'>
+              <button
+                type='button'
+                onClick={event => {
+                  event.stopPropagation();
+                  handleTogglePlayback();
+                }}
+                className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle text-secondary-token hover:border-primary hover:text-primary-token transition-colors'
+                aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
+              >
+                {isTrackPlaying ? (
+                  <Pause className='h-3.5 w-3.5' />
+                ) : (
+                  <Play className='h-3.5 w-3.5' />
+                )}
+              </button>
+              <div className='h-1 flex-1 rounded-full bg-surface-2'>
+                <div
+                  className='h-full rounded-full bg-primary transition-[width]'
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+            <p className='text-[10px] text-tertiary-token'>
+              {track.audioFormat
+                ? `Audio preview · ${track.audioFormat.toUpperCase()}`
+                : 'Audio preview'}
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Actions menu */}
       <TrackActionsMenu
@@ -289,7 +391,7 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          className='shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          className='mt-0.5 shrink-0 self-start rounded p-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
           aria-label={`Actions for ${track.title}`}
         >
           <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />

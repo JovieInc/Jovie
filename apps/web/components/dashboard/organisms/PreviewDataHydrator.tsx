@@ -7,6 +7,9 @@ import {
   type PreviewPanelLink,
   usePreviewPanelData,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
+import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 
 function convertSocialLinksToPreviewLinks(
   links: ProfileSocialLink[]
@@ -29,11 +32,26 @@ function convertSocialLinksToPreviewLinks(
  */
 export function PreviewDataHydrator({
   initialLinks,
+  spotifyConnected,
+  spotifyArtistName,
+  appleMusicConnected,
+  appleMusicArtistName,
 }: {
   readonly initialLinks: ProfileSocialLink[];
+  readonly spotifyConnected: boolean;
+  readonly spotifyArtistName: string | null;
+  readonly appleMusicConnected: boolean;
+  readonly appleMusicArtistName: string | null;
 }) {
   const { setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+
+  // Register ProfileContactSidebar in the unified right panel system
+  useRegisterRightPanel(
+    <ErrorBoundary fallback={null}>
+      <ProfileContactSidebar />
+    </ErrorBoundary>
+  );
 
   const previewLinks = useMemo(
     () => convertSocialLinksToPreviewLinks(initialLinks),
@@ -46,10 +64,30 @@ export function PreviewDataHydrator({
       username: selectedProfile.username,
       displayName: selectedProfile.displayName ?? selectedProfile.username,
       avatarUrl: selectedProfile.avatarUrl ?? null,
+      bio: selectedProfile.bio ?? null,
+      genres: selectedProfile.genres ?? null,
       links: previewLinks,
       profilePath: `/${selectedProfile.username}`,
+      dspConnections: {
+        spotify: {
+          connected: spotifyConnected,
+          artistName: spotifyArtistName,
+        },
+        appleMusic: {
+          connected: appleMusicConnected,
+          artistName: appleMusicArtistName,
+        },
+      },
     });
-  }, [selectedProfile, previewLinks, setPreviewData]);
+  }, [
+    selectedProfile,
+    previewLinks,
+    setPreviewData,
+    spotifyConnected,
+    spotifyArtistName,
+    appleMusicConnected,
+    appleMusicArtistName,
+  ]);
 
   return null;
 }

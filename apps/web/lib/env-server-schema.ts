@@ -28,12 +28,6 @@ export const ServerEnvSchema = z.object({
   CLERK_SECRET_KEY: z.string().optional(),
   CLERK_WEBHOOK_SECRET: z.string().optional(),
 
-  // Cloudinary configuration
-  CLOUDINARY_API_KEY: z.string().optional(),
-  CLOUDINARY_API_SECRET: z.string().optional(),
-  CLOUDINARY_UPLOAD_FOLDER: z.string().optional(),
-  CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
-
   // Email / notifications
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM_EMAIL: z.string().email().optional(),
@@ -52,6 +46,7 @@ export const ServerEnvSchema = z.object({
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),
+  APPLE_MUSIC_DEVELOPER_TOKEN: z.string().optional(),
 
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
@@ -63,14 +58,21 @@ export const ServerEnvSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
+  TIP_PLATFORM_FEE_PERCENT: z.string().optional(),
+
+  // Stripe price IDs for Founding tier ($9/mo, locked-in early supporter pricing)
+  STRIPE_PRICE_FOUNDING_MONTHLY: z.string().startsWith('price_').optional(),
 
   // Stripe price IDs for Pro tier ($39/mo, $348/yr)
-  STRIPE_PRICE_PRO_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_PRO_YEARLY: z.string().optional(),
+  STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
 
   // Stripe price IDs for Growth tier ($99/mo, $948/yr)
-  STRIPE_PRICE_GROWTH_MONTHLY: z.string().optional(),
-  STRIPE_PRICE_GROWTH_YEARLY: z.string().optional(),
+  STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_GROWTH_YEARLY: z.string().startsWith('price_').optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
@@ -127,7 +129,11 @@ export const ServerEnvSchema = z.object({
 
   // Sentry server-side
   SENTRY_DSN: z.string().optional(),
+  SENTRY_DSN_DEV: z.string().optional(),
   SENTRY_WEBHOOK_SECRET: z.string().optional(),
+  SENTRY_AUTH_TOKEN: z.string().optional(),
+  SENTRY_ORG_SLUG: z.string().optional(),
+  SENTRY_DEV_PROJECT: z.string().optional(),
 
   // Linear webhook automation
   LINEAR_WEBHOOK_SECRET: z.string().optional(),
@@ -143,6 +149,14 @@ export const ServerEnvSchema = z.object({
 
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
+
+  // Instantly (outreach email campaigns)
+  INSTANTLY_API_KEY: z.string().optional(),
+  INSTANTLY_CAMPAIGN_ID: z.string().optional(),
+
+  // Google Custom Search Engine (lead discovery)
+  GOOGLE_CSE_API_KEY: z.string().optional(),
+  GOOGLE_CSE_ENGINE_ID: z.string().optional(),
 
   // Jovie Marketing Pixels (for retargeting Jovie visitors)
   JOVIE_FACEBOOK_PIXEL_ID: z.string().optional(),
@@ -163,10 +177,6 @@ export const ENV_KEYS = [
   'VERCEL_ENV',
   'CLERK_SECRET_KEY',
   'CLERK_WEBHOOK_SECRET',
-  'CLOUDINARY_API_KEY',
-  'CLOUDINARY_API_SECRET',
-  'CLOUDINARY_UPLOAD_FOLDER',
-  'CLOUDINARY_UPLOAD_PRESET',
   'RESEND_API_KEY',
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
@@ -176,12 +186,18 @@ export const ENV_KEYS = [
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
+  'APPLE_MUSIC_DEVELOPER_TOKEN',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
   'STRIPE_SECRET_KEY',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_TIP_WEBHOOK_SECRET',
+  'STRIPE_CONNECT_WEBHOOK_SECRET',
+  'STRIPE_WEBHOOK_SECRET_TIPS',
+  'TIP_PLATFORM_FEE_PERCENT',
+  'STRIPE_PRICE_FOUNDING_MONTHLY',
   'STRIPE_PRICE_PRO_MONTHLY',
+  'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
@@ -218,11 +234,17 @@ export const ENV_KEYS = [
   'IMPERSONATION_SECRET',
   'SENTRY_DSN',
   'SENTRY_WEBHOOK_SECRET',
+  'SENTRY_AUTH_TOKEN',
+  'SENTRY_ORG_SLUG',
   'LINEAR_WEBHOOK_SECRET',
   'GH_DISPATCH_TOKEN',
   'STATSIG_SERVER_SECRET',
   'AI_GATEWAY_API_KEY',
   'JOVIE_DEV_MEMORY_MONITOR',
+  'INSTANTLY_API_KEY',
+  'INSTANTLY_CAMPAIGN_ID',
+  'GOOGLE_CSE_API_KEY',
+  'GOOGLE_CSE_ENGINE_ID',
   'JOVIE_FACEBOOK_PIXEL_ID',
   'JOVIE_FACEBOOK_ACCESS_TOKEN',
   'JOVIE_GOOGLE_MEASUREMENT_ID',

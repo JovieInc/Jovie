@@ -2,6 +2,7 @@
 
 import { BadgeCheck } from 'lucide-react';
 import { memo } from 'react';
+import { toast } from 'sonner';
 
 import { Avatar } from '@/components/molecules/Avatar';
 import { EntityHeaderCard } from '@/components/molecules/drawer';
@@ -34,13 +35,16 @@ export const ContactAvatar = memo(function ContactAvatar({
       src={avatarUrl}
       alt={altText}
       name={displayName}
-      size='lg'
+      size='xl'
       uploadable
       onUpload={onAvatarUpload}
+      onError={message => {
+        toast.error(message || 'Failed to upload avatar. Please try again.');
+      }}
       showHoverOverlay
     />
   ) : (
-    <Avatar src={avatarUrl} alt={altText} name={displayName} size='lg' />
+    <Avatar src={avatarUrl} alt={altText} name={displayName} size='xl' />
   );
 
   return (
@@ -51,7 +55,7 @@ export const ContactAvatar = memo(function ContactAvatar({
       badge={
         isVerified ? (
           <BadgeCheck
-            className='h-4 w-4 shrink-0 text-blue-500'
+            className='h-4 w-4 shrink-0 text-accent'
             aria-label='Verified'
           />
         ) : undefined

@@ -1,0 +1,50 @@
+# Documentation
+*.md
+docs/
+architecture/
+audits/
+ideation/
+
+# CI/CD and tooling config
+.github/
+.claude/
+.cursor/
+.vscode/
+.windsurf/
+.sonarlint/
+.zap/
+.orchestrator/
+.neon/
+.husky/
+
+# Test files and artifacts
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/tests/
+**/e2e/
+**/playwright/
+playwright-report/
+test-results/
+artifacts/
+coverage/
+**/__tests__/
+
+# Storybook
+storybook-static/
+**/*.stories.ts
+**/*.stories.tsx
+chromatic.config.json
+
+# Misc build/dev files
+*.log
+*.pem
+.DS_Store
+.eslintcache
+patches/
+scripts/
+*.mjs
+*.cjs
+cleanup_old_branches*.sh
+pnpm-lock.yaml

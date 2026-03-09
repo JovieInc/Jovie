@@ -16,6 +16,7 @@ describe('resolveClerkIdentity', () => {
     expect(identity.email).toBe('test@example.com');
     expect(identity.displayName).toBe('Private Full Name');
     expect(identity.displayNameSource).toBe('private_metadata_full_name');
+    expect(identity.spotifyUsername).toBe(null);
   });
 
   it('falls back to Clerk fullName when private metadata is absent', () => {
@@ -62,12 +63,25 @@ describe('resolveClerkIdentity', () => {
     expect(identity.displayNameSource).toBe('email_local_part');
   });
 
+  it('extracts Spotify username from external accounts', () => {
+    const identity = resolveClerkIdentity({
+      primaryEmailAddress: { emailAddress: 'person@example.com' },
+      externalAccounts: [
+        { provider: 'oauth_google', username: 'ignored-google' },
+        { provider: 'oauth_spotify', username: 'spotify.artist' },
+      ],
+    });
+
+    expect(identity.spotifyUsername).toBe('spotify.artist');
+  });
+
   it('returns nulls when user is missing', () => {
     const identity = resolveClerkIdentity(null);
 
     expect(identity.email).toBe(null);
     expect(identity.displayName).toBe(null);
     expect(identity.avatarUrl).toBe(null);
+    expect(identity.spotifyUsername).toBe(null);
     expect(identity.displayNameSource).toBe(null);
   });
 });

@@ -8,6 +8,11 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   useUserSafe: () => mockUseUser(),
 }));
 
+// Mock analytics
+vi.mock('@/lib/analytics', () => ({
+  track: vi.fn(),
+}));
+
 // Mock next/link
 vi.mock('next/link', () => ({
   default: ({
@@ -36,7 +41,6 @@ vi.mock('next/link', () => ({
 
 describe('ClaimBanner', () => {
   const defaultProps = {
-    claimToken: 'test-claim-token-123',
     profileHandle: 'testartist',
   };
 
@@ -55,17 +59,17 @@ describe('ClaimBanner', () => {
       expect(screen.getByText('Claim Profile')).toBeInTheDocument();
     });
 
-    it('displays profile handle when no display name provided', () => {
+    it('displays banner text regardless of display name', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
       expect(
-        screen.getByText('Your profile? Claim testartist')
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
       ).toBeInTheDocument();
     });
 
-    it('displays display name when provided', () => {
+    it('displays banner text when display name is provided', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(
@@ -73,7 +77,7 @@ describe('ClaimBanner', () => {
       );
 
       expect(
-        screen.getByText('Your profile? Claim Test Artist Display')
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
       ).toBeInTheDocument();
     });
 
@@ -82,10 +86,8 @@ describe('ClaimBanner', () => {
 
       render(<ClaimBanner {...defaultProps} displayName='Test Artist' />);
 
-      const banner = screen.getByRole('banner', {
-        name: 'Claim profile banner',
-      });
-      expect(banner).toHaveAttribute('aria-label', 'Claim profile banner');
+      const banner = screen.getByRole('banner');
+      expect(banner).toBeInTheDocument();
 
       const cta = screen.getByTestId('claim-banner-cta');
       expect(cta).toHaveAttribute(
@@ -96,31 +98,20 @@ describe('ClaimBanner', () => {
   });
 
   describe('URL generation', () => {
-    it('generates signup URL with redirect for signed-out users', () => {
+    it('generates signup URL with redirect for all users', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
       const cta = screen.getByTestId('claim-banner-cta');
+      // ClaimBanner no longer includes a claim token — it directs to signup
       expect(cta).toHaveAttribute(
         'href',
-        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-claim-token-123'
+        '/signup?handle=testartist&redirect_url=%2Ftestartist'
       );
     });
 
-    it('generates direct claim URL for signed-in users', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: true, isLoaded: true });
-
-      render(<ClaimBanner {...defaultProps} />);
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      expect(cta).toHaveAttribute(
-        'href',
-        '/testartist/claim?token=test-claim-token-123'
-      );
-    });
-
-    it('defaults to signup URL while loading', () => {
+    it('generates signup URL while loading', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: false });
 
       render(<ClaimBanner {...defaultProps} />);
@@ -128,40 +119,19 @@ describe('ClaimBanner', () => {
       const cta = screen.getByTestId('claim-banner-cta');
       expect(cta).toHaveAttribute(
         'href',
-        '/signup?redirect_url=%2Ftestartist%2Fclaim%3Ftoken%3Dtest-claim-token-123'
+        '/signup?handle=testartist&redirect_url=%2Ftestartist'
       );
-    });
-
-    it('properly encodes special characters in claim token', () => {
-      mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
-
-      render(
-        <ClaimBanner
-          claimToken='token-with-special/chars&stuff'
-          profileHandle='test'
-        />
-      );
-
-      const cta = screen.getByTestId('claim-banner-cta');
-      const href = cta.getAttribute('href');
-      // The claim path contains encoded token, then the whole redirect_url is encoded
-      expect(href).toContain('token%3Dtoken-with-special');
     });
   });
 
   describe('responsive behavior', () => {
-    it('renders mobile-friendly text', () => {
+    it('renders a single copy text visible at all breakpoints', () => {
       mockUseUser.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
       render(<ClaimBanner {...defaultProps} />);
 
-      // Mobile text
       expect(
-        screen.getByText('Your profile? Claim testartist')
-      ).toBeInTheDocument();
-      // Desktop text
-      expect(
-        screen.getByText('Is this your profile? Claim testartist')
+        screen.getByText('Is this your profile? Claim it in 30 seconds.')
       ).toBeInTheDocument();
     });
   });

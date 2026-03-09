@@ -1,18 +1,21 @@
 'use client';
 
+import { Badge } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Copy, Mail, Phone, Trash2 } from 'lucide-react';
+import { Mail, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   TableActionMenu,
   type TableActionMenuItem,
 } from '@/components/atoms/table-action-menu';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
+import { convertContextMenuItems } from '@/components/organisms/table';
 import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
+import { getContactRowContextMenuItems } from './row-actions';
 
 const contactColumnHelper = createColumnHelper<EditableContact>();
 
@@ -59,7 +62,7 @@ export function createContactColumns(
       cell: ({ row }) => {
         const contact = row.original;
         const label = getContactRoleLabel(contact.role, contact.customLabel);
-        return <span className='font-medium text-primary-token'>{label}</span>;
+        return <span className='font-[510] text-primary-token'>{label}</span>;
       },
       size: 180,
     }),
@@ -81,7 +84,7 @@ export function createContactColumns(
       header: 'Territories',
       cell: ({ row }) => {
         const { summary } = summarizeTerritories(row.original.territories);
-        return <span className='text-secondary-token'>{summary}</span>;
+        return <Badge size='sm'>{summary}</Badge>;
       },
       size: 140,
     }),
@@ -138,37 +141,11 @@ export function createContactColumns(
       header: '',
       cell: ({ row }) => {
         const contact = row.original;
-        const items: TableActionMenuItem[] = [];
-
-        if (contact.email) {
-          items.push({
-            id: 'copy-email',
-            label: 'Copy email',
-            icon: Copy,
-            onClick: () => copyToClipboard(contact.email!, 'Email'), // NOSONAR - narrowed by `if` guard above
-          });
-        }
-
-        if (contact.phone) {
-          items.push({
-            id: 'copy-phone',
-            label: 'Copy phone',
-            icon: Copy,
-            onClick: () => copyToClipboard(contact.phone!, 'Phone'), // NOSONAR - narrowed by `if` guard above
-          });
-        }
-
-        if (items.length > 0) {
-          items.push({ id: 'separator', label: '', onClick: () => {} });
-        }
-
-        items.push({
-          id: 'delete',
-          label: 'Delete contact',
-          icon: Trash2,
-          variant: 'destructive',
-          onClick: () => callbacks.onDelete(contact),
-        });
+        const items: TableActionMenuItem[] = convertContextMenuItems(
+          getContactRowContextMenuItems(contact, {
+            onDelete: callbacks.onDelete,
+          })
+        );
 
         return (
           <div className='flex items-center justify-end'>

@@ -1,0 +1,134 @@
+name: Visual & A11y Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/components/**'
+      - 'apps/web/.storybook/**'
+      - 'packages/ui/**'
+
+permissions:
+  contents: read
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: visual-a11y-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  storybook-a11y:
+    name: Storybook A11y Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright
+        run: pnpm --filter web exec playwright install chromium --with-deps
+
+      - name: Run Storybook A11y Tests
+        id: a11y-test
+        run: pnpm --filter web test:a11y
+
+      - name: A11y Results Summary
+        if: always()
+        run: |
+          if [ "${{ steps.a11y-test.outcome }}" == "failure" ]; then
+            echo "::warning::⚠️ Accessibility violations detected in Storybook components. Check the test output above for details."
+            echo ""
+            echo "## 🔍 A11y Check Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Accessibility violations detected**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Some components have accessibility issues (contrast, labels, etc.)." >> $GITHUB_STEP_SUMMARY
+            echo "These are logged as warnings - review the job output for details." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "To run locally: \`pnpm --filter web test:a11y\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ A11y Check Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All Storybook components passed accessibility checks." >> $GITHUB_STEP_SUMMARY
+          fi
+
+  playwright-visual:
+    name: Playwright Visual Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Skip on forks — secrets (DATABASE_URL) are not available
+    if: ${{ github.event.pull_request == null || github.event.pull_request.head.repo.full_name == github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4.2.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright
+        run: pnpm --filter web exec playwright install chromium chromium-headless-shell --with-deps
+
+      - name: Run Visual Regression Tests
+        id: visual-test
+        run: pnpm --filter web e2e:visual
+        env:
+          CI: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Skip auth-required tests in CI without secrets
+          E2E_SKIP_AUTH: true
+
+      - name: Upload Visual Diff Artifacts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: visual-diff-report
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Visual Test Results Summary
+        if: always()
+        run: |
+          if [ "${{ steps.visual-test.outcome }}" == "failure" ]; then
+            echo "::warning::⚠️ Visual differences detected. Check the artifacts for diff images."
+            echo ""
+            echo "## 🖼️ Visual Regression Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ **Visual differences detected**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Some pages have visual changes from the baseline." >> $GITHUB_STEP_SUMMARY
+            echo "Download the artifacts to review diff images." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "If changes are intentional, update snapshots:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+            echo "pnpm --filter web e2e:visual:update" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ Visual Regression Results" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All visual tests passed - no unexpected changes detected." >> $GITHUB_STEP_SUMMARY
+          fi

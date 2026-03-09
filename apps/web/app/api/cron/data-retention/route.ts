@@ -39,6 +39,27 @@ function verifyCronSecret(provided: string | undefined): boolean {
 }
 
 /**
+ * Extract a bearer token only when the authorization header uses the expected scheme.
+ * Avoids partial replacement patterns that can be bypassed with repeated prefixes.
+ */
+function extractBearerToken(authHeader: string | null): string | undefined {
+  if (!authHeader) return undefined;
+
+  // RFC 7235: auth-scheme is case-insensitive
+  const spaceIndex = authHeader.indexOf(' ');
+  if (spaceIndex === -1) return undefined;
+
+  const scheme = authHeader.slice(0, spaceIndex);
+  if (scheme.toLowerCase() !== 'bearer') return undefined;
+
+  const token = authHeader.slice(spaceIndex + 1);
+  // Reject empty or whitespace-containing tokens
+  if (token.length === 0 || /\s/.test(token)) return undefined;
+
+  return token;
+}
+
+/**
  * Verify request origin is from trusted sources (Vercel Cron or internal).
  * Defense in depth - verify source before checking secret.
  */
@@ -76,7 +97,7 @@ export async function GET(request: NextRequest) {
 
   // Verify cron authorization
   const authHeader = request.headers.get('authorization');
-  const cronSecret = authHeader?.replace('Bearer ', '');
+  const cronSecret = extractBearerToken(authHeader);
 
   if (!env.CRON_SECRET) {
     logger.error('[Data Retention Cron] CRON_SECRET not configured');

@@ -4,6 +4,7 @@
  * Spotify Connect Hook
  *
  * Handles connecting to Spotify artists via search or URL.
+ * JOV-1340: Added `fireAndForget` option for non-blocking onboarding flow.
  */
 
 import { useCallback, useTransition } from 'react';
@@ -20,8 +21,19 @@ export interface SpotifyArtist {
 export interface UseSpotifyConnectParams {
   dispatch: React.Dispatch<ReleasesEmptyStateAction>;
   searchClear: () => void;
-  onConnected?: (releases: ReleaseViewModel[], artistName: string) => void;
+  onConnected?: (
+    releases: ReleaseViewModel[],
+    artistName: string,
+    spotifyArtistId?: string,
+    spotifyUrl?: string
+  ) => void;
   onImportStart?: (artistName: string) => void;
+  /**
+   * JOV-1340: When true, proceeds immediately without waiting for
+   * the connect API call. The import runs in the background.
+   * Used by onboarding to avoid blocking the user.
+   */
+  fireAndForget?: boolean;
 }
 
 export function useSpotifyConnect({
@@ -29,6 +41,7 @@ export function useSpotifyConnect({
   searchClear,
   onConnected,
   onImportStart,
+  fireAndForget = false,
 }: UseSpotifyConnectParams) {
   const [isPending, startTransition] = useTransition();
 
@@ -44,8 +57,24 @@ export function useSpotifyConnect({
   const connectFromUrl = useCallback(
     (artistId: string) => {
       const artistUrl = `https://open.spotify.com/artist/${artistId}`;
-      onImportStart?.('');
+      dispatch({ type: 'SET_ERROR', payload: null });
+      dispatch({ type: 'CLEAR_SEARCH' });
+      searchClear();
 
+      if (fireAndForget) {
+        // JOV-1340: Proceed immediately, connect in background
+        onConnected?.([], '', artistId, artistUrl);
+        void connectSpotifyArtist({
+          spotifyArtistId: artistId,
+          spotifyArtistUrl: artistUrl,
+          artistName: '',
+        }).catch(() => {
+          // Import failure is non-critical during onboarding
+        });
+        return;
+      }
+
+      onImportStart?.('');
       startTransition(async () => {
         try {
           const result = await connectSpotifyArtist({
@@ -56,7 +85,16 @@ export function useSpotifyConnect({
 
           if (result.success) {
             dispatch({ type: 'CLEAR_SEARCH' });
-            onConnected?.(result.releases, result.artistName);
+            if (result.importing) {
+              onConnected?.([], result.artistName, artistId, artistUrl);
+            } else {
+              onConnected?.(
+                result.releases,
+                result.artistName,
+                artistId,
+                artistUrl
+              );
+            }
           } else {
             dispatch({ type: 'SET_ERROR', payload: result.message });
           }
@@ -69,19 +107,30 @@ export function useSpotifyConnect({
         }
       });
     },
-    [dispatch, onConnected, onImportStart]
+    [dispatch, searchClear, onConnected, onImportStart, fireAndForget]
   );
 
   // Handle selection from search results
   const handleArtistSelect = useCallback(
     (artist: SpotifyArtist) => {
       dispatch({ type: 'SET_ERROR', payload: null });
-
-      // Clear the search UI and show importing state immediately
       dispatch({ type: 'CLEAR_SEARCH' });
       searchClear();
-      onImportStart?.(artist.name);
 
+      if (fireAndForget) {
+        // JOV-1340: Proceed immediately, connect in background
+        onConnected?.([], artist.name, artist.id, artist.url);
+        void connectSpotifyArtist({
+          spotifyArtistId: artist.id,
+          spotifyArtistUrl: artist.url,
+          artistName: artist.name,
+        }).catch(() => {
+          // Import failure is non-critical during onboarding
+        });
+        return;
+      }
+
+      onImportStart?.(artist.name);
       startTransition(async () => {
         try {
           const result = await connectSpotifyArtist({
@@ -91,7 +140,16 @@ export function useSpotifyConnect({
           });
 
           if (result.success) {
-            onConnected?.(result.releases, result.artistName);
+            if (result.importing) {
+              onConnected?.([], result.artistName, artist.id, artist.url);
+            } else {
+              onConnected?.(
+                result.releases,
+                result.artistName,
+                artist.id,
+                artist.url
+              );
+            }
           } else {
             dispatch({ type: 'SET_ERROR', payload: result.message });
           }
@@ -104,70 +162,13 @@ export function useSpotifyConnect({
         }
       });
     },
-    [searchClear, dispatch, onConnected, onImportStart]
-  );
-
-  // Handle manual URL submission
-  const handleManualSubmit = useCallback(
-    (manualUrl: string): boolean => {
-      dispatch({ type: 'SET_ERROR', payload: null });
-
-      const trimmedUrl = manualUrl.trim();
-      if (!trimmedUrl) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Please enter a Spotify artist URL',
-        });
-        return false;
-      }
-
-      const artistId = extractSpotifyArtistId(trimmedUrl);
-      if (!artistId) {
-        dispatch({
-          type: 'SET_ERROR',
-          payload: 'Please enter a valid Spotify artist URL',
-        });
-        return false;
-      }
-
-      const artistUrl = `https://open.spotify.com/artist/${artistId}`;
-
-      // Clear the form and show importing state
-      dispatch({ type: 'RESET_MANUAL_MODE' });
-      onImportStart?.('');
-
-      startTransition(async () => {
-        try {
-          const result = await connectSpotifyArtist({
-            spotifyArtistId: artistId,
-            spotifyArtistUrl: artistUrl,
-            artistName: '',
-          });
-
-          if (result.success) {
-            onConnected?.(result.releases, result.artistName);
-          } else {
-            dispatch({ type: 'SET_ERROR', payload: result.message });
-          }
-        } catch (err) {
-          dispatch({
-            type: 'SET_ERROR',
-            payload:
-              err instanceof Error ? err.message : 'Failed to connect artist',
-          });
-        }
-      });
-
-      return true;
-    },
-    [dispatch, extractSpotifyArtistId, onConnected, onImportStart]
+    [searchClear, dispatch, onConnected, onImportStart, fireAndForget]
   );
 
   return {
-    isPending,
+    isPending: fireAndForget ? false : isPending,
     extractSpotifyArtistId,
     connectFromUrl,
     handleArtistSelect,
-    handleManualSubmit,
   };
 }

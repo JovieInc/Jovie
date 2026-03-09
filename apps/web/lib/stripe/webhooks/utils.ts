@@ -14,6 +14,17 @@ import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { captureWarning } from '@/lib/error-tracking';
+import { getRedis } from '@/lib/redis';
+
+const BILLING_STATUS_CACHE_KEY_PREFIX = 'billing:status:v1:';
+
+function hasStringId(value: unknown): value is { id: string } {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  return 'id' in value && typeof value.id === 'string' && value.id.length > 0;
+}
 
 /**
  * Safely extract the Stripe object ID from a webhook event.
@@ -32,15 +43,8 @@ import { captureWarning } from '@/lib/error-tracking';
  * ```
  */
 export function getStripeObjectId(event: Stripe.Event): string | null {
-  // Stripe webhook events always have data.object with an 'id' field
-  // Cast to unknown first to satisfy TypeScript
-  const object = event.data?.object as unknown as
-    | { id?: string }
-    | null
-    | undefined;
-
-  if (object && typeof object.id === 'string' && object.id.length > 0) {
-    return object.id;
+  if (hasStringId(event.data?.object)) {
+    return event.data.object.id;
   }
 
   return null;
@@ -195,9 +199,22 @@ export function isActiveSubscription(
  * await invalidateBillingCache();
  * ```
  */
-export async function invalidateBillingCache(): Promise<void> {
+export async function invalidateBillingCache(userId?: string): Promise<void> {
   // Revalidate the dashboard and any pages that display billing info
   revalidatePath(APP_ROUTES.DASHBOARD);
   revalidatePath(APP_ROUTES.BILLING);
   revalidatePath(APP_ROUTES.SETTINGS);
+
+  if (!userId) {
+    return;
+  }
+
+  const redis = getRedis();
+  if (!redis) {
+    return;
+  }
+
+  await redis
+    .del(`${BILLING_STATUS_CACHE_KEY_PREFIX}${userId}`)
+    .catch(() => undefined);
 }

@@ -1,8 +1,10 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
+  Bell,
   BellRing,
   Copy,
   Download,
@@ -11,25 +13,33 @@ import {
   UserMinus,
   Users,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
+import { AnalyticsSidebar } from '@/components/dashboard/organisms/AnalyticsSidebar';
+import { useAudiencePanel } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
-  TablePaginationFooter,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { useRegisterTablePanel } from '@/hooks/useRegisterTablePanel';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { queryKeys } from '@/lib/queries/keys';
 import { cn } from '@/lib/utils';
+import {
+  buildTouringCityMap,
+  matchTouringCity,
+} from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import { AudienceTableProvider } from './AudienceTableContext';
+import {
+  AudienceTableStableProvider,
+  AudienceTableVolatileProvider,
+} from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
@@ -41,13 +51,23 @@ import {
   renderEmailCell,
   renderIntentScoreCell,
   renderLastActionCell,
+  renderLtvCell,
   renderReturningCell,
   renderSourceCell,
   renderUserCell,
   SelectCell,
+  TouringCityCell,
 } from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
+
+// Module-level icon constants — allocated once, reused across all rows and renders.
+const ICON_EYE = <Eye className='h-3.5 w-3.5' />;
+const ICON_COPY = <Copy className='h-3.5 w-3.5' />;
+const ICON_PHONE = <Phone className='h-3.5 w-3.5' />;
+const ICON_BELL = <Bell className='h-3.5 w-3.5' />;
+const ICON_DOWNLOAD = <Download className='h-3.5 w-3.5' />;
+const ICON_USER_MINUS = <UserMinus className='h-3.5 w-3.5' />;
 
 function getSrDescription(
   isEmpty: boolean,
@@ -64,43 +84,55 @@ function getSrDescription(
 }
 
 /**
- * Redesigned column definitions for members mode.
+ * Compact Linear-style column definitions for members mode.
  *
- * Columns: Select | User | Intent Score | Returning | Source | Last Action | Quick Actions
+ * Layout: Select | User (primary label) | Intent dot | LTV ($) | Returning icon | Source icon | Touring badge | Last Action | Quick Actions
  *
- * Cell renderers that need dynamic state (selection, menu, quick actions) read from
- * AudienceTableContext instead of closing over values, keeping these definitions fully stable.
+ * Headers are hidden via `hideHeader` on the table. Icon columns use fixed widths
+ * so layout never shifts when content appears/disappears.
  */
 const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   memberColumnHelper.display({
     id: 'select',
     header: () => null,
     cell: SelectCell,
-    size: 56,
+    size: 40,
   }),
   memberColumnHelper.accessor('displayName', {
     id: 'user',
-    header: 'Visitor',
+    header: 'User',
     cell: renderUserCell,
-    size: 220,
+    size: 260,
   }),
   memberColumnHelper.accessor('intentLevel', {
     id: 'intentScore',
     header: 'Intent',
     cell: renderIntentScoreCell,
-    size: 110,
+    size: 40,
+  }),
+  memberColumnHelper.accessor('tipAmountTotalCents', {
+    id: 'ltv',
+    header: 'LTV',
+    cell: renderLtvCell,
+    size: 40,
   }),
   memberColumnHelper.accessor('visits', {
     id: 'returning',
     header: 'Returning',
     cell: renderReturningCell,
-    size: 100,
+    size: 40,
   }),
   memberColumnHelper.accessor('referrerHistory', {
     id: 'source',
     header: 'Source',
     cell: renderSourceCell,
-    size: 140,
+    size: 40,
+  }),
+  memberColumnHelper.display({
+    id: 'touringCity',
+    header: 'Touring',
+    cell: TouringCityCell,
+    size: 110,
   }),
   memberColumnHelper.accessor('latestActions', {
     id: 'lastAction',
@@ -177,11 +209,7 @@ const MobileCardList = memo(function MobileCardList({
   });
 
   return (
-    <div
-      ref={parentRef}
-      className='md:hidden overflow-auto'
-      style={{ maxHeight: '100%' }}
-    >
+    <div ref={parentRef} className='md:hidden h-full overflow-auto'>
       <div
         className='relative w-full'
         style={{ height: `${virtualizer.getTotalSize()}px` }}
@@ -217,21 +245,22 @@ export const DashboardAudienceTableUnified = memo(
     view,
     rows,
     total,
-    page,
-    pageSize,
     sort,
     direction,
-    onPageChange,
-    onPageSizeChange,
     onSortChange,
     onViewChange,
     onFiltersChange,
     profileUrl,
     profileId,
     subscriberCount,
+    totalAudienceCount,
     filters,
+    hasNextPage,
+    isFetchingNextPage,
+    onLoadMore,
+    tourDates,
   }: DashboardAudienceTableProps) {
-    const router = useRouter();
+    const queryClient = useQueryClient();
     const {
       openMenuRowId,
       setOpenMenuRowId,
@@ -241,14 +270,11 @@ export const DashboardAudienceTableUnified = memo(
       selectedIds,
       selectedCount,
       toggleSelect,
-      totalPages,
       handleCopyProfileLink,
     } = useDashboardAudienceTable({
       mode,
       rows,
       total,
-      page,
-      pageSize,
       sort,
       direction,
       profileUrl,
@@ -273,12 +299,14 @@ export const DashboardAudienceTableUnified = memo(
           if (selectedMember?.id === member.id) {
             setSelectedMember(null);
           }
-          router.refresh();
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.audience.all,
+          });
         } catch {
           toast.error('Failed to remove member');
         }
       },
-      [profileId, selectedMember, setSelectedMember, router]
+      [profileId, selectedMember, setSelectedMember, queryClient]
     );
 
     // Quick action: export member as vCard
@@ -295,6 +323,53 @@ export const DashboardAudienceTableUnified = memo(
       [handleRemoveMember]
     );
 
+    // Quick action: view member profile (opens contact sidebar)
+    const {
+      mode: panelMode,
+      open: openPanel,
+      close: closePanel,
+    } = useAudiencePanel();
+
+    // Auto-select first row when contact panel opens with no selection
+    React.useEffect(() => {
+      if (panelMode === 'contact' && !selectedMember && rows.length > 0) {
+        setSelectedMember(rows[0]);
+      }
+    }, [panelMode, selectedMember, rows, setSelectedMember]);
+
+    const handleViewProfile = React.useCallback(
+      (member: AudienceMember) => {
+        setSelectedMember(member);
+        openPanel('contact');
+      },
+      [setSelectedMember, openPanel]
+    );
+
+    // Quick action: send notification (copies contact info for now)
+    const handleSendNotification = React.useCallback(
+      (member: AudienceMember) => {
+        if (member.email) {
+          void navigator.clipboard.writeText(member.email);
+          toast.success('Email copied - ready to send notification');
+        } else if (member.phone) {
+          void navigator.clipboard.writeText(member.phone);
+          toast.success('Phone copied - ready to send notification');
+        }
+      },
+      []
+    );
+
+    // Build touring city map for O(1) lookup per member
+    const touringCityMap = useMemo(
+      () => buildTouringCityMap(tourDates ?? []),
+      [tourDates]
+    );
+
+    const getTouringCity = React.useCallback(
+      (member: AudienceMember) => matchTouringCity(member, touringCityMap),
+      [touringCityMap]
+    );
+
     // Context menu items for right-click
     const getContextMenuItems = React.useCallback(
       (member: AudienceMember): ContextMenuItemType[] => {
@@ -302,13 +377,13 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'view-details',
             label: 'View details',
-            icon: <Eye className='h-3.5 w-3.5' />,
+            icon: ICON_EYE,
             onClick: () => setSelectedMember(member),
           },
           {
             id: 'copy-email',
             label: 'Copy email',
-            icon: <Copy className='h-3.5 w-3.5' />,
+            icon: ICON_COPY,
             onClick: () => {
               if (member.email) {
                 void navigator.clipboard.writeText(member.email);
@@ -320,7 +395,7 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'copy-phone',
             label: 'Copy phone',
-            icon: <Phone className='h-3.5 w-3.5' />,
+            icon: ICON_PHONE,
             onClick: () => {
               if (member.phone) {
                 void navigator.clipboard.writeText(member.phone);
@@ -329,11 +404,26 @@ export const DashboardAudienceTableUnified = memo(
             },
             disabled: !member.phone,
           },
+          {
+            id: 'send-notification',
+            label: 'Send notification',
+            icon: ICON_BELL,
+            onClick: () => {
+              if (member.email) {
+                void navigator.clipboard.writeText(member.email);
+                toast.success('Email copied - ready to send notification');
+              } else if (member.phone) {
+                void navigator.clipboard.writeText(member.phone);
+                toast.success('Phone copied - ready to send notification');
+              }
+            },
+            disabled: !member.email && !member.phone,
+          },
           { type: 'separator' as const },
           {
             id: 'export-contact',
             label: 'Export as vCard',
-            icon: <Download className='h-3.5 w-3.5' />,
+            icon: ICON_DOWNLOAD,
             onClick: () => {
               downloadVCard(member);
               toast.success('Contact exported as vCard');
@@ -343,7 +433,7 @@ export const DashboardAudienceTableUnified = memo(
           {
             id: 'remove-member',
             label: 'Block',
-            icon: <UserMinus className='h-3.5 w-3.5' />,
+            icon: ICON_USER_MINUS,
             onClick: () => {
               handleRemoveMember(member).catch(() => {});
             },
@@ -357,30 +447,37 @@ export const DashboardAudienceTableUnified = memo(
 
     const columns = mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
 
-    // Context value for cell renderers — avoids putting dynamic state in column defs
-    const contextValue = useMemo(
+    // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
+    const stableContextValue = useMemo(
       () => ({
-        selectedIds,
         toggleSelect,
-        page,
-        pageSize,
-        openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
         onExportMember: handleExportMember,
         onBlockMember: handleBlockMember,
+        onViewProfile: handleViewProfile,
+        onSendNotification: handleSendNotification,
+        getTouringCity,
       }),
       [
-        selectedIds,
         toggleSelect,
-        page,
-        pageSize,
-        openMenuRowId,
         setOpenMenuRowId,
         getContextMenuItems,
         handleExportMember,
         handleBlockMember,
+        handleViewProfile,
+        handleSendNotification,
+        getTouringCity,
       ]
+    );
+
+    // Volatile context: frequently-changing state — only SelectCell and LastSeenCell subscribe
+    const volatileContextValue = useMemo(
+      () => ({
+        selectedIds,
+        openMenuRowId,
+      }),
+      [selectedIds, openMenuRowId]
     );
 
     const emptyStateHeading =
@@ -412,133 +509,158 @@ export const DashboardAudienceTableUnified = memo(
       href: '/support',
     };
 
-    // Row className — high intent rows get bold styling for visual hierarchy
+    // Row className — compact Linear-style rows with subtle hover
     const getRowClassName = React.useCallback(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
-        const isHighIntent = row.intentLevel === 'high';
         return cn(
-          isSelected ? 'bg-surface-2/70' : 'hover:bg-surface-2/50',
-          isHighIntent && 'font-medium'
+          'h-8',
+          isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'
         );
       },
       [selectedMember]
     );
 
-    // Register right panel with AuthShell instead of rendering inline
-    const sidebarPanel = useMemo(
-      () => (
-        <AudienceMemberSidebar
-          member={selectedMember}
-          isOpen={Boolean(selectedMember)}
-          onClose={() => setSelectedMember(null)}
-          contextMenuItems={
-            selectedMember
-              ? convertToCommonDropdownItems(
-                  getContextMenuItems(selectedMember)
-                )
-              : undefined
-          }
-        />
-      ),
-      [selectedMember, getContextMenuItems, setSelectedMember]
+    // Issue 4: Arrow keys update sidebar when panel is open
+    const handleFocusedRowChange = React.useCallback(
+      (index: number) => {
+        if (panelMode === 'contact' && rows[index]) {
+          setSelectedMember(rows[index]);
+        }
+      },
+      [panelMode, rows, setSelectedMember]
     );
 
-    useRegisterTablePanel(sidebarPanel);
+    // Close handler for the right panel
+    const handleClosePanel = React.useCallback(() => {
+      closePanel();
+      setSelectedMember(null);
+    }, [closePanel, setSelectedMember]);
+
+    // Register unified right panel — shows contact or analytics based on mode
+    const sidebarPanel = useMemo(() => {
+      if (panelMode === 'contact') {
+        return (
+          <AudienceMemberSidebar
+            member={selectedMember}
+            isOpen
+            onClose={handleClosePanel}
+            contextMenuItems={
+              selectedMember
+                ? convertToCommonDropdownItems(
+                    getContextMenuItems(selectedMember)
+                  )
+                : undefined
+            }
+          />
+        );
+      }
+      if (panelMode === 'analytics') {
+        return <AnalyticsSidebar isOpen onClose={handleClosePanel} />;
+      }
+      // Panel closed — render closed drawer to animate out
+      return (
+        <AudienceMemberSidebar
+          member={null}
+          isOpen={false}
+          onClose={handleClosePanel}
+        />
+      );
+    }, [panelMode, selectedMember, getContextMenuItems, handleClosePanel]);
+
+    useRegisterRightPanel(sidebarPanel);
 
     return (
-      <AudienceTableProvider value={contextValue}>
-        <div
-          className='flex h-full min-h-0 flex-col overflow-hidden'
-          data-testid='dashboard-audience-table'
-        >
-          <h1 className='sr-only'>
-            {rows.length === 0 ? 'Audience' : 'Audience CRM'}
-          </h1>
-          <p className='sr-only'>{getSrDescription(rows.length === 0, mode)}</p>
+      <AudienceTableStableProvider value={stableContextValue}>
+        <AudienceTableVolatileProvider value={volatileContextValue}>
+          <div
+            className='flex h-full min-h-0 flex-col overflow-hidden'
+            data-testid='dashboard-audience-table'
+          >
+            <h1 className='sr-only'>
+              {rows.length === 0 ? 'Audience' : 'Audience CRM'}
+            </h1>
+            <p className='sr-only'>
+              {getSrDescription(rows.length === 0, mode)}
+            </p>
 
-          {/* Subheader with filter dropdown and export */}
-          <AudienceTableSubheader
-            view={view}
-            filters={filters}
-            onFiltersChange={onFiltersChange}
-            rows={rows}
-            selectedIds={selectedIds}
-            subscriberCount={subscriberCount}
-            total={total}
-          />
+            {/* Subheader with filter dropdown and export */}
+            <AudienceTableSubheader
+              view={view}
+              onViewChange={onViewChange}
+              filters={filters}
+              onFiltersChange={onFiltersChange}
+              rows={rows}
+              selectedIds={selectedIds}
+              subscriberCount={subscriberCount}
+              totalAudienceCount={totalAudienceCount}
+              total={total}
+            />
 
-          <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
-            {/* Scrollable content area */}
-            <div className='flex-1 min-h-0 overflow-auto'>
-              {rows.length === 0 ? (
-                <EmptyState
-                  icon={emptyStateIcon}
-                  heading={emptyStateHeading}
-                  description={emptyStateDescription}
-                  action={emptyStatePrimaryAction}
-                  secondaryAction={emptyStateSecondaryAction}
-                />
-              ) : (
-                <>
-                  {/* Mobile card list (virtualized) */}
-                  <MobileCardList
-                    rows={rows}
-                    mode={mode}
-                    selectedMemberId={selectedMember?.id ?? null}
-                    onTap={setSelectedMember}
+            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+              {/* Scrollable content area */}
+              <div className='flex-1 min-h-0 overflow-auto'>
+                {rows.length === 0 ? (
+                  <EmptyState
+                    icon={emptyStateIcon}
+                    heading={emptyStateHeading}
+                    description={emptyStateDescription}
+                    action={emptyStatePrimaryAction}
+                    secondaryAction={emptyStateSecondaryAction}
                   />
-
-                  {/* Desktop table */}
-                  <div className='hidden md:block h-full'>
-                    <UnifiedTable
-                      data={rows}
-                      columns={columns}
-                      isLoading={false}
-                      emptyState={
-                        <EmptyState
-                          icon={emptyStateIcon}
-                          heading={emptyStateHeading}
-                          description={emptyStateDescription}
-                          action={emptyStatePrimaryAction}
-                          secondaryAction={emptyStateSecondaryAction}
-                        />
-                      }
-                      getRowId={row => row.id}
-                      enableVirtualization={true}
-                      enableKeyboardNavigation={true}
-                      minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                      className='text-[13px]'
-                      getRowClassName={getRowClassName}
-                      onRowClick={row => setSelectedMember(row)}
-                      getContextMenuItems={getContextMenuItems}
+                ) : (
+                  <>
+                    {/* Mobile card list (virtualized) */}
+                    <MobileCardList
+                      rows={rows}
+                      mode={mode}
+                      selectedMemberId={selectedMember?.id ?? null}
+                      onTap={setSelectedMember}
                     />
-                  </div>
-                </>
-              )}
+
+                    {/* Desktop table */}
+                    <div className='hidden md:block h-full'>
+                      <UnifiedTable
+                        data={rows}
+                        columns={columns}
+                        isLoading={false}
+                        emptyState={
+                          <EmptyState
+                            icon={emptyStateIcon}
+                            heading={emptyStateHeading}
+                            description={emptyStateDescription}
+                            action={emptyStatePrimaryAction}
+                            secondaryAction={emptyStateSecondaryAction}
+                          />
+                        }
+                        getRowId={row => row.id}
+                        enableVirtualization={true}
+                        enableKeyboardNavigation={true}
+                        hideHeader={mode === 'members'}
+                        minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+                        className='text-[13px]'
+                        getRowClassName={getRowClassName}
+                        onRowClick={row => handleViewProfile(row)}
+                        onFocusedRowChange={handleFocusedRowChange}
+                        getContextMenuItems={getContextMenuItems}
+                        hasNextPage={hasNextPage}
+                        isFetchingNextPage={isFetchingNextPage}
+                        onLoadMore={onLoadMore}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
-            {/* Pagination footer — uses the shared component for consistency */}
-            <div className='shrink-0'>
-              <TablePaginationFooter
-                currentPage={page}
-                totalPages={totalPages}
-                pageSize={pageSize}
-                totalItems={total}
-                onPageChange={onPageChange}
-                onPageSizeChange={onPageSizeChange}
-              />
+            <div className='sr-only' aria-live='polite' aria-atomic='true'>
+              {rows.length > 0 && `Showing ${rows.length} members`}
+              {selectedCount > 0 &&
+                `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
             </div>
           </div>
-
-          <div className='sr-only' aria-live='polite' aria-atomic='true'>
-            {total > 0 &&
-              `Showing ${(page - 1) * pageSize + 1} to ${Math.min(page * pageSize, total)} of ${total}`}
-            {selectedCount > 0 &&
-              `. ${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
-          </div>
-        </div>
-      </AudienceTableProvider>
+        </AudienceTableVolatileProvider>
+      </AudienceTableStableProvider>
     );
   }
 );

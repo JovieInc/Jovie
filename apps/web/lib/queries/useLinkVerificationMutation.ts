@@ -5,7 +5,7 @@ import { FetchError, fetchWithTimeout } from './fetch';
 
 export interface LinkVerificationInput {
   shortId: string;
-  verified: boolean;
+  challengeToken: string;
   timestamp: number;
 }
 
@@ -28,7 +28,7 @@ async function verifyLink(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          verified: input.verified,
+          challengeToken: input.challengeToken,
           timestamp: input.timestamp,
         }),
       }
@@ -75,7 +75,7 @@ export interface UseLinkVerificationMutationOptions {
  *   },
  * });
  *
- * verifyLink({ shortId: 'abc123', verified: true, timestamp: Date.now() });
+ * verifyLink({ shortId: 'abc123', challengeToken: 'token', timestamp: Date.now() });
  */
 export function useLinkVerificationMutation(
   options: UseLinkVerificationMutationOptions = {}

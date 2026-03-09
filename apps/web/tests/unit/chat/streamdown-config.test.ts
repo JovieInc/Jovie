@@ -9,7 +9,7 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(config.mode).toBe('streaming');
     expect(config.isAnimating).toBe(true);
     expect(config.caret).toBe('block');
-    expect(config.className).toContain('text-sm');
+    expect(config.className).toContain('text-[15px]');
     expect(config.className).toContain('custom-class');
   });
 
@@ -20,8 +20,8 @@ describe('getChatMarkdownStreamdownConfig', () => {
     expect(
       config.urlTransform?.('javascript:alert(1)', 'href', {} as never)
     ).toBe('');
-    expect(config.urlTransform?.('https://jovie.fm', 'href', {} as never)).toBe(
-      'https://jovie.fm'
+    expect(config.urlTransform?.('https://jov.ie', 'href', {} as never)).toBe(
+      'https://jov.ie'
     );
   });
 });

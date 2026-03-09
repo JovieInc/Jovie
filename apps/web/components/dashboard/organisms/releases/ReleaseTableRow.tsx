@@ -1,12 +1,14 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import { PencilLine, Trash2 } from 'lucide-react';
+import { PencilLine, QrCode, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -72,10 +74,14 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
   const handleCopyWithFeedback = useCallback(
     async (path: string, label: string, testId: string) => {
-      await onCopy(path, label, testId);
-      setCopiedId(testId);
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-      copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+      try {
+        await onCopy(path, label, testId);
+        setCopiedId(testId);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => setCopiedId(null), 2000);
+      } catch (error) {
+        console.error('Failed to copy link:', error);
+      }
     },
     [onCopy]
   );
@@ -96,6 +102,44 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
   ]);
 
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+
+  const handleCopyQrCode = useCallback(async () => {
+    try {
+      const qrUrl = getQrCodeUrl(smartLinkUrl, 512);
+      const response = await fetch(qrUrl);
+
+      if (!response.ok) {
+        throw new Error('Failed to generate QR code');
+      }
+
+      const qrBlob = await response.blob();
+
+      if (
+        typeof globalThis.ClipboardItem === 'function' &&
+        navigator.clipboard?.write
+      ) {
+        await navigator.clipboard.write([
+          new globalThis.ClipboardItem({
+            [qrBlob.type || 'image/png']: qrBlob,
+          }),
+        ]);
+        toast.success('QR code copied');
+        return;
+      }
+
+      const objectUrl = URL.createObjectURL(qrBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `${release.slug}-qr.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      toast.success('QR code downloaded (copy unsupported in this browser)');
+    } catch {
+      toast.error('Unable to copy QR code');
+    }
+  }, [release.slug, smartLinkUrl]);
 
   const utmShareItems = useMemo(
     () =>
@@ -126,6 +170,14 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
         onClick: handleCopySmartLink,
       },
+      {
+        id: 'copy-qr-code',
+        label: 'Copy QR code',
+        icon: QrCode,
+        onClick: () => {
+          handleCopyQrCode().catch(() => {});
+        },
+      },
       ...utmShareItems,
       {
         id: 'separator',
@@ -141,7 +193,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         disabled: !onDelete,
       },
     ],
-    [handleEdit, handleCopySmartLink, utmShareItems, onDelete]
+    [handleEdit, handleCopySmartLink, handleCopyQrCode, utmShareItems, onDelete]
   );
 
   const manualOverrideCount = release.providers.filter(
@@ -152,12 +204,12 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     <>
       <tr
         className={cn(
-          'group transition-colors duration-200 hover:bg-surface-2/50',
+          'group transition-colors duration-150 hover:bg-white/[0.02]',
           index !== totalRows - 1 && 'border-b border-subtle'
         )}
       >
         {/* Release info cell */}
-        <td className='px-4 py-4 align-middle'>
+        <td className='px-4 py-2.5 align-middle'>
           <div className='flex items-center gap-3'>
             {/* Artwork thumbnail */}
             <ReleaseArtworkThumb
@@ -167,7 +219,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
             {/* Title and metadata */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='line-clamp-1 text-sm font-semibold text-primary-token'>
+                <span className='line-clamp-1 text-[13px] font-[510] tracking-[-0.011em] text-primary-token'>
                   {release.title}
                 </span>
                 {manualOverrideCount > 0 && (
@@ -180,7 +232,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                 )}
               </div>
               {artistName && (
-                <div className='mt-0.5 line-clamp-1 text-xs text-secondary-token'>
+                <div className='mt-0.5 line-clamp-1 text-[12px] font-[450] text-secondary-token'>
                   {artistName}
                 </div>
               )}
@@ -189,8 +241,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         </td>
 
         {/* Release date cell */}
-        <td className='px-4 py-4 align-middle'>
-          <span className='line-clamp-1 text-xs text-secondary-token'>
+        <td className='px-4 py-2.5 align-middle'>
+          <span className='line-clamp-1 text-[12px] font-[450] tabular-nums text-secondary-token'>
             {release.releaseDate
               ? new Date(release.releaseDate).toLocaleDateString('en-US', {
                   month: 'short',
@@ -202,7 +254,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         </td>
 
         {/* Smart link cell */}
-        <td className='px-4 py-4 align-middle'>
+        <td className='px-4 py-2.5 align-middle'>
           {(() => {
             const smartLinkTestId = `smart-link-copy-${release.id}`;
             const isCopied = copiedId === smartLinkTestId;
@@ -220,7 +272,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                   )
                 }
                 className={cn(
-                  'inline-flex items-center text-xs transition-colors',
+                  'inline-flex items-center text-[13px] transition-colors',
                   isCopied && 'bg-success/10 text-success hover:bg-success/10'
                 )}
               >
@@ -272,7 +324,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
           }
 
           return (
-            <td key={providerKey} className='px-4 py-4 align-middle'>
+            <td key={providerKey} className='px-4 py-2.5 align-middle'>
               <div className='flex items-center gap-3'>
                 <ProviderStatusDot
                   status={status}
@@ -312,7 +364,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
         })}
 
         {/* Actions cell */}
-        <td className='px-4 py-4 align-middle text-right'>
+        <td className='px-4 py-2.5 align-middle text-right'>
           <div className='flex justify-end'>
             <TableActionMenu items={menuItems} />
           </div>

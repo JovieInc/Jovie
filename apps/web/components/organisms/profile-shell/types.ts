@@ -39,8 +39,13 @@ export interface ProfileShellProps {
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
+  /** Current profile mode — controls social-bar visibility for conversion optimization */
+  readonly mode?: string;
   readonly showTipButton?: boolean;
+  readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
+  readonly showTourButton?: boolean;
+  readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly showNotificationButton?: boolean;
   readonly maxWidthClass?: string;

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   deleteContact,
@@ -8,6 +9,7 @@ import {
 } from '@/app/app/(shell)/dashboard/contacts/actions';
 import { track } from '@/lib/analytics';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
+import { queryKeys } from '@/lib/queries/keys';
 import type {
   ContactRole,
   DashboardContact,
@@ -118,6 +120,8 @@ export function useContactsManager({
   artistHandle,
   initialContacts,
 }: UseContactsManagerProps): UseContactsManagerReturn {
+  const queryClient = useQueryClient();
+
   // Domain state - the actual contact data
   const [contacts, setContacts] = useState<DashboardContact[]>(
     () => initialContacts
@@ -145,6 +149,36 @@ export function useContactsManager({
         {}
       )
   );
+
+  // Sync local state when the query cache refreshes (e.g., after invalidation
+  // triggered by save/delete). Without this, stale TanStack Query data can
+  // overwrite correct local state on component re-mount. (JOV-920)
+  const prevInitialContactsRef = useRef(initialContacts);
+  useEffect(() => {
+    if (prevInitialContactsRef.current === initialContacts) return;
+    prevInitialContactsRef.current = initialContacts;
+
+    // Skip sync if there are unsaved temp contacts to avoid losing edits
+    const hasTempContacts = contacts.some(c => c.id.startsWith('temp-'));
+    if (hasTempContacts) return;
+
+    setContacts(initialContacts);
+    setBaseline(
+      initialContacts.reduce(
+        (acc, contact) => ({ ...acc, [contact.id]: contact }),
+        {}
+      )
+    );
+    setUiState(
+      initialContacts.reduce(
+        (acc, contact) => ({
+          ...acc,
+          [contact.id]: uiState[contact.id] ?? { ...DEFAULT_UI_STATE },
+        }),
+        {} as Record<string, ContactUIState>
+      )
+    );
+  }, [initialContacts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasContacts = contacts.length > 0;
 
@@ -269,6 +303,16 @@ export function useContactsManager({
           return next;
         });
 
+        // Invalidate TanStack Query contacts cache so background refetches
+        // return fresh data and prevent stale reads on re-mount (JOV-920)
+        queryClient
+          .invalidateQueries({
+            queryKey: queryKeys.contacts.list(profileId),
+          })
+          .catch(() => {
+            /* background refresh — swallow */
+          });
+
         toast.success('Contact saved', { id: 'contact-save' });
         track(
           isNewContact
@@ -288,13 +332,17 @@ export function useContactsManager({
           error instanceof Error ? error.message : 'Unable to save contact';
         setUiState(prev => ({
           ...prev,
-          [contactId]: { ...prev[contactId], isSaving: false, error: message },
+          [contactId]: {
+            ...prev[contactId],
+            isSaving: false,
+            error: message,
+          },
         }));
         toast.error(message);
         return undefined;
       }
     },
-    [profileId, artistHandle]
+    [profileId, artistHandle, queryClient]
   );
 
   // Delete confirmation state
@@ -349,6 +397,15 @@ export function useContactsManager({
         delete next[contactId];
         return next;
       });
+      // Invalidate TanStack Query contacts cache after deletion (JOV-920)
+      queryClient
+        .invalidateQueries({
+          queryKey: queryKeys.contacts.list(profileId),
+        })
+        .catch(() => {
+          /* background refresh — swallow */
+        });
+
       toast.success('Contact removed');
       track('contacts_contact_deleted', {
         handle: artistHandle,
@@ -363,7 +420,7 @@ export function useContactsManager({
         error instanceof Error ? error.message : 'Unable to delete contact';
       toast.error(message);
     }
-  }, [pendingDeleteContact, profileId, artistHandle]);
+  }, [pendingDeleteContact, profileId, artistHandle, queryClient]);
 
   const handleCancel = useCallback(
     (contact: EditableContact) => {

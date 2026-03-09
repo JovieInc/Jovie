@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, gt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
@@ -42,6 +43,8 @@ type LinkInput = {
   sourcePlatform?: string | null;
   sourceType?: IngestionSourceType | null;
   evidence?: Partial<LinkEvidencePayload> | null;
+  verificationStatus?: 'unverified' | 'pending' | 'verified' | null;
+  verificationToken?: string | null;
 };
 
 type UpdateSocialLinksData = z.infer<typeof updateSocialLinksSchema>;
@@ -234,6 +237,9 @@ const buildEvidencePayload = (link: LinkInput): LinkEvidencePayload => ({
   signals: link.evidence?.signals ?? [],
 });
 
+const buildVerificationToken = (): string =>
+  `jovie-verify=${randomUUID().replaceAll('-', '')}`;
+
 const scoreLinkConfidence = (
   link: LinkInput,
   normalizedUrl: string,
@@ -265,8 +271,10 @@ export const buildSocialLinksInsertPayload = (
   links: LinkInput[],
   profileId: string,
   usernameNormalized: string | null,
-  nextVersion: number
+  nextVersion: number,
+  options?: { supportsVerification?: boolean }
 ): { payload: Array<typeof socialLinks.$inferInsert>; linkUrls: string[] } => {
+  const supportsVerification = options?.supportsVerification ?? true;
   const payload = links.map((link, index) => {
     const detected = detectPlatform(link.url);
     const normalizedUrl = detected.normalizedUrl;
@@ -277,6 +285,18 @@ export const buildSocialLinksInsertPayload = (
       evidence,
       usernameNormalized
     );
+
+    const isWebsite = link.platform === 'website';
+    const verificationFields = supportsVerification
+      ? {
+          verificationToken: isWebsite
+            ? (link.verificationToken ?? buildVerificationToken())
+            : null,
+          verificationStatus: isWebsite
+            ? (link.verificationStatus ?? 'pending')
+            : 'unverified',
+        }
+      : {};
 
     return {
       creatorProfileId: profileId,
@@ -295,6 +315,7 @@ export const buildSocialLinksInsertPayload = (
         signals: Array.from(new Set(evidence.signals)),
       },
       displayText: link.displayText || null,
+      ...verificationFields,
       version: nextVersion,
     };
   });

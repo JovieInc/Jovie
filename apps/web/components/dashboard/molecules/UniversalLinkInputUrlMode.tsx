@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { X } from 'lucide-react';
+import { ArrowUp, Check, Mic, X } from 'lucide-react';
 import React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -55,6 +55,29 @@ interface UniversalLinkInputUrlModeProps {
     readonly ariaActivedescendant?: string;
     readonly ariaAutocomplete?: 'list';
   };
+  readonly onSubmit?: () => void;
+  readonly canSubmit?: boolean;
+  readonly voiceInputEnabled?: boolean;
+  readonly onVoiceInput?: () => void;
+  readonly isVoiceRecording?: boolean;
+  readonly recordingDurationLabel?: string;
+  readonly waveformLevels?: number[];
+  readonly onCancelVoiceRecording?: () => void;
+  readonly onSendVoiceRecording?: () => void;
+}
+
+function VoiceRecordingWaveform({ levels }: { levels: number[] }) {
+  return (
+    <div className='flex h-8 items-end gap-1' aria-hidden='true'>
+      {levels.map(level => (
+        <span
+          key={`wave-${level.toFixed(3)}`}
+          className='w-1 rounded-full bg-accent/80 transition-all duration-150'
+          style={{ height: `${Math.max(6, Math.round(level * 22))}px` }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export function UniversalLinkInputUrlMode({
@@ -74,8 +97,16 @@ export function UniversalLinkInputUrlMode({
   onBlur,
   isDropdownOpen = false,
   comboboxAria,
+  onSubmit,
+  canSubmit = false,
+  voiceInputEnabled = false,
+  onVoiceInput,
+  isVoiceRecording = false,
+  recordingDurationLabel = '0:00',
+  waveformLevels = [0.35, 0.55, 0.75, 0.5, 0.68, 0.4, 0.62],
+  onCancelVoiceRecording,
+  onSendVoiceRecording,
 }: UniversalLinkInputUrlModeProps) {
-  const currentPlatformIcon = detectedLink?.platform.icon || 'globe';
   const brandColor = detectedLink?.platform.color
     ? `#${detectedLink.platform.color}`
     : '#6b7280';
@@ -88,57 +119,96 @@ export function UniversalLinkInputUrlMode({
 
   return (
     <div className='relative w-full'>
-      <div
-        className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden bg-surface-1 px-2 py-1 shadow-xs transition-all',
-          isDropdownOpen
-            ? 'rounded-t-3xl border-2 border-b-0 border-accent'
-            : 'rounded-full border border-default focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
-          disabled && 'opacity-50'
-        )}
-      >
-        <UniversalLinkInputPlatformSelector
-          currentPlatformIcon={currentPlatformIcon}
-          onPlatformSelect={onPlatformSelect}
-          onArtistSearchSelect={onArtistSearchSelect}
-          onRestoreFocus={onRestoreFocus}
-          disabled={disabled}
-        />
+      {isVoiceRecording ? (
+        <div className='flex w-full items-center gap-2 rounded-3xl border border-default bg-surface-1 px-2 py-1 shadow-xs'>
+          <button
+            type='button'
+            onClick={onCancelVoiceRecording}
+            className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+            aria-label='Cancel voice recording'
+          >
+            <X className='h-4 w-4' />
+          </button>
 
-        <label htmlFor='link-url-input' className='sr-only'>
-          Link URL
-        </label>
-        <Input
-          ref={inputRef as React.RefObject<HTMLInputElement>}
-          id='link-url-input'
-          type='url'
-          inputSize='lg'
-          placeholder={placeholder}
-          value={url}
-          onChange={event => onUrlChange(event.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          disabled={disabled}
-          inputMode='url'
-          autoCapitalize='none'
-          autoCorrect='off'
-          autoComplete='off'
-          className='border-0 bg-transparent px-0 pr-24 focus-visible:ring-0 focus-visible:ring-offset-0'
-          aria-describedby={detectedLink ? 'link-detection-status' : undefined}
-          role={comboboxAria?.role}
-          aria-expanded={comboboxAria?.ariaExpanded}
-          aria-controls={comboboxAria?.ariaControls}
-          aria-activedescendant={comboboxAria?.ariaActivedescendant}
-          aria-autocomplete={comboboxAria?.ariaAutocomplete}
-        />
+          <div className='flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl bg-surface-2 px-3 py-2'>
+            <VoiceRecordingWaveform levels={waveformLevels} />
+            <span className='text-sm font-medium tabular-nums text-primary-token'>
+              {recordingDurationLabel}
+            </span>
+          </div>
 
-        {url && (
-          <div className='absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1'>
-            {detectedLink && (
+          <button
+            type='button'
+            onClick={onSendVoiceRecording}
+            className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+            aria-label='Send voice recording'
+          >
+            <Check className='h-4 w-4' />
+          </button>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            'relative flex w-full items-center gap-2 overflow-hidden bg-surface-1 px-2 py-1 shadow-xs transition-all',
+            isDropdownOpen
+              ? 'rounded-t-3xl border-2 border-b-0 border-accent'
+              : 'rounded-full border border-default focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+            disabled && 'opacity-50'
+          )}
+        >
+          <UniversalLinkInputPlatformSelector
+            onPlatformSelect={onPlatformSelect}
+            onArtistSearchSelect={onArtistSearchSelect}
+            onRestoreFocus={onRestoreFocus}
+            disabled={disabled}
+          />
+
+          <label htmlFor='link-url-input' className='sr-only'>
+            Link URL
+          </label>
+          <Input
+            ref={inputRef as React.RefObject<HTMLInputElement>}
+            id='link-url-input'
+            type='url'
+            inputSize='lg'
+            placeholder={placeholder}
+            value={url}
+            onChange={event => onUrlChange(event.target.value)}
+            onKeyDown={onKeyDown}
+            onPaste={onPaste}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            disabled={disabled}
+            inputMode='url'
+            autoCapitalize='none'
+            autoCorrect='off'
+            autoComplete='off'
+            className='border-0 bg-transparent px-0 pr-2 focus-visible:ring-0 focus-visible:ring-offset-0'
+            aria-describedby={
+              detectedLink ? 'link-detection-status' : undefined
+            }
+            role={comboboxAria?.role}
+            aria-expanded={comboboxAria?.ariaExpanded}
+            aria-controls={comboboxAria?.ariaControls}
+            aria-activedescendant={comboboxAria?.ariaActivedescendant}
+            aria-autocomplete={comboboxAria?.ariaAutocomplete}
+          />
+
+          <div className='flex items-center gap-1 pr-1'>
+            {voiceInputEnabled && (
+              <button
+                type='button'
+                onClick={onVoiceInput}
+                className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                aria-label='Start voice input'
+              >
+                <Mic className='h-4 w-4' />
+              </button>
+            )}
+
+            {url && detectedLink && (
               <div
-                className='flex items-center justify-center h-8 w-8 rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
+                className='flex h-8 w-8 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
                 style={{
                   backgroundColor: iconBg,
                   color: iconColor,
@@ -151,17 +221,30 @@ export function UniversalLinkInputUrlMode({
                 />
               </div>
             )}
+
+            {url && (
+              <button
+                type='button'
+                onClick={onClear}
+                className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                aria-label='Clear input'
+              >
+                <X className='h-4 w-4' />
+              </button>
+            )}
+
             <button
               type='button'
-              onClick={onClear}
-              className='flex items-center justify-center h-11 w-11 rounded-xl text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95 sm:h-8 sm:w-8 sm:rounded-full'
-              aria-label='Clear input'
+              onClick={onSubmit}
+              disabled={disabled || !canSubmit}
+              className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-45 active:scale-95'
+              aria-label='Submit'
             >
-              <X className='h-5 w-5 sm:h-4 sm:w-4' />
+              <ArrowUp className='h-4 w-4' />
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div id='link-detection-status' className='sr-only' aria-live='polite'>
         {getLinkDetectionStatus(detectedLink, url)}
@@ -169,7 +252,7 @@ export function UniversalLinkInputUrlMode({
 
       {url && !detectedLink?.isValid && (
         <output className='hidden text-xs text-secondary-token'>
-          💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more for
+          Paste links from Spotify, Instagram, TikTok, YouTube, and more for
           automatic detection
         </output>
       )}

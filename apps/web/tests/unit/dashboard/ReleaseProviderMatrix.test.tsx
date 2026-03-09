@@ -2,7 +2,13 @@ import { TooltipProvider } from '@jovie/ui';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { TablePanelProvider } from '@/contexts/TablePanelContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
+
+let latestSubheaderProps:
+  | {
+      onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
+    }
+  | undefined;
 
 /**
  * ReleaseProviderMatrix Component Tests
@@ -42,8 +48,8 @@ vi.mock('@/contexts/HeaderActionsContext', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useRegisterTablePanel', () => ({
-  useRegisterTablePanel: vi.fn(),
+vi.mock('@/hooks/useRegisterRightPanel', () => ({
+  useRegisterRightPanel: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/usePlanGate', () => ({
@@ -72,7 +78,7 @@ vi.mock('@/hooks/useClipboard', () => ({
 }));
 
 vi.mock('@/lib/utils/platform-detection', () => ({
-  getBaseUrl: () => 'https://test.jovie.com',
+  getBaseUrl: () => 'https://test.jov.ie',
 }));
 
 // Mock TanStack Query mutations
@@ -97,22 +103,43 @@ vi.mock('@/lib/queries', () => ({
     mutate: vi.fn(),
     isPending: false,
   }),
+  useSaveCanvasStatusMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useSaveReleaseLyricsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useFormatReleaseLyricsMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
 }));
 
 // Mock heavy children
 vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
-    ReleaseTable: () => <div data-testid='release-table'>table</div>,
+    ReleaseTable: ({ releases }: { releases: Array<{ id: string }> }) => (
+      <div data-testid='release-table'>rows:{releases.length}</div>
+    ),
   })
 );
 
 vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
   () => ({
-    ReleaseTableSubheader: () => (
-      <div data-testid='release-subheader'>subheader</div>
-    ),
+    ReleaseTableSubheader: (props: {
+      onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
+    }) => {
+      latestSubheaderProps = props;
+      return (
+        <button type='button' data-testid='release-subheader'>
+          subheader
+        </button>
+      );
+    },
     DEFAULT_RELEASE_FILTERS: { releaseTypes: [], popularity: [], labels: [] },
   })
 );
@@ -123,6 +150,13 @@ vi.mock(
     ReleasesEmptyState: () => (
       <div data-testid='releases-empty-state'>empty</div>
     ),
+  })
+);
+
+vi.mock(
+  '@/components/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
+  () => ({
+    SpotifyConnectDialog: () => null,
   })
 );
 
@@ -204,7 +238,7 @@ function renderWithProviders(
   return render(ui, {
     wrapper: ({ children }) => (
       <TooltipProvider>
-        <TablePanelProvider>{children}</TablePanelProvider>
+        <RightPanelProvider>{children}</RightPanelProvider>
       </TooltipProvider>
     ),
     ...options,
@@ -219,6 +253,7 @@ function makeRelease(id = 'release-1') {
     slug: `test-release-${id}`,
     smartLinkPath: `/r/test-release-${id}`,
     releaseType: 'single' as const,
+    isExplicit: false,
     totalTracks: 1,
     providers: [
       {
@@ -262,6 +297,7 @@ const primaryProviders = [
 describe('ReleaseProviderMatrix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    latestSubheaderProps = undefined;
   });
 
   describe('conditional rendering', () => {
@@ -305,7 +341,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
 
-    it('shows footer with release count when releases exist', () => {
+    it('renders table and subheader when releases exist', () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease('r1'), makeRelease('r2'), makeRelease('r3')]}
@@ -314,8 +350,8 @@ describe('ReleaseProviderMatrix', () => {
           spotifyConnected={true}
         />
       );
-      expect(screen.getByText(/3/)).toBeInTheDocument();
-      expect(screen.getByText(/releases/)).toBeInTheDocument();
+      expect(screen.getByTestId('release-table')).toBeInTheDocument();
+      expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
   });
 
@@ -341,6 +377,30 @@ describe('ReleaseProviderMatrix', () => {
       // Allow for React.StrictMode double render (2) + useEffect re-renders
       // but catch infinite loops (which would blow past any reasonable count)
       expect(renderCount).toBeLessThanOrEqual(4);
+    });
+  });
+
+  describe('release view filtering', () => {
+    it('filters to single-track entries when switched to tracks view', () => {
+      const single = makeRelease('single-track');
+      const album = {
+        ...makeRelease('album-track'),
+        releaseType: 'album' as const,
+        totalTracks: 12,
+      };
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[single, album]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      latestSubheaderProps?.onReleaseViewChange?.('tracks');
+
+      expect(screen.getByTestId('release-table')).toHaveTextContent('rows:1');
     });
   });
 });

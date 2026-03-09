@@ -187,9 +187,9 @@ export const SwipeToReveal = memo(function SwipeToReveal({
         {actions}
       </div>
 
-      {/* Sliding content */}
+      {/* Sliding content — bg-surface-1 so actions behind don't bleed through */}
       <div
-        className={cn('relative z-10', contentClassName)}
+        className={cn('relative z-10 bg-surface-1', contentClassName)}
         style={style}
         {...handlers}
       >

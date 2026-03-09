@@ -1,1 +1,1 @@
-export * from './InviteCampaignManager';
+export { InviteCampaignManager } from './InviteCampaignManager';

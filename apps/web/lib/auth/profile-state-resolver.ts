@@ -15,6 +15,7 @@ export interface ProfileData {
   username: string | null;
   usernameNormalized: string | null;
   displayName: string | null;
+  avatarUrl: string | null;
   isPublic: boolean | null;
   onboardingCompletedAt: Date | null;
 }
@@ -39,10 +40,11 @@ export function isProfileComplete(profile: ProfileData): boolean {
   const hasHandle =
     Boolean(profile.usernameNormalized) && Boolean(profile.username);
   const hasName = Boolean(profile.displayName?.trim());
+  const hasAvatar = Boolean(profile.avatarUrl?.trim());
   const isPublic = profile.isPublic !== false;
   const hasCompleted = Boolean(profile.onboardingCompletedAt);
 
-  return hasHandle && hasName && isPublic && hasCompleted;
+  return hasHandle && hasName && hasAvatar && isPublic && hasCompleted;
 }
 
 /**

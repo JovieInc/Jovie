@@ -11,6 +11,7 @@ import {
   EVENT_BADGE_CONFIG,
   formatDate,
   formatEventType,
+  formatStatus,
   LINEAR_EASE,
 } from './billing-constants';
 
@@ -26,9 +27,7 @@ export function BillingHistorySection({
       transition={{ duration: 0.5, delay: 0.2, ease: LINEAR_EASE }}
       className='space-y-4'
     >
-      <h2 className='text-lg font-semibold text-primary-token'>
-        Billing History
-      </h2>
+      <h2 className='text-lg font-[590] text-primary-token'>Billing History</h2>
 
       {historyQuery.isLoading && (
         <Card>
@@ -41,7 +40,7 @@ export function BillingHistorySection({
       {!historyQuery.isLoading && historyQuery.error && (
         <Card>
           <CardContent className='p-6'>
-            <p className='text-sm text-tertiary-token'>
+            <p className='text-[13px] text-tertiary-token'>
               Unable to load billing history.
             </p>
           </CardContent>
@@ -58,10 +57,16 @@ export function BillingHistorySection({
                   const config = EVENT_BADGE_CONFIG[entry.eventType];
                   const IconComponent = config?.icon ?? Clock;
                   const badgeVariant = config?.variant ?? 'secondary';
+                  const badgeLabel = entry.status
+                    ? formatStatus(entry.status)
+                    : 'Billing';
 
                   return (
                     <div
-                      key={entry.id}
+                      key={
+                        entry.maskedIdentifier ??
+                        `${entry.eventType}-${entry.timestamp}`
+                      }
                       className='flex items-center justify-between px-6 py-4 transition-colors hover:bg-[var(--color-interactive-hover)]'
                     >
                       <div className='flex items-center gap-3'>
@@ -69,7 +74,7 @@ export function BillingHistorySection({
                           <IconComponent className='h-4 w-4 text-secondary-token' />
                         </div>
                         <div>
-                          <p className='text-sm font-medium text-primary-token'>
+                          <p className='text-[13px] font-[510] text-primary-token'>
                             {formatEventType(entry.eventType)}
                           </p>
                           <Badge
@@ -77,14 +82,12 @@ export function BillingHistorySection({
                             size='sm'
                             className='mt-0.5'
                           >
-                            {entry.source === 'webhook'
-                              ? 'Stripe'
-                              : entry.source}
+                            {badgeLabel}
                           </Badge>
                         </div>
                       </div>
-                      <time className='shrink-0 text-xs text-tertiary-token'>
-                        {formatDate(entry.createdAt)}
+                      <time className='shrink-0 text-[11px] text-tertiary-token'>
+                        {formatDate(entry.timestamp)}
                       </time>
                     </div>
                   );
@@ -96,10 +99,10 @@ export function BillingHistorySection({
           <Card>
             <CardContent className='p-8 text-center'>
               <Clock className='mx-auto h-8 w-8 text-tertiary-token' />
-              <p className='mt-3 text-sm text-secondary-token'>
+              <p className='mt-3 text-[13px] text-secondary-token'>
                 No billing events yet.
               </p>
-              <p className='mt-1 text-xs text-tertiary-token'>
+              <p className='mt-1 text-[11px] text-tertiary-token'>
                 Events will appear here as your subscription activity changes.
               </p>
             </CardContent>

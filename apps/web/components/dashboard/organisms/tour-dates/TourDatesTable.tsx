@@ -40,7 +40,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-xs font-medium text-tertiary-token'>
+      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-[13px] font-[510] text-tertiary-token'>
         Past
       </span>
     );
@@ -49,19 +49,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-xs font-medium text-warning'>
+        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-[13px] font-[510] text-warning'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-xs font-medium text-error'>
+        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-[13px] font-[510] text-error'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-xs font-medium text-success'>
+        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-[13px] font-[510] text-success'>
           On Sale
         </span>
       );
@@ -77,11 +77,11 @@ const DateCell = memo(function DateCell({
 }) {
   return (
     <div className='flex flex-col'>
-      <span className='font-medium text-primary-token'>
+      <span className='font-[510] text-primary-token'>
         {formatShortDate(startDate)}
       </span>
       {startTime && (
-        <span className='text-xs text-tertiary-token'>{startTime}</span>
+        <span className='text-[13px] text-tertiary-token'>{startTime}</span>
       )}
     </div>
   );
@@ -137,7 +137,7 @@ const TicketsCell = memo(function TicketsCell({
       aria-label='Buy tickets (opens in new tab)'
     >
       <Icon name='Ticket' className='h-4 w-4' aria-hidden='true' />
-      <span className='text-sm'>Buy</span>
+      <span className='text-[13px]'>Buy</span>
     </a>
   );
 });
@@ -165,7 +165,7 @@ const SourceCell = memo(function SourceCell({
   const config = PROVIDER_CONFIG[provider];
 
   return (
-    <span className={cn('text-xs', config.className)}>{config.label}</span>
+    <span className={cn('text-[13px]', config.className)}>{config.label}</span>
   );
 });
 
@@ -186,7 +186,7 @@ const ActionsHeader = memo(function ActionsHeader({
             onSync();
           }}
           disabled={isSyncing}
-          className='inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-secondary-token hover:bg-surface-2 disabled:opacity-50'
+          className='inline-flex items-center gap-1 rounded px-2 py-1 text-[13px] text-secondary-token hover:bg-surface-2 disabled:opacity-50'
         >
           <Icon
             name='RefreshCw'
@@ -383,17 +383,17 @@ export function TourDatesTable({
       getRowId={row => row.id}
       getRowClassName={row => {
         const past = isPastDate(new Date(row.startDate));
-        return cn('group hover:bg-surface-2/50', past && 'opacity-60');
+        return cn('group hover:bg-white/[0.02]', past && 'opacity-60');
       }}
       enableVirtualization={tourDates.length >= 20}
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       className='text-[13px]'
       emptyState={
-        <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
           <Icon name='Calendar' className='h-6 w-6' />
           <div>
-            <div className='font-medium'>No tour dates</div>
-            <div className='text-xs'>
+            <div className='font-[510]'>No tour dates</div>
+            <div className='text-[13px]'>
               Add your first tour date to get started.
             </div>
           </div>

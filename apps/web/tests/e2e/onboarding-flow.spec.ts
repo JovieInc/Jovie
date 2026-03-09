@@ -13,6 +13,15 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Onboarding Flow', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
     // Start each test at the homepage
     await page.goto('/', { waitUntil: 'domcontentloaded' });
   });
@@ -198,7 +207,7 @@ test.describe('Onboarding Flow', () => {
 
     // Wait for redirect to complete and page to settle
     await expect(page).toHaveURL(/\/signin/, { timeout: 30000 });
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
 
     // Filter out expected authentication redirects and common non-critical errors.
     // WebKit in particular generates additional console errors for resource loading,

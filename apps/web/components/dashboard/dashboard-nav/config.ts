@@ -1,17 +1,19 @@
 import {
   Banknote,
   CalendarDays,
+  Download,
+  HandCoins,
   Home,
   IdCard,
-  Link2,
+  Image as ImageIcon,
   MailCheck,
+  MessageSquare,
   Music,
-  Music2,
   PieChart,
-  Rocket,
+  Search,
+  Send,
   Settings,
   ShieldCheck,
-  Sparkles,
   SquarePen,
   UserCircle,
   UserPlus,
@@ -27,11 +29,11 @@ import type { NavItem } from './types';
 // ---------------------------------------------------------------------------
 
 export const dashboardHome: NavItem = {
-  name: 'Dashboard',
-  href: APP_ROUTES.DASHBOARD,
+  name: 'Home',
+  href: APP_ROUTES.CHAT,
   id: 'overview',
   icon: Home,
-  description: 'Overview of your dashboard',
+  description: 'Start a new thread',
 };
 
 export const profileNavItem: NavItem = {
@@ -57,6 +59,13 @@ export const primaryNavigation: NavItem[] = [
     id: 'audience',
     icon: Users,
     description: 'Understand your audience demographics',
+  },
+  {
+    name: 'Earnings',
+    href: APP_ROUTES.DASHBOARD_EARNINGS,
+    id: 'earnings',
+    icon: HandCoins,
+    description: 'QR codes, tip links, and payout settings',
   },
 ];
 
@@ -92,18 +101,6 @@ export const artistSettingsNavigation: NavItem[] = [
     icon: UserCircle,
   },
   {
-    name: 'Social Links',
-    href: APP_ROUTES.SETTINGS_SOCIAL_LINKS,
-    id: 'social-links',
-    icon: Link2,
-  },
-  {
-    name: 'Music Links',
-    href: APP_ROUTES.SETTINGS_MUSIC_LINKS,
-    id: 'music-links',
-    icon: Music2,
-  },
-  {
     name: 'Contacts',
     href: APP_ROUTES.SETTINGS_CONTACTS,
     id: 'contacts',
@@ -116,21 +113,9 @@ export const artistSettingsNavigation: NavItem[] = [
     icon: CalendarDays,
   },
   {
-    name: 'Branding',
-    href: APP_ROUTES.SETTINGS_BRANDING,
-    id: 'branding',
-    icon: Sparkles,
-  },
-  {
-    name: 'Ad Pixels',
-    href: APP_ROUTES.SETTINGS_AD_PIXELS,
-    id: 'ad-pixels',
-    icon: Rocket,
-  },
-  {
-    name: 'Audience',
+    name: 'Audience & Tracking',
     href: APP_ROUTES.SETTINGS_AUDIENCE,
-    id: 'audience',
+    id: 'audience-tracking',
     icon: MailCheck,
   },
 ];
@@ -150,6 +135,27 @@ export const adminNavigation: NavItem[] = [
     description: 'Internal metrics and operations',
   },
   {
+    name: 'Leads',
+    href: APP_ROUTES.ADMIN_LEADS,
+    id: 'admin_leads',
+    icon: Search,
+    description: 'Discover, qualify, and action growth leads',
+  },
+  {
+    name: 'Outreach',
+    href: APP_ROUTES.ADMIN_OUTREACH,
+    id: 'admin_outreach',
+    icon: MailCheck,
+    description: 'Run and review outreach workflows',
+  },
+  {
+    name: 'Campaigns',
+    href: APP_ROUTES.ADMIN_CAMPAIGNS,
+    id: 'admin_campaigns',
+    icon: Send,
+    description: 'Manage creator claim campaigns',
+  },
+  {
     name: 'Waitlist',
     href: APP_ROUTES.ADMIN_WAITLIST,
     id: 'admin_waitlist',
@@ -164,6 +170,13 @@ export const adminNavigation: NavItem[] = [
     description: 'Manage creator profiles and verification',
   },
   {
+    name: 'Ingest',
+    href: APP_ROUTES.ADMIN_INGEST,
+    id: 'admin_ingest',
+    icon: Download,
+    description: 'Manually ingest creator profiles',
+  },
+  {
     name: 'Users',
     href: APP_ROUTES.ADMIN_USERS,
     id: 'admin_users',
@@ -171,11 +184,59 @@ export const adminNavigation: NavItem[] = [
     description: 'Review signed up users and billing status',
   },
   {
+    name: 'Feedback',
+    href: APP_ROUTES.ADMIN_FEEDBACK,
+    id: 'admin_feedback',
+    icon: MessageSquare,
+    description: 'Review user feedback',
+  },
+  {
     name: 'Activity',
     href: APP_ROUTES.ADMIN_ACTIVITY,
     id: 'admin_activity',
     icon: PieChart,
     description: 'Review recent system and creator activity',
+  },
+  {
+    name: 'Screenshots',
+    href: APP_ROUTES.ADMIN_SCREENSHOTS,
+    id: 'admin_screenshots',
+    icon: ImageIcon,
+    description: 'View generated UI screenshots',
+  },
+];
+
+export interface AdminNavSection {
+  label: string;
+  items: NavItem[];
+}
+
+export const adminNavigationSections: AdminNavSection[] = [
+  {
+    label: 'Growth',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_leads')!,
+      adminNavigation.find(item => item.id === 'admin_outreach')!,
+      adminNavigation.find(item => item.id === 'admin_campaigns')!,
+      adminNavigation.find(item => item.id === 'admin_ingest')!,
+    ],
+  },
+  {
+    label: 'Data',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_waitlist')!,
+      adminNavigation.find(item => item.id === 'admin_creators')!,
+      adminNavigation.find(item => item.id === 'admin_users')!,
+      adminNavigation.find(item => item.id === 'admin_feedback')!,
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      adminNavigation.find(item => item.id === 'admin_overview')!,
+      adminNavigation.find(item => item.id === 'admin_activity')!,
+      adminNavigation.find(item => item.id === 'admin_screenshots')!,
+    ],
   },
 ];
 

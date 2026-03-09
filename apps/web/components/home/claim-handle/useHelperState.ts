@@ -9,7 +9,7 @@ interface UseHelperStateProps {
   readonly checkingAvail: boolean;
   readonly available: boolean | null;
   readonly availError: string | null;
-  readonly displayDomain: string;
+  readonly displayDomain?: string;
 }
 
 export function useHelperState({
@@ -18,13 +18,12 @@ export function useHelperState({
   checkingAvail,
   available,
   availError,
-  displayDomain,
 }: UseHelperStateProps): HelperState {
   return useMemo(() => {
     if (!handle) {
       return {
         tone: 'idle' as const,
-        text: `Your Jovie profile will live at ${displayDomain}/your-handle`,
+        text: '',
       };
     }
 
@@ -43,26 +42,21 @@ export function useHelperState({
       };
     }
 
-    if (available === false) {
-      return { tone: 'error' as const, text: 'Handle already taken' };
-    }
-
+    // Show availError before "already taken" so timeout/network errors
+    // display their specific message instead of a misleading "taken" label.
     if (availError) {
       return { tone: 'error' as const, text: availError };
+    }
+
+    if (available === false) {
+      return { tone: 'error' as const, text: 'Handle already taken' };
     }
 
     return {
       tone: 'idle' as const,
       text: 'Use lowercase letters, numbers, or hyphens (3–30 chars).',
     };
-  }, [
-    available,
-    availError,
-    checkingAvail,
-    displayDomain,
-    handle,
-    handleError,
-  ]);
+  }, [available, availError, checkingAvail, handle, handleError]);
 }
 
 export const HELPER_TONE_CLASSES = {

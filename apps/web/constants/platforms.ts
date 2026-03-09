@@ -12,5 +12,13 @@
  * @see {@link https://simpleicons.org/} for icon slugs
  */
 
-// Re-export everything from the modular platforms directory
-export * from './platforms/index';
+export { CATEGORY_LABELS, CATEGORY_ORDER } from './platforms/categories';
+export { ALL_PLATFORMS } from './platforms/data';
+export type { SocialPlatform } from './platforms/derived';
+export { PLATFORM_METADATA_MAP, SOCIAL_PLATFORMS } from './platforms/derived';
+export type { PlatformCategory, PlatformMetadata } from './platforms/types';
+export {
+  getPlatformMetadata,
+  getPlatformsByCategory,
+  isValidPlatform,
+} from './platforms/utils';

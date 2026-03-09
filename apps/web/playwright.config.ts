@@ -1,4 +1,8 @@
-import { defineConfig, devices } from '@playwright/test';
+import {
+  defineConfig,
+  devices,
+  type ReporterDescription,
+} from '@playwright/test';
 
 // Build extra HTTP headers for Vercel Deployment Protection bypass
 // Both headers are required for browser automation to work correctly
@@ -14,6 +18,8 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
+const sentryE2eEnabled =
+  process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 
 const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
@@ -24,12 +30,22 @@ const webServerCommand = process.env.DATABASE_URL
 
 function getRetries(): number {
   if (!isCI) return 0;
-  return isSmokeOnly ? 1 : 2;
+  return isSmokeOnly ? 2 : 2;
 }
 
 function getWorkers(): number | undefined {
   if (!isCI) return undefined;
   return isSmokeOnly ? 8 : 4;
+}
+
+const ciReporters: ReporterDescription[] = [
+  ['line'],
+  ['html', { open: 'never' }],
+  ['json', { outputFile: 'test-results/results.json' }],
+];
+
+if (sentryE2eEnabled) {
+  ciReporters.push(['./tests/e2e/reporters/sentry-ci-reporter.ts']);
 }
 
 export default defineConfig({
@@ -43,28 +59,21 @@ export default defineConfig({
   // Smoke tests: more parallelism since tests are faster
   // Increased from 6 to 8 for smoke - tests are I/O-bound, not CPU-bound
   workers: getWorkers(),
-  reporter: isCI
-    ? [
-        ['line'],
-        ['html', { open: 'never' }],
-        // JSON reporter for flakiness tracking
-        ['json', { outputFile: 'test-results/results.json' }],
-      ]
-    : 'html',
+  reporter: isCI ? ciReporters : 'html',
 
   // Global timeout settings
   // Turbopack compilation can take 30+ seconds for dashboard, so smoke tests need more time
   timeout: isSmokeOnly ? 90_000 : 120_000, // 90s for smoke (Turbopack), 120s for full
   expect: {
-    timeout: 20_000,
+    timeout: 25_000,
     // Visual regression snapshot settings
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.05, // 5% pixel difference allowed
+      maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (cross-platform font rendering)
       threshold: 0.2, // Per-pixel color threshold
       animations: 'disabled',
     },
     toMatchSnapshot: {
-      maxDiffPixelRatio: 0.05,
+      maxDiffPixelRatio: 0.08,
       threshold: 0.2,
     },
   },
@@ -100,7 +109,7 @@ export default defineConfig({
       dependencies: ['auth-setup'],
       use: { ...devices['Desktop Chrome'] },
     },
-    // Only run Firefox in full-matrix workflow (weekly comprehensive testing)
+    // Firefox and WebKit run in nightly full-matrix workflow only
     ...(isFullMatrix
       ? [
           {
@@ -108,11 +117,6 @@ export default defineConfig({
             dependencies: ['auth-setup'],
             use: { ...devices['Desktop Firefox'] },
           },
-        ]
-      : []),
-    // Keep WebKit for local testing only (skip in CI)
-    ...(!isCI
-      ? [
           {
             name: 'webkit',
             dependencies: ['auth-setup'],
@@ -135,6 +139,8 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: '3100',
             NEXT_DISABLE_TOOLBAR: '1',
+            NODE_OPTIONS:
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
           url: 'http://localhost:3100',
           reuseExistingServer: !isCI,

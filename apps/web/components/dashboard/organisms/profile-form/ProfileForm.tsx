@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Input } from '@jovie/ui';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import type { ProfileFormProps } from './types';
@@ -100,10 +101,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         >
           <div className='flex items-center justify-between'>
             <div className='flex flex-col'>
-              <span className='text-sm font-medium text-primary-token'>
+              <span className='text-[13px] font-[510] text-primary-token'>
                 Show Jovie branding
               </span>
-              <span className='text-xs text-secondary-token'>
+              <span className='text-[11px] text-secondary-token'>
                 Display Jovie branding on your profile
               </span>
             </div>
@@ -146,10 +147,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       >
         {loading ? (
           <div className='flex items-center justify-center space-x-2'>
-            <span
-              className='animate-spin motion-reduce:animate-none h-4 w-4 border-2 border-current border-t-transparent rounded-full'
-              aria-hidden='true'
-            ></span>
+            <LoadingSpinner size='sm' tone='inverse' label='Updating' />
             <span>Updating...</span>
           </div>
         ) : (
@@ -162,7 +160,9 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           className='bg-green-500/10 border border-green-500/20 rounded-lg p-3 block'
           aria-live='polite'
         >
-          <p className='text-sm text-success'>Profile updated successfully!</p>
+          <p className='text-[13px] text-success'>
+            Profile updated successfully!
+          </p>
         </output>
       )}
     </form>

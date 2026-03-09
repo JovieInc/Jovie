@@ -63,7 +63,7 @@ describe('usePlanGate – edge cases', () => {
 
     expect(result.current.isPro).toBe(false);
     expect(result.current.plan).toBeNull();
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
     expect(result.current.canRemoveBranding).toBe(false);
   });
@@ -77,9 +77,14 @@ describe('usePlanGate – edge cases', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     // Should fall back to free entitlements
     expect(result.current.isError).toBe(true);
@@ -101,13 +106,18 @@ describe('usePlanGate – edge cases', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     expect(result.current.isError).toBe(true);
     expect(result.current.isPro).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
   });
 
   it('pro user with isPro=true but no plan string → free-tier entitlements from registry', async () => {
@@ -132,7 +142,7 @@ describe('usePlanGate – edge cases', () => {
     expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
 
@@ -174,7 +184,7 @@ describe('usePlanGate – edge cases', () => {
     });
 
     // getRetentionDays / getContactsLimit only recognize 'pro' and 'growth'
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
 });
@@ -204,7 +214,7 @@ describe('usePlanGate – feature consistency', () => {
     expect(result.current.canExportContacts).toBe(true);
   });
 
-  it('all boolean features are false for free user', async () => {
+  it('pro-only boolean features are false for free user', async () => {
     mockBillingResponse({
       isPro: false,
       plan: 'free',
@@ -220,11 +230,19 @@ describe('usePlanGate – feature consistency', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
+    // Pro-only features stay false
     expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canAccessAdPixels).toBe(false);
     expect(result.current.canFilterSelfFromAnalytics).toBe(false);
     expect(result.current.canAccessAdvancedAnalytics).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
+    expect(result.current.canBeVerified).toBe(false);
+    expect(result.current.canAccessFutureReleases).toBe(false);
+    // Free-tier unlocked features
+    expect(result.current.aiCanUseTools).toBe(true);
+    expect(result.current.canCreateManualReleases).toBe(true);
+    expect(result.current.canSendNotifications).toBe(true);
+    expect(result.current.canEditSmartLinks).toBe(true);
   });
 
   it('error state defaults all features to free tier', async () => {
@@ -236,15 +254,20 @@ describe('usePlanGate – feature consistency', () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
+    // Query-level retryDelay (1s exponential) takes precedence over
+    // QueryClient default retryDelay:0, so we need a longer timeout.
+    await waitFor(
+      () => {
+        expect(result.current.isLoading).toBe(false);
+      },
+      { timeout: 5000 }
+    );
 
     expect(result.current.isError).toBe(true);
     expect(result.current.canRemoveBranding).toBe(false);
     expect(result.current.canAccessAdPixels).toBe(false);
     expect(result.current.canExportContacts).toBe(false);
-    expect(result.current.analyticsRetentionDays).toBe(7);
+    expect(result.current.analyticsRetentionDays).toBe(30);
     expect(result.current.contactsLimit).toBe(100);
   });
 });

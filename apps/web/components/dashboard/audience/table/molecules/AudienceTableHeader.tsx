@@ -20,6 +20,7 @@ const MEMBER_COLUMNS = [
   { key: 'device', label: 'Device' },
   { key: 'visits', label: 'Visits' },
   { key: 'actions', label: 'Actions', align: 'right' as const },
+  { key: 'ltv', label: 'LTV' },
   { key: 'lastSeen', label: 'Last seen' },
 ] as const;
 
@@ -93,10 +94,10 @@ export function AudienceTableHeader({
     <thead
       className={cn(
         'sticky top-0 z-20 bg-surface-1',
-        headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
+        headerElevated && 'shadow-card shadow-black/10 dark:shadow-black/40'
       )}
     >
-      <tr className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+      <tr className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
         <th className='w-14 border-b border-subtle px-4 py-3 text-left'>
           <Checkbox
             aria-label='Select all'
@@ -173,7 +174,7 @@ export function AudienceTableHeader({
                     </div>
                     <span
                       className={cn(
-                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/50 px-2.5 py-0.5 text-xs font-medium text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
+                        'inline-flex items-center rounded-full border border-subtle bg-surface-2/50 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token tabular-nums transition-all duration-150 whitespace-nowrap',
                         selectedCount > 0 &&
                           'pointer-events-none opacity-0 -translate-y-0.5'
                       )}

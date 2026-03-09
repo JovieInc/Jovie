@@ -1,11 +1,11 @@
 import { eq } from 'drizzle-orm';
-import { headers } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { tips } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
@@ -16,7 +16,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(req: NextRequest) {
   try {
-    if (!process.env.STRIPE_TIP_WEBHOOK_SECRET) {
+    if (!env.STRIPE_TIP_WEBHOOK_SECRET) {
       return NextResponse.json(
         { error: 'Stripe webhook not configured' },
         { status: 500, headers: NO_STORE_HEADERS }
@@ -24,8 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.text();
-    const headersList = await headers();
-    const signature = headersList.get('stripe-signature');
+    const signature = req.headers.get('stripe-signature');
 
     if (!signature) {
       return NextResponse.json(
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
       event = stripe.webhooks.constructEvent(
         body,
         signature,
-        process.env.STRIPE_TIP_WEBHOOK_SECRET
+        env.STRIPE_TIP_WEBHOOK_SECRET
       );
     } catch (err) {
       logger.error('Invalid signature', err);

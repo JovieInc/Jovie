@@ -1,12 +1,11 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { Check, Copy, User } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useMemo } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
@@ -17,6 +16,7 @@ import {
 import { getMessageText } from '../utils';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
+import { ChatLinkRemovalCard } from './ChatLinkRemovalCard';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
@@ -63,18 +63,13 @@ export function ChatMessage({
   return (
     <motion.div
       data-message-id={id}
-      className={cn('flex gap-3', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex gap-3.5', isUser ? 'justify-end' : 'justify-start')}
       initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
-      {!isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-          <BrandLogo size={16} tone='auto' />
-        </div>
-      )}
       {isUser ? (
-        <div className='max-w-[80%] rounded-2xl px-4 py-3 bg-accent text-accent-foreground'>
+        <div className='max-w-[78%] rounded-2xl bg-accent/95 px-4 py-3.5 text-accent-foreground'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
               {fileParts.map((file, index) => (
@@ -94,15 +89,15 @@ export function ChatMessage({
             </div>
           )}
           {messageText && (
-            <div className='whitespace-pre-wrap text-sm leading-relaxed'>
+            <div className='whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em]'>
               {messageText}
             </div>
           )}
         </div>
       ) : (
-        <div className='flex max-w-[80%] flex-col'>
+        <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-2xl bg-surface-2 px-4 py-3 text-primary-token'>
+            <div className='px-5 py-4 text-primary-token'>
               <ChatMarkdown
                 content={messageText}
                 isStreaming={Boolean(isStreaming)}
@@ -150,16 +145,42 @@ export function ChatMessage({
               );
             }
 
+            if (
+              toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
+              toolInvocation.state === 'result' &&
+              toolInvocation.result?.success &&
+              profileId
+            ) {
+              const result = toolInvocation.result as {
+                linkId: string;
+                platform: string;
+                url: string;
+              };
+              return (
+                <div
+                  key={toolInvocation.toolInvocationId}
+                  className={cn(messageText && 'mt-3')}
+                >
+                  <ChatLinkRemovalCard
+                    profileId={profileId}
+                    linkId={result.linkId}
+                    platform={result.platform}
+                    url={result.url}
+                  />
+                </div>
+              );
+            }
+
             return null;
           })}
 
           {!isStreaming && messageText && (
-            <div className='mt-1 flex items-center gap-0.5 pl-1'>
+            <div className='mt-1.5 flex items-center gap-0.5 pl-1.5'>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy'}>
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='rounded-md p-1.5 text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token'
+                  className='flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }
@@ -172,22 +193,6 @@ export function ChatMessage({
                 </button>
               </SimpleTooltip>
             </div>
-          )}
-        </div>
-      )}
-      {isUser && (
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 overflow-hidden'>
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt=''
-              width={32}
-              height={32}
-              className='h-full w-full object-cover'
-              unoptimized
-            />
-          ) : (
-            <User className='h-4 w-4 text-secondary-token' />
           )}
         </div>
       )}

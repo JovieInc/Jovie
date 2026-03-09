@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   createRateLimitHeadersFromStatus,
   getClientIP,
@@ -126,7 +127,7 @@ export async function GET(request: Request) {
           database: envInfo.hasDatabase,
           auth: envInfo.hasClerk,
           payments: envInfo.hasStripe,
-          images: envInfo.hasCloudinary,
+          images: envInfo.hasVercelBlob,
         },
       },
     };
@@ -202,6 +203,10 @@ export async function GET(request: Request) {
       { error: errorMessage },
       'health/env'
     );
+    void captureWarning('Environment health check crashed', error, {
+      service: 'env',
+      route: '/api/health/env',
+    });
 
     return NextResponse.json(body, {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,

@@ -1,8 +1,10 @@
 export interface AppleStyleOnboardingFormProps {
   readonly initialDisplayName?: string;
   readonly initialHandle?: string;
+  readonly isReservedHandle?: boolean;
   readonly userEmail?: string | null;
   readonly userId: string;
+  readonly shouldAutoSubmitHandle?: boolean;
 }
 
 export interface OnboardingState {
@@ -29,10 +31,19 @@ export interface HandleValidationState {
 export const ONBOARDING_STEPS = [
   {
     id: 'handle',
-    title: 'Claim your handle',
-    prompt: '',
+    title: 'Choose your handle',
+    prompt: 'This is how fans will find and remember you.',
   },
-  { id: 'done', title: "You're live.", prompt: '' },
+  {
+    id: 'dsp',
+    title: 'Connect your music',
+    prompt: 'Import your releases from Spotify so fans can find your music.',
+  },
+  {
+    id: 'profile-review',
+    title: 'Your profile',
+    prompt: 'Review your profile before going live.',
+  },
 ] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];

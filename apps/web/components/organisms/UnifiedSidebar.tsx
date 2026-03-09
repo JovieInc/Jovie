@@ -19,6 +19,8 @@ import {
   userSettingsNavigation,
 } from '@/components/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
+import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
+import { SidebarUpgradeBanner } from '@/components/feedback/SidebarUpgradeBanner';
 import {
   Sidebar,
   SidebarContent,
@@ -161,7 +163,7 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-7 items-center gap-2 rounded-md px-2 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
@@ -179,12 +181,16 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 items-center gap-1.5 rounded-md px-1.5 transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 w-full items-center gap-2 rounded-md px-2 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
-              <BrandLogo size={16} tone='auto' className='size-4 shrink-0' />
-              <span className='text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+              <BrandLogo
+                size={14}
+                tone='auto'
+                className='rounded-[4px] shrink-0'
+              />
+              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
               </span>
               <ChevronDown
@@ -218,6 +224,7 @@ function SidebarHeaderNav({
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { state, isMobile, setOpen } = useSidebar();
+  const { isAdmin: isUserAdmin } = useDashboardData();
   const isCollapsed = state === 'closed';
   const pathname = usePathname();
   const isInSettings = section === 'settings';
@@ -232,11 +239,11 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='icon'
       className={cn(
         'bg-base',
-        '[--sidebar-width:232px]',
+        '[--sidebar-width:244px]',
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 pt-2 pb-0'>
+      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0 lg:mt-2'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -257,10 +264,13 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
+      <SidebarUpgradeBanner />
+      <SidebarInstallBanner />
+
       <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
         <span className='text-2xs text-sidebar-muted select-none'>
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {process.env.NEXT_PUBLIC_BUILD_SHA
+          {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
             ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
             : ''}
         </span>

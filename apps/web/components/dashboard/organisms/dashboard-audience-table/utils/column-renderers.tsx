@@ -1,25 +1,32 @@
 'use client';
 
 import type { CellContext } from '@tanstack/react-table';
+import { Bell, Eye } from 'lucide-react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
+  AudienceIdentificationIndicator,
   AudienceIntentScoreCell,
   AudienceLastActionCell,
   AudienceLastSeenCell,
   AudienceLocationCell,
+  AudienceLtvCell,
   AudienceQuickActionsCell,
   AudienceReturningCell,
   AudienceRowSelectionCell,
   AudienceSourceCell,
+  AudienceTouringBadge,
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
 } from '@/components/dashboard/audience/table/atoms';
 import { convertContextMenuItems } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
-import { useAudienceTableContext } from '../AudienceTableContext';
+import {
+  useAudienceTableStableContext,
+  useAudienceTableVolatileContext,
+} from '../AudienceTableContext';
 
 /**
  * Renders the user cell with display name, type, email, and phone
@@ -33,6 +40,9 @@ export function renderUserCell({
       type={row.original.type}
       email={row.original.email}
       phone={row.original.phone}
+      deviceType={row.original.deviceType}
+      geoCity={row.original.geoCity}
+      geoCountry={row.original.geoCountry}
     />
   );
 }
@@ -132,6 +142,24 @@ export function renderLastActionCell({
 }
 
 /**
+ * Renders the LTV (Lifetime Value) cell with tier indicator and tooltip
+ */
+export function renderLtvCell({ row }: CellContext<AudienceMember, number>) {
+  return (
+    <AudienceLtvCell
+      tipAmountTotalCents={row.original.tipAmountTotalCents}
+      tipCount={row.original.tipCount}
+      visits={row.original.visits}
+      engagementScore={row.original.engagementScore}
+      streamingClicks={row.original.ltvStreamingClicks}
+      tipClickValueCents={row.original.ltvTipClickValueCents}
+      merchSalesCents={row.original.ltvMerchSalesCents}
+      ticketSalesCents={row.original.ltvTicketSalesCents}
+    />
+  );
+}
+
+/**
  * Renders the email cell for subscribers
  */
 export function renderEmailCell({
@@ -145,9 +173,9 @@ export function renderEmailCell({
  * Avoids closing over selectedIds/page/pageSize which would destabilize column defs.
  */
 export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
-  const { selectedIds, toggleSelect, page, pageSize } =
-    useAudienceTableContext();
-  const rowNumber = (page - 1) * pageSize + row.index + 1;
+  const { selectedIds } = useAudienceTableVolatileContext();
+  const { toggleSelect } = useAudienceTableStableContext();
+  const rowNumber = row.index + 1;
   return (
     <AudienceRowSelectionCell
       rowNumber={rowNumber}
@@ -165,7 +193,8 @@ export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
 export function LastSeenCell({
   row,
 }: CellContext<AudienceMember, string | null>) {
-  const { openMenuRowId, setOpenMenuRowId } = useAudienceTableContext();
+  const { openMenuRowId } = useAudienceTableVolatileContext();
+  const { setOpenMenuRowId } = useAudienceTableStableContext();
   return (
     <AudienceLastSeenCell
       row={row.original}
@@ -181,7 +210,7 @@ export function LastSeenCell({
  * Avoids closing over getContextMenuItems which would destabilize column defs.
  */
 export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
-  const { getContextMenuItems } = useAudienceTableContext();
+  const { getContextMenuItems } = useAudienceTableStableContext();
   const contextMenuItems = getContextMenuItems(row.original);
   const actionMenuItems = convertContextMenuItems(contextMenuItems);
 
@@ -193,17 +222,79 @@ export function MenuCell({ row }: CellContext<AudienceMember, unknown>) {
 }
 
 /**
- * Quick actions cell with Export and Block buttons.
+ * Renders the identification indicator cell
+ */
+export function renderIdentificationCell({
+  row,
+}: CellContext<AudienceMember, AudienceMember['type']>) {
+  return (
+    <AudienceIdentificationIndicator
+      type={row.original.type}
+      hasEmail={Boolean(row.original.email)}
+      hasPhone={Boolean(row.original.phone)}
+      spotifyConnected={row.original.spotifyConnected}
+    />
+  );
+}
+
+/**
+ * Touring city badge cell - reads touring city map from context.
+ */
+export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
+  const { getTouringCity } = useAudienceTableStableContext();
+  const info = getTouringCity(row.original);
+  return (
+    <AudienceTouringBadge
+      touringCity={info?.city ?? null}
+      showDate={info?.showDate ?? null}
+    />
+  );
+}
+
+/**
+ * Quick actions cell with View Profile, Send Notification, Export, and Block.
  * Reads handlers from context to keep column defs stable.
  */
 export function QuickActionsCell({
   row,
 }: CellContext<AudienceMember, unknown>) {
-  const { onExportMember, onBlockMember } = useAudienceTableContext();
+  const { onExportMember, onBlockMember, onViewProfile, onSendNotification } =
+    useAudienceTableStableContext();
+  const member = row.original;
+  const canNotify = Boolean(member.email || member.phone);
+
   return (
-    <AudienceQuickActionsCell
-      onExport={() => onExportMember(row.original)}
-      onBlock={() => onBlockMember(row.original)}
-    />
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation prevents row click when using action buttons
+    <div
+      role='toolbar'
+      className='flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100'
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
+    >
+      <button
+        type='button'
+        onClick={() => onViewProfile(member)}
+        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+        aria-label='View profile'
+        title='View profile'
+      >
+        <Eye className='h-4 w-4' />
+      </button>
+      {canNotify && (
+        <button
+          type='button'
+          onClick={() => onSendNotification(member)}
+          className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+          aria-label='Send notification'
+          title='Send notification'
+        >
+          <Bell className='h-4 w-4' />
+        </button>
+      )}
+      <AudienceQuickActionsCell
+        onExport={() => onExportMember(member)}
+        onBlock={() => onBlockMember(member)}
+      />
+    </div>
   );
 }

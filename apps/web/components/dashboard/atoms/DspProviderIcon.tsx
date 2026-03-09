@@ -1,7 +1,7 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
@@ -55,7 +55,13 @@ export function DspProviderIcon({
   showLabel = false,
 }: DspProviderIconProps) {
   const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted ? resolvedTheme === 'dark' : false;
   const label = PROVIDER_LABELS[provider];
   const rawColor = PROVIDER_COLORS[provider];
   // Ensure brand color meets WCAG 3:1 non-text contrast.
@@ -90,7 +96,7 @@ export function DspProviderIcon({
         />
       </span>
       {showLabel && (
-        <span className='text-xs font-medium text-secondary-token'>
+        <span className='text-[13px] font-[510] text-secondary-token'>
           {label}
         </span>
       )}

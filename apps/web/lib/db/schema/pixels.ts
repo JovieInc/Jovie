@@ -65,6 +65,9 @@ export interface PixelEventData {
   referrer?: string;
   // Page info
   pageUrl?: string;
+  // Tip data
+  tipAmount?: number;
+  tipMethod?: string;
   // Allow additional fields
   [key: string]: unknown;
 }

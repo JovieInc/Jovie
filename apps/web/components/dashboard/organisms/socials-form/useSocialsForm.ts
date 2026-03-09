@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import {
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
@@ -10,12 +12,34 @@ import {
   normalizeUrl,
   validateUrl,
 } from '@/lib/utils/platform-detection';
-import type { SocialLink, UseSocialsFormReturn } from './types';
+import type {
+  SocialLink,
+  UseSocialsFormReturn,
+  VerificationError,
+  VerificationErrorCode,
+} from './types';
 
 const DEFAULT_PLATFORMS = ['instagram', 'tiktok', 'youtube'] as const;
 
 /** DSPs managed via the dedicated connections UI — exclude from social links. */
 export const PRIMARY_DSP_IDS = new Set(['spotify', 'apple_music']);
+
+const KNOWN_ERROR_CODES = new Set<string>([
+  'dns_not_found',
+  'domain_already_claimed',
+  'invalid_url',
+  'rate_limited',
+  'server_error',
+]);
+
+function toVerificationErrorCode(
+  code: string | undefined
+): VerificationErrorCode {
+  if (code && KNOWN_ERROR_CODES.has(code)) {
+    return code as VerificationErrorCode;
+  }
+  return 'server_error';
+}
 
 interface UseSocialsFormOptions {
   artistId: string;
@@ -43,6 +67,9 @@ export function useSocialsForm({
     reset: resetMutation,
   } = useSaveSocialLinksMutation(artistId);
   const [submitError, setSubmitError] = useState<string | undefined>(undefined);
+  const [verifyingLinkId, setVerifyingLinkId] = useState<string | null>(null);
+  const [verificationError, setVerificationError] =
+    useState<VerificationError | null>(null);
 
   // Sync fetched data to local state when it changes.
   // Sync fetched links into local state only when the local state hasn't been
@@ -58,7 +85,13 @@ export function useSocialsForm({
       );
     } else {
       setSocialLinks(
-        fetchedLinks.filter(link => !PRIMARY_DSP_IDS.has(link.platform))
+        fetchedLinks
+          .filter(link => !PRIMARY_DSP_IDS.has(link.platform))
+          .map(link => ({
+            ...link,
+            verificationStatus: link.verificationStatus ?? 'unverified',
+            verificationToken: link.verificationToken ?? null,
+          }))
       );
     }
   }, [artistId, fetchedLinks]);
@@ -89,8 +122,22 @@ export function useSocialsForm({
             url: normalizedUrl,
             sortOrder: index,
             isActive: true,
+            verificationStatus: link.verificationStatus,
+            verificationToken: link.verificationToken,
           };
         });
+
+      // Check for duplicate platforms
+      const seenPlatforms = new Set<string>();
+      for (const link of linksToInsert) {
+        if (seenPlatforms.has(link.platform)) {
+          setSubmitError(
+            `Duplicate platform: each platform can only be added once.`
+          );
+          return;
+        }
+        seenPlatforms.add(link.platform);
+      }
 
       for (const link of linksToInsert) {
         const platform = getPlatform(link.platform);
@@ -113,6 +160,16 @@ export function useSocialsForm({
   const updateSocialLink = useCallback(
     (index: number, field: keyof SocialLink, value: string) => {
       setSocialLinks(prev => {
+        // Prevent switching to a platform that's already used by another row
+        if (field === 'platform') {
+          const isDuplicate = prev.some(
+            (link, i) => i !== index && link.platform === value
+          );
+          if (isDuplicate) {
+            toast.error('This platform is already connected');
+            return prev;
+          }
+        }
         const updatedLinks = [...prev];
         updatedLinks[index] = { ...updatedLinks[index], [field]: value };
         return updatedLinks;
@@ -160,6 +217,70 @@ export function useSocialsForm({
     ]);
   }, []);
 
+  const clearVerificationError = useCallback(() => {
+    setVerificationError(null);
+  }, []);
+
+  const verifyWebsite = useCallback(
+    async (linkId: string) => {
+      if (!linkId) return;
+      setVerifyingLinkId(linkId);
+      setSubmitError(undefined);
+      setVerificationError(null);
+      try {
+        const response = await fetchWithTimeout<{
+          ok: boolean;
+          status: 'pending' | 'verified';
+          code?: string;
+          error?: string;
+        }>('/api/dashboard/social-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId: artistId, linkId }),
+        });
+
+        setSocialLinks(prev =>
+          prev.map(link =>
+            link.id === linkId
+              ? { ...link, verificationStatus: response.status }
+              : link
+          )
+        );
+
+        // Handle structured error codes from the backend
+        if (!response.ok && response.code) {
+          setVerificationError({
+            code: toVerificationErrorCode(response.code),
+            message: response.error ?? 'Verification failed.',
+          });
+        }
+      } catch (err) {
+        // Try to extract structured error from FetchError response body
+        if (err instanceof FetchError && err.response) {
+          try {
+            const body = await err.response.clone().json();
+            if (body && typeof body === 'object' && 'code' in body) {
+              setVerificationError({
+                code: toVerificationErrorCode(body.code as string),
+                message: (body.error as string) ?? 'Verification failed.',
+              });
+              return;
+            }
+          } catch {
+            // JSON parse failed, fall through to generic error
+          }
+        }
+        setVerificationError({
+          code: 'server_error',
+          message: 'We could not verify your website. Please try again.',
+        });
+      } finally {
+        setVerifyingLinkId(null);
+      }
+    },
+    [artistId]
+  );
+
   return {
     loading: isFetching || isSaving,
     error:
@@ -172,5 +293,9 @@ export function useSocialsForm({
     scheduleNormalize,
     handleUrlBlur,
     addSocialLink,
+    verifyWebsite,
+    verifyingLinkId,
+    verificationError,
+    clearVerificationError,
   };
 }

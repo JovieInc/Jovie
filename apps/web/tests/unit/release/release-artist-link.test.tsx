@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type LinkProps = {
   readonly href: string;
@@ -63,6 +63,10 @@ const { UnreleasedReleaseHero } = await import(
 );
 
 describe('release artist links', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('renders artist name as link on release landing page when handle exists', () => {
     render(
       <ReleaseLandingPage
@@ -118,9 +122,14 @@ describe('release artist links', () => {
     render(
       <UnreleasedReleaseHero
         release={{
+          id: 'release-1',
+          slug: 'future-release',
           title: 'Future Release',
           artworkUrl: null,
           releaseDate: new Date(Date.now() + 1000 * 60 * 60 * 24),
+          trackId: null,
+          hasSpotify: true,
+          hasAppleMusic: true,
         }}
         artist={{
           id: 'artist-1',
@@ -133,5 +142,70 @@ describe('release artist links', () => {
 
     const artistLink = screen.getByRole('link', { name: 'Test Artist' });
     expect(artistLink).toHaveAttribute('href', '/test-artist');
+  });
+
+  it('renders a dismissible claim banner for unclaimed creators', () => {
+    render(
+      <ReleaseLandingPage
+        release={{
+          title: 'Test Release',
+          artworkUrl: null,
+          releaseDate: '2026-01-10',
+        }}
+        artist={{
+          name: 'Test Artist',
+          handle: 'test-artist',
+          avatarUrl: null,
+        }}
+        providers={[]}
+        claimBanner={{
+          profileId: 'profile-1',
+          username: 'test-artist',
+        }}
+      />
+    );
+
+    expect(screen.getByText('Is this your music?')).toBeInTheDocument();
+
+    const claimLink = screen.getByRole('link', { name: /claim profile/i });
+    expect(claimLink).toHaveAttribute(
+      'href',
+      '/signup?handle=test-artist&redirect_url=%2Ftest-artist'
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /dismiss claim profile banner/i })
+    );
+
+    expect(screen.queryByText('Is this your music?')).not.toBeInTheDocument();
+  });
+
+  it('keeps claim banner dismissed after localStorage flag is set', () => {
+    window.localStorage.setItem(
+      'smartlink:claim-banner:dismissed:profile-2',
+      '1'
+    );
+
+    render(
+      <ReleaseLandingPage
+        release={{
+          title: 'Test Release',
+          artworkUrl: null,
+          releaseDate: '2026-01-10',
+        }}
+        artist={{
+          name: 'Test Artist',
+          handle: 'test-artist',
+          avatarUrl: null,
+        }}
+        providers={[]}
+        claimBanner={{
+          profileId: 'profile-2',
+          username: 'test-artist',
+        }}
+      />
+    );
+
+    expect(screen.queryByText('Is this your music?')).not.toBeInTheDocument();
   });
 });

@@ -14,16 +14,16 @@ export function cleanBeaconsDisplayName(name: string): string {
   return (
     safeName
       // Handle " | Beacons" and variations
-      .replace(/\s*\|\s*Beacons(?:\.ai)?$/i, '')
+      .replace(/ *\| *Beacons(?:\.ai)?$/i, '')
       // Handle " - Beacons.ai" and variations
-      .replace(/\s*-\s*Beacons(?:\.ai)?$/i, '')
+      .replace(/ *- *Beacons(?:\.ai)?$/i, '')
       // Handle "on Beacons.ai" and variations
-      .replace(/\s+on\s+Beacons(?:\.ai)?$/i, '')
+      .replace(/ +on +Beacons(?:\.ai)?$/i, '')
       // Handle "'s Beacons.ai" and variations
       // Note: ['\u2019] matches both U+0027 (') and U+2019 (') apostrophe variants
-      .replace(/['\u2019]s\s+Beacons(?:\.ai)?$/i, '')
+      .replace(/['\u2019]s +Beacons(?:\.ai)?$/i, '')
       // Handle just "Beacons" at the end
-      .replace(/\s+Beacons(?:\.ai)?$/i, '')
+      .replace(/ +Beacons(?:\.ai)?$/i, '')
       .trim()
   );
 }

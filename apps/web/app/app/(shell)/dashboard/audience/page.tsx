@@ -5,6 +5,7 @@ import { DashboardAudienceClient } from '@/components/dashboard/organisms/Dashbo
 import type { AudienceSegment } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -14,6 +15,7 @@ import {
 } from '@/lib/utils/string-utils';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
+import { loadUpcomingTourDates } from '../tour-dates/actions';
 import { getAudienceServerData } from './audience-data';
 
 // User-specific page - always render fresh
@@ -31,11 +33,13 @@ async function AudienceContent({
 
     // Handle unauthenticated users
     if (!dashboardData.user?.id) {
-      redirect('/sign-in?redirect_url=/app/dashboard/audience');
+      redirect(
+        `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
+      );
     }
 
     // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding) {
+    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
       redirect('/onboarding');
     }
 
@@ -57,18 +61,33 @@ async function AudienceContent({
         (audienceFilters as readonly string[]).includes(s)
     );
 
-    const audienceData = await getAudienceServerData({
-      userId: dashboardData.user.id,
-      selectedProfileId: artist?.id ?? null,
-      searchParams: {
-        page: String(parsedParams.page),
-        pageSize: String(parsedParams.pageSize),
-        sort: parsedParams.sort,
-        direction: parsedParams.direction,
-      },
-      view: parsedParams.view,
-      segments: validSegments,
-    });
+    // Fetch audience data and tour dates in parallel
+    const [audienceData, tourDates] = await Promise.all([
+      getAudienceServerData({
+        userId: dashboardData.user.id,
+        selectedProfileId: artist?.id ?? null,
+        searchParams: {
+          page: String(parsedParams.page),
+          pageSize: String(parsedParams.pageSize),
+          sort: parsedParams.sort,
+          direction: parsedParams.direction,
+        },
+        view: parsedParams.view,
+        includeDetails: true,
+        segments: validSegments,
+      }),
+      artist?.id
+        ? loadUpcomingTourDates(artist.id).catch(() => [])
+        : Promise.resolve([]),
+    ]);
+
+    // Map tour dates to lightweight shape for client-side city matching
+    const tourDatesForMatching = tourDates.map(
+      (td: { city: string; startDate: string }) => ({
+        city: td.city,
+        startDate: td.startDate,
+      })
+    );
 
     return (
       <DashboardAudienceClient
@@ -83,7 +102,9 @@ async function AudienceContent({
         profileUrl={profileUrl}
         profileId={artist?.id ?? undefined}
         subscriberCount={audienceData.subscriberCount}
+        totalAudienceCount={audienceData.totalAudienceCount}
         filters={{ segments: validSegments }}
+        tourDates={tourDatesForMatching}
       />
     );
   } catch (error) {

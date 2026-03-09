@@ -28,11 +28,16 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 const ADMIN_PAGES = [
   { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/activity', name: 'Admin Activity' },
+  { path: '/app/admin/leads', name: 'Admin Leads' },
+  { path: '/app/admin/outreach', name: 'Admin Outreach' },
   { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
+  { path: '/app/admin/ingest', name: 'Admin Ingest' },
+  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
   { path: '/app/admin/creators', name: 'Admin Creators' },
   { path: '/app/admin/users', name: 'Admin Users' },
-  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
+  { path: '/app/admin/feedback', name: 'Admin Feedback' },
+  { path: '/app/admin/activity', name: 'Admin Activity' },
+  { path: '/app/admin/screenshots', name: 'Admin Screenshots' },
 ] as const;
 
 /**
@@ -48,6 +53,11 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   test.setTimeout(300_000);
 
   test.beforeEach(async ({ page }) => {
+    // Skip if Clerk testing not set up
+    test.skip(
+      process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true',
+      'Auth setup not available'
+    );
     // Skip if no admin credentials configured
     if (!hasAdminCredentials()) {
       console.log('⚠ Skipping admin navigation tests - no credentials');
@@ -101,16 +111,21 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // Wait for page to fully stabilize with retry for admin nav visibility
     // There can be race conditions with auth/caching that cause flakiness
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {})
+      .catch(() => {});
 
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      await page.waitForTimeout(1000);
-      hasAdminAccess = await adminNavSection.isVisible().catch(() => false);
-      if (hasAdminAccess) break;
-      console.log(`Admin nav not visible yet, attempt ${attempt + 1}/5`);
-    }
+    hasAdminAccess = await expect
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      })
+      .toBeTruthy()
+      .then(() => true)
+      .catch(() => false);
 
     if (!hasAdminAccess) {
       // Capture screenshot for debugging
@@ -140,7 +155,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
       });
       await waitForHydration(page);
-      await page.waitForTimeout(500); // Allow state to settle
+      await page.waitForLoadState('domcontentloaded');
 
       // Check for client-side errors
       const { hasError: pageError } = await checkForClientError(page);
@@ -180,7 +195,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       }
 
       await waitForHydration(page);
-      await page.waitForTimeout(500); // Allow state to settle
+      await page.waitForLoadState('domcontentloaded');
 
       // Check for client-side errors
       const { hasError: pageError } = await checkForClientError(page);
@@ -218,7 +233,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
     });
     await waitForHydration(page);
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('domcontentloaded');
 
     // Check for client-side errors on return
     const { hasError: returnError } = await checkForClientError(page);
@@ -261,16 +276,21 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // signInUser in beforeEach already navigated to /app/dashboard
     // and waited for transient React 19 errors to resolve
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {})
+      .catch(() => {});
 
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      await page.waitForTimeout(1000);
-      hasAdminAccess = await adminNavSection.isVisible().catch(() => false);
-      if (hasAdminAccess) break;
-      console.log(`Admin nav not visible yet, attempt ${attempt + 1}/5`);
-    }
+    hasAdminAccess = await expect
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      })
+      .toBeTruthy()
+      .then(() => true)
+      .catch(() => false);
 
     if (!hasAdminAccess) {
       console.log('⚠ Test user does not have admin access');
@@ -299,7 +319,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       });
 
       // Brief wait for React to render
-      await page.waitForTimeout(300);
+      await page.waitForLoadState('domcontentloaded');
 
       // Check for client-side errors
       const { hasError: pageError } = await checkForClientError(page);
@@ -330,7 +350,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     }
 
     // Final check after all navigation
-    await page.waitForTimeout(500);
+    await page.waitForLoadState('domcontentloaded');
     const { hasError: finalError } = await checkForClientError(page);
     if (!finalError) {
       await expect(
@@ -359,16 +379,21 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // signInUser in beforeEach already navigated to /app/dashboard
     // and waited for transient React 19 errors to resolve
-    await page.waitForLoadState('networkidle').catch(() => {});
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {})
+      .catch(() => {});
 
     // Retry checking for admin nav - it may take a moment to appear
     let hasAdminAccess = false;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      await page.waitForTimeout(1000);
-      hasAdminAccess = await adminNavSection.isVisible().catch(() => false);
-      if (hasAdminAccess) break;
-      console.log(`Admin nav not visible yet, attempt ${attempt + 1}/5`);
-    }
+    hasAdminAccess = await expect
+      .poll(async () => adminNavSection.isVisible().catch(() => false), {
+        timeout: 10000,
+        intervals: [500, 1000, 2000],
+      })
+      .toBeTruthy()
+      .then(() => true)
+      .catch(() => false);
 
     if (!hasAdminAccess) {
       console.log('⚠ Test user does not have admin access');
@@ -384,7 +409,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       if (!(await adminLink.isVisible())) {
         // Click to expand the admin section
         await adminNavHeader.click();
-        await page.waitForTimeout(300);
+        await page.waitForLoadState('domcontentloaded');
       }
     }
 
@@ -407,7 +432,7 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       }
 
       await linkElement.click();
-      await page.waitForTimeout(500); // Wait for navigation
+      await page.waitForLoadState('domcontentloaded'); // Wait for navigation
 
       // Check for client-side errors
       const { hasError: navError } = await checkForClientError(page);

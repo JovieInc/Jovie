@@ -17,6 +17,12 @@ import {
   Users,
 } from 'lucide-react';
 import { APP_ROUTES } from '@/constants/routes';
+// Unicode glyphs via String.fromCodePoint so they survive encoding-unaware
+// pipelines (CI, bundlers, proxies) without producing mojibake.
+export const GLYPH_CMD = String.fromCodePoint(0x2318);
+export const GLYPH_OPT = String.fromCodePoint(0x2325);
+export const GLYPH_SHIFT = String.fromCodePoint(0x21e7);
+export const GLYPH_ARROW_RIGHT = String.fromCodePoint(0x2192);
 
 /**
  * Keyboard shortcut definition
@@ -56,7 +62,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'command-menu',
     label: 'Open command menu',
-    keys: '⌘ K',
+    keys: `${GLYPH_CMD} K`,
     category: 'general',
     icon: Command,
     shortcutKey: 'Meta+k',
@@ -72,7 +78,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'keyboard-shortcuts',
     label: 'View keyboard shortcuts',
-    keys: '⌘ /',
+    keys: `${GLYPH_CMD} /`,
     category: 'general',
     icon: Keyboard,
     shortcutKey: 'Meta+/',
@@ -80,7 +86,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'toggle-sidebar',
     label: 'Toggle sidebar',
-    keys: '⌘ B',
+    keys: `${GLYPH_CMD} B`,
     category: 'general',
     icon: PanelLeft,
     shortcutKey: 'Meta+b',
@@ -199,7 +205,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   {
     id: 'sign-out',
     label: 'Sign out',
-    keys: '⌥ ⇧ Q',
+    keys: `${GLYPH_OPT} ${GLYPH_SHIFT} Q`,
     category: 'actions',
     icon: LogOut,
     shortcutKey: 'Alt+Shift+Q',

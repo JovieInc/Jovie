@@ -178,13 +178,13 @@ async function chaosTestPage(
     // Wait for page to stabilize - don't require full 'load' state which can timeout
     await Promise.race([
       waitForHydration(page),
-      page.waitForTimeout(10000),
+      page.waitForLoadState('domcontentloaded', { timeout: 10000 }),
     ]).catch(() => {});
 
     // Additional stabilization wait
     await Promise.race([
       page.waitForLoadState('networkidle'),
-      page.waitForTimeout(5000),
+      page.waitForLoadState('domcontentloaded', { timeout: 5000 }),
     ]).catch(() => {});
 
     const elements = await findClickableElements(page);
@@ -202,7 +202,7 @@ async function chaosTestPage(
         await locator.scrollIntoViewIfNeeded().catch(() => {});
 
         await locator.click({ timeout: 2000, force: false });
-        await page.waitForTimeout(200); // Shorter wait between clicks
+        await page.waitForLoadState('domcontentloaded');
         elementsClicked++;
 
         // Check for new React errors
@@ -228,13 +228,13 @@ async function chaosTestPage(
           await smokeNavigate(page, url);
           await Promise.race([
             waitForHydration(page),
-            page.waitForTimeout(5000),
+            page.waitForLoadState('domcontentloaded', { timeout: 5000 }),
           ]).catch(() => {});
         }
 
         // Close any modals/dialogs that might have opened
         await page.keyboard.press('Escape').catch(() => {});
-        await page.waitForTimeout(100);
+        // brief settle handled by next locator check
       } catch {
         // Ignore click failures (navigation, detached elements, etc.)
       }

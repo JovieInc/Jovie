@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuth = vi.hoisted(() => vi.fn());
 const mockGetUserBillingInfo = vi.hoisted(() => vi.fn());
+const mockGetRedis = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -9,6 +10,10 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   getUserBillingInfo: mockGetUserBillingInfo,
+}));
+
+vi.mock('@/lib/redis', () => ({
+  getRedis: mockGetRedis,
 }));
 
 vi.mock('@sentry/nextjs', () => ({
@@ -23,6 +28,7 @@ describe('GET /api/billing/status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockGetRedis.mockReturnValue(null);
   });
 
   it('returns 401 when not authenticated', async () => {
@@ -73,6 +79,42 @@ describe('GET /api/billing/status', () => {
     // Should return 503 so clients can distinguish "free" from "billing unavailable"
     expect(response.status).toBe(503);
     expect(data.error).toBe('Billing service temporarily unavailable');
+  });
+
+  it('returns cached billing status with stale flag when billing lookup fails', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_cached' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: false,
+      error: 'stripe timeout',
+    });
+
+    const mockRedis = {
+      get: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          payload: {
+            isPro: true,
+            plan: 'pro',
+            stripeCustomerId: 'cus_cached',
+            stripeSubscriptionId: 'sub_cached',
+          },
+          cachedAt: new Date().toISOString(),
+        })
+      ),
+      set: vi.fn(),
+    };
+    mockGetRedis.mockReturnValue(mockRedis);
+
+    const { GET } = await import('@/app/api/billing/status/route');
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data._stale).toBe(true);
+    expect(data._staleReason).toBe('Payment service temporarily unavailable');
+    expect(data.isPro).toBe(true);
+    expect(data.plan).toBe('pro');
+    expect(data.stripeCustomerId).toBe('cus_cached');
+    expect(data.stripeSubscriptionId).toBe('sub_cached');
   });
 
   it('returns free entitlements when user exists but has no billing data', async () => {
@@ -173,6 +215,34 @@ describe('GET /api/billing/status', () => {
 
     expect(response.headers.get('Cache-Control')).toBe(
       'private, max-age=60, stale-while-revalidate=300'
+    );
+  });
+
+  it('writes billing status to cache on success', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_cache_write' });
+    mockGetUserBillingInfo.mockResolvedValue({
+      success: true,
+      data: {
+        isPro: true,
+        plan: 'pro',
+        stripeCustomerId: 'cus_write',
+        stripeSubscriptionId: 'sub_write',
+      },
+    });
+
+    const mockRedis = {
+      get: vi.fn(),
+      set: vi.fn().mockResolvedValue('OK'),
+    };
+    mockGetRedis.mockReturnValue(mockRedis);
+
+    const { GET } = await import('@/app/api/billing/status/route');
+    await GET();
+
+    expect(mockRedis.set).toHaveBeenCalledWith(
+      expect.stringContaining('billing:status:v1:user_cache_write'),
+      expect.any(String),
+      expect.objectContaining({ ex: 3600 })
     );
   });
 

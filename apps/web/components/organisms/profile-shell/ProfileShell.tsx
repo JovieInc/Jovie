@@ -1,8 +1,8 @@
 'use client';
 
-import { DollarSign } from 'lucide-react';
+import { Calendar, DollarSign } from 'lucide-react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
@@ -15,6 +15,7 @@ import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { TipDrawer } from '@/components/profile/TipDrawer';
 import { Container } from '@/components/site/Container';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
 import type { ProfileShellProps } from './types';
 import { useProfileShell } from './useProfileShell';
@@ -43,8 +44,12 @@ export function ProfileShell({
   subtitle,
   children,
   showSocialBar = true,
+  mode,
   showTipButton = false,
+  isTipModeActive = false,
   showBackButton = false,
+  showTourButton = false,
+  isTourModeActive = false,
   showFooter = true,
   showNotificationButton = false,
   maxWidthClass = 'w-full max-w-md',
@@ -54,6 +59,7 @@ export function ProfileShell({
   allowPhotoDownloads = false,
 }: ProfileShellProps) {
   const {
+    handleNotificationsTrigger,
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
@@ -68,6 +74,16 @@ export function ProfileShell({
   const isMobile = useBreakpointDown('md');
   const [tipDrawerOpen, setTipDrawerOpen] = useState(false);
 
+  // Fire tip_page_view pixel event when tip mode is active on page load
+  useEffect(() => {
+    if (!isTipModeActive) return;
+    // @ts-expect-error - joviePixel is set by JoviePixel component
+    if (globalThis.joviePixel?.track) {
+      // @ts-expect-error - joviePixel is set by JoviePixel component
+      globalThis.joviePixel.track('tip_page_view');
+    }
+  }, [isTipModeActive]);
+
   // Extract venmo link from social links for the tip drawer
   const venmoLink = useMemo(
     () => socialLinks.find(l => l.platform === 'venmo')?.url ?? null,
@@ -78,12 +94,19 @@ export function ProfileShell({
     [venmoLink]
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
+  const availableDspPreferences = useMemo(
+    () =>
+      getAvailableDSPs(artist).map(dsp => ({
+        key: dsp.key,
+        label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
+      })),
+    [artist]
+  );
 
   const {
     channelBusy,
     contentPreferences,
     handleMenuOpenChange,
-    handleNotificationsClick,
     handleUnsubscribe,
     hasActiveSubscriptions,
     isNotificationMenuOpen,
@@ -104,6 +127,7 @@ export function ProfileShell({
       return (
         <ProfileNotificationsMenu
           artistId={artist.id}
+          availableDspPreferences={availableDspPreferences}
           channelBusy={channelBusy}
           contentPreferences={contentPreferences}
           hasActiveSubscriptions={hasActiveSubscriptions}
@@ -124,7 +148,7 @@ export function ProfileShell({
         buttonRef={menuTriggerRef}
         hasActiveSubscriptions={false}
         notificationsState={notificationsState}
-        onClick={handleNotificationsClick}
+        onClick={handleNotificationsTrigger}
       />
     );
   };
@@ -132,7 +156,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative w-full min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
+        className='relative w-full min-h-dvh bg-base text-primary-token font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
@@ -159,9 +183,11 @@ export function ProfileShell({
             {renderNotificationControls()}
           </div>
 
-          <div className='relative z-10 flex min-h-screen flex-col py-12'>
-            <div className='flex flex-1 flex-col items-center justify-start px-4'>
-              <div className={`${maxWidthClass} space-y-6 md:space-y-8`}>
+          <div className='relative z-10 flex min-h-dvh flex-col pt-14 pb-4 sm:pt-16 sm:pb-6'>
+            <div className='flex flex-1 flex-col items-center px-4'>
+              <div
+                className={`${maxWidthClass} space-y-4 sm:space-y-5 md:space-y-6`}
+              >
                 <ArtistInfo
                   artist={artist}
                   subtitle={subtitle}
@@ -170,13 +196,24 @@ export function ProfileShell({
                 />
                 {children}
                 {/* Social bar with contacts and tip buttons inline */}
-                {(showSocialBar || hasTipSupport || hasActiveSubscriptions) && (
+                {(showSocialBar ||
+                  showTourButton ||
+                  hasTipSupport ||
+                  hasActiveSubscriptions) && (
                   <div className='flex justify-center'>
                     <div
                       className='flex flex-wrap items-center justify-center gap-3'
                       data-testid='social-links'
                     >
-                      {(showSocialBar || hasActiveSubscriptions) &&
+                      {/* Mail (contacts) — left */}
+                      <ArtistContactsButton
+                        contacts={contacts}
+                        artistHandle={artist.handle}
+                        artistName={artist.name}
+                      />
+                      {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
+                      {(!mode || mode === 'profile') &&
+                        showSocialBar &&
                         hasSocialLinks &&
                         socialNetworkLinks.map(link => (
                           <SocialLinkComponent
@@ -186,11 +223,27 @@ export function ProfileShell({
                             artistName={artist.name}
                           />
                         ))}
-                      <ArtistContactsButton
-                        contacts={contacts}
-                        artistHandle={artist.handle}
-                        artistName={artist.name}
-                      />
+                      {/* Tour */}
+                      {showTourButton && (
+                        <CircleIconButton
+                          size='md'
+                          variant='ghost'
+                          ariaLabel='Tour dates'
+                          data-testid='tour-trigger'
+                          className={`border transition-colors ${
+                            isTourModeActive
+                              ? 'border-subtle bg-surface-2 text-primary-token'
+                              : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                          }`}
+                          asChild
+                        >
+                          <Link href={`/${artist.handle}?mode=tour`}>
+                            <Calendar className='h-4 w-4' aria-hidden='true' />
+                          </Link>
+                        </CircleIconButton>
+                      )}
+
+                      {/* Tip — right */}
                       {hasTipSupport &&
                         venmoLink &&
                         (isMobile ? (
@@ -200,7 +253,11 @@ export function ProfileShell({
                               variant='ghost'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className='border border-transparent hover:border-subtle hover:bg-surface-2'
+                              className={`border transition-colors ${
+                                isTipModeActive
+                                  ? 'border-subtle bg-surface-2 text-primary-token'
+                                  : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                              }`}
                               onClick={() => setTipDrawerOpen(true)}
                             >
                               <DollarSign
@@ -218,12 +275,16 @@ export function ProfileShell({
                             />
                           </>
                         ) : (
+                          /* Always reserve space for the tip button to prevent layout shift.
+                             When tip mode is active, render invisibly instead of not at all. */
                           <CircleIconButton
                             size='md'
                             variant='ghost'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className='border border-transparent hover:border-subtle hover:bg-surface-2'
+                            className={`border border-transparent transition-colors hover:border-subtle hover:bg-surface-2${isTipModeActive ? ' invisible' : ''}`}
+                            aria-hidden={isTipModeActive || undefined}
+                            tabIndex={isTipModeActive ? -1 : undefined}
                             asChild
                           >
                             <Link href={`/${artist.handle}?mode=tip`}>

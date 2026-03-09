@@ -3,19 +3,30 @@
 import { Button, Input, Switch } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
-import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import {
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useSaveStatus } from '@/components/dashboard/hooks/useSaveStatus';
+import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { usePixelSettingsMutation } from '@/lib/queries';
 import { queryKeys } from '@/lib/queries/keys';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 const INPUT_CLASS =
-  'block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors';
+  'block w-full px-3 py-2 border border-subtle rounded-md bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-[13px] shadow-card transition-colors';
 
 interface PlatformSectionProps {
   readonly platform: string;
+  readonly description: string;
   readonly pixelIdLabel: string;
   readonly pixelIdPlaceholder: string;
   readonly pixelIdName: string;
@@ -28,10 +39,12 @@ interface PlatformSectionProps {
   readonly helpText: string;
   readonly onPixelIdChange: (value: string) => void;
   readonly onTokenChange: (value: string) => void;
+  readonly isConfigured: boolean;
 }
 
 function PlatformSection({
   platform,
+  description,
   pixelIdLabel,
   pixelIdPlaceholder,
   pixelIdName,
@@ -44,18 +57,28 @@ function PlatformSection({
   helpText,
   onPixelIdChange,
   onTokenChange,
+  isConfigured,
 }: PlatformSectionProps) {
   const [showToken, setShowToken] = useState(false);
 
   return (
-    <div className='space-y-4 p-4 bg-surface-0 rounded-lg border border-subtle'>
+    <div className='space-y-4'>
       <div className='flex items-center justify-between'>
-        <h4 className='text-sm font-medium text-primary'>{platform}</h4>
+        <div>
+          <h4 className='text-[13px] font-[510] text-primary'>{platform}</h4>
+          <p className='mt-1 text-[13px] text-secondary-token'>{description}</p>
+        </div>
+        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-secondary-token'>
+          {isConfigured ? 'Configured' : 'Not configured'}
+        </span>
+      </div>
+
+      <div className='flex items-center justify-between'>
         <a
           href={helpUrl}
           target='_blank'
           rel='noopener noreferrer'
-          className='text-xs text-interactive hover:text-interactive/80 flex items-center gap-1'
+          className='text-[13px] text-interactive hover:text-interactive/80 flex items-center gap-1'
         >
           {helpText}
           <ExternalLink className='h-4 w-4' />
@@ -66,7 +89,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='block text-xs font-medium text-primary-token mb-2'
+            className='block text-[11px] font-[510] text-primary-token mb-2'
           >
             {pixelIdLabel}
           </label>
@@ -84,7 +107,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={tokenName}
-            className='block text-xs font-medium text-primary-token mb-2'
+            className='block text-[11px] font-[510] text-primary-token mb-2'
           >
             {tokenLabel}
           </label>
@@ -144,11 +167,23 @@ export interface SettingsAdPixelsSectionProps {
 export function SettingsAdPixelsSection({
   isPro = true,
 }: SettingsAdPixelsSectionProps) {
-  const { mutate: savePixels, isPending: isPixelSaving } =
+  const { mutateAsync: savePixels, isPending: isPixelSaving } =
     usePixelSettingsMutation();
+  const {
+    status: saveStatus,
+    markSaving,
+    markSuccess,
+    markError,
+    resetStatus,
+  } = useSaveStatus();
 
   // Fetch existing pixel settings on mount
-  const { data: existingSettings } = useQuery<PixelSettingsResponse>({
+  const {
+    data: existingSettings,
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery<PixelSettingsResponse>({
     queryKey: queryKeys.pixels.settings(),
     queryFn: async ({ signal }) => {
       const res = await fetch('/api/dashboard/pixels', { signal });
@@ -157,6 +192,7 @@ export function SettingsAdPixelsSection({
     },
     enabled: isPro,
     staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache after unmount
   });
 
   const [pixelData, setPixelData] = useState({
@@ -175,6 +211,25 @@ export function SettingsAdPixelsSection({
     google: false,
     tiktok: false,
   });
+
+  const baselineValues = useMemo(
+    () => ({
+      facebookPixelId: existingSettings?.pixels.facebookPixelId ?? '',
+      googleMeasurementId: existingSettings?.pixels.googleMeasurementId ?? '',
+      tiktokPixelId: existingSettings?.pixels.tiktokPixelId ?? '',
+      enabled: existingSettings?.pixels.enabled ?? true,
+    }),
+    [existingSettings]
+  );
+
+  const hasUnsavedChanges =
+    pixelData.facebookPixelId !== baselineValues.facebookPixelId ||
+    pixelData.googleMeasurementId !== baselineValues.googleMeasurementId ||
+    pixelData.tiktokPixelId !== baselineValues.tiktokPixelId ||
+    pixelData.enabled !== baselineValues.enabled ||
+    tokenModified.facebook ||
+    tokenModified.google ||
+    tokenModified.tiktok;
 
   // Populate form with existing settings when fetched
   useEffect(() => {
@@ -199,11 +254,13 @@ export function SettingsAdPixelsSection({
       }));
       // Reset token modified flags when settings are loaded
       setTokenModified({ facebook: false, google: false, tiktok: false });
+      resetStatus();
     }
-  }, [existingSettings, isPro]);
+  }, [existingSettings, isPro, resetStatus]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setPixelData(prev => ({ ...prev, [field]: value }));
+    resetStatus();
     // Track when token fields are modified
     if (field === 'facebookAccessToken') {
       setTokenModified(prev => ({ ...prev, facebook: true }));
@@ -215,36 +272,56 @@ export function SettingsAdPixelsSection({
   };
 
   const handlePixelSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
+    async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-
-      const formData = new FormData(e.currentTarget);
+      if (!hasUnsavedChanges) return;
 
       // Only send token values if they were actually modified
       const getTokenIfModified = (
-        field: string,
+        tokenValue: string,
         platform: keyof typeof tokenModified
       ): string => {
-        const value = formData.get(field) as string;
-        if (!tokenModified[platform] || value === TOKEN_PLACEHOLDER) return '';
-        return value ?? '';
+        if (!tokenModified[platform] || tokenValue === TOKEN_PLACEHOLDER) {
+          return '';
+        }
+        return tokenValue;
       };
 
-      savePixels({
-        facebookPixelId: (formData.get('facebookPixelId') as string) ?? '',
-        facebookAccessToken: getTokenIfModified(
-          'facebookAccessToken',
-          'facebook'
-        ),
-        googleMeasurementId:
-          (formData.get('googleMeasurementId') as string) ?? '',
-        googleApiSecret: getTokenIfModified('googleApiSecret', 'google'),
-        tiktokPixelId: (formData.get('tiktokPixelId') as string) ?? '',
-        tiktokAccessToken: getTokenIfModified('tiktokAccessToken', 'tiktok'),
-        enabled: pixelData.enabled,
-      });
+      try {
+        markSaving();
+        await savePixels({
+          facebookPixelId: pixelData.facebookPixelId,
+          facebookAccessToken: getTokenIfModified(
+            pixelData.facebookAccessToken,
+            'facebook'
+          ),
+          googleMeasurementId: pixelData.googleMeasurementId,
+          googleApiSecret: getTokenIfModified(
+            pixelData.googleApiSecret,
+            'google'
+          ),
+          tiktokPixelId: pixelData.tiktokPixelId,
+          tiktokAccessToken: getTokenIfModified(
+            pixelData.tiktokAccessToken,
+            'tiktok'
+          ),
+          enabled: pixelData.enabled,
+        });
+        markSuccess();
+        setTokenModified({ facebook: false, google: false, tiktok: false });
+      } catch {
+        markError('Failed to save. Try again.');
+      }
     },
-    [savePixels, pixelData.enabled, tokenModified]
+    [
+      hasUnsavedChanges,
+      markError,
+      markSaving,
+      markSuccess,
+      pixelData,
+      savePixels,
+      tokenModified,
+    ]
   );
 
   if (!isPro) {
@@ -262,6 +339,29 @@ export function SettingsAdPixelsSection({
     );
   }
 
+  if (isLoading) {
+    return (
+      <DashboardCard variant='settings'>
+        <PixelsSectionSkeleton />
+      </DashboardCard>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SettingsErrorState
+        message='Failed to load pixel settings.'
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
+  // Check if any pixels are configured
+  const hasAnyPixels =
+    existingSettings?.pixels?.facebookPixelId ||
+    existingSettings?.pixels?.googleMeasurementId ||
+    existingSettings?.pixels?.tiktokPixelId;
+
   return (
     <form onSubmit={handlePixelSubmit} className='space-y-6'>
       <DashboardCard
@@ -270,9 +370,9 @@ export function SettingsAdPixelsSection({
         className='divide-y divide-subtle'
       >
         <div className='flex items-center justify-between px-4 py-3'>
-          <span className='text-sm text-primary-token'>Pixel tracking</span>
+          <span className='text-[13px] text-primary-token'>Pixel tracking</span>
           <div className='flex items-center gap-2'>
-            <span className='text-xs text-secondary-token'>
+            <span className='text-[11px] text-secondary-token'>
               {pixelData.enabled ? 'Enabled' : 'Disabled'}
             </span>
             <Switch
@@ -283,9 +383,25 @@ export function SettingsAdPixelsSection({
           </div>
         </div>
 
-        <div className='px-4 py-3 space-y-4'>
+        {!hasAnyPixels && (
+          <div className='px-4 py-4 text-center'>
+            <p className='text-[13px] text-secondary-token'>
+              No tracking pixels configured. Add your first pixel to start
+              tracking conversions.
+            </p>
+          </div>
+        )}
+
+        <div className='space-y-2 px-4 pt-3'>
+          <p className='text-[13px] text-secondary-token'>
+            Configure each retargeting destination independently.
+          </p>
+        </div>
+
+        <div className='space-y-4 px-4 pb-3'>
           <PlatformSection
             platform='Facebook Conversions API'
+            description='Track profile views and link clicks in Meta Ads Manager.'
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
             pixelIdName='facebookPixelId'
@@ -296,6 +412,12 @@ export function SettingsAdPixelsSection({
             tokenValue={pixelData.facebookAccessToken}
             helpUrl='https://www.facebook.com/business/help/952192354843755'
             helpText='Get credentials'
+            isConfigured={
+              !!(
+                existingSettings?.pixels.facebookPixelId &&
+                existingSettings?.hasTokens.facebook
+              )
+            }
             onPixelIdChange={value =>
               handleInputChange('facebookPixelId', value)
             }
@@ -306,6 +428,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='Google Analytics 4 (Measurement Protocol)'
+            description='Send conversion events directly to your GA4 property.'
             pixelIdLabel='Measurement ID'
             pixelIdPlaceholder='G-XXXXXXXXXX'
             pixelIdName='googleMeasurementId'
@@ -316,6 +439,12 @@ export function SettingsAdPixelsSection({
             tokenValue={pixelData.googleApiSecret}
             helpUrl='https://developers.google.com/analytics/devguides/collection/protocol/ga4'
             helpText='Get credentials'
+            isConfigured={
+              !!(
+                existingSettings?.pixels.googleMeasurementId &&
+                existingSettings?.hasTokens.google
+              )
+            }
             onPixelIdChange={value =>
               handleInputChange('googleMeasurementId', value)
             }
@@ -324,6 +453,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='TikTok Events API'
+            description='Measure profile engagement and optimize TikTok campaigns.'
             pixelIdLabel='Pixel Code'
             pixelIdPlaceholder='CXXXXXXXXXX'
             pixelIdName='tiktokPixelId'
@@ -334,6 +464,12 @@ export function SettingsAdPixelsSection({
             tokenValue={pixelData.tiktokAccessToken}
             helpUrl='https://ads.tiktok.com/marketing_api/docs?id=1771101027431425'
             helpText='Get credentials'
+            isConfigured={
+              !!(
+                existingSettings?.pixels.tiktokPixelId &&
+                existingSettings?.hasTokens.tiktok
+              )
+            }
             onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
             onTokenChange={value =>
               handleInputChange('tiktokAccessToken', value)
@@ -342,17 +478,19 @@ export function SettingsAdPixelsSection({
         </div>
 
         <div className='px-4 py-3'>
-          <p className='text-xs text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             Events are sent server-side for better accuracy. No third-party
             JavaScript on your profile. Credentials are encrypted.
           </p>
         </div>
       </DashboardCard>
 
-      <div className='flex justify-end pt-2'>
+      <div className='flex items-center justify-end gap-3 pt-2'>
+        <SettingsStatusPill status={saveStatus} />
         <Button
           type='submit'
           loading={isPixelSaving}
+          disabled={isPixelSaving || !hasUnsavedChanges}
           className={SETTINGS_BUTTON_CLASS}
         >
           Save pixel settings

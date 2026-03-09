@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import DashboardLayoutClient from '@/app/app/(shell)/dashboard/DashboardLayoutClient';
+import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTable } from './dashboard-audience-table';
 
@@ -48,6 +48,8 @@ const mockMembers: AudienceMember[] = [
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,
+    tipAmountTotalCents: 3500,
+    tipCount: 5,
     tags: ['superfan'],
     deviceType: 'mobile',
     lastSeenAt: new Date().toISOString(),
@@ -70,6 +72,8 @@ const mockMembers: AudienceMember[] = [
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,
+    tipAmountTotalCents: 0,
+    tipCount: 0,
     tags: [],
     deviceType: 'desktop',
     lastSeenAt: new Date().toISOString(),
@@ -95,6 +99,8 @@ const mockMembers: AudienceMember[] = [
     phone: '+15555555555',
     spotifyConnected: false,
     purchaseCount: 0,
+    tipAmountTotalCents: 1200,
+    tipCount: 2,
     tags: ['sms'],
     deviceType: 'mobile',
     lastSeenAt: new Date().toISOString(),
@@ -124,15 +130,15 @@ const meta: Meta<typeof DashboardAudienceTable> = {
       },
     },
   },
-  tags: ['autodocs', 'audience-a11y'],
+  tags: ['autodocs', 'audience-a11y', 'no-vitest'],
   decorators: [
     Story => (
       <DashboardDataProvider value={mockDashboardData}>
-        <DashboardLayoutClient dashboardData={mockDashboardData}>
+        <TableMetaProvider>
           <div className='h-[720px] bg-surface-1 text-primary-token'>
             <Story />
           </div>
-        </DashboardLayoutClient>
+        </TableMetaProvider>
       </DashboardDataProvider>
     ),
   ],

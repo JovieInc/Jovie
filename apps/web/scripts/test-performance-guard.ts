@@ -40,11 +40,11 @@ class TestPerformanceGuard {
   private resolvedBaselinePath?: string;
 
   private thresholds: PerformanceThresholds = {
-    totalDuration: 400000, // 6.67 minutes (updated to match critical suite baseline)
+    totalDuration: 480000, // 8 minutes — CI runners vary 360-420s; needs headroom to catch regressions not noise
     p95: 200, // 200ms
     setupTime: 150000, // 150 seconds (CI cold start + environment initialization)
     individualTest: 200, // 200ms
-    slowTestCount: 5, // Max 5 slow tests allowed
+    slowTestCount: 0, // Zero tolerance — every test must be under individualTest threshold
   };
 
   private budgets: Record<string, PerformanceBudget> = {
@@ -54,13 +54,13 @@ class TestPerformanceGuard {
         'Smoke suite should finish under 30s to keep deploy feedback instant.',
     },
     critical: {
-      maxTotalDuration: 400000, // 6.67 minutes
+      maxTotalDuration: 480000, // 8 minutes
       description: 'Critical regression suite (includes auth E2E tests)',
     },
     full: {
-      maxTotalDuration: 420000,
+      maxTotalDuration: 480000,
       description:
-        'Full coverage runs should stay under 7 minutes to guard against drift.',
+        'Full coverage runs should stay under 8 minutes to guard against drift.',
     },
   };
 
@@ -125,7 +125,7 @@ class TestPerformanceGuard {
         encoding: 'utf8',
         stdio: 'pipe',
         maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
-        timeout: 360000,
+        timeout: 540000, // 9min — above budget ceiling so guard can report violations instead of crashing
       });
 
       this.parseTestOutput(output);

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
+import { db } from '@/lib/db';
+import { dashboardQuery } from '@/lib/db/query-timeout';
+import { syncSocialLinksFromPrimaryMusicUrls } from '@/lib/db/social-links-sync';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -53,10 +56,35 @@ async function parseProfileUpdateRequest(req: Request) {
   } as const;
 }
 
+async function attemptClerkRollback(
+  rollback: (() => Promise<void>) | undefined,
+  clerkUserId: string,
+  context: string
+) {
+  if (!rollback) return;
+
+  try {
+    await rollback();
+  } catch (error) {
+    logger.error('Failed to rollback Clerk profile update:', {
+      error: error instanceof Error ? error.message : error,
+      clerkUserId,
+      context,
+    });
+    await captureError('Clerk profile rollback failed', error, {
+      route: '/api/dashboard/profile',
+      context,
+    });
+  }
+}
+
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      const userProfile = await getProfileByClerkId(clerkUserId);
+      const userProfile = await dashboardQuery(
+        () => getProfileByClerkId(clerkUserId),
+        'User profile fetch'
+      );
 
       if (!userProfile) {
         return NextResponse.json(
@@ -144,22 +172,42 @@ export async function PUT(req: Request) {
       if (usernameGuard instanceof NextResponse) return usernameGuard;
 
       const clerkUpdates = buildClerkUpdates(displayNameForUserUpdate);
-      const [clerkSyncFailed, updatedProfile] = await Promise.all([
-        syncClerkProfile({
-          clerkUserId,
-          clerkUpdates,
-          avatarUrl,
-        }),
-        updateProfileRecords({
+      const { clerkSyncFailed, rollback } = await syncClerkProfile({
+        clerkUserId,
+        clerkUpdates,
+        avatarUrl,
+      });
+
+      let updateResult;
+      try {
+        updateResult = await updateProfileRecords({
           clerkUserId,
           dbProfileUpdates,
           displayNameForUserUpdate,
-        }),
-      ]);
-      if (updatedProfile instanceof NextResponse) return updatedProfile;
+        });
+      } catch (error) {
+        await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');
+        throw error;
+      }
+      if (updateResult instanceof NextResponse) {
+        await attemptClerkRollback(rollback, clerkUserId, 'db_update_response');
+        return updateResult;
+      }
+
+      const { updatedProfile, oldUsernameNormalized } = updateResult;
+
+      await syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
+        spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
+        appleMusicUrl: dbProfileUpdates.appleMusicUrl as
+          | string
+          | null
+          | undefined,
+        youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
+      });
 
       await finalizeProfileResponse({
         updatedProfile,
+        oldUsernameNormalized,
         clerkUserId,
       });
 

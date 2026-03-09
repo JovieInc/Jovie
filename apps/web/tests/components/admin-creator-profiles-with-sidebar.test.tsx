@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -49,8 +50,13 @@ vi.mock('@/components/admin/CreatorAvatarCell', () => ({
   ),
 }));
 
-vi.mock('@/components/organisms/ContactSidebar', () => ({
-  ContactSidebar: () => null,
+const saveContactSpy = vi.fn(async contact => contact);
+
+vi.mock('@/components/admin/admin-creator-profiles/useContactSave', () => ({
+  useContactSave: () => ({
+    isSaving: false,
+    saveContact: saveContactSpy,
+  }),
 }));
 
 vi.mock('@/components/admin/table/TableRowActions', () => ({
@@ -95,6 +101,30 @@ const renderWithProviders = (ui: ReactNode) => {
       </ToastProvider>
     </QueryClientProvider>
   );
+};
+
+const getProfileRow = (username: string) =>
+  screen.getByRole('row', { name: new RegExp(`@${username}`, 'i') });
+
+const expectSidebarOpen = async () => {
+  await waitFor(
+    () => {
+      expect(screen.getByTestId('contact-sidebar')).toHaveAttribute(
+        'aria-hidden',
+        'false'
+      );
+    },
+    { timeout: 3000 }
+  );
+
+  await waitFor(
+    () => {
+      expect(screen.getByPlaceholderText('Full name')).toBeInTheDocument();
+    },
+    { timeout: 3000 }
+  );
+
+  return screen.getByTestId('contact-sidebar');
 };
 
 describe('AdminCreatorProfilesWithSidebar', () => {
@@ -180,5 +210,99 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     expect(
       screen.getByRole('button', { name: 'Creator actions' })
     ).toBeInTheDocument();
+  });
+
+  it('opens the real contact sidebar from a row click and renders contact details', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AdminCreatorProfilesWithSidebar
+        profiles={[baseProfile]}
+        page={1}
+        pageSize={20}
+        total={1}
+        search=''
+        sort={defaultSort}
+      />
+    );
+
+    await user.click(getProfileRow('alice'));
+
+    const sidebar = await expectSidebarOpen();
+    expect(within(sidebar).getByPlaceholderText('@username')).toHaveValue(
+      '@alice'
+    );
+    expect(within(sidebar).getByPlaceholderText('Full name')).toHaveValue(
+      'alice'
+    );
+  });
+
+  it('saves edited contact details with the expected payload', async () => {
+    const user = userEvent.setup();
+    saveContactSpy.mockClear();
+
+    renderWithProviders(
+      <AdminCreatorProfilesWithSidebar
+        profiles={[baseProfile]}
+        page={1}
+        pageSize={20}
+        total={1}
+        search=''
+        sort={defaultSort}
+      />
+    );
+
+    await user.click(getProfileRow('alice'));
+    await expectSidebarOpen();
+    const nameInput = await screen.findByPlaceholderText('Full name');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Alice Example');
+
+    await waitFor(
+      () => {
+        expect(saveContactSpy).toHaveBeenCalled();
+
+        const savedContact = saveContactSpy.mock.calls.at(-1)?.[0];
+        expect(savedContact).toEqual(
+          expect.objectContaining({
+            id: 'profile-1',
+            username: 'alice',
+          })
+        );
+        expect(savedContact?.displayName).toContain('Alice');
+      },
+      { timeout: 4000 }
+    );
+  });
+
+  it('closes the sidebar via the close button', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AdminCreatorProfilesWithSidebar
+        profiles={[baseProfile]}
+        page={1}
+        pageSize={20}
+        total={1}
+        search=''
+        sort={defaultSort}
+      />
+    );
+
+    await user.click(getProfileRow('alice'));
+    const sidebar = await expectSidebarOpen();
+
+    // Close is now in the overflow dropdown menu
+    await user.click(
+      within(sidebar).getByRole('button', { name: /more actions/i })
+    );
+    await user.click(screen.getByText('Close'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('contact-sidebar')).toHaveAttribute(
+        'aria-hidden',
+        'true'
+      );
+    });
   });
 });

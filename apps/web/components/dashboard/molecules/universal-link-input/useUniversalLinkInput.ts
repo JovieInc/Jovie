@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
+import type { LinkSection } from '@/components/dashboard/organisms/links/utils/link-display-utils';
 import { track } from '@/lib/analytics';
 import {
   type DetectedLink,
@@ -16,6 +16,7 @@ import { useInputFocusController } from '../useInputFocusController';
 import type { PlatformOption, UseUniversalLinkInputReturn } from './types';
 import { useChatMode } from './useChatMode';
 import {
+  filterPlatformsBySection,
   isUnsafeUrl,
   looksLikeUrlOrDomain,
   normalizeQuery,
@@ -36,6 +37,8 @@ interface UseUniversalLinkInputOptions {
   chatEnabled?: boolean;
   /** Callback when user submits a chat message */
   onChatSubmit?: (message: string) => void;
+  /** When set, only show platform suggestions from this sidebar category */
+  categoryFilter?: LinkSection;
 }
 
 export function useUniversalLinkInput({
@@ -49,6 +52,7 @@ export function useUniversalLinkInput({
   clearSignal,
   chatEnabled = true,
   onChatSubmit,
+  categoryFilter,
 }: UseUniversalLinkInputOptions): UseUniversalLinkInputReturn {
   const [url, setUrl] = useState('');
   const [searchMode, setSearchMode] = useState<ArtistSearchProvider | null>(
@@ -89,8 +93,11 @@ export function useUniversalLinkInput({
     if (!trimmed) return [];
     if (looksLikeUrlOrDomain(trimmed)) return [];
     if (detectedLink?.isValid) return [];
-    return rankPlatformOptions(trimmed, PLATFORM_OPTIONS, existingPlatforms);
-  }, [detectedLink?.isValid, existingPlatforms, url]);
+    const filteredOptions = categoryFilter
+      ? filterPlatformsBySection(PLATFORM_OPTIONS, categoryFilter)
+      : PLATFORM_OPTIONS;
+    return rankPlatformOptions(trimmed, filteredOptions, existingPlatforms);
+  }, [categoryFilter, detectedLink?.isValid, existingPlatforms, url]);
 
   const isShortQuery = useMemo(() => {
     const trimmed = normalizeQuery(url);

@@ -26,6 +26,24 @@ export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
 
+/**
+ * Check if a referrer URL is from the same origin as the request.
+ * Used to filter out the HTTP Referer header on same-origin fetch() calls,
+ * which would incorrectly record the app's own URL as the traffic source.
+ */
+function isSameOriginReferrer(
+  referrerUrl: string,
+  requestUrl: string
+): boolean {
+  try {
+    const referrerHost = new URL(referrerUrl).hostname;
+    const requestHost = new URL(requestUrl).hostname;
+    return referrerHost === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 function inferAudienceDeviceType(
   userAgent: string | null
 ): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
@@ -88,12 +106,20 @@ export async function POST(request: NextRequest) {
       target,
       linkId,
       source: resolvedSource,
+      context,
+      utmParams,
     } = validationResult.data;
 
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
     // ipAddress already extracted above for rate limiting
-    const referrer = request.headers.get('referer') ?? undefined;
+    // Filter out self-referrals: the HTTP Referer header on same-origin fetch()
+    // is the current page URL, not the external traffic source.
+    const httpReferer = request.headers.get('referer') ?? undefined;
+    const referrer =
+      httpReferer && isSameOriginReferrer(httpReferer, request.url)
+        ? undefined
+        : httpReferer;
     const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
@@ -226,6 +252,36 @@ export async function POST(request: NextRequest) {
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 
+      const metadata: Record<string, unknown> = {
+        target,
+        ...(resolvedSource ? { source: resolvedSource } : {}),
+        ...(context?.contentType ? { contentType: context.contentType } : {}),
+        ...(context?.contentId ? { contentId: context.contentId } : {}),
+        ...(context?.provider ? { provider: context.provider } : {}),
+        ...(context?.smartLinkSlug
+          ? { smartLinkSlug: context.smartLinkSlug }
+          : {}),
+      };
+
+      if (utmParams) {
+        metadata.utmParams = utmParams;
+      }
+
+      const rawTipAmount =
+        typeof context?.tipAmountCents === 'number'
+          ? context.tipAmountCents
+          : typeof context?.tipAmount === 'number'
+            ? Math.round(context.tipAmount * 100)
+            : undefined;
+
+      if (
+        linkType === 'tip' &&
+        typeof rawTipAmount === 'number' &&
+        rawTipAmount > 0
+      ) {
+        metadata.tipAmountCents = rawTipAmount;
+      }
+
       const [insertedClickEvent] = await tx
         .insert(clickEvents)
         .values({
@@ -238,9 +294,7 @@ export async function POST(request: NextRequest) {
           country: geoCountry,
           city: geoCity,
           deviceType: platformDetected,
-          metadata: resolvedSource
-            ? { target, source: resolvedSource }
-            : { target },
+          metadata,
           audienceMemberId: resolvedMember.id,
         })
         .returning({ id: clickEvents.id });

@@ -2,15 +2,17 @@
 
 import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import {
   SwipeToReveal,
   SwipeToRevealGroup,
 } from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { mobileReleaseTokens } from '@/components/dashboard/tokens';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
+
+type SmartLinkLockReason = 'scheduled' | 'cap' | null;
 
 interface MobileReleaseListProps {
   readonly releases: ReleaseViewModel[];
@@ -22,9 +24,7 @@ interface MobileReleaseListProps {
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
   readonly groupByYear?: boolean;
 }
 
@@ -40,9 +40,13 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
   const groups = new Map<string, ReleaseViewModel[]>();
 
   for (const release of releases) {
-    const year = release.releaseDate
-      ? new Date(release.releaseDate).getFullYear().toString()
-      : 'Unknown';
+    const rawYear = release.releaseDate
+      ? new Date(release.releaseDate).getFullYear()
+      : null;
+    const year =
+      rawYear !== null && !Number.isNaN(rawYear)
+        ? rawYear.toString()
+        : 'Unknown';
     const group = groups.get(year);
     if (group) {
       group.push(release);
@@ -55,6 +59,14 @@ function groupReleasesByYear(releases: ReleaseViewModel[]): YearGroup[] {
     year,
     releases: yearReleases,
   }));
+}
+
+function getLockIconName(
+  isLocked: boolean,
+  lockReason?: SmartLinkLockReason
+): string {
+  if (!isLocked) return 'Link2';
+  return lockReason === 'scheduled' ? 'Clock' : 'Lock';
 }
 
 /** Swipe action buttons revealed on left-swipe */
@@ -73,7 +85,7 @@ const SwipeActions = memo(function SwipeActions({
     testId: string
   ) => Promise<string>;
   readonly isLocked: boolean;
-  readonly lockReason?: 'scheduled' | 'cap' | null;
+  readonly lockReason?: SmartLinkLockReason;
 }) {
   const handleCopy = useCallback(() => {
     if (onCopy && !isLocked) {
@@ -96,34 +108,35 @@ const SwipeActions = memo(function SwipeActions({
       <button
         type='button'
         onClick={() => onEdit(release)}
-        className='flex w-16 flex-col items-center justify-center gap-1 bg-indigo-500 text-white active:bg-indigo-600'
+        className={cn(
+          mobileReleaseTokens.swipeActions.button,
+          mobileReleaseTokens.swipeActions.edit
+        )}
         aria-label={`Edit ${release.title}`}
       >
         <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
-        <span className='text-[10px] font-medium'>Edit</span>
+        <span className={mobileReleaseTokens.swipeActions.label}>Edit</span>
       </button>
       <button
         type='button'
         onClick={handleCopy}
         disabled={isLocked || !onCopy}
         className={cn(
-          'flex w-16 flex-col items-center justify-center gap-1 text-white active:opacity-80',
+          mobileReleaseTokens.swipeActions.button,
           isLocked
-            ? 'bg-neutral-400 opacity-60'
-            : 'bg-sky-500 active:bg-sky-600'
+            ? mobileReleaseTokens.swipeActions.locked
+            : mobileReleaseTokens.swipeActions.link
         )}
         aria-label={
           isLocked ? lockedAriaLabel : `Copy smart link for ${release.title}`
         }
       >
         <Icon
-          name={
-            isLocked ? (lockReason === 'scheduled' ? 'Clock' : 'Lock') : 'Link2'
-          }
+          name={getLockIconName(isLocked, lockReason)}
           className='h-4 w-4'
           aria-hidden='true'
         />
-        <span className='text-[10px] font-medium'>
+        <span className={mobileReleaseTokens.swipeActions.label}>
           {isLocked ? lockedLabel : 'Link'}
         </span>
       </button>
@@ -131,7 +144,13 @@ const SwipeActions = memo(function SwipeActions({
   );
 });
 
-/** Single release row in the mobile list */
+function getReleaseYear(release: ReleaseViewModel): number | null {
+  if (!release.releaseDate) return null;
+  const year = new Date(release.releaseDate).getFullYear();
+  return Number.isNaN(year) ? null : year;
+}
+
+/** Single release row in the mobile list — Apple Music layout, Linear tokens */
 const MobileReleaseRow = memo(function MobileReleaseRow({
   release,
   artistName,
@@ -149,89 +168,65 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
     testId: string
   ) => Promise<string>;
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (
-    releaseId: string
-  ) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
-  const year = release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
-    : null;
+  const year = getReleaseYear(release);
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
 
-  const actions = useMemo(
-    () => (
-      <SwipeActions
-        release={release}
-        onEdit={onEdit}
-        onCopy={onCopy}
-        isLocked={isLocked}
-        lockReason={lockReason}
-      />
-    ),
-    [release, onEdit, onCopy, isLocked, lockReason]
-  );
-
   return (
     <SwipeToReveal
       itemId={release.id}
       actionsWidth={SWIPE_ACTIONS_WIDTH}
-      actions={actions}
+      actions={
+        <SwipeActions
+          release={release}
+          onEdit={onEdit}
+          onCopy={onCopy}
+          isLocked={isLocked}
+          lockReason={lockReason}
+        />
+      }
       className='border-b border-subtle'
       contentClassName='bg-base'
     >
       <button
         type='button'
         onClick={() => onEdit(release)}
-        className='flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50'
+        className={mobileReleaseTokens.row.container}
       >
-        {/* Artwork thumbnail */}
-        <ReleaseArtworkThumb
-          src={release.artworkUrl}
-          alt={`${release.title} artwork`}
-        />
-
-        {/* Title + metadata */}
+        {/* Title + subtitle stacked — artwork hidden on mobile for density */}
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-1.5'>
-            <TruncatedText
-              lines={1}
-              className='text-sm font-semibold text-primary-token'
-            >
+            <TruncatedText lines={1} className={mobileReleaseTokens.row.title}>
               {release.title}
             </TruncatedText>
+            {/* Release type badge */}
             <span
               className={cn(
-                'shrink-0 text-[10px] font-medium uppercase tracking-wide',
-                typeStyle.text
+                mobileReleaseTokens.row.typeBadge,
+                typeStyle.text,
+                typeStyle.bg
               )}
             >
               {typeStyle.label}
             </span>
           </div>
-          {artistName && (
-            <TruncatedText
-              lines={1}
-              className='mt-0.5 text-xs text-secondary-token'
-            >
-              {artistName}
-            </TruncatedText>
-          )}
+          <div className={mobileReleaseTokens.row.subtitle}>
+            {artistName && <span>{artistName}</span>}
+            {artistName && year && (
+              <span className={mobileReleaseTokens.row.dot}>{' \u00B7 '}</span>
+            )}
+            {year && <span className='tabular-nums'>{year}</span>}
+          </div>
         </div>
-
-        {/* Year on the right */}
-        {year && (
-          <span className='shrink-0 text-xs tabular-nums text-tertiary-token'>
-            {year}
-          </span>
-        )}
 
         {/* Chevron indicator */}
         <Icon
           name='ChevronRight'
-          className='h-4 w-4 shrink-0 text-tertiary-token'
+          className={mobileReleaseTokens.row.chevron}
           aria-hidden='true'
         />
       </button>
@@ -245,20 +240,21 @@ function YearGroupHeader({
   count,
 }: Readonly<{ year: string; count: number }>) {
   return (
-    <div className='sticky top-0 z-10 flex items-center justify-between border-b border-subtle bg-base px-4 py-2'>
-      <span className='text-sm font-semibold text-primary-token'>{year}</span>
-      <span className='text-xs tabular-nums text-tertiary-token'>{count}</span>
+    <div className={mobileReleaseTokens.groupHeader}>
+      <span className={mobileReleaseTokens.groupHeaderTitle}>{year}</span>
+      <span className={mobileReleaseTokens.groupHeaderCount}>{count}</span>
     </div>
   );
 }
 
 /**
- * MobileReleaseList - Card/list-based mobile view for releases
+ * MobileReleaseList - Compact list view inspired by Apple Music layout
+ * with Linear design tokens.
  *
  * Features:
  * - Full-width tap targets
- * - Artwork visible (not hidden like in table view)
- * - Vertically stacked info instead of columns
+ * - Artwork hidden for density; title + artist + year inline
+ * - Release type shown as a colored pill badge
  * - Optional year grouping with sticky headers
  * - iOS-style swipe-to-reveal actions (Edit, Copy smart link)
  * - No horizontal scrolling

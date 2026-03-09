@@ -1,6 +1,7 @@
 'use client';
 
 import type * as React from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface TableRowProps {
@@ -30,15 +31,18 @@ export function TableRow({
 }: Readonly<TableRowProps>) {
   const isVirtual = virtualRow !== undefined;
 
-  const combinedStyle: React.CSSProperties = {
-    ...customStyle,
-    ...(isVirtual
-      ? {
-          transform: `translateY(${virtualRow.start}px)`,
-          height: '60px',
-        }
-      : {}),
-  };
+  const combinedStyle = useMemo<React.CSSProperties>(
+    () => ({
+      ...customStyle,
+      ...(isVirtual
+        ? {
+            transform: `translateY(${virtualRow?.start}px)`,
+            height: '60px',
+          }
+        : {}),
+    }),
+    [customStyle, isVirtual, virtualRow?.start]
+  );
 
   return (
     <tr
@@ -46,14 +50,14 @@ export function TableRow({
       data-index={dataIndex}
       className={cn(
         // Base styles
-        'group transition-colors duration-200 border-b border-subtle last:border-b-0',
+        'group transition-colors duration-150 border-b border-subtle last:border-b-0',
         // Fixed height to prevent layout shift
         'h-[60px]',
-        // Hover and selected states matching creator table
+        // Hover and selected states — aligned with Linear design tokens
         (() => {
-          if (checked) return 'bg-[#ebebf6] dark:bg-[#1b1d38]';
-          if (selected) return 'bg-base dark:bg-surface-2';
-          return 'hover:bg-base dark:hover:bg-surface-2';
+          if (checked) return 'bg-white/[0.04]';
+          if (selected) return 'bg-white/[0.04]';
+          return 'hover:bg-white/[0.02]';
         })(),
         // Clickable cursor
         onClick && 'cursor-pointer',

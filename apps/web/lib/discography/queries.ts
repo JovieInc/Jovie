@@ -1,5 +1,4 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-
 import { db, doesTableExist } from '@/lib/db';
 import {
   type DiscogRelease,
@@ -12,6 +11,7 @@ import {
   providerLinks,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { resolveTrackProviderLinks } from './track-provider-links';
 
 /**
  * Release data source types
@@ -59,6 +59,9 @@ export interface UpsertReleaseInput {
   upc?: string | null;
   totalTracks?: number;
   isExplicit?: boolean;
+  genres?: string[] | null;
+  copyrightLine?: string | null;
+  distributor?: string | null;
   artworkUrl?: string | null;
   spotifyPopularity?: number | null;
   sourceType?: ReleaseSourceType;
@@ -172,6 +175,9 @@ export async function getLatestReleaseByUsername(
       upc: discogReleases.upc,
       totalTracks: discogReleases.totalTracks,
       isExplicit: discogReleases.isExplicit,
+      genres: discogReleases.genres,
+      copyrightLine: discogReleases.copyrightLine,
+      distributor: discogReleases.distributor,
       artworkUrl: discogReleases.artworkUrl,
       spotifyPopularity: discogReleases.spotifyPopularity,
       sourceType: discogReleases.sourceType,
@@ -189,6 +195,46 @@ export async function getLatestReleaseByUsername(
     .limit(1);
 
   return release ?? null;
+}
+
+/**
+ * Get release stats for a creator by username.
+ * Returns total release count and up to 3 recent release titles.
+ */
+export async function getReleaseStatsByUsername(
+  usernameNormalized: string
+): Promise<{ releaseCount: number; topReleaseTitles: string[] }> {
+  if (!(await hasDiscogReleasesTable())) {
+    return { releaseCount: 0, topReleaseTitles: [] };
+  }
+
+  const [countResult, topReleases] = await Promise.all([
+    db
+      .select({
+        count: drizzleSql<number>`count(*)::int`,
+      })
+      .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized)),
+    db
+      .select({ title: discogReleases.title })
+      .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
+      .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
+      .orderBy(drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`)
+      .limit(3),
+  ]);
+
+  return {
+    releaseCount: countResult[0]?.count ?? 0,
+    topReleaseTitles: topReleases.map(release => release.title),
+  };
 }
 
 /**
@@ -362,6 +408,9 @@ export async function upsertRelease(
     upc: input.upc ?? null,
     totalTracks: input.totalTracks ?? 0,
     isExplicit: input.isExplicit ?? false,
+    genres: input.genres ?? null,
+    copyrightLine: input.copyrightLine ?? null,
+    distributor: input.distributor ?? null,
     artworkUrl: input.artworkUrl ?? null,
     spotifyPopularity: input.spotifyPopularity ?? null,
     sourceType: input.sourceType ?? 'ingested',
@@ -384,6 +433,9 @@ export async function upsertRelease(
         upc: input.upc ?? null,
         totalTracks: input.totalTracks ?? 0,
         isExplicit: input.isExplicit ?? false,
+        genres: input.genres ?? null,
+        copyrightLine: input.copyrightLine ?? null,
+        distributor: input.distributor ?? null,
         artworkUrl: input.artworkUrl ?? null,
         spotifyPopularity: input.spotifyPopularity ?? null,
         sourceType: input.sourceType ?? 'ingested',
@@ -525,6 +577,8 @@ export async function upsertTrack(input: {
   isExplicit?: boolean;
   isrc?: string | null;
   previewUrl?: string | null;
+  audioUrl?: string | null;
+  audioFormat?: string | null;
   sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
@@ -541,6 +595,8 @@ export async function upsertTrack(input: {
     isExplicit: input.isExplicit ?? false,
     isrc: input.isrc ?? null,
     previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     createdAt: now,
@@ -563,6 +619,8 @@ export async function upsertTrack(input: {
         isExplicit: input.isExplicit ?? false,
         isrc: input.isrc ?? null,
         previewUrl: input.previewUrl ?? null,
+        audioUrl: input.audioUrl ?? null,
+        audioFormat: input.audioFormat ?? null,
         sourceType: input.sourceType ?? 'ingested',
         metadata: input.metadata ?? {},
         updatedAt: now,
@@ -603,6 +661,8 @@ export interface TrackWithProviders {
   isExplicit: boolean;
   isrc: string | null;
   previewUrl: string | null;
+  audioUrl: string | null;
+  audioFormat: string | null;
   providerLinks: ProviderLink[];
 }
 
@@ -659,17 +719,29 @@ export async function getTracksForReleaseWithProviders(
   // Fetch provider links for ONLY paginated tracks (not all tracks)
   const trackIds = tracks.map(t => t.id);
   let trackProviderLinks: ProviderLink[] = [];
+  let releaseProviderLinks: ProviderLink[] = [];
 
   if (await hasProviderLinksTable()) {
-    trackProviderLinks = await db
-      .select()
-      .from(providerLinks)
-      .where(
-        and(
-          eq(providerLinks.ownerType, 'track'),
-          inArray(providerLinks.trackId, trackIds)
-        )
-      );
+    [trackProviderLinks, releaseProviderLinks] = await Promise.all([
+      db
+        .select()
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'track'),
+            inArray(providerLinks.trackId, trackIds)
+          )
+        ),
+      db
+        .select()
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            eq(providerLinks.releaseId, releaseId)
+          )
+        ),
+    ]);
   }
 
   // Group links by track ID
@@ -694,7 +766,12 @@ export async function getTracksForReleaseWithProviders(
     isExplicit: track.isExplicit,
     isrc: track.isrc,
     previewUrl: track.previewUrl,
-    providerLinks: linksByTrack.get(track.id) ?? [],
+    audioUrl: track.audioUrl,
+    audioFormat: track.audioFormat,
+    providerLinks: resolveTrackProviderLinks(
+      linksByTrack.get(track.id) ?? [],
+      releaseProviderLinks
+    ),
   }));
 
   return {

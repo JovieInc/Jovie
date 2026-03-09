@@ -17,7 +17,13 @@ export interface ClerkUserIdentityInput {
   lastName?: string | null;
   username?: string | null;
   imageUrl?: string | null;
+  externalAccounts?: ClerkExternalAccount[] | null;
   privateMetadata?: ClerkPrivateMetadata | null;
+}
+
+export interface ClerkExternalAccount {
+  provider?: string | null;
+  username?: string | null;
 }
 
 export type ClerkDisplayNameSource =
@@ -33,7 +39,22 @@ export interface ClerkResolvedIdentity {
   email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  spotifyUsername: string | null;
   displayNameSource: ClerkDisplayNameSource;
+}
+
+function resolveSpotifyUsername(
+  externalAccounts: ClerkExternalAccount[] | null | undefined
+): string | null {
+  if (!externalAccounts?.length) return null;
+
+  const spotifyAccount = externalAccounts.find(account => {
+    const provider = (account.provider ?? '').toLowerCase();
+    return provider.includes('spotify');
+  });
+
+  const username = spotifyAccount?.username?.trim() ?? '';
+  return username || null;
 }
 
 function deriveDisplayNameFromEmail(email: string): string {
@@ -109,11 +130,13 @@ export function resolveClerkIdentity(
   // Upgrade OAuth provider avatar URLs to high resolution
   // Google OAuth returns 96x96 by default, we upgrade to 512x512
   const avatarUrl = upgradeOAuthAvatarUrl(user?.imageUrl);
+  const spotifyUsername = resolveSpotifyUsername(user?.externalAccounts);
 
   return {
     email,
     displayName,
     avatarUrl,
+    spotifyUsername,
     displayNameSource,
   };
 }

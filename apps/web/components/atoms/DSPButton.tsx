@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, type ButtonProps } from '@jovie/ui';
-import DOMPurify from 'isomorphic-dompurify';
+import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 
 const sizeMap = { sm: 'sm', md: 'default', lg: 'lg' } as const;

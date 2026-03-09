@@ -1,0 +1,296 @@
+# Auto-PR on Agent Push
+#
+# PURPOSE: Automatically creates a PR when an agent (Codex, Claude, etc.) pushes
+# code to an agent branch without an existing PR. This closes the gap where
+# agents complete work and push, but leave no PR for the CI pipeline to process.
+#
+# TRIGGER: Push to agent branch pattern (codex/*, codegen-bot/*, linear/*, claude/*,
+#          plus personal branches like tim/jov-XXXX-description)
+#
+# SAFETY:
+# - Idempotent: skips if PR already exists for the branch
+# - Skips audit-only pushes (branches with only docs/audits and no code changes)
+# - Extracts Linear ticket ID from branch name for traceability
+# - Enables auto-merge so the PR flows through the full pipeline
+# - Does NOT bypass any quality gates (CI, scope judge, auto-approve all still apply)
+
+name: Auto-PR on Agent Push
+
+on:
+  push:
+    branches:
+      - 'codex/**'
+      - 'codegen-bot/**'
+      - 'linear/**'
+      - 'claude/**'
+      - '*/jov-**'
+
+permissions: {}
+
+concurrency:
+  group: auto-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  open-pr:
+    name: Open PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Stagger start to avoid CI stampede
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Hash the branch name to get a deterministic delay (0-120s).
+          # When 50 Codex branches push simultaneously, this spreads PR creation
+          # over ~2 minutes instead of all hitting at once.
+          HASH=$(echo -n "$BRANCH" | md5sum | tr -d -c '0-9' | head -c 8)
+          DELAY=$((10#$HASH % 120))
+          echo "Stagger delay for $BRANCH: ${DELAY}s (hash-based)"
+          sleep $DELAY
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Check for code changes
+        id: diff
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Compare this branch against main to get all changed files
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+
+          if [[ -z "$CHANGED" ]]; then
+            echo "No files changed vs main. Skipping PR."
+            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Filter out audit-only files: audits/, docs/, and standalone markdown
+          # A push is "audit-only" if every changed file matches these patterns
+          CODE_CHANGES=$(echo "$CHANGED" | grep -vE '^(audits/|docs/|\.github/workflows/|[^/]+\.md$)' || true)
+
+          if [[ -z "$CODE_CHANGES" ]]; then
+            echo "All changes are audit/docs only. Skipping PR creation."
+            echo "has_code_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Found code changes:"
+            echo "$CODE_CHANGES"
+            echo "has_code_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for existing PR and rate limit
+        if: steps.diff.outputs.has_code_changes == 'true'
+        id: check
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ github.ref_name }}
+          MAX_OPEN_AGENT_PRS: '10'
+          MAX_WAIT_MINUTES: '6'
+        run: |
+          echo "Branch: $BRANCH"
+
+          # Use jq --arg to prevent shell injection via branch name
+          EXISTING=$(gh api repos/${{ github.repository }}/pulls \
+            | jq --arg branch "$BRANCH" '[.[] | select(.head.ref == $branch and .state == "open")] | length')
+
+          if [[ "$EXISTING" -gt 0 ]]; then
+            echo "PR already exists for $BRANCH. Skipping."
+            echo "should_create=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Rate limit with retry: wait for capacity instead of silently dropping
+          MAX_WAIT=$((MAX_WAIT_MINUTES * 60))
+          WAITED=0
+          POLL_INTERVAL=30
+
+          while true; do
+            OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
+              | jq '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/") or (.headRefName | test("^[^/]+/jov-[0-9]+-"; "i")))] | length')
+
+            echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
+
+            if [[ "$OPEN_AGENT_PRS" -lt "$MAX_OPEN_AGENT_PRS" ]]; then
+              echo "Capacity available. Will create PR."
+              echo "should_create=true" >> $GITHUB_OUTPUT
+              break
+            fi
+
+            if [[ "$WAITED" -ge "$MAX_WAIT" ]]; then
+              echo "::warning::Rate limit still hit after waiting ${MAX_WAIT}s ($OPEN_AGENT_PRS open agent PRs). Skipping PR for $BRANCH."
+              echo "should_create=false" >> $GITHUB_OUTPUT
+              break
+            fi
+
+            echo "Rate limit reached. Waiting ${POLL_INTERVAL}s for capacity..."
+            sleep $POLL_INTERVAL
+            WAITED=$((WAITED + POLL_INTERVAL))
+          done
+
+      - name: Parse branch name
+        id: parse
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true'
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+
+          # Extract Linear ticket ID (JOV-123) from anywhere in the branch name
+          # Handles: codex/linear-mention-jov-854-desc, linear/JOV-42-desc, claude/jov-100-fix
+          TICKET=$(echo "$BRANCH" | grep -oiP 'jov-\d+' | head -1 | tr '[:lower:]' '[:upper:]' || echo "")
+          echo "ticket=$TICKET" >> $GITHUB_OUTPUT
+
+          # Build PR title from branch name
+          # Strip the agent prefix (codex/, claude/, etc.)
+          SLUG=$(echo "$BRANCH" | sed 's|^[^/]*/||')
+
+          if [[ -n "$TICKET" ]]; then
+            # Remove ticket from slug to avoid duplication in title
+            DESC=$(echo "$SLUG" | sed -E "s/[-_]?${TICKET,,}[-_]?//gI" | sed 's/^[-_]//;s/[-_]$//' | tr -- '-_' '  ')
+            TITLE="${TICKET}: ${DESC}"
+          else
+            DESC=$(echo "$SLUG" | tr -- '-_' '  ')
+            TITLE="$DESC"
+          fi
+
+          # Capitalize first letter of description
+          TITLE=$(echo "$TITLE" | sed 's/\(: \)\(.\)/\1\U\2/;s/^\(.\)/\U\1/')
+
+          echo "title=$TITLE" >> $GITHUB_OUTPUT
+          echo "PR title: $TITLE"
+
+      - name: Fetch Linear ticket details
+        id: linear
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true' && steps.parse.outputs.ticket != ''
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          TICKET="${{ steps.parse.outputs.ticket }}"
+
+          if [[ -z "$LINEAR_API_KEY" ]]; then
+            echo "No LINEAR_API_KEY. Skipping ticket lookup."
+            echo "has_details=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Fetch issue details from Linear GraphQL API
+          RESPONSE=$(curl -sS https://api.linear.app/graphql \
+            -H "Authorization: $LINEAR_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg id "$TICKET" '{
+              query: "query($id: String!) { issueVcsBranchSearch(branchName: $id) { id identifier title url description state { name } } }",
+              variables: { id: $id }
+            }')")
+
+          ISSUE_ID=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.id // ""')
+          ISSUE_TITLE=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.title // ""')
+          ISSUE_URL=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.url // ""')
+          ISSUE_DESC=$(echo "$RESPONSE" | jq -r '.data.issueVcsBranchSearch.description // ""' | head -c 2000)
+
+          if [[ -n "$ISSUE_ID" ]]; then
+            echo "Found Linear issue: $ISSUE_TITLE"
+            echo "has_details=true" >> $GITHUB_OUTPUT
+            echo "issue_id=$ISSUE_ID" >> $GITHUB_OUTPUT
+            echo "issue_title=$ISSUE_TITLE" >> $GITHUB_OUTPUT
+            echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+
+            # Override PR title with actual ticket title
+            echo "title=${TICKET}: ${ISSUE_TITLE}" >> $GITHUB_OUTPUT
+
+            # Base64 encode description for safe multiline handling
+            echo "issue_desc=$(echo "$ISSUE_DESC" | base64 -w0)" >> $GITHUB_OUTPUT
+          else
+            echo "Linear issue not found for $TICKET"
+            echo "has_details=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create PR
+        if: steps.diff.outputs.has_code_changes == 'true' && steps.check.outputs.should_create == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ github.ref_name }}
+          TICKET: ${{ steps.parse.outputs.ticket }}
+          HAS_LINEAR: ${{ steps.linear.outputs.has_details }}
+          LINEAR_TITLE: ${{ steps.linear.outputs.title }}
+          PARSED_TITLE: ${{ steps.parse.outputs.title }}
+          LINEAR_ISSUE_URL: ${{ steps.linear.outputs.issue_url }}
+          LINEAR_ISSUE_ID: ${{ steps.linear.outputs.issue_id }}
+          LINEAR_ISSUE_DESC_B64: ${{ steps.linear.outputs.issue_desc }}
+        run: |
+
+          # Use Linear title if available, otherwise parsed title
+          if [[ "$HAS_LINEAR" == "true" ]]; then
+            TITLE="$LINEAR_TITLE"
+          else
+            TITLE="$PARSED_TITLE"
+          fi
+
+          RUN_URL="/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          # Build PR body using a temp file to safely handle special characters
+          BODY_FILE=$(mktemp)
+          trap 'rm -f "$BODY_FILE"' EXIT
+
+          if [[ "$HAS_LINEAR" == "true" ]]; then
+            ISSUE_DESC=$(echo "$LINEAR_ISSUE_DESC_B64" | base64 -d 2>/dev/null || echo "")
+            {
+              echo "## Goal"
+              echo ""
+              printf '%s\n' "$ISSUE_DESC"
+              echo ""
+              echo "## Linear"
+              echo ""
+              echo "- Issue: ${TICKET}"
+              echo "- URL: ${LINEAR_ISSUE_URL}"
+              echo ""
+              echo "<!-- linear-issue-id:${LINEAR_ISSUE_ID} -->"
+              echo "<!-- linear-issue-identifier:${TICKET} -->"
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
+          elif [[ -n "$TICKET" ]]; then
+            {
+              echo "## Goal"
+              echo ""
+              echo "Implements ${TICKET} from Linear."
+              echo ""
+              echo "<!-- linear-issue-identifier:${TICKET} -->"
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
+          else
+            {
+              echo "## Goal"
+              echo ""
+              echo "Agent-generated changes on \`${BRANCH}\`."
+              echo ""
+              echo "---"
+              echo "*PR auto-created by [Auto-PR on Agent Push](${RUN_URL})*"
+            } > "$BODY_FILE"
+          fi
+
+          PR_URL=$(gh pr create \
+            --repo "${{ github.repository }}" \
+            --base main \
+            --head "$BRANCH" \
+            --draft \
+            --title "$TITLE" \
+            --body-file "$BODY_FILE")
+
+          echo "Created PR: $PR_URL"

@@ -1,7 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { ClientProviders } from '@/components/providers/ClientProviders';
+import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
+
+export const dynamic = 'force-dynamic';
 
 export default async function BillingLayout({
   children,
@@ -11,13 +14,13 @@ export default async function BillingLayout({
   // Ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
-    redirect('/sign-in');
+    redirect(APP_ROUTES.SIGNIN);
   }
 
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   return (
-    <ClientProviders publishableKey={publishableKey}>
+    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
       <div className='min-h-screen bg-background text-foreground'>
         <div className='mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8'>
           <div className='mx-auto max-w-4xl'>{children}</div>

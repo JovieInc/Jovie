@@ -8,41 +8,62 @@ import type { AudienceView } from './types';
 interface AudienceHeaderBadgeProps {
   readonly view: AudienceView;
   readonly onViewChange: (view: AudienceView) => void;
+  /** Null when the COUNT query was skipped for performance (JOV-1262). */
+  readonly totalAudienceCount: number | null;
+  /** Null when the COUNT query was skipped for performance (JOV-1262). */
+  readonly subscriberCount: number | null;
 }
 
 const VIEW_OPTIONS: {
   value: AudienceView;
-  label: string;
   Icon: typeof Users;
 }[] = [
-  { value: 'all', label: 'All audience', Icon: Users },
-  { value: 'subscribers', label: 'Subscribers', Icon: BellRing },
-  { value: 'anonymous', label: 'Anonymous', Icon: Ghost },
+  { value: 'all', Icon: Users },
+  { value: 'subscribers', Icon: BellRing },
+  { value: 'anonymous', Icon: Ghost },
 ];
 
 export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   view,
   onViewChange,
+  totalAudienceCount,
+  subscriberCount,
 }: AudienceHeaderBadgeProps) {
+  const anonymousCount =
+    totalAudienceCount !== null && subscriberCount !== null
+      ? Math.max(totalAudienceCount - subscriberCount, 0)
+      : null;
+
+  const labels: Record<AudienceView, string> = {
+    all:
+      totalAudienceCount !== null
+        ? `All Audience (${totalAudienceCount})`
+        : 'All Audience',
+    subscribers:
+      subscriberCount !== null ? `Followers (${subscriberCount})` : 'Followers',
+    anonymous:
+      anonymousCount !== null ? `Anonymous (${anonymousCount})` : 'Anonymous',
+  };
+
   return (
-    <div className='flex items-center min-w-0 overflow-x-auto'>
+    <div className='flex items-center min-w-0 overflow-x-auto scrollbar-hide'>
       <fieldset className='inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0/80 p-[3px] backdrop-blur-sm'>
         <legend className='sr-only'>Audience view filter</legend>
-        {VIEW_OPTIONS.map(({ value, label, Icon }) => (
+        {VIEW_OPTIONS.map(({ value, Icon }) => (
           <button
             key={value}
             type='button'
             onClick={() => onViewChange(value)}
             aria-pressed={view === value}
             className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tracking-[-0.01em] transition-all duration-150 whitespace-nowrap',
+              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-[510] tracking-[-0.01em] transition-all duration-150 whitespace-nowrap',
               view === value
-                ? 'border-default bg-surface-2 text-primary-token shadow-sm'
+                ? 'border-default bg-surface-2 text-primary-token shadow-card'
                 : 'border-transparent text-tertiary-token hover:text-secondary-token hover:bg-surface-1'
             )}
           >
             <Icon className='h-3 w-3' />
-            {label}
+            {labels[value]}
           </button>
         ))}
       </fieldset>

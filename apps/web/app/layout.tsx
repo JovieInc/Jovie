@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import { headers } from 'next/headers';
 import Script from 'next/script';
 import React from 'react';
 import { CoreProviders } from '@/components/providers/CoreProviders';
@@ -28,10 +27,13 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description:
-    'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
+    'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
   keywords: [
+    'Jovie',
+    'link in bio for musicians',
     'artist profile',
     'music artist',
+    'smart links',
     'spotify',
     'social media',
     'music promotion',
@@ -61,7 +63,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     title: APP_NAME,
     description:
-      'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
+      'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
     siteName: APP_NAME,
     images: [
       {
@@ -76,9 +78,10 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: APP_NAME,
     description:
-      'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
+      'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
     images: [`${APP_URL}/og/default.png`],
-    creator: '@jovie',
+    creator: '@jovieapp',
+    site: '@jovieapp',
   },
   robots: {
     index: true,
@@ -97,16 +100,16 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
     'application-name': APP_NAME,
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
     'msapplication-config': 'none',
-    'theme-color': '#ffffff',
+    'theme-color': '#0a0a0a',
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: APP_NAME,
   },
   icons: {
@@ -144,21 +147,23 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Vercel Toolbar: visible only to authenticated Vercel team members.
-  // Dynamically imported to keep it code-split. Disable with NEXT_DISABLE_TOOLBAR=1.
-  const VercelToolbar = process.env.NEXT_DISABLE_TOOLBAR
-    ? null
-    : (await import('@vercel/toolbar/next')).VercelToolbar;
+  // Vercel Toolbar: visible only to authenticated Vercel team members in non-production.
+  // Disabled in production to avoid showing floating button to team members visiting jov.ie.
+  const enableToolbar =
+    process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
+  const VercelToolbar = enableToolbar
+    ? (await import('@vercel/toolbar/next')).VercelToolbar
+    : null;
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  // Read CSP nonce from request headers (set by middleware) to prevent
-  // hydration mismatch: server renders nonce="" but client expects undefined
-  const headersList = await headers();
-  const nonce = headersList.get('x-nonce') || undefined;
+  // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
+  // response header set by the middleware (proxy.ts). No need to read headers() here,
+  // which would force all routes into dynamic rendering.
+  // Cookie banner visibility is determined client-side by reading document.cookie.
 
   const headContent = (
     <head>
-      <Script src='/theme-init.js' strategy='beforeInteractive' nonce={nonce} />
+      <Script src='/theme-init.js' strategy='beforeInteractive' />
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}
@@ -188,13 +193,6 @@ export default async function RootLayout({
         href='https://img.clerk.com'
         crossOrigin='anonymous'
       />
-      {/* Cloudinary - media assets */}
-      <link rel='dns-prefetch' href='https://res.cloudinary.com' />
-      <link
-        rel='preconnect'
-        href='https://res.cloudinary.com'
-        crossOrigin='anonymous'
-      />
       {/* Clerk Auth API */}
       <link
         rel='preconnect'
@@ -214,30 +212,47 @@ export default async function RootLayout({
         crossOrigin='anonymous'
       />
 
-      {/* Structured Data for Organization */}
+      {/* Structured Data: WebSite + Organization (global, all pages) */}
+      <Script
+        id='website-schema'
+        type='application/ld+json'
+        strategy='afterInteractive'
+        suppressHydrationWarning
+      >
+        {JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'WebSite',
+          name: APP_NAME,
+          alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
+          url: APP_URL,
+          description:
+            'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+          inLanguage: 'en-US',
+          publisher: {
+            '@type': 'Organization',
+            name: APP_NAME,
+            url: APP_URL,
+          },
+        })}
+      </Script>
       <Script
         id='organization-schema'
         type='application/ld+json'
         strategy='afterInteractive'
-        nonce={nonce}
         suppressHydrationWarning
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'Organization',
-            name: APP_NAME,
-            url: APP_URL,
-            logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-            description:
-              'Artist profiles for music artists. Connect your music, social media, and merch in one place.',
-            sameAs: [
-              'https://twitter.com/jovie',
-              'https://instagram.com/jovie',
-            ],
-          }),
-        }}
-      />
+      >
+        {JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'Organization',
+          name: APP_NAME,
+          legalName: 'Jovie Technology Inc.',
+          url: APP_URL,
+          logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+          description:
+            'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+          sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
+        })}
+      </Script>
     </head>
   );
 
@@ -292,12 +307,12 @@ export default async function RootLayout({
     <html lang='en' className='dark' suppressHydrationWarning>
       {headContent}
       <body className={bodyClassName}>
-        {/* Skip to main content link for keyboard accessibility */}
+        {/* Skip to main content link for keyboard accessibility (WCAG 2.4.1) */}
         <a
           href='#main-content'
-          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-100 focus:px-4 focus:py-2 focus:bg-btn-primary focus:text-btn-primary-foreground focus:rounded-md focus:text-sm focus:font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+          className='sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-surface-1 focus:px-4 focus:py-2 focus:text-sm focus:text-primary-token focus:shadow-lg focus:ring-2 focus:ring-accent'
         >
-          Skip to main content
+          Skip to content
         </a>
         <CoreProviders>{children}</CoreProviders>
 

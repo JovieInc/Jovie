@@ -1,10 +1,18 @@
-import { and, sql as drizzleSql, gte, inArray, lte } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  sql as drizzleSql,
+  gt,
+  gte,
+  inArray,
+  lte,
+} from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
-import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -28,6 +36,178 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Core logic for scheduling release notifications.
  * Exported for use by the consolidated /api/cron/daily-maintenance handler.
  */
+type SubscriberRow = {
+  id: string;
+  creatorProfileId: string;
+  channel: string;
+  email: string | null;
+  phone: string | null;
+  preferences: (typeof notificationSubscriptions.$inferSelect)['preferences'];
+};
+
+type NotificationInsertValue = {
+  creatorProfileId: string;
+  releaseId: string;
+  notificationSubscriptionId: string;
+  notificationType: 'release_day';
+  scheduledFor: Date;
+  status: 'pending';
+  dedupKey: string;
+  metadata: { releaseTitle: string | null; channel: string };
+};
+
+/** Fetch eligible creator IDs based on plan entitlements. */
+async function getEligibleCreatorIds(
+  creatorProfileIds: string[]
+): Promise<Set<string>> {
+  const eligible = new Set<string>();
+  try {
+    const entitlementsMap =
+      await getBatchCreatorEntitlements(creatorProfileIds);
+    for (const [profileId, { entitlements }] of entitlementsMap) {
+      if (entitlements.booleans.canSendNotifications) {
+        eligible.add(profileId);
+      }
+    }
+  } catch {
+    logger.warn(
+      '[schedule-release-notifications] Batch entitlements lookup failed, skipping all creators'
+    );
+  }
+  return eligible;
+}
+
+const SUBSCRIBER_PAGE_SIZE = 500;
+const INSERT_BATCH_SIZE = 500;
+const INSERT_CONCURRENCY = 5;
+
+/**
+ * Insert a batch of notification rows with conflict handling.
+ * Logs and returns 0 on failure so the caller can continue.
+ */
+async function insertNotificationBatch(
+  batch: NotificationInsertValue[],
+  now: Date
+): Promise<number> {
+  try {
+    const inserted = await db
+      .insert(fanReleaseNotifications)
+      .values(batch)
+      .onConflictDoUpdate({
+        target: fanReleaseNotifications.dedupKey,
+        set: {
+          scheduledFor: drizzleSql`EXCLUDED.scheduled_for`,
+          status: 'pending',
+          error: null,
+          updatedAt: now,
+        },
+        setWhere: inArray(fanReleaseNotifications.status, [
+          'cancelled',
+          'pending',
+        ]),
+      })
+      .returning({ id: fanReleaseNotifications.id });
+    return inserted.length;
+  } catch (err) {
+    logger.error(
+      '[schedule-release-notifications] Batch insert failed, continuing:',
+      err
+    );
+    return 0;
+  }
+}
+
+/**
+ * JOV-1252 / JOV-1253 / JOV-1255:
+ * Stream subscribers for a single release using keyset pagination so we never
+ * hold the full subscriber list in memory. Notification rows are inserted in
+ * batches as we iterate (no full cross-product array built up front), and
+ * inserts run with bounded concurrency (INSERT_CONCURRENCY at a time).
+ */
+async function scheduleNotificationsForRelease(
+  release: {
+    id: string;
+    creatorProfileId: string;
+    title: string | null;
+    releaseDate: Date;
+  },
+  now: Date
+): Promise<number> {
+  let lastId = '';
+  let pendingBatch: NotificationInsertValue[] = [];
+  const pendingInserts: Promise<number>[] = [];
+  let totalScheduled = 0;
+
+  const flushBatch = () => {
+    if (pendingBatch.length === 0) return;
+    const batchToInsert = pendingBatch;
+    pendingBatch = [];
+    pendingInserts.push(insertNotificationBatch(batchToInsert, now));
+  };
+
+  while (true) {
+    const conditions = [
+      drizzleSql`${notificationSubscriptions.creatorProfileId} = ${release.creatorProfileId}`,
+      drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
+      drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
+      drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`,
+    ];
+
+    if (lastId) {
+      conditions.push(gt(notificationSubscriptions.id, lastId));
+    }
+
+    const page: SubscriberRow[] = await db
+      .select({
+        id: notificationSubscriptions.id,
+        creatorProfileId: notificationSubscriptions.creatorProfileId,
+        channel: notificationSubscriptions.channel,
+        email: notificationSubscriptions.email,
+        phone: notificationSubscriptions.phone,
+        preferences: notificationSubscriptions.preferences,
+      })
+      .from(notificationSubscriptions)
+      .where(and(...conditions))
+      .orderBy(asc(notificationSubscriptions.id))
+      .limit(SUBSCRIBER_PAGE_SIZE);
+
+    for (const subscriber of page) {
+      pendingBatch.push({
+        creatorProfileId: release.creatorProfileId,
+        releaseId: release.id,
+        notificationSubscriptionId: subscriber.id,
+        notificationType: 'release_day',
+        scheduledFor: release.releaseDate,
+        status: 'pending',
+        dedupKey: `release_day:${release.id}:${subscriber.id}`,
+        metadata: {
+          releaseTitle: release.title,
+          channel: subscriber.channel,
+        },
+      });
+
+      if (pendingBatch.length >= INSERT_BATCH_SIZE) {
+        flushBatch();
+      }
+    }
+
+    if (page.length < SUBSCRIBER_PAGE_SIZE) break;
+    lastId = page[page.length - 1].id;
+
+    // Drain completed inserts when concurrency ceiling is reached
+    if (pendingInserts.length >= INSERT_CONCURRENCY) {
+      const counts = await Promise.all(pendingInserts.splice(0));
+      totalScheduled += counts.reduce((a, b) => a + b, 0);
+    }
+  }
+
+  // Flush remaining rows and await all in-flight inserts in parallel
+  flushBatch();
+  const counts = await Promise.all(pendingInserts);
+  totalScheduled += counts.reduce((a, b) => a + b, 0);
+
+  return totalScheduled;
+}
 export async function scheduleReleaseNotifications(): Promise<{
   scheduled: number;
   releasesFound: number;
@@ -55,29 +235,11 @@ export async function scheduleReleaseNotifications(): Promise<{
     return { scheduled: 0, releasesFound: 0 };
   }
 
-  let totalScheduled = 0;
-
   const creatorProfileIds = [
     ...new Set(upcomingReleases.map(r => r.creatorProfileId)),
   ];
 
-  // Check which creators can send notifications based on their plan
-  const eligibleCreatorIds = new Set<string>();
-  await Promise.all(
-    creatorProfileIds.map(async profileId => {
-      try {
-        const { entitlements } = await getCreatorEntitlements(profileId);
-        if (entitlements.booleans.canSendNotifications) {
-          eligibleCreatorIds.add(profileId);
-        }
-      } catch {
-        // If plan lookup fails, skip this creator (don't send on error)
-        logger.warn(
-          `[schedule-release-notifications] Failed to check plan for creator ${profileId}, skipping`
-        );
-      }
-    })
-  );
+  const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
 
   // Filter to only eligible releases
   const eligibleReleases = upcomingReleases.filter(r =>
@@ -97,103 +259,23 @@ export async function scheduleReleaseNotifications(): Promise<{
     return { scheduled: 0, releasesFound: upcomingReleases.length };
   }
 
-  const eligibleCreatorProfileIds = [
-    ...new Set(eligibleReleases.map(r => r.creatorProfileId)),
-  ];
-
-  const allSubscribers = await db
-    .select({
-      id: notificationSubscriptions.id,
-      creatorProfileId: notificationSubscriptions.creatorProfileId,
-      channel: notificationSubscriptions.channel,
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-      preferences: notificationSubscriptions.preferences,
-    })
-    .from(notificationSubscriptions)
-    .where(
-      and(
-        inArray(
-          notificationSubscriptions.creatorProfileId,
-          eligibleCreatorProfileIds
-        ),
-        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`,
-        drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
-        drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`
-      )
-    );
-
-  const subscribersByCreator = new Map<
-    string,
-    (typeof allSubscribers)[number][]
-  >();
-  for (const subscriber of allSubscribers) {
-    const existing = subscribersByCreator.get(subscriber.creatorProfileId);
-    if (existing) {
-      existing.push(subscriber);
-    } else {
-      subscribersByCreator.set(subscriber.creatorProfileId, [subscriber]);
-    }
-  }
-
-  const notificationValues: Array<{
-    creatorProfileId: string;
-    releaseId: string;
-    notificationSubscriptionId: string;
-    notificationType: 'release_day';
-    scheduledFor: Date;
-    status: 'pending';
-    dedupKey: string;
-    metadata: { releaseTitle: string | null; channel: string };
-  }> = [];
-
+  // Stream subscribers per-release, insert in parallel batches as we go
+  let totalScheduled = 0;
   for (const release of eligibleReleases) {
     if (!release.releaseDate) continue;
-
-    const subscribers =
-      subscribersByCreator.get(release.creatorProfileId) || [];
-
-    for (const subscriber of subscribers) {
-      const dedupKey = `release_day:${release.id}:${subscriber.id}`;
-
-      notificationValues.push({
-        creatorProfileId: release.creatorProfileId,
-        releaseId: release.id,
-        notificationSubscriptionId: subscriber.id,
-        notificationType: 'release_day',
-        scheduledFor: release.releaseDate,
-        status: 'pending',
-        dedupKey,
-        metadata: {
-          releaseTitle: release.title,
-          channel: subscriber.channel,
-        },
-      });
+    try {
+      const count = await scheduleNotificationsForRelease(
+        release as typeof release & { releaseDate: Date },
+        now
+      );
+      totalScheduled += count;
+    } catch (err) {
+      logger.error(
+        `[schedule-release-notifications] Failed to schedule notifications for release ${release.id}:`,
+        err
+      );
+      // Continue processing remaining releases
     }
-  }
-
-  const BATCH_SIZE = 500;
-  for (let i = 0; i < notificationValues.length; i += BATCH_SIZE) {
-    const batch = notificationValues.slice(i, i + BATCH_SIZE);
-    const inserted = await db
-      .insert(fanReleaseNotifications)
-      .values(batch)
-      .onConflictDoUpdate({
-        target: fanReleaseNotifications.dedupKey,
-        set: {
-          scheduledFor: drizzleSql`EXCLUDED.scheduled_for`,
-          status: 'pending',
-          error: null,
-          updatedAt: now,
-        },
-        setWhere: inArray(fanReleaseNotifications.status, [
-          'cancelled',
-          'pending',
-        ]),
-      })
-      .returning({ id: fanReleaseNotifications.id });
-
-    totalScheduled += inserted.length;
   }
 
   logger.info(

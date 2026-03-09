@@ -1,8 +1,9 @@
-import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { publicEnv } from '@/lib/env-public';
 
 // Extracted static style to avoid creating new object on each render
 const FONT_SYNTHESIS_STYLE = { fontSynthesisWeight: 'none' } as const;
+const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
 export function PricingPreview() {
   return (
@@ -20,7 +21,9 @@ export function PricingPreview() {
           </p>
         </div>
 
-        <div className='grid md:grid-cols-3 gap-8 max-w-4xl mx-auto'>
+        <div
+          className={`grid ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-8 max-w-4xl mx-auto`}
+        >
           {/* Free Tier */}
           <div className='text-center'>
             <h3
@@ -59,34 +62,25 @@ export function PricingPreview() {
             </p>
           </div>
 
-          {/* Growth Tier */}
-          <div className='text-center'>
-            <h3
-              className='text-sm font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-3'
-              style={FONT_SYNTHESIS_STYLE}
-            >
-              Growth
-            </h3>
-            <p
-              className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
-              style={FONT_SYNTHESIS_STYLE}
-            >
-              $99
-            </p>
-            <p className='text-sm text-neutral-600 dark:text-neutral-400'>
-              Automation + retargeting
-            </p>
-          </div>
-        </div>
-
-        <div className='text-center mt-10'>
-          <Link
-            href='/pricing'
-            className='inline-block px-6 py-3 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors'
-            style={FONT_SYNTHESIS_STYLE}
-          >
-            View pricing →
-          </Link>
+          {growthPlanEnabled && (
+            <div className='text-center'>
+              <h3
+                className='text-sm font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400 mb-3'
+                style={FONT_SYNTHESIS_STYLE}
+              >
+                Growth
+              </h3>
+              <p
+                className='text-4xl sm:text-5xl font-semibold text-neutral-900 dark:text-white mb-3'
+                style={FONT_SYNTHESIS_STYLE}
+              >
+                $99
+              </p>
+              <p className='text-sm text-neutral-600 dark:text-neutral-400'>
+                Automation + retargeting
+              </p>
+            </div>
+          )}
         </div>
       </Container>
     </section>

@@ -257,6 +257,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** API search: 30 requests per minute per IP */
+  spotifySearchApi: {
+    name: 'Spotify Search API',
+    limit: 30,
+    window: '1 m',
+    prefix: 'spotify:search:api',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   /** Profile claim: 5 attempts per hour per user - CRITICAL for security */
   spotifyClaim: {
     name: 'Spotify Claim',
@@ -294,6 +303,15 @@ export const RATE_LIMITERS = {
     limit: 80,
     window: '1 m',
     prefix: 'dsp:apple-music:lookup',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Apple Music search: 30 requests per minute per IP */
+  appleMusicSearch: {
+    name: 'Apple Music Search',
+    limit: 30,
+    window: '1 m',
+    prefix: 'dsp:apple-music:search',
     analytics: true,
   } satisfies RateLimitConfig,
 
@@ -351,6 +369,42 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Apple Music rescan (free): 1 per day per profile */
+  appleMusicRescanFree: {
+    name: 'Apple Music Rescan (Free)',
+    limit: 1,
+    window: '1 d',
+    prefix: 'dsp:apple-music:rescan:free',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Apple Music rescan (paid): 1 per hour per profile */
+  appleMusicRescanPaid: {
+    name: 'Apple Music Rescan (Paid)',
+    limit: 1,
+    window: '1 h',
+    prefix: 'dsp:apple-music:rescan:paid',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Release refresh (free): 1 per day per release */
+  releaseRefreshFree: {
+    name: 'Release Refresh (Free)',
+    limit: 1,
+    window: '1 d',
+    prefix: 'release:refresh:free',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Release refresh (paid): 1 per hour per release */
+  releaseRefreshPaid: {
+    name: 'Release Refresh (Paid)',
+    limit: 1,
+    window: '1 h',
+    prefix: 'release:refresh:paid',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // AI Chat Operations
   // ---------------------------------------------------------------------------
@@ -401,6 +455,28 @@ export const RATE_LIMITERS = {
     limit: 1,
     window: '5 m',
     prefix: 'bandsintown:sync',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Link Wrapping
+  // ---------------------------------------------------------------------------
+
+  /** Wrap-link (authenticated): 50 requests per hour per user */
+  wrapLink: {
+    name: 'Wrap Link',
+    limit: 50,
+    window: '1 h',
+    prefix: 'wrap-link',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Wrap-link (anonymous): 20 requests per hour per IP - stricter for unauthenticated */
+  wrapLinkAnonymous: {
+    name: 'Wrap Link (Anonymous)',
+    limit: 20,
+    window: '1 h',
+    prefix: 'wrap-link:anon',
     analytics: true,
   } satisfies RateLimitConfig,
 

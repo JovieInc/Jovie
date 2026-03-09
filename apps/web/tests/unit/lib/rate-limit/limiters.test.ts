@@ -143,6 +143,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       window: '1 m',
       prefix: 'spotify:search',
     },
+    spotifySearchApi: {
+      name: 'Spotify Search API',
+      limit: 30,
+      window: '1 m',
+      prefix: 'spotify:search:api',
+    },
     spotifyClaim: {
       name: 'Spotify Claim',
       limit: 5,
@@ -160,6 +166,12 @@ vi.mock('@/lib/rate-limit/config', () => ({
       limit: 10,
       window: '1 m',
       prefix: 'spotify:public-search',
+    },
+    appleMusicSearch: {
+      name: 'Apple Music Search',
+      limit: 30,
+      window: '1 m',
+      prefix: 'dsp:apple-music:search',
     },
     aiChat: { name: 'AI Chat', limit: 30, window: '1 h', prefix: 'ai:chat' },
     aiChatDailyFree: {
@@ -209,6 +221,30 @@ vi.mock('@/lib/rate-limit/config', () => ({
       limit: 5,
       window: '1 h',
       prefix: 'account:export',
+    },
+    appleMusicRescanFree: {
+      name: 'Apple Music Rescan (Free)',
+      limit: 1,
+      window: '1 d',
+      prefix: 'dsp:apple-music:rescan:free',
+    },
+    appleMusicRescanPaid: {
+      name: 'Apple Music Rescan (Paid)',
+      limit: 1,
+      window: '1 h',
+      prefix: 'dsp:apple-music:rescan:paid',
+    },
+    releaseRefreshFree: {
+      name: 'Release Refresh (Free)',
+      limit: 1,
+      window: '1 d',
+      prefix: 'release:refresh:free',
+    },
+    releaseRefreshPaid: {
+      name: 'Release Refresh (Paid)',
+      limit: 1,
+      window: '1 h',
+      prefix: 'release:refresh:paid',
     },
   },
 }));
@@ -283,11 +319,17 @@ describe('limiters.ts', () => {
         'health',
         'general',
         'spotifySearch',
+        'spotifySearchApi',
         'spotifyClaim',
         'spotifyRefresh',
         'spotifyPublicSearch',
         'aiChat',
         'bandsintownSync',
+        'appleMusicSearch',
+        'appleMusicRescanFree',
+        'appleMusicRescanPaid',
+        'releaseRefreshFree',
+        'releaseRefreshPaid',
         'accountDelete',
         'accountExport',
       ];
@@ -805,6 +847,236 @@ describe('limiters.ts', () => {
       expect(result.reason).toBe(
         'Too many export requests. Please try again later.'
       );
+    });
+  });
+
+  // =========================================================================
+  // checkAppleMusicRescanRateLimit (plan-aware)
+  // =========================================================================
+
+  describe('checkAppleMusicRescanRateLimit', () => {
+    it('returns success when under limit for free plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit('profile-1', null);
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('profile-1');
+    });
+
+    it('returns success when under limit for pro plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit('profile-1', 'pro');
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('profile-1');
+    });
+
+    it('returns success when under limit for growth plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit(
+        'profile-1',
+        'growth'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('profile-1');
+    });
+
+    it('returns success when under limit for founding plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit(
+        'profile-1',
+        'founding'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('profile-1');
+    });
+
+    it('returns failure with upgrade message for free plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit('profile-1', null);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('24 hours');
+      expect(result.reason).toContain('Upgrade to Pro');
+    });
+
+    it('returns failure without upgrade message for pro plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit('profile-1', 'pro');
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('1 hour');
+      expect(result.reason).not.toContain('Upgrade');
+    });
+
+    it('returns failure without upgrade message for growth plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit(
+        'profile-1',
+        'growth'
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('1 hour');
+      expect(result.reason).not.toContain('Upgrade');
+    });
+
+    it('returns failure without upgrade message for founding plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkAppleMusicRescanRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkAppleMusicRescanRateLimit(
+        'profile-1',
+        'founding'
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('1 hour');
+      expect(result.reason).not.toContain('Upgrade');
+    });
+  });
+
+  // =========================================================================
+  // checkReleaseRefreshRateLimit (plan-aware)
+  // =========================================================================
+
+  describe('checkReleaseRefreshRateLimit', () => {
+    it('returns success when under limit for free plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit('release-1', null);
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('release-1');
+    });
+
+    it('returns success when under limit for pro plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit('release-1', 'pro');
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('release-1');
+    });
+
+    it('returns success when under limit for growth plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit('release-1', 'growth');
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('release-1');
+    });
+
+    it('returns success when under limit for founding plan', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit(
+        'release-1',
+        'founding'
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockLimit).toHaveBeenCalledWith('release-1');
+    });
+
+    it('returns failure with upgrade message for free plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit('release-1', null);
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('24 hours');
+      expect(result.reason).toContain('Upgrade to Pro');
+    });
+
+    it('returns failure without upgrade message for pro plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit('release-1', 'pro');
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('1 hour');
+      expect(result.reason).not.toContain('Upgrade');
+    });
+
+    it('returns failure without upgrade message for growth plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit('release-1', 'growth');
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('1 hour');
+      expect(result.reason).not.toContain('Upgrade');
+    });
+
+    it('returns failure without upgrade message for founding plan', async () => {
+      mockLimit.mockResolvedValue(makeDeniedResult());
+
+      const { checkReleaseRefreshRateLimit } = await import(
+        '@/lib/rate-limit/limiters'
+      );
+      const result = await checkReleaseRefreshRateLimit(
+        'release-1',
+        'founding'
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.reason).toContain('1 hour');
+      expect(result.reason).not.toContain('Upgrade');
     });
   });
 });

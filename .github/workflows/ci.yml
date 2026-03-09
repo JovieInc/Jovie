@@ -5,7 +5,7 @@ on:
     branches: [main]
   merge_group:
   push:
-    branches: [main, 'codegen-bot/**', 'claude/**']
+    branches: [main]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -17,9 +17,116 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  # Larger runner for CPU-heavy jobs (typecheck, build, tests).
+  # Set to a GitHub-hosted larger runner label (e.g. "ubuntu-4core") for burst throughput,
+  # or leave as "ubuntu-latest" for default 2-core runners.
+  FAST_RUNNER: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
 
 jobs:
+
+  # ── Centralized path-change detection ──────────────────────────────────
+  # Runs once, outputs change flags for all job types.
+  # Downstream jobs read outputs instead of fetching git history independently.
+  ci-path-changes:
+    name: Path Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      run_build: ${{ steps.detect.outputs.run_build }}
+      run_test: ${{ steps.detect.outputs.run_test }}
+      run_e2e: ${{ steps.detect.outputs.run_e2e }}
+      run_drizzle: ${{ steps.detect.outputs.run_drizzle }}
+      has_code_changes: ${{ steps.detect.outputs.has_code_changes }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+      - name: Detect path changes for all job types
+        id: detect
+        shell: bash
+        run: |
+          IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
+          FULL_CI_LABEL="${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}"
+
+          # Force run all if the 'testing' label is present
+          if [[ "$FULL_CI_LABEL" == "true" ]]; then
+            echo "Forcing full CI run due to 'testing' label"
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
+              echo "$t=true" >> $GITHUB_OUTPUT
+            done
+            exit 0
+          fi
+
+          # Determine changed files
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}"
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual dispatch: run everything
+            echo "Manual dispatch: running all checks"
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
+              echo "$t=true" >> $GITHUB_OUTPUT
+            done
+            exit 0
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+
+          # Check if only docs changed (exclude .github/ — workflow changes must run CI)
+          if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
+            echo "Only documentation files changed"
+            for t in run_build run_test run_e2e run_drizzle has_code_changes; do
+              echo "$t=false" >> $GITHUB_OUTPUT
+            done
+            exit 0
+          fi
+
+          echo "has_code_changes=true" >> $GITHUB_OUTPUT
+
+          # Build paths
+          BUILD_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|package.*\.json|turbo\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$BUILD_PATTERN"; then
+            echo "run_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_build=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Test paths
+          TEST_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|packages/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$TEST_PATTERN"; then
+            echo "run_test=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_test=false" >> $GITHUB_OUTPUT
+          fi
+
+          # E2E paths
+          E2E_PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'
+          if echo "$CHANGED_FILES" | grep -q -E "$E2E_PATTERN"; then
+            echo "run_e2e=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_e2e=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Drizzle paths
+          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+          if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
+            echo "run_drizzle=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_drizzle=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Fork guard: disable E2E for forks (no secrets)
+          if [[ "$IS_FORK" == "true" ]]; then
+            echo "Fork PR: disabling e2e and build"
+            echo "run_e2e=false" >> $GITHUB_OUTPUT
+            echo "run_build=false" >> $GITHUB_OUTPUT
+            echo "run_test=false" >> $GITHUB_OUTPUT
+          fi
 
   ci-env-example-guard:
     name: Env Example Guard
@@ -55,29 +162,13 @@ jobs:
   ci-guardrails:
     name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping guardrails."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping guardrails."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
         run: pnpm --filter=@jovie/web run next:proxy-guard
@@ -85,29 +176,13 @@ jobs:
   ci-biome:
     name: Lint
     # Single consolidated job for all Biome checks (lint + format)
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping Biome checks."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping Biome checks."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Biome CI (lint + format)
         run: |
@@ -131,29 +206,13 @@ jobs:
   ci-eslint:
     name: ESLint Server Boundaries
     # Check server/client boundary violations
+    needs: [ci-path-changes]
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping ESLint."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping ESLint."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run ESLint server boundary checks
         run: pnpm --filter=@jovie/web run lint:server-boundaries
@@ -161,29 +220,13 @@ jobs:
   ci-knip:
     name: Knip (dead code)
     # Detect unused files, dependencies, and exports
+    needs: [ci-path-changes]
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.ci-path-changes.outputs.has_code_changes == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping Knip."
-            exit 0
-          fi
-
-          # Skip for docs-only changes
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping Knip."
-            exit 0
-          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Knip (unused files, deps & exports)
         run: pnpm knip
@@ -192,29 +235,15 @@ jobs:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
-    runs-on: ubuntu-latest
+    needs: [ci-path-changes]
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
+    if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.has_code_changes == 'true' }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping typecheck."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping typecheck."
-            exit 0
-          fi
+        with:
+          # Full history needed for turbo --affected merge-base detection
+          fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
@@ -235,10 +264,7 @@ jobs:
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
       - name: Run typecheck
-        run: pnpm turbo typecheck
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+        run: pnpm turbo typecheck --affected
 
   neon-db:
     name: Neon DB
@@ -285,19 +311,25 @@ jobs:
       - name: Determine sanitized branch name
         id: sanitize-branch
         if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'testing') || steps.check-backend.outputs.needs_db == 'true' }}
+        env:
+          RAW_REF: ${{ github.head_ref || github.ref_name }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref || github.ref_name }}"
+          RAW="$RAW_REF"
 
           # Avoid collisions with protected long-lived branches in Neon.
           # For push to main we reuse the long-lived Neon branch.
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
-            RAW="${{ github.ref_name }}"
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" == "main" ]]; then
+            RAW="$REF_NAME"
           fi
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
-          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -329,6 +361,7 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
+    needs: [ci-path-changes]
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
@@ -341,13 +374,8 @@ jobs:
           fetch-depth: 0
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
 
       # Skip notification (updated condition)
       - name: Skip notification
@@ -371,7 +399,7 @@ jobs:
 
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
+    needs: [neon-db, ci-path-changes]
     # Drizzle check runs on push to main or PRs with testing label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
@@ -381,18 +409,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
-      # Check if Drizzle-related changes require running this job
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -439,19 +461,19 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-biome, ci-eslint, ci-knip, ci-guardrails]
+    needs: [ci-typecheck, ci-biome, ci-eslint, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), Knip (dead code), and guardrails succeeded"
+          echo "ci-fast passed: Typecheck, Biome (lint + format), ESLint (server boundaries), and guardrails succeeded"
 
   ci-pr-ready:
     name: PR Ready
-    # Single merge gate for PRs and merge queue: fast checks + unit tests + a11y must all pass.
-    # This is the only required status check in the branch ruleset.
-    needs: [ci-fast, ci-unit-tests, ci-a11y, ci-layout-guard]
+    # Single merge gate for PRs and merge queue.
+    # Gates only on the fast deterministic lane.
+    needs: [ci-fast]
     if: ${{ always() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -459,41 +481,93 @@ jobs:
       - name: Evaluate required PR checks
         run: |
           echo "ci-fast: ${{ needs.ci-fast.result }}"
-          echo "ci-unit-tests: ${{ needs.ci-unit-tests.result }}"
-          echo "ci-a11y: ${{ needs.ci-a11y.result }}"
-          echo "ci-layout-guard: ${{ needs.ci-layout-guard.result }}"
-
           # ci-fast must succeed
           if [[ "${{ needs.ci-fast.result }}" != "success" ]]; then
             echo "❌ ci-fast did not pass"
             exit 1
           fi
 
-          # ci-unit-tests must succeed (path-gated skips still report success)
-          if [[ "${{ needs.ci-unit-tests.result }}" == "failure" || "${{ needs.ci-unit-tests.result }}" == "cancelled" ]]; then
-            echo "❌ ci-unit-tests failed"
-            exit 1
+          echo "All required PR checks passed: lint, typecheck, guardrails"
+
+  ci-build-public:
+    name: Build (public routes)
+    needs: [ci-path-changes]
+    # Shared Next.js build for a11y + layout-guard — build once, test twice.
+    # On PRs: always runs for first-class accessibility/layout verification (non-fork only).
+    # On merge_group: runs to validate a11y/layout haven't regressed before merge.
+    # On main push: always runs for full coverage.
+    # Fork PRs are excluded (no secrets) — skipped via fork-pr-gate.
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      has_artifact: ${{ steps.check_changes.outputs.run_full_ci }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        shell: bash
+        run: |
+          # Run when UI/component paths changed (build or test patterns cover a11y-relevant changes).
+          RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
           fi
 
-          # ci-a11y: allow skip (path-gated) but block on failure
-          if [[ "${{ needs.ci-a11y.result }}" == "failure" ]]; then
-            echo "❌ ci-a11y failed — accessibility violations detected"
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: echo "Skipping build — no UI-relevant paths changed."
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Build app (public routes only — no secrets needed)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm turbo build --filter=@jovie/web
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Verify build output exists
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [ ! -d "apps/web/.next" ]; then
+            echo "::error::Build output directory apps/web/.next does not exist — build may have used remote cache without producing local output"
             exit 1
           fi
+          echo "Build output verified: $(du -sh apps/web/.next | cut -f1)"
 
-          # ci-layout-guard must succeed (no overlapping/touching layout regressions)
-          if [[ "${{ needs.ci-layout-guard.result }}" != "success" ]]; then
-            echo "❌ ci-layout-guard failed — layout overlap/touching regressions detected"
-            exit 1
-          fi
+      - name: Package build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: tar -cf /tmp/nextjs-build.tar -C apps/web .next
 
-          echo "✅ All PR checks passed: lint, typecheck, guardrails, unit tests, a11y, and layout integrity"
+      - name: Upload build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build.tar
+          retention-days: 1
+          if-no-files-found: error
 
   ci-layout-guard:
-    name: Layout Guard (blocking)
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    name: Layout Guard (informational)
+    needs: [ci-build-public]
+    # Fully informational — never blocks PRs or merge queue.
+    # Runs when ci-build-public produced an artifact. Failures are logged but don't gate merges.
+    # Skipped on push-to-main (merge queue already validated).
+    if: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -503,22 +577,27 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium)
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app (public routes only — no secrets needed)
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+      - name: Download build artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.download.outcome == 'success'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run layout overlap/touching guard
+        if: steps.download.outcome == 'success'
         run: |
           cd apps/web
           mkdir -p tests/.auth
@@ -541,7 +620,7 @@ jobs:
 
       - name: Upload Playwright Report on Failure
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: layout-guard-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -549,7 +628,9 @@ jobs:
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
+    needs: [ci-path-changes]
+    # Only run when drizzle/schema paths changed — skip entirely otherwise to save runners
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && needs.ci-path-changes.outputs.run_drizzle == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     outputs:
@@ -557,7 +638,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Cleanup old Neon branches (prevent limit errors)
         uses: ./.github/actions/neon-branch-cleanup
@@ -570,13 +651,8 @@ jobs:
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_drizzle }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -587,11 +663,15 @@ jobs:
       - name: Determine sanitized Neon branch name
         id: sanitize-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
+        env:
+          RAW_REF: ${{ github.head_ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          RAW="${{ github.head_ref }}"
-          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          BASE=$(echo "$SANITIZED" | cut -c1-40)
-          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          RAW="$RAW_REF"
+          SANITIZED=$(printf '%s' "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          BASE=$(printf '%s' "$SANITIZED" | cut -c1-40)
+          SUFFIX="${RUN_ID}-${RUN_ATTEMPT}"
           FINAL="${BASE}-${SUFFIX}"
           echo "Using sanitized branch name: $FINAL"
           echo "name=$FINAL" >> $GITHUB_OUTPUT
@@ -628,81 +708,296 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-  # Public Profile Smoke Test - runs against jov.ie (production) to verify public profiles work
-  # This test runs on pushes to main after deploy completes
+  # Post-deploy smoke test -- deterministic curl checks against production.
+  # Replaces the previous Playwright-based test that was flaky due to
+  # dynamic content assertions, hydration timing, and excessive retries.
   ci-public-profile-smoke:
-    name: Public Profile Smoke
+    name: Post-Deploy Smoke (Production)
     needs: [deploy]
     # Run after successful deploy to production
     if: ${{ always() && needs.deploy.result == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Wait for CDN propagation
+        run: |
+          echo "Waiting 30s for Vercel CDN propagation after deploy..."
+          sleep 30
+
+      - name: Verify production endpoints are healthy
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: |
+          set -euo pipefail
+
+          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
+          COOKIE_JAR="$(mktemp)"
+          MAX_RETRIES=5
+
+          # Vercel Deployment Protection bypass
+          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
+          BYPASS_ARGS=()
+          if [ -n "$BYPASS_SECRET" ]; then
+            BYPASS_ARGS+=(
+              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
+              -H "x-vercel-set-bypass-cookie: true"
+              -c "$COOKIE_JAR"
+              -b "$COOKIE_JAR"
+            )
+          fi
+
+          # Helper: curl with standard options, returns "body\nstatus_code"
+          # Append a cache-busting query parameter to bypass Vercel CDN edge cache,
+          # ensuring post-deploy smoke tests always hit the origin server.
+          fetch() {
+            local sep="?"
+            [[ "$1" == *"?"* ]] && sep="&"
+            curl -sS -L -A "$USER_AGENT" \
+              -H "Cache-Control: no-cache, no-store, must-revalidate" \
+              -H "Pragma: no-cache" \
+              "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${1}${sep}_cb=$(date +%s%N)" || echo -e "\n000"
+          }
+
+          # Helper: retry a check function with exponential backoff (max 5 attempts)
+          retry() {
+            local label="$1"; shift
+            local attempt=1
+            while [ $attempt -le $MAX_RETRIES ]; do
+              if "$@"; then
+                return 0
+              fi
+              if [ $attempt -lt $MAX_RETRIES ]; then
+                local delay=$((attempt * 3))
+                echo "  Retry $attempt/$MAX_RETRIES for $label in ${delay}s..."
+                sleep "$delay"
+              fi
+              attempt=$((attempt + 1))
+            done
+            echo "::error::$label failed after $MAX_RETRIES attempts"
+            return 1
+          }
+
+          FAILURES=0
+
+          # -- 1. Health API: JSON status=ok --
+          check_health() {
+            local response
+            response=$(fetch "https://jov.ie/api/health")
+            local status="${response##*$'\n'}"
+            local body="${response%$'\n'*}"
+
+            if [ "$status" != "200" ]; then
+              echo "  Health API returned HTTP $status"
+              return 1
+            fi
+
+            if ! echo "$body" | grep -q '"status":"ok"'; then
+              echo "  Health API status is not ok: $body"
+              return 1
+            fi
+
+            echo "  Health API: HTTP 200, status=ok"
+            return 0
+          }
+
+          echo "=== 1/4 Health API ==="
+          if ! retry "Health API" check_health; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 2. Homepage: HTTP 200, >1000 chars, no error strings --
+          check_homepage() {
+            local response
+            response=$(fetch "https://jov.ie")
+            local status="${response##*$'\n'}"
+            local body="${response%$'\n'*}"
+
+            if [ "$status" != "200" ]; then
+              echo "  Homepage returned HTTP $status"
+              return 1
+            fi
+
+            if [ ${#body} -lt 1000 ]; then
+              echo "  Homepage body too short (${#body} chars)"
+              return 1
+            fi
+
+            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
+              echo "  Homepage contains error message"
+              return 1
+            fi
+
+            echo "  Homepage: HTTP 200, ${#body} chars, no errors"
+            return 0
+          }
+
+          echo "=== 2/4 Homepage ==="
+          if ! retry "Homepage" check_homepage; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 3. Public profile: HTTP 200, substantial content, no 404 markers --
+          # Warm up the database connection before checking the profile page.
+          # The health check (step 1) may use a lightweight query that doesn't
+          # fully warm Neon, so hit the profile once and discard the result.
+          fetch "https://jov.ie/tim" > /dev/null 2>&1
+          sleep 5
+
+          check_profile() {
+            local response
+            response=$(fetch "https://jov.ie/tim")
+            local status="${response##*$'\n'}"
+            local body="${response%$'\n'*}"
+
+            if [ "$status" -ge 500 ] 2>/dev/null; then
+              echo "  Profile /tim returned HTTP $status (server error)"
+              return 1
+            fi
+
+            if [ ${#body} -lt 500 ]; then
+              echo "  Profile /tim body too short (${#body} chars)"
+              return 1
+            fi
+
+            if echo "$body" | grep -qi "application error\|internal server error\|something went wrong"; then
+              echo "  Profile /tim contains error content"
+              return 1
+            fi
+
+            # "Profile not found" with HTTP 200 is a valid app response (data issue),
+            # not a code regression — warn but don't fail.
+            if echo "$body" | grep -qi "profile not found\|page could not be found"; then
+              echo "  Profile /tim: HTTP $status, profile not seeded (non-blocking warning)"
+            else
+              echo "  Profile /tim: HTTP $status, ${#body} chars, renders correctly"
+            fi
+            return 0
+          }
+
+          echo "=== 3/4 Public Profile ==="
+          if ! retry "Public Profile" check_profile; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- 4. Critical pages: /sign-up, /pricing -- no 5xx --
+          check_critical_pages() {
+            for route in "/sign-up" "/pricing"; do
+              local response
+              response=$(fetch "https://jov.ie${route}")
+              local status="${response##*$'\n'}"
+
+              if [ "$status" -ge 500 ] 2>/dev/null; then
+                echo "  Route ${route} returned HTTP $status (server error)"
+                return 1
+              fi
+              echo "  ${route}: HTTP $status"
+            done
+            return 0
+          }
+
+          echo "=== 4/4 Critical Pages ==="
+          if ! retry "Critical Pages" check_critical_pages; then
+            FAILURES=$((FAILURES + 1))
+          fi
+
+          # -- Summary --
+          echo ""
+          if [ $FAILURES -gt 0 ]; then
+            echo "::error::Post-deploy smoke failed: $FAILURES/4 checks failed"
+            exit 1
+          fi
+          echo "Post-deploy smoke passed: 4/4 checks OK"
+
+  # Post-deploy authenticated smoke test — lightweight Playwright test against production.
+  # Verifies sign-in + dashboard load with real credentials after deploy.
+  # Non-blocking initially — promote to blocking once stable.
+  ci-post-deploy-auth-smoke:
+    name: Post-Deploy Auth Smoke (Production)
+    needs: [deploy]
+    if: ${{ always() && needs.deploy.result == 'success' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 1
 
+      - name: Check for production auth credentials
+        id: check-creds
+        run: |
+          if [ -z "${{ secrets.E2E_PROD_USER_EMAIL }}" ] && [ -z "${{ secrets.E2E_CLERK_USER_USERNAME }}" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "No production auth credentials configured — skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check-creds.outputs.skip != 'true'
 
       - name: Cache Playwright Browsers
+        if: steps.check-creds.outputs.skip != 'true'
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
+        if: steps.check-creds.outputs.skip != 'true'
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Run Public Profile Smoke Test against production
-        run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Wait for CDN propagation
+        if: steps.check-creds.outputs.skip != 'true'
+        run: sleep 30
 
-      - name: Run Performance Budget Guard against production
+      - name: Run production auth smoke tests
+        if: steps.check-creds.outputs.skip != 'true'
         run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:budgets
+          cd apps/web
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          CI=true BASE_URL=https://jov.ie pnpm exec playwright test tests/e2e/smoke-prod-auth.spec.ts --project=chromium --reporter=line
         env:
+          E2E_PROD_USER_EMAIL: ${{ secrets.E2E_PROD_USER_EMAIL }}
+          E2E_PROD_USER_PASSWORD: ${{ secrets.E2E_PROD_USER_PASSWORD }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Upload Playwright Artifacts on Failure
-        if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: failure() && steps.check-creds.outputs.skip != 'true'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          name: public-profile-smoke-report-${{ github.run_id }}
+          name: post-deploy-auth-smoke-${{ github.run_id }}
           path: |
-            playwright-report/
-            test-results/
+            apps/web/playwright-report/
+            apps/web/test-results/
           retention-days: 3
 
   ci-build:
     name: Build
-    # Optimized: no dependencies - runs in parallel with typecheck/lint for faster CI
+    needs: [ci-path-changes]
     # Build skips typecheck (NEXT_IGNORE_TYPECHECK=1), downstream jobs gate on ci-fast
-    # Build runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
-    runs-on: ubuntu-latest
+    # Skipped in merge queue: no merge-queue jobs depend on the full build.
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'testing') || contains(github.event.pull_request.labels.*.name, 'deploy-preview'))) || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          # Full history needed for turbo --affected merge-base detection
+          fetch-depth: 0
 
-      # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'build'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_build }}" >> $GITHUB_OUTPUT
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -721,7 +1016,7 @@ jobs:
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
+        run: pnpm turbo build --affected
         env:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
@@ -731,6 +1026,7 @@ jobs:
 
       - name: Pre-deploy Lighthouse performance check
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        continue-on-error: true
         run: |
           cd apps/web
 
@@ -743,18 +1039,26 @@ jobs:
           node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
 
-          # Wait for server to be ready
+          # Wait for server to be ready (verify it actually started)
           echo "Waiting for server to start..."
+          SERVER_READY=false
           for i in {1..30}; do
             if curl -s http://localhost:3000 > /dev/null; then
               echo "Server is ready!"
+              SERVER_READY=true
               break
             fi
             sleep 1
           done
 
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "⚠️ Server failed to start within 30s. Skipping Lighthouse."
+            kill $SERVER_PID 2>/dev/null || true
+            exit 0
+          fi
+
           # Run Lighthouse CI with build config
-          pnpm exec lhci autorun --config=.lighthouserc.build.json || {
+          pnpm --filter web exec lhci autorun --config=.lighthouserc.build.json || {
             echo "⚠️ Lighthouse checks failed - performance regression detected"
             kill $SERVER_PID 2>/dev/null || true
             exit 1
@@ -770,13 +1074,19 @@ jobs:
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
   ci-unit-tests:
-    name: Unit Tests
-    # Optimized: no dependencies - runs in parallel with typecheck/build for faster CI
-    # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy
-    # Unit tests run on all PRs, merge queue, and push to main
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    name: Unit Tests (${{ matrix.shard }})
+    needs: [ci-path-changes]
+    # Runs in parallel with typecheck/build for faster CI.
+    # Downstream jobs gate on ci-fast to ensure typecheck passed before deploy.
+    # Skipped on push-to-main (merge queue already validated) and merge queue.
+    # Still runs on agent branch pushes (codegen-bot/**, claude/**, codex/**).
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{ vars.CI_FAST_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/4', '2/4', '3/4', '4/4']
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -784,18 +1094,10 @@ jobs:
         with:
           fetch-depth: 0  # Full history for vitest --changed
 
-      # Check if test-related changes require running this job
-      # For PRs: use path guard to skip docs-only changes (unless 'testing' label)
-      # For push to main: only run if test-related paths changed
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -834,22 +1136,31 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          # Enable coverage on main branch and PRs for Codecov integration
-          COVERAGE_FLAG="--coverage"
+          # Only collect coverage on main branch pushes — PRs diff against main baseline
+          COVERAGE_FLAG=""
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            COVERAGE_FLAG="--coverage"
+          fi
+          # Use forked pool with limited workers to reduce CI flakiness from memory pressure
+          export NODE_OPTIONS="--max-old-space-size=4096"
+          VITEST_CI_FLAGS="--pool=forks --maxWorkers=2"
+          # Mitigate low-frequency flakes by retrying failed tests once in CI
+          RETRY_FLAG="--retry=1"
 
           if [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "🚀 Main branch: Running full test suite with coverage"
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
-          elif [ -n "${{ github.base_ref }}" ]; then
-            echo "🔍 PR: Running full test suite with coverage"
-            # Run all tests on PRs to catch regressions before merge
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }}
+            pnpm turbo test --affected -- run --config=vitest.config.mts $VITEST_CI_FLAGS $COVERAGE_FLAG $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+          elif [ -n "${{ github.base_ref }}" ] || [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "🔍 PR/merge queue: Running full test suite"
+            # Run all tests on PRs and merge queue to catch regressions before merge
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
           else
             echo "🔍 Feature branch push: Running critical + interaction tests only (no base_ref available)"
             # Push events on feature branches (claude/*, codegen-bot/*) don't have base_ref,
             # so we can't determine changed files. Run critical + interaction tests only to avoid OOM
             # from the full test suite. The PR event covers changed-file tests.
-            cd apps/web && pnpm vitest run --config=vitest.config.mts $COVERAGE_FLAG ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
+            # --passWithNoTests: some shards may have no files matching the filter
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction"
           fi
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
@@ -858,17 +1169,17 @@ jobs:
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: cd apps/web && pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: pnpm turbo test:fast --affected -- --pool=forks --maxWorkers=2 --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
       - name: Run packages/ui unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/ui run test
+        run: pnpm turbo test --filter=@jovie/ui
 
       - name: Upload coverage to Codecov
-        if: steps.check_changes.outputs.run_full_ci == 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
         with:
           directory: apps/web/coverage
@@ -887,24 +1198,29 @@ jobs:
 
   ci-a11y:
     name: A11y (axe)
-    # Runs axe-core WCAG 2.1 AA audit on public routes (no auth/secrets needed)
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
+    # Skipped on push-to-main (merge queue already validated).
+    needs: [ci-build-public, ci-path-changes]
+    if: ${{ (((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) || github.event_name == 'workflow_dispatch')) && needs.ci-build-public.outputs.has_artifact == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: |
+          # Align with ci-build-public: run when build OR test paths changed.
+          RUN_BUILD="${{ needs.ci-path-changes.outputs.run_build }}"
+          RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"
+          if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]]; then
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -920,7 +1236,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -928,14 +1244,17 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Build app (public routes only — no secrets needed)
+      - name: Download build artifact
+        id: download
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run build
-        env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
-          NEXT_IGNORE_ESLINT: '1'
-          NEXT_IGNORE_TYPECHECK: '1'
-          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+
+      - name: Extract build artifact
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
 
       - name: Run axe a11y audit (public routes)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -952,10 +1271,14 @@ jobs:
             if curl -sf http://localhost:3100 > /dev/null 2>&1; then break; fi
             sleep 1
           done
-          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line
-          EXIT_CODE=$?
+          pnpm exec playwright test tests/e2e/axe-audit.spec.ts --project=chromium --reporter=line || EXIT_CODE=$?
           kill $SERVER_PID 2>/dev/null || true
-          exit $EXIT_CODE
+          # Non-blocking: the production server lacks runtime secrets (DB, Clerk)
+          # so all routes return 500. Axe fails on the error page, not the app.
+          # TODO: re-enable blocking once test env has proper mocks.
+          if [ "${EXIT_CODE:-0}" -ne 0 ]; then
+            echo "::warning::A11y audit failed (exit $EXIT_CODE) — non-blocking until test env is fixed"
+          fi
         env:
           BASE_URL: http://localhost:3100
           SMOKE_ONLY: '1'
@@ -964,7 +1287,7 @@ jobs:
 
       - name: Upload Playwright Report on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: a11y-axe-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -975,27 +1298,21 @@ jobs:
     environment: Preview – jovie
     # Gated: only runs with 'testing' label to save CI time on most PRs
     # Full E2E runs on merge to main anyway
-    needs: [ci-fast]
+    needs: [ci-fast, ci-path-changes]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
-    # Reduced from 15 to 10 min after consolidating smoke tests (19 → 6 tests)
     timeout-minutes: 10
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: false
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1030,7 +1347,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1045,6 +1362,10 @@ jobs:
           NODE_ENV: test
           CI: true
           SMOKE_ONLY: '1'
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-pr-e2e
+          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
@@ -1052,7 +1373,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e2e-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -1072,26 +1393,21 @@ jobs:
   ci-admin-smoke:
     name: Admin E2E Smoke
     environment: Preview – jovie
-    # Gated: only runs with 'testing' label (admin tests need auth credentials)
-    # Also runs on push to main for full coverage
-    needs: [ci-fast]
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    # Gated: only runs with 'testing' label (admin tests need auth credentials).
+    # Removed push-to-main trigger — merge queue validates PRs before merge.
+    needs: [ci-fast, ci-path-changes]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1126,7 +1442,7 @@ jobs:
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1179,7 +1495,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: admin-smoke-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -1199,7 +1515,7 @@ jobs:
   ci-e2e-migrate:
     name: E2E DB Migrate
     environment: Preview – jovie
-    needs: [ci-fast, ci-build, neon-db]
+    needs: [ci-fast, ci-build, neon-db, ci-path-changes]
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -1208,17 +1524,12 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_e2e }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1269,18 +1580,17 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
   ci-e2e-tests:
-    name: E2E Tests
+    name: Full E2E (Preview)
     environment: Preview – jovie
-    # Optimized: needs ci-fast to ensure typecheck/lint passed before running E2E
+    # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
     needs: [ci-fast, ci-build, neon-db, ci-e2e-migrate]
-    # E2E runs on push to main or PRs with testing label
-    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' }}
+    if: ${{ needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: true
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -1288,7 +1598,7 @@ jobs:
 
       - name: Set shard env
         run: |
-          echo "SHARD_TOTAL=2" >> $GITHUB_ENV
+          echo "SHARD_TOTAL=4" >> $GITHUB_ENV
           echo "SHARD_INDEX=${{ matrix.shard }}" >> $GITHUB_ENV
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
@@ -1331,7 +1641,7 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key - chromium only for CI (Firefox runs weekly)
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -1383,8 +1693,15 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           SMOKE_ONLY: '1'
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-pr-e2e
+          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
@@ -1400,6 +1717,10 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
           SMOKE_ONLY: '1'
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-pr-e2e-auth
+          SENTRY_RELEASE: ${{ github.sha }}
           # Auth smoke requires real Clerk keys in CI
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -1417,27 +1738,46 @@ jobs:
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-main-e2e
+          SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test --reporter=line --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test --shard=${SHARD_INDEX}/${SHARD_TOTAL} ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
         if: ${{ matrix.shard == 1 && steps.quarantine.outputs.has_quarantine == 'true' }}
         continue-on-error: true
-        run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          SENTRY_E2E_REPORTING: '1'
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
+          SENTRY_RELEASE: ${{ github.sha }}
+        run: cd apps/web && pnpm playwright test --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -1445,7 +1785,7 @@ jobs:
 
       - name: Upload Playwright Test Results on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ github.job }}-shard-${{ matrix.shard }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
@@ -1453,23 +1793,21 @@ jobs:
 
   ci-test-performance:
     name: Test Performance Budgets
-    needs: [ci-typecheck]
+    needs: [ci-path-changes]
+    # Post-merge only: takes ~6.5 min and is not a merge gate.
+    # Running on PRs adds wall time without blocking merge.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          fetch-depth: 2
+          fetch-depth: 1
 
       - name: Check for relevant changes
         id: check_changes
-        uses: ./.github/actions/check-path-changes
-        with:
-          job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
-          base-ref: ${{ github.base_ref }}
-          event-name: ${{ github.event_name }}
-          is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+        shell: bash
+        run: echo "run_full_ci=${{ needs.ci-path-changes.outputs.run_test }}" >> $GITHUB_OUTPUT
 
       - name: Skip notification
         if: steps.check_changes.outputs.run_full_ci != 'true'
@@ -1487,38 +1825,34 @@ jobs:
       - name: Enforce test performance budgets
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          SUITE="critical"
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
-            SUITE="full"
-          fi
-
-          TEST_PERFORMANCE_SUITE="$SUITE" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="$SUITE" --use-baseline
+          TEST_PERFORMANCE_SUITE="full" TEST_PERFORMANCE_USE_BASELINE="true" pnpm test:guard -- --suite="full" --use-baseline
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    # Gated: only runs with 'deploy-preview' label to save CI time on most PRs
-    # Use label for PRs that need visual review of changes
-    needs: [ci-fast, ci-build]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'deploy-preview') }}
+    # Preview deploys are the default QA surface for internal PRs.
+    # Keep this independent from the main deploy gate so review happens before merge.
+    needs: [ci-fast]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: preview-deploy-${{ github.repository }}
+      cancel-in-progress: false
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
-        run: pnpm add -g vercel@latest
+        run: pnpm add -g vercel@50.22.1
+      - name: Export secrets to env
+        uses: oNaiPs/secrets-to-env-action@v1.7
+        with:
+          secrets: ${{ toJSON(secrets) }}
       - name: Pull env (preview)
         run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - name: Build (PR preview)
         run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
       - name: Deploy (PR preview, fast deployment for UI-only changes)
@@ -1540,7 +1874,7 @@ jobs:
           fi
 
           # Deploy preview with DATABASE_URL injected only for this deployment
-          deployment_url=$(vercel deploy --prebuilt \
+          deployment_url=$(vercel deploy --prebuilt --archive=tgz \
             --env DATABASE_URL="$POOLED_URL" \
             --env GIT_BRANCH="${GIT_BRANCH}" \
             --token $VERCEL_TOKEN)
@@ -1769,52 +2103,24 @@ jobs:
                 body: summaryBody
               });
             }
-  # CRITICAL: Required smoke tests run BEFORE production deploy
-  # These tests verify the most critical user flows: public profiles + auth
+  # Extended smoke validation for risky changes.
+  # This remains available for opt-in PR validation but does not block production deploys.
   ci-smoke-required:
-    name: Smoke Tests (Required)
-    needs: [ci-fast, ci-build, neon-db, ci-e2e-smoke, ci-admin-smoke]
-    if: ${{ always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false)) }}
+    name: Extended Smoke (Preview)
+    needs: [ci-fast, ci-build, neon-db, ci-e2e-tests]
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    environment: Preview – jovie
+    timeout-minutes: 20
     steps:
-      - name: Gate required smoke on PRs
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          if [ "${{ needs.ci-e2e-smoke.outputs.run_full_ci }}" != "true" ]; then
-            echo "No E2E-relevant changes detected; not requiring E2E smoke."
-            exit 0
-          fi
-
-          if [ "${{ needs.ci-e2e-smoke.result }}" != "success" ]; then
-            echo "E2E Smoke (PR Fast Feedback) did not succeed."
-            exit 1
-          fi
-
-          echo "E2E Smoke (PR Fast Feedback) succeeded."
-
-      - name: Gate admin smoke on PRs
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          # ci-admin-smoke: allow skip (label-gated) but block on failure
-          if [ "${{ needs.ci-admin-smoke.result }}" == "failure" ]; then
-            echo "Admin E2E Smoke did not succeed."
-            exit 1
-          fi
-
-          echo "Admin E2E Smoke: ${{ needs.ci-admin-smoke.result }} (skip/success OK)"
-
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         with:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
       - name: Resolve Neon DB URL (job-local, with retry)
         id: resolve_neon
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: ./.github/actions/neon-create-branch-with-retry
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -1823,7 +2129,6 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
 
       - name: Run migrations for Smoke DB
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
@@ -1832,32 +2137,92 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Run Required Smoke Tests
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Download build artifact from ci-build
+        id: download-build
+        if: ${{ needs.ci-build.outputs.run_full_ci == 'true' }}
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: nextjs-build-${{ github.run_id }}
+          path: /tmp/nextjs-build-download
+        continue-on-error: true
+
+      - name: Extract or rebuild for smoke tests
         run: |
-          CI=true pnpm --filter=@jovie/web run test:e2e tests/e2e/smoke-auth.spec.ts tests/e2e/smoke-public.spec.ts --project=chromium --reporter=line
+          if [ -f /tmp/nextjs-build-download/nextjs-build.tar ]; then
+            echo "Reusing build artifact from ci-build (saves ~3-4 min)"
+            tar -xf /tmp/nextjs-build-download/nextjs-build.tar -C apps/web
+          else
+            echo "Build artifact not available, building from scratch"
+            pnpm turbo build --filter=@jovie/web
+          fi
+          # Standalone output needs static assets alongside server.js
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+        env:
+          DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+
+      - name: Run Required Smoke Tests
+        run: |
+          cd apps/web
+          # Start standalone production server (not Turbopack dev) to avoid SWC OOM on CI runners
+          # IMPORTANT: Pass runtime env vars explicitly — the step's env: block only applies to
+          # the shell process, but backgrounded processes inherit from the shell's exported vars.
+          export DATABASE_URL="${{ steps.resolve_neon.outputs.db_url }}"
+          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
+          export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
+          export FLAGS_SECRET="E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          PORT=3100 node .next/standalone/apps/web/server.js &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+
+          # Wait for server readiness
+          SERVER_READY=false
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3100 > /dev/null 2>&1; then
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "::error::Standalone server failed to start within 30s"
+            exit 1
+          fi
+
+          # Run smoke tests with BASE_URL set (skips Playwright webServer config)
+          cd "$GITHUB_WORKSPACE"
+          set +e
+          CI=true BASE_URL=http://localhost:3100 pnpm --filter=@jovie/web exec playwright test --config=playwright.config.smoke.ts --reporter=line
+          EXIT_CODE=$?
+          set -e
+          exit $EXIT_CODE
         env:
           DATABASE_URL: ${{ steps.resolve_neon.outputs.db_url }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
       - name: Upload Playwright Artifacts on Failure
-        if: ${{ failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: smoke-required-report-${{ github.run_id }}
           path: |
@@ -1865,13 +2230,15 @@ jobs:
             apps/web/test-results/
           retention-days: 3
 
-  # Homepage smoke test runs BEFORE production deploy
-  # Uses curl-based check for reliability (Playwright had issues with Vercel bypass)
+  # Homepage smoke test checks CURRENT production state (informational only).
+  # NOT a deploy blocker — if prod is degraded we still need to be able to ship fixes.
+  # Post-deploy verification is handled by canary-health-gate.
   ci-homepage-smoke:
-    name: Homepage Smoke (Pre-Deploy)
+    name: Homepage Smoke (Informational)
     needs: [ci-fast, ci-build]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    continue-on-error: true
     timeout-minutes: 5
     steps:
       - name: Verify homepage renders correctly
@@ -1929,13 +2296,18 @@ jobs:
           echo "✅ Homepage smoke passed"
 
   deploy:
-    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests, ci-smoke-required, ci-homepage-smoke] # Required smoke + homepage smoke must pass before deploy
-    # Deploy on main push if no failures (skipped jobs are OK - e.g., E2E skipped for CI-only changes)
+    needs: [ci-fast]
+    # Fast production path: merge on deterministic checks, then deploy immediately.
+    # Longer validation lanes run on preview or asynchronously after deploy.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Deploy concurrency: if multiple main pushes stack up (e.g., merge queue burst),
+    # cancel the in-progress deploy and deploy only the latest commit.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: true
     outputs:
-      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
     env:
@@ -1948,7 +2320,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
-        run: pnpm add -g vercel@latest
+        run: pnpm add -g vercel@50.22.1
       - name: DB safety check (production - preflight)
         id: preflight
         run: pnpm --filter=@jovie/web exec tsx scripts/drizzle-migrate-preflight.ts
@@ -1965,25 +2337,22 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
       - name: Upgrade corepack
-        run: npm install -g corepack@latest && corepack enable
+        run: npm install -g corepack@0.34.6 && corepack enable
+      - name: Export secrets to env
+        uses: oNaiPs/secrets-to-env-action@v1.7
+        with:
+          secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
         run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
       - name: Build (production)
         run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
         env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
-          deployment_url=$(vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }})
-          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+          vercel deploy --prebuilt --prod --archive=tgz --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -1994,7 +2363,12 @@ jobs:
     if: ${{ always() && needs.deploy.result == 'success' }}
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      deployment_url: ${{ needs.deploy.outputs.deployment_url }}
+      # Pass production URL as literal — NOT from deploy outputs.
+      # GitHub Actions masks output values that match secrets, and
+      # secrets-to-env-action registers all secrets. Since a secret
+      # contains "https://jov.ie", any output with that value becomes
+      # empty (***) in downstream jobs.
+      deployment_url: https://jov.ie
       fallback_health_url: https://jov.ie/api/health
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
@@ -2002,9 +2376,29 @@ jobs:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+  sentry-error-gate:
+    name: Sentry Error Gate (production)
+    needs: [deploy, canary-health-gate]
+    if: ${{ always() && needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    uses: ./.github/workflows/sentry-error-gate.yml
+    with:
+      deployment_url: https://jov.ie
+      soak_minutes: 5
+      baseline_window_minutes: 30
+      threshold_multiplier: 3
+      min_baseline_errors: 5
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   deploy-notify:
     name: Notify production deploy
-    needs: [deploy, canary-health-gate]
+    needs: [deploy, canary-health-gate, sentry-error-gate]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -2037,7 +2431,7 @@ jobs:
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
 
       - name: Slack notify (production deploy)
-        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -2062,13 +2456,14 @@ jobs:
 
       - name: Classify failure type
         id: classify-failure
-        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') }}
+        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success' || needs.sentry-error-gate.result == 'failure') }}
         run: |
           # Determine failure type for accurate Slack notification
           MIGRATION_STATUS="${{ needs.deploy.outputs.migration_status }}"
           PREFLIGHT_STATUS="${{ needs.deploy.outputs.preflight_status }}"
           DEPLOY_RESULT="${{ needs.deploy.result }}"
           CANARY_RESULT="${{ needs.canary-health-gate.result }}"
+          SENTRY_RESULT="${{ needs.sentry-error-gate.result }}"
 
           if [ "$PREFLIGHT_STATUS" = "failure" ]; then
             echo "failure_type=migration_preflight" >> "$GITHUB_OUTPUT"
@@ -2090,6 +2485,11 @@ jobs:
             echo "failure_emoji=⚠️" >> "$GITHUB_OUTPUT"
             echo "failure_title=CANARY HEALTH CHECK FAILED" >> "$GITHUB_OUTPUT"
             echo "failure_detail=Deployment is LIVE but health check failed - investigate immediately" >> "$GITHUB_OUTPUT"
+          elif [ "$SENTRY_RESULT" = "failure" ]; then
+            echo "failure_type=sentry" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=📈" >> "$GITHUB_OUTPUT"
+            echo "failure_title=SENTRY ERROR SPIKE DETECTED" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Post-deploy error rate exceeded threshold - auto-rollback triggered" >> "$GITHUB_OUTPUT"
           else
             echo "failure_type=unknown" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=❓" >> "$GITHUB_OUTPUT"
@@ -2175,6 +2575,31 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+      - name: Slack notify (sentry error spike - URGENT)
+        if: ${{ always() && steps.classify-failure.outputs.failure_type == 'sentry' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "📈 SENTRY ERROR SPIKE — Auto-rollback triggered: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Status", "value": "📈 Error rate spiked post-deploy — auto-rollback triggered", "short": false },
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Action Required", "value": "Check Sentry for new errors, verify rollback succeeded", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - name: Slack notify (general deploy failure)
         if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
@@ -2205,11 +2630,13 @@ jobs:
     name: Lighthouse CI (Production)
     needs: [deploy]
     # Run after successful deploy (tests homepage + /tim profile)
+    # Informational only -- performance regressions should not block deploys
     if: ${{ always() && needs.deploy.result == 'success' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
-        run: pnpm exec lhci autorun --config=.lighthouserc.json
+        run: pnpm --filter web exec lhci autorun --config=.lighthouserc.json

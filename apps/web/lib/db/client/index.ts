@@ -5,6 +5,8 @@
  * session helpers, and health checks.
  */
 
+// Circuit Breaker
+export { DbCircuitOpenError, dbCircuitBreaker } from './circuit-breaker';
 // Connection
 export {
   db,
@@ -12,6 +14,7 @@ export {
   getPoolMetrics,
   getPoolState,
   initializeDb,
+  resetPool,
 } from './connection';
 // Type Guards
 export { isActiveConnectionsRow, isRecord, isTableExistsRow } from './guards';

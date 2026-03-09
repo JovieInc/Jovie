@@ -1,8 +1,10 @@
 'use client';
 
-import { Bell } from 'lucide-react';
+import { SimpleTooltip } from '@jovie/ui';
+import { Bell, Check } from 'lucide-react';
 import React from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import type { NotificationSubscriptionState } from '@/types/notifications';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 
 type ProfileNotificationsButtonProps = {
@@ -11,7 +13,18 @@ type ProfileNotificationsButtonProps = {
   readonly onClick: () => void;
   readonly ariaExpanded?: boolean;
   readonly buttonRef?: React.RefObject<HTMLButtonElement | null>;
+  readonly subscribedChannels?: NotificationSubscriptionState;
 };
+
+function getTooltipLabel(channels?: NotificationSubscriptionState): string {
+  const hasEmail = Boolean(channels?.email);
+  const hasSms = Boolean(channels?.sms);
+
+  if (hasEmail && hasSms) return 'Subscribed via Email & SMS';
+  if (hasEmail) return 'Subscribed via Email';
+  if (hasSms) return 'Subscribed via SMS';
+  return 'Subscribed';
+}
 
 export function ProfileNotificationsButton({
   ariaExpanded,
@@ -19,10 +32,11 @@ export function ProfileNotificationsButton({
   hasActiveSubscriptions,
   notificationsState,
   onClick,
+  subscribedChannels,
 }: ProfileNotificationsButtonProps) {
   const isEditing = notificationsState === 'editing';
 
-  return (
+  const button = (
     <CircleIconButton
       ref={buttonRef}
       size='xs'
@@ -41,9 +55,27 @@ export function ProfileNotificationsButton({
       {hasActiveSubscriptions ? (
         <span
           aria-hidden
-          className='absolute -right-1 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary'
-        />
+          className='absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-white'
+        >
+          <Check
+            className='h-2.5 w-2.5 text-black dark:text-black'
+            strokeWidth={3}
+          />
+        </span>
       ) : null}
     </CircleIconButton>
   );
+
+  if (hasActiveSubscriptions) {
+    return (
+      <SimpleTooltip
+        content={getTooltipLabel(subscribedChannels)}
+        side='bottom'
+      >
+        {button}
+      </SimpleTooltip>
+    );
+  }
+
+  return button;
 }

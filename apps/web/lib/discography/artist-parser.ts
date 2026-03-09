@@ -56,12 +56,12 @@ export interface SpotifyArtistInput {
 // Regex Patterns for Artist Credit Parsing
 // ============================================================================
 
-const BRACKET_SEGMENT_PATTERN = /[([]\s*([^)\]]+?)\s*[)\]]/g;
+const BRACKET_SEGMENT_PATTERN = /[([]\s{0,5}([^)\]]+?)\s{0,5}[)\]]/g;
 const FEATURED_KEYWORD_PATTERN = /^(?:feat\.?|ft\.?|featuring)\b/i;
 const FEATURED_INLINE_PATTERN = /\b(?:feat\.?|ft\.?|featuring)\b/gi;
 const REMIXED_BY_PREFIX_PATTERN = /^(?:remixed\s+by|remix\s+by)\b/i;
 const REMIX_TRAILING_PATTERN =
-  /^(.*)\b(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip)\b/i;
+  /^(.*?)\b(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip)\b/i;
 const REMIX_KEYWORD_PATTERN =
   /\b(?:remix|rmx|mix|edit|bootleg|rework|flip|version|vip)\b/i;
 const WITH_KEYWORD_PATTERN = /^with\b/i;
@@ -71,8 +71,8 @@ const WITH_INLINE_PATTERN = /\bwith\b/gi;
  * Pattern to match "with" credits
  * Matches: "(with X)", "with X"
  */
-const VS_SEPARATOR_PATTERN = /\s+(?:vs\.?|versus)\s+/i;
-const AND_SEPARATOR_PATTERN = /\s+(?:&|and|x)\s+/i;
+const VS_SEPARATOR_PATTERN = / +(?:vs\.?|versus) +/i;
+const AND_SEPARATOR_PATTERN = / +(?:&|and|x) +/i;
 
 /**
  * Pattern to match "vs" credits in artist names
@@ -435,7 +435,7 @@ export function extractWith(title: string): ParsedArtistCredit[] {
 export function splitByConjunction(artistString: string): string[] {
   // Split by & , "and", or standalone "x"
   return artistString
-    .split(/\s*(?:&|,|\band\b|\bx\b)\s*/i)
+    .split(/ *(?:&|,|\band\b|\bx\b) */i)
     .map(s => s.trim())
     .filter(Boolean);
 }
@@ -630,12 +630,12 @@ export function isRemix(title: string): boolean {
   const lowerTitle = title.toLowerCase();
 
   const bracketPatterns = [
-    /[([].*remix.*[)\]]/i,
-    /[([].*rmx.*[)\]]/i,
-    /[([].*rework.*[)\]]/i,
-    /[([].*bootleg.*[)\]]/i,
-    /[([].*edit.*[)\]]/i,
-    /[([].*flip.*[)\]]/i,
+    /[([]\s*[^)\]]*remix[^)\]]*[)\]]/i,
+    /[([]\s*[^)\]]*rmx[^)\]]*[)\]]/i,
+    /[([]\s*[^)\]]*rework[^)\]]*[)\]]/i,
+    /[([]\s*[^)\]]*bootleg[^)\]]*[)\]]/i,
+    /[([]\s*[^)\]]*edit[^)\]]*[)\]]/i,
+    /[([]\s*[^)\]]*flip[^)\]]*[)\]]/i,
   ];
 
   return (
@@ -677,6 +677,6 @@ export function cleanTrackTitle(title: string): string {
 
   return withoutInlineWith
     .replaceAll(/\s+/g, ' ')
-    .replace(/\s*[-–]\s*$/, '')
+    .replace(/ *[-–] *$/, '')
     .trim();
 }

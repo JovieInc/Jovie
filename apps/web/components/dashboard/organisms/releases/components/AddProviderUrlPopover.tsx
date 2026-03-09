@@ -45,7 +45,7 @@ export function AddProviderUrlPopover({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
         >
           <Icon
             name='Plus'
@@ -75,7 +75,7 @@ export function AddProviderUrlPopover({
               style={{ backgroundColor: accent }}
               aria-hidden='true'
             />
-            <span className='text-xs font-medium text-primary-token'>
+            <span className='text-[13px] font-[510] text-primary-token'>
               Add {providerLabel} link
             </span>
           </div>
@@ -88,7 +88,7 @@ export function AddProviderUrlPopover({
             onChange={e => setUrl(e.target.value)}
             disabled={isSaving}
             autoComplete='off'
-            className='text-xs'
+            className='text-[13px]'
           />
           <div className='flex justify-end gap-2'>
             <Button
@@ -99,7 +99,7 @@ export function AddProviderUrlPopover({
                 setUrl('');
                 setOpen(false);
               }}
-              className='text-xs'
+              className='text-[13px]'
             >
               Cancel
             </Button>
@@ -108,7 +108,7 @@ export function AddProviderUrlPopover({
               variant='primary'
               size='sm'
               disabled={!url.trim() || isSaving}
-              className='text-xs'
+              className='text-[13px]'
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>

@@ -1,8 +1,11 @@
 #!/bin/bash
-# Protect critical files based on agents.md HARD GUARDRAILS
+# Protect critical files based on AGENTS.md HARD GUARDRAILS
 # - Prevent modification of Drizzle migrations (append-only, line 51)
 # - Prevent creation of middleware.ts (use proxy.ts instead, line 11)
 # - Check for biome-ignore suppressions (never allowed, line 52)
+# - Prevent hardcoded legacy dashboard route literals in app/components
+# - Prevent dynamic marketing page revalidation patterns
+# - Prevent nested layouts from rendering global singleton UI
 
 # Get file path and content from tool input (TOOL_INPUT is a JSON string)
 # Support both jq and fallback for environments without jq
@@ -19,9 +22,9 @@ if [ -z "$file_path" ]; then
   exit 0
 fi
 
-# HARD GUARDRAIL: Drizzle migrations are immutable (agents.md line 51)
+# HARD GUARDRAIL: Drizzle migrations are immutable (AGENTS.md line 51)
 if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizzle/migrations/meta/_journal\.json$ ]]; then
-  echo "🚨 BLOCKED: Drizzle migration files are IMMUTABLE (agents.md line 51)"
+  echo "🚨 BLOCKED: Drizzle migration files are IMMUTABLE (AGENTS.md line 51)"
   echo "File: $file_path"
   echo ""
   echo "Drizzle migrations are append-only once merged to main."
@@ -34,9 +37,9 @@ if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizz
   exit 1
 fi
 
-# HARD GUARDRAIL: No middleware.ts allowed (agents.md line 11)
+# HARD GUARDRAIL: No middleware.ts allowed (AGENTS.md line 11)
 if [[ "$file_path" =~ /middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; then
-  echo "🚨 BLOCKED: Do not create middleware.ts (agents.md line 11)"
+  echo "🚨 BLOCKED: Do not create middleware.ts (AGENTS.md line 11)"
   echo "File: $file_path"
   echo ""
   echo "This repo uses apps/web/proxy.ts as the middleware entrypoint."
@@ -47,10 +50,10 @@ if [[ "$file_path" =~ /middleware\.ts$ ]] && [[ ! "$file_path" =~ \.next/ ]]; th
   exit 1
 fi
 
-# HARD GUARDRAIL: Never suppress Biome errors (agents.md line 52)
+# HARD GUARDRAIL: Never suppress Biome errors (AGENTS.md line 52)
 if [ -n "$content" ]; then
   if echo "$content" | grep -q "biome-ignore"; then
-    echo "🚨 BLOCKED: biome-ignore comments are not allowed (agents.md line 52)"
+    echo "🚨 BLOCKED: biome-ignore comments are not allowed (AGENTS.md line 52)"
     echo "File: $file_path"
     echo ""
     echo "Do NOT use biome-ignore to suppress lint or format errors."
@@ -63,6 +66,43 @@ if [ -n "$content" ]; then
     echo "  - Restructuring code to follow best practices"
     echo ""
     echo "If a rule seems incorrect, discuss with the team before suppressing."
+    exit 1
+  fi
+fi
+
+# HARD GUARDRAIL: Route literals must use constants in app/components code
+if [[ "$file_path" =~ ^apps/web/(app|components)/.*\.(ts|tsx)$ ]] \
+  && [[ ! "$file_path" =~ \.(test|spec|stories)\.(ts|tsx)$ ]]; then
+  if echo "$content" | grep -qE "['\"]/app/dashboard/(analytics|audience|earnings|profile|releases|links|chat)['\"]"; then
+    echo "🚨 BLOCKED: Hardcoded legacy dashboard route literal detected"
+    echo "File: $file_path"
+    echo ""
+    echo "Import the route from apps/web/constants/routes.ts instead of embedding /app/dashboard/* strings."
+    exit 1
+  fi
+fi
+
+# HARD GUARDRAIL: Marketing pages must remain fully static
+if [[ "$file_path" =~ ^apps/web/app/\(marketing\)/.*\.(ts|tsx)$ ]]; then
+  if echo "$content" | grep -qE "export const revalidate\s*=" \
+    && ! echo "$content" | grep -qE "export const revalidate\s*=\s*false\b"; then
+    echo "🚨 BLOCKED: Marketing pages must use export const revalidate = false"
+    echo "File: $file_path"
+    exit 1
+  fi
+
+  if echo "$content" | grep -qE "headers\(|cookies\(|cache:\s*['\"]no-store['\"]"; then
+    echo "🚨 BLOCKED: Marketing pages must not depend on request-time data or no-store fetches"
+    echo "File: $file_path"
+    exit 1
+  fi
+fi
+
+# HARD GUARDRAIL: Global singleton UI must not mount from nested layouts
+if [[ "$file_path" =~ ^apps/web/app/.+/layout\.tsx$ ]] && [[ "$file_path" != "apps/web/app/layout.tsx" ]]; then
+  if echo "$content" | grep -qE "CookieBannerSection|ToastProvider|ClerkAnalytics|<Analytics|ModalProvider"; then
+    echo "🚨 BLOCKED: Global UI singletons must render only from apps/web/app/layout.tsx"
+    echo "File: $file_path"
     exit 1
   fi
 fi

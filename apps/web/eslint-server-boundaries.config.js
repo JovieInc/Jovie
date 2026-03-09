@@ -67,9 +67,8 @@ module.exports = [
     rules: {
       // Server-only imports are critical errors - these would cause runtime failures
       '@jovie/server-only-imports': 'error',
-      // Missing 'use client' is a warning initially for gradual adoption
-      // TODO: Promote to 'error' once existing violations are fixed
-      '@jovie/use-client-directive': 'warn',
+      // Missing 'use client' is a critical boundary violation and must fail linting
+      '@jovie/use-client-directive': 'error',
     },
   },
 ];

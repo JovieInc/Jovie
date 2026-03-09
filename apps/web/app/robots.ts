@@ -14,6 +14,34 @@ import { env } from '@/lib/env-server';
 
 const isProduction = env.VERCEL_ENV === 'production';
 
+/** Paths blocked from indexing (app dashboard, APIs, tracking params). */
+const DISALLOW_PATHS = [
+  '/app/',
+  '/api/',
+  '/out/',
+  '/*?ref=*',
+  '/*&ref=*',
+  '/*?utm_*',
+  '/*&utm_*',
+  '/*?fbclid=*',
+  '/*&fbclid=*',
+  '/*?gclid=*',
+  '/*&gclid=*',
+];
+
+/**
+ * AI crawlers to explicitly allow.
+ * Listing them signals that Jovie welcomes AI search indexing.
+ */
+const AI_CRAWLERS = [
+  'GPTBot',
+  'ChatGPT-User',
+  'Claude-Web',
+  'Applebot-Extended',
+  'PerplexityBot',
+  'Google-Extended',
+];
+
 export default function robots(): MetadataRoute.Robots {
   // jov.ie - allow marketing + profiles, block app/api routes
   if (isProduction) {
@@ -22,8 +50,14 @@ export default function robots(): MetadataRoute.Robots {
         {
           userAgent: '*',
           allow: '/',
-          disallow: ['/app/', '/api/', '/out/'],
+          disallow: DISALLOW_PATHS,
         },
+        // Explicitly welcome AI crawlers for better AI search visibility
+        ...AI_CRAWLERS.map(crawler => ({
+          userAgent: crawler,
+          allow: ['/', '/llms.txt'],
+          disallow: DISALLOW_PATHS,
+        })),
       ],
       sitemap: `${BASE_URL}/sitemap.xml`,
       host: BASE_URL,

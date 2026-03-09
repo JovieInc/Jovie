@@ -19,9 +19,9 @@ export interface UseContactSidebarReturn {
   handleFieldChange: (updater: (current: Contact) => Contact) => void;
   handleAvatarUpload: (file: File) => Promise<string>;
   handleCopyProfileUrl: () => Promise<void>;
-  handleNameChange: (field: 'firstName' | 'lastName', value: string) => void;
+  displayName: string;
+  handleNameChange: (value: string) => void;
   handleUsernameChange: (raw: string) => void;
-  handleWebsiteChange: (value: string) => void;
   handleAddLink: () => void;
   handleRemoveLink: (index: number) => void;
   handleNewLinkKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -51,6 +51,11 @@ export function useContactSidebar({
       .join(' ');
     return parts || contact.displayName || contact.username;
   }, [contact]);
+
+  const displayName = useMemo(
+    () => contact?.displayName ?? fullName,
+    [contact?.displayName, fullName]
+  );
 
   const handleFieldChange = useCallback(
     (updater: (current: Contact) => Contact) => {
@@ -88,8 +93,18 @@ export function useContactSidebar({
   }, [contact]);
 
   const handleNameChange = useCallback(
-    (field: 'firstName' | 'lastName', value: string) => {
-      handleFieldChange(current => ({ ...current, [field]: value }));
+    (value: string) => {
+      const trimmed = value.trim();
+      const parts = trimmed.split(/\s+/).filter(Boolean);
+      const firstName = parts[0] ?? undefined;
+      const lastName = parts.slice(1).join(' ') || undefined;
+
+      handleFieldChange(current => ({
+        ...current,
+        displayName: trimmed || null,
+        firstName,
+        lastName,
+      }));
     },
     [handleFieldChange]
   );
@@ -98,13 +113,6 @@ export function useContactSidebar({
     (raw: string) => {
       const username = sanitizeUsernameInput(raw);
       handleFieldChange(current => ({ ...current, username }));
-    },
-    [handleFieldChange]
-  );
-
-  const handleWebsiteChange = useCallback(
-    (value: string) => {
-      handleFieldChange(current => ({ ...current, website: value || null }));
     },
     [handleFieldChange]
   );
@@ -183,9 +191,9 @@ export function useContactSidebar({
     handleFieldChange,
     handleAvatarUpload,
     handleCopyProfileUrl,
+    displayName,
     handleNameChange,
     handleUsernameChange,
-    handleWebsiteChange,
     handleAddLink,
     handleRemoveLink,
     handleNewLinkKeyDown,

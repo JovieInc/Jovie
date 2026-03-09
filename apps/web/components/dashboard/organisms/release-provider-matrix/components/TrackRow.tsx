@@ -1,13 +1,20 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { memo, useMemo } from 'react';
+import { Pause, Play } from 'lucide-react';
+import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
+import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { PROVIDER_TO_DSP } from '@/lib/discography/provider-domains';
-import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
+import type {
+  ProviderKey,
+  ReleaseViewModel,
+  TrackViewModel,
+} from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
 interface ProviderConfig {
@@ -23,6 +30,8 @@ interface TrackRowProps {
   readonly columnCount: number;
   /** Column visibility state from TanStack table */
   readonly columnVisibility?: Record<string, boolean>;
+  readonly isSelected?: boolean;
+  readonly onClick?: () => void;
 }
 
 /**
@@ -41,7 +50,10 @@ export const TrackRow = memo(function TrackRow({
   allProviders,
   columnCount,
   columnVisibility,
+  isSelected,
+  onClick,
 }: TrackRowProps) {
+  const { playbackState, toggleTrack } = useTrackAudioPlayer();
   // Helper to check if a column is visible
   const isVisible = (id: string) => columnVisibility?.[id] !== false;
   // Format track number with disc number if multi-disc
@@ -70,17 +82,59 @@ export const TrackRow = memo(function TrackRow({
     });
   }, [allProviders, providerMap]);
 
+  const previewUrl = track.previewUrl || track.audioUrl;
+  const canPlay = Boolean(previewUrl);
+  const isActiveTrack = playbackState.activeTrackId === track.id;
+  const isPlaying = isActiveTrack && playbackState.isPlaying;
+
+  const handleTogglePlayback = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!previewUrl) return;
+      toggleTrack({
+        id: track.id,
+        title: track.title,
+        audioUrl: previewUrl,
+      }).catch(() => {});
+    },
+    [previewUrl, toggleTrack, track.id, track.title]
+  );
+
   return (
-    <tr className='group hover:bg-surface-2/30 border-l-2 border-l-transparent'>
+    <tr
+      className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
+      onClick={onClick}
+    >
       {/* 1. Spacer for checkbox column (always visible) */}
-      {isVisible('select') && <td className='w-14' />}
+      {isVisible('select') && (
+        <td className='w-14 py-2'>
+          <div className='flex items-center justify-center'>
+            {canPlay ? (
+              <button
+                type='button'
+                onClick={handleTogglePlayback}
+                className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-white/[0.06]'
+                aria-label={
+                  isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
+                }
+              >
+                {isPlaying ? (
+                  <Pause className='h-3 w-3' />
+                ) : (
+                  <Play className='h-3 w-3' />
+                )}
+              </button>
+            ) : null}
+          </div>
+        </td>
+      )}
 
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
         <td className='py-2 pr-4'>
           <div className='flex items-center gap-3 pl-8'>
             {/* Track number */}
-            <span className='w-8 shrink-0 text-right text-xs tabular-nums text-tertiary-token'>
+            <span className='w-8 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
               {trackLabel}.
             </span>
 
@@ -89,7 +143,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-sm text-primary-token'
+                  className='text-[13px] text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -141,12 +195,12 @@ export const TrackRow = memo(function TrackRow({
                     );
                   })}
                 </div>
-                <span className='text-xs text-tertiary-token'>
+                <span className='text-[11px] text-tertiary-token'>
                   {availableCount}/{allProviders.length}
                 </span>
               </>
             ) : (
-              <span className='text-xs text-tertiary-token'>—</span>
+              <span className='text-[11px] text-tertiary-token'>—</span>
             )}
           </div>
         </td>
@@ -162,11 +216,11 @@ export const TrackRow = memo(function TrackRow({
       {isVisible('metrics') && (
         <td className='py-2'>
           {track.durationMs ? (
-            <span className='text-xs text-secondary-token tabular-nums'>
+            <span className='text-[11px] text-secondary-token tabular-nums'>
               {formatDuration(track.durationMs)}
             </span>
           ) : (
-            <span className='text-xs text-tertiary-token'>—</span>
+            <span className='text-[11px] text-tertiary-token'>—</span>
           )}
         </td>
       )}
@@ -195,26 +249,56 @@ export const TrackRow = memo(function TrackRow({
  */
 interface TrackRowsContainerProps {
   readonly tracks: TrackViewModel[];
+  readonly release?: ReleaseViewModel;
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly allProviders: ProviderKey[];
   readonly columnCount: number;
-  /** Column visibility state from TanStack table */
   readonly columnVisibility?: Record<string, boolean>;
+  readonly onTrackClick?: (trackData: TrackSidebarData) => void;
+  readonly selectedTrackId?: string | null;
 }
 
 export const TrackRowsContainer = memo(function TrackRowsContainer({
   tracks,
+  release,
   providerConfig,
   allProviders,
   columnCount,
   columnVisibility,
+  onTrackClick,
+  selectedTrackId,
 }: TrackRowsContainerProps) {
+  const handleTrackClick = useCallback(
+    (track: TrackViewModel) => {
+      if (!onTrackClick || !release) return;
+      onTrackClick({
+        id: track.id,
+        title: track.title,
+        slug: track.slug,
+        smartLinkPath: track.smartLinkPath,
+        trackNumber: track.trackNumber,
+        discNumber: track.discNumber,
+        durationMs: track.durationMs,
+        isrc: track.isrc,
+        isExplicit: track.isExplicit,
+        previewUrl: track.previewUrl,
+        audioUrl: track.audioUrl,
+        audioFormat: track.audioFormat,
+        providers: track.providers,
+        releaseTitle: release.title,
+        releaseArtworkUrl: release.artworkUrl,
+        releaseId: release.id,
+      });
+    },
+    [onTrackClick, release]
+  );
+
   if (tracks.length === 0) {
     return (
       <tr className='bg-surface-1/50'>
         <td
           colSpan={columnCount}
-          className='py-3 pl-20 text-xs text-tertiary-token'
+          className='py-3 pl-20 text-[11px] text-tertiary-token'
         >
           <div className='flex items-center gap-2'>
             <Icon name='AlertCircle' className='h-3.5 w-3.5' />
@@ -235,6 +319,8 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
           allProviders={allProviders}
           columnCount={columnCount}
           columnVisibility={columnVisibility}
+          isSelected={selectedTrackId === track.id}
+          onClick={onTrackClick ? () => handleTrackClick(track) : undefined}
         />
       ))}
     </>

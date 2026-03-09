@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TEST_USER_ID = 'user_123';
 const NO_STORE = 'no-store';
+const PRIVATE_CACHE = 'private, max-age=60, stale-while-revalidate=120';
 const PROFILE_ID = '123e4567-e89b-12d3-a456-426614174000';
 
 type QueryRows = Array<Record<string, unknown>>;
 
 // Hoist mocks to avoid module resets
+const mockRequireAuth = vi.fn();
 const mockWithDbSession = vi.fn();
 const mockWithDbSessionTx = vi.fn();
 const mockGetUserDashboardAnalytics = vi.fn();
@@ -59,6 +61,7 @@ function createSelectQueue(responses: QueryRows[]) {
 }
 
 vi.mock('@/lib/auth/session', () => ({
+  requireAuth: (...args: any[]) => mockRequireAuth(...args),
   withDbSession: (...args: any[]) => mockWithDbSession(...args),
   withDbSessionTx: (...args: any[]) => mockWithDbSessionTx(...args),
 }));
@@ -130,6 +133,12 @@ function mockSession({
   unauthorized?: boolean;
   tx?: unknown;
 } = {}) {
+  // Mock requireAuth for routes that authenticate without withDbSession
+  if (unauthorized) {
+    mockRequireAuth.mockRejectedValue(new Error('Unauthorized'));
+  } else {
+    mockRequireAuth.mockResolvedValue(TEST_USER_ID);
+  }
   mockWithDbSession.mockImplementation(
     async (callback: (userId: string) => Promise<unknown>) => {
       if (unauthorized) throw new Error('Unauthorized');
@@ -272,7 +281,7 @@ describe('Dashboard API contracts', () => {
       const body = await response.json();
 
       expectStatusOk(response, body);
-      expect(response.headers.get('Cache-Control')).toBe(NO_STORE);
+      expect(response.headers.get('Cache-Control')).toBe(PRIVATE_CACHE);
       expect(Array.isArray(body.activities)).toBe(true);
       expect(body.activities).toEqual(
         expect.arrayContaining([
@@ -343,7 +352,7 @@ describe('Dashboard API contracts', () => {
       expectStatusOk(response, body);
       expect(body).toMatchObject({
         total: 1,
-        members: [
+        rows: [
           expect.objectContaining({
             id: 'member_1',
             latestActions: ['visit'],
@@ -356,10 +365,10 @@ describe('Dashboard API contracts', () => {
     });
 
     it('paginates subscribers with contract-safe response', async () => {
-      const tx = {
-        select: createSelectQueue([
-          [{ id: PROFILE_ID }],
-          [
+      let executeCallIndex = 0;
+      const executeResponses = [
+        {
+          rows: [
             {
               id: 'sub_1',
               email: 'fan@example.com',
@@ -369,8 +378,17 @@ describe('Dashboard API contracts', () => {
               channel: 'email',
             },
           ],
-          [{ total: 1 }],
-        ]),
+        },
+        { rows: [{ total: 1 }] },
+      ];
+
+      const tx = {
+        select: createSelectQueue([[{ id: PROFILE_ID }]]),
+        execute: async () => {
+          const result = executeResponses[executeCallIndex] ?? { rows: [] };
+          executeCallIndex += 1;
+          return result;
+        },
       };
 
       mockSession({ tx });
@@ -388,7 +406,7 @@ describe('Dashboard API contracts', () => {
       expectStatusOk(response, body);
       expect(body).toEqual({
         total: 1,
-        subscribers: [
+        rows: [
           {
             id: 'sub_1',
             email: 'fan@example.com',

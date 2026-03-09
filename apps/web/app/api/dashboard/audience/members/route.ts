@@ -1,17 +1,72 @@
-import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  sql as drizzleSql,
+  eq,
+  gt,
+  gte,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
+import {
+  buildCursorCondition,
+  decodeCursor,
+  encodeCursor,
+} from '@/lib/db/queries/audience-cursor';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
-import { audienceMembers } from '@/lib/db/schema/analytics';
+import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
+import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { logger } from '@/lib/utils/logger';
-import { membersQuerySchema } from '@/lib/validation/schemas';
+import {
+  type MembersQueryParams,
+  membersQuerySchema,
+} from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+type AudienceSegment = MembersQueryParams['segments'][number];
+
+/**
+ * Maps a validated segment value to its corresponding SQL condition.
+ */
+const segmentToCondition = (segment: AudienceSegment) => {
+  switch (segment) {
+    case 'highIntent':
+      return eq(audienceMembers.intentLevel, 'high');
+    case 'returning':
+      return gt(audienceMembers.visits, 1);
+    case 'frequent':
+      return gte(audienceMembers.visits, 3);
+    case 'recent24h':
+      return gt(
+        audienceMembers.lastSeenAt,
+        drizzleSql`NOW() - INTERVAL '24 hours'`
+      );
+  }
+};
+
+/**
+ * Builds a combined SQL condition from multiple segment filters using OR
+ * semantics: selecting multiple segments shows members matching ANY of the
+ * selected segments (union), not all of them (intersection).
+ */
+const buildSegmentCondition = (segments: AudienceSegment[]) => {
+  if (segments.length === 0) {
+    return drizzleSql<boolean>`true`;
+  }
+
+  const conditions = segments.map(segmentToCondition);
+
+  return conditions.length === 1 ? conditions[0] : or(...conditions)!;
+};
 
 const MEMBER_SORT_COLUMNS = {
   lastSeen: audienceMembers.lastSeenAt,
@@ -30,8 +85,10 @@ export async function GET(request: NextRequest) {
         profileId: searchParams.get('profileId'),
         sort: searchParams.get('sort') ?? undefined,
         direction: searchParams.get('direction') ?? undefined,
+        cursor: searchParams.get('cursor') ?? undefined,
         page: searchParams.get('page') ?? undefined,
         pageSize: searchParams.get('pageSize') ?? undefined,
+        segments: searchParams.getAll('segments'),
       });
 
       if (!parsed.success) {
@@ -41,20 +98,37 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      const { profileId, sort, direction, page, pageSize } = parsed.data;
+      const { profileId, sort, direction, cursor, pageSize, segments } =
+        parsed.data;
 
       // Verify user owns the profile
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(
-          { members: [], total: 0 },
+          { rows: [], total: null, hasMore: false, nextCursor: null },
           { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
-      const offset = (page - 1) * pageSize;
+      const segmentCondition = buildSegmentCondition(segments);
+
+      // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
+      let cursorCondition: SQL<unknown> = drizzleSql`true`;
+      if (cursor) {
+        const decoded = decodeCursor(cursor);
+        if (decoded) {
+          const { v: cursorSortVal, id: cursorId } = decoded;
+          cursorCondition = buildCursorCondition(
+            direction,
+            sortColumn,
+            audienceMembers.id,
+            cursorSortVal,
+            cursorId
+          );
+        }
+      }
 
       const baseQuery = tx
         .select({
@@ -74,22 +148,77 @@ export async function GET(request: NextRequest) {
           phone: audienceMembers.phone,
           spotifyConnected: audienceMembers.spotifyConnected,
           purchaseCount: audienceMembers.purchaseCount,
+          tipAmountTotalCents:
+            drizzleSql<number>`COALESCE(${tipAudience.tipAmountTotalCents}, 0)`.as(
+              'tip_amount_total_cents'
+            ),
+          tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
+            'tip_count'
+          ),
+          ltvStreamingClicks: drizzleSql<number>`(
+            SELECT COALESCE(COUNT(*), 0)
+            FROM ${clickEvents}
+            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+              AND ${clickEvents.linkType} = 'listen'
+              AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+          )`.as('ltv_streaming_clicks'),
+          ltvTipClickValueCents: drizzleSql<number>`(
+            SELECT COALESCE(
+              SUM(
+                CASE
+                  WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+                    THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
+                  ELSE 0
+                END
+              ),
+              0
+            )
+            FROM ${clickEvents}
+            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
+          )`.as('ltv_tip_click_value_cents'),
+          ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
+          ltvTicketSalesCents: drizzleSql<number>`0`.as(
+            'ltv_ticket_sales_cents'
+          ),
           tags: audienceMembers.tags,
           lastSeenAt: audienceMembers.lastSeenAt,
           createdAt: audienceMembers.firstSeenAt,
         })
         .from(audienceMembers)
-        .where(eq(audienceMembers.creatorProfileId, profileId));
+        .leftJoin(
+          tipAudience,
+          and(
+            eq(tipAudience.profileId, audienceMembers.creatorProfileId),
+            eq(tipAudience.email, audienceMembers.email)
+          )
+        )
+        .where(
+          and(
+            eq(audienceMembers.creatorProfileId, profileId),
+            segmentCondition,
+            cursorCondition
+          )
+        );
 
-      const [rows, [{ total }]] = await Promise.all([
-        baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
-        tx
-          .select({
-            total: drizzleSql`COALESCE(COUNT(${audienceMembers.id}), 0)`,
-          })
-          .from(audienceMembers)
-          .where(eq(audienceMembers.creatorProfileId, profileId)),
-      ]);
+      // Fetch pageSize+1 to detect hasMore without COUNT(*) (JOV-1260, JOV-1263).
+      const rawRows = await baseQuery
+        .orderBy(orderFn(sortColumn), orderFn(audienceMembers.id))
+        .limit(pageSize + 1);
+
+      const hasMore = rawRows.length > pageSize;
+      const rows = hasMore ? rawRows.slice(0, pageSize) : rawRows;
+
+      // Build next-page cursor from the last returned row.
+      let nextCursor: string | null = null;
+      if (hasMore && rows.length > 0) {
+        const lastRow = rows[rows.length - 1];
+        const rawSortVal = lastRow.lastSeenAt;
+        const sortValStr =
+          rawSortVal instanceof Date
+            ? rawSortVal.toISOString()
+            : String(rawSortVal ?? '');
+        nextCursor = encodeCursor(sortValStr, lastRow.id);
+      }
 
       const serializeDate = (value?: Date | string | null) => {
         if (!value) return null;
@@ -117,13 +246,20 @@ export async function GET(request: NextRequest) {
         phone: member.phone,
         spotifyConnected: Boolean(member.spotifyConnected),
         purchaseCount: member.purchaseCount,
+        tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
+        tipCount: member.tipCount ?? 0,
+        ltvStreamingClicks: member.ltvStreamingClicks ?? 0,
+        ltvTipClickValueCents: member.ltvTipClickValueCents ?? 0,
+        ltvMerchSalesCents: member.ltvMerchSalesCents ?? 0,
+        ltvTicketSalesCents: member.ltvTicketSalesCents ?? 0,
         tags: Array.isArray(member.tags) ? member.tags : [],
         lastSeenAt: serializeDate(member.lastSeenAt),
         createdAt: serializeDate(member.createdAt),
       }));
 
+      // total is null — clients use hasMore / nextCursor for pagination control.
       return NextResponse.json(
-        { members, total: Number(total ?? 0) },
+        { rows: members, total: null, hasMore, nextCursor },
         { status: 200, headers: NO_STORE_HEADERS }
       );
     });

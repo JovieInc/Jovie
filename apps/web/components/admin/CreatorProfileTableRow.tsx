@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   Checkbox,
   ContextMenu,
   ContextMenuContent,
@@ -9,6 +10,7 @@ import {
   ContextMenuTrigger,
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
+import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import {
   memo,
@@ -30,12 +32,18 @@ import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
+const dateFormatter = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+});
+
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0';
-  if (isChecked) return cn(baseClasses, 'bg-accent-subtle');
-  if (isSelected) return cn(baseClasses, 'bg-base dark:bg-surface-2');
-  return cn(baseClasses, 'hover:bg-base dark:hover:bg-surface-2');
+    'group cursor-pointer border-b border-subtle transition-colors duration-150 last:border-b-0';
+  if (isChecked) return cn(baseClasses, 'bg-white/[0.04]');
+  if (isSelected) return cn(baseClasses, 'bg-white/[0.04]');
+  return cn(baseClasses, 'hover:bg-white/[0.02]');
 };
 
 const renderContextMenuItem = ({
@@ -222,17 +230,14 @@ function CreatorProfileTableRowComponent({
       tabIndex={0}
       aria-selected={isSelected}
     >
-      <td className='w-14 px-4 py-3 align-middle'>
-        <button
-          type='button'
-          className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'
-          onClick={event => event.stopPropagation()}
-          onKeyDown={event =>
-            handleActivationKeyDown(event, e => e.stopPropagation())
-          }
-          tabIndex={-1}
-          aria-label='Checkbox container'
-        >
+      <td
+        className='w-14 px-4 py-3 align-middle'
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event =>
+          handleActivationKeyDown(event, e => e.stopPropagation())
+        }
+      >
+        <div className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'>
           <span
             className={cn(
               'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
@@ -255,7 +260,7 @@ function CreatorProfileTableRowComponent({
               className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
             />
           </div>
-        </button>
+        </div>
       </td>
       <td
         className={cn(
@@ -298,13 +303,7 @@ function CreatorProfileTableRowComponent({
         </div>
       </td>
       <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
-        {profile.createdAt
-          ? new Intl.DateTimeFormat('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-            }).format(profile.createdAt)
-          : '—'}
+        {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td
         className='px-4 py-3 align-middle text-right'
@@ -314,6 +313,27 @@ function CreatorProfileTableRowComponent({
         }
       >
         <div className='flex items-center justify-end gap-2'>
+          <Button
+            type='button'
+            size='sm'
+            variant='ghost'
+            className='h-8 gap-1.5 px-2 text-xs text-secondary-token hover:text-primary-token'
+            onClick={async e => {
+              e.stopPropagation();
+              await onRefreshIngest();
+            }}
+            disabled={refreshIngestStatus === 'loading'}
+            aria-label='Refresh creator music data'
+            title='Refresh creator music data'
+          >
+            <RefreshCw
+              className={cn(
+                'h-3.5 w-3.5',
+                refreshIngestStatus === 'loading' && 'animate-spin'
+              )}
+            />
+            Refresh
+          </Button>
           {/* Icon action buttons - always visible on hover */}
           <div
             className={cn(

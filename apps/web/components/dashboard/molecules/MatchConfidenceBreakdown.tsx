@@ -1,5 +1,6 @@
 'use client';
 
+import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 
 /** Get color class based on contribution score threshold */
@@ -88,19 +89,19 @@ function ScoreRow({ label, score, weight, description }: ScoreRowProps) {
 
   return (
     <div className='group'>
-      <div className='flex items-center justify-between text-xs'>
+      <div className='flex items-center justify-between text-[13px]'>
         <div className='flex items-center gap-2'>
-          <span className='font-medium text-secondary-token'>{label}</span>
+          <span className='font-[510] text-secondary-token'>{label}</span>
           <span className='text-tertiary-token/60'>
             ({Math.round(weight * 100)}% weight)
           </span>
         </div>
         <div className='flex items-center gap-2'>
           <span className='text-tertiary-token'>{percentage}%</span>
-          <span className='text-tertiary-token/60'>→</span>
+          <span className='text-tertiary-token/60'>{GLYPH_ARROW_RIGHT}</span>
           <span
             className={cn(
-              'font-medium',
+              'font-[510]',
               getContributionColorClass(contribution)
             )}
           >
@@ -170,13 +171,13 @@ export function MatchConfidenceBreakdown({
 
       {/* Total */}
       <div className='border-t border-subtle pt-2'>
-        <div className='flex items-center justify-between text-xs'>
-          <span className='font-medium text-primary-token'>
+        <div className='flex items-center justify-between text-[13px]'>
+          <span className='font-[510] text-primary-token'>
             Total Confidence
           </span>
           <span
             className={cn(
-              'font-semibold',
+              'font-[590]',
               getTotalScoreColorClass(totalPercentage)
             )}
           >

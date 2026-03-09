@@ -2,6 +2,7 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import React from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
   ClerkSafeValuesProvider,
@@ -9,6 +10,8 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
+import { NuqsProvider } from './NuqsProvider';
+import { QueryProvider } from './QueryProvider';
 
 interface ClientProvidersProps {
   readonly children: React.ReactNode;
@@ -40,7 +43,9 @@ function wrapWithCoreProviders({
   skipCoreProviders,
 }: WrappedProvidersOptions) {
   const content = skipCoreProviders ? (
-    children
+    <NuqsProvider>
+      <QueryProvider>{children}</QueryProvider>
+    </NuqsProvider>
   ) : (
     <CoreProviders initialThemeMode={initialThemeMode}>
       {children}
@@ -151,7 +156,14 @@ export function ClientProviders({
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
+    <ClerkProvider
+      publishableKey={publishableKey}
+      appearance={clerkAppearance}
+      signInUrl={APP_ROUTES.SIGNIN}
+      signUpUrl={APP_ROUTES.SIGNUP}
+      signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
+      signUpFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+    >
       <ClerkSafeValuesProvider>
         {wrapWithCoreProviders({
           children,

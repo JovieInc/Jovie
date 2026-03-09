@@ -50,13 +50,13 @@ export const ContactItem = memo(function ContactItem({
   const hasEmailAndPhone = Boolean(contact.email) && Boolean(contact.phone);
 
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 shadow-sm'>
+    <div className='rounded-xl border border-subtle bg-surface-1 p-4 shadow-card'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-sm font-semibold text-primary-token'>
+          <p className='text-[13px] font-[590] text-primary-token'>
             {buildSummary(contact)}
           </p>
-          <p className='text-xs text-secondary-token'>
+          <p className='text-[13px] text-secondary-token'>
             {preferredChannel
               ? `Default action: ${preferredChannel}`
               : 'Select a default action'}
@@ -123,7 +123,7 @@ export const ContactItem = memo(function ContactItem({
           )}
 
           {contact.error ? (
-            <p className='text-sm text-error'>{contact.error}</p>
+            <p className='text-[13px] text-error'>{contact.error}</p>
           ) : null}
 
           <ContactItemActions

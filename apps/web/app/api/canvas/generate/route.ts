@@ -9,7 +9,7 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { CORS_HEADERS } from '@/lib/http/headers';
+import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   buildCanvasMetadata,
   getCanvasGenerationJob,
@@ -40,11 +40,16 @@ const statusCheckSchema = z.object({
  * Returns the job ID for polling status.
  */
 export async function POST(req: Request) {
+  const corsHeaders = createAuthenticatedCorsHeaders(
+    req.headers.get('origin'),
+    'POST, OPTIONS'
+  );
+
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS }
+      { status: 401, headers: corsHeaders }
     );
   }
 
@@ -57,13 +62,13 @@ export async function POST(req: Request) {
           error:
             'Canvas generation requires a Pro plan. Upgrade to unlock this feature.',
         },
-        { status: 403, headers: CORS_HEADERS }
+        { status: 403, headers: corsHeaders }
       );
     }
   } catch {
     return NextResponse.json(
       { error: 'Unable to verify plan status. Please try again.' },
-      { status: 503, headers: CORS_HEADERS }
+      { status: 503, headers: corsHeaders }
     );
   }
 
@@ -73,7 +78,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json(
       { error: 'Invalid JSON body' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -84,7 +89,7 @@ export async function POST(req: Request) {
         error: 'Invalid request',
         details: parseResult.error.flatten().fieldErrors,
       },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -107,7 +112,7 @@ export async function POST(req: Request) {
     if (!release) {
       return NextResponse.json(
         { error: 'Release not found' },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -126,7 +131,7 @@ export async function POST(req: Request) {
     if (!profile || profile.clerkId !== userId) {
       return NextResponse.json(
         { error: 'Release not found' },
-        { status: 404, headers: CORS_HEADERS }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -138,7 +143,7 @@ export async function POST(req: Request) {
           message:
             'This release has no album artwork. Upload artwork first, then generate a canvas.',
         },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -146,7 +151,7 @@ export async function POST(req: Request) {
     if (!artworkValidation.valid) {
       return NextResponse.json(
         { error: artworkValidation.error },
-        { status: 400, headers: CORS_HEADERS }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -191,7 +196,7 @@ export async function POST(req: Request) {
         message:
           'Canvas generation job created. Video generation will be available once an AI video provider is configured.',
       },
-      { status: 201, headers: CORS_HEADERS }
+      { status: 201, headers: corsHeaders }
     );
   } catch (error) {
     Sentry.captureException(error, {
@@ -201,7 +206,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json(
       { error: 'Failed to start canvas generation' },
-      { status: 500, headers: CORS_HEADERS }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -212,11 +217,16 @@ export async function POST(req: Request) {
  * Check the status of a canvas generation job.
  */
 export async function GET(req: Request) {
+  const corsHeaders = createAuthenticatedCorsHeaders(
+    req.headers.get('origin'),
+    'GET, OPTIONS'
+  );
+
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
-      { status: 401, headers: CORS_HEADERS }
+      { status: 401, headers: corsHeaders }
     );
   }
 
@@ -228,7 +238,7 @@ export async function GET(req: Request) {
   if (!parseResult.success) {
     return NextResponse.json(
       { error: 'Invalid jobId parameter' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: corsHeaders }
     );
   }
 
@@ -236,7 +246,7 @@ export async function GET(req: Request) {
   if (!job) {
     return NextResponse.json(
       { error: 'Job not found' },
-      { status: 404, headers: CORS_HEADERS }
+      { status: 404, headers: corsHeaders }
     );
   }
 
@@ -251,7 +261,7 @@ export async function GET(req: Request) {
   if (!owner || owner.clerkId !== userId) {
     return NextResponse.json(
       { error: 'Job not found' },
-      { status: 404, headers: CORS_HEADERS }
+      { status: 404, headers: corsHeaders }
     );
   }
 
@@ -264,6 +274,6 @@ export async function GET(req: Request) {
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
     },
-    { headers: CORS_HEADERS }
+    { headers: corsHeaders }
   );
 }

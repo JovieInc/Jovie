@@ -14,7 +14,8 @@ const slugifyHeading = (value: string): string => {
     .toLowerCase()
     .trim()
     .replaceAll(/[^a-z0-9]+/g, '-')
-    .replaceAll(/(^-+)|(-+$)/g, '');
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
 };
 
 type HeadingNode = {

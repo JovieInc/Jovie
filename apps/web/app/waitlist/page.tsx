@@ -196,23 +196,18 @@ export default function WaitlistPage() {
     heardAbout,
   ]);
 
-  // Handle user ID changes and sync storage
+  // If auth identity changes, clear any saved waitlist draft.
+  const lastUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-    try {
-      const storedUserId = globalThis.sessionStorage.getItem(
-        WAITLIST_STORAGE_KEYS.userId
-      );
-      if (storedUserId && storedUserId !== userId) {
-        clearWaitlistStorage();
-        setIsSubmitted(false);
-      }
-      if (userId) {
-        globalThis.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.userId, userId);
-      }
-    } catch {
-      // Ignore storage errors
+    if (!isLoaded || !isSignedIn || !userId) return;
+
+    if (lastUserIdRef.current && lastUserIdRef.current !== userId) {
+      clearWaitlistStorage();
+      setIsSubmitted(false);
     }
+
+    lastUserIdRef.current = userId;
   }, [isLoaded, isSignedIn, userId]);
 
   // Handle waitlist status from TanStack Query (cached, deduplicated)
@@ -466,7 +461,7 @@ export default function WaitlistPage() {
       showFooterPrompt={false}
       showLogo={false}
       showLogoutButton
-      logoutRedirectUrl='/sign-in'
+      logoutRedirectUrl={APP_ROUTES.SIGNIN}
     >
       <div className='w-full'>
         <form onSubmit={handleSubmit} className='space-y-4'>

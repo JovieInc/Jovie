@@ -7,10 +7,18 @@ import {
   PopoverTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { X } from 'lucide-react';
+import type React from 'react';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { ExportCSVButton } from '@/components/organisms/table';
+import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ExportCSVButton,
+} from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
+import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
 import { useReleaseFilterCounts } from './hooks/useReleaseFilterCounts';
 import { ReleaseFilterDropdown } from './ReleaseFilterDropdown';
@@ -67,6 +75,12 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
+  /** DSP connection badges to display on the left */
+  readonly dspBadges?: React.ReactNode;
+  /** Whether search is currently active */
+  readonly isSearchOpen?: boolean;
+  /** Callback to toggle search open/close */
+  readonly onSearchToggle?: () => void;
 }
 
 /** Options for release view segmented control */
@@ -93,7 +107,7 @@ function ReleaseViewSegmentedControl({
           onClick={() => onChange(option.value)}
           aria-pressed={value === option.value}
           className={cn(
-            'flex flex-col items-center gap-1 rounded-lg py-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+            'flex flex-col items-center gap-1 rounded-lg py-3 text-[13px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
             value === option.value
               ? 'bg-surface-2 text-primary-token border border-subtle'
               : 'text-tertiary-token hover:text-secondary-token border border-transparent'
@@ -123,12 +137,12 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded px-1 py-1 focus-visible:outline-none focus-visible:bg-interactive-hover'
+      className='flex w-full items-center justify-between gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover'
     >
       <span className='text-[13px] text-secondary-token'>{label}</span>
       <span
         className={cn(
-          'flex h-[18px] w-[30px] items-center rounded-full p-[3px] transition-colors',
+          'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
           checked ? 'bg-primary' : 'bg-surface-3'
         )}
       >
@@ -173,7 +187,11 @@ function LinearStyleDisplayMenu({
 }) {
   return (
     <Popover>
-      <TooltipShortcut label='Display' shortcut='⇧V' side='bottom'>
+      <TooltipShortcut
+        label='Display'
+        shortcut={`${GLYPH_SHIFT}V`}
+        side='bottom'
+      >
         <PopoverTrigger asChild>
           <Button
             variant='ghost'
@@ -188,7 +206,20 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent align='end' className='w-56 p-0'>
+      <PopoverContent align='end' className='w-[260px]'>
+        {/* Header */}
+        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
+          <span className='text-[13px] font-[510] text-primary-token'>
+            Display
+          </span>
+          <PopoverPrimitive.Close
+            aria-label='Close'
+            className='rounded-md p-0.5 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+          >
+            <X className='h-3.5 w-3.5' />
+          </PopoverPrimitive.Close>
+        </div>
+
         {/* Release view toggle */}
         {onReleaseViewChange && (
           <div className='border-b border-subtle px-3 py-2'>
@@ -198,29 +229,33 @@ function LinearStyleDisplayMenu({
             />
           </div>
         )}
+
         {/* List options */}
         {onGroupByYearChange && (
-          <div className='border-b border-subtle px-2 py-1.5 space-y-0'>
-            <p className='px-1 py-1 text-[11px] font-medium text-secondary-token'>
+          <div className='border-b border-subtle px-3 py-1.5'>
+            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               List options
             </p>
-            {onGroupByYearChange && (
-              <ToggleSwitch
-                label='Group by year'
-                checked={groupByYear ?? false}
-                onToggle={() => onGroupByYearChange(!groupByYear)}
-              />
-            )}
+            <ToggleSwitch
+              label='Group by year'
+              checked={groupByYear ?? false}
+              onToggle={() => onGroupByYearChange(!groupByYear)}
+            />
           </div>
         )}
 
-        {/* Column visibility (Fields) */}
+        {/* Column visibility (Properties) */}
         {availableColumns.length > 0 && (
-          <div className='px-2 py-1.5'>
-            <p className='px-1 py-1 text-[11px] font-medium text-secondary-token'>
-              Properties
+          <div
+            className={cn(
+              'px-3 py-2',
+              onResetToDefaults && 'border-b border-subtle'
+            )}
+          >
+            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              Display properties
             </p>
-            <div className='flex flex-wrap gap-1 px-1'>
+            <div className='flex flex-wrap gap-1 px-0.5'>
               {availableColumns.map(col => {
                 const isVisible = columnVisibility[col.id] !== false;
                 return (
@@ -231,7 +266,7 @@ function LinearStyleDisplayMenu({
                     aria-pressed={isVisible}
                     aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
                     className={cn(
-                      'rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
+                      'rounded-md px-2 py-0.5 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
                       isVisible
                         ? 'bg-interactive-active text-secondary-token'
                         : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
@@ -244,9 +279,10 @@ function LinearStyleDisplayMenu({
             </div>
           </div>
         )}
+
         {/* Reset to defaults */}
         {onResetToDefaults && (
-          <div className='border-t border-subtle px-3 py-1.5'>
+          <div className='px-3 py-1.5'>
             <button
               type='button'
               onClick={onResetToDefaults}
@@ -262,11 +298,10 @@ function LinearStyleDisplayMenu({
 }
 
 /**
- * ReleaseTableSubheader - Subheader with Filter, Display, and Export controls
+ * ReleaseTableSubheader - Subheader with right-aligned Filter, Display, and Export controls
  *
  * Follows Linear's UI pattern with:
- * - Filter button on the left
- * - Display settings + Export button on the right
+ * - Filter, Display, and Export actions grouped on the right
  */
 export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   releases,
@@ -281,27 +316,44 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
+  dspBadges,
+  isSearchOpen,
+  onSearchToggle,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
 
-  const pillButtonClass =
-    'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token';
-
   return (
-    <div className='flex items-center justify-between border-b border-subtle bg-transparent px-4 py-1'>
-      {/* Left: Filter */}
-      <div className='flex items-center gap-2'>
+    <div className='flex items-center justify-between border-b border-subtle/80 bg-surface/20 px-4 py-1.5'>
+      {/* Left: DSP connection badges */}
+      <div className='flex items-center gap-2'>{dspBadges}</div>
+
+      {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
+      <ActionBar className='hidden items-center md:flex'>
+        {onSearchToggle && (
+          <TooltipShortcut label='Search' side='bottom'>
+            <Button
+              variant='ghost'
+              size='sm'
+              onClick={onSearchToggle}
+              className={cn(
+                ACTION_BAR_BUTTON_CLASS,
+                isSearchOpen && 'bg-interactive-active text-primary-token'
+              )}
+              aria-pressed={isSearchOpen}
+            >
+              <Icon name='Search' className='h-3.5 w-3.5' />
+              Search
+            </Button>
+          </TooltipShortcut>
+        )}
         <ReleaseFilterDropdown
           filters={filters}
           onFiltersChange={onFiltersChange}
           counts={counts}
-          buttonClassName={pillButtonClass}
+          buttonClassName={ACTION_BAR_BUTTON_CLASS}
         />
-      </div>
-
-      {/* Right: Display + Export (hidden on mobile where list view is used) */}
-      <div className='hidden md:flex items-center gap-2'>
+        <div className='h-4 w-px bg-subtle/80' aria-hidden='true' />
         <LinearStyleDisplayMenu
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={onColumnVisibilityChange}
@@ -311,7 +363,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}
           onReleaseViewChange={onReleaseViewChange}
-          triggerClassName={pillButtonClass}
+          triggerClassName={ACTION_BAR_BUTTON_CLASS}
         />
         <ExportCSVButton
           getData={() => getReleasesForExport(releases, selectedIds)}
@@ -320,9 +372,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label='Export'
           variant='ghost'
           size='sm'
-          className={pillButtonClass}
+          className={ACTION_BAR_BUTTON_CLASS}
+          tooltipLabel='Export'
         />
-      </div>
+      </ActionBar>
     </div>
   );
 });

@@ -20,11 +20,13 @@ export default async function ReleasesPage() {
 
   // Handle unauthenticated users
   if (!dashboardData.user?.id) {
-    redirect('/sign-in?redirect_url=/app/dashboard/releases');
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_RELEASES}`
+    );
   }
 
   // Handle redirects for users who need onboarding
-  if (dashboardData.needsOnboarding) {
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect('/onboarding');
   }
 
@@ -74,6 +76,8 @@ export default async function ReleasesPage() {
     (dashboardData.selectedProfile?.settings as Record<string, unknown>) ?? {};
   const allowArtworkDownloads =
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
+  const spotifyImportStatus =
+    (profileSettings.spotifyImportStatus as string) ?? 'idle';
 
   return (
     <ReleasesClientBoundary>
@@ -86,6 +90,7 @@ export default async function ReleasesPage() {
         appleMusicConnected={appleMusicStatus.connected}
         appleMusicArtistName={appleMusicStatus.artistName}
         allowArtworkDownloads={allowArtworkDownloads}
+        initialImporting={spotifyImportStatus === 'importing'}
       />
     </ReleasesClientBoundary>
   );

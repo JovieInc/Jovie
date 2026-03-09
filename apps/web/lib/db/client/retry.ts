@@ -5,6 +5,7 @@
  */
 
 import { PERFORMANCE_THRESHOLDS } from '../config';
+import { dbCircuitBreaker } from './circuit-breaker';
 import { logDbError, logDbInfo } from './logging';
 
 const DB_CONFIG = {
@@ -21,7 +22,7 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection.*reset/i,
   /connection.*terminated/i,
   /connection.*closed/i,
-  /server conn crashed\??/i,
+  /server\s+conn\s+crashed\??/i,
   /connection.*unexpectedly/i,
   /timeout/i,
   /network/i,
@@ -36,16 +37,43 @@ const RETRYABLE_ERROR_PATTERNS: readonly RegExp[] = [
   /connection pool exhausted/i,
   /client has encountered a connection error/i,
   /terminating connection due to administrator command/i,
+  // Neon/Drizzle wraps low-level connection failures as "Failed query: <sql>".
+  // These are transient (dropped WebSocket, cold-start timeout) and should be retried.
+  /^failed query/i,
 ] as const;
+
+type RetryableErrorCandidate = {
+  message?: unknown;
+  name?: unknown;
+};
+
+function getErrorText(error: unknown): string[] {
+  if (error instanceof Error) {
+    return [error.message, error.name];
+  }
+
+  if (typeof error !== 'object' || error === null) {
+    return [];
+  }
+
+  const candidate = error as RetryableErrorCandidate;
+  return [candidate.message, candidate.name].flatMap(value =>
+    typeof value === 'string' ? [value] : []
+  );
+}
 
 /**
  * Check if an error is retryable (transient)
  */
 export function isRetryableError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
+  const errorText = getErrorText(error);
 
-  return RETRYABLE_ERROR_PATTERNS.some(
-    pattern => pattern.test(error.message) || pattern.test(error.name)
+  if (errorText.length === 0) {
+    return false;
+  }
+
+  return RETRYABLE_ERROR_PATTERNS.some(pattern =>
+    errorText.some(value => pattern.test(value))
   );
 }
 
@@ -55,49 +83,77 @@ export function isRetryableError(error: unknown): boolean {
 export async function withRetry<T>(
   operation: () => Promise<T>,
   context: string,
-  maxRetries = DB_CONFIG.maxRetries
+  maxRetries: number = DB_CONFIG.maxRetries
 ): Promise<T> {
-  let lastError: unknown;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = await operation();
-      if (attempt > 1) {
-        logDbInfo(
-          'retry_success',
-          `Operation succeeded on attempt ${attempt}`,
-          { context }
-        );
-      }
-      return result;
-    } catch (error) {
-      lastError = error;
-
-      // Check if error is retryable
-      const isRetryable = isRetryableError(error);
-
-      logDbError('retry_attempt', error, {
-        context,
-        attempt,
-        maxRetries,
-        isRetryable,
-        willRetry: attempt < maxRetries && isRetryable,
-      });
-
-      // Don't retry if not retryable or on last attempt
-      if (!isRetryable || attempt >= maxRetries) {
-        break;
-      }
-
-      // Exponential backoff delay
-      const delay =
-        DB_CONFIG.retryDelay *
-        Math.pow(DB_CONFIG.retryBackoffMultiplier, attempt - 1);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
+  if (!Number.isInteger(maxRetries) || maxRetries < 1) {
+    throw new RangeError(
+      `Invalid maxRetries: ${maxRetries}. Expected a positive integer.`
+    );
   }
 
-  throw lastError;
+  return dbCircuitBreaker.execute(
+    async () => {
+      let lastError: unknown;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const result = await operation();
+          if (attempt > 1) {
+            logDbInfo(
+              'retry_success',
+              `Operation succeeded on attempt ${attempt}`,
+              { context }
+            );
+          }
+          return result;
+        } catch (error) {
+          lastError = error;
+
+          // Check if error is retryable
+          const isRetryable = isRetryableError(error);
+
+          const willRetry = attempt < maxRetries && isRetryable;
+          logDbError(
+            'retry_attempt',
+            error,
+            {
+              context,
+              attempt,
+              maxRetries,
+              isRetryable,
+              willRetry,
+            },
+            // Log intermediate retryable failures as breadcrumbs only — they
+            // are expected transient events that will be retried. Capturing
+            // them as Sentry exceptions floods the error dashboard with noise
+            // for errors that the retry loop ultimately recovers from.
+            // Only the final unrecoverable throw (after all retries or a
+            // non-retryable error) reaches the caller and Sentry via normal
+            // exception propagation.
+            { asBreadcrumb: willRetry }
+          );
+
+          // Don't retry if not retryable or on last attempt
+          if (!isRetryable || attempt >= maxRetries) {
+            break;
+          }
+
+          // Exponential backoff delay
+          const delay =
+            DB_CONFIG.retryDelay *
+            Math.pow(DB_CONFIG.retryBackoffMultiplier, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+
+      throw lastError instanceof Error
+        ? lastError
+        : new Error(String(lastError));
+    },
+    {
+      shouldCountFailure: isRetryableError,
+    }
+  );
 }
 
 export { DB_CONFIG };

@@ -32,9 +32,9 @@ describe('Kbd', () => {
     it('applies default variant by default', () => {
       render(<Kbd data-testid='kbd'>⌘K</Kbd>);
       const kbd = screen.getByTestId('kbd');
-      expect(kbd.className).toContain('bg-surface-1');
-      expect(kbd.className).toContain('border-subtle');
-      expect(kbd.className).toContain('text-secondary-token');
+      expect(kbd.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(kbd.className).toContain('border-(--linear-border-default)');
+      expect(kbd.className).toContain('text-(--linear-text-secondary)');
     });
 
     it('applies tooltip variant', () => {
@@ -44,9 +44,9 @@ describe('Kbd', () => {
         </Kbd>
       );
       const kbd = screen.getByTestId('kbd');
-      expect(kbd.className).toContain('bg-surface-2');
-      expect(kbd.className).toContain('border-subtle');
-      expect(kbd.className).toContain('text-secondary-token');
+      expect(kbd.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(kbd.className).toContain('border-(--linear-border-default)');
+      expect(kbd.className).toContain('text-(--linear-text-primary)');
     });
 
     it('tooltip variant has dark mode styles', () => {
@@ -56,8 +56,8 @@ describe('Kbd', () => {
         </Kbd>
       );
       const kbd = screen.getByTestId('kbd');
-      expect(kbd.className).toContain('bg-surface-2');
-      expect(kbd.className).toContain('border-subtle');
+      expect(kbd.className).toContain('bg-(--linear-bg-surface-1)');
+      expect(kbd.className).toContain('border-(--linear-border-default)');
     });
   });
 
@@ -68,12 +68,13 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('inline-flex');
       expect(kbd.className).toContain('items-center');
       expect(kbd.className).toContain('justify-center');
-      expect(kbd.className).toContain('rounded-md');
-      expect(kbd.className).toContain('px-1.5');
-      expect(kbd.className).toContain('py-0.5');
-      expect(kbd.className).toContain('font-sans');
+      expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(kbd.className).toContain('px-1');
+      expect(kbd.className).toContain('py-px');
+      expect(kbd.className).toContain('leading-none');
+      expect(kbd.className).toContain('font-mono');
       expect(kbd.className).toContain('text-[11px]');
-      expect(kbd.className).toContain('font-medium');
+      expect(kbd.className).toContain('font-[450]');
     });
 
     it('merges custom className', () => {
@@ -84,7 +85,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByTestId('kbd');
       expect(kbd.className).toContain('custom-class');
-      expect(kbd.className).toContain('rounded-md');
+      expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
     });
   });
 
@@ -141,7 +142,7 @@ describe('Kbd', () => {
         </div>
       );
       const kbd = screen.getByText('⌘K');
-      expect(kbd.className).toContain('text-secondary-token');
+      expect(kbd.className).toContain('text-(--linear-text-primary)');
     });
   });
 });

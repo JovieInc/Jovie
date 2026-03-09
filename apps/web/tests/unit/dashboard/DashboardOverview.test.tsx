@@ -1,12 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import { BASE_URL } from '@/constants/domains';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema/profiles';
@@ -71,6 +65,10 @@ function renderDashboard(
 }
 
 describe('DashboardOverview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
     // Reset clipboard mock between tests
@@ -127,6 +125,7 @@ describe('DashboardOverview', () => {
   });
 
   it('supports copy-to-clipboard with aria-live status', async () => {
+    vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
     (navigator as any).clipboard = { writeText };
 
@@ -150,31 +149,51 @@ describe('DashboardOverview', () => {
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(writeText.mock.calls[0][0]).toBe(`${BASE_URL}/artist1`);
 
-    // Wait for the copy success state to appear
-    await waitFor(() => {
-      const copiedBtns = screen.getAllByRole('button', { name: /Copied!/i });
-      expect(copiedBtns.length).toBeGreaterThanOrEqual(1);
+    // Wait for the copy success state to appear (clipboard promise resolves via microtask)
+    await act(async () => {
+      await Promise.resolve();
     });
+
+    const copiedBtns = screen.getAllByRole('button', { name: /Copied!/i });
+    expect(copiedBtns.length).toBeGreaterThanOrEqual(1);
 
     // At least one status element should announce the copy
-    await waitFor(() => {
-      const statuses = screen.getAllByRole('status');
-      const hasAnnouncement = statuses.some(s =>
-        s.textContent?.includes('Profile URL copied to clipboard')
-      );
-      expect(hasAnnouncement).toBe(true);
+    const statuses = screen.getAllByRole('status');
+    const hasAnnouncement = statuses.some(s =>
+      s.textContent?.includes('Profile URL copied to clipboard')
+    );
+    expect(hasAnnouncement).toBe(true);
+
+    // Advance fake timers past the 2-second reset timeout
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
     });
 
-    // After timeout, button should reset back to idle (this happens after ~2 seconds)
-    await waitFor(
-      () => {
-        expect(
-          within(headerEl as HTMLElement).getByRole('button', {
-            name: 'Copy URL',
-          })
-        ).toBeInTheDocument();
-      },
-      { timeout: 3000 }
-    );
+    // Button should reset back to idle state after timeout
+    expect(
+      within(headerEl as HTMLElement).getByRole('button', {
+        name: 'Copy URL',
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('uses responsive sizing for header action buttons', () => {
+    const profile = makeProfile({
+      userId: 'db-user-123',
+      spotifyUrl: 'https://open.spotify.com/artist/123',
+    });
+    renderDashboard(profile, true);
+
+    // The "View profile" link button should use responsive sizing (smaller on mobile)
+    const viewProfileLink = screen.getByRole('link', { name: 'View profile' });
+    const viewProfileBtn = viewProfileLink.closest('[class*="rounded-full"]');
+    expect(viewProfileBtn).not.toBeNull();
+    const btnClass = viewProfileBtn!.className;
+
+    // Should have mobile-first small size and sm: breakpoint for larger
+    expect(btnClass).toContain('h-8');
+    expect(btnClass).toContain('w-8');
+    expect(btnClass).toContain('sm:h-11');
+    expect(btnClass).toContain('sm:w-11');
   });
 });

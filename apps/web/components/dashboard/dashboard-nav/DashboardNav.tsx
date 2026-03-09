@@ -2,9 +2,10 @@
 
 import { Badge } from '@jovie/ui/atoms/badge';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -12,9 +13,11 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
+import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import {
-  adminNavigation,
+  adminNavigationSections,
   artistSettingsNavigation,
   primaryNavigation,
   userSettingsNavigation,
@@ -51,6 +54,9 @@ function isItemActive(pathname: string, item: NavItem): boolean {
 export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
+  const router = useRouter();
+  const { isOpen: isPreviewOpen, open: openPreviewPanel } =
+    usePreviewPanelState();
 
   const username =
     selectedProfile?.usernameNormalized ?? selectedProfile?.username;
@@ -67,12 +73,21 @@ export function DashboardNav(_: DashboardNavProps) {
 
   // Replace "Profile" label with artist display name when available
   const artistName = selectedProfile?.displayName;
+  const profileId = selectedProfile?.id ?? '';
+  const { data: releases } = useReleasesQuery(profileId);
+  const releaseCount = releases?.length ?? 0;
+
   const primaryItems = useMemo(() => {
-    if (!artistName) return primaryNavigation;
-    return primaryNavigation.map(item =>
-      item.id === 'profile' ? { ...item, name: artistName } : item
-    );
-  }, [artistName]);
+    return primaryNavigation.map(item => {
+      if (item.id === 'profile' && artistName) {
+        return { ...item, name: artistName };
+      }
+      if (item.id === 'releases' && releaseCount > 0) {
+        return { ...item, badge: releaseCount };
+      }
+      return item;
+    });
+  }, [artistName, releaseCount]);
 
   const genres = selectedProfile?.genres ?? [];
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
@@ -86,11 +101,25 @@ export function DashboardNav(_: DashboardNavProps) {
     [primaryItems]
   );
 
+  // Profile nav item opens the preview drawer instead of navigating to a separate page.
+  // If already on a chat route, just opens the drawer; otherwise navigates first.
+  const handleProfileClick = useCallback(() => {
+    const isOnChat = pathname.startsWith(APP_ROUTES.CHAT);
+    if (isOnChat) {
+      openPreviewPanel();
+    } else {
+      router.push(APP_ROUTES.CHAT);
+      queueMicrotask(() => openPreviewPanel());
+    }
+  }, [pathname, openPreviewPanel, router]);
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
-      const isActive = isItemActive(pathname, item);
+      const isActive = isProfileItem
+        ? isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT)
+        : isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
 
       return (
@@ -100,16 +129,17 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
+          onClick={isProfileItem ? handleProfileClick : undefined}
         />
       );
     },
-    [pathname, profileActions]
+    [pathname, profileActions, handleProfileClick, isPreviewOpen]
   );
 
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: NavItem[]) => (
-      <SidebarMenu>
+      <SidebarMenu className='gap-0.5'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
@@ -157,7 +187,7 @@ export function DashboardNav(_: DashboardNavProps) {
         </div>
       )}
 
-      {!isInSettings && (
+      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && (
         <div className='mt-3'>
           <RecentChats />
         </div>
@@ -166,7 +196,19 @@ export function DashboardNav(_: DashboardNavProps) {
       {isAdmin && !isInSettings && (
         <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            {renderSection(adminNavigation)}
+            <div className='space-y-2'>
+              {adminNavigationSections.map((section, index) => (
+                <div key={section.label} data-admin-section={section.label}>
+                  {index > 0 ? (
+                    <div className='my-1.5 mx-2 border-t border-sidebar-border' />
+                  ) : null}
+                  <p className='px-2 pb-1 text-[11px] uppercase tracking-wide text-sidebar-muted group-data-[collapsible=icon]:hidden'>
+                    {section.label}
+                  </p>
+                  {renderSection(section.items)}
+                </div>
+              ))}
+            </div>
           </SidebarCollapsibleGroup>
         </div>
       )}

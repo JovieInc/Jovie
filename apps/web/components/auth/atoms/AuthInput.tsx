@@ -21,15 +21,15 @@ interface AuthInputProps
 
 const authInputClasses = cn(
   // Base styling - subtle borders for premium feel
-  'border border-subtle bg-white dark:bg-surface-1 text-primary-token',
-  'placeholder:text-tertiary-token',
-  'rounded-[6px]',
+  'border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] text-[var(--linear-text-primary)]',
+  'placeholder:text-[var(--linear-text-tertiary)]',
+  'rounded-[var(--linear-radius-sm)]',
   // Focus ring
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0',
-  // Mobile-optimized sizing - min 44px height for touch targets
-  'h-[44px] min-h-[44px]',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-border-focus)]/40 focus-visible:ring-offset-2',
+  // Mobile-optimized sizing
+  'h-[var(--linear-button-height-md)] sm:h-[var(--linear-button-height-md)] min-h-[40px] px-3',
   // Typography
-  'text-[13px] leading-5',
+  'text-[var(--linear-caption-size)] font-[var(--linear-caption-weight)]',
   // Touch optimizations
   'touch-manipulation',
   '[-webkit-tap-highlight-color:transparent]',

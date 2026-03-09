@@ -37,19 +37,19 @@ function ClerkAccountSections() {
   return (
     <>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3 first:pt-0'>
+        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3 first:pt-0'>
           Email
         </h3>
         <EmailManagementCard user={typedUser} />
       </div>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
+        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
           Connected accounts
         </h3>
         <ConnectedAccountsCard user={typedUser} />
       </div>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
+        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
           Sessions
         </h3>
         <SessionManagementCard
@@ -61,21 +61,27 @@ function ClerkAccountSections() {
   );
 }
 
-export function AccountSettingsSection() {
+interface AccountSettingsSectionProps {
+  readonly isGrowth?: boolean;
+}
+
+export function AccountSettingsSection({
+  isGrowth = false,
+}: AccountSettingsSectionProps) {
   return (
     <div className='space-y-0' data-testid='account-settings-section'>
       <ClerkAccountSections />
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
+        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
           Appearance
         </h3>
         <SettingsAppearanceSection />
       </div>
       <div>
-        <h3 className='text-[13px] font-medium text-secondary-token pt-6 pb-3'>
+        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
           Notifications
         </h3>
-        <SettingsNotificationsSection />
+        <SettingsNotificationsSection isGrowth={isGrowth} />
       </div>
     </div>
   );

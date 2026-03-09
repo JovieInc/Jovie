@@ -9,12 +9,13 @@ import { cn } from '../lib/utils';
  * Provides consistent close button styling across Dialog, AlertDialog, and Sheet.
  */
 export const closeButtonStyles = {
-  base: 'absolute right-4 top-4 rounded-sm opacity-70 transition-opacity',
-  hover: 'hover:opacity-100',
+  base: 'absolute right-4 top-4 rounded-[var(--radius-sm)] text-secondary-token opacity-70 transition-colors duration-normal ease-interactive p-1',
+  hover:
+    'hover:bg-interactive-hover hover:text-primary-token hover:opacity-100',
   focus:
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background',
   disabled: 'disabled:pointer-events-none',
-  offset: 'ring-offset-surface-1',
+  offset: 'ring-offset-background',
 } as const;
 
 /**

@@ -1,8 +1,26 @@
 'use client';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { cn, typography } from '../table.styles';
+
+const defaultFormatOptions: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+};
+
+const defaultTooltipFormatOptions: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+};
+
+const defaultFormatter = new Intl.DateTimeFormat('en-US', defaultFormatOptions);
+const defaultTooltipFormatter = new Intl.DateTimeFormat(
+  'en-US',
+  defaultTooltipFormatOptions
+);
 
 interface DateCellProps {
   /**
@@ -53,28 +71,35 @@ interface DateCellProps {
  */
 export const DateCell = React.memo(function DateCell({
   date,
-  formatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  },
-  tooltipFormatOptions = {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  },
-  locale = 'en-US',
+  formatOptions,
+  tooltipFormatOptions,
+  locale,
   className,
 }: DateCellProps) {
-  // Format user-friendly date
-  const formatted = date
-    ? new Intl.DateTimeFormat(locale, formatOptions).format(date)
-    : '—';
+  const isDefault = !formatOptions && !tooltipFormatOptions && !locale;
+  const cellFormatter = useMemo(
+    () =>
+      isDefault
+        ? defaultFormatter
+        : new Intl.DateTimeFormat(
+            locale ?? 'en-US',
+            formatOptions ?? defaultFormatOptions
+          ),
+    [isDefault, locale, formatOptions]
+  );
+  const tipFormatter = useMemo(
+    () =>
+      isDefault
+        ? defaultTooltipFormatter
+        : new Intl.DateTimeFormat(
+            locale ?? 'en-US',
+            tooltipFormatOptions ?? defaultTooltipFormatOptions
+          ),
+    [isDefault, locale, tooltipFormatOptions]
+  );
 
-  // Format full date for tooltip
-  const fullDate = date
-    ? new Intl.DateTimeFormat(locale, tooltipFormatOptions).format(date)
-    : null;
+  const formatted = date ? cellFormatter.format(date) : '—';
+  const fullDate = date ? tipFormatter.format(date) : null;
 
   return (
     <Tooltip>

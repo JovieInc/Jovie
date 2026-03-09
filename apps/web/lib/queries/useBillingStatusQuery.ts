@@ -10,6 +10,8 @@ export interface BillingStatusData {
   plan: string | null;
   hasStripeCustomer: boolean;
   stripeSubscriptionId: string | null;
+  stale: boolean;
+  staleReason: string | null;
 }
 
 interface BillingStatusResponse {
@@ -17,6 +19,8 @@ interface BillingStatusResponse {
   plan?: string | null;
   stripeCustomerId?: string | null;
   stripeSubscriptionId?: string | null;
+  _stale?: boolean;
+  _staleReason?: string;
 }
 
 // Create the base fetch function using createQueryFn for consistent error handling
@@ -37,6 +41,8 @@ async function fetchBillingStatus({
     plan: payload?.plan ?? null,
     hasStripeCustomer: Boolean(payload?.stripeCustomerId),
     stripeSubscriptionId: payload?.stripeSubscriptionId ?? null,
+    stale: Boolean(payload?._stale),
+    staleReason: payload?._staleReason ?? null,
   };
 }
 
@@ -48,13 +54,16 @@ export const billingStatusQueryOptions = {
   // FREQUENT_CACHE: 1 min stale, 10 min gc - appropriate for billing data
   ...FREQUENT_CACHE,
   // Billing endpoint can return 503 when billing systems are transiently down.
-  // Avoid aggressive retries/refetch loops that spam logs and backend.
+  // Allow 1 retry with backoff for transient failures (5xx/429/408).
+  // Don't retry 4xx client errors — they won't self-heal.
   retry: (failureCount: number, error: Error) => {
-    if (error instanceof FetchError && error.status === 503) {
+    if (error instanceof FetchError && !error.isRetryable()) {
       return false;
     }
     return failureCount < 1;
   },
+  retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
+  // Mutations already invalidate this query, so focus-based refetching is noise.
   refetchOnWindowFocus: false,
 } as const;
 

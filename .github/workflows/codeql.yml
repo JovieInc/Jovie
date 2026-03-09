@@ -14,23 +14,27 @@ name: CodeQL Security Analysis
 on:
   push:
     branches: ['main']
-  pull_request:
-    branches: ['main']
-  merge_group:
+  # Removed pull_request and merge_group triggers — CodeQL on push-to-main
+  # catches everything that merges, and weekly schedule covers drift.
+  # This eliminates ~570 redundant runs/month.
   schedule:
     - cron: '36 13 * * 1' # Weekly on Monday at 13:36 UTC
 
-permissions:
-  security-events: write
-  packages: read
-  actions: read
-  contents: read
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
     strategy:
       fail-fast: false
@@ -46,13 +50,14 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@9e907b5e64f6b83e7804b09294d44122997950d6 # v3.28.15
+        uses: github/codeql-action/init@0d579ffd059c29b07949a3cce3983f0780820c98 # v3.28.15
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           config-file: .github/codeql/codeql-config.yml
+          queries: security-extended
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@9e907b5e64f6b83e7804b09294d44122997950d6 # v3.28.15
+        uses: github/codeql-action/analyze@0d579ffd059c29b07949a3cce3983f0780820c98 # v3.28.15
         with:
           category: '/language:${{matrix.language}}'

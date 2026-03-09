@@ -1,21 +1,23 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import { isProductionTarget, signInUser } from '../helpers/clerk-auth';
+import {
+  SMOKE_TIMEOUTS,
+  waitForHydration,
+  waitForNetworkIdle,
+} from './utils/smoke-test-utils';
 
 /**
- * Dashboard Pages Health Check
+ * Dashboard E2E Tests (consolidated from dashboard-pages-health, dashboard-landing, dashboard-routing)
  *
- * Comprehensive E2E tests that verify every dashboard page:
- * 1. Loads without white screens or error pages
- * 2. No critical console errors
- * 3. Key content elements are visible
+ * Covers:
+ * 1. All dashboard page health checks (loads, no errors, content visible)
+ * 2. Admin page health checks
+ * 3. Routing (back/forward nav, deep linking, redirect behavior)
+ * 4. Lazy component hydration
  *
  * Run with doppler:
  *   doppler run -- pnpm exec playwright test dashboard-pages-health --project=chromium
- *
- * For debugging individual pages:
- *   doppler run -- pnpm exec playwright test dashboard-pages-health --project=chromium --grep "Profile"
  */
 
 /**
@@ -210,6 +212,15 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
   test.setTimeout(360_000);
 
   test.beforeEach(async ({ page }) => {
+    // Skip full health check on production targets — use smoke-prod-auth.spec.ts instead
+    if (isProductionTarget()) {
+      test.skip(
+        true,
+        'Full dashboard health check skipped on production target'
+      );
+      return;
+    }
+
     // Skip if no Clerk credentials configured
     if (!hasClerkCredentials()) {
       console.log('⚠ Skipping dashboard health tests - no Clerk credentials');
@@ -217,6 +228,16 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
       test.skip();
       return;
     }
+
+    await page.route('**/api/profile/view', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', route =>
+      route.fulfill({ status: 200, body: '{}' })
+    );
 
     // Set up Clerk testing token and sign in
     await setupClerkTestingToken({ page });
@@ -259,10 +280,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
         await waitForHydration(page);
 
         // Allow page to stabilize
-        await Promise.race([
-          page.waitForLoadState('networkidle'),
-          page.waitForTimeout(5000),
-        ]).catch(() => {});
+        await waitForNetworkIdle(page);
 
         const loadTimeMs = Date.now() - startTime;
 
@@ -451,7 +469,9 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
       await waitForHydration(page);
 
       // Wait for page to stabilize
-      await page.waitForLoadState('networkidle').catch(() => {});
+      await page
+        .waitForLoadState('networkidle', { timeout: 5000 })
+        .catch(() => {});
       // Wait for React to fully hydrate - check for absence of loading states
       await page
         .waitForFunction(
@@ -485,10 +505,16 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 });
 
 test.describe('Admin Pages Health Check @smoke', () => {
-  // Admin pages: signInUser (180s+) + admin page navigation (120s each)
-  test.setTimeout(480_000);
+  // Admin pages: signInUser (180s+) + 6 admin pages × 60s each (warmed up in global-setup)
+  test.setTimeout(600_000);
 
   test.beforeEach(async ({ page }) => {
+    // Skip full admin health check on production targets
+    if (isProductionTarget()) {
+      test.skip(true, 'Admin health check skipped on production target');
+      return;
+    }
+
     // Skip if no admin credentials configured
     if (!hasAdminCredentials()) {
       console.log('⚠ Skipping admin health tests - no credentials');
@@ -519,7 +545,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
    * admin access, the pages will return 404 and the test will skip.
    */
   test('All admin pages load without errors', async ({ page }, testInfo) => {
-    test.setTimeout(360_000); // 6 minutes for 6 admin pages (dev mode is slow, especially under load)
+    test.setTimeout(480_000); // 8 minutes — 6 admin pages warmed up in global-setup, but first-run can be slow
 
     // Capture browser console errors for debugging page failures
     const consoleErrors: string[] = [];
@@ -543,17 +569,14 @@ test.describe('Admin Pages Health Check @smoke', () => {
         // Admin pages are hit later in the test suite when the server may be under load
         const response = await page.goto(pageConfig.path, {
           waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION * 2, // Double timeout for admin pages under load
+          timeout: 90_000, // 90s — admin pages warmed up in global-setup; 90s handles slow render
         });
 
         // Wait for React hydration
         await waitForHydration(page);
 
         // Allow page to stabilize
-        await Promise.race([
-          page.waitForLoadState('networkidle'),
-          page.waitForTimeout(5000),
-        ]).catch(() => {});
+        await waitForNetworkIdle(page);
 
         const loadTimeMs = Date.now() - startTime;
         const currentUrl = page.url();
@@ -765,6 +788,144 @@ test.describe('Admin Pages Health Check @smoke', () => {
     expect(
       realFailures,
       `${realFailures.length} pages failed health check (excluding ${infraFailures.length} transient infra failures)`
+    ).toHaveLength(0);
+  });
+});
+
+// ============================================================================
+// Dashboard Routing Tests (consolidated from dashboard-routing.spec.ts)
+// ============================================================================
+
+test.describe('Dashboard Routing', () => {
+  test.setTimeout(180_000);
+
+  test.beforeEach(async ({ page }) => {
+    if (!hasClerkCredentials()) {
+      test.skip();
+      return;
+    }
+
+    await page.route('**/api/profile/view', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/audience/visit', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+    await page.route('**/api/track', r =>
+      r.fulfill({ status: 200, body: '{}' })
+    );
+
+    await setupClerkTestingToken({ page });
+    try {
+      await signInUser(page);
+    } catch {
+      test.skip();
+    }
+  });
+
+  test('legacy /app/dashboard redirects away', async ({ page }) => {
+    await page.goto('/app/dashboard', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      waitUntil: 'domcontentloaded',
+    });
+    await page.waitForURL(url => !url.pathname.endsWith('/app/dashboard'), {
+      timeout: 30000,
+    });
+  });
+
+  test('browser back/forward navigation works', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await page.goto('/app/dashboard/profile', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/dashboard\/profile/);
+
+    await page.goto('/app/settings', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await waitForHydration(page);
+    await expect(page).toHaveURL(/\/app\/settings/);
+
+    await page.goBack({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/app\/dashboard\/profile/, {
+      timeout: 30_000,
+    });
+
+    await page.goForward({ timeout: 60_000 });
+    await expect(page).toHaveURL(/\/app\/settings/, { timeout: 30_000 });
+  });
+
+  test('all dashboard routes render content @smoke', async ({ page }) => {
+    test.setTimeout(240_000);
+    const routes = [
+      { path: '/app/dashboard/profile', content: /profile|links|edit/i },
+      { path: '/app/dashboard/earnings', content: /earnings|tips|revenue/i },
+      { path: '/app/dashboard/releases', content: /releases|music|tracks/i },
+      {
+        path: '/app/dashboard/audience',
+        content: /audience|fans|subscribers/i,
+      },
+    ];
+
+    for (const { path, content } of routes) {
+      await page.goto(path, { timeout: SMOKE_TIMEOUTS.NAVIGATION });
+      await waitForHydration(page);
+      await waitForNetworkIdle(page);
+
+      const mainContent = page.locator('main').getByText(content).first();
+      const hasMatchingContent = await mainContent
+        .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+        .catch(() => false);
+
+      if (hasMatchingContent) continue;
+
+      // Fallback: verify page has some content (not blank)
+      const bodyText = await page
+        .locator('body')
+        .textContent()
+        .catch(() => '');
+      const bodyLength = bodyText?.trim().length ?? 0;
+      expect(
+        bodyLength > 10,
+        `Route ${path} should render some content (found ${bodyLength} chars)`
+      ).toBe(true);
+    }
+  });
+
+  test('lazy components hydrate without errors @smoke', async ({ page }) => {
+    test.setTimeout(180_000);
+    const hydrationErrors: string[] = [];
+
+    page.on('console', msg => {
+      const text = msg.text();
+      if (
+        text.includes('Hydration failed') ||
+        text.includes('Text content did not match') ||
+        text.includes('did not match. Server:')
+      ) {
+        hydrationErrors.push(text);
+      }
+    });
+
+    await page.goto('/app/dashboard/profile', {
+      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    });
+    await page
+      .waitForLoadState('networkidle', { timeout: 5000 })
+      .catch(() => {});
+
+    await page
+      .waitForFunction(
+        () => !document.querySelector('[data-loading="true"], .skeleton'),
+        { timeout: 15_000 }
+      )
+      .catch(() => {});
+
+    expect(
+      hydrationErrors,
+      `Hydration errors detected: ${hydrationErrors.join(', ')}`
     ).toHaveLength(0);
   });
 });

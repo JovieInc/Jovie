@@ -27,8 +27,14 @@ function mapEventToFacebook(eventType: NormalizedEvent['eventType']): string {
       return 'ViewContent';
     case 'form_submit':
       return 'Lead';
+    case 'subscribe':
+      return 'Subscribe';
     case 'scroll_depth':
       return 'ViewContent';
+    case 'tip_page_view':
+      return 'ViewContent';
+    case 'tip_intent':
+      return 'InitiateCheckout';
     default:
       return 'PageView';
   }
@@ -68,6 +74,9 @@ export async function forwardToFacebook(
             // https://developers.facebook.com/docs/marketing-api/conversions-api/parameters/customer-information-parameters
             ...(event.clientIp && { client_ip_address: event.clientIp }),
             client_user_agent: event.userAgent,
+            // Hashed PII improves match rate (SHA-256 hex, per Facebook spec)
+            ...(event.hashedEmail && { em: [event.hashedEmail] }),
+            ...(event.hashedPhone && { ph: [event.hashedPhone] }),
           },
           custom_data: {
             content_type: 'profile',
@@ -76,6 +85,8 @@ export async function forwardToFacebook(
             ...(event.utmSource && { utm_source: event.utmSource }),
             ...(event.utmMedium && { utm_medium: event.utmMedium }),
             ...(event.utmCampaign && { utm_campaign: event.utmCampaign }),
+            ...(event.tipAmount && { value: event.tipAmount, currency: 'USD' }),
+            ...(event.tipMethod && { payment_method: event.tipMethod }),
           },
         },
       ],

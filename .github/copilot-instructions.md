@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions for Jovie
 
-**ALWAYS follow these instructions first and only fallback to additional search and context gathering if the information here is incomplete or found to be in error.**
+**ALWAYS follow these instructions first and only fallback to additional search and context gathering if the information here is incomplete or found to be in error. If this file conflicts with `AGENTS.md`, `AGENTS.md` is canonical.**
 
 This repository uses GitHub Copilot (including the Coding Agent) to propose and implement small, focused changes via Pull Requests. These instructions provide comprehensive guidance for working in the Jovie codebase like a developer would after acquiring a fresh clone.
 
@@ -20,7 +20,7 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 ## Critical Setup Requirements
 
 ### Prerequisites
-- **Node.js 24.0.0**: Required version (check `.nvmrc`). Use `nvm use 24` or `nvm install 24`
+- **Node.js 22.x**: Required version (check `.nvmrc`). Use `nvm use 22` or `nvm install 22`
 - **pnpm 9.15.4**: Exact version required (not npm or yarn)
 - **Environment Variables**: Copy `.env.example` to `.env.local` and configure
 
@@ -28,23 +28,18 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 Run these commands in order for a fresh repository clone:
 
 ```bash
-# 0. VERIFY NODE VERSION FIRST (must be v24.x)
-node --version  # Expected: v24.0.0
+# 0. Run the repo bootstrap first
+./scripts/setup.sh
 
-# 1. Ensure exact pnpm version via Corepack
+# 1. VERIFY NODE VERSION FIRST (must be v22.x)
+node --version  # Expected: v22.13.0 or higher
+
+# 2. Ensure exact pnpm version via Corepack
 corepack enable pnpm
 corepack prepare pnpm@9.15.4 --activate
 
-# 2. Install dependencies (TIMING: ~60-90 seconds)
-# NOTE: Use --no-frozen-lockfile due to lockfile sync issues
-pnpm install --no-frozen-lockfile
-
-# 3. Copy environment template
-cp .env.example .env.local
-# EDIT .env.local with your credentials (see Environment Variables section)
-
-# 4. Start development server (TIMING: ~1.5 seconds)
-pnpm run dev
+# 3. Start development server
+doppler run -- pnpm --filter web dev:local
 ```
 
 ### Critical Timeout Requirements
@@ -211,7 +206,7 @@ tests/                       # Test suites (unit, e2e, integration)
 - **`app/api/`** - API routes for various features
 - **`lib/db/queries.ts`** - Database query functions
 - **`lib/auth/`** - Clerk authentication helpers
-- **`middleware.ts`** - Clerk auth middleware configuration
+- **`apps/web/proxy.ts`** - Auth/proxy entrypoint (do not create `middleware.ts`)
 
 ### Development Tools
 - **`scripts/drizzle-migrate.ts`** - Database migration runner
@@ -347,7 +342,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 1. **Check Clerk config**: Verify publishable key in environment
 2. **Clear browser data**: Clear cookies and local storage
 3. **Test in incognito**: Rule out browser state issues
-4. **Review middleware**: Check `middleware.ts` configuration
+4. **Review proxy routing**: Check `apps/web/proxy.ts` configuration
 
 ### Build/Deploy Failures
 1. **Check timeout settings**: Ensure 75+ minute timeouts for builds
@@ -415,7 +410,7 @@ After making changes, **ALWAYS test these user scenarios manually**:
 - Always calculate: `(calls per run) × (runs per day) × 30 = monthly API calls`. If >1,000/month, justify it.
 - PRs with recurring external API calls MUST include a **Cost Impact** section
 
-**Full details**: See `agents.md` → "Infrastructure & Scheduling Guardrails" at the repo root.
+**Full details**: See `AGENTS.md` → "Infrastructure & Scheduling Guardrails" at the repo root.
 
 ---
 

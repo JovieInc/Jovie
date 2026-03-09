@@ -1,12 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  COUNTRY_CODE_COOKIE,
   LISTEN_COOKIE,
 } from '@/constants/app';
 import { track } from '@/lib/analytics';
-import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
+import {
+  type AvailableDSP,
+  getAvailableDSPs,
+  sortDSPsForDevice,
+} from '@/lib/dsp';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { detectPlatformFromUA } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
 interface StaticListenInterfaceProps {
@@ -30,9 +40,35 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
   dspsOverride,
   enableDynamicEngagement = false,
 }: StaticListenInterfaceProps) {
-  const [dsps] = useState<AvailableDSP[]>(
-    () => dspsOverride ?? getAvailableDSPs(artist)
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
   );
+
+  const dsps = useMemo(() => {
+    const countryCode =
+      typeof document === 'undefined'
+        ? null
+        : document.cookie
+            .split(';')
+            .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
+            ?.split('=')[1];
+
+    const baseDSPs = dspsOverride ?? getAvailableDSPs(artist);
+    const userAgent =
+      typeof navigator === 'undefined' ? undefined : navigator.userAgent;
+    const detectedPlatform = detectPlatformFromUA(userAgent);
+    const platform =
+      detectedPlatform === 'ios' || detectedPlatform === 'android'
+        ? detectedPlatform
+        : 'desktop';
+
+    return sortDSPsForDevice(baseDSPs, {
+      countryCode: countryCode ?? null,
+      platform,
+      enableDevicePriority,
+    });
+  }, [artist, dspsOverride, enableDevicePriority]);
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -120,43 +156,28 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             </p>
           </div>
         ) : (
-          availableDSPs.map(dsp => (
-            <button
-              type='button'
-              key={dsp.key}
-              onClick={() => handleDSPClick(dsp)}
-              disabled={selectedDSP === dsp.key || isLoading}
-              className={`
-                w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl font-medium text-[15px]
-                transition-all duration-150 ease-out will-change-transform
-                hover:scale-[1.01] hover:-translate-y-px active:scale-[0.99]
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-opacity-50
-                disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
-                ${selectedDSP === dsp.key ? 'opacity-75 cursor-wait' : ''}
-              `}
-              style={{
-                backgroundColor: dsp.config.color,
-                color: dsp.config.textColor,
-              }}
-              aria-label={`Open in ${dsp.name} app if installed, otherwise opens in web browser`}
-            >
-              <div
-                className='shrink-0'
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: SVG logos are trusted internal constants from DSP_CONFIGS, not user content
-                dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
+          availableDSPs.map(dsp => {
+            const logoConfig =
+              DSP_LOGO_CONFIG[dsp.key as keyof typeof DSP_LOGO_CONFIG];
+            const isSelected = selectedDSP === dsp.key;
+
+            return (
+              <SmartLinkProviderButton
+                key={dsp.key}
+                onClick={() => handleDSPClick(dsp)}
+                label={isSelected ? `Opening ${dsp.name}...` : dsp.name}
+                iconPath={logoConfig?.iconPath}
+                className={isSelected || isLoading ? 'opacity-60' : undefined}
               />
-              <span>
-                {selectedDSP === dsp.key ? 'Opening...' : `Open in ${dsp.name}`}
-              </span>
-            </button>
-          ))
+            );
+          })
         )}
       </div>
 
       {/* Help text */}
       <div className='mt-6 text-center'>
         <p className='text-xs text-tertiary-token'>
-          If you have the app installed, it will open automatically
+          Your preferred app opens first next time.
         </p>
       </div>
     </div>

@@ -1,13 +1,13 @@
 'use client';
 
-import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
-import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
+import { getOAuthErrorMessage } from '@/lib/auth/clerk-errors';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
@@ -32,6 +32,7 @@ export function SignUpForm() {
     error,
     clearError,
     shouldSuggestSignIn,
+    oauthFailureProvider,
     startEmailFlow,
     verifyCode,
     resendCode,
@@ -41,7 +42,6 @@ export function SignUpForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [lastAuthMethod] = useLastAuthMethod();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClerkStalled = useLoadingStall(isLoaded);
@@ -52,7 +52,7 @@ export function SignUpForm() {
   // Build sign-in URL with email and redirect preserved
   const buildSignInUrl = useCallback(
     (emailToPass: string) => {
-      const signInUrl = new URL('/signin', globalThis.location.origin);
+      const signInUrl = new URL(APP_ROUTES.SIGNIN, globalThis.location.origin);
       // Pass email to prefill sign-in form
       if (emailToPass) {
         signInUrl.searchParams.set('email', emailToPass);
@@ -96,19 +96,52 @@ export function SignUpForm() {
   };
 
   return (
-    <Card className='shadow-none border-0 bg-transparent p-0'>
-      <CardContent className='space-y-3 p-0'>
+    <div className='w-full'>
+      <div className='space-y-3'>
         {/* Method selection step */}
         {step === 'method' && (
-          <MethodSelector
-            onEmailClick={handleEmailClick}
-            onGoogleClick={() => startOAuth('google')}
-            onSpotifyClick={() => startOAuth('spotify')}
-            loadingState={loadingState}
-            lastMethod={lastAuthMethod}
-            mode='signup'
-            error={step === 'method' ? error : null}
-          />
+          <>
+            <MethodSelector
+              onEmailClick={handleEmailClick}
+              onGoogleClick={startOAuth}
+              loadingState={loadingState}
+              mode='signup'
+              error={step === 'method' && oauthFailureProvider ? null : error}
+            />
+
+            {error && oauthFailureProvider && (
+              <div
+                className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3 animate-in fade-in-0 slide-in-from-top-2 duration-300'
+                role='alert'
+              >
+                <p className='text-sm font-medium text-destructive'>
+                  {getOAuthErrorMessage(error, 'Google')}
+                </p>
+                <p className='text-sm text-[#4c515a] dark:text-[#a8aaad]'>
+                  Try another sign-up method to keep going right away.
+                </p>
+                <div className='flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
+                  <button
+                    type='button'
+                    onClick={() => startOAuth()}
+                    className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
+                  >
+                    Try Google again
+                  </button>
+                  <button
+                    type='button'
+                    onClick={handleEmailClick}
+                    className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
+                  >
+                    Continue with email
+                  </button>
+                </div>
+                <p className='text-xs text-[#6b6f76] dark:text-[#969799]'>
+                  Details: {error}
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {/* Email input step */}
@@ -160,13 +193,13 @@ export function SignUpForm() {
         {shouldSuggestSignIn && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
             {isRedirecting ? (
-              <>Redirecting to sign in…</>
+              <>Redirecting to sign in&hellip;</>
             ) : (
               <>
                 Account already exists.{' '}
                 <Link
                   href={buildSignInUrl(email)}
-                  className='text-primary-token hover:underline focus-ring-themed rounded-md'
+                  className='text-primary-token underline focus-ring-themed rounded-md'
                 >
                   Sign in instead
                 </Link>
@@ -175,18 +208,21 @@ export function SignUpForm() {
           </p>
         )}
 
+        {/* Clerk bot protection CAPTCHA mount point */}
+        <div id='clerk-captcha' />
+
         {step === 'method' && (
-          <p className='mt-6 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
+          <p className='mt-4 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
             By signing up, you agree to our{' '}
             <Link
-              href='/legal/terms'
+              href={APP_ROUTES.LEGAL_TERMS}
               className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
-              href='/legal/privacy'
+              href={APP_ROUTES.LEGAL_PRIVACY}
               className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
             >
               Privacy Policy
@@ -194,7 +230,7 @@ export function SignUpForm() {
             .
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

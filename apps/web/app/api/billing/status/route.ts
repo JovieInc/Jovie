@@ -7,6 +7,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
+import { getRedis } from '@/lib/redis';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 
@@ -20,6 +21,107 @@ const CACHE_HEADERS = {
 
 // No caching for error responses
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+const BILLING_STATUS_CACHE_KEY_PREFIX = 'billing:status:v1:';
+const BILLING_STATUS_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
+
+interface BillingStatusPayload {
+  isPro: boolean;
+  plan: string;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+}
+
+interface BillingStatusStalePayload extends BillingStatusPayload {
+  _stale: true;
+  _staleReason: string;
+}
+
+interface BillingStatusCacheEntry {
+  payload: BillingStatusPayload;
+  cachedAt: string;
+}
+
+function getBillingStatusCacheKey(userId: string): string {
+  return `${BILLING_STATUS_CACHE_KEY_PREFIX}${userId}`;
+}
+
+function buildBillingStatusPayload(params: {
+  isPro: boolean;
+  plan: string | null | undefined;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+}): BillingStatusPayload {
+  return {
+    isPro: params.isPro,
+    plan: params.plan ?? 'free',
+    stripeCustomerId: params.stripeCustomerId,
+    stripeSubscriptionId: params.stripeSubscriptionId,
+  };
+}
+
+async function readCachedBillingStatus(
+  userId: string
+): Promise<BillingStatusCacheEntry | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  try {
+    const cached = await redis.get<BillingStatusCacheEntry>(
+      getBillingStatusCacheKey(userId)
+    );
+    if (!cached) return null;
+
+    const entry =
+      typeof cached === 'string'
+        ? (JSON.parse(cached) as BillingStatusCacheEntry)
+        : cached;
+
+    if (!entry?.payload) return null;
+
+    return entry;
+  } catch (error) {
+    logger.warn('Billing status cache read failed', {
+      userId,
+      error,
+    });
+    return null;
+  }
+}
+
+function writeBillingStatusCache(
+  userId: string,
+  payload: BillingStatusPayload
+): void {
+  const redis = getRedis();
+  if (!redis) return;
+
+  const entry: BillingStatusCacheEntry = {
+    payload,
+    cachedAt: new Date().toISOString(),
+  };
+
+  redis
+    .set(getBillingStatusCacheKey(userId), JSON.stringify(entry), {
+      ex: BILLING_STATUS_CACHE_TTL_SECONDS,
+    })
+    .catch(error => {
+      logger.warn('Billing status cache write failed', {
+        userId,
+        error,
+      });
+    });
+}
+
+function buildStaleBillingStatusPayload(
+  payload: BillingStatusPayload
+): BillingStatusStalePayload {
+  return {
+    ...payload,
+    _stale: true,
+    _staleReason: 'Payment service temporarily unavailable',
+  };
+}
 
 export async function GET() {
   try {
@@ -35,6 +137,14 @@ export async function GET() {
     // Get user's billing information
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success) {
+      const cached = await readCachedBillingStatus(userId);
+      if (cached) {
+        return NextResponse.json(
+          buildStaleBillingStatusPayload(cached.payload),
+          { headers: CACHE_HEADERS }
+        );
+      }
+
       // Billing lookup failed — surface as 503 so clients can distinguish
       // "free user" from "billing system unavailable" and show a retry state
       // instead of silently revoking pro features.
@@ -57,29 +167,28 @@ export async function GET() {
 
     if (!billingResult.data) {
       // User exists in auth but not in database — likely needs onboarding
-      return NextResponse.json(
-        {
-          isPro: false,
-          plan: 'free',
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-        },
-        { headers: CACHE_HEADERS }
-      );
+      const payload = buildBillingStatusPayload({
+        isPro: false,
+        plan: 'free',
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+      });
+      writeBillingStatusCache(userId, payload);
+      return NextResponse.json(payload, { headers: CACHE_HEADERS });
     }
 
     const { isPro, stripeCustomerId, stripeSubscriptionId, plan } =
       billingResult.data;
 
-    return NextResponse.json(
-      {
-        isPro,
-        plan: plan ?? 'free',
-        stripeCustomerId,
-        stripeSubscriptionId,
-      },
-      { headers: CACHE_HEADERS }
-    );
+    const payload = buildBillingStatusPayload({
+      isPro,
+      plan,
+      stripeCustomerId,
+      stripeSubscriptionId,
+    });
+
+    writeBillingStatusCache(userId, payload);
+    return NextResponse.json(payload, { headers: CACHE_HEADERS });
   } catch (error) {
     logger.error('Error getting billing status:', error);
 

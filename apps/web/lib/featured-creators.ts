@@ -10,6 +10,10 @@ export type FeaturedCreator = {
   handle: string;
   name: string;
   src: string;
+  tagline: string | null;
+  genres: string[];
+  latestReleaseTitle: string | null;
+  latestReleaseType: string | null;
 };
 
 /**
@@ -45,16 +49,16 @@ function shuffle<T>(arr: T[], seed: number): T[] {
 
 async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
   try {
-    // Add timeout to table existence check (5s) to prevent hanging during cold starts
+    // Add timeout to table existence check (15s) to prevent false negatives during cold starts
     const tableExists = await Promise.race([
       doesTableExist(TABLE_NAMES.creatorProfiles),
       new Promise<boolean>(resolve =>
         setTimeout(() => {
           captureWarning(
-            '[FeaturedCreators] Table check timed out after 5s, assuming table does not exist'
+            '[FeaturedCreators] Table check timed out after 15s, assuming table does not exist'
           );
           resolve(false);
-        }, 5000)
+        }, 15000)
       ),
     ]);
 
@@ -72,8 +76,10 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
           id: creatorProfiles.id,
           username: creatorProfiles.username,
           displayName: creatorProfiles.displayName,
+          bio: creatorProfiles.bio,
           avatarUrl: creatorProfiles.avatarUrl,
           creatorType: creatorProfiles.creatorType,
+          genres: creatorProfiles.genres,
         })
         .from(creatorProfiles)
         .where(
@@ -93,21 +99,71 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
       ),
     ]);
 
+    const creatorIds = data.map(creator => creator.id);
+    const releaseByCreatorId = new Map<
+      string,
+      { title: string; type: string | null }
+    >();
+
+    if (creatorIds.length > 0 && (await doesTableExist('discog_releases'))) {
+      const latestReleases = await Promise.race([
+        db.query.discogReleases.findMany({
+          where: (releases, { inArray }) =>
+            inArray(releases.creatorProfileId, creatorIds),
+          columns: {
+            creatorProfileId: true,
+            title: true,
+            releaseType: true,
+            releaseDate: true,
+            createdAt: true,
+          },
+          orderBy: (releases, { desc }) => [
+            desc(releases.releaseDate),
+            desc(releases.createdAt),
+          ],
+          limit: 100,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('Discog releases query timeout after 10s')),
+            10000
+          )
+        ),
+      ]);
+
+      for (const release of latestReleases) {
+        if (!releaseByCreatorId.has(release.creatorProfileId)) {
+          releaseByCreatorId.set(release.creatorProfileId, {
+            title: release.title,
+            type: release.releaseType,
+          });
+        }
+      }
+    }
+
     const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
     return shuffle(
-      data.map(a => ({
-        id: a.id,
-        handle: a.username,
-        name: a.displayName || a.username,
-        src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
-          width: 256,
-          height: 256,
-          quality: 70,
-          format: 'webp',
-          crop: 'fill',
-          gravity: 'face',
-        }),
-      })),
+      data.map(a => {
+        const latestRelease = releaseByCreatorId.get(a.id);
+
+        return {
+          id: a.id,
+          handle: a.username,
+          name: a.displayName || a.username,
+          src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
+            width: 256,
+            height: 256,
+            quality: 70,
+            format: 'webp',
+            crop: 'fill',
+            gravity: 'face',
+          }),
+          tagline: a.bio,
+          genres: a.genres?.slice(0, 2) ?? [],
+          latestReleaseTitle: latestRelease?.title ?? null,
+          latestReleaseType: latestRelease?.type ?? null,
+        };
+      }),
       seed
     );
   } catch (error) {
@@ -159,7 +215,8 @@ async function queryFeaturedCreatorsForSearch(): Promise<
         eq(creatorProfiles.isFeatured, true),
         eq(creatorProfiles.marketingOptOut, false)
       )
-    );
+    )
+    .limit(200);
 
   const vipMap = new Map<string, VipArtist>();
 

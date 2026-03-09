@@ -1,41 +1,38 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
 import {
-  SidebarInset,
   SidebarProvider,
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
-import { useTablePanel } from '@/contexts/TablePanelContext';
-import { cn } from '@/lib/utils';
+import { useRightPanel } from '@/contexts/RightPanelContext';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
+import { AppShellFrame } from './AppShellFrame';
 
 export interface AuthShellProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
   readonly breadcrumbs: DashboardBreadcrumbItem[];
-  /** Badge/pill shown after breadcrumb (left side) */
   readonly headerBadge?: ReactNode;
-  /** Actions shown on right side of header */
   readonly headerAction?: ReactNode;
   readonly showMobileTabs?: boolean;
   readonly isTableRoute?: boolean;
-  /** Preview panel slot (rendered alongside main content) */
-  readonly previewPanel?: ReactNode;
   readonly onSidebarOpenChange?: (open: boolean) => void;
-  /** Server-provided sidebar default open state (from cookie). Eliminates layout flash. */
   readonly sidebarDefaultOpen?: boolean;
   readonly children: ReactNode;
 }
 
-/**
- * AuthShellInner - Inner component that has access to sidebar context
- */
+function getContentClassName(showMobileTabs: boolean, isTableRoute: boolean) {
+  if (!showMobileTabs) return undefined;
+  return isTableRoute ? 'pb-20 lg:pb-0' : 'pb-20 lg:pb-6';
+}
+
 function AuthShellInner({
   section,
   breadcrumbs,
@@ -43,25 +40,36 @@ function AuthShellInner({
   headerAction,
   showMobileTabs = false,
   isTableRoute = false,
-  previewPanel,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, state } = useSidebar();
-  const tablePanel = useTablePanel();
+  const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
 
-  // Sidebar expand button (desktop only, when collapsed)
   const sidebarTrigger =
     !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
 
   const isInSettings = section === 'settings';
 
-  return (
-    <>
-      <UnifiedSidebar section={section} />
+  // Memoize the sidebar so it doesn't re-render on breadcrumb/header changes.
+  // The sidebar only depends on `section` — it shouldn't remount when
+  // navigating between pages within the same section.
+  const sidebar = useMemo(
+    () => <UnifiedSidebar section={section} />,
+    [section]
+  );
 
-      <SidebarInset className='bg-surface-1 lg:border-[0.5px] lg:border-default lg:rounded-[4px_4px_12px_4px] lg:m-2 lg:ml-0'>
-        {!isInSettings && (
+  // Memoize mobile bottom nav — stable across route changes
+  const mobileBottomNav = useMemo(
+    () => (showMobileTabs ? <DashboardMobileTabs /> : null),
+    [showMobileTabs]
+  );
+
+  return (
+    <AppShellFrame
+      sidebar={sidebar}
+      header={
+        isInSettings ? null : (
           <DashboardHeader
             breadcrumbs={breadcrumbs}
             sidebarTrigger={sidebarTrigger}
@@ -72,60 +80,26 @@ function AuthShellInner({
             }
             showDivider={isTableRoute}
           />
-        )}
-        {isTableRoute ? (
-          <div
-            className={cn(
-              'flex-1 min-h-0 overflow-hidden flex',
-              showMobileTabs && 'pb-20 lg:pb-0'
-            )}
-          >
-            <div className='flex-1 min-h-0 min-w-0 overflow-hidden overflow-x-auto'>
-              {children}
-            </div>
-            {tablePanel}
-          </div>
-        ) : (
-          <div className='flex-1 min-h-0 overflow-hidden flex'>
-            <div
-              className={cn(
-                'flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-6',
-                showMobileTabs && 'pb-20 lg:pb-6'
-              )}
-            >
-              {children}
-            </div>
-            {previewPanel}
-          </div>
-        )}
-      </SidebarInset>
-
-      {showMobileTabs && <DashboardMobileTabs />}
-    </>
+        )
+      }
+      main={children}
+      rightPanel={rightPanel}
+      mobileBottomNav={mobileBottomNav}
+      contentClassName={getContentClassName(showMobileTabs, isTableRoute)}
+      isTableRoute={isTableRoute}
+    />
   );
 }
 
-/**
- * AuthShell - Unified layout component for all post-auth pages
- *
- * Pure layout component with 2-panel structure:
- * - Sidebar (dynamic navigation based on section)
- * - Main content area (with header, surface hierarchy, and optional preview panel)
- *
- * Right drawers (contact/release/audience detail panels) are rendered
- * by individual page components using the shared RightDrawer shell.
- */
 export function AuthShell(props: Readonly<AuthShellProps>) {
   const { onSidebarOpenChange, sidebarDefaultOpen, ...rest } = props;
 
   return (
-    <div className='flex h-svh w-full overflow-hidden bg-base'>
-      <SidebarProvider
-        defaultOpen={sidebarDefaultOpen}
-        onOpenChange={onSidebarOpenChange}
-      >
-        <AuthShellInner {...rest} />
-      </SidebarProvider>
-    </div>
+    <SidebarProvider
+      defaultOpen={sidebarDefaultOpen}
+      onOpenChange={onSidebarOpenChange}
+    >
+      <AuthShellInner {...rest} />
+    </SidebarProvider>
   );
 }

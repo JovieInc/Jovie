@@ -3,22 +3,42 @@
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
 
 import * as Sentry from '@sentry/nextjs';
+import { createBeforeSendHook, getBaseServerConfig } from '@/lib/sentry/config';
 
-/**
- * PII Collection Notice:
- * When sendDefaultPii is enabled, Sentry may collect:
- * - User IP addresses (anonymized via beforeSend)
- * - User IDs (Clerk user IDs only, no emails)
- * - Request headers (sensitive headers scrubbed)
- *
- * This data is used for error debugging and is retained per Sentry's data retention policy.
- * Users can request data deletion via privacy@jov.ie.
- */
+const baseConfig = getBaseServerConfig();
 
-const isProduction = process.env.NODE_ENV === 'production';
+// Health endpoint is polled every minute by Sentry uptime monitoring.
+// Exclude it from performance traces to avoid polluting transaction data.
+// Sentry uptime monitor config: Alerts → Uptime → Add Monitor
+//   URL: https://app.jovie.com/api/health  |  Interval: 1 min
+const HEALTH_ENDPOINT_PATTERN = /^\/api\/health/;
 
 Sentry.init({
-  dsn: process.env.SENTRY_DSN,
+  ...baseConfig,
+
+  // Drop performance traces for the health endpoint — Sentry's uptime monitor
+  // pings it every minute, which would otherwise skew p50/p99 latency data.
+  tracesSampler: samplingContext => {
+    const name = samplingContext.name ?? '';
+    if (HEALTH_ENDPOINT_PATTERN.test(name)) {
+      return 0;
+    }
+    return baseConfig.tracesSampleRate;
+  },
+
+  // Extend shared beforeSend with server-specific filtering
+  beforeSend: createBeforeSendHook(event => {
+    // EPIPE/ECONNRESET on /api/chat are expected client disconnects (tab close,
+    // navigation). Drop them only for that path; surface them everywhere else.
+    const isChatPath = event.request?.url?.includes('/api/chat');
+    if (isChatPath) {
+      const msg = event.exception?.values?.[0]?.value ?? '';
+      if (/write EPIPE/.test(msg) || /ECONNRESET/.test(msg)) {
+        return null;
+      }
+    }
+    return event;
+  }),
 
   // Suppress known non-actionable errors
   ignoreErrors: [
@@ -29,16 +49,11 @@ Sentry.init({
     // Node.js TransformStream internal bug — not application code.
     // Occurs during streaming responses (chat API). Only 2 users affected.
     /transformAlgorithm is not a function/,
+    // Expected auth errors from server actions when session expires or user
+    // is not authenticated. These are handled by the client error boundary
+    // and are not bugs (JOV-1065).
+    /^Unauthorized$/,
   ],
-
-  // Sample 10% of transactions in production, 100% in development
-  tracesSampleRate: isProduction ? 0.1 : 1.0,
-
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
-
-  // Enable sending user PII - scrubbed via beforeSend hook below
-  sendDefaultPii: true,
 
   // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage)
   integrations: [
@@ -47,47 +62,4 @@ Sentry.init({
       recordOutputs: true,
     }),
   ],
-
-  // Suppress initialization timeout warnings (Sentry continues in background)
-  debug: false,
-
-  // Scrub sensitive data before sending to Sentry
-  beforeSend(event) {
-    // EPIPE/ECONNRESET on /api/chat are expected client disconnects (tab close,
-    // navigation). Drop them only for that path; surface them everywhere else.
-    const isChatPath = event.request?.url?.includes('/api/chat');
-    if (isChatPath) {
-      const msg = event.exception?.values?.[0]?.value ?? '';
-      if (/write EPIPE/.test(msg) || /ECONNRESET/.test(msg)) {
-        return null;
-      }
-    }
-
-    // Anonymize IP addresses
-    if (event.user?.ip_address) {
-      event.user.ip_address = '{{auto}}';
-    }
-
-    // Remove email addresses if present
-    if (event.user?.email) {
-      delete event.user.email;
-    }
-
-    // Scrub sensitive headers
-    if (event.request?.headers) {
-      const sensitiveHeaders = [
-        'authorization',
-        'cookie',
-        'x-api-key',
-        'x-auth-token',
-      ];
-      for (const header of sensitiveHeaders) {
-        if (event.request.headers[header]) {
-          event.request.headers[header] = '[Filtered]';
-        }
-      }
-    }
-
-    return event;
-  },
 });

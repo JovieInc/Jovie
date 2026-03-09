@@ -26,14 +26,29 @@ import * as Sentry from '@sentry/nextjs';
 export type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
 export interface CircuitBreakerConfig {
-  /** Number of failures before opening circuit. Default: 5 */
+  /** Provider identifier used in logs and alerts. Default: external-service */
+  name: string;
+  /** Number of failures before opening circuit. Default: 10 */
   failureThreshold: number;
-  /** Time in ms before attempting recovery. Default: 30000 (30s) */
+  /** Time in ms before attempting recovery. Default: 60000 (60s) */
   resetTimeout: number;
   /** Number of successful calls to close circuit. Default: 2 */
   successThreshold: number;
-  /** Time window in ms to track failures. Default: 60000 (1min) */
+  /** Time window in ms to track failures. Default: 120000 (2min) */
   failureWindow: number;
+  /**
+   * Minimum number of requests within the failure window before the
+   * circuit can trip open. Prevents the breaker from opening during
+   * low-traffic periods where a handful of transient errors would
+   * otherwise exceed the failure threshold. Default: 20
+   */
+  minimumRequestCount: number;
+  /**
+   * Optional predicate to classify errors. Return false to exclude
+   * an error from the failure count (e.g. rate-limit 429 responses).
+   * When omitted, all errors count as failures.
+   */
+  shouldCount?: (error: unknown) => boolean;
 }
 
 export interface CircuitBreakerStats {
@@ -44,6 +59,7 @@ export interface CircuitBreakerStats {
   lastStateChange: number;
   totalFailures: number;
   totalSuccesses: number;
+  requestsInWindow: number;
 }
 
 // ============================================================================
@@ -64,20 +80,22 @@ function parseEnvNumber(envVar: string | undefined, fallback: number): number {
  * Environment variables allow runtime tuning without code changes.
  *
  * Environment variables:
- * - CIRCUIT_BREAKER_FAILURE_THRESHOLD: failures to open (default: 5)
- * - CIRCUIT_BREAKER_RESET_TIMEOUT_MS: ms before recovery attempt (default: 30000)
+ * - CIRCUIT_BREAKER_FAILURE_THRESHOLD: failures to open (default: 10)
+ * - CIRCUIT_BREAKER_RESET_TIMEOUT_MS: ms before recovery attempt (default: 60000)
  * - CIRCUIT_BREAKER_SUCCESS_THRESHOLD: successes to close (default: 2)
- * - CIRCUIT_BREAKER_FAILURE_WINDOW_MS: failure tracking window (default: 60000)
+ * - CIRCUIT_BREAKER_FAILURE_WINDOW_MS: failure tracking window (default: 120000)
+ * - CIRCUIT_BREAKER_MIN_REQUEST_COUNT: min requests before tripping (default: 20)
  */
 function createDefaultConfig(): CircuitBreakerConfig {
   return {
+    name: 'external-service',
     failureThreshold: parseEnvNumber(
       process.env['CIRCUIT_BREAKER_FAILURE_THRESHOLD'],
-      5
+      10
     ),
     resetTimeout: parseEnvNumber(
       process.env['CIRCUIT_BREAKER_RESET_TIMEOUT_MS'],
-      30_000
+      60_000
     ),
     successThreshold: parseEnvNumber(
       process.env['CIRCUIT_BREAKER_SUCCESS_THRESHOLD'],
@@ -85,7 +103,11 @@ function createDefaultConfig(): CircuitBreakerConfig {
     ),
     failureWindow: parseEnvNumber(
       process.env['CIRCUIT_BREAKER_FAILURE_WINDOW_MS'],
-      60_000
+      120_000
+    ),
+    minimumRequestCount: parseEnvNumber(
+      process.env['CIRCUIT_BREAKER_MIN_REQUEST_COUNT'],
+      20
     ),
   };
 }
@@ -105,7 +127,7 @@ const DEFAULT_CONFIG: CircuitBreakerConfig = createDefaultConfig();
  *
  * Usage:
  * ```typescript
- * const breaker = new CircuitBreaker({ failureThreshold: 5 });
+ * const breaker = new CircuitBreaker({ failureThreshold: 10 });
  *
  * try {
  *   const result = await breaker.execute(() => fetchFromSpotify());
@@ -123,6 +145,7 @@ export class CircuitBreaker {
   private lastFailureTime: number | null = null;
   private lastStateChange: number = Date.now();
   private failureTimestamps: number[] = [];
+  private requestTimestamps: number[] = [];
 
   // Lifetime stats
   private totalFailures: number = 0;
@@ -151,12 +174,19 @@ export class CircuitBreaker {
       );
     }
 
+    // Track every request for minimumRequestCount enforcement
+    this.requestTimestamps.push(Date.now());
+
     try {
       const result = await fn();
       this.onSuccess();
       return result;
     } catch (error) {
-      this.onFailure();
+      // Only count errors that the config considers real failures.
+      // Rate-limit (429) responses are excluded so they don't trip the breaker.
+      if (!this.config.shouldCount || this.config.shouldCount(error)) {
+        this.onFailure();
+      }
       throw error;
     }
   }
@@ -233,14 +263,20 @@ export class CircuitBreaker {
         break;
 
       case 'CLOSED': {
-        // Clean old failures and recount atomically
+        // Clean old failures and request timestamps, then recount atomically
         const cutoff = now - this.config.failureWindow;
         this.failureTimestamps = this.failureTimestamps.filter(
           ts => ts > cutoff
         );
+        this.requestTimestamps = this.requestTimestamps.filter(
+          ts => ts > cutoff
+        );
         this.failures = this.failureTimestamps.length;
 
-        if (this.failures >= this.config.failureThreshold) {
+        const hasEnoughTraffic =
+          this.requestTimestamps.length >= this.config.minimumRequestCount;
+
+        if (this.failures >= this.config.failureThreshold && hasEnoughTraffic) {
           this.transitionTo('OPEN');
         }
         break;
@@ -254,6 +290,7 @@ export class CircuitBreaker {
   private clearOldFailures(): void {
     const cutoff = Date.now() - this.config.failureWindow;
     this.failureTimestamps = this.failureTimestamps.filter(ts => ts > cutoff);
+    this.requestTimestamps = this.requestTimestamps.filter(ts => ts > cutoff);
     this.failures = this.failureTimestamps.length;
   }
 
@@ -270,6 +307,7 @@ export class CircuitBreaker {
       this.failures = 0;
       this.successes = 0;
       this.failureTimestamps = [];
+      this.requestTimestamps = [];
     } else if (newState === 'HALF_OPEN') {
       this.successes = 0;
     }
@@ -277,10 +315,21 @@ export class CircuitBreaker {
     // Log state transition for monitoring
     Sentry.addBreadcrumb({
       category: 'circuit-breaker',
-      message: `State transition: ${oldState} -> ${newState}`,
+      message: `[${this.config.name}] State transition: ${oldState} -> ${newState}`,
       level: 'info',
       data: this.getStats(),
     });
+
+    // Alert Sentry when the circuit opens so we know the service is failing
+    if (newState === 'OPEN') {
+      Sentry.captureMessage(
+        `[${this.config.name}] Circuit breaker opened (${oldState} -> OPEN)`,
+        {
+          level: 'warning',
+          extra: { ...this.getStats() },
+        }
+      );
+    }
   }
 
   /**
@@ -295,6 +344,7 @@ export class CircuitBreaker {
       lastStateChange: this.lastStateChange,
       totalFailures: this.totalFailures,
       totalSuccesses: this.totalSuccesses,
+      requestsInWindow: this.requestTimestamps.length,
     };
   }
 
@@ -348,12 +398,49 @@ export class CircuitOpenError extends Error {
 // ============================================================================
 
 /**
+ * Check whether an error represents a rate-limit (429) response.
+ * Rate limits are transient back-pressure, not a sign of service failure,
+ * so they should not count toward the circuit breaker failure threshold.
+ */
+function isRateLimitError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  // IngestError / SpotifyError with a `code` field
+  if ('code' in error) {
+    const code = (error as Error & { code: string }).code;
+    if (code === 'SPOTIFY_RATE_LIMITED' || code === 'RATE_LIMITED') return true;
+  }
+
+  // SpotifyError (dsp-enrichment provider) with a `statusCode` field
+  if ('statusCode' in error) {
+    const status = (error as Error & { statusCode: number }).statusCode;
+    if (status === 429) return true;
+  }
+
+  // Generic error with a `status` field
+  if ('status' in error) {
+    const status = (error as Error & { status: number }).status;
+    if (status === 429) return true;
+  }
+
+  return false;
+}
+
+/**
  * Global circuit breaker instance for Spotify API calls.
- * Configured with conservative thresholds to prevent cascading failures.
+ *
+ * Tuned to avoid false positives during transient error bursts:
+ * - 10 real failures (excluding 429s) within a 2-minute window to trip
+ * - At least 20 total requests in the window before the circuit can open
+ * - 60s cool-down before probing recovery
+ * - 2 consecutive successes required to close from HALF_OPEN
  */
 export const spotifyCircuitBreaker = new CircuitBreaker({
-  failureThreshold: 5, // Open after 5 failures
-  resetTimeout: 30_000, // Try again after 30 seconds
+  name: 'spotify',
+  failureThreshold: 10, // Open after 10 real failures
+  resetTimeout: 60_000, // Try again after 60 seconds
   successThreshold: 2, // Need 2 successes to close
-  failureWindow: 60_000, // Count failures within 1 minute
+  failureWindow: 120_000, // Count failures within 2 minutes
+  minimumRequestCount: 20, // Need 20 requests before circuit can open
+  shouldCount: (error: unknown) => !isRateLimitError(error),
 });

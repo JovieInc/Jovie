@@ -13,12 +13,12 @@ Continuously intake Linear work, route tasks to teammates, ship safely through `
 ## Required Environment (hard requirements)
 
 - Repository: Jovie monorepo root
-- Node.js: **24.x**
+- Node.js: **22.x**
 - pnpm: **9.15.4**
 
 Before any task execution:
 
-1. Verify `node --version` is 24.x
+1. Verify `node --version` is 22.x
 2. Verify `pnpm --version` is 9.15.4
 
 Execution conventions:
@@ -38,18 +38,82 @@ Execution conventions:
 6. Keep marketing/legal routes fully static
 7. Render global providers once in root layout only
 
+## Linear Issue Gating (mandatory)
+
+Before dispatching or executing any Linear issue:
+
+- Skip issues labeled `human-review-required`
+- Skip issues whose description contains `This issue requires human review`
+- Do not work on, close, or comment on skipped issues
+
+When querying Linear, always apply both filters:
+
+- Exclude label: `human-review-required`
+- Exclude description containing: `This issue requires human review`
+
 ## Orchestration Loop (run continuously)
+
+### 0) Auto-open draft PRs for orphaned Codex branches
+
+Before entering the issue intake/picking loop, scan for pushed Codex branches that still have no PR and auto-open a draft PR for each.
+
+```bash
+for branch in $(git branch -r | grep 'origin/tim/jov-' | sed 's/origin\///'); do
+  PR_EXISTS=$(gh pr list --head "$branch" --json number --jq 'length')
+  if [ "$PR_EXISTS" = "0" ]; then
+    gh pr create --draft --head "$branch" \
+      --title "fix: $(echo "$branch" | sed 's/tim\/jov-[0-9]*-//')" \
+      --body "Auto-opened by autopilot for Codex branch without PR"
+  fi
+done
+```
+
+Run this check once per autopilot cycle so no `tim/jov-*` Codex branch remains orphaned without a PR.
 
 ### 1) Intake from Linear
 
-- Poll team `jovie` for issues in `new` or `ready`
+- Poll Linear team (use team name from Linear, currently `Joive`) for issues in `new`, `ready`, or `todo`
+- **Also poll for stuck `in progress` issues** — these are tasks where a previous agent (Cursor, Codex, or a teammate) started work but failed to complete. Detect stuck issues by:
+  - Status is `in progress` but no open PR exists for the issue's git branch
+  - Status is `in progress` and the linked PR was closed without merging
+  - Status is `in progress` with no update in the last 24 hours
+  - Treat these as high-priority re-intake: the work was attempted and failed, so it needs a fresh start
 - For each issue not already queued:
   - Create a shared Agent Teams task
   - Subject: issue title
   - Description: issue body + Linear URL + acceptance criteria
   - Include dedupe key = Linear issue ID
+  - For stuck `in progress` issues: add context about the previous attempt (check for existing branches, PRs, or Linear comments describing what went wrong)
 
-### 2) Dispatch + Task Execution
+### 2) Batch Analysis
+
+After intake, group small related issues into batches before dispatch. This avoids PR sprawl when multiple trivial issues target the same area.
+
+**Batching eligibility** — ALL must be true for each issue in a candidate batch:
+
+- **Trivial scope**: UI tweak, copy/text change, style fix, config change, or similar — no new features, no logic changes, no schema changes
+- **Same target area**: Issues touch the same component, page, or module (e.g., all target `apps/web/components/dashboard/` or `apps/web/app/(app)/settings/`)
+- **Same change type**: All UI fixes, all copy updates, all style tweaks, etc. — don't mix types
+- **Within PR size limits**: Combined estimated diff ≤ 400 lines and ≤ 10 files (per AGENTS.md)
+- **Max 5 issues per batch**: Keeps PRs reviewable
+
+**Grouping algorithm:**
+
+1. From the intake queue, identify issues that look trivial (based on title, description, labels, and estimated scope)
+2. Group by `(target area, change type)` — e.g., `(dashboard components, UI fix)` or `(settings page, copy change)`
+3. For each group, greedily pack issues into batches of up to 5, ensuring combined scope stays within PR limits
+4. Issues that don't fit any batch remain as solo tasks (dispatched individually per existing behavior)
+
+**Batch rules:**
+
+- One batch = one branch = one PR
+- Branch name: `fix/batch-<area>-<issue-ids>` (e.g., `fix/batch-dashboard-JOV-101-102-103`)
+- If a batch fails validation, retry the **entire batch** — do not split mid-flight
+- If a batch repeatedly fails (≥2 retries), break it into solo issues and redispatch individually
+
+### 3) Dispatch + Task Execution
+
+#### Solo issues (default path)
 
 - Assign unclaimed tasks (or allow self-claim)
 - Each task handler must:
@@ -58,7 +122,26 @@ Execution conventions:
   3. Run `/ship` to commit, push branch, and open PR
   4. Link PR back to the Linear issue
 
-### 3) Validation Gates (minimum)
+#### Stuck/failed issues (re-intake from `in progress`)
+
+When picking up a stuck issue that a previous agent failed on:
+
+1. **Check for existing work** — look for branches matching the issue's `gitBranchName`, open/closed PRs, and Linear comments describing what was attempted
+2. **Assess salvageability** — if the existing branch has useful partial work, build on it. If it's broken or conflicts with main, start fresh from main
+3. **Start fresh by default** — create a new branch from main (e.g., `fix/jov-XXXX-<slug>`) rather than continuing on a potentially broken branch
+4. **Delete stale branches** — if the old branch has no useful commits, delete it to avoid confusion
+5. **Comment on the Linear issue** — note that the previous attempt stalled and a new attempt is starting, with a brief summary of what went wrong if discoverable
+
+#### Batched issues
+
+- Single task handler implements **all issues in the batch** on one branch
+- Work through issues sequentially, committing after each (or as logical units)
+- Commit messages reference the specific issue: `fix(dashboard): update button spacing (JOV-101)`
+- Final PR encompasses all commits for the batch
+- PR title uses batch format: `fix(<area>): batch <type> fixes (<issue-ids>)`
+- All Linear issues in the batch get linked to the same PR
+
+### 4) Validation Gates (minimum)
 
 - `pnpm turbo typecheck`
 - `pnpm turbo lint`
@@ -67,7 +150,7 @@ Execution conventions:
 
 If task touches app/web runtime/db flows, run relevant scoped checks too.
 
-### 4) Background PR Orchestration (parallel)
+### 5) Background PR Orchestration (parallel)
 
 Continuously monitor teammate PRs and run `/orchestrate` behavior:
 
@@ -77,14 +160,23 @@ Continuously monitor teammate PRs and run `/orchestrate` behavior:
 - Push follow-up fixes
 - Sync PR status and summary back to Linear
 
-### 5) Linear Status Sync Rules
+### 6) Linear Status Sync Rules
+
+#### Solo issues
 
 - Merged/completed -> set `done` with PR link + merge SHA
 - Open PR / awaiting review -> set `review` with PR link
 - Blocked -> set `blocked` with explicit blocker + next action
 - Retrying after failure -> comment attempt number + failure summary
 
-### 6) Retry + Escalation
+#### Batched issues
+
+- All issues in a merged batch -> set `done` on **every** issue with shared PR link + merge SHA
+- All issues in an open batch PR -> set `review` on **every** issue with shared PR link
+- If batch is blocked -> set `blocked` on all issues with blocker details
+- If batch is broken into solo issues after repeated failure -> update each issue independently from that point
+
+### 7) Retry + Escalation
 
 - On failure, requeue with:
   - reason
@@ -93,7 +185,7 @@ Continuously monitor teammate PRs and run `/orchestrate` behavior:
   - elevated priority when repeated
 - Escalate to lead channel when retry threshold is exceeded
 
-### 7) Efficiency Defaults
+### 8) Efficiency Defaults
 
 - Batch short tool calls
 - Parallelize independent workstreams
@@ -102,12 +194,49 @@ Continuously monitor teammate PRs and run `/orchestrate` behavior:
 
 ## PR Output Requirements
 
-Every shipped PR should include:
+### Solo PRs
 
 - Linear issue link
-- concise change summary
-- validation evidence (typecheck/lint/test)
-- rollback notes for risky changes
+- Concise change summary
+- Validation evidence (typecheck/lint/test)
+- Rollback notes for risky changes
+
+### Batch PRs
+
+Title format: `fix(<area>): batch <type> fixes (<issue-ids>)`
+
+Example: `fix(dashboard): batch UI fixes (JOV-101, JOV-102, JOV-103)`
+
+Body template:
+
+```markdown
+## Summary
+
+Batch of <N> related <type> fixes in `<target area>`.
+
+## Changes
+
+### JOV-101: <issue title>
+<1-2 sentence summary of what changed>
+
+### JOV-102: <issue title>
+<1-2 sentence summary of what changed>
+
+### JOV-103: <issue title>
+<1-2 sentence summary of what changed>
+
+## Validation
+- [x] typecheck
+- [x] lint
+- [x] tests
+
+## Linear Issues
+- JOV-101
+- JOV-102
+- JOV-103
+```
+
+### General
 
 When required by team process, add PR comment:
 

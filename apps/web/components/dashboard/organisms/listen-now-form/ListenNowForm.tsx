@@ -12,7 +12,7 @@ import {
 import { CheckCircle2, ExternalLink, Music, Plus, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
@@ -154,6 +154,15 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     },
     [searchPaletteProvider, updatePrimaryField, schedulePrimaryNormalize]
   );
+
+  /** Set of platform IDs already used across additional links (for duplicate prevention). */
+  const usedAdditionalPlatforms = useMemo(() => {
+    const used = new Set<string>();
+    for (const link of additionalLinks) {
+      if (link.platform) used.add(link.platform);
+    }
+    return used;
+  }, [additionalLinks]);
 
   const spotifyConnected = !!primaryFields.spotifyUrl;
   const appleMusicConnected = !!primaryFields.appleMusicUrl;
@@ -412,11 +421,21 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                         <SelectValue placeholder='Platform' />
                       </SelectTrigger>
                       <SelectContent>
-                        {ADDITIONAL_DSP_OPTIONS.map(p => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
+                        {ADDITIONAL_DSP_OPTIONS.map(p => {
+                          const alreadyUsed =
+                            usedAdditionalPlatforms.has(p.id) &&
+                            p.id !== link.platform;
+                          return (
+                            <SelectItem
+                              key={p.id}
+                              value={p.id}
+                              disabled={alreadyUsed}
+                            >
+                              {p.name}
+                              {alreadyUsed ? ' (already added)' : ''}
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
 

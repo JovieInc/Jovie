@@ -1,8 +1,10 @@
 /**
- * In-Memory Rate Limiter
+ * In-Memory Rate Limiter (Development Only)
  *
- * A simple in-memory rate limiter for development and fallback scenarios.
- * Note: Not persistent across server restarts and doesn't scale across instances.
+ * WARNING: This store resets on every deploy and is NOT shared across serverless
+ * instances. In production, Redis (via Upstash) MUST be the primary store.
+ * This in-memory implementation exists only as a development convenience and
+ * as a last-resort fallback that logs errors loudly (see rate-limiter.ts).
  */
 
 import { parseWindowToMs } from './config';

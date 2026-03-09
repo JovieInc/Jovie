@@ -2,153 +2,186 @@ import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
- * Homepage Tests
+ * Homepage E2E Tests (consolidated from homepage + featured-artists)
  *
- * NOTE: Tests public homepage for unauthenticated visitors.
- * Must run without saved authentication.
+ * Covers: hero, sections, navigation, meta, responsiveness, featured
+ * creators carousel. All tests run unauthenticated.
  */
 
-// Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
+
+/**
+ * Force all DeferredSections to render by patching IntersectionObserver
+ * before the page loads (headless mode doesn't trigger IO reliably).
+ */
+async function forceDeferredSections(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    const OriginalIO = window.IntersectionObserver;
+    window.IntersectionObserver = class extends OriginalIO {
+      constructor(
+        callback: IntersectionObserverCallback,
+        options?: IntersectionObserverInit
+      ) {
+        super(callback, options);
+        const self = this;
+        const origObserve = this.observe.bind(this);
+        this.observe = (target: Element) => {
+          origObserve(target);
+          setTimeout(() => {
+            callback(
+              [
+                {
+                  isIntersecting: true,
+                  target,
+                  intersectionRatio: 1,
+                } as IntersectionObserverEntry,
+              ],
+              self
+            );
+          }, 50);
+        };
+      }
+    } as unknown as typeof IntersectionObserver;
+  });
+}
+
+async function interceptAnalytics(page: import('@playwright/test').Page) {
+  await page.route('**/api/profile/view', r =>
+    r.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/audience/visit', r =>
+    r.fulfill({ status: 200, body: '{}' })
+  );
+  await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+}
 
 test.describe('Homepage', () => {
   test.beforeEach(async ({ page }) => {
+    await interceptAnalytics(page);
     await page.goto('/', { waitUntil: 'domcontentloaded' });
-    // Wait for React to fully hydrate using deterministic method
     await waitForHydration(page);
   });
 
-  test('displays the main hero section', async ({ page }) => {
-    // Check main headline
+  test('hero section renders with headline and claim handle form', async ({
+    page,
+  }) => {
     await expect(page.locator('h1')).toContainText(
-      'Jovie is a purpose-built link in bio for artists and musicians'
+      'AI to power your music career'
     );
+    await expect(page.getByText(/Built to amplify your work/i)).toBeVisible();
 
-    // Check lead text
-    await expect(
-      page.getByText(/Capture every fan with AI-powered profiles/i)
-    ).toBeVisible();
-  });
-
-  test('displays the hero CTA buttons', async ({ page }) => {
-    // Check "Get started" button in hero
+    // Claim handle input in hero
     const heroSection = page.locator('main section').first();
-    const getStartedButton = heroSection.getByRole('link', {
-      name: /Get started/i,
-    });
-    await expect(getStartedButton).toBeVisible();
-    await expect(getStartedButton).toHaveAttribute('href', '/signup');
-
-    // Check "See how it works" button
-    const howItWorksButton = heroSection.getByRole('link', {
-      name: /See how it works/i,
-    });
-    await expect(howItWorksButton).toBeVisible();
-    await expect(howItWorksButton).toHaveAttribute('href', '#how-it-works');
+    const input = heroSection.locator('input').first();
+    await expect(input).toBeVisible();
   });
 
-  test('displays the content sections', async ({ page }) => {
-    // Check that main sections load (deferred sections may not be visible immediately)
-    const body = await page.locator('body').textContent();
-    expect(body).toBeTruthy();
-
-    // Verify hero section is visible
-    const h1 = page.locator('h1');
-    await expect(h1).toBeVisible();
-
-    // Verify page has content (not blank)
-    expect(body && body.length > 500).toBe(true);
-  });
-
-  test('displays the page with sections', async ({ page }) => {
-    // Check that page has multiple sections
+  test('page has multiple sections with substantial content', async ({
+    page,
+  }) => {
     const sections = page.locator('section');
     const sectionCount = await sections.count();
     expect(sectionCount).toBeGreaterThan(1);
 
-    // Verify page isn't blank
     const bodyText = await page.locator('body').textContent();
     expect(bodyText && bodyText.length > 1000).toBe(true);
   });
 
-  test('displays multiple sections', async ({ page }) => {
-    // Scroll through page to load deferred sections
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-    await page.waitForTimeout(1000);
-
-    // Check for section elements
-    const sections = page.locator('section');
-    const sectionCount = await sections.count();
-    expect(sectionCount).toBeGreaterThan(1);
-  });
-
-  test('has proper navigation elements', async ({ page }) => {
-    // Check for header navigation
+  test('header navigation and footer visible', async ({ page }) => {
     const header = page.locator('header');
     await expect(header).toBeVisible();
 
-    // Check for logo/brand link
     const logoLink = page.locator('a[href="/"]').first();
     await expect(logoLink).toBeVisible();
   });
 
   test('has proper meta information', async ({ page }) => {
-    // Check page title
     await expect(page).toHaveTitle(/Jovie/);
-
-    // Check meta description exists
     const metaDescription = page.locator('meta[name="description"]');
     await expect(metaDescription).toHaveAttribute('content');
   });
 
   test('is responsive on mobile', async ({ page }) => {
-    // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
 
-    // Check that main content is visible
     await expect(page.locator('h1')).toContainText(
-      'Jovie is a purpose-built link in bio',
-      {
-        timeout: SMOKE_TIMEOUTS.VISIBILITY,
-      }
+      'AI to power your music career',
+      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     );
 
-    // Check that CTAs are visible
-    const getStartedButton = page.getByRole('link', {
-      name: /Get started/i,
-    });
-    await expect(getStartedButton).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-  });
-
-  test('has proper accessibility features', async ({ page }) => {
-    // Check for proper heading structure
-    const headings = page.locator('h1, h2, h3');
-    await expect(headings.first()).toContainText(
-      'Jovie is a purpose-built link in bio'
-    );
-
-    // Check for proper link labels in hero
     const heroSection = page.locator('main section').first();
-    const getStartedLink = heroSection.getByRole('link', {
-      name: /Get started/i,
-    });
-    await expect(getStartedLink).toBeVisible();
-
-    // Check for proper image alt texts (logo in header should exist)
-    const headerLogo = page.locator('header img, header svg').first();
-    await expect(headerLogo).toBeVisible();
+    const input = heroSection.locator('input').first();
+    await expect(input).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
   });
 
-  test('has proper loading states', async ({ page }) => {
-    // Check that page loads without errors
+  test('no loading or error states visible after hydration', async ({
+    page,
+  }) => {
     await expect(page.locator('body')).not.toContainText('Error');
     await expect(page.locator('body')).not.toContainText('Loading...');
-
-    // Check that main content is visible
     await expect(page.locator('h1')).toBeVisible();
+  });
+});
+
+test.describe('Homepage - Featured Creators Carousel', () => {
+  test('showcase section loads and displays creators', async ({ page }) => {
+    await interceptAnalytics(page);
+    await forceDeferredSections(page);
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    const showcaseHeading = page
+      .locator('h2')
+      .filter({ hasText: /see it in action|featured/i });
+    const dataTestId = page.locator('[data-testid="featured-creators"]');
+    await expect(showcaseHeading.first().or(dataTestId.first())).toBeVisible({
+      timeout: 20000,
+    });
+  });
+
+  test('showcase section has images with alt text', async ({ page }) => {
+    await interceptAnalytics(page);
+    await forceDeferredSections(page);
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    const showcaseHeading = page
+      .locator('h2')
+      .filter({ hasText: /see it in action|featured/i });
+    await expect(showcaseHeading.first()).toBeVisible({ timeout: 20000 });
+
+    const images = page.locator('img');
+    const imageCount = await images.count();
+    expect(imageCount).toBeGreaterThan(0);
+
+    const visibleImages = page.locator('img:visible');
+    const visibleCount = await visibleImages.count();
+    if (visibleCount > 0) {
+      const firstImage = visibleImages.first();
+      const alt = await firstImage.getAttribute('alt');
+      expect(alt).not.toBeNull();
+    }
+  });
+
+  test('showcase loads without critical console errors', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') errors.push(msg.text());
+    });
+
+    await interceptAnalytics(page);
+    await forceDeferredSections(page);
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await waitForHydration(page);
+
+    const criticalErrors = errors.filter(
+      error =>
+        !error.includes('Failed to load resource') &&
+        !error.includes('net::ERR_FAILED') &&
+        !error.includes('i.scdn.co') &&
+        !error.includes('CORS') &&
+        !error.includes('Clerk') &&
+        !error.includes('Sentry')
+    );
+
+    expect(criticalErrors.length).toBe(0);
   });
 });

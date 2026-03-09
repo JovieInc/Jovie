@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
   Skeleton,
 } from '@jovie/ui';
-import { Ellipsis, Trash2 } from 'lucide-react';
+import { Copy, Ellipsis, MessageSquare, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -72,6 +72,9 @@ export function RecentChats() {
     title: string;
   } | null>(null);
 
+  // Track which thread's dropdown menu is open so only one can be open at a time
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTarget) return;
 
@@ -101,7 +104,11 @@ export function RecentChats() {
 
   if (isLoading) {
     return (
-      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
+      <SidebarCollapsibleGroup
+        label='Threads'
+        defaultOpen={false}
+        icon={MessageSquare}
+      >
         <SidebarMenu>
           {(['a', 'b', 'c'] as const).map(id => (
             <SidebarMenuItem key={`skeleton-${id}`}>
@@ -121,7 +128,7 @@ export function RecentChats() {
 
   return (
     <>
-      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
+      <SidebarCollapsibleGroup label='Threads' defaultOpen icon={MessageSquare}>
         <SidebarMenu>
           {conversations.map(convo => {
             const href = `${APP_ROUTES.CHAT}/${convo.id}`;
@@ -151,13 +158,29 @@ export function RecentChats() {
                 </span>
 
                 <SidebarMenuActions showOnHover>
-                  <DropdownMenu>
+                  <DropdownMenu
+                    open={openMenuId === convo.id}
+                    onOpenChange={open => setOpenMenuId(open ? convo.id : null)}
+                  >
                     <DropdownMenuTrigger asChild>
                       <SidebarMenuAction aria-label='Thread options'>
                         <Ellipsis aria-hidden='true' className='size-4' />
                       </SidebarMenuAction>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent side='right' align='start'>
+                    <DropdownMenuContent side='bottom' align='end'>
+                      <DropdownMenuItem
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(convo.id);
+                            notifications.success('Session ID copied');
+                          } catch {
+                            notifications.error('Could not copy session ID');
+                          }
+                        }}
+                      >
+                        <Copy className='size-4' aria-hidden='true' />
+                        Copy Session ID
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setDeleteTarget({ id: convo.id, title })}
                         className='text-destructive focus:text-destructive'
@@ -182,14 +205,16 @@ export function RecentChats() {
       >
         <AlertDialogContent className='max-w-sm'>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete thread</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className='text-sm font-semibold text-primary-token'>
+              Delete thread
+            </AlertDialogTitle>
+            <AlertDialogDescription className='text-[13px] text-secondary-token'>
               This will permanently delete &ldquo;
               {deleteTarget?.title ?? 'Untitled thread'}&rdquo;. This action
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className='gap-2 sm:gap-2'>
             <AlertDialogCancel disabled={deleteConversation.isPending}>
               Cancel
             </AlertDialogCancel>

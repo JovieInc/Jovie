@@ -7,25 +7,25 @@ import { cn } from '../lib/utils';
 
 const inputVariants = cva(
   [
-    'flex w-full rounded-[var(--radius-md)] border border-default bg-surface-input px-3.5 py-3',
-    'text-[13px] ring-offset-background',
+    'flex w-full rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
+    'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary)',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
-    'placeholder:text-muted-foreground',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+    'placeholder:text-(--linear-text-tertiary)',
+    'focus-visible:outline-none focus-visible:border-(--linear-border-focus)',
     'disabled:cursor-not-allowed disabled:opacity-50',
-    'transition-colors',
+    'transition-colors duration-normal',
   ],
   {
     variants: {
       variant: {
         default: '',
-        error: 'border-destructive focus-visible:ring-destructive',
-        success: 'border-green-500 focus-visible:ring-green-500',
+        error: 'border-(--linear-error) focus-visible:border-(--linear-error)',
+        success: 'border-success focus-visible:border-success',
       },
       inputSize: {
         sm: 'h-7 px-2 py-1 text-xs',
-        md: 'h-10 px-3.5 py-2 text-[13px]',
-        lg: 'h-[68px] px-3.5 py-3 text-[13px]',
+        md: 'h-8 px-3 py-1.5 text-[13px]',
+        lg: 'h-10 px-3.5 py-2 text-[13px]',
       },
     },
     defaultVariants: {
@@ -249,7 +249,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               <span
                 className={cn(
                   'animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent',
-                  'text-muted-foreground',
+                  'text-secondary-token',
                   getSpinnerSize(effectiveSize)
                 )}
                 aria-hidden='true'
@@ -258,7 +258,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
             {/* Status icon */}
             {statusIcon && !isPending && (
-              <div className='text-muted-foreground'>{statusIcon}</div>
+              <div className='text-secondary-token'>{statusIcon}</div>
             )}
 
             {/* Trailing content */}

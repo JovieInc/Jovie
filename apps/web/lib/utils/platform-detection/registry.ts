@@ -135,6 +135,7 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
   featurefm: createPlatformInfo('featurefm', 'https://ffm.to/...'),
 
   // Payment/Tip Platforms
+  stripe: createPlatformInfo('stripe', 'https://dashboard.stripe.com/login'),
   venmo: createPlatformInfo('venmo', 'https://venmo.com/username'),
   paypal: createPlatformInfo('paypal', 'https://paypal.me/username'),
   cashapp: createPlatformInfo('cashapp', 'https://cash.app/$username'),
@@ -233,7 +234,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
   { pattern: /music\.apple\.com/i, platformId: 'apple_music' },
   {
-    pattern: /music\.youtube\.com|youtube\.com\/(channel|@)/i,
+    pattern: /music\.youtube\.com/i,
     platformId: 'youtube_music',
   },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
@@ -269,6 +270,7 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
 
   // Payment platforms
+  { pattern: /(?:www\.)?dashboard\.stripe\.com/i, platformId: 'stripe' },
   { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
   { pattern: /(?:www\.)?paypal\.me|paypal\.com/i, platformId: 'paypal' },
   { pattern: /(?:www\.)?cash\.app/i, platformId: 'cashapp' },
@@ -299,9 +301,6 @@ export const DOMAIN_PATTERNS: DomainPattern[] = [
   { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
   { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
   { pattern: /music\.163\.com/i, platformId: 'netease' },
-
-  // Website fallback - keep last
-  { pattern: /./, platformId: 'website' },
 ];
 
 /**

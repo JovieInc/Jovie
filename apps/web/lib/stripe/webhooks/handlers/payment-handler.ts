@@ -234,7 +234,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         eventType: 'payment_succeeded',
       });
 
-      await invalidateBillingCache();
+      await invalidateBillingCache(userId);
       await this.tryRecordReferralCommission(userId, invoice);
       this.sendRecoveryEmailIfNeeded(invoice, subscription, userId);
 
@@ -361,7 +361,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
 
-    await invalidateBillingCache();
+    await invalidateBillingCache(userId);
 
     // Send dunning email (fire-and-forget, don't block webhook response)
     if (shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
@@ -413,8 +413,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
 
     // Legacy fallback: top-level subscription field (pre-v20 SDK / older API versions)
-    const raw = invoice as unknown as Record<string, unknown>;
-    const subField = raw['subscription'];
+    const subField = Reflect.get(invoice, 'subscription');
 
     if (typeof subField === 'string') {
       return subField;

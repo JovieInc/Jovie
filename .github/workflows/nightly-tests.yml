@@ -1,0 +1,292 @@
+# Nightly Tests
+#
+# PURPOSE: Consolidated nightly test suite running both unit tests and E2E tests
+# in parallel. Alerts to Slack on failures.
+#
+# REPLACES: nightly-unit-tests.yml, nightly-e2e-tests.yml
+#
+# SCHEDULE: Daily at 2:00 AM UTC (both suites run in parallel)
+
+name: Nightly Tests
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: 'Which suite to run'
+        type: choice
+        options:
+          - all
+          - unit
+          - e2e
+        default: all
+      coverage:
+        description: 'Enable unit test coverage report'
+        required: false
+        default: false
+        type: boolean
+      test_filter:
+        description: 'E2E test file pattern (leave empty for full suite)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  knip:
+    name: Knip Dead Code Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run Knip
+        run: pnpm knip
+
+  # ==========================================================================
+  # Unit Tests
+  # ==========================================================================
+  unit-tests:
+    name: Full Unit Test Suite
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'unit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run full unit test suite
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.coverage }}" = "true" ]; then
+            pnpm --filter=@jovie/web run test -- --coverage
+          else
+            pnpm --filter=@jovie/web run test
+          fi
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Upload coverage report
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.coverage == 'true' }}
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: unit-test-coverage
+          path: apps/web/coverage/
+          retention-days: 7
+
+  # ==========================================================================
+  # E2E Tests
+  # ==========================================================================
+  e2e-tests:
+    name: Nightly E2E Suite
+    if: >-
+      github.event_name == 'schedule' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'e2e'
+    environment: Preview – jovie
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Create ephemeral Neon database branch
+        id: neon-branch
+        uses: ./.github/actions/neon-create-branch-with-retry
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: nightly-e2e-${{ github.run_id }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+          expires_in_hours: '3'
+
+      - name: Run database migrations
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          GIT_BRANCH: nightly
+          ALLOW_PROD_MIGRATIONS: 'true'
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
+
+      - name: Run nightly E2E tests
+        run: |
+          cd apps/web
+          if [ -n "${{ github.event.inputs.test_filter }}" ]; then
+            pnpm playwright test "${{ github.event.inputs.test_filter }}" --config=playwright.config.nightly.ts --project=chromium --reporter=line
+          else
+            pnpm playwright test --config=playwright.config.nightly.ts --project=chromium --reporter=line
+          fi
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
+          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+
+      - name: Upload Playwright Report on Failure
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: nightly-e2e-report-${{ github.run_id }}
+          path: apps/web/playwright-report/
+          retention-days: 7
+
+      - name: Upload Test Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: nightly-e2e-results-${{ github.run_id }}
+          path: apps/web/test-results/
+          retention-days: 7
+
+      - name: Cleanup Neon branch
+        if: always()
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          BRANCH_NAME: nightly-e2e-${{ github.run_id }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "Neon credentials missing; skipping branch cleanup." >&2
+            exit 0
+          fi
+
+          echo "Deleting Neon branch '$BRANCH_NAME' for nightly run ${{ github.run_id }}..."
+          pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
+            echo "Branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
+          }
+
+  # ==========================================================================
+  # Notifications
+  # ==========================================================================
+  notify:
+    name: Notify Results
+    needs: [knip, unit-tests, e2e-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Slack notification on Knip failure
+        if: ${{ needs.knip.result == 'failure' }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "Nightly Knip audit failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Nightly Knip Audit Failed*\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Slack notification on unit test failure
+        if: ${{ needs.unit-tests.result == 'failure' }}
+        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
+        with:
+          channel-id: ${{ vars.SLACK_CI_CHANNEL_ID }}
+          payload: |
+            {
+              "text": "Nightly unit tests failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Nightly Unit Tests Failed*\n\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Slack notification on E2E failure
+        if: ${{ needs.e2e-tests.result == 'failure' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Nightly Tests'
+          custom_payload: |
+            {
+              "text": "Nightly E2E tests failed",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Workflow", "value": "Nightly E2E Tests", "short": true },
+                    { "title": "Status", "value": "Failed", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notification on all success
+        if: >-
+          needs.knip.result != 'failure' &&
+          needs.unit-tests.result != 'failure' &&
+          needs.e2e-tests.result != 'failure'
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#monitoring'
+          author_name: 'Nightly Tests'
+          custom_payload: |
+            {
+              "text": "Nightly tests passed",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Workflow", "value": "Nightly Tests", "short": true },
+                    { "title": "Status", "value": "All Passed", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

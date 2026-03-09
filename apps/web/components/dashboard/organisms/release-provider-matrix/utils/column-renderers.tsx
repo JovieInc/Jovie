@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
@@ -145,7 +145,7 @@ export function createActionsHeaderRenderer(
             variant='ghost'
             size='sm'
             onClick={onClearSelection}
-            className='h-7 gap-1 text-xs'
+            className='h-7 gap-1 text-[13px]'
           >
             <Icon name='X' className='h-3.5 w-3.5' />
             Clear
@@ -249,7 +249,7 @@ export function createSmartLinkCellRenderer(
   };
 }
 
-/** Combined right column: smart link + popularity + year (responsive) */
+/** Combined right column: smart link + year (responsive) */
 export function createRightMetaCellRenderer(
   isSmartLinkLocked?: (releaseId: string) => boolean,
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null
@@ -258,13 +258,14 @@ export function createRightMetaCellRenderer(
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
-    const year = release.releaseDate
+    const rawYear = release.releaseDate
       ? new Date(release.releaseDate).getFullYear()
       : null;
+    const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
     return (
-      <div className='flex min-w-[180px] md:min-w-[300px] items-center justify-end gap-3 text-xs text-secondary-token'>
-        <div className='min-w-0 flex-1'>
+      <div className='grid min-w-[220px] grid-cols-[minmax(0,1fr)_20px_44px] items-center justify-end gap-x-3 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
+        <div className='min-w-0'>
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}
@@ -272,12 +273,13 @@ export function createRightMetaCellRenderer(
           />
         </div>
 
-        <div className='hidden sm:flex items-center gap-2 tabular-nums text-secondary-token shrink-0'>
-          <div className='w-4 flex justify-center'>
-            <PopularityIcon popularity={release.spotifyPopularity} />
-          </div>
-          <span className='w-10 text-right'>{year ?? '—'}</span>
+        <div className='flex w-4 items-center justify-center'>
+          <PopularityIcon popularity={release.spotifyPopularity} />
         </div>
+
+        <span className='hidden w-12 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
+          {year ?? 'Unknown'}
+        </span>
       </div>
     );
   };
@@ -334,11 +336,9 @@ export function renderReleaseTypeCell({
   const style = getReleaseTypeStyle(type);
 
   return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${style.border} ${style.text}`}
-    >
+    <Badge size='sm' className={`${style.border} ${style.bg} ${style.text}`}>
       {style.label}
-    </span>
+    </Badge>
   );
 }
 
@@ -364,7 +364,7 @@ export function renderLabelCell({
   if (!label) return <EmptyCell />;
 
   return (
-    <TruncatedText lines={1} className='text-xs text-secondary-token'>
+    <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
       {label}
     </TruncatedText>
   );
@@ -375,7 +375,7 @@ export function renderTotalTracksCell({
   getValue,
 }: CellContext<ReleaseViewModel, number>) {
   return (
-    <span className='text-xs text-secondary-token tabular-nums'>
+    <span className='text-[13px] text-secondary-token tabular-nums'>
       {getValue()}
     </span>
   );
@@ -389,7 +389,7 @@ export function renderDurationCell({
   if (!durationMs) return <EmptyCell />;
 
   return (
-    <span className='text-xs text-secondary-token tabular-nums'>
+    <span className='text-[13px] text-secondary-token tabular-nums'>
       {formatDuration(durationMs)}
     </span>
   );
@@ -409,12 +409,12 @@ export function renderGenresCell({
 
   return (
     <div className='flex items-center gap-1'>
-      <TruncatedText lines={1} className='text-xs text-secondary-token'>
+      <TruncatedText lines={1} className='text-[13px] text-secondary-token'>
         {firstGenre}
       </TruncatedText>
       {remainingCount > 0 && (
         <span
-          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] text-tertiary-token'
+          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] text-tertiary-token'
           title={genres.slice(1).join(', ')}
         >
           +{remainingCount}
@@ -441,7 +441,7 @@ export function renderMetricsCell({
     : null;
 
   return (
-    <div className='flex items-center gap-3 text-xs text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-3 text-[13px] text-secondary-token tabular-nums'>
       {/* Tracks count - fixed width */}
       <span className='w-8 text-right' title='Tracks'>
         {release.totalTracks}
@@ -452,11 +452,11 @@ export function renderMetricsCell({
         {duration ?? '—'}
       </span>
 
-      {/* Label - truncated */}
+      {/* Label */}
       {release.label && (
         <TruncatedText
           lines={1}
-          className='max-w-24 text-tertiary-token'
+          className='max-w-48 text-tertiary-token'
           tooltipSide='top'
         >
           {release.label}
@@ -479,19 +479,20 @@ export function renderStatsCell({
   row,
 }: CellContext<ReleaseViewModel, unknown>) {
   const release = row.original;
-  const year = release.releaseDate
+  const rawYear = release.releaseDate
     ? new Date(release.releaseDate).getFullYear()
     : null;
+  const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
   return (
-    <div className='flex items-center gap-2 text-xs text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-2 text-[13px] text-secondary-token tabular-nums'>
       {/* Popularity icon first */}
       <div className='w-4 flex justify-center'>
         <PopularityIcon popularity={release.spotifyPopularity} />
       </div>
 
       {/* Year - fixed width, right aligned */}
-      <span className='w-10 text-right'>{year ?? '—'}</span>
+      <span className='w-10 text-right'>{year ?? 'Unknown'}</span>
     </div>
   );
 }

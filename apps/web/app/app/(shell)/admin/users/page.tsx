@@ -46,11 +46,11 @@ export const runtime = 'nodejs';
 export default async function AdminUsersPage({
   searchParams,
 }: Readonly<AdminUsersPageProps>) {
-  const { page, pageSize, sort, q } =
+  const { pageSize, sort, q } =
     await adminUsersSearchParams.parse(searchParams);
 
   const { users, total } = await getAdminUsers({
-    page,
+    page: 1,
     pageSize,
     search: q ?? '',
     sort,
@@ -61,7 +61,7 @@ export default async function AdminUsersPage({
       <PageContent noPadding>
         <AdminUsersTableUnified
           users={users}
-          page={page}
+          page={1}
           pageSize={pageSize}
           total={total}
           search={q ?? ''}

@@ -43,18 +43,18 @@ export function DefaultStatusBanner({
 
   if (isUnavailable) {
     statusLabel = 'Status Unavailable';
-    statusTone = 'text-slate-500 dark:text-slate-400';
-    badgeTone = 'border-slate-500/20 bg-slate-500/10';
+    statusTone = 'text-tertiary-token';
+    badgeTone = 'border-subtle bg-surface-2';
     Icon = HelpCircle;
   } else if (isAlive) {
     statusLabel = 'Default Alive';
-    statusTone = 'text-emerald-600 dark:text-emerald-300';
-    badgeTone = 'border-emerald-500/20 bg-emerald-500/10';
+    statusTone = 'text-success';
+    badgeTone = 'border-success/20 bg-success/10';
     Icon = CheckCircle2;
   } else {
     statusLabel = 'Default Dead';
-    statusTone = 'text-rose-600 dark:text-rose-300';
-    badgeTone = 'border-rose-500/20 bg-rose-500/10';
+    statusTone = 'text-error';
+    badgeTone = 'border-error/20 bg-error/10';
     Icon = AlertTriangle;
   }
 
@@ -79,7 +79,7 @@ export function DefaultStatusBanner({
 
   return (
     <Card
-      className='border-subtle bg-surface-1'
+      className='border-subtle bg-transparent'
       data-testid='default-status-banner'
     >
       <CardContent className='flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-center md:justify-between'>

@@ -1,4 +1,5 @@
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export interface ReleaseProviderMatrixProps {
   readonly releases: ReleaseViewModel[];
@@ -13,6 +14,8 @@ export interface ReleaseProviderMatrixProps {
   readonly appleMusicArtistName?: string | null;
   /** Whether artwork downloads are allowed on public pages */
   readonly allowArtworkDownloads?: boolean;
+  /** Whether a Spotify import is currently in progress (from server) */
+  readonly initialImporting?: boolean;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;
@@ -49,12 +52,21 @@ export interface UseReleaseProviderMatrixReturn {
   handleReset: (provider: ProviderKey) => void;
   handleSync: () => void;
   handleRefreshRelease: (releaseId: string) => void;
+  refreshingReleaseId: string | null;
+  flashedReleaseId: string | null;
   handleRescanIsrc: (releaseId: string) => void;
   isRescanningIsrc: boolean;
+  handleCanvasStatusUpdate: (
+    releaseId: string,
+    status: CanvasStatus
+  ) => Promise<void>;
   handleAddUrl: (
     releaseId: string,
     provider: ProviderKey,
     url: string
   ) => Promise<void>;
+  handleSaveLyrics: (releaseId: string, lyrics: string) => Promise<void>;
+  handleFormatLyrics: (releaseId: string, lyrics: string) => Promise<string[]>;
+  isLyricsSaving: boolean;
   setDrafts: React.Dispatch<React.SetStateAction<DraftState>>;
 }

@@ -27,6 +27,21 @@ export type SortDirection = z.infer<typeof sortDirectionSchema>;
 // =============================================================================
 
 /**
+ * Audience segment filter values.
+ */
+export const audienceSegmentValues = [
+  'highIntent',
+  'returning',
+  'frequent',
+  'recent24h',
+] as const;
+
+/**
+ * Audience segment filter validation schema.
+ */
+export const audienceSegmentSchema = z.enum(audienceSegmentValues);
+
+/**
  * Audience member sort column values.
  */
 export const memberSortValues = [
@@ -61,13 +76,20 @@ export const membersQuerySchema = z.object({
   sort: memberSortSchema.default('lastSeen'),
   /** Sort direction */
   direction: sortDirectionSchema.default('desc'),
-  /** Page number (1-indexed) */
+  /**
+   * Opaque keyset cursor returned by the previous page response.
+   * When present, keyset pagination is used instead of OFFSET (JOV-1263).
+   */
+  cursor: z.string().optional(),
+  /** @deprecated Use `cursor` instead. Kept for backward-compatibility. */
   page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
   /** Items per page (1-100) */
   pageSize: z.preprocess(
     val => Number(val ?? 10),
     z.number().int().min(1).max(100)
   ),
+  /** Segment filters */
+  segments: z.array(audienceSegmentSchema).default([]),
 });
 
 /**
@@ -104,6 +126,8 @@ export type SubscriberSort = z.infer<typeof subscriberSortSchema>;
  * Used for GET /api/dashboard/audience/subscribers requests.
  *
  * Pre-instantiated to avoid per-request Zod schema construction overhead.
+ * Uses cursor/keyset pagination (JOV-1265): pass `cursor` (opaque base64
+ * token returned in previous response) instead of `page`.
  */
 export const subscribersQuerySchema = z.object({
   /** Creator profile ID (UUID format) */
@@ -112,8 +136,14 @@ export const subscribersQuerySchema = z.object({
   sort: subscriberSortSchema.default('createdAt'),
   /** Sort direction */
   direction: sortDirectionSchema.default('desc'),
-  /** Page number (1-indexed) */
-  page: z.preprocess(val => Number(val ?? 1), z.number().int().min(1)),
+  /**
+   * Opaque cursor token from the previous page's `nextCursor` field.
+   * Omit (or pass null/empty) to start from the beginning.
+   */
+  cursor: z
+    .string()
+    .nullish()
+    .transform(v => v ?? null),
   /** Items per page (1-100) */
   pageSize: z.preprocess(
     val => Number(val ?? 10),

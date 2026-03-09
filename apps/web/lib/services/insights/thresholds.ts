@@ -41,6 +41,12 @@ export const GENERATION_COOLDOWN_HOURS = 1;
 /** Maximum profiles to process per cron batch (reduced from 100 to control LLM costs) */
 export const MAX_CRON_BATCH_SIZE = 25;
 
+/** Number of profiles processed in parallel per cron chunk */
+export const INSIGHTS_CRON_CONCURRENCY = 5;
+
+/** Hard timeout for processing a single profile in cron */
+export const INSIGHTS_CRON_PROFILE_TIMEOUT_MS = 45_000;
+
 /** Minimum confidence score for an insight to be stored */
 export const MIN_CONFIDENCE = 0.5;
 

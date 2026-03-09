@@ -1,25 +1,35 @@
 'use client';
 
-import { useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
 export function SettingsAudienceSection() {
-  const [doubleOptIn, setDoubleOptIn] = useState(true);
-  const { updateNotifications, isPending } = useNotificationSettingsMutation();
+  const { updateNotificationsAsync } = useNotificationSettingsMutation();
+
+  const {
+    checked: doubleOptIn,
+    handleToggle,
+    isPending,
+    saveStatus,
+  } = useOptimisticToggle({
+    initialValue: true,
+    mutateAsync: (enabled: boolean) =>
+      updateNotificationsAsync({ require_double_opt_in: enabled }),
+    errorMessage: 'Failed to update email verification setting.',
+  });
 
   return (
     <DashboardCard variant='settings' padding='none'>
+      <SettingsStatusPill status={saveStatus} className='px-4 pt-3' />
       <div className='px-4 py-3'>
         <SettingsToggleRow
           title='Require Email Verification'
           description='New fans must confirm their email before receiving notifications.'
           checked={doubleOptIn}
-          onCheckedChange={(enabled: boolean) => {
-            setDoubleOptIn(enabled);
-            updateNotifications({ require_double_opt_in: enabled });
-          }}
+          onCheckedChange={handleToggle}
           disabled={isPending}
           ariaLabel='Toggle email verification requirement'
         />

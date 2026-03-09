@@ -17,7 +17,7 @@ export interface CheckboxProps
  * Supports indeterminate state via the indeterminate prop.
  */
 const Checkbox = React.forwardRef<
-  React.ElementRef<typeof CheckboxPrimitive.Root>,
+  React.ComponentRef<typeof CheckboxPrimitive.Root>,
   CheckboxProps
 >(({ className, indeterminate, ...props }, ref) => {
   const internalRef = React.useRef<HTMLButtonElement>(null);
@@ -54,10 +54,11 @@ const Checkbox = React.forwardRef<
     <CheckboxPrimitive.Root
       ref={mergedRef}
       className={cn(
-        'peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'peer h-4 w-4 shrink-0 rounded-(--linear-app-radius-item) border border-(--linear-border-strong) bg-transparent cursor-pointer transition-colors duration-fast ease-interactive',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
+        'data-[state=checked]:bg-(--linear-btn-primary-bg) data-[state=checked]:border-(--linear-btn-primary-bg) data-[state=checked]:text-(--linear-btn-primary-fg)',
+        'data-[state=indeterminate]:bg-(--linear-btn-primary-bg) data-[state=indeterminate]:border-(--linear-btn-primary-bg) data-[state=indeterminate]:text-(--linear-btn-primary-fg)',
         className
       )}
       {...props}
@@ -65,7 +66,7 @@ const Checkbox = React.forwardRef<
       <CheckboxPrimitive.Indicator
         className={cn('flex items-center justify-center text-current')}
       >
-        <Check className='h-4 w-4' />
+        <Check className='h-3 w-3 [stroke-width:2.5]' />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );

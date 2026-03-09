@@ -51,6 +51,7 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { fireSubscribeCAPIEvent } from '@/lib/tracking/fire-subscribe-event';
 import {
   statusSchema,
   subscribeSchema,
@@ -299,7 +300,7 @@ async function sendSubscriptionConfirmationEmail(
       id: dedupKey,
       dedupKey,
       category: 'transactional',
-      subject: `You're subscribed to ${artistName} on Jovie`,
+      subject: `Notifications on for ${artistName} on Jovie`,
       text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
       html: `
         <p>Thanks for turning on notifications for <strong>${artistName}</strong>.</p>
@@ -464,6 +465,106 @@ async function dispatchSubscriptionEmail(
   );
 }
 
+function resolveGeoContext(
+  headers: Headers | undefined,
+  fallbackCountry: string | null | undefined,
+  fallbackCity: string | null | undefined
+) {
+  const ipAddress = getForwardedIp(headers);
+  const geoCountry =
+    getHeader(headers, 'x-vercel-ip-country') ||
+    getHeader(headers, 'cf-ipcountry') ||
+    null;
+  const geoCity = getHeader(headers, 'x-vercel-ip-city');
+  return {
+    ipAddress,
+    countryCode: sanitizeCountryCode(geoCountry ?? fallbackCountry),
+    cityValue: sanitizeCity(fallbackCity ?? geoCity),
+  };
+}
+
+function buildSubscriptionValues(params: {
+  artist_id: string;
+  channel: NotificationChannel;
+  normalizedEmail: string | null;
+  normalizedPhone: string | null;
+  countryCode: string | null | undefined;
+  cityValue: string | null | undefined;
+  ipAddress: string | null | undefined;
+  source: string;
+  defaultPreferences: FanNotificationPreferences;
+  shouldVerifyEmail: boolean;
+  emailOtp: EmailOtpResult | null;
+}) {
+  const {
+    artist_id,
+    channel,
+    normalizedEmail,
+    normalizedPhone,
+    countryCode,
+    cityValue,
+    ipAddress,
+    source,
+    defaultPreferences,
+    shouldVerifyEmail,
+    emailOtp,
+  } = params;
+  return {
+    creatorProfileId: artist_id,
+    channel,
+    email: normalizedEmail,
+    phone: channel === 'sms' ? normalizedPhone : null,
+    countryCode,
+    city: cityValue,
+    ipAddress,
+    source,
+    preferences: defaultPreferences,
+    confirmedAt: shouldVerifyEmail ? null : new Date(),
+    emailOtpHash: emailOtp?.otpHash,
+    emailOtpExpiresAt: emailOtp?.otpExpiresAt,
+    emailOtpLastSentAt: emailOtp ? new Date() : null,
+    emailOtpAttempts: 0,
+  };
+}
+
+async function firePostSubscribeActions({
+  dynamicEnabled,
+  normalizedEmail,
+  normalizedPhone,
+  ipAddress,
+  artist_id,
+  shouldVerifyEmail,
+  headers,
+}: {
+  dynamicEnabled: boolean;
+  normalizedEmail: string | null;
+  normalizedPhone: string | null;
+  ipAddress: string | null | undefined;
+  artist_id: string;
+  shouldVerifyEmail: boolean;
+  headers: Headers | undefined;
+}): Promise<void> {
+  if (dynamicEnabled && normalizedEmail) {
+    const ua = getHeader(headers, 'user-agent') || null;
+    await upsertAudienceMember(
+      artist_id,
+      normalizedEmail,
+      ipAddress ?? null,
+      ua
+    );
+  }
+  if (!shouldVerifyEmail) {
+    void fireSubscribeCAPIEvent({
+      creatorProfileId: artist_id,
+      email: normalizedEmail ?? undefined,
+      phone: normalizedPhone ?? undefined,
+      ipAddress: ipAddress ?? undefined,
+      userAgent: getHeader(headers, 'user-agent') ?? undefined,
+      sourceUrl: getHeader(headers, 'referer') ?? undefined,
+    });
+  }
+}
+
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
   context: NotificationDomainContext = {}
@@ -497,14 +598,11 @@ export const subscribeToNotificationsDomain = async (
     const { profile: artistProfile, dynamicEnabled } = artistResult;
     const creatorIsPro = artistProfile.creatorIsPro;
 
-    const ipAddress = getForwardedIp(context.headers);
-    const geoCountry =
-      getHeader(context.headers, 'x-vercel-ip-country') ||
-      getHeader(context.headers, 'cf-ipcountry') ||
-      null;
-    const geoCity = getHeader(context.headers, 'x-vercel-ip-city');
-    const countryCode = sanitizeCountryCode(geoCountry ?? country_code);
-    const cityValue = sanitizeCity(city ?? geoCity);
+    const { ipAddress, countryCode, cityValue } = resolveGeoContext(
+      context.headers,
+      country_code,
+      city
+    );
 
     const normalizedEmail =
       channel === 'email' ? (normalizeSubscriptionEmail(email) ?? null) : null;
@@ -561,22 +659,21 @@ export const subscribeToNotificationsDomain = async (
 
     await db
       .insert(notificationSubscriptions)
-      .values({
-        creatorProfileId: artist_id,
-        channel,
-        email: normalizedEmail,
-        phone: channel === 'sms' ? normalizedPhone : null,
-        countryCode,
-        city: cityValue,
-        ipAddress,
-        source,
-        preferences: defaultPreferences,
-        confirmedAt: shouldVerifyEmail ? null : new Date(),
-        emailOtpHash: emailOtp?.otpHash,
-        emailOtpExpiresAt: emailOtp?.otpExpiresAt,
-        emailOtpLastSentAt: emailOtp ? new Date() : null,
-        emailOtpAttempts: 0,
-      })
+      .values(
+        buildSubscriptionValues({
+          artist_id,
+          channel,
+          normalizedEmail,
+          normalizedPhone,
+          countryCode,
+          cityValue,
+          ipAddress,
+          source,
+          defaultPreferences,
+          shouldVerifyEmail,
+          emailOtp,
+        })
+      )
       .onConflictDoUpdate(upsertConfig);
 
     await trackSubscribeSuccess({
@@ -590,10 +687,18 @@ export const subscribeToNotificationsDomain = async (
       dynamic_enabled: dynamicEnabled,
     });
 
-    if (dynamicEnabled && normalizedEmail) {
-      const ua = getHeader(context.headers, 'user-agent') || null;
-      await upsertAudienceMember(artist_id, normalizedEmail, ipAddress, ua);
-    }
+    // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
+    // email subscribers who are already verified from a previous subscription).
+    // Email OTP subscribers fire this event in verifyEmailOtpDomain() instead.
+    await firePostSubscribeActions({
+      dynamicEnabled,
+      normalizedEmail,
+      normalizedPhone,
+      ipAddress,
+      artist_id,
+      shouldVerifyEmail,
+      headers: context.headers,
+    });
 
     const dispatchResult = await dispatchSubscriptionEmail(
       channel,
@@ -683,6 +788,12 @@ export const verifyEmailOtpDomain = async (
       emailOtpAttempts: 0,
     })
     .where(eq(notificationSubscriptions.id, subscription.id));
+
+  // Fire CAPI Subscribe event now that the email subscriber is confirmed
+  void fireSubscribeCAPIEvent({
+    creatorProfileId: parsed.data.artist_id,
+    email: normalizedEmail ?? undefined,
+  });
 
   return {
     status: 200,

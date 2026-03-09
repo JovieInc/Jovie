@@ -30,6 +30,53 @@ export interface ValidatedTrackRequest {
   target: string;
   linkId?: string;
   source?: 'qr' | 'link';
+  context?: TrackClickContext;
+  utmParams?: {
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+    utm_term?: string;
+    utm_content?: string;
+  };
+}
+
+export interface TrackClickContext {
+  contentType?: 'release' | 'track';
+  contentId?: string;
+  provider?: string;
+  smartLinkSlug?: string;
+  tipAmount?: number;
+  tipAmountCents?: number;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeUtmParams(
+  utmParams: unknown
+): ValidatedTrackRequest['utmParams'] | undefined {
+  if (typeof utmParams !== 'object' || utmParams === null) {
+    return undefined;
+  }
+
+  const params = utmParams as Record<string, unknown>;
+
+  const normalized = {
+    utm_source: normalizeOptionalString(params.utm_source),
+    utm_medium: normalizeOptionalString(params.utm_medium),
+    utm_campaign: normalizeOptionalString(params.utm_campaign),
+    utm_term: normalizeOptionalString(params.utm_term),
+    utm_content: normalizeOptionalString(params.utm_content),
+  };
+
+  if (!Object.values(normalized).some(Boolean)) {
+    return undefined;
+  }
+
+  return normalized;
 }
 
 /**
@@ -139,6 +186,44 @@ export function normalizeSource(source: unknown): 'qr' | 'link' | undefined {
   return undefined;
 }
 
+function normalizeContext(context: unknown): TrackClickContext | undefined {
+  if (!context || typeof context !== 'object') return undefined;
+  const raw = context as Record<string, unknown>;
+  const normalized: TrackClickContext = {};
+
+  if (raw.contentType === 'release' || raw.contentType === 'track') {
+    normalized.contentType = raw.contentType;
+  }
+
+  if (typeof raw.contentId === 'string' && raw.contentId.trim().length > 0) {
+    normalized.contentId = raw.contentId.trim();
+  }
+
+  if (typeof raw.provider === 'string' && raw.provider.trim().length > 0) {
+    normalized.provider = raw.provider.trim();
+  }
+
+  if (
+    typeof raw.smartLinkSlug === 'string' &&
+    raw.smartLinkSlug.trim().length > 0
+  ) {
+    normalized.smartLinkSlug = raw.smartLinkSlug.trim();
+  }
+
+  if (
+    typeof raw.tipAmountCents === 'number' &&
+    Number.isFinite(raw.tipAmountCents)
+  ) {
+    normalized.tipAmountCents = Math.max(0, Math.round(raw.tipAmountCents));
+  }
+
+  if (typeof raw.tipAmount === 'number' && Number.isFinite(raw.tipAmount)) {
+    normalized.tipAmount = Math.max(0, raw.tipAmount);
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
+
 /**
  * Validate entire track request
  * Returns validation error or validated data
@@ -155,13 +240,16 @@ export function validateTrackRequest(
     };
   }
 
-  const { handle, linkType, target, linkId, source } = body as {
-    handle?: string;
-    linkType?: LinkType;
-    target?: string;
-    linkId?: string;
-    source?: unknown;
-  };
+  const { handle, linkType, target, linkId, source, context, utmParams } =
+    body as {
+      handle?: string;
+      linkType?: LinkType;
+      target?: string;
+      linkId?: string;
+      source?: unknown;
+      context?: unknown;
+      utmParams?: unknown;
+    };
 
   // Run all validations
   const requiredError = validateRequiredFields({ handle, linkType, target });
@@ -184,6 +272,8 @@ export function validateTrackRequest(
       target: target!,
       linkId,
       source: normalizeSource(source),
+      context: normalizeContext(context),
+      utmParams: normalizeUtmParams(utmParams),
     },
   };
 }

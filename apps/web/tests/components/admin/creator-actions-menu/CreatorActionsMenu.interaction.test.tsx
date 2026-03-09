@@ -1,9 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu/CreatorActionsMenu';
-import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 vi.mock('next/link', () => ({
@@ -21,12 +20,6 @@ vi.mock('next/link', () => ({
     </a>
   ),
 }));
-
-vi.mock('@/hooks/useClipboard', () => ({
-  copyToClipboard: vi.fn(),
-}));
-
-const mockedCopyToClipboard = vi.mocked(copyToClipboard);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -84,33 +77,79 @@ function renderMenu(
   return handlers;
 }
 
+async function openMenu(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /actions/i }));
+}
+
 describe('CreatorActionsMenu interaction tests', () => {
-  it('opens dropdown and fires action handlers', async () => {
+  it('renders all expected menu items for a standard creator', async () => {
+    const user = userEvent.setup();
+    renderMenu(createProfile());
+
+    await openMenu(user);
+
+    const menu = screen.getByRole('menu');
+    expect(
+      within(menu).getByRole('menuitem', { name: /refresh ingest/i })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitem', { name: /verify creator/i })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitem', { name: /^feature$/i })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitem', { name: /disable marketing emails/i })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitem', { name: /view profile/i })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitem', { name: /send invite/i })
+    ).toBeInTheDocument();
+    expect(
+      within(menu).getByRole('menuitem', { name: /delete creator/i })
+    ).toBeInTheDocument();
+  });
+
+  it('fires each action handler from menu interactions', async () => {
     const user = userEvent.setup();
     const handlers = renderMenu(createProfile());
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: /verify creator/i }));
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
-    await user.click(screen.getByRole('menuitem', { name: /feature/i }));
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: /^feature$/i }));
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
     await user.click(
       screen.getByRole('menuitem', { name: /disable marketing emails/i })
     );
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: /send invite/i }));
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
     await user.click(screen.getByRole('menuitem', { name: /delete creator/i }));
 
-    expect(handlers.onToggleVerification).toHaveBeenCalledTimes(1);
-    expect(handlers.onToggleFeatured).toHaveBeenCalledTimes(1);
-    expect(handlers.onToggleMarketing).toHaveBeenCalledTimes(1);
-    expect(handlers.onSendInvite).toHaveBeenCalledTimes(1);
-    expect(handlers.onDelete).toHaveBeenCalledTimes(1);
+    expect(handlers.onToggleVerification).toHaveBeenCalledOnce();
+    expect(handlers.onToggleFeatured).toHaveBeenCalledOnce();
+    expect(handlers.onToggleMarketing).toHaveBeenCalledOnce();
+    expect(handlers.onSendInvite).toHaveBeenCalledOnce();
+    expect(handlers.onDelete).toHaveBeenCalledOnce();
+  });
+
+  it('closes the menu after selecting an action', async () => {
+    const user = userEvent.setup();
+    renderMenu(createProfile());
+
+    await openMenu(user);
+    await user.click(screen.getByRole('menuitem', { name: /verify creator/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    });
   });
 
   it('renders conditional labels for verified and featured profiles', async () => {
@@ -118,7 +157,7 @@ describe('CreatorActionsMenu interaction tests', () => {
 
     renderMenu(createProfile({ isVerified: true, isFeatured: true }));
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
 
     expect(
       screen.getByRole('menuitem', { name: /unverify creator/i })
@@ -128,34 +167,15 @@ describe('CreatorActionsMenu interaction tests', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows copy feedback and reverts after 2000ms', async () => {
-    mockedCopyToClipboard.mockResolvedValue(true);
+  it('does not show copy claim link (tokens are hashed)', async () => {
     const user = userEvent.setup();
 
     renderMenu(createProfile());
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
-    await user.click(
-      screen.getByRole('menuitem', { name: /copy claim link/i })
-    );
-
-    expect(mockedCopyToClipboard).toHaveBeenCalledWith(
-      expect.stringContaining('/dina/claim?token=claim-token-123')
-    );
-
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
     expect(
-      screen.getByRole('menuitem', { name: /copied!/i })
-    ).toBeInTheDocument();
-
-    await waitFor(
-      () => {
-        expect(
-          screen.getByRole('menuitem', { name: /copy claim link/i })
-        ).toBeInTheDocument();
-      },
-      { timeout: 3000 }
-    );
+      screen.queryByRole('menuitem', { name: /copy claim link/i })
+    ).not.toBeInTheDocument();
   });
 
   it('disables trigger while loading', () => {
@@ -171,11 +191,8 @@ describe('CreatorActionsMenu interaction tests', () => {
       createProfile({ isClaimed: false, claimToken: 'claim-token-123' })
     );
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
 
-    expect(
-      screen.getByRole('menuitem', { name: /copy claim link/i })
-    ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: /send invite/i })
     ).toBeInTheDocument();
@@ -186,13 +203,24 @@ describe('CreatorActionsMenu interaction tests', () => {
 
     renderMenu(createProfile({ isClaimed: true }));
 
-    await user.click(screen.getByRole('button', { name: /actions/i }));
+    await openMenu(user);
 
     expect(
       screen.queryByRole('menuitem', { name: /copy claim link/i })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('menuitem', { name: /send invite/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it.skip('hides delete action for featured creators (business rule not implemented)', async () => {
+    const user = userEvent.setup();
+
+    renderMenu(createProfile({ isFeatured: true }));
+    await openMenu(user);
+
+    expect(
+      screen.queryByRole('menuitem', { name: /delete creator/i })
     ).not.toBeInTheDocument();
   });
 });

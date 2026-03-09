@@ -11,6 +11,7 @@ import { Button } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { useConfirmChatEditMutation } from '@/lib/queries/useConfirmChatEditMutation';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,7 @@ export function ProfileEditPreviewCard({
   const [applied, setApplied] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const confirmEdit = useConfirmChatEditMutation();
+  const previewPanel = usePreviewPanelContext();
 
   const handleApply = useCallback(async () => {
     confirmEdit.mutate(
@@ -60,11 +62,24 @@ export function ProfileEditPreviewCard({
         onSuccess: () => {
           setApplied(true);
           toast.success(`${preview.fieldLabel} updated successfully`);
+
+          // Instantly update sidebar preview if available
+          if (
+            previewPanel?.previewData &&
+            preview.field === 'displayName' &&
+            typeof preview.newValue === 'string'
+          ) {
+            previewPanel.setPreviewData({
+              ...previewPanel.previewData,
+              displayName: preview.newValue,
+            });
+          }
+
           onApply?.();
         },
       }
     );
-  }, [profileId, preview, onApply, confirmEdit]);
+  }, [profileId, preview, onApply, confirmEdit, previewPanel]);
 
   const handleCancel = useCallback(() => {
     setCancelled(true);
@@ -77,7 +92,7 @@ export function ProfileEditPreviewCard({
       <div className='rounded-xl border border-success/30 bg-success-subtle p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
-          <span className='text-sm font-medium'>
+          <span className='text-[13px] font-[510]'>
             {preview.fieldLabel} updated
           </span>
         </div>
@@ -91,7 +106,7 @@ export function ProfileEditPreviewCard({
       <div className='rounded-xl border border-subtle bg-surface-1 p-4 opacity-60'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
-          <span className='text-sm'>Edit cancelled</span>
+          <span className='text-[13px]'>Edit cancelled</span>
         </div>
       </div>
     );
@@ -102,11 +117,11 @@ export function ProfileEditPreviewCard({
       {/* Header */}
       <div className='mb-3 flex items-start justify-between'>
         <div>
-          <h4 className='text-sm font-medium text-primary-token'>
+          <h4 className='text-[13px] font-[510] text-primary-token'>
             Update {preview.fieldLabel}
           </h4>
           {preview.reason && (
-            <p className='mt-0.5 text-xs text-secondary-token'>
+            <p className='mt-0.5 text-[11px] text-secondary-token'>
               {preview.reason}
             </p>
           )}
@@ -116,12 +131,12 @@ export function ProfileEditPreviewCard({
       {/* Diff view */}
       <div className='mb-4 space-y-2'>
         <div className='rounded-lg bg-surface-1 p-3'>
-          <div className='mb-1 text-xs font-medium text-tertiary-token'>
+          <div className='mb-1 text-[11px] font-[510] text-tertiary-token'>
             Current
           </div>
           <div
             className={cn(
-              'text-sm',
+              'text-[13px]',
               !preview.currentValue && 'italic text-tertiary-token'
             )}
           >
@@ -129,8 +144,8 @@ export function ProfileEditPreviewCard({
           </div>
         </div>
         <div className='rounded-lg border border-accent/20 bg-accent/10 p-3'>
-          <div className='mb-1 text-xs font-medium text-accent'>New</div>
-          <div className='text-sm text-primary-token'>
+          <div className='mb-1 text-[11px] font-[510] text-accent'>New</div>
+          <div className='text-[13px] text-primary-token'>
             {formatValue(preview.newValue)}
           </div>
         </div>

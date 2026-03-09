@@ -220,7 +220,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
   return (
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility
     <div
-      className={`rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-sm shadow-black/5 ${className ?? ''}`}
+      className={`rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-card ${className ?? ''}`}
       aria-label='Ingested link suggestions'
     >
       <div className='flex flex-wrap items-center justify-center gap-2'>
@@ -234,28 +234,34 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
             : suggestion.platform.name;
 
           return (
-            <PlatformPill
-              key={key}
-              platformIcon={suggestion.platform.icon}
-              platformName={suggestion.platform.name}
-              primaryText={pillText}
-              badgeText='Suggested'
-              state='ready'
-              suffix={<Plus className='h-3.5 w-3.5' aria-hidden />}
-              trailing={
-                <button
-                  type='button'
-                  aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
-                  className='grid h-6 w-6 place-items-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition hover:bg-surface-2 hover:text-primary-token'
-                  onClick={event => handleDismiss(suggestion, event)}
-                >
-                  <X className='h-3.5 w-3.5' aria-hidden />
-                </button>
-              }
-              onClick={() => handleAccept(suggestion)}
-              className='pr-1.5'
-              testId='ingested-suggestion-pill'
-            />
+            <div key={key} className='relative'>
+              <button
+                type='button'
+                aria-label={`Accept ${suggestion.platform.name} suggestion`}
+                className='rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                onClick={() => handleAccept(suggestion)}
+              >
+                <PlatformPill
+                  platformIcon={suggestion.platform.icon}
+                  platformName={suggestion.platform.name}
+                  primaryText={pillText}
+                  badgeText='Suggested'
+                  state='ready'
+                  suffix={<Plus className='h-3.5 w-3.5' aria-hidden />}
+                  className='pr-10'
+                  testId='ingested-suggestion-pill'
+                />
+              </button>
+
+              <button
+                type='button'
+                aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
+                className='absolute top-1/2 right-2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition hover:bg-surface-2 hover:text-primary-token'
+                onClick={event => handleDismiss(suggestion, event)}
+              >
+                <X className='h-3.5 w-3.5' aria-hidden />
+              </button>
+            </div>
           );
         })}
       </div>

@@ -2,6 +2,8 @@
 
 import { ArrowDown } from 'lucide-react';
 
+const numberFormatter = new Intl.NumberFormat();
+
 interface FunnelStage {
   label: string;
   value: number;
@@ -15,7 +17,7 @@ interface AnalyticsFunnelProps {
 }
 
 function formatNumber(num: number): string {
-  return Intl.NumberFormat().format(num);
+  return numberFormatter.format(num);
 }
 
 function calculateRate(current: number, previous: number): string {
@@ -40,7 +42,7 @@ export function AnalyticsFunnel({
       description: 'Distinct users identified',
     },
     {
-      label: 'Subscribers',
+      label: 'Followers',
       value: subscribers,
       description: 'Opted-in for notifications',
     },
@@ -64,7 +66,7 @@ export function AnalyticsFunnel({
               <div className='flex flex-col items-center py-2'>
                 <ArrowDown className='h-4 w-4 text-tertiary-token' />
                 {conversionRate && (
-                  <span className='text-xs font-medium text-accent mt-0.5 tabular-nums'>
+                  <span className='text-[11px] font-[510] text-accent mt-0.5 tabular-nums'>
                     {conversionRate}
                   </span>
                 )}
@@ -85,13 +87,13 @@ export function AnalyticsFunnel({
                   transition-all duration-200
                 `}
               >
-                <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token mb-2'>
+                <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token mb-2'>
                   {stage.label}
                 </p>
-                <p className='text-4xl font-extrabold tracking-tight text-primary-token tabular-nums'>
+                <p className='text-4xl font-[590] tracking-[-0.022em] text-primary-token tabular-nums'>
                   {formatNumber(stage.value)}
                 </p>
-                <p className='text-xs text-secondary-token mt-1'>
+                <p className='text-[13px] text-secondary-token mt-1'>
                   {stage.description}
                 </p>
               </div>

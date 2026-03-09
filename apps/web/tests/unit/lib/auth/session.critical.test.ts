@@ -32,8 +32,21 @@ vi.mock('@/lib/db/schema', () => ({
 describe('@critical session.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     mockDbExecute.mockResolvedValue(undefined);
+    // Mock transaction to invoke the callback with a mock tx object
+    mockDbTransaction.mockImplementation(
+      async (callback: (tx: unknown) => Promise<unknown>) => {
+        const mockTx = {
+          execute: mockDbExecute,
+          select: mockDbSelect,
+          transaction: mockDbTransaction,
+          update: vi.fn(),
+          insert: vi.fn(),
+          delete: vi.fn(),
+        };
+        return callback(mockTx);
+      }
+    );
   });
 
   describe('validateClerkUserId', () => {
@@ -106,6 +119,38 @@ describe('@critical session.ts', () => {
       expect(result.userId).toBe('user_provided_123');
       // Combined into single query for performance
       expect(mockDbExecute).toHaveBeenCalledTimes(1);
+
+      const executedSql = mockDbExecute.mock.calls[0]?.[0];
+      const queryText = JSON.stringify(executedSql);
+
+      expect(queryText).toContain('app.clerk_user_id');
+      expect(queryText).not.toContain('app.user_id');
+    });
+
+    it('throws when session-scoped set_config fails', async () => {
+      const { setupDbSession } = await import('@/lib/auth/session');
+
+      mockDbExecute.mockRejectedValueOnce(new Error('set_config unavailable'));
+
+      await expect(setupDbSession('user_fallback_123')).rejects.toThrow(
+        'set_config unavailable'
+      );
+      expect(mockDbExecute).toHaveBeenCalledTimes(1);
+
+      const queryText = JSON.stringify(mockDbExecute.mock.calls[0]?.[0]);
+      expect(queryText).toContain("set_config('app.clerk_user_id'");
+    });
+
+    it('returns null userId when no authenticated user and no clerkUserId', async () => {
+      mockCachedAuth.mockResolvedValue({ userId: null });
+
+      const { setupDbSession } = await import('@/lib/auth/session');
+
+      const result = await setupDbSession();
+
+      expect(result.userId).toBeNull();
+      // Should not attempt set_config at all
+      expect(mockDbExecute).not.toHaveBeenCalled();
     });
 
     it('uses getCachedAuth when no clerkUserId provided', async () => {
@@ -119,12 +164,13 @@ describe('@critical session.ts', () => {
       expect(mockCachedAuth).toHaveBeenCalled();
     });
 
-    it('throws when not authenticated and no clerkUserId', async () => {
+    it('returns null userId when not authenticated and no clerkUserId', async () => {
       mockCachedAuth.mockResolvedValue({ userId: null });
 
       const { setupDbSession } = await import('@/lib/auth/session');
 
-      await expect(setupDbSession()).rejects.toThrow('Unauthorized');
+      const result = await setupDbSession();
+      expect(result.userId).toBeNull();
     });
 
     it('validates userId format', async () => {
@@ -173,13 +219,12 @@ describe('@critical session.ts', () => {
         clerkUserId: 'user_123',
       });
 
-      // The implementation passes the db object directly (neon-http driver doesn't support transactions)
-      // Verify the db object was passed (has execute, select, transaction methods)
+      // The WebSocket driver supports real transactions.
+      // Verify the transaction callback received a tx object and the userId.
+      expect(mockDbTransaction).toHaveBeenCalledTimes(1);
       expect(operation).toHaveBeenCalledWith(
         expect.objectContaining({
           execute: expect.any(Function),
-          select: expect.any(Function),
-          transaction: expect.any(Function),
         }),
         'user_123'
       );
@@ -215,7 +260,7 @@ describe('@critical session.ts', () => {
 
       const { requireAuth } = await import('@/lib/auth/session');
 
-      await expect(requireAuth()).rejects.toThrow('Authentication required');
+      await expect(requireAuth()).rejects.toThrow('Unauthorized');
     });
   });
 

@@ -5,7 +5,7 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -18,6 +18,7 @@ import {
 import { getLatestReleaseByUsername } from '@/lib/discography/queries';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+import { hashClaimToken } from '@/lib/security/claim-token';
 import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   ProfileData,
@@ -27,6 +28,46 @@ import type {
   ProfileWithUser,
 } from './types';
 
+/**
+ * Shared select columns for profile queries.
+ * Extract once to avoid repeating 30+ column mappings across 4 query functions.
+ */
+const profileSelectColumns = {
+  id: creatorProfiles.id,
+  userId: creatorProfiles.userId,
+  creatorType: creatorProfiles.creatorType,
+  username: creatorProfiles.username,
+  usernameNormalized: creatorProfiles.usernameNormalized,
+  displayName: creatorProfiles.displayName,
+  bio: creatorProfiles.bio,
+  avatarUrl: creatorProfiles.avatarUrl,
+  venmoHandle: creatorProfiles.venmoHandle,
+  spotifyUrl: creatorProfiles.spotifyUrl,
+  appleMusicUrl: creatorProfiles.appleMusicUrl,
+  youtubeUrl: creatorProfiles.youtubeUrl,
+  spotifyId: creatorProfiles.spotifyId,
+  appleMusicId: creatorProfiles.appleMusicId,
+  youtubeMusicId: creatorProfiles.youtubeMusicId,
+  deezerId: creatorProfiles.deezerId,
+  tidalId: creatorProfiles.tidalId,
+  soundcloudId: creatorProfiles.soundcloudId,
+  isPublic: creatorProfiles.isPublic,
+  isVerified: creatorProfiles.isVerified,
+  isClaimed: creatorProfiles.isClaimed,
+  claimToken: creatorProfiles.claimToken,
+  isFeatured: creatorProfiles.isFeatured,
+  marketingOptOut: creatorProfiles.marketingOptOut,
+  settings: creatorProfiles.settings,
+  theme: creatorProfiles.theme,
+  profileViews: creatorProfiles.profileViews,
+  genres: creatorProfiles.genres,
+  location: creatorProfiles.location,
+  activeSinceYear: creatorProfiles.activeSinceYear,
+  spotifyPopularity: creatorProfiles.spotifyPopularity,
+  createdAt: creatorProfiles.createdAt,
+  updatedAt: creatorProfiles.updatedAt,
+} as const;
+
 // Bounded data retrieval limits to prevent OOM on profiles with many links
 const MAX_SOCIAL_LINKS = 100;
 const MAX_CONTACTS = 50;
@@ -35,12 +76,13 @@ const MAX_CONTACTS = 50;
 const PROFILE_CACHE_KEY_PREFIX = 'profile:data:';
 const PROFILE_CACHE_TTL_SECONDS = 300; // 5 minutes - short TTL for freshness
 
-// Query timeout for public profile pages (fail fast for user-facing pages)
-// Increase timeout in test/development to account for Turbopack compilation overhead
+// Query timeout for public profile pages.
+// Neon cold starts can take 10-15s, so production needs enough headroom to
+// avoid false 404s while still failing reasonably fast for genuine issues.
 const PUBLIC_PROFILE_QUERY_TIMEOUT_MS =
   process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test'
     ? 30000 // 30 seconds for dev/test
-    : 5000; // 5 seconds for production
+    : 15000; // 15 seconds for production (covers Neon cold starts)
 
 /**
  * Get a profile by its ID.
@@ -52,35 +94,7 @@ export async function getProfileById(
   profileId: string
 ): Promise<ProfileData | null> {
   const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      creatorType: creatorProfiles.creatorType,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      bio: creatorProfiles.bio,
-      avatarUrl: creatorProfiles.avatarUrl,
-      venmoHandle: creatorProfiles.venmoHandle,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-      youtubeUrl: creatorProfiles.youtubeUrl,
-      spotifyId: creatorProfiles.spotifyId,
-      isPublic: creatorProfiles.isPublic,
-      isVerified: creatorProfiles.isVerified,
-      isClaimed: creatorProfiles.isClaimed,
-      isFeatured: creatorProfiles.isFeatured,
-      marketingOptOut: creatorProfiles.marketingOptOut,
-      settings: creatorProfiles.settings,
-      theme: creatorProfiles.theme,
-      profileViews: creatorProfiles.profileViews,
-      genres: creatorProfiles.genres,
-      location: creatorProfiles.location,
-      activeSinceYear: creatorProfiles.activeSinceYear,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      createdAt: creatorProfiles.createdAt,
-      updatedAt: creatorProfiles.updatedAt,
-    })
+    .select(profileSelectColumns)
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profileId))
     .limit(1);
@@ -98,35 +112,7 @@ export async function getProfileByUsername(
   username: string
 ): Promise<ProfileData | null> {
   const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
-      creatorType: creatorProfiles.creatorType,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      bio: creatorProfiles.bio,
-      avatarUrl: creatorProfiles.avatarUrl,
-      venmoHandle: creatorProfiles.venmoHandle,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-      youtubeUrl: creatorProfiles.youtubeUrl,
-      spotifyId: creatorProfiles.spotifyId,
-      isPublic: creatorProfiles.isPublic,
-      isVerified: creatorProfiles.isVerified,
-      isClaimed: creatorProfiles.isClaimed,
-      isFeatured: creatorProfiles.isFeatured,
-      marketingOptOut: creatorProfiles.marketingOptOut,
-      settings: creatorProfiles.settings,
-      theme: creatorProfiles.theme,
-      profileViews: creatorProfiles.profileViews,
-      genres: creatorProfiles.genres,
-      location: creatorProfiles.location,
-      activeSinceYear: creatorProfiles.activeSinceYear,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      createdAt: creatorProfiles.createdAt,
-      updatedAt: creatorProfiles.updatedAt,
-    })
+    .select(profileSelectColumns)
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
     .limit(1);
@@ -145,35 +131,10 @@ export async function getProfileWithUser(
 ): Promise<ProfileWithUser | null> {
   const [profile] = await db
     .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
+      ...profileSelectColumns,
       userIsPro: users.isPro,
       userClerkId: users.clerkId,
-      creatorType: creatorProfiles.creatorType,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      bio: creatorProfiles.bio,
-      avatarUrl: creatorProfiles.avatarUrl,
-      venmoHandle: creatorProfiles.venmoHandle,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-      youtubeUrl: creatorProfiles.youtubeUrl,
-      spotifyId: creatorProfiles.spotifyId,
-      isPublic: creatorProfiles.isPublic,
-      isVerified: creatorProfiles.isVerified,
-      isClaimed: creatorProfiles.isClaimed,
-      isFeatured: creatorProfiles.isFeatured,
-      marketingOptOut: creatorProfiles.marketingOptOut,
-      settings: creatorProfiles.settings,
-      theme: creatorProfiles.theme,
-      profileViews: creatorProfiles.profileViews,
-      genres: creatorProfiles.genres,
-      location: creatorProfiles.location,
-      activeSinceYear: creatorProfiles.activeSinceYear,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      createdAt: creatorProfiles.createdAt,
-      updatedAt: creatorProfiles.updatedAt,
+      userEmail: users.email,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -435,35 +396,10 @@ async function fetchProfileFromDatabase(
   // Step 1: Fetch profile first (single query with user JOIN)
   const [profile] = await db
     .select({
-      id: creatorProfiles.id,
-      userId: creatorProfiles.userId,
+      ...profileSelectColumns,
       userIsPro: users.isPro,
       userClerkId: users.clerkId,
-      creatorType: creatorProfiles.creatorType,
-      username: creatorProfiles.username,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      displayName: creatorProfiles.displayName,
-      bio: creatorProfiles.bio,
-      avatarUrl: creatorProfiles.avatarUrl,
-      venmoHandle: creatorProfiles.venmoHandle,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-      youtubeUrl: creatorProfiles.youtubeUrl,
-      spotifyId: creatorProfiles.spotifyId,
-      isPublic: creatorProfiles.isPublic,
-      isVerified: creatorProfiles.isVerified,
-      isClaimed: creatorProfiles.isClaimed,
-      isFeatured: creatorProfiles.isFeatured,
-      marketingOptOut: creatorProfiles.marketingOptOut,
-      settings: creatorProfiles.settings,
-      theme: creatorProfiles.theme,
-      profileViews: creatorProfiles.profileViews,
-      genres: creatorProfiles.genres,
-      location: creatorProfiles.location,
-      activeSinceYear: creatorProfiles.activeSinceYear,
-      spotifyPopularity: creatorProfiles.spotifyPopularity,
-      createdAt: creatorProfiles.createdAt,
-      updatedAt: creatorProfiles.updatedAt,
+      userEmail: users.email,
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -578,6 +514,7 @@ export async function getProfileSummary(
       avatarUrl: creatorProfiles.avatarUrl,
       isPublic: creatorProfiles.isPublic,
       isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
       isVerified: creatorProfiles.isVerified,
     })
     .from(creatorProfiles)
@@ -598,13 +535,19 @@ export async function isClaimTokenValid(
   username: string,
   claimToken: string
 ): Promise<boolean> {
+  const claimTokenHash = await hashClaimToken(claimToken);
+
+  // Try hashed token first (post-migration 0039 flow)
   const [row] = await db
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
     .where(
       and(
         eq(creatorProfiles.usernameNormalized, username.toLowerCase()),
-        eq(creatorProfiles.claimToken, claimToken),
+        or(
+          eq(creatorProfiles.claimToken, claimTokenHash),
+          eq(creatorProfiles.claimToken, claimToken)
+        ),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )
@@ -624,12 +567,17 @@ export async function isClaimTokenValid(
 export async function lookupUsernameByClaimToken(
   claimToken: string
 ): Promise<string | null> {
+  const claimTokenHash = await hashClaimToken(claimToken);
+
   const [row] = await db
     .select({ username: creatorProfiles.username })
     .from(creatorProfiles)
     .where(
       and(
-        eq(creatorProfiles.claimToken, claimToken),
+        or(
+          eq(creatorProfiles.claimToken, claimTokenHash),
+          eq(creatorProfiles.claimToken, claimToken)
+        ),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, false)
       )

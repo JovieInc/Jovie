@@ -8,13 +8,15 @@
  */
 
 import { NextResponse } from 'next/server';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { logger } from '@/lib/utils/logger';
 import type { fetchFullExtractionProfile } from './full-extraction-flow';
 import type { checkExistingProfile } from './profile-operations';
 import { processProfileExtraction } from './profile-processing';
-import { generateClaimToken } from './social-platform-flow';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -62,7 +64,6 @@ export async function handleReingestProfile({
           id: existing.id,
           username: existing.usernameNormalized,
           usernameNormalized: existing.usernameNormalized,
-          claimToken: existing.claimToken,
         },
         links: extraction.links.length,
         warning: mergeError
@@ -101,7 +102,11 @@ export async function handleNewProfileIngest({
   extraction: Awaited<ReturnType<typeof fetchFullExtractionProfile>>;
 }): Promise<NextResponse> {
   return withSystemIngestionSession(async tx => {
-    const { claimToken, claimTokenExpiresAt } = generateClaimToken();
+    const {
+      token: claimToken,
+      tokenHash: claimTokenHash,
+      expiresAt: claimTokenExpiresAt,
+    } = await generateClaimTokenPair();
 
     const [created] = await tx
       .insert(creatorProfiles)
@@ -116,7 +121,7 @@ export async function handleNewProfileIngest({
         isFeatured: false,
         marketingOptOut: false,
         isClaimed: false,
-        claimToken,
+        claimToken: claimTokenHash,
         claimTokenExpiresAt,
         settings: {},
         theme: {},
@@ -130,7 +135,6 @@ export async function handleNewProfileIngest({
         usernameNormalized: creatorProfiles.usernameNormalized,
         displayName: creatorProfiles.displayName,
         avatarUrl: creatorProfiles.avatarUrl,
-        claimToken: creatorProfiles.claimToken,
         isClaimed: creatorProfiles.isClaimed,
         claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
@@ -138,11 +142,18 @@ export async function handleNewProfileIngest({
       });
 
     if (!created) {
+      await captureError(
+        'Failed to create creator profile during ingestion',
+        new Error('Profile insert returned no rows'),
+        { finalHandle, displayName }
+      );
       return NextResponse.json(
         { error: 'Failed to create creator profile' },
         { status: 500, headers: NO_STORE_HEADERS }
       );
     }
+
+    await invalidateProfileCache(created.usernameNormalized);
 
     const { mergeError } = await processProfileExtraction(
       tx,
@@ -172,7 +183,7 @@ export async function handleNewProfileIngest({
           id: created.id,
           username: created.username,
           usernameNormalized: created.usernameNormalized,
-          claimToken: created.claimToken,
+          claimToken,
         },
         links: extraction.links.length,
         warning: mergeError

@@ -10,14 +10,14 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, sql as drizzleSql, eq, or } from 'drizzle-orm';
-import type { BatchItem } from 'drizzle-orm/batch';
 import {
   unstable_noStore as noStore,
   unstable_cache as unstableCache,
 } from 'next/cache';
 import { cache } from 'react';
-import { getSessionSetupSql, validateClerkUserId } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { APP_ROUTES } from '@/constants/routes';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { type DbOrTransaction } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
 import { userSettings, users } from '@/lib/db/schema/auth';
@@ -30,49 +30,13 @@ import {
   type TippingStats,
 } from '@/lib/db/server';
 import { sqlAny } from '@/lib/db/sql-helpers';
-import { getEntitlements } from '@/lib/entitlements/registry';
-import {
-  BillingUnavailableError,
-  getCurrentUserEntitlements,
-} from '@/lib/entitlements/server';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { handleMigrationErrors } from '@/lib/migrations/handleMigrationErrors';
+import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
+import { mapSocialLinkExistence } from './social-link-utils';
 
 const { logger } = Sentry;
-
-/**
- * Executes a query with RLS session setup using Drizzle's batch API.
- * This ensures session variables are set on the same connection as the query execution.
- *
- * With the Neon HTTP driver, each db.execute() can hit a different connection.
- * By using db.batch(), we guarantee that the session setup and the actual query
- * execute on the same connection, ensuring RLS policies work correctly.
- *
- * @param clerkUserId - The Clerk user ID for session setup
- * @param queryFn - Function that returns the Drizzle query builder (not executed yet)
- * @param context - Description for error messages (used for timeout wrapper)
- * @returns The query result with timeout wrapper
- */
-async function executeWithSession<T>(
-  clerkUserId: string,
-  queryFn: () => { execute: () => Promise<T> },
-  context?: string
-): Promise<T> {
-  validateClerkUserId(clerkUserId);
-
-  const sessionSql = getSessionSetupSql(clerkUserId);
-  const query = queryFn();
-
-  // Batch the session setup with the query to ensure they run on the same connection.
-  // The batch API executes all statements as an implicit transaction.
-  return dashboardQuery(async () => {
-    const [_sessionResult, queryResult] = await db.batch([
-      db.execute(sessionSql),
-      query as unknown as BatchItem<'pg'>,
-    ]);
-    return queryResult as T;
-  }, context ?? 'Query with session');
-}
 
 function truncateString(value: string, maxLength: number): string {
   if (value.length <= maxLength) return value;
@@ -143,6 +107,122 @@ export interface DashboardData {
   isAdmin: boolean;
   /** Tipping statistics for the selected profile */
   tippingStats: TippingStats;
+  /** Profile setup completion percentage and recommended next steps */
+  profileCompletion: ProfileCompletion;
+  /** Optional diagnostic payload when dashboard data loading partially fails */
+  dashboardLoadError?: {
+    stage: 'core_fetch' | 'core_cache';
+    message: string;
+    code: string | null;
+    errorType: string;
+  };
+  /** Whether the user appears to be in their first chat session window */
+  isFirstSession?: boolean;
+}
+
+export interface ProfileCompletionStep {
+  id: 'name' | 'avatar' | 'email' | 'music-links';
+  label: string;
+  description: string;
+  href: string;
+}
+
+export interface ProfileCompletion {
+  percentage: number;
+  completedCount: number;
+  totalCount: number;
+  steps: ProfileCompletionStep[];
+  profileIsLive: boolean;
+}
+
+function hasText(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function deriveIsFirstSession(
+  selectedProfile: CreatorProfile | null,
+  now = Date.now(),
+  windowMs = 15 * 60 * 1000
+): boolean {
+  if (!selectedProfile?.createdAt) return false;
+  const ageMs = now - selectedProfile.createdAt.getTime();
+  return ageMs >= 0 && ageMs < windowMs;
+}
+
+function buildProfileCompletion(
+  selectedProfile: CreatorProfile | null,
+  email: string | null | undefined,
+  hasMusicLinks: boolean
+): ProfileCompletion {
+  if (!selectedProfile) {
+    return {
+      percentage: 0,
+      completedCount: 0,
+      totalCount: 4,
+      steps: [],
+      profileIsLive: false,
+    };
+  }
+
+  const completion = calculateRequiredProfileCompletion({
+    displayName: selectedProfile.displayName,
+    avatarUrl: selectedProfile.avatarUrl,
+    email,
+    hasMusicLinks,
+  });
+
+  const steps: ProfileCompletionStep[] = [];
+
+  if (!completion.hasName) {
+    steps.push({
+      id: 'name',
+      label: 'Add your artist name',
+      description: 'A clear name helps fans recognize and trust your profile.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    });
+  }
+
+  if (!completion.hasAvatar) {
+    steps.push({
+      id: 'avatar',
+      label: 'Add a profile photo',
+      description: 'A recognizable photo makes your page feel personal.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    });
+  }
+
+  if (!completion.hasEmail) {
+    steps.push({
+      id: 'email',
+      label: 'Add your account email',
+      description: 'Email keeps your account recoverable and mission-critical.',
+      href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
+    });
+  }
+
+  if (!completion.hasMusicLinks) {
+    steps.push({
+      id: 'music-links',
+      label: 'Add your music platforms',
+      description:
+        'Help listeners stream you on Spotify, Apple Music, and more.',
+      href: APP_ROUTES.DASHBOARD_LINKS,
+    });
+  }
+
+  const profileIsLive =
+    completion.hasName &&
+    completion.hasAvatar &&
+    hasText(selectedProfile.username) &&
+    completion.hasMusicLinks;
+
+  return {
+    percentage: completion.percentage,
+    completedCount: completion.completedCount,
+    totalCount: completion.totalCount,
+    steps,
+    profileIsLive,
+  };
 }
 
 /**
@@ -162,191 +242,204 @@ async function fetchDashboardCoreWithSession(
   clerkUserId: string
 ): Promise<CoreData> {
   try {
-    // First check if user exists in users table
-    // Use batch API to ensure RLS session variables are set on the same connection
-    const [userData] = await executeWithSession(
-      clerkUserId,
-      () =>
-        db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.clerkId, clerkUserId))
-          .limit(1),
-      'User lookup query'
-    );
+    return await withDbSessionTx(
+      async (tx, sessionUserId) => {
+        // First check if user exists in users table
+        const [userData] = await dashboardQuery(
+          () =>
+            tx
+              .select({ id: users.id, email: users.email })
+              .from(users)
+              .where(eq(users.clerkId, sessionUserId))
+              .limit(1),
+          'User lookup query'
+        );
 
-    if (!userData?.id) {
-      // No user row yet — send to onboarding to create user/artist
-      return {
-        user: null,
-        creatorProfiles: [],
-        selectedProfile: null,
-        needsOnboarding: true,
-        sidebarCollapsed: false,
-        hasSocialLinks: false,
-        hasMusicLinks: false,
-        tippingStats: createEmptyTippingStats(),
-      };
-    }
+        if (!userData?.id) {
+          // No user row yet — send to onboarding to create user/artist
+          return {
+            user: null,
+            creatorProfiles: [],
+            selectedProfile: null,
+            needsOnboarding: true,
+            sidebarCollapsed: false,
+            hasSocialLinks: false,
+            hasMusicLinks: false,
+            tippingStats: createEmptyTippingStats(),
+            profileCompletion: buildProfileCompletion(null, null, false),
+            isFirstSession: false,
+          };
+        }
 
-    // Now that we know user exists, get creator profiles
-    // Use batch API to ensure RLS session variables are set on the same connection
-    const creatorData = await executeWithSession(
-      clerkUserId,
-      () =>
-        db
-          .select()
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.userId, userData.id))
-          .orderBy(asc(creatorProfiles.createdAt)),
-      'Creator profiles query'
-    ).catch((error: unknown) => {
-      const migrationResult = handleMigrationErrors(error, {
-        userId: userData.id,
-        operation: 'creator_profiles',
-      });
-
-      if (!migrationResult.shouldRetry) {
-        return migrationResult.fallbackData as CreatorProfile[];
-      }
-
-      Sentry.captureException(error, {
-        tags: { query: 'creator_profiles', context: 'dashboard_data' },
-      });
-      throw error;
-    });
-
-    if (!creatorData || creatorData.length === 0) {
-      // No creator profiles yet — onboarding
-      return {
-        user: userData,
-        creatorProfiles: [],
-        selectedProfile: null,
-        needsOnboarding: true,
-        sidebarCollapsed: false,
-        hasSocialLinks: false,
-        hasMusicLinks: false,
-        tippingStats: createEmptyTippingStats(),
-      };
-    }
-
-    const selected = selectDashboardProfile(creatorData);
-
-    // Performance optimization: Fetch settings, link counts, AND tipping stats in parallel.
-    // This eliminates the waterfall where tipping stats had to wait for chrome data to finish.
-    // Each query in Promise.all uses batch API to ensure RLS session on same connection.
-    const [settings, linkCounts, tippingStats] = await Promise.all([
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select()
-            .from(userSettings)
-            .where(eq(userSettings.userId, userData.id))
-            .limit(1),
-        'User settings query'
-      )
-        .then(
-          result => result?.[0] as { sidebarCollapsed: boolean } | undefined
-        )
-        .catch((error: unknown) => {
+        // Now that we know user exists, get creator profiles
+        const creatorData = await dashboardQuery(
+          () =>
+            tx
+              .select()
+              .from(creatorProfiles)
+              .where(eq(creatorProfiles.userId, userData.id))
+              .orderBy(asc(creatorProfiles.createdAt)),
+          'Creator profiles query'
+        ).catch((error: unknown) => {
           const migrationResult = handleMigrationErrors(error, {
             userId: userData.id,
-            operation: 'user_settings',
+            operation: 'creator_profiles',
           });
 
           if (!migrationResult.shouldRetry) {
-            return migrationResult.fallbackData as
-              | { sidebarCollapsed: boolean }
-              | undefined;
+            return migrationResult.fallbackData as CreatorProfile[];
           }
+
           Sentry.captureException(error, {
-            tags: { query: 'user_settings', context: 'dashboard_data' },
+            tags: { query: 'creator_profiles', context: 'dashboard_data' },
           });
           throw error;
-        }),
-      // Existence queries for link booleans.
-      // We only need true/false values, so limit(1) avoids full-table counting scans.
-      // Each query uses its own executeWithSession to ensure proper RLS session setup.
-      // Note: Previously these were wrapped in a custom { execute } object, but
-      // db.batch() requires real Drizzle query objects with _prepare() — custom
-      // wrappers cause TypeError: query._prepare is not a function (JOV-794/795).
-      Promise.all([
-        executeWithSession(
-          clerkUserId,
+        });
+
+        if (!creatorData || creatorData.length === 0) {
+          // No creator profiles yet — onboarding
+          return {
+            user: userData,
+            creatorProfiles: [],
+            selectedProfile: null,
+            needsOnboarding: true,
+            sidebarCollapsed: false,
+            hasSocialLinks: false,
+            hasMusicLinks: false,
+            tippingStats: createEmptyTippingStats(),
+            profileCompletion: buildProfileCompletion(null, null, false),
+            isFirstSession: false,
+          };
+        }
+
+        const selected = selectDashboardProfile(creatorData);
+
+        // Fetch settings, link counts, and tipping stats sequentially to
+        // avoid exhausting the connection pool during high-concurrency requests.
+        const settings = await dashboardQuery(
           () =>
-            db
-              .select({ id: socialLinks.id })
-              .from(socialLinks)
-              .where(
-                and(
-                  eq(socialLinks.creatorProfileId, selected.id),
-                  eq(socialLinks.state, 'active')
+            tx
+              .select()
+              .from(userSettings)
+              .where(eq(userSettings.userId, userData.id))
+              .limit(1),
+          'User settings query'
+        )
+          .then(
+            result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+          )
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'user_settings',
+            });
+
+            if (!migrationResult.shouldRetry) {
+              return migrationResult.fallbackData as
+                | { sidebarCollapsed: boolean }
+                | undefined;
+            }
+
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'user_settings',
+                context: 'dashboard_data_settled',
+              },
+            });
+            return undefined;
+          });
+
+        // Optimized existence query for link booleans.
+        // Aggregate counts are scoped to the selected profile's active links.
+        const linkCounts = await dashboardQuery(
+          () =>
+            tx
+              .select({
+                hasLinks: drizzleSql<boolean>`
+                exists (
+                  select 1
+                  from ${socialLinks}
+                  where ${and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true)
+                  )}
                 )
-              )
+              `,
+                hasMusicLinks: drizzleSql<boolean>`
+                exists (
+                  select 1
+                  from ${socialLinks}
+                  where ${and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true),
+                    or(
+                      eq(socialLinks.platformType, 'dsp'),
+                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
+                    )
+                  )}
+                )
+              `,
+              })
+              .from(users)
+              .where(eq(users.id, userData.id))
               .limit(1),
           'Social links existence query'
-        ),
-        executeWithSession(
-          clerkUserId,
-          () =>
-            db
-              .select({ id: socialLinks.id })
-              .from(socialLinks)
-              .where(
-                and(
-                  eq(socialLinks.creatorProfileId, selected.id),
-                  eq(socialLinks.state, 'active'),
-                  or(
-                    eq(socialLinks.platformType, 'dsp'),
-                    eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                  )
-                )
-              )
-              .limit(1),
-          'Music links existence query'
-        ),
-      ])
-        .then(([activeLinks, activeMusicLinks]) => ({
-          hasLinks: activeLinks.length > 0,
-          hasMusicLinks: activeMusicLinks.length > 0,
-        }))
-        .catch((error: unknown) => {
-          const migrationResult = handleMigrationErrors(error, {
-            userId: userData.id,
-            operation: 'social_links_count',
-          });
+        )
+          .then(result => {
+            return mapSocialLinkExistence(result?.[0]);
+          })
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'social_links_count',
+            });
 
-          if (!migrationResult.shouldRetry) {
+            if (!migrationResult.shouldRetry) {
+              return { hasLinks: false, hasMusicLinks: false };
+            }
+
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'social_links_existence',
+                context: 'dashboard_data_settled',
+              },
+            });
             return { hasLinks: false, hasMusicLinks: false };
-          }
-          Sentry.captureException(error, {
-            tags: {
-              query: 'social_links_existence',
-              context: 'dashboard_data',
-            },
           });
-          throw error;
-        }),
-      // Tipping stats now run in parallel with settings and link counts,
-      // eliminating the previous waterfall where they waited for chrome data
-      fetchTippingStatsWithSession(selected.id, clerkUserId),
-    ]);
 
-    const hasLinks = linkCounts.hasLinks;
-    const hasMusicLinks = linkCounts.hasMusicLinks;
+        const tippingStats = await fetchTippingStatsWithSession(
+          tx,
+          selected.id
+        );
 
-    // Return data with first profile selected by default
-    return {
-      user: userData,
-      creatorProfiles: creatorData,
-      selectedProfile: selected,
-      needsOnboarding: !profileIsPublishable(selected),
-      sidebarCollapsed: settings?.sidebarCollapsed ?? false,
-      hasSocialLinks: hasLinks,
-      hasMusicLinks,
-      tippingStats,
-    };
+        const hasLinks = linkCounts.hasLinks;
+        const hasMusicLinks = linkCounts.hasMusicLinks;
+
+        // Return data with first profile selected by default
+        return {
+          user: userData,
+          creatorProfiles: creatorData,
+          selectedProfile: selected,
+          needsOnboarding: !profileIsPublishable(selected),
+          sidebarCollapsed: settings?.sidebarCollapsed ?? false,
+          hasSocialLinks: hasLinks,
+          hasMusicLinks,
+          tippingStats,
+          profileCompletion: buildProfileCompletion(
+            selected,
+            userData.email,
+            hasMusicLinks
+          ),
+          dashboardLoadError: undefined,
+          isFirstSession: deriveIsFirstSession(selected),
+        };
+      },
+      { clerkUserId }
+    );
   } catch (error) {
     // Handle both standard and non-standard error objects
     const errorObj = error as
@@ -388,13 +481,21 @@ async function fetchDashboardCoreWithSession(
       hasSocialLinks: false,
       hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, null, false),
+      dashboardLoadError: {
+        stage: 'core_fetch',
+        message,
+        code: code ?? null,
+        errorType,
+      },
+      isFirstSession: false,
     };
   }
 }
 
 async function fetchTippingStatsWithSession(
-  profileId: string,
-  clerkUserId: string
+  tx: DbOrTransaction,
+  profileId: string
 ): Promise<TippingStats> {
   try {
     const startOfMonth = new Date();
@@ -402,19 +503,14 @@ async function fetchTippingStatsWithSession(
     startOfMonth.setUTCHours(0, 0, 0, 0);
     const startOfMonthISO = startOfMonth.toISOString();
 
-    // Execute queries in parallel, each using batch API to ensure RLS session
-    // on the same connection. This is critical because the Neon HTTP driver is
-    // stateless - each query may hit a different connection.
-    const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select({
-              totalReceived: drizzleSql`
+    const tipTotalsRawResult = await dashboardQuery(
+      () =>
+        tx
+          .select({
+            totalReceived: drizzleSql`
             COALESCE(SUM(${tips.amountCents}), 0)
           `,
-              monthReceived: drizzleSql`
+            monthReceived: drizzleSql`
             COALESCE(
               SUM(
                 CASE
@@ -426,39 +522,37 @@ async function fetchTippingStatsWithSession(
               0
             )
           `,
-              tipsSubmitted: drizzleSql`
+            tipsSubmitted: drizzleSql`
             COALESCE(COUNT(${tips.id}), 0)
           `,
-            })
-            .from(tips)
-            .where(eq(tips.creatorProfileId, profileId)),
-        'Tipping stats query'
-      ),
-      executeWithSession(
-        clerkUserId,
-        () =>
-          db
-            .select({
-              total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
-              qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
-              link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
-            })
-            .from(clickEvents)
-            .where(
-              and(
-                eq(clickEvents.creatorProfileId, profileId),
-                eq(clickEvents.linkType, 'tip')
-              )
-            ),
-        'Click events query'
-      ),
-    ]);
+          })
+          .from(tips)
+          .where(eq(tips.creatorProfileId, profileId)),
+      'Tipping stats query'
+    );
+
+    const clickStatsResult = await dashboardQuery(
+      () =>
+        tx
+          .select({
+            qr: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'qr' then 1 else 0 end), 0)`,
+            link: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'link' then 1 else 0 end), 0)`,
+          })
+          .from(clickEvents)
+          .where(
+            and(
+              eq(clickEvents.creatorProfileId, profileId),
+              eq(clickEvents.linkType, 'tip')
+            )
+          ),
+      'Click events query'
+    );
 
     const tipTotalsRaw = tipTotalsRawResult?.[0];
     const clickStats = clickStatsResult?.[0];
 
     return {
-      tipClicks: Number(clickStats?.total ?? 0),
+      tipClicks: Number((clickStats?.qr ?? 0) + (clickStats?.link ?? 0)),
       qrTipClicks: Number(clickStats?.qr ?? 0),
       linkTipClicks: Number(clickStats?.link ?? 0),
       tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
@@ -493,36 +587,9 @@ async function resolveDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
 
-  let entitlements;
-  try {
-    entitlements = await getCurrentUserEntitlements();
-  } catch (error) {
-    if (error instanceof BillingUnavailableError) {
-      // Billing DB is down — degrade gracefully instead of crashing dashboard.
-      // Admin status is still available from the error since it's fetched independently.
-      // Note: Not reporting to Sentry here — the underlying DB failure is already
-      // captured upstream in fetchUserBillingData. Duplicate reporting was creating
-      // thousands of Sentry events (JOVIE-WEB-AD/AE/AF/AC/9Y/9C).
-      logger.warn('Billing unavailable, degrading to free tier', {
-        userId: error.userId,
-        isAdmin: error.isAdmin,
-      });
-      const freeDefaults = getEntitlements('free');
-      entitlements = {
-        userId: error.userId,
-        isAdmin: error.isAdmin,
-        isAuthenticated: true,
-        email: null,
-        plan: 'free' as const,
-        isPro: false,
-        hasAdvancedFeatures: false,
-        ...freeDefaults.booleans,
-        ...freeDefaults.limits,
-      };
-    } else {
-      throw error;
-    }
-  }
+  // getCurrentUserEntitlements degrades gracefully on billing failure --
+  // it returns free-tier defaults with admin status preserved, never throws.
+  const entitlements = await getCurrentUserEntitlements();
   const isAdmin = entitlements.isAdmin;
   const userId = entitlements.userId;
 
@@ -537,13 +604,14 @@ async function resolveDashboardData(): Promise<DashboardData> {
       hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, null, false),
+      isFirstSession: false,
     };
   }
 
   try {
     // Single cached fetch for all dashboard core data (profile, settings, links, tipping stats).
-    // Tipping stats now run in parallel with settings and link counts inside the core fetch,
-    // eliminating the previous waterfall where they waited for chrome data to complete.
+    // Queries are sequenced within the core fetch to reduce connection pool pressure.
     const coreData = await Sentry.startSpan(
       { op: 'task', name: 'dashboard.getCoreData' },
       async () => getCachedDashboardCore(userId)
@@ -552,8 +620,21 @@ async function resolveDashboardData(): Promise<DashboardData> {
     return {
       ...coreData,
       isAdmin,
+      dashboardLoadError: coreData.dashboardLoadError,
     };
   } catch (error) {
+    const errorObj = error as
+      | Error
+      | { code?: string; message?: string; cause?: unknown };
+    const message =
+      (errorObj as Error).message ??
+      (errorObj as { message?: string }).message ??
+      'Unknown error';
+    const code =
+      (errorObj as { code?: string }).code ??
+      (errorObj as { cause?: { code?: string } }).cause?.code;
+    const errorType = errorObj?.constructor?.name ?? typeof errorObj;
+
     Sentry.captureException(error, {
       tags: { context: 'get_dashboard_data' },
     });
@@ -568,15 +649,22 @@ async function resolveDashboardData(): Promise<DashboardData> {
       hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
+      profileCompletion: buildProfileCompletion(null, null, false),
+      dashboardLoadError: {
+        stage: 'core_cache',
+        message,
+        code: code ?? null,
+        errorType,
+      },
+      isFirstSession: false,
     };
   }
 }
 
 /**
  * Single consolidated cache for all dashboard core data.
- * Settings, link counts, and tipping stats are fetched in parallel
- * within fetchDashboardCoreWithSession, eliminating the previous
- * waterfall where tipping stats waited for chrome data.
+ * Settings, link counts, and tipping stats are fetched sequentially
+ * within fetchDashboardCoreWithSession to avoid pool exhaustion.
  */
 const getCachedDashboardCore = unstableCache(
   async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),
@@ -631,7 +719,7 @@ export async function getDashboardDataFresh(): Promise<DashboardData> {
  * Both functions now share the same deduped loader.
  *
  * @returns Complete DashboardData for the current user
- * @deprecated Use getDashboardData() instead
+ * @deprecated Use getDashboardData() instead. This alias is planned for removal in a future major release; migrate to getDashboardData() to avoid breakage.
  */
 export async function getDashboardDataCached(): Promise<DashboardData> {
   // Backwards-compatible alias; now shares the deduped loader.

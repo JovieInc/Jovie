@@ -39,7 +39,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   // Validate userId format to prevent SQL injection
@@ -52,32 +52,56 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
  * This allows the session setup to be batched with other queries.
  *
  * @param userId - The Clerk user ID (already validated)
- * @returns SQL statement that sets RLS session variables
+ * @returns SQL statement that sets RLS session variable(s)
  */
 export function getSessionSetupSql(userId: string) {
   validateClerkUserId(userId);
 
-  // Set the session variables for RLS in a single query.
-  // is_local=false (session-scoped) because the Neon HTTP driver has no
-  // transaction context — is_local=true would be silently discarded.
-  return drizzleSql`SELECT set_config('app.user_id', ${userId}, false), set_config('app.clerk_user_id', ${userId}, false)`;
+  // Set the Clerk session variable for RLS using transaction-local scope.
+  // is_local=true ensures the variable is scoped to the current transaction,
+  // preventing cross-request RLS session bleed in pooled connections.
+  return drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`;
+}
+
+function getSessionSetupFallbackSql(userId: string) {
+  validateClerkUserId(userId);
+  return drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`;
+}
+
+async function applySessionUserId(userId: string): Promise<void> {
+  // setupDbSession is used outside explicit transaction boundaries.
+  // Use session-scoped set_config (is_local=false) directly to avoid
+  // emitting avoidable query errors for transaction-local scope.
+  await db.execute(
+    drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, false)`
+  );
 }
 
 /**
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
  *
- * Note: For better performance with the Neon HTTP driver, consider using
- * getSessionSetupSql() with db.batch() to ensure session setup and queries
- * execute on the same connection.
+ * Note: Since we use the Neon WebSocket driver, db.transaction() is fully
+ * supported and is the recommended way to ensure session setup and queries
+ * execute on the same stateful connection.
  */
 export async function setupDbSession(clerkUserId?: string) {
-  const userId = await resolveClerkUserId(clerkUserId);
+  let userId: string;
+  try {
+    userId = await resolveClerkUserId(clerkUserId);
+  } catch (error) {
+    // If no authenticated user, skip RLS setup gracefully
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      logDbInfo('setupDbSession', 'Skipping RLS setup — no authenticated user');
+      return { userId: null };
+    }
+    throw error;
+  }
 
   try {
     // Execute the session setup SQL with retry logic for transient failures
     await withRetry(async () => {
-      await db.execute(getSessionSetupSql(userId));
+      await applySessionUserId(userId);
     }, 'setupDbSession');
 
     logDbInfo('setupDbSession', 'Session setup completed successfully', {
@@ -99,6 +123,9 @@ export async function withDbSession<T>(
   options?: { clerkUserId?: string }
 ): Promise<T> {
   const { userId } = await setupDbSession(options?.clerkUserId);
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
   return operation(userId);
 }
 
@@ -106,32 +133,43 @@ export async function withDbSession<T>(
  * Transaction isolation levels supported by PostgreSQL
  */
 export type IsolationLevel =
-  | 'read_committed'
-  | 'repeatable_read'
+  | 'read committed'
+  | 'read uncommitted'
+  | 'repeatable read'
   | 'serializable';
 
 /**
  * Run DB operations with RLS session variables set.
- * Sets app.user_id and app.clerk_user_id via session-scoped set_config
+ * Sets app.clerk_user_id via session-scoped set_config
  * before executing the operation.
  *
- * Note: The Neon HTTP driver does not support transactions. The operation
- * runs directly against db without transaction isolation. Callers should
- * also filter by userId in WHERE clauses for defense-in-depth.
- *
- * @param operation - The database operation to execute
- * @param options.clerkUserId - Optional explicit Clerk user ID (uses auth() if not provided)
- * @param options.isolationLevel - Unused with Neon HTTP driver (retained for API compatibility)
+ * @param operation The callback to execute with the transaction
+ * @param options Optional Clerk user ID and isolation level override
+ * @returns The result of the operation
  */
 export async function withDbSessionTx<T>(
   operation: (tx: DbOrTransaction, userId: string) => Promise<T>,
   options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
-  // Set RLS session variables via setupDbSession (session-scoped).
-  // The neon-http driver does not support transactions, so the operation
-  // runs directly against db. Callers must also filter by userId.
-  const { userId } = await setupDbSession(options?.clerkUserId);
-  return operation(db, userId);
+  const userId = await resolveClerkUserId(options?.clerkUserId);
+
+  // Since we use the Neon WebSocket driver, we can use db.transaction()
+  // to ensure session setup and queries execute on the same stateful connection.
+  return db.transaction(
+    async tx => {
+      // Set the session variable within the transaction
+      try {
+        await tx.execute(getSessionSetupSql(userId));
+      } catch (error) {
+        logDbError('withDbSessionTx_set_config_failed', error, { userId });
+        await tx.execute(getSessionSetupFallbackSql(userId));
+      }
+      return operation(tx, userId);
+    },
+    options?.isolationLevel
+      ? { isolationLevel: options.isolationLevel }
+      : undefined
+  );
 }
 
 /**
@@ -140,7 +178,7 @@ export async function withDbSessionTx<T>(
 export async function requireAuth() {
   const { userId } = await getCachedAuth();
   if (!userId) {
-    throw new TypeError('Authentication required');
+    throw new Error('Unauthorized');
   }
   return userId;
 }

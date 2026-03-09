@@ -68,7 +68,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
+          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-[13px] text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
         />
         {value && (
           <button
@@ -127,7 +127,7 @@ function SubmenuCheckboxItem({
     >
       <div className='flex items-center gap-2'>
         {icon && <span className='text-tertiary-token'>{icon}</span>}
-        <span className='text-xs'>{label}</span>
+        <span className='text-[13px]'>{label}</span>
       </div>
       <div className='flex items-center gap-2'>
         {count > 0 && (
@@ -235,7 +235,7 @@ export function FilterSubmenu<T extends string = string>({
           />
           <span>{label}</span>
           {selectedCount > 0 && (
-            <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary'>
+            <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-[510] text-primary'>
               {selectedCount}
             </span>
           )}
@@ -245,7 +245,8 @@ export function FilterSubmenu<T extends string = string>({
       <DropdownMenuSubContent
         sideOffset={4}
         alignOffset={-4}
-        className='min-w-[200px] max-h-[300px] overflow-hidden flex flex-col'
+        collisionPadding={8}
+        className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
       >
         <SearchInput
           value={search}
@@ -260,7 +261,7 @@ export function FilterSubmenu<T extends string = string>({
 
         <div className='flex-1 overflow-y-auto p-1'>
           {filteredOptions.length === 0 ? (
-            <div className='py-6 text-center text-xs text-tertiary-token'>
+            <div className='py-6 text-center text-[13px] text-tertiary-token'>
               No options found
             </div>
           ) : (

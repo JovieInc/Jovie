@@ -1,29 +1,34 @@
 'use client';
 
 import { Check, Copy, Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DrawerHeader } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getContactRoleLabel } from '@/lib/contacts/constants';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { ContactRole } from '@/types/contacts';
 
-interface ContactDetailHeaderProps {
+interface UseContactDetailHeaderProps {
   readonly role: ContactRole;
   readonly customLabel?: string | null;
   readonly email?: string | null;
-  readonly onClose: () => void;
   readonly onDelete: () => void;
+  readonly onClose?: () => void;
 }
 
-export function ContactDetailHeader({
+interface UseContactDetailHeaderResult {
+  readonly title: string;
+  readonly actions: ReactNode | undefined;
+}
+
+export function useContactDetailHeaderParts({
   role,
   customLabel,
   email,
-  onClose,
   onDelete,
-}: ContactDetailHeaderProps) {
+  onClose,
+}: UseContactDetailHeaderProps): UseContactDetailHeaderResult {
   const notifications = useNotifications();
   const [isCopied, setIsCopied] = useState(false);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,18 +75,15 @@ export function ContactDetailHeader({
 
   const hasActions = primaryActions.length > 0 || overflowActions.length > 0;
 
-  return (
-    <DrawerHeader
-      title={roleLabel}
-      onClose={onClose}
-      actions={
-        hasActions ? (
-          <DrawerHeaderActions
-            primaryActions={primaryActions}
-            overflowActions={overflowActions}
-          />
-        ) : undefined
-      }
-    />
-  );
+  return {
+    title: roleLabel,
+    actions:
+      hasActions || onClose ? (
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
+          onClose={onClose}
+        />
+      ) : undefined,
+  };
 }

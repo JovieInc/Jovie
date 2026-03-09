@@ -4,6 +4,20 @@ export interface SocialLink {
   id: string;
   platform: string;
   url: string;
+  verificationStatus?: 'unverified' | 'pending' | 'verified';
+  verificationToken?: string | null;
+}
+
+export type VerificationErrorCode =
+  | 'dns_not_found'
+  | 'domain_already_claimed'
+  | 'invalid_url'
+  | 'rate_limited'
+  | 'server_error';
+
+export interface VerificationError {
+  code: VerificationErrorCode;
+  message: string;
 }
 
 export interface SocialsFormProps {
@@ -25,4 +39,8 @@ export interface UseSocialsFormReturn {
   scheduleNormalize: (index: number, raw: string) => void;
   handleUrlBlur: (index: number) => void;
   addSocialLink: () => void;
+  verifyWebsite: (linkId: string) => Promise<void>;
+  verifyingLinkId: string | null;
+  verificationError: VerificationError | null;
+  clearVerificationError: () => void;
 }

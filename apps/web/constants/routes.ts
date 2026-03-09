@@ -17,7 +17,11 @@ export const APP_ROUTES = {
   DASHBOARD_EARNINGS: '/app/dashboard/earnings',
   DASHBOARD_LINKS: '/app/dashboard/links',
   DASHBOARD_PROFILE: '/app/dashboard/profile',
-  PROFILE: '/app/profile',
+  DASHBOARD_ANALYTICS: '/app/dashboard/analytics',
+  DASHBOARD_AUDIENCE: '/app/dashboard/audience',
+  DASHBOARD_RELEASES: '/app/dashboard/releases',
+  /** @deprecated Profile is now a drawer on the chat route. Use CHAT instead. */
+  PROFILE: '/app/chat',
   CONTACTS: '/app/contacts',
   RELEASES: '/app/releases',
   TOUR_DATES: '/app/tour-dates',
@@ -32,18 +36,17 @@ export const APP_ROUTES = {
   SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
-  SETTINGS_BRANDING: '/app/settings/branding',
-  SETTINGS_AD_PIXELS: '/app/settings/ad-pixels',
   SETTINGS_BILLING: '/app/settings/billing',
-  SETTINGS_SOCIAL_LINKS: '/app/settings/social-links',
-  SETTINGS_MUSIC_LINKS: '/app/settings/music-links',
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
   SETTINGS_AUDIENCE: '/app/settings/audience',
+  SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
 
   // Admin
   ADMIN: '/app/admin',
   ADMIN_WAITLIST: '/app/admin/waitlist',
+  ADMIN_WAITLIST_SETTINGS: '/app/admin/waitlist/settings',
+  ADMIN_FEEDBACK: '/app/admin/feedback',
   ADMIN_CREATORS: '/app/admin/creators',
   ADMIN_CREATORS_BULK_REFRESH: '/app/admin/creators/bulk-refresh',
   ADMIN_CREATORS_DELETE: '/app/admin/creators/delete',
@@ -52,10 +55,25 @@ export const APP_ROUTES = {
   ADMIN_CREATORS_TOGGLE_VERIFY: '/app/admin/creators/toggle-verify',
   ADMIN_USERS: '/app/admin/users',
   ADMIN_ACTIVITY: '/app/admin/activity',
+  ADMIN_CAMPAIGNS: '/app/admin/campaigns',
+  ADMIN_LEADS: '/app/admin/leads',
+  ADMIN_OUTREACH: '/app/admin/outreach',
+  ADMIN_OUTREACH_EMAIL: '/app/admin/outreach/email',
+  ADMIN_OUTREACH_DM: '/app/admin/outreach/dm',
+  ADMIN_OUTREACH_REVIEW: '/app/admin/outreach/review',
+  ADMIN_INGEST: '/app/admin/ingest',
   ADMIN_SCREENSHOTS: '/app/admin/screenshots',
 
   // Marketing
+  DEMO: '/demo',
   PRICING: '/pricing',
+  LAUNCH: '/launch',
+  LAUNCH_PRICING: '/launch/pricing',
+
+  // Legal
+  LEGAL_PRIVACY: '/legal/privacy',
+  LEGAL_TERMS: '/legal/terms',
+  LEGAL_COOKIES: '/legal/cookies',
 
   // Auth & Onboarding
   SIGNIN: '/signin',
@@ -65,6 +83,7 @@ export const APP_ROUTES = {
 
   // Billing
   BILLING: '/billing',
+  BILLING_REMOVE_BRANDING: '/billing/remove-branding',
   BILLING_SUCCESS: '/billing/success',
   BILLING_CANCEL: '/billing/cancel',
 

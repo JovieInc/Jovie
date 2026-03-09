@@ -52,7 +52,7 @@ export function DataPrivacySection() {
         {/* Data Export */}
         <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4'>
           <div className='min-w-0'>
-            <p className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
+            <p className='text-[13px] sm:text-[14px] font-[510] text-primary-token'>
               Export Your Data
             </p>
             <p className='text-xs sm:text-[13px] text-secondary-token mt-0.5 sm:mt-1'>
@@ -74,7 +74,7 @@ export function DataPrivacySection() {
         {/* Account Deletion */}
         <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pt-3 sm:pt-4'>
           <div className='min-w-0'>
-            <p className='text-[13px] sm:text-[14px] font-medium text-primary-token'>
+            <p className='text-[13px] sm:text-[14px] font-[510] text-primary-token'>
               Delete Account
             </p>
             <p className='text-xs sm:text-[13px] text-secondary-token mt-0.5 sm:mt-1'>

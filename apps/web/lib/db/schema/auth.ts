@@ -30,9 +30,15 @@ export const users = pgTable(
     plan: text('plan').default('free'), // 'free' | 'pro' | 'growth'
     stripeCustomerId: text('stripe_customer_id').unique(),
     stripeSubscriptionId: text('stripe_subscription_id').unique(),
+    stripePriceId: text('stripe_price_id'),
     billingUpdatedAt: timestamp('billing_updated_at'),
     billingVersion: integer('billing_version').default(1).notNull(),
     lastBillingEventAt: timestamp('last_billing_event_at'),
+    // Lifecycle email tracking
+    founderWelcomeSentAt: timestamp('founder_welcome_sent_at'),
+    welcomeFailedAt: timestamp('welcome_failed_at'),
+    outboundSuppressedAt: timestamp('outbound_suppressed_at'),
+    suppressionFailedAt: timestamp('suppression_failed_at'),
     // Growth plan beta access request
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),

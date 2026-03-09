@@ -7,14 +7,21 @@ import { db } from '@/lib/db';
 import { batchUpdateSocialLinks, type SocialLinkUpdate } from '@/lib/db/batch';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  buildIdempotencyKey,
+  IdempotencyError,
+  withIdempotency,
+} from '@/lib/idempotency';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const SOCIAL_LINKS_LOCK_TTL_SECONDS = 45;
 
 /**
  * Schema for updating social links via admin
@@ -164,107 +171,124 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    // Get existing links to determine which to delete
-    const existingLinks = await db
-      .select({ id: socialLinks.id })
-      .from(socialLinks)
-      .where(eq(socialLinks.creatorProfileId, profileId));
+    const lockKey = buildIdempotencyKey('admin-social-links', profileId);
+    return await withIdempotency(
+      lockKey,
+      SOCIAL_LINKS_LOCK_TTL_SECONDS,
+      async () => {
+        // Get existing links to determine which to delete
+        const existingLinks = await db
+          .select({ id: socialLinks.id })
+          .from(socialLinks)
+          .where(eq(socialLinks.creatorProfileId, profileId));
 
-    const existingIds = new Set(existingLinks.map(l => l.id));
-    const incomingIds = new Set(links.filter(l => l.id).map(l => l.id!));
+        const existingIds = new Set(existingLinks.map(l => l.id));
+        const incomingIds = new Set(links.filter(l => l.id).map(l => l.id!));
 
-    // Delete links that are no longer present
-    const idsToDelete = [...existingIds].filter(id => !incomingIds.has(id));
-    if (idsToDelete.length > 0) {
-      await db.delete(socialLinks).where(inArray(socialLinks.id, idsToDelete));
-    }
+        // Delete links that are no longer present
+        const idsToDelete = [...existingIds].filter(id => !incomingIds.has(id));
+        if (idsToDelete.length > 0) {
+          await db
+            .delete(socialLinks)
+            .where(inArray(socialLinks.id, idsToDelete));
+        }
 
-    // Batch upsert links - separate into inserts and updates
-    const now = new Date();
-    const linksToInsert: (typeof socialLinks.$inferInsert)[] = [];
-    const linksToUpdate: SocialLinkUpdate[] = [];
+        // Batch upsert links - separate into inserts and updates
+        const now = new Date();
+        const linksToInsert: (typeof socialLinks.$inferInsert)[] = [];
+        const linksToUpdate: SocialLinkUpdate[] = [];
 
-    for (let i = 0; i < links.length; i++) {
-      const link = links[i];
-      if (!link) continue;
+        for (let i = 0; i < links.length; i++) {
+          const link = links[i];
+          if (!link) continue;
 
-      const detected = detectPlatform(link.url);
-      const platform = detected.platform.id;
-      const platformType = link.platformType || detected.platform.icon;
-      const normalizedUrl = detected.normalizedUrl || link.url;
+          const detected = detectPlatform(link.url);
+          const platform = detected.platform.id;
+          const platformType = link.platformType || detected.platform.icon;
+          const normalizedUrl = detected.normalizedUrl || link.url;
 
-      if (link.id && existingIds.has(link.id)) {
-        // Collect for batch update
-        linksToUpdate.push({
-          id: link.id,
-          url: normalizedUrl,
-          platform,
-          platformType,
-          displayText: link.label || null,
-          sortOrder: i,
-        });
-      } else {
-        // Collect for batch insert
-        linksToInsert.push({
-          creatorProfileId: profileId,
-          url: normalizedUrl,
-          platform,
-          platformType,
-          displayText: link.label || null,
-          sortOrder: i,
-          state: 'active',
-          isActive: true,
-          sourceType: 'admin',
-          confidence: '1.00',
-          version: 1,
-          createdAt: now,
-          updatedAt: now,
-        });
+          if (link.id && existingIds.has(link.id)) {
+            // Collect for batch update
+            linksToUpdate.push({
+              id: link.id,
+              url: normalizedUrl,
+              platform,
+              platformType,
+              displayText: link.label || null,
+              sortOrder: i,
+            });
+          } else {
+            // Collect for batch insert
+            linksToInsert.push({
+              creatorProfileId: profileId,
+              url: normalizedUrl,
+              platform,
+              platformType,
+              displayText: link.label || null,
+              sortOrder: i,
+              state: 'active',
+              isActive: true,
+              sourceType: 'admin',
+              confidence: '1.00',
+              version: 1,
+              createdAt: now,
+              updatedAt: now,
+            });
+          }
+        }
+
+        // Execute batch operations
+        if (linksToInsert.length > 0) {
+          await db.insert(socialLinks).values(linksToInsert);
+        }
+        if (linksToUpdate.length > 0) {
+          await batchUpdateSocialLinks(linksToUpdate);
+        }
+
+        // Invalidate cache to ensure public profile reflects changes
+        await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
+
+        await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
+
+        // Return updated links
+        const updatedLinks = await db
+          .select({
+            id: socialLinks.id,
+            label: socialLinks.displayText,
+            url: socialLinks.url,
+            platform: socialLinks.platform,
+            platformType: socialLinks.platformType,
+          })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.creatorProfileId, profileId),
+              not(eq(socialLinks.state, 'rejected'))
+            )
+          )
+          .orderBy(asc(socialLinks.sortOrder));
+
+        const mapped: SocialLinkRow[] = updatedLinks.map(row => ({
+          id: row.id,
+          label: row.label ?? row.platform ?? 'Link',
+          url: row.url,
+          platform: row.platform,
+          platformType: row.platformType,
+        }));
+
+        return NextResponse.json(
+          { success: true, links: mapped },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
       }
-    }
-
-    // Execute batch operations
-    if (linksToInsert.length > 0) {
-      await db.insert(socialLinks).values(linksToInsert);
-    }
-    if (linksToUpdate.length > 0) {
-      await batchUpdateSocialLinks(linksToUpdate);
-    }
-
-    // Invalidate cache to ensure public profile reflects changes
-    await invalidateSocialLinksCache(profileId, profile.usernameNormalized);
-
-    // Return updated links
-    const updatedLinks = await db
-      .select({
-        id: socialLinks.id,
-        label: socialLinks.displayText,
-        url: socialLinks.url,
-        platform: socialLinks.platform,
-        platformType: socialLinks.platformType,
-      })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          not(eq(socialLinks.state, 'rejected'))
-        )
-      )
-      .orderBy(asc(socialLinks.sortOrder));
-
-    const mapped: SocialLinkRow[] = updatedLinks.map(row => ({
-      id: row.id,
-      label: row.label ?? row.platform ?? 'Link',
-      url: row.url,
-      platform: row.platform,
-      platformType: row.platformType,
-    }));
-
-    return NextResponse.json(
-      { success: true, links: mapped },
-      { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    if (error instanceof IdempotencyError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: 409, headers: NO_STORE_HEADERS }
+      );
+    }
     logger.error('Admin creator social links PUT error:', error);
     await captureError('Admin social links update failed', error, {
       route: '/api/admin/creator-social-links',

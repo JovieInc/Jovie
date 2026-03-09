@@ -6,8 +6,9 @@
  */
 
 import { RATE_LIMITERS } from './config';
+import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import { createRateLimiter, RateLimiter } from './rate-limiter';
-import type { RateLimitResult } from './types';
+import type { PlanAwareRateLimiter, RateLimitResult } from './types';
 
 // ============================================================================
 // Authentication & User Operations
@@ -276,6 +277,14 @@ export const spotifySearchLimiter = createRateLimiter(
 );
 
 /**
+ * Rate limiter for Spotify search API
+ * Limit: 30 requests per minute per IP
+ */
+export const spotifySearchApiLimiter = createRateLimiter(
+  RATE_LIMITERS.spotifySearchApi
+);
+
+/**
  * Rate limiter for profile claim attempts
  * CRITICAL: 5 attempts per hour per user - prevents claim abuse
  */
@@ -392,6 +401,9 @@ export const aiChatLimiter = createRateLimiter(RATE_LIMITERS.aiChat);
 /**
  * Plan-specific daily AI chat limiters.
  * Each plan has a separate daily quota on top of the hourly burst limiter.
+ *
+ * @deprecated Use aiChatDailyPlanAwareLimiter instead for new code.
+ * These individual limiters are kept for backward compatibility.
  */
 export const aiChatDailyFreeLimiter = createRateLimiter(
   RATE_LIMITERS.aiChatDailyFree
@@ -402,6 +414,27 @@ export const aiChatDailyProLimiter = createRateLimiter(
 export const aiChatDailyGrowthLimiter = createRateLimiter(
   RATE_LIMITERS.aiChatDailyGrowth
 );
+
+/**
+ * Plan-aware AI chat daily limiter.
+ * Automatically selects the correct daily quota based on the user's plan tier.
+ * - Free: 25 messages/day
+ * - Pro/Founding: 100 messages/day
+ * - Growth: 500 messages/day
+ */
+export const aiChatDailyPlanAwareLimiter: PlanAwareRateLimiter =
+  createPlanAwareRateLimiter({
+    configs: {
+      free: RATE_LIMITERS.aiChatDailyFree,
+      pro: RATE_LIMITERS.aiChatDailyPro,
+      // founding falls back to pro automatically via the factory
+      growth: RATE_LIMITERS.aiChatDailyGrowth,
+    },
+    errorMessage: plan =>
+      plan === 'growth' || plan === 'pro' || plan === 'founding'
+        ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
+        : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
+  });
 
 /**
  * Check AI chat rate limit (burst only, plan-unaware).
@@ -436,26 +469,8 @@ export async function checkAiChatRateLimitForPlan(
     return burstResult;
   }
 
-  // 2. Check daily plan-specific quota
-  let dailyLimiter: RateLimiter;
-  if (plan === 'growth') {
-    dailyLimiter = aiChatDailyGrowthLimiter;
-  } else if (plan === 'pro') {
-    dailyLimiter = aiChatDailyProLimiter;
-  } else {
-    dailyLimiter = aiChatDailyFreeLimiter;
-  }
-
-  const dailyMessage =
-    plan === 'growth' || plan === 'pro'
-      ? 'You have reached your daily AI message limit. Your quota resets tomorrow.'
-      : 'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.';
-
-  const dailyResult = await checkRateLimit(dailyLimiter, userId, dailyMessage);
-  if (!dailyResult.success) {
-    return dailyResult;
-  }
-
+  // 2. Check daily plan-specific quota using the plan-aware limiter
+  const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
   return dailyResult;
 }
 
@@ -488,6 +503,14 @@ export async function checkBandsintownSyncRateLimit(
 // ============================================================================
 // DSP Discovery Operations
 // ============================================================================
+
+/**
+ * Rate limiter for Apple Music search
+ * Limit: 30 requests per minute per IP
+ */
+export const appleMusicSearchLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicSearch
+);
 
 /**
  * Rate limiter for DSP artist discovery
@@ -530,6 +553,120 @@ export async function checkIsrcRescanRateLimit(
     releaseId,
     'This release was recently scanned. Please wait before scanning again.'
   );
+}
+
+// ============================================================================
+// Apple Music Rescan (plan-aware)
+// ============================================================================
+
+/**
+ * Rate limiter for Apple Music rescan (free plan)
+ * Limit: 1 per day per profile
+ *
+ * @deprecated Use appleMusicRescanPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
+ */
+export const appleMusicRescanFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicRescanFree
+);
+
+/**
+ * Rate limiter for Apple Music rescan (paid plan)
+ * Limit: 1 per hour per profile
+ *
+ * @deprecated Use appleMusicRescanPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
+ */
+export const appleMusicRescanPaidLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicRescanPaid
+);
+
+/**
+ * Plan-aware Apple Music rescan limiter.
+ * Automatically selects the correct limit based on the user's plan tier.
+ * - Free: 1 per day
+ * - Pro/Founding/Growth: 1 per hour
+ */
+export const appleMusicRescanPlanAwareLimiter: PlanAwareRateLimiter =
+  createPlanAwareRateLimiter({
+    configs: {
+      free: RATE_LIMITERS.appleMusicRescanFree,
+      pro: RATE_LIMITERS.appleMusicRescanPaid,
+      // founding falls back to pro automatically via the factory
+      growth: RATE_LIMITERS.appleMusicRescanPaid,
+    },
+    errorMessage: plan =>
+      plan === 'growth' || plan === 'pro' || plan === 'founding'
+        ? 'Apple Music was recently refreshed. Please wait 1 hour before refreshing again.'
+        : 'Apple Music was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
+  });
+
+/**
+ * Check Apple Music rescan rate limit (plan-aware).
+ * Free: 1/day, Paid (pro/founding/growth): 1/hour.
+ */
+export async function checkAppleMusicRescanRateLimit(
+  profileId: string,
+  plan: string | null
+): Promise<RateLimitResult> {
+  return appleMusicRescanPlanAwareLimiter.limit(profileId, plan);
+}
+
+// ============================================================================
+// Release Refresh (plan-aware)
+// ============================================================================
+
+/**
+ * Rate limiter for release refresh (free plan)
+ * Limit: 1 per day per release
+ *
+ * @deprecated Use releaseRefreshPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
+ */
+export const releaseRefreshFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.releaseRefreshFree
+);
+
+/**
+ * Rate limiter for release refresh (paid plan)
+ * Limit: 1 per hour per release
+ *
+ * @deprecated Use releaseRefreshPlanAwareLimiter instead for new code.
+ * This individual limiter is kept for backward compatibility.
+ */
+export const releaseRefreshPaidLimiter = createRateLimiter(
+  RATE_LIMITERS.releaseRefreshPaid
+);
+
+/**
+ * Plan-aware release refresh limiter.
+ * Automatically selects the correct limit based on the user's plan tier.
+ * - Free: 1 per day
+ * - Pro/Founding/Growth: 1 per hour
+ */
+export const releaseRefreshPlanAwareLimiter: PlanAwareRateLimiter =
+  createPlanAwareRateLimiter({
+    configs: {
+      free: RATE_LIMITERS.releaseRefreshFree,
+      pro: RATE_LIMITERS.releaseRefreshPaid,
+      // founding falls back to pro automatically via the factory
+      growth: RATE_LIMITERS.releaseRefreshPaid,
+    },
+    errorMessage: plan =>
+      plan === 'growth' || plan === 'pro' || plan === 'founding'
+        ? 'This release was recently refreshed. Please wait 1 hour before refreshing again.'
+        : 'This release was recently refreshed. Please wait 24 hours before refreshing again. Upgrade to Pro for hourly refreshes.',
+  });
+
+/**
+ * Check release refresh rate limit (plan-aware).
+ * Free: 1/day, Paid (pro/founding/growth): 1/hour.
+ */
+export async function checkReleaseRefreshRateLimit(
+  releaseId: string,
+  plan: string | null
+): Promise<RateLimitResult> {
+  return releaseRefreshPlanAwareLimiter.limit(releaseId, plan);
 }
 
 /**
@@ -608,6 +745,43 @@ export async function checkAccountExportRateLimit(
   );
 }
 
+// ============================================================================
+// Link Wrapping
+// ============================================================================
+
+/**
+ * Rate limiter for wrap-link (authenticated)
+ * Limit: 50 requests per hour per user
+ */
+export const wrapLinkLimiter = createRateLimiter(RATE_LIMITERS.wrapLink);
+
+/**
+ * Rate limiter for wrap-link (anonymous)
+ * Limit: 20 requests per hour per IP - stricter for unauthenticated callers
+ */
+export const wrapLinkAnonymousLimiter = createRateLimiter(
+  RATE_LIMITERS.wrapLinkAnonymous
+);
+
+/**
+ * Check wrap-link rate limit.
+ * Uses userId for authenticated callers, IP for anonymous.
+ */
+export async function checkWrapLinkRateLimit(
+  identifier: string,
+  isAuthenticated: boolean
+): Promise<RateLimitResult> {
+  const limiter = isAuthenticated ? wrapLinkLimiter : wrapLinkAnonymousLimiter;
+  const result = await limiter.limit(identifier);
+  if (!result.success) {
+    return {
+      ...result,
+      reason: 'Rate limit exceeded. Please try again later.',
+    };
+  }
+  return result;
+}
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -635,12 +809,20 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     health: healthLimiter,
     general: generalLimiter,
     spotifySearch: spotifySearchLimiter,
+    spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,
     spotifyRefresh: spotifyRefreshLimiter,
     spotifyPublicSearch: spotifyPublicSearchLimiter,
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
+    appleMusicSearch: appleMusicSearchLimiter,
+    appleMusicRescanFree: appleMusicRescanFreeLimiter,
+    appleMusicRescanPaid: appleMusicRescanPaidLimiter,
+    releaseRefreshFree: releaseRefreshFreeLimiter,
+    releaseRefreshPaid: releaseRefreshPaidLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,
+    wrapLink: wrapLinkLimiter,
+    wrapLinkAnonymous: wrapLinkAnonymousLimiter,
   };
 }

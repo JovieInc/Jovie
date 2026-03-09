@@ -1,10 +1,25 @@
+import { geoAwarePopularityIndex } from '@/constants/app';
 import { Artist, Release } from '@/types/db';
+
+export type DevicePlatform = 'ios' | 'android' | 'desktop';
 
 export interface DSPConfig {
   name: string;
   color: string;
   textColor: string;
   logoSvg: string;
+}
+
+function buildMonogramLogo(name: string): string {
+  const monogram = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(word => word[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg"><title>${name}</title><circle cx="12" cy="12" r="10" fill="currentColor" opacity="0.2"/><text x="12" y="15" text-anchor="middle" font-size="8" font-family="system-ui, -apple-system, sans-serif" font-weight="700" fill="currentColor">${monogram}</text></svg>`;
 }
 
 function buildSpotifyArtistUrl(artistId: string): string {
@@ -35,6 +50,90 @@ export const DSP_CONFIGS: Record<string, DSPConfig> = {
     color: '#FF0000',
     textColor: 'white',
     logoSvg: `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>YouTube</title><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  },
+  youtube_music: {
+    name: 'YouTube Music',
+    color: '#FF0000',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('YouTube Music'),
+  },
+  deezer: {
+    name: 'Deezer',
+    color: '#2F9AFF',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Deezer'),
+  },
+  tidal: {
+    name: 'Tidal',
+    color: '#111111',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Tidal'),
+  },
+  amazon_music: {
+    name: 'Amazon Music',
+    color: '#146EB4',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Amazon Music'),
+  },
+  bandcamp: {
+    name: 'Bandcamp',
+    color: '#629AA0',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Bandcamp'),
+  },
+  beatport: {
+    name: 'Beatport',
+    color: '#A3E422',
+    textColor: '#0A0A0A',
+    logoSvg: buildMonogramLogo('Beatport'),
+  },
+  pandora: {
+    name: 'Pandora',
+    color: '#224099',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Pandora'),
+  },
+  napster: {
+    name: 'Napster',
+    color: '#2259FF',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Napster'),
+  },
+  audiomack: {
+    name: 'Audiomack',
+    color: '#FFA200',
+    textColor: '#0A0A0A',
+    logoSvg: buildMonogramLogo('Audiomack'),
+  },
+  qobuz: {
+    name: 'Qobuz',
+    color: '#0070EF',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Qobuz'),
+  },
+  anghami: {
+    name: 'Anghami',
+    color: '#F300F9',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Anghami'),
+  },
+  boomplay: {
+    name: 'Boomplay',
+    color: '#0052FF',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('Boomplay'),
+  },
+  iheartradio: {
+    name: 'iHeartRadio',
+    color: '#C6002B',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('iHeartRadio'),
+  },
+  tiktok: {
+    name: 'TikTok',
+    color: '#000000',
+    textColor: 'white',
+    logoSvg: buildMonogramLogo('TikTok'),
   },
   soundcloud_release: {
     name: 'SoundCloud',
@@ -77,37 +176,150 @@ function addDSP(
   });
 }
 
+export function sortDSPsByGeoPopularity(
+  dsps: AvailableDSP[],
+  countryCode?: string | null
+): AvailableDSP[] {
+  return dsps.sort((a, b) => {
+    const rankDelta =
+      geoAwarePopularityIndex(a.key, countryCode) -
+      geoAwarePopularityIndex(b.key, countryCode);
+
+    if (rankDelta !== 0) return rankDelta;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+const IOS_APPLE_MUSIC_PRIORITY_WEIGHT = -2;
+
+function getDevicePriorityWeight(
+  dspKey: string,
+  platform: DevicePlatform
+): number {
+  if (platform === 'ios' && dspKey === 'apple_music') {
+    return IOS_APPLE_MUSIC_PRIORITY_WEIGHT;
+  }
+
+  return 0;
+}
+
+interface SortDSPsForDeviceOptions {
+  countryCode?: string | null;
+  platform?: DevicePlatform;
+  enableDevicePriority?: boolean;
+}
+
+/**
+ * Sort DSPs by geo popularity with optional device-aware weighting.
+ *
+ * Device weighting is intentionally small so geo ordering remains the primary
+ * signal while letting us gently favor native-first UX on iOS.
+ */
+export function sortDSPsForDevice(
+  dsps: AvailableDSP[],
+  options: SortDSPsForDeviceOptions = {}
+): AvailableDSP[] {
+  const {
+    countryCode,
+    platform = 'desktop',
+    enableDevicePriority = false,
+  } = options;
+
+  return dsps.sort((a, b) => {
+    const baseRankDelta =
+      geoAwarePopularityIndex(a.key, countryCode) -
+      geoAwarePopularityIndex(b.key, countryCode);
+
+    // Geo popularity is always the primary signal
+    if (baseRankDelta !== 0) {
+      return baseRankDelta;
+    }
+
+    // Device weighting is a secondary tiebreaker when geo ranks are equal
+    if (enableDevicePriority) {
+      const devicePriorityDelta =
+        getDevicePriorityWeight(a.key, platform) -
+        getDevicePriorityWeight(b.key, platform);
+
+      if (devicePriorityDelta !== 0) {
+        return devicePriorityDelta;
+      }
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+}
+
+// ============================================================================
+// DSP URL Builders (construct artist page URLs from platform IDs)
+// ============================================================================
+
+function buildDeezerArtistUrl(artistId: string): string {
+  return `https://www.deezer.com/artist/${artistId}`;
+}
+
+function buildTidalArtistUrl(artistId: string): string {
+  return `https://tidal.com/browse/artist/${artistId}`;
+}
+
+function buildSoundcloudArtistUrl(slug: string): string {
+  return `https://soundcloud.com/${slug}`;
+}
+
+function buildYoutubeMusicChannelUrl(channelId: string): string {
+  return `https://music.youtube.com/channel/${channelId}`;
+}
+
 export function getAvailableDSPs(
   artist: Artist,
-  releases?: Release[]
+  releases?: Release[],
+  countryCode?: string | null
 ): AvailableDSP[] {
   const dsps: AvailableDSP[] = [];
 
-  // Check artist URLs
+  // Check artist URLs (explicit URLs take priority)
   const spotifyUrl =
     artist.spotify_url ||
     (artist.spotify_id ? buildSpotifyArtistUrl(artist.spotify_id) : null);
   addDSP(dsps, 'spotify', spotifyUrl);
   addDSP(dsps, 'apple_music', artist.apple_music_url);
   addDSP(dsps, 'youtube', artist.youtube_url);
+
+  // Build URLs from DSP IDs when explicit URLs are not available
   addDSP(
     dsps,
     'soundcloud',
-    (artist as Artist & { soundcloud_url?: string }).soundcloud_url
+    (artist as Artist & { soundcloud_url?: string }).soundcloud_url ||
+      (artist.soundcloud_id
+        ? buildSoundcloudArtistUrl(artist.soundcloud_id)
+        : null)
+  );
+  addDSP(
+    dsps,
+    'deezer',
+    artist.deezer_id ? buildDeezerArtistUrl(artist.deezer_id) : null
+  );
+  addDSP(
+    dsps,
+    'tidal',
+    artist.tidal_id ? buildTidalArtistUrl(artist.tidal_id) : null
+  );
+  addDSP(
+    dsps,
+    'youtube_music',
+    artist.youtube_music_id
+      ? buildYoutubeMusicChannelUrl(artist.youtube_music_id)
+      : null
   );
 
   // Check for release-specific URLs if releases are provided
   if (releases) {
-    const spotifyRelease = releases.find(r => r.dsp === 'spotify');
-    const appleRelease = releases.find(r => r.dsp === 'apple_music');
-    const youtubeRelease = releases.find(r => r.dsp === 'youtube');
-
-    addDSP(dsps, 'spotify', spotifyRelease?.url);
-    addDSP(dsps, 'apple_music', appleRelease?.url);
-    addDSP(dsps, 'youtube', youtubeRelease?.url);
+    for (const release of releases) {
+      addDSP(dsps, release.dsp, release.url);
+    }
   }
 
-  return dsps;
+  return sortDSPsByGeoPopularity(dsps, countryCode);
 }
 
 export function generateDSPButtonHTML(dsp: AvailableDSP): string {

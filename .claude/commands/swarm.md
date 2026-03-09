@@ -7,18 +7,30 @@ Pull Linear issues and dispatch isolated agents in parallel, each in its own git
 ## Required Environment
 
 ```bash
-node --version   # MUST be v24.x
+node --version   # MUST be v22.x
 pnpm --version   # MUST be 9.15.4
 ```
 
-If wrong: `nvm use 24 && corepack prepare pnpm@9.15.4 --activate`
+If wrong: `nvm use 22 && corepack prepare pnpm@9.15.4 --activate`
 
 ## Execution
+
+
+### Linear Issue Gating (mandatory)
+
+When scanning Linear issues for swarm dispatch, always skip:
+
+- Issues labeled `human-review-required`
+- Issues whose description contains `This issue requires human review`
+
+Do not work on, close, or comment on skipped issues.
 
 ### Phase 1: Intake
 
 1. **Fetch issues from Linear:**
    - Use `list_issues` MCP tool with `team: "jovie"`, states: `started`, `unstarted`, `backlog`
+   - Exclude label: `human-review-required`
+   - Exclude description containing: `This issue requires human review`
    - Limit to N issues (from argument or default 5)
 
 2. **Deduplicate against open PRs:**
@@ -81,7 +93,7 @@ SETUP (do this first):
 cd /tmp/jovie-worktrees/jov-<NUMBER> && pnpm install
 
 CODEBASE RULES:
-- Node 24.x, pnpm 9.15.4 only
+- Node 22.x, pnpm 9.15.4 only
 - Never edit drizzle/migrations/
 - Never create middleware.ts
 - Never add // biome-ignore

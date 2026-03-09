@@ -14,6 +14,7 @@ import { VIDEO_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import { getContrastSafeIconColor } from '@/lib/utils/color';
+import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface VideoProvider {
   key: VideoProviderKey;
@@ -35,6 +36,8 @@ interface SoundsLandingPageProps {
   readonly videoProviders: VideoProvider[];
   /** Smart link path back to the main release page */
   readonly smartLinkPath: string;
+  /** UTM params captured from incoming request and passed to outbound links */
+  readonly utmParams?: PartialUTMParams;
 }
 
 export function SoundsLandingPage({
@@ -42,6 +45,7 @@ export function SoundsLandingPage({
   artist,
   videoProviders,
   smartLinkPath,
+  utmParams = {},
 }: Readonly<SoundsLandingPageProps>) {
   return (
     <div className='h-dvh bg-black text-white'>
@@ -50,7 +54,10 @@ export function SoundsLandingPage({
         <div className='absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/[0.03] blur-[120px]' />
       </div>
 
-      <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
+      <main
+        id='main-content'
+        className='relative z-10 flex h-full flex-col items-center px-6 pt-10'
+      >
         <div className='flex w-full max-w-[272px] min-h-0 flex-1 flex-col'>
           {/* Artwork */}
           <div className='shrink-0'>
@@ -98,7 +105,7 @@ export function SoundsLandingPage({
 
           {/* Video Platform Buttons */}
           <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2 pb-2'>
+            <div className='space-y-2 py-1'>
               {videoProviders.map(provider => {
                 const logoConfig = VIDEO_LOGO_CONFIG[provider.key];
                 const brandHover = logoConfig
@@ -108,10 +115,10 @@ export function SoundsLandingPage({
                 return (
                   <a
                     key={provider.key}
-                    href={provider.url}
+                    href={appendUTMParamsToUrl(provider.url, utmParams)}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='group flex w-full items-center gap-3.5 rounded-xl bg-gradient-to-r from-pink-500/[0.08] to-violet-500/[0.08] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-all duration-150 ease-out hover:-translate-y-px hover:from-pink-500/[0.14] hover:to-violet-500/[0.14] hover:ring-white/[0.16]'
+                    className='group flex w-full items-center gap-3.5 rounded-xl bg-gradient-to-r from-pink-500/[0.08] to-violet-500/[0.08] px-4 py-3 ring-1 ring-inset ring-white/[0.10] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/[0.14] hover:to-violet-500/[0.14]'
                     style={
                       { '--brand-hover': brandHover } as React.CSSProperties
                     }
@@ -131,7 +138,7 @@ export function SoundsLandingPage({
                     </span>
                     <Icon
                       name='ExternalLink'
-                      className='h-4 w-4 text-white/25 transition-all duration-150 group-hover:text-white/40'
+                      className='h-4 w-4 text-white/25 transition-colors duration-100 group-hover:text-white/40'
                       aria-hidden='true'
                     />
                   </a>
@@ -142,7 +149,7 @@ export function SoundsLandingPage({
             {/* Back to streaming links */}
             <div className='mt-3 text-center'>
               <Link
-                href={smartLinkPath}
+                href={appendUTMParamsToUrl(smartLinkPath, utmParams)}
                 className='inline-flex items-center gap-1.5 text-[12px] text-white/35 transition-colors hover:text-white/55'
               >
                 <Icon

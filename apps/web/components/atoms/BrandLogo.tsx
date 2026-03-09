@@ -48,6 +48,7 @@ export function BrandLogo({
           aria-hidden={ariaHidden}
           style={style}
           className={cn(baseClassName, 'dark:hidden')}
+          unoptimized
         />
         <Image
           src='/brand/Jovie-Logo-Icon-White.svg'
@@ -60,6 +61,7 @@ export function BrandLogo({
           aria-hidden={ariaHidden}
           style={style}
           className={cn(baseClassName, 'hidden dark:block')}
+          unoptimized
         />
       </>
     );
@@ -84,6 +86,7 @@ export function BrandLogo({
       aria-hidden={ariaHidden}
       style={style}
       className={baseClassName}
+      unoptimized
     />
   );
 }

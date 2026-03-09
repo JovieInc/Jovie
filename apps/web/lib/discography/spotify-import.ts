@@ -13,10 +13,11 @@ import {
   getBestSpotifyImage,
   getSpotifyAlbums,
   getSpotifyArtistAlbums,
-  mapSpotifyAlbumType,
+  getSpotifyTracks,
   parseSpotifyReleaseDate,
   type SpotifyAlbum,
   type SpotifyAlbumFull,
+  type SpotifyTrackFull,
 } from '@/lib/spotify';
 import {
   sanitizeImageUrl,
@@ -42,6 +43,7 @@ import {
   upsertRelease,
   upsertTrack,
 } from './queries';
+import { classifySpotifyReleaseType } from './release-type';
 import { generateUniqueSlug } from './slug';
 
 // ============================================================================
@@ -53,6 +55,8 @@ const MAX_RELEASES_PER_IMPORT = 200;
 
 /** Maximum number of tracks per release */
 const MAX_TRACKS_PER_RELEASE = 100;
+
+const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
 export interface SpotifyImportResult {
   success: boolean;
@@ -85,7 +89,14 @@ async function discoverLinksForReleases(
 
   for (const release of importedReleases) {
     try {
-      const existingProviders = release.providerLinks.map(l => l.providerId);
+      // Only count canonical/manual links as existing — search fallback URLs
+      // should be upgraded to canonical links via ISRC/UPC discovery.
+      const existingProviders = release.providerLinks
+        .filter(l => {
+          const meta = l.metadata as Record<string, unknown> | null;
+          return meta?.discoveredFrom !== 'search_fallback';
+        })
+        .map(l => l.providerId);
       await discoverLinksForRelease(release.id, existingProviders, {
         skipExisting: true,
         storefront: market.toLowerCase(),
@@ -131,6 +142,57 @@ async function importAlbumBatch(
         creatorProfileId,
       });
     }
+  }
+}
+
+function mergeFullTrackMetadata(
+  album: SpotifyAlbumFull,
+  fullTracksById: Map<string, SpotifyTrackFull>
+): SpotifyAlbumFull {
+  return {
+    ...album,
+    tracks: {
+      ...album.tracks,
+      items: album.tracks.items.map(track => {
+        const fullTrack = fullTracksById.get(track.id);
+        if (!fullTrack) return track;
+
+        return {
+          ...track,
+          external_ids: fullTrack.external_ids,
+        };
+      }),
+    },
+  };
+}
+
+function normalizeSpotifyIsrc(isrc: string | undefined): string | null {
+  if (!isrc) return null;
+
+  const normalized = isrc.replaceAll(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (!ISRC_REGEX.test(normalized)) return null;
+
+  return normalized;
+}
+
+function logTrackIsrcCoverage(album: SpotifyAlbumFull): void {
+  const tracks = album.tracks.items;
+  if (tracks.length === 0) return;
+
+  const tracksWithIsrc = tracks.filter(
+    track => normalizeSpotifyIsrc(track.external_ids?.isrc) !== null
+  ).length;
+
+  if (tracksWithIsrc !== tracks.length) {
+    captureWarning('Spotify ISRC coverage is incomplete for album tracks', {
+      source: 'spotify_import',
+      albumId: album.id,
+      albumName: sanitizeName(album.name),
+      totalTracks: tracks.length,
+      tracksWithIsrc,
+      tracksMissingIsrc: tracks.length - tracksWithIsrc,
+      coverageRatio: Number((tracksWithIsrc / tracks.length).toFixed(3)),
+    });
   }
 }
 
@@ -218,10 +280,22 @@ export async function importReleasesFromSpotify(
           ? await getSpotifyAlbums(albumIds, market)
           : [];
 
+        const spotifyTrackIds = fullAlbums.flatMap(album =>
+          album.tracks.items.map(track => track.id)
+        );
+        const fullTracks = includeTracks
+          ? await getSpotifyTracks(spotifyTrackIds, market)
+          : [];
+        const fullTracksById = new Map<string, SpotifyTrackFull>(
+          fullTracks.map(track => [track.id, track])
+        );
+
         // Create a map for quick lookup
         const fullAlbumMap = new Map<string, SpotifyAlbumFull>();
         for (const album of fullAlbums) {
-          fullAlbumMap.set(album.id, album);
+          const enrichedAlbum = mergeFullTrackMetadata(album, fullTracksById);
+          logTrackIsrcCoverage(enrichedAlbum);
+          fullAlbumMap.set(album.id, enrichedAlbum);
         }
 
         // 3. Import each album
@@ -263,26 +337,6 @@ export async function importReleasesFromSpotify(
 }
 
 /**
- * Determine release type, inferring EP from track count
- *
- * Spotify's API only returns 'album', 'single', or 'compilation' — there is
- * no 'ep' value. EPs (4-6 tracks) are reported as 'single' by Spotify, so we
- * detect them by checking the track count. When Spotify says 'album', we trust
- * that classification regardless of track count.
- */
-function determineReleaseType(
-  albumType: SpotifyAlbum['album_type'],
-  totalTracks: number
-): 'album' | 'single' | 'ep' | 'compilation' {
-  const releaseType = mapSpotifyAlbumType(albumType);
-  // Spotify reports EPs as 'single' — detect them by track count (4-6 tracks)
-  if (releaseType === 'single' && totalTracks >= 4 && totalTracks <= 6) {
-    return 'ep';
-  }
-  return releaseType;
-}
-
-/**
  * Sanitize album metadata fields
  */
 function sanitizeAlbumMetadata(
@@ -310,12 +364,33 @@ function sanitizeAlbumMetadata(
       ? Math.min(100, Math.max(0, Math.round(rawPopularity)))
       : null;
 
+  // Extract genres from full album (Spotify returns genres on album objects)
+  const genres =
+    fullAlbum?.genres && fullAlbum.genres.length > 0
+      ? fullAlbum.genres.slice(0, 10).map(g => sanitizeText(g, 100))
+      : null;
+
+  // Extract copyright line (℗ = phonographic copyright, type 'P')
+  const pCopyright = fullAlbum?.copyrights?.find(c => c.type === 'P');
+  const copyrightLine = pCopyright?.text
+    ? sanitizeText(pCopyright.text, 500)
+    : null;
+
+  // Extract distributor from © copyright (type 'C')
+  const cCopyright = fullAlbum?.copyrights?.find(c => c.type === 'C');
+  const distributor = cCopyright?.text
+    ? sanitizeText(cCopyright.text, 500)
+    : null;
+
   return {
     sanitizedTitle,
     artworkUrl,
     sanitizedLabel,
     sanitizedUpc,
     popularity,
+    genres,
+    copyrightLine,
+    distributor,
   };
 }
 
@@ -413,16 +488,13 @@ async function processTracksForRelease(
         existingTrack?.id
       ));
 
-    const sanitizedIsrc = track.external_ids?.isrc
-      ? track.external_ids.isrc
-          .replaceAll(/[^a-zA-Z0-9]/g, '')
-          .slice(0, 12)
-          .toUpperCase()
-      : null;
+    const sanitizedIsrc = normalizeSpotifyIsrc(track.external_ids?.isrc);
 
     const sanitizedPreviewUrl = track.preview_url
       ? sanitizeSpotifyPreviewUrl(track.preview_url)
       : null;
+    const audioFallbackUrl = sanitizedPreviewUrl;
+    const audioFallbackFormat = audioFallbackUrl ? 'mp3' : null;
 
     const createdTrack = await upsertTrack({
       releaseId: release.id,
@@ -435,6 +507,8 @@ async function processTracksForRelease(
       isExplicit: track.explicit,
       isrc: sanitizedIsrc,
       previewUrl: sanitizedPreviewUrl,
+      audioUrl: audioFallbackUrl,
+      audioFormat: audioFallbackFormat,
       sourceType: 'ingested',
       metadata: {
         spotifyId: track.id,
@@ -523,7 +597,7 @@ async function importSingleRelease(
   const effectiveAlbumType = fullAlbum?.album_type ?? album.album_type;
   const effectiveTotalTracks = fullAlbum?.total_tracks ?? album.total_tracks;
 
-  const releaseType = determineReleaseType(
+  const releaseType = classifySpotifyReleaseType(
     effectiveAlbumType,
     effectiveTotalTracks
   );
@@ -543,6 +617,9 @@ async function importSingleRelease(
     upc: metadata.sanitizedUpc,
     totalTracks: Math.min(effectiveTotalTracks, MAX_TRACKS_PER_RELEASE),
     isExplicit: false,
+    genres: metadata.genres,
+    copyrightLine: metadata.copyrightLine,
+    distributor: metadata.distributor,
     artworkUrl: metadata.artworkUrl,
     spotifyPopularity: metadata.popularity,
     sourceType: 'ingested',

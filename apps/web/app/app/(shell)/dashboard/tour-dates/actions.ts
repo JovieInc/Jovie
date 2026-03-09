@@ -9,6 +9,7 @@ import {
 } from 'next/cache';
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
@@ -73,12 +74,13 @@ async function requireProfile(): Promise<{
 }> {
   const data = await getDashboardData();
 
-  if (data.needsOnboarding) {
+  if (data.needsOnboarding && !data.dashboardLoadError) {
     redirect('/onboarding');
   }
 
+  // Redirect to onboarding if no profile exists (new users, mid-onboarding, or load errors)
   if (!data.selectedProfile) {
-    throw new TypeError('Missing creator profile');
+    redirect('/onboarding');
   }
 
   // Use bandsintown fields directly from selectedProfile (already fetched by getDashboardData)
@@ -211,14 +213,16 @@ async function fetchTourDatesCore(
 }
 
 /**
- * Load tour dates for the current profile with caching (30s TTL)
- * Cache is invalidated on mutations (create, update, delete, sync)
+ * Core tour dates loading logic (cacheable).
+ * Cache is invalidated on mutations (create, update, delete, sync).
  */
-export async function loadTourDates(): Promise<TourDateViewModel[]> {
+async function resolveTourDates(): Promise<TourDateViewModel[]> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`/sign-in?redirect_url=${APP_ROUTES.SETTINGS_TOURING}`);
+    redirect(
+      `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.SETTINGS_TOURING}`
+    );
   }
 
   const profile = await requireProfile();
@@ -233,6 +237,12 @@ export async function loadTourDates(): Promise<TourDateViewModel[]> {
     }
   )();
 }
+
+/**
+ * Cached loader for tour dates.
+ * Uses React's cache() for request-level deduplication.
+ */
+export const loadTourDates = cache(resolveTourDates);
 
 /**
  * Load upcoming tour dates only (for public display)
@@ -315,7 +325,7 @@ export async function saveBandsintownApiKey(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -373,7 +383,7 @@ export async function removeBandsintownApiKey(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -423,7 +433,7 @@ export async function connectBandsintownArtist(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -492,7 +502,7 @@ export async function syncFromBandsintown(): Promise<{
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -531,9 +541,10 @@ export async function syncFromBandsintown(): Promise<{
     source: 'bandsintown',
   });
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return {
     success: true,
@@ -561,7 +572,7 @@ export async function createTourDate(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -599,9 +610,10 @@ export async function createTourDate(params: {
     source: 'manual',
   });
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapTourDateToViewModel(created);
 }
@@ -626,7 +638,7 @@ export async function updateTourDate(params: {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -675,9 +687,10 @@ export async function updateTourDate(params: {
     .where(eq(tourDates.id, params.id))
     .returning();
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return mapTourDateToViewModel(updated);
 }
@@ -692,7 +705,7 @@ export async function deleteTourDate(
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();
@@ -711,9 +724,10 @@ export async function deleteTourDate(
     tourDateId: id,
   });
 
-  // Invalidate cache and revalidate path
+  // Invalidate cache tag so next server fetch returns fresh data
   revalidateTag(`tour-dates:${userId}:${profile.id}`, 'max');
-  revalidatePath(APP_ROUTES.SETTINGS_TOURING);
+  // Skip revalidatePath — the mutation hook handles cache updates via TanStack
+  // Query, and a path revalidation resets client-side state (closing the sidebar).
 
   return { success: true };
 }
@@ -726,7 +740,7 @@ export async function disconnectBandsintown(): Promise<{ success: boolean }> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    throw new TypeError('Unauthorized');
+    throw new Error('Unauthorized');
   }
 
   const profile = await requireProfile();

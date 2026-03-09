@@ -1,26 +1,41 @@
 'use client';
 
-import { Camera } from 'lucide-react';
+import {
+  Camera,
+  DollarSign,
+  Eye,
+  Link2,
+  MessageSquare,
+  Music,
+} from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
 
-import { type ChatSuggestion, DEFAULT_SUGGESTIONS } from '../types';
+import {
+  type ChatSuggestion,
+  DEFAULT_SUGGESTIONS,
+  FEEDBACK_SUGGESTION,
+  FIRST_SESSION_SUGGESTIONS,
+} from '../types';
 
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Camera,
+  DollarSign,
+  Eye,
+  Link2,
+  MessageSquare,
+  Music,
 };
 
-const ACCENT_TEXT_CLASSES = {
-  blue: 'text-blue-400',
-  green: 'text-emerald-400',
-  purple: 'text-purple-400',
-  orange: 'text-orange-400',
-} as const;
+/** All suggestion accents use the single accent color from the design system. */
+const ACCENT_TEXT_CLASS = 'text-accent';
 
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
+  readonly isFirstSession?: boolean;
+  readonly latestReleaseTitle?: string | null;
 }
 
 function SuggestionPill({
@@ -37,9 +52,9 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex w-fit items-center gap-2 rounded-lg border border-white/[0.06]',
-        'bg-white/[0.02] px-3.5 py-2.5 text-left',
-        'hover:border-white/[0.1] hover:bg-white/[0.04]',
+        'chat-pill flex items-center gap-2 rounded-lg border border-subtle',
+        'bg-surface-1 px-3.5 py-2.5 text-left',
+        'hover:border-default hover:bg-surface-2',
         'active:scale-[0.98]',
         'focus:outline-none',
         'cursor-pointer transition-colors duration-fast'
@@ -47,10 +62,7 @@ function SuggestionPill({
     >
       {IconComponent && (
         <IconComponent
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            ACCENT_TEXT_CLASSES[suggestion.accent]
-          )}
+          className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
         />
       )}
       <span className='text-[13px] leading-snug text-secondary-token'>
@@ -60,16 +72,40 @@ function SuggestionPill({
   );
 }
 
-export function SuggestedPrompts({ onSelect }: SuggestedPromptsProps) {
+export function SuggestedPrompts({
+  onSelect,
+  isFirstSession = false,
+  latestReleaseTitle,
+}: SuggestedPromptsProps) {
+  const suggestions = isFirstSession
+    ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
+        if (
+          suggestion.icon === 'Link2' &&
+          typeof latestReleaseTitle === 'string' &&
+          latestReleaseTitle.trim().length > 0
+        ) {
+          const cleanTitle = latestReleaseTitle.trim();
+          return {
+            ...suggestion,
+            label: `Set up a link for “${cleanTitle}”`,
+            prompt: `Set up a link for ${cleanTitle}.`,
+          };
+        }
+
+        return suggestion;
+      })
+    : DEFAULT_SUGGESTIONS;
+
   return (
-    <div className='flex flex-col gap-2'>
-      {DEFAULT_SUGGESTIONS.map(suggestion => (
+    <div className='flex flex-col gap-2 w-full max-w-sm mx-auto'>
+      {suggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
           suggestion={suggestion}
           onSelect={onSelect}
         />
       ))}
+      <SuggestionPill suggestion={FEEDBACK_SUGGESTION} onSelect={onSelect} />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import {
   trimLeadingSlashes,
   trimTrailingSlashes,
@@ -84,7 +85,7 @@ function SetupTaskItem({
           href={actionHref}
           className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
         >
-          {actionLabel} →
+          {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
       )}
     </li>
@@ -139,7 +140,7 @@ export function DashboardOverview({
       <div className='grid grid-cols-1 gap-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-4'>
         <div className='min-w-0'>
           <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
-            <h1 className='text-xl font-semibold text-primary-token'>
+            <h1 className='text-xl font-[590] text-primary-token'>
               Welcome back, {greetingName}
             </h1>
             <div className='flex items-center gap-1'>
@@ -147,7 +148,7 @@ export function DashboardOverview({
                 asChild
                 variant='secondary'
                 size='sm'
-                className='h-11 w-11 rounded-full p-0'
+                className='h-8 w-8 sm:h-11 sm:w-11 rounded-full p-0'
               >
                 <Link
                   href={`/${artist.handle}`}
@@ -157,7 +158,7 @@ export function DashboardOverview({
                 >
                   <Icon
                     name='ArrowUpRight'
-                    className='h-5 w-5'
+                    className='h-4 w-4 sm:h-5 sm:w-5'
                     aria-hidden='true'
                   />
                   <span className='sr-only'>View profile</span>
@@ -167,7 +168,7 @@ export function DashboardOverview({
                 relativePath={`/${artist.handle}`}
                 idleLabel='Copy URL'
                 iconName='Copy'
-                className='h-11 w-11 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
+                className='h-8 w-8 sm:h-11 sm:w-11 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
               />
             </div>
           </div>
@@ -177,7 +178,7 @@ export function DashboardOverview({
           <DashboardOverviewHeaderToolbarClient />
         </div>
 
-        <p className='text-sm text-secondary-token sm:col-span-2'>
+        <p className='text-[13px] text-secondary-token sm:col-span-2'>
           Keep your profile polished and ready to share.
         </p>
       </div>
@@ -213,14 +214,14 @@ export function DashboardOverview({
                 isComplete={hasMusicLink}
                 stepNumber={2}
                 label='Add a music link'
-                actionHref={APP_ROUTES.PROFILE}
+                actionHref={APP_ROUTES.SETTINGS_ARTIST_PROFILE}
                 actionLabel='Add'
               />
               <SetupTaskItem
                 isComplete={hasSocialLinks}
                 stepNumber={3}
                 label='Add social links'
-                actionHref={APP_ROUTES.PROFILE}
+                actionHref={APP_ROUTES.SETTINGS_ARTIST_PROFILE}
                 actionLabel='Add'
               />
             </ul>

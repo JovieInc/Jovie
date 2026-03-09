@@ -32,6 +32,10 @@ export interface DashboardLayoutClientProps {
   readonly children: React.ReactNode;
 }
 
+export function TableMetaProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+
 export default function DashboardLayoutClient({
   children,
 }: DashboardLayoutClientProps) {

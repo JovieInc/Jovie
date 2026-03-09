@@ -350,12 +350,12 @@ describe('contacts/actions.ts', () => {
       // Profile cache invalidation inside the transaction
       expect(mockInvalidateProfileCache).toHaveBeenCalledWith('janedoe');
 
-      // Tag and path invalidation after the transaction
+      // Tag invalidation after the transaction (path skipped to preserve sidebar state)
       expect(mockRevalidateTag).toHaveBeenCalledWith(
         'contacts:user_123:prof_1',
         'max'
       );
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/contacts');
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
   });
 
@@ -596,7 +596,9 @@ describe('contacts/actions.ts', () => {
         'contacts:user_123:prof_1',
         'max'
       );
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings/contacts');
+      // revalidatePath is intentionally skipped to avoid resetting client-side
+      // state (closing the sidebar). Local state handles cache updates.
+      expect(mockRevalidatePath).not.toHaveBeenCalled();
     });
   });
 

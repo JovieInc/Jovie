@@ -9,10 +9,10 @@
  * - Trigger discovery for new profiles
  */
 
-import * as Sentry from '@sentry/nextjs';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { addBreadcrumb } from '@/lib/sentry/client-lite';
 
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
@@ -230,7 +230,7 @@ export function useConfirmDspMatchMutation() {
 
     onError: (error, variables) => {
       // Log error for monitoring
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'dsp-enrichment',
         message: `Failed to confirm match ${variables.matchId}`,
         level: 'error',
@@ -271,7 +271,7 @@ export function useRejectDspMatchMutation() {
     },
 
     onError: (error, variables) => {
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'dsp-enrichment',
         message: `Failed to reject match ${variables.matchId}`,
         level: 'error',
@@ -314,7 +314,7 @@ export function useTriggerDiscoveryMutation() {
     },
 
     onError: (error, variables) => {
-      Sentry.addBreadcrumb({
+      addBreadcrumb({
         category: 'dsp-enrichment',
         message: `Failed to trigger discovery for profile ${variables.profileId}`,
         level: 'error',

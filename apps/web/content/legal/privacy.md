@@ -12,7 +12,7 @@ Jovie exists so musicians can share their story with confidence. That means keep
 
 ### Age Requirement
 
-Jovie is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will promptly delete it. If you believe a child under 13 has provided us with personal information, please contact privacy@meetjovie.com.
+Jovie is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will promptly delete it. If you believe a child under 13 has provided us with personal information, please contact privacy@jov.ie.
 
 ### Account Information
 
@@ -186,7 +186,7 @@ We retain your data only as long as necessary to provide our services:
 You have the right to request deletion of your data at any time:
 
 1. **Self-service deletion**: Access your account settings and select "Delete Account" to initiate deletion
-2. **Email request**: Send a deletion request to privacy@meetjovie.com
+2. **Email request**: Send a deletion request to privacy@jov.ie
 3. **Response time**: We will process deletion requests within 30 days
 
 Upon deletion:
@@ -213,7 +213,7 @@ We build in control throughout the experience:
 - **Access & correction:** Request a snapshot or update any of your stored data
 - **Deletion:** Close your account and your profile data is removed on request
 - **Exports:** Download your data for a standalone backup
-- **Analytics opt-out:** Contact privacy@meetjovie.com to opt out of non-essential analytics (we rely on Statsig for core product signals)
+- **Analytics opt-out:** Contact privacy@jov.ie to opt out of non-essential analytics (we rely on Statsig for core product signals)
 
 ## Google API Services Disclosure
 
@@ -231,5 +231,5 @@ We may update this privacy policy from time to time. We will notify you of any m
 
 If you have questions about this policy, your data, or wish to exercise your rights:
 
-- **Email:** privacy@meetjovie.com
+- **Email:** privacy@jov.ie
 - **Response time:** We aim to respond within 5 business days

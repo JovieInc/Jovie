@@ -23,7 +23,7 @@ const cases = [
   },
   {
     name: 'invalid characters',
-    handle: 'bad_handle',
+    handle: 'bad@handle',
     valid: false,
     errorIncludes: 'hyphens',
   },

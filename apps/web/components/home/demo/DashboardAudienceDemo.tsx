@@ -3,14 +3,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { AUDIENCE_MEMBERS, AUDIENCE_SUMMARY } from './mock-data';
 
-const INTENT_COLORS: Record<string, string> = {
+/**
+ * Intent dot + label colors matching AudienceIntentScoreCell patterns.
+ */
+const INTENT_DOT_COLORS: Record<string, string> = {
   High: '#22c55e',
-  Medium: '#f59e0b',
-  Low: '#94a3b8',
+  Medium: '#fbbf24',
+  Low: '#a1a1aa',
+};
+
+const INTENT_TEXT_COLORS: Record<string, string> = {
+  High: '#4ade80',
+  Medium: '#fbbf24',
+  Low: 'var(--linear-text-tertiary)',
+};
+
+const INTENT_FONT_WEIGHTS: Record<string, number> = {
+  High: 600,
+  Medium: 500,
+  Low: 400,
 };
 
 /**
  * Audience management demo with subscriber summary and a table of fan activity.
+ * Matches real DashboardAudienceTableUnified column patterns.
  */
 export function DashboardAudienceDemo() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -83,7 +99,7 @@ export function DashboardAudienceDemo() {
         <table className='w-full text-left text-xs'>
           <thead>
             <tr style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}>
-              {['Visitor', 'Intent', 'Status', 'Source', 'Last Action'].map(
+              {['Visitor', 'Intent', 'Returning', 'Source', 'Last Action'].map(
                 h => (
                   <th
                     key={h}
@@ -119,32 +135,42 @@ export function DashboardAudienceDemo() {
                 >
                   {m.name}
                 </td>
+                {/* Intent — dot + colored label (matches AudienceIntentScoreCell) */}
                 <td className='px-3 py-2'>
-                  <span
-                    className='inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium'
-                    style={{
-                      backgroundColor: `${INTENT_COLORS[m.intent]}20`,
-                      color: INTENT_COLORS[m.intent],
-                    }}
-                  >
+                  <span className='inline-flex items-center gap-1.5'>
                     <span
-                      className='h-1.5 w-1.5 rounded-full'
-                      style={{ backgroundColor: INTENT_COLORS[m.intent] }}
+                      className='inline-block size-1.5 shrink-0 rounded-full'
+                      style={{ backgroundColor: INTENT_DOT_COLORS[m.intent] }}
                     />
-                    {m.intent}
+                    <span
+                      className='text-xs'
+                      style={{
+                        color: INTENT_TEXT_COLORS[m.intent],
+                        fontWeight: INTENT_FONT_WEIGHTS[m.intent],
+                      }}
+                    >
+                      {m.intent}
+                    </span>
                   </span>
                 </td>
+                {/* Returning — matches AudienceReturningCell */}
                 <td
                   className='px-3 py-2'
                   style={{ color: 'var(--linear-text-secondary)' }}
                 >
-                  {m.status}
+                  {m.status === 'Returning' ? 'Yes' : 'No'}
                 </td>
-                <td
-                  className='px-3 py-2'
-                  style={{ color: 'var(--linear-text-secondary)' }}
-                >
-                  {m.source}
+                {/* Source — pill badge */}
+                <td className='px-3 py-2'>
+                  <span
+                    className='inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium'
+                    style={{
+                      color: 'var(--linear-text-secondary)',
+                      backgroundColor: 'var(--linear-bg-surface-2)',
+                    }}
+                  >
+                    {m.source}
+                  </span>
                 </td>
                 <td
                   className='px-3 py-2'

@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { DSPButtonGroup } from '@/components/molecules/DSPButtonGroup';
-import { LISTEN_COOKIE } from '@/constants/app';
+import { COUNTRY_CODE_COOKIE, LISTEN_COOKIE } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import type { AvailableDSP } from '@/lib/dsp';
+import { type AvailableDSP, sortDSPsForDevice } from '@/lib/dsp';
 import { captureError } from '@/lib/error-tracking';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { detectPlatformFromUA } from '@/lib/utils';
 
 export interface ListenSectionProps {
   /** Artist handle for tracking */
@@ -43,6 +46,11 @@ export function ListenSection({
   enableDeepLinks = true,
   enableTracking = true,
 }: Readonly<ListenSectionProps>) {
+  const enableDevicePriority = useFeatureGate(
+    FEATURE_FLAG_KEYS.IOS_APPLE_MUSIC_PRIORITY,
+    false
+  );
+
   useEffect(() => {
     // Auto open preferred URL if provided
     if (initialPreferredUrl) {
@@ -53,6 +61,30 @@ export function ListenSection({
       }
     }
   }, [initialPreferredUrl]);
+
+  const sortedDSPs = useMemo(() => {
+    const countryCode =
+      typeof document === 'undefined'
+        ? null
+        : document.cookie
+            .split(';')
+            .find(cookie => cookie.trim().startsWith(`${COUNTRY_CODE_COOKIE}=`))
+            ?.split('=')[1];
+
+    const userAgent =
+      typeof navigator === 'undefined' ? undefined : navigator.userAgent;
+    const detectedPlatform = detectPlatformFromUA(userAgent);
+    const platform =
+      detectedPlatform === 'ios' || detectedPlatform === 'android'
+        ? detectedPlatform
+        : 'desktop';
+
+    return sortDSPsForDevice([...dsps], {
+      countryCode: countryCode ?? null,
+      platform,
+      enableDevicePriority,
+    });
+  }, [dsps, enableDevicePriority]);
 
   const handleDSPClick = async (dspKey: string, url: string) => {
     try {
@@ -121,7 +153,7 @@ export function ListenSection({
   return (
     <div className={className} data-test='listen-btn'>
       <DSPButtonGroup
-        dsps={dsps}
+        dsps={sortedDSPs}
         onDSPClick={handleDSPClick}
         size={size}
         showPreferenceNotice={showPreferenceNotice}

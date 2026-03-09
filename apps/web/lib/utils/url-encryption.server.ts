@@ -7,6 +7,13 @@ import type { EncryptionResult } from './url-encryption';
 
 const ALGORITHM = 'aes-256-gcm';
 
+const SCRYPT_WORK_FACTOR = Object.freeze({
+  N: 2 ** 17,
+  r: 8,
+  p: 1,
+  maxmem: 256 * 1024 * 1024,
+});
+
 const isTestTime = isTestEnv();
 
 // Build-time detection - these are injected by Next.js build process
@@ -54,7 +61,7 @@ export function encryptUrl(url: string): EncryptionResult {
   try {
     const iv = crypto.randomBytes(16);
     const salt = crypto.randomBytes(16);
-    const key = crypto.scryptSync(keyMaterial, salt, 32);
+    const key = crypto.scryptSync(keyMaterial, salt, 32, SCRYPT_WORK_FACTOR);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
     const encryptedBuffer = Buffer.concat([
@@ -103,7 +110,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
     }
 
     const salt = Buffer.from(encryptionResult.salt, 'hex');
-    const key = crypto.scryptSync(keyMaterial, salt, 32);
+    const key = crypto.scryptSync(keyMaterial, salt, 32, SCRYPT_WORK_FACTOR);
     const iv = Buffer.from(encryptionResult.iv, 'hex');
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
 
@@ -124,4 +131,63 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
 
 export function generateSignedToken(): string {
   return crypto.randomBytes(32).toString('hex');
+}
+
+const CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Create an HMAC-signed challenge token for the interstitial page.
+ * The token binds to a specific shortId and has a short TTL,
+ * preventing bypass via direct API calls.
+ */
+export function createChallengeToken(shortId: string): {
+  token: string;
+  issuedAt: number;
+} {
+  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  if (!keyMaterial) {
+    throw new Error(
+      '[url-encryption] Cannot create challenge token: encryption key not configured.'
+    );
+  }
+  const issuedAt = Date.now();
+  const payload = `${shortId}:${issuedAt}`;
+  const hmac = crypto
+    .createHmac('sha256', keyMaterial)
+    .update(payload)
+    .digest('hex');
+  return { token: `${hmac}.${issuedAt}`, issuedAt };
+}
+
+/**
+ * Verify an HMAC-signed challenge token.
+ * Returns true only if the token was signed by this server,
+ * matches the given shortId, and has not expired.
+ */
+export function verifyChallengeToken(shortId: string, token: string): boolean {
+  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  if (!keyMaterial) return false;
+
+  const dotIndex = token.indexOf('.');
+  if (dotIndex === -1) return false;
+
+  const receivedHmac = token.substring(0, dotIndex);
+  const issuedAtStr = token.substring(dotIndex + 1);
+  const issuedAt = Number(issuedAtStr);
+
+  if (!Number.isFinite(issuedAt)) return false;
+
+  const age = Date.now() - issuedAt;
+  if (age < 0 || age > CHALLENGE_TTL_MS) return false;
+
+  const expectedPayload = `${shortId}:${issuedAtStr}`;
+  const expectedHmac = crypto
+    .createHmac('sha256', keyMaterial)
+    .update(expectedPayload)
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(receivedHmac, 'hex'),
+    Buffer.from(expectedHmac, 'hex')
+  );
 }

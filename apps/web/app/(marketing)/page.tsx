@@ -1,67 +1,29 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
+import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-
-const ComparisonSection = dynamic(
-  () =>
-    import('@/components/home/comparison-visual').then(m => ({
-      default: m.ComparisonSection,
-    })),
-  { loading: () => <div style={{ height: 480 }} /> }
-);
-const ExampleProfilesCarousel = dynamic(
-  () =>
-    import('@/components/home/ExampleProfilesCarousel').then(m => ({
-      default: m.ExampleProfilesCarousel,
-    })),
-  { loading: () => <div style={{ height: 400 }} /> }
-);
-const DeeplinksGrid = dynamic(
-  () =>
-    import('@/components/home/DeeplinksGrid').then(m => ({
-      default: m.DeeplinksGrid,
-    })),
-  { loading: () => <div style={{ height: 480 }} /> }
-);
-
-import { DashboardShowcase } from '@/components/home/DashboardShowcase';
+import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticReleaseSmartlinksSection';
+import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { FALLBACK_AVATARS } from '@/components/home/featured-creators-fallback';
-import { HowItWorksRich } from '@/components/home/HowItWorksRich';
-import { LabelLogosBar } from '@/components/home/LabelLogosBar';
-import { ProblemSection } from '@/components/home/ProblemSection';
-import { ProfileMockup } from '@/components/home/ProfileMockup';
+import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
+import { LogoBar } from '@/components/home/LogoBar';
+import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { SeeItInActionCarousel } from '@/components/home/SeeItInActionCarousel';
-import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
-import { DeferredSection } from '@/components/organisms/DeferredSection';
+import { ReleaseNotificationsSection } from '@/components/home/ReleaseNotificationsSection';
+import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
-import {
-  homepageComparison,
-  homepageDashboardShowcase,
-  homepageDeeplinksGrid,
-  homepageExampleProfiles,
-  homepageFinalCta,
-  homepageHero,
-  homepageHowItWorks,
-  homepageLabelLogos,
-  homepageProblem,
-  homepageProductPreview,
-  homepageSeeItInAction,
-  homepageWhatYouGet,
-} from '@/lib/flags/homepage';
+import { publicEnv } from '@/lib/env-public';
 
-// Flags read cookies for toolbar overrides, making this page dynamic.
-// Revert to `revalidate = false` once homepage design is finalized.
+// Marketing pages must remain fully static.
+export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The Link-in-Bio Built for Artists`;
+  const title = `${APP_NAME} — The link in bio your music deserves.`;
   const description =
-    'Capture fan contacts, guide listeners to the right music destination, and grow your owned audience with a conversion-first artist profile.';
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.';
   const keywords = [
-    'link in bio',
-    'linktree alternative',
-    'artist link in bio',
+    'smart link in bio',
+    'link in bio for musicians',
+    'linktree alternative for artists',
     'music link in bio',
     'creator profile',
     'music artist',
@@ -123,7 +85,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The Link-in-Bio Built for Artists`,
+          alt: `${APP_NAME} - The link in bio that converts`,
           type: 'image/png',
         },
       ],
@@ -135,13 +97,13 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The Link-in-Bio Built for Artists`,
+          alt: `${APP_NAME} - The link in bio that converts`,
           width: 1200,
           height: 630,
         },
       ],
-      creator: '@jovie',
-      site: '@jovie',
+      creator: '@jovieapp',
+      site: '@jovieapp',
     },
     robots: {
       index: true,
@@ -157,13 +119,13 @@ export async function generateMetadata(): Promise<Metadata> {
       },
     },
     verification: {
-      google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+      google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     },
     other: {
-      'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || '',
+      'msvalidate.01': publicEnv.NEXT_PUBLIC_BING_SITE_VERIFICATION ?? '',
       'yandex-verification':
-        process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION || '',
-      'p:domain_verify': process.env.NEXT_PUBLIC_PINTEREST_VERIFICATION || '',
+        publicEnv.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION ?? '',
+      'p:domain_verify': publicEnv.NEXT_PUBLIC_PINTEREST_VERIFICATION ?? '',
     },
   };
 }
@@ -177,9 +139,9 @@ const WEBSITE_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: APP_NAME,
-  alternateName: 'Jovie Link in Bio',
+  alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Capture fan contacts and direct every visitor to the right listening destination with one focused profile.',
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -236,7 +198,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   '@context': 'https://schema.org',
   '@type': 'Organization',
   name: APP_NAME,
-  legalName: 'Jovie Inc',
+  legalName: 'Jovie Technology Inc.',
   url: APP_URL,
   logo: {
     '@type': 'ImageObject',
@@ -246,8 +208,8 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'A conversion-first link-in-bio platform for artists to capture fan contacts and drive clear next actions.',
-  sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
+    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.',
+  sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
     contactType: 'customer support',
@@ -255,35 +217,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
 });
 
-export default async function HomePage() {
-  const [
-    showHero,
-    showLabelLogos,
-    showHowItWorks,
-    showDashboardShowcase,
-    showProductPreview,
-    showExampleProfiles,
-    showDeeplinksGrid,
-    showProblem,
-    showComparison,
-    showWhatYouGet,
-    showSeeItInAction,
-    showFinalCta,
-  ] = await Promise.all([
-    homepageHero(),
-    homepageLabelLogos(),
-    homepageHowItWorks(),
-    homepageDashboardShowcase(),
-    homepageProductPreview(),
-    homepageExampleProfiles(),
-    homepageDeeplinksGrid(),
-    homepageProblem(),
-    homepageComparison(),
-    homepageWhatYouGet(),
-    homepageSeeItInAction(),
-    homepageFinalCta(),
-  ]);
-
+export default function HomePage() {
   return (
     <div
       className='relative min-h-screen'
@@ -296,82 +230,87 @@ export default async function HomePage() {
       <AuthRedirectHandler />
 
       {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
       {/* Hero + logo bar fill the viewport together (minus fixed header) */}
-      <div
-        className='flex flex-col'
-        style={{ minHeight: 'calc(100svh - var(--linear-header-height))' }}
-      >
-        {showHero && <RedesignedHero />}
-        {showLabelLogos && <LabelLogosBar />}
+      <div className='flex flex-col'>
+        <RedesignedHero />
+        <LogoBar />
       </div>
 
-      {showHowItWorks && <HowItWorksRich />}
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
-      {showDashboardShowcase && (
-        <DeferredSection placeholderHeight={640}>
-          <DashboardShowcase />
-        </DeferredSection>
-      )}
+      <DeeplinksGrid />
 
-      {showProductPreview && (
-        <DeferredSection placeholderHeight={640}>
-          <ProfileMockup />
-        </DeferredSection>
-      )}
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
-      {showExampleProfiles && (
-        <DeferredSection placeholderHeight={400}>
-          <ExampleProfilesCarousel />
-        </DeferredSection>
-      )}
+      <AutomaticReleaseSmartlinksSection />
 
-      {showDeeplinksGrid && (
-        <DeferredSection placeholderHeight={480}>
-          <DeeplinksGrid />
-        </DeferredSection>
-      )}
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
-      {showProblem && <ProblemSection />}
+      <ReleaseNotificationsSection />
 
-      {showComparison && (
-        <DeferredSection placeholderHeight={480}>
-          <ComparisonSection />
-        </DeferredSection>
-      )}
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
-      {showWhatYouGet && (
-        <DeferredSection placeholderHeight={560}>
-          <WhatYouGetSection />
-        </DeferredSection>
-      )}
+      <AudienceCRMSection />
 
-      {showSeeItInAction && (
-        <DeferredSection placeholderHeight={520}>
-          <SeeItInActionCarousel creators={FALLBACK_AVATARS} />
-        </DeferredSection>
-      )}
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
 
-      {showFinalCta && (
-        <DeferredSection placeholderHeight={480}>
-          <FinalCTASection />
-        </DeferredSection>
-      )}
+      <PricingSection />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
+      <SeeItInAction />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
+      <FinalCTASection />
+
+      <FloatingClaimBar />
     </div>
   );
 }

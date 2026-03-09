@@ -2,8 +2,11 @@ import { register } from '@/instrumentation';
 
 let initializationPromise: Promise<void> | null = null;
 
-/** Timeout for Sentry initialization to prevent blocking renders */
-const SENTRY_INIT_TIMEOUT_MS = 100;
+/** Timeout for Sentry initialization to prevent blocking renders.
+ * Extended in development since cold starts are slower and we don't need
+ * edge-function latency constraints. */
+const SENTRY_INIT_TIMEOUT_MS =
+  process.env.NODE_ENV === 'development' ? 5000 : 100;
 
 /**
  * Ensures the Sentry SDK is initialized for the current execution context.
@@ -13,11 +16,6 @@ const SENTRY_INIT_TIMEOUT_MS = 100;
  * If initialization times out, Sentry will continue initializing in the background.
  */
 export function ensureSentry(): Promise<void> {
-  // Skip Sentry entirely in development to avoid noisy init timeouts
-  if (process.env.NODE_ENV === 'development') {
-    return Promise.resolve();
-  }
-
   if (!initializationPromise) {
     const sentryInit = register().catch(error => {
       console.error('[Sentry] Failed to initialize SDK', error);

@@ -8,6 +8,7 @@ import {
   ENTITLEMENT_REGISTRY,
   getAllPlanIds,
 } from '@/lib/entitlements/registry';
+import { publicEnv } from '@/lib/env-public';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -40,6 +41,8 @@ export const metadata: Metadata = {
   },
 };
 
+const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
+
 // Product/Offer JSON-LD Structured Data — derived from ENTITLEMENT_REGISTRY
 const PRICING_SCHEMA = JSON.stringify({
   '@context': 'https://schema.org',
@@ -50,29 +53,31 @@ const PRICING_SCHEMA = JSON.stringify({
   url: `${APP_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
-    itemListElement: getAllPlanIds().map((planId, index) => {
-      const plan = ENTITLEMENT_REGISTRY[planId];
-      const price = plan.marketing.price?.monthly ?? 0;
-      return {
-        '@type': 'ListItem',
-        position: index + 1,
-        item: {
-          '@type': 'Product',
-          name: `${APP_NAME} ${plan.marketing.displayName}`,
-          description: plan.marketing.tagline,
-          offers: {
-            '@type': 'Offer',
-            price: String(price),
-            priceCurrency: 'USD',
-            ...(price > 0 && {
-              priceValidUntil: '2026-12-31',
-              billingIncrement: 'P1M',
-            }),
-            availability: 'https://schema.org/InStock',
+    itemListElement: getAllPlanIds()
+      .filter(planId => growthPlanEnabled || planId !== 'growth')
+      .map((planId, index) => {
+        const plan = ENTITLEMENT_REGISTRY[planId];
+        const price = plan.marketing.price?.monthly ?? 0;
+        return {
+          '@type': 'ListItem',
+          position: index + 1,
+          item: {
+            '@type': 'Product',
+            name: `${APP_NAME} ${plan.marketing.displayName}`,
+            description: plan.marketing.tagline,
+            offers: {
+              '@type': 'Offer',
+              price: String(price),
+              priceCurrency: 'USD',
+              ...(price > 0 && {
+                priceValidUntil: '2026-12-31',
+                billingIncrement: 'P1M',
+              }),
+              availability: 'https://schema.org/InStock',
+            },
           },
-        },
-      };
-    }),
+        };
+      }),
   },
 });
 
@@ -85,7 +90,6 @@ interface PricingTierProps {
   readonly billingLabel: string;
   readonly price: string;
   readonly priceSuffix?: string;
-  readonly yearlyPrice?: string;
   readonly buttonLabel: string;
   readonly buttonHref: string;
   readonly buttonVariant: 'primary' | 'secondary';
@@ -99,7 +103,6 @@ function PricingTier({
   billingLabel,
   price,
   priceSuffix,
-  yearlyPrice,
   buttonLabel,
   buttonHref,
   buttonVariant,
@@ -175,18 +178,6 @@ function PricingTier({
             </span>
           )}
         </div>
-
-        {/* Yearly price - always render container for consistent spacing */}
-        <div
-          className='mt-2'
-          style={{
-            fontSize: 'var(--linear-label-size)',
-            color: 'var(--linear-text-tertiary)',
-            minHeight: '20px',
-          }}
-        >
-          {yearlyPrice || '\u00A0'}
-        </div>
       </div>
 
       {/* CTA Button */}
@@ -246,11 +237,7 @@ export default function PricingPage() {
   return (
     <div className='min-h-screen'>
       {/* Structured Data for SEO */}
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
-        dangerouslySetInnerHTML={{ __html: PRICING_SCHEMA }}
-      />
+      <script type='application/ld+json'>{PRICING_SCHEMA}</script>
 
       <Container size='lg'>
         <div className='section-spacing-linear'>
@@ -265,7 +252,7 @@ export default function PricingPage() {
                 color: 'var(--linear-text-primary)',
               }}
             >
-              Pricing
+              Simple pricing. No Surprises.
             </h1>
             <p
               className='mt-4 mx-auto max-w-lg'
@@ -275,16 +262,16 @@ export default function PricingPage() {
                 color: 'var(--linear-text-secondary)',
               }}
             >
-              Use Jovie for free with unlimited profiles. Upgrade to remove
-              branding, unlock advanced analytics, and export your contacts.
+              Start free with unlimited smartlinks. Upgrade when you&apos;re
+              ready to grow.
             </p>
           </div>
 
           {/* Pricing Grid */}
           <div className='mx-auto max-w-5xl'>
-            {/* Desktop: 3 columns, Mobile: stacked cards */}
+            {/* Desktop: 2-3 columns, Mobile: stacked cards */}
             <div
-              className='grid grid-cols-1 md:grid-cols-3 rounded-xl md:rounded-lg overflow-hidden'
+              className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} rounded-xl md:rounded-lg overflow-hidden`}
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-default)',
@@ -309,7 +296,6 @@ export default function PricingPage() {
                 billingLabel='Billed monthly'
                 price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
                 priceSuffix='/month'
-                yearlyPrice={`or $${ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.pro.marketing.price!.yearly})`}
                 buttonLabel='Get started'
                 buttonHref='/signup?plan=pro'
                 buttonVariant='primary'
@@ -317,22 +303,32 @@ export default function PricingPage() {
                 isHighlighted
               />
 
-              {/* Growth Tier */}
-              <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
-                <PricingTier
-                  name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
-                  badge='Early Access'
-                  billingLabel='Billed monthly'
-                  price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
-                  priceSuffix='/month'
-                  yearlyPrice={`or $${ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly}/year (save $${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly * 12 - ENTITLEMENT_REGISTRY.growth.marketing.price!.yearly})`}
-                  buttonLabel='Request Early Access'
-                  buttonHref='/signup?plan=growth'
-                  buttonVariant='secondary'
-                  features={ENTITLEMENT_REGISTRY.growth.marketing.features}
-                />
-              </div>
+              {growthPlanEnabled && (
+                <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
+                  <PricingTier
+                    name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
+                    badge='Early Access'
+                    billingLabel='Billed monthly'
+                    price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
+                    priceSuffix='/month'
+                    buttonLabel='Request Early Access'
+                    buttonHref='/signup?plan=growth'
+                    buttonVariant='secondary'
+                    features={ENTITLEMENT_REGISTRY.growth.marketing.features}
+                  />
+                </div>
+              )}
             </div>
+
+            <p
+              className='mt-4 text-center'
+              style={{
+                fontSize: 'var(--linear-label-size)',
+                color: 'var(--linear-text-tertiary)',
+              }}
+            >
+              Unlimited subject to abuse guardrails.
+            </p>
           </div>
         </div>
       </Container>

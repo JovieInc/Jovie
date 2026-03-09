@@ -45,7 +45,11 @@ export function ThemeToggle({
     () =>
       shortcutDisplay
         ? () => (
-            <TooltipContent side='top' align='center'>
+            <TooltipContent
+              side='top'
+              align='center'
+              className='flex items-center gap-2'
+            >
               <span>Toggle theme</span>
               <Kbd variant='tooltip'>{shortcutDisplay}</Kbd>
             </TooltipContent>

@@ -95,6 +95,13 @@ export interface VirtualizedTableBodyProps<TData> {
   readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
+   * Called when the row is shift-clicked (for range selection).
+   * @param rowIndex - The index of the clicked row
+   * @param rowData  - The data of the clicked row
+   */
+  readonly onRowShiftClick?: (rowIndex: number, rowData: TData) => void;
+
+  /**
    * Custom row renderer
    */
   readonly renderRow?: (row: TData, index: number) => React.ReactNode;
@@ -164,6 +171,7 @@ export function VirtualizedTableBody<TData>({
   onRowClick,
   onRowContextMenu,
   onKeyDown,
+  onRowShiftClick,
   getContextMenuItems,
   getRowClassName,
   renderRow,
@@ -196,17 +204,23 @@ export function VirtualizedTableBody<TData>({
       {/* Rows */}
       {items.map((item, listIndex) => {
         // Extract row data based on virtualization mode
-        const { row, virtualItem, rowIndex } = useVirtual
-          ? {
-              virtualItem: item as VirtualItem, // NOSONAR - narrowing union type
-              row: rows[(item as VirtualItem).index]!, // NOSONAR - narrowing union type
-              rowIndex: (item as VirtualItem).index, // NOSONAR - narrowing union type
-            }
-          : {
-              virtualItem: undefined,
-              row: item as Row<TData>,
-              rowIndex: listIndex,
-            };
+        let virtualItem: VirtualItem | undefined;
+        let rowIndex = listIndex;
+        let row: Row<TData> | undefined;
+
+        if (useVirtual) {
+          virtualItem = item as VirtualItem; // NOSONAR - narrowing union type
+          rowIndex = virtualItem.index;
+          row = rows[virtualItem.index];
+        } else {
+          row = item as Row<TData>;
+        }
+
+        // Virtual items can briefly reference a stale index while data is shrinking.
+        // Skip rendering this item and let the next virtualizer pass reconcile indices.
+        if (!row) {
+          return null;
+        }
 
         const rowData = row.original as TData;
 
@@ -232,6 +246,7 @@ export function VirtualizedTableBody<TData>({
             onFocusChange={onFocusChange}
             getRowClassName={getRowClassName}
             measureElement={rowVirtualizer?.measureElement}
+            onRowShiftClick={onRowShiftClick}
           />
         );
 

@@ -14,4 +14,19 @@ describe('CookieBannerSection', () => {
       screen.getByRole('button', { name: /accept all/i })
     ).toBeInTheDocument();
   });
+
+  it('hides the banner when jv_cc_required cookie is 0', () => {
+    // Simulate middleware setting jv_cc_required=0 (non-EU visitor)
+    Object.defineProperty(document, 'cookie', {
+      writable: true,
+      value: 'jv_cc_required=0',
+    });
+    render(<CookieBannerSection />);
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+    // Clean up
+    Object.defineProperty(document, 'cookie', {
+      writable: true,
+      value: '',
+    });
+  });
 });

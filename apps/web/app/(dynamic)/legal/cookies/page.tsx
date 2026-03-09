@@ -31,7 +31,7 @@ export default async function CookiesPage() {
           'We use cookies to improve your experience. Here is exactly what we collect and why.',
         highlight: 'Full transparency',
       }}
-      contactEmail='privacy@meetjovie.com'
+      contactEmail='privacy@jov.ie'
       supportDescription='Questions about cookies or tracking?'
     />
   );

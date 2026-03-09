@@ -4,10 +4,12 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
+import { APP_ROUTES } from '@/constants/routes';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
+import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 import { extractErrorMessage } from '@/lib/utils/errors';
 
 interface OnboardingPageProps {
@@ -55,7 +57,7 @@ export default async function OnboardingPage({
         },
       });
     }
-    redirect('/sign-in?redirect_url=/onboarding');
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
   }
 
   const user = await currentUser();
@@ -87,28 +89,45 @@ export default async function OnboardingPage({
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
-  const initialHandle =
+  const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
+
+  const providedHandle =
     resolvedSearchParams?.handle ||
     existingProfile?.username ||
     user?.username ||
-    '';
+    spotifySuggestedHandle;
+
+  const shouldReserveHandle = !providedHandle;
+  const reservedHandle = shouldReserveHandle
+    ? await reserveOnboardingHandle(initialDisplayName)
+    : null;
+
+  const initialHandle = providedHandle || reservedHandle || '';
+
+  const shouldAutoSubmitHandle =
+    Boolean(spotifySuggestedHandle) &&
+    !resolvedSearchParams?.handle &&
+    !existingProfile?.username &&
+    !user?.username;
 
   return (
     <AuthLayout
-      formTitle='Claim your handle'
+      formTitle='Choose your handle'
       showFooterPrompt={false}
       showFormTitle={false}
       logoSpinDelayMs={10000}
       showLogoutButton
-      logoutRedirectUrl='/sign-in'
+      logoutRedirectUrl={APP_ROUTES.SIGNIN}
     >
       <div className='relative min-h-[500px]'>
         {/* Unified onboarding form */}
         <OnboardingFormWrapper
           initialDisplayName={initialDisplayName}
           initialHandle={initialHandle}
+          isReservedHandle={Boolean(reservedHandle)}
           userEmail={userEmail}
           userId={userId}
+          shouldAutoSubmitHandle={shouldAutoSubmitHandle}
         />
       </div>
     </AuthLayout>
