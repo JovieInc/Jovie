@@ -12,6 +12,7 @@ import {
   DateCell,
   TableCheckboxCell,
 } from '@/components/organisms/table';
+import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
 
@@ -54,7 +55,7 @@ export function renderUsernameCell({
     return <EmptyCell />;
   }
 
-  const profileUrl = `https://jov.ie/@${username}`;
+  const profileUrl = getProfileUrl(username);
 
   return (
     <div className='group/username flex items-center gap-1.5 min-w-0'>
