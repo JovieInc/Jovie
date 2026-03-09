@@ -1,29 +1,22 @@
 'use client';
 
-import { DemoAnalyticsPanel } from './DemoAnalyticsPanel';
-import { DemoRealAudiencePanel } from './DemoRealAudiencePanel';
+import { DemoAuthShell } from './DemoAuthShell';
 import { DemoRealReleasesPanel } from './DemoRealReleasesPanel';
-import { DemoSettingsPanel } from './DemoSettingsPanel';
-import { DemoShell } from './DemoShell';
-import { useDemoState } from './use-demo-state';
 
+/**
+ * DemoReleasesExperience — the full demo page content wrapped in the real
+ * authenticated app shell (sidebar, header, nav) fed by mock data.
+ *
+ * Renders the releases table as the main content.
+ */
 export function DemoReleasesExperience({
-  containerClassName,
+  containerClassName: _containerClassName,
 }: {
   readonly containerClassName?: string;
 } = {}) {
-  const { activeTab, switchTab } = useDemoState();
-
   return (
-    <DemoShell
-      activeTab={activeTab}
-      onTabChange={switchTab}
-      containerClassName={containerClassName}
-    >
-      {activeTab === 'releases' && <DemoRealReleasesPanel />}
-      {activeTab === 'audience' && <DemoRealAudiencePanel />}
-      {activeTab === 'analytics' && <DemoAnalyticsPanel />}
-      {activeTab === 'settings' && <DemoSettingsPanel />}
-    </DemoShell>
+    <DemoAuthShell>
+      <DemoRealReleasesPanel />
+    </DemoAuthShell>
   );
 }
