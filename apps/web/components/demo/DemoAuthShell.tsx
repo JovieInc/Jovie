@@ -19,6 +19,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMemo } from 'react';
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
@@ -27,14 +28,12 @@ import { AuthShellWrapper } from '../organisms/AuthShellWrapper';
 import { DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 
-const DEMO_PROFILE_ID = DEMO_DASHBOARD_DATA.selectedProfile?.id ?? '';
-
 /**
  * Creates a QueryClient pre-seeded with demo data.
  * - Releases query is populated so DashboardNav shows the badge count.
  * - All queries are configured to never retry or refetch (static demo data).
  */
-function createDemoQueryClient(): QueryClient {
+function createDemoQueryClient(profileId: string): QueryClient {
   const client = new QueryClient({
     defaultOptions: {
       queries: {
@@ -49,7 +48,7 @@ function createDemoQueryClient(): QueryClient {
 
   // Pre-seed the releases query so the sidebar badge shows the count
   client.setQueryData(
-    queryKeys.releases.matrix(DEMO_PROFILE_ID),
+    queryKeys.releases.matrix(profileId),
     DEMO_RELEASE_VIEW_MODELS
   );
 
@@ -59,13 +58,21 @@ function createDemoQueryClient(): QueryClient {
 // Noop server action stand-in for sidebar collapse persistence
 async function noopPersist() {}
 
-export function DemoAuthShell({
-  children,
-}: {
+interface DemoAuthShellProps {
   readonly children: React.ReactNode;
-}) {
+  /** Pre-built DashboardData from a DB-fetched FeaturedCreator. Falls back to Tim White. */
+  readonly dashboardData?: DashboardData;
+}
+
+export function DemoAuthShell({ children, dashboardData }: DemoAuthShellProps) {
+  const data = dashboardData ?? DEMO_DASHBOARD_DATA;
+  const profileId = data.selectedProfile?.id ?? '';
+
   // Stable QueryClient instance per component mount
-  const demoQueryClient = useMemo(() => createDemoQueryClient(), []);
+  const demoQueryClient = useMemo(
+    () => createDemoQueryClient(profileId),
+    [profileId]
+  );
 
   return (
     <ClientProviders
@@ -73,7 +80,7 @@ export function DemoAuthShell({
       skipCoreProviders
     >
       <QueryClientProvider client={demoQueryClient}>
-        <DashboardDataProvider value={DEMO_DASHBOARD_DATA}>
+        <DashboardDataProvider value={data}>
           <AuthShellWrapper
             persistSidebarCollapsed={noopPersist}
             sidebarDefaultOpen

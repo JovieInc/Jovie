@@ -1,5 +1,6 @@
 'use client';
 
+import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DemoAuthShell } from './DemoAuthShell';
 import { DemoRealReleasesPanel } from './DemoRealReleasesPanel';
 
@@ -7,15 +8,16 @@ import { DemoRealReleasesPanel } from './DemoRealReleasesPanel';
  * DemoReleasesExperience — the full demo page content wrapped in the real
  * authenticated app shell (sidebar, header, nav) fed by mock data.
  *
- * Renders the releases table as the main content.
+ * Accepts optional dashboardData from a server component that fetches
+ * a featured creator from the DB via getDemoCreator().
  */
 export function DemoReleasesExperience({
-  containerClassName: _containerClassName,
+  dashboardData,
 }: {
-  readonly containerClassName?: string;
+  readonly dashboardData?: DashboardData;
 } = {}) {
   return (
-    <DemoAuthShell>
+    <DemoAuthShell dashboardData={dashboardData}>
       <DemoRealReleasesPanel />
     </DemoAuthShell>
   );
