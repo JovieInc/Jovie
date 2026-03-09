@@ -1,6 +1,10 @@
 'use client';
 
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import {
+  type InfiniteData,
+  keepPreviousData,
+  useInfiniteQuery,
+} from '@tanstack/react-query';
 import type { AudienceFilters } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import type { AudienceMember } from '@/types';
 import { PAGINATED_CACHE } from './cache-strategies';
@@ -8,10 +12,22 @@ import { queryKeys } from './keys';
 
 interface AudiencePageResponse {
   rows: AudienceMember[];
-  // total is only returned on the first page of subscribers to avoid per-page COUNT overhead.
-  // On subsequent pages it is null; use rows.length < pageSize as the "no more pages" signal.
+  /**
+   * Members: always null — pagination is cursor-based (JOV-1263).
+   * Subscribers: count on page 1 only; null on subsequent pages.
+   */
   total: number | null;
+  /** Members only: true when another page exists (JOV-1260, JOV-1263). */
+  hasMore?: boolean;
+  /** Members only: opaque cursor for the next page fetch (JOV-1263). */
+  nextCursor?: string | null;
 }
+
+/**
+ * Opaque page parameter union.
+ * Members use a string cursor; subscribers fall back to a numeric page number.
+ */
+type PageParam = string | number;
 
 interface UseAudienceInfiniteQueryParams {
   profileId: string;
@@ -20,7 +36,7 @@ interface UseAudienceInfiniteQueryParams {
   direction: 'asc' | 'desc';
   filters: AudienceFilters;
   pageSize?: number;
-  initialData?: { rows: AudienceMember[]; total: number };
+  initialData?: { rows: AudienceMember[]; total: number | null };
 }
 
 export function useAudienceInfiniteQuery({
@@ -38,19 +54,42 @@ export function useAudienceInfiniteQuery({
     segments: filters.segments,
   };
 
-  return useInfiniteQuery<AudiencePageResponse>({
+  return useInfiniteQuery<
+    AudiencePageResponse,
+    Error,
+    InfiniteData<AudiencePageResponse, PageParam>,
+    unknown[],
+    PageParam
+  >({
     queryKey:
       mode === 'members'
-        ? queryKeys.audience.members(profileId, filterParams)
-        : queryKeys.audience.subscribers(profileId, filterParams),
+        ? ([
+            ...queryKeys.audience.members(profileId, filterParams),
+          ] as unknown[])
+        : ([
+            ...queryKeys.audience.subscribers(profileId, filterParams),
+          ] as unknown[]),
     queryFn: async ({ pageParam, signal }) => {
       const params = new URLSearchParams({
-        page: String(pageParam),
         pageSize: String(pageSize),
         sort,
         direction,
         profileId,
       });
+
+      if (mode === 'members') {
+        // Cursor-based pagination for members (JOV-1263).
+        // pageParam is a cursor string on subsequent pages, or the sentinel 'first' on page 1.
+        if (typeof pageParam === 'string' && pageParam !== 'first') {
+          params.set('cursor', pageParam);
+        }
+      } else {
+        // Page-number pagination for subscribers (unchanged).
+        params.set(
+          'page',
+          String(typeof pageParam === 'number' ? pageParam : 1)
+        );
+      }
 
       for (const segment of filters.segments) {
         params.append('segments', segment);
@@ -63,23 +102,30 @@ export function useAudienceInfiniteQuery({
       if (!res.ok) {
         throw new Error(`Failed to fetch audience: ${res.status}`);
       }
-      return res.json();
+      return res.json() as Promise<AudiencePageResponse>;
     },
     getNextPageParam: (lastPage, allPages) => {
-      // When total is available (first page), use it for accurate pagination.
-      // On subsequent pages total is null (count skipped for perf); fall back to
-      // the rows-length heuristic: a full page means more data likely exists.
-      if (lastPage.total !== null) {
+      if (mode === 'members') {
+        // Cursor-based: use nextCursor when another page exists (JOV-1263).
+        return lastPage.hasMore && lastPage.nextCursor
+          ? lastPage.nextCursor
+          : undefined;
+      }
+      // Subscribers: page-number fallback using total or rows-length heuristic.
+      if (lastPage.total !== null && lastPage.total !== undefined) {
         const loaded = allPages.length * pageSize;
         return loaded < lastPage.total ? allPages.length + 1 : undefined;
       }
       return lastPage.rows.length >= pageSize ? allPages.length + 1 : undefined;
     },
-    initialPageParam: 1,
+    initialPageParam:
+      mode === 'members' ? ('first' as PageParam) : (1 as PageParam),
     initialData: initialData
       ? {
           pages: [{ rows: initialData.rows, total: initialData.total }],
-          pageParams: [1],
+          pageParams: [
+            mode === 'members' ? ('first' as PageParam) : (1 as PageParam),
+          ],
         }
       : undefined,
     placeholderData: keepPreviousData,

@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { cacheQuery } from '@/lib/db/cache';
 import { CircuitOpenError } from '@/lib/dsp-enrichment/circuit-breakers';
 import {
   extractImageUrls,
@@ -23,6 +24,7 @@ const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
+const APPLE_MUSIC_SEARCH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
 
 interface AppleMusicArtistResult {
   id: string;
@@ -30,29 +32,6 @@ interface AppleMusicArtistResult {
   url: string;
   imageUrl?: string;
   genres?: string[];
-}
-
-// Simple in-memory cache
-const searchCache = new Map<
-  string,
-  { data: AppleMusicArtistResult[]; timestamp: number }
->();
-const CACHE_DURATION = 5 * 60 * 1000;
-const MAX_CACHE_SIZE = 100;
-
-function cleanupSearchCache(): void {
-  const now = Date.now();
-  for (const [key, entry] of searchCache.entries()) {
-    if (now - entry.timestamp > CACHE_DURATION) {
-      searchCache.delete(key);
-    }
-  }
-  if (searchCache.size > MAX_CACHE_SIZE) {
-    const entries = Array.from(searchCache.entries());
-    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-    const toDelete = entries.slice(0, entries.length - MAX_CACHE_SIZE);
-    toDelete.forEach(([key]) => searchCache.delete(key));
-  }
 }
 
 function parseLimit(
@@ -130,32 +109,28 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const cacheKey = `${q.toLowerCase()}:${limit}`;
-  const cached = searchCache.get(cacheKey);
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cached.data, { headers: rateLimitHeaders });
-  }
+  const cacheKey = `apple-music:search:${q.toLowerCase()}:${limit}`;
 
   try {
-    const artists = await searchArtist(q, {}, limit);
-
-    const results: AppleMusicArtistResult[] = artists.map(artist => {
-      const images = extractImageUrls(artist.attributes?.artwork);
-      return {
-        id: artist.id,
-        name: artist.attributes?.name ?? 'Unknown Artist',
-        url:
-          artist.attributes?.url ??
-          `https://music.apple.com/artist/${artist.id}`,
-        imageUrl: images?.medium ?? images?.small ?? undefined,
-        genres: artist.attributes?.genreNames ?? undefined,
-      };
-    });
-
-    searchCache.set(cacheKey, {
-      data: results,
-      timestamp: Date.now(),
-    });
+    const results = await cacheQuery<AppleMusicArtistResult[]>(
+      cacheKey,
+      async () => {
+        const artists = await searchArtist(q, {}, limit);
+        return artists.map(artist => {
+          const images = extractImageUrls(artist.attributes?.artwork);
+          return {
+            id: artist.id,
+            name: artist.attributes?.name ?? 'Unknown Artist',
+            url:
+              artist.attributes?.url ??
+              `https://music.apple.com/artist/${artist.id}`,
+            imageUrl: images?.medium ?? images?.small ?? undefined,
+            genres: artist.attributes?.genreNames ?? undefined,
+          };
+        });
+      },
+      { ttlSeconds: APPLE_MUSIC_SEARCH_CACHE_TTL_SECONDS }
+    );
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
@@ -195,15 +170,5 @@ export async function GET(request: NextRequest) {
       { error: 'Search failed', code: 'SEARCH_FAILED' },
       { status: 500, headers: rateLimitHeaders }
     );
-  } finally {
-    // Probabilistic cleanup (10% of requests) to amortize cost.
-    // Full cleanup on every request is O(n log n) due to sorting;
-    // force cleanup when maps exceed size limits.
-    if (
-      crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32 < 0.1 ||
-      searchCache.size > MAX_CACHE_SIZE
-    ) {
-      cleanupSearchCache();
-    }
   }
 }

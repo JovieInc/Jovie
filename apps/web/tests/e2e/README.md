@@ -21,7 +21,7 @@ pnpm test:e2e -- --headed
 Run a specific test file:
 
 ```bash
-pnpm test:e2e tests/e2e/onboarding.happy.spec.ts
+pnpm test:e2e tests/e2e/onboarding.spec.ts
 ```
 
 ### Onboarding Happy Path Tests
@@ -48,7 +48,7 @@ The onboarding happy path tests verify the complete user onboarding flow from si
 Run the full onboarding happy path test:
 
 ```bash
-E2E_ONBOARDING_FULL=1 pnpm test:e2e tests/e2e/onboarding.happy.spec.ts
+E2E_ONBOARDING_FULL=1 pnpm test:e2e tests/e2e/onboarding.spec.ts
 ```
 
 Run with custom test user:
@@ -57,7 +57,7 @@ Run with custom test user:
 E2E_ONBOARDING_FULL=1 \
 E2E_TEST_EMAIL="test@example.com" \
 E2E_TEST_PASSWORD="SecurePassword123!" \
-pnpm test:e2e tests/e2e/onboarding.happy.spec.ts
+pnpm test:e2e tests/e2e/onboarding.spec.ts
 ```
 
 Run in CI with Preview URL:
@@ -65,14 +65,13 @@ Run in CI with Preview URL:
 ```bash
 E2E_ONBOARDING_FULL=1 \
 BASE_URL="https://jovie-preview.vercel.app" \
-pnpm test:e2e tests/e2e/onboarding.happy.spec.ts
+pnpm test:e2e tests/e2e/onboarding.spec.ts
 ```
 
 ### Test Structure
 
-- **smoke.onboarding.spec.ts**: Basic smoke tests for onboarding flow
-- **onboarding.happy.spec.ts**: Comprehensive happy path test with programmatic sign-in
-- **onboarding-flow.spec.ts**: Additional onboarding scenarios and edge cases
+- **onboarding.spec.ts**: Comprehensive onboarding tests (happy path, existing user, taken handle)
+- **onboarding-flow.spec.ts**: Unauthenticated onboarding flows (redirects, handle API)
 
 ### Debugging Tests
 
@@ -85,7 +84,7 @@ pnpm test:e2e tests/e2e/onboarding.happy.spec.ts
 2. **Use Playwright Inspector**:
 
    ```bash
-   PWDEBUG=1 pnpm test:e2e tests/e2e/onboarding.happy.spec.ts
+   PWDEBUG=1 pnpm test:e2e tests/e2e/onboarding.spec.ts
    ```
 
 3. **Generate trace on failure**:
