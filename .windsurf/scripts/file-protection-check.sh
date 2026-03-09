@@ -4,6 +4,9 @@
 # - Prevent modification of Drizzle migrations (append-only, line 51)
 # - Prevent creation of middleware.ts (use proxy.ts instead, line 11)
 # - Check for biome-ignore suppressions (never allowed, line 52)
+# - Prevent hardcoded legacy dashboard route literals in app/components
+# - Prevent dynamic marketing page revalidation patterns
+# - Prevent nested layouts from rendering global singleton UI
 
 # Get file path and content from tool input (same as Claude)
 file_path=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
@@ -58,6 +61,43 @@ if [ -n "$content" ]; then
     echo "  - Restructuring code to follow best practices"
     echo ""
     echo "If a rule seems incorrect, discuss with the team before suppressing."
+    exit 2  # Exit 2 blocks in Windsurf
+  fi
+fi
+
+# HARD GUARDRAIL: Route literals must use constants in app/components code
+if [[ "$file_path" =~ ^apps/web/(app|components)/.*\.(ts|tsx)$ ]] \
+  && [[ ! "$file_path" =~ \.(test|spec|stories)\.(ts|tsx)$ ]]; then
+  if echo "$content" | grep -qE "['\"]/app/dashboard/(analytics|audience|earnings|profile|releases|links|chat)['\"]"; then
+    echo "BLOCKED: Hardcoded legacy dashboard route literal detected"
+    echo "File: $file_path"
+    echo ""
+    echo "Import the route from apps/web/constants/routes.ts instead of embedding /app/dashboard/* strings."
+    exit 2  # Exit 2 blocks in Windsurf
+  fi
+fi
+
+# HARD GUARDRAIL: Marketing pages must remain fully static
+if [[ "$file_path" =~ ^apps/web/app/\(marketing\)/.*\.(ts|tsx)$ ]]; then
+  if echo "$content" | grep -qE "export const revalidate\s*=" \
+    && ! echo "$content" | grep -qE "export const revalidate\s*=\s*false\b"; then
+    echo "BLOCKED: Marketing pages must use export const revalidate = false"
+    echo "File: $file_path"
+    exit 2  # Exit 2 blocks in Windsurf
+  fi
+
+  if echo "$content" | grep -qE "headers\(|cookies\(|cache:\s*['\"]no-store['\"]"; then
+    echo "BLOCKED: Marketing pages must not depend on request-time data or no-store fetches"
+    echo "File: $file_path"
+    exit 2  # Exit 2 blocks in Windsurf
+  fi
+fi
+
+# HARD GUARDRAIL: Global singleton UI must not mount from nested layouts
+if [[ "$file_path" =~ ^apps/web/app/.+/layout\.tsx$ ]] && [[ "$file_path" != "apps/web/app/layout.tsx" ]]; then
+  if echo "$content" | grep -qE "CookieBannerSection|ToastProvider|ClerkAnalytics|<Analytics|ModalProvider"; then
+    echo "BLOCKED: Global UI singletons must render only from apps/web/app/layout.tsx"
+    echo "File: $file_path"
     exit 2  # Exit 2 blocks in Windsurf
   fi
 fi

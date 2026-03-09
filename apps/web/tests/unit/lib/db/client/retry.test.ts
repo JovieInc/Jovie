@@ -1,4 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+  addBreadcrumb: vi.fn(),
+}));
+
+vi.mock('@/lib/env-server', () => ({
+  env: { NODE_ENV: 'test' },
+}));
+
+import * as Sentry from '@sentry/nextjs';
 import {
   DbCircuitOpenError,
   dbCircuitBreaker,
@@ -33,6 +45,8 @@ describe('isRetryableError', () => {
 describe('withRetry', () => {
   beforeEach(() => {
     dbCircuitBreaker.reset();
+    vi.mocked(Sentry.captureException).mockClear();
+    vi.mocked(Sentry.addBreadcrumb).mockClear();
   });
   it('returns result on first success', async () => {
     const result = await withRetry(() => Promise.resolve('ok'), 'test', 3);
@@ -88,5 +102,37 @@ describe('withRetry', () => {
       'connection reset by peer'
     );
     expect(operation).toHaveBeenCalledTimes(2);
+  });
+
+  it('logs intermediate retryable failures as breadcrumbs, not Sentry exceptions', async () => {
+    // JOV-1433: "Failed query:" errors during retry must not be sent to
+    // Sentry as exceptions on intermediate attempts — only the final
+    // unrecoverable failure should reach Sentry.
+    let attempt = 0;
+    const operation = vi.fn(async () => {
+      attempt++;
+      if (attempt < 3) throw new Error('Failed query: SELECT 1');
+      return 'ok';
+    });
+
+    const result = await withRetry(operation, 'test-breadcrumb', 3);
+    expect(result).toBe('ok');
+
+    // Intermediate retryable failures: breadcrumb only, no Sentry exception
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalled();
+  });
+
+  it('captures final non-retryable failure as Sentry exception, not breadcrumb', async () => {
+    const operation = vi.fn(async () => {
+      throw new Error('syntax error in SQL');
+    });
+
+    await expect(
+      withRetry(operation, 'test-final-exception', 3)
+    ).rejects.toThrow('syntax error in SQL');
+
+    // Non-retryable: captured as Sentry exception immediately
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
 });
