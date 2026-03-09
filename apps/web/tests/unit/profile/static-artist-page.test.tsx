@@ -69,6 +69,22 @@ vi.mock('@/lib/dsp', () => ({
   getAvailableDSPs: vi.fn(() => []),
 }));
 
+// Mock useUserLocation so the geolocation API is never invoked in jsdom.
+// TourModePanel (imported by StaticArtistPage) calls navigator.geolocation
+// which is absent in jsdom — without this mock the hook's 5 s timeout races
+// against Vitest's 5 s testTimeout and causes the first test to fail.
+vi.mock('@/hooks/useUserLocation', () => ({
+  useUserLocation: () => ({ location: null, isLoading: false, error: null }),
+}));
+
+// Hoist the StaticArtistPage import to module level so the module graph is
+// resolved before any test starts. Importing inside the first test body
+// exhausts the 5 s testTimeout during the cold-start of the module tree
+// (TourModePanel → vaul Drawer, etc.).
+const { StaticArtistPage } = await import(
+  '@/components/profile/StaticArtistPage'
+);
+
 const mockArtist: Artist = {
   id: 'artist-1',
   owner_user_id: 'user-1',
@@ -129,10 +145,7 @@ describe('StaticArtistPage', () => {
     cleanup();
   });
 
-  it('renders profile mode with primary CTA', async () => {
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
+  it('renders profile mode with primary CTA', () => {
     render(
       <StaticArtistPage
         mode='profile'
@@ -149,10 +162,7 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('profile-primary-cta')).toBeDefined();
   });
 
-  it('renders listen mode with listen interface', async () => {
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
+  it('renders listen mode with listen interface', () => {
     render(
       <StaticArtistPage
         mode='listen'
@@ -168,10 +178,7 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('listen-interface')).toBeDefined();
   });
 
-  it('renders tip mode with venmo selector when venmo link exists', async () => {
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
+  it('renders tip mode with venmo selector when venmo link exists', () => {
     render(
       <StaticArtistPage
         mode='tip'
@@ -187,10 +194,7 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('venmo-tip-selector')).toBeDefined();
   });
 
-  it('renders tip mode with unavailable message when no venmo link', async () => {
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
+  it('renders tip mode with unavailable message when no venmo link', () => {
     render(
       <StaticArtistPage
         mode='tip'
@@ -206,10 +210,7 @@ describe('StaticArtistPage', () => {
     expect(screen.getByText(/Venmo tipping is not available/)).toBeDefined();
   });
 
-  it('renders subscribe mode with notifications CTA', async () => {
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
+  it('renders subscribe mode with notifications CTA', () => {
     render(
       <StaticArtistPage
         mode='subscribe'
@@ -225,7 +226,7 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('notifications-cta')).toBeDefined();
   });
 
-  it('renders latest release card when in profile mode with release', async () => {
+  it('renders latest release card when in profile mode with release', () => {
     const mockRelease = {
       id: 'release-1',
       creatorProfileId: 'profile-123',
@@ -241,9 +242,6 @@ describe('StaticArtistPage', () => {
       updatedAt: new Date(),
     };
 
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
     render(
       <StaticArtistPage
         mode='profile'
@@ -260,10 +258,7 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('latest-release-card')).toBeDefined();
   });
 
-  it('does not render latest release card when no release', async () => {
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
+  it('does not render latest release card when no release', () => {
     render(
       <StaticArtistPage
         mode='profile'
@@ -280,7 +275,7 @@ describe('StaticArtistPage', () => {
     expect(screen.queryByTestId('latest-release-card')).toBeNull();
   });
 
-  it('does not render latest release in non-profile modes', async () => {
+  it('does not render latest release in non-profile modes', () => {
     const mockRelease = {
       id: 'release-1',
       title: 'Test Album',
@@ -289,9 +284,6 @@ describe('StaticArtistPage', () => {
       releaseDate: null,
     };
 
-    const { StaticArtistPage } = await import(
-      '@/components/profile/StaticArtistPage'
-    );
     render(
       <StaticArtistPage
         mode='listen'
