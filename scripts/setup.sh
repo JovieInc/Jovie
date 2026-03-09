@@ -14,6 +14,11 @@ success() { echo -e "${GREEN}✅ $*${RESET}"; }
 info()    { echo "   $*"; }
 
 MISSING=()
+IS_WORKTREE=false
+
+if git rev-parse --is-inside-work-tree &>/dev/null && [ -f ".git" ]; then
+  IS_WORKTREE=true
+fi
 
 # ─── 1. Node.js version check ───────────────────────────────────────────────
 echo ""
@@ -103,6 +108,9 @@ fi
 echo ""
 echo "── Dependencies ────────────────────────────────────────────────────────"
 if command -v pnpm &>/dev/null; then
+  if [[ "$IS_WORKTREE" == "true" ]]; then
+    info "Fresh worktree detected (.git is a file) — installing dependencies for this worktree."
+  fi
   info "Running pnpm install..."
   pnpm install
   success "Dependencies installed"

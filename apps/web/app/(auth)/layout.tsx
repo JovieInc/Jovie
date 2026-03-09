@@ -1,5 +1,4 @@
 import localFont from 'next/font/local';
-import { ClerkAnalytics } from '@/components/providers/ClerkAnalytics';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
@@ -28,7 +27,6 @@ export default async function AuthLayout({
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
         <div className={inter.className}>
           <main id='main-content'>{children}</main>
-          <ClerkAnalytics />
         </div>
       </FeatureFlagsProvider>
     </ClientProviders>

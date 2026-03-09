@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import React from 'react';
+import { ClerkAnalytics } from './ClerkAnalytics';
 
 const ToastProvider = dynamic(
   () => import('./ToastProvider').then(mod => ({ default: mod.ToastProvider })),
@@ -40,6 +41,7 @@ export function LazyProviders({
   return (
     <ToastProvider>
       {children}
+      <ClerkAnalytics />
       {enableAnalytics ? <Analytics /> : null}
     </ToastProvider>
   );
