@@ -18,12 +18,17 @@ export interface UpdateProfileRecordsParams {
   displayNameForUserUpdate: string | undefined;
 }
 
+export interface UpdateProfileRecordsResult {
+  updatedProfile: (typeof creatorProfiles)['$inferSelect'];
+  oldUsernameNormalized: string | null;
+}
+
 export async function updateProfileRecords({
   clerkUserId,
   dbProfileUpdates,
   displayNameForUserUpdate,
 }: UpdateProfileRecordsParams): Promise<
-  (typeof creatorProfiles)['$inferSelect'] | NextResponse
+  UpdateProfileRecordsResult | NextResponse
 > {
   const user = await getUserByClerkId(db, clerkUserId);
   if (!user) {
@@ -32,6 +37,12 @@ export async function updateProfileRecords({
       { status: 404, headers: NO_STORE_HEADERS }
     );
   }
+
+  const [existingProfile] = await db
+    .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, user.id))
+    .limit(1);
 
   const [updatedProfile] = await db
     .update(creatorProfiles)
@@ -53,7 +64,10 @@ export async function updateProfileRecords({
     );
   }
 
-  return updatedProfile;
+  return {
+    updatedProfile,
+    oldUsernameNormalized: existingProfile?.usernameNormalized ?? null,
+  };
 }
 
 export async function getProfileByClerkId(clerkUserId: string) {

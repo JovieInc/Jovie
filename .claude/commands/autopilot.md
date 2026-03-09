@@ -55,12 +55,18 @@ When querying Linear, always apply both filters:
 
 ### 1) Intake from Linear
 
-- Poll team `jovie` for issues in `new` or `ready`
+- Poll Linear team (use team name from Linear, currently `Joive`) for issues in `new`, `ready`, or `todo`
+- **Also poll for stuck `in progress` issues** — these are tasks where a previous agent (Cursor, Codex, or a teammate) started work but failed to complete. Detect stuck issues by:
+  - Status is `in progress` but no open PR exists for the issue's git branch
+  - Status is `in progress` and the linked PR was closed without merging
+  - Status is `in progress` with no update in the last 24 hours
+  - Treat these as high-priority re-intake: the work was attempted and failed, so it needs a fresh start
 - For each issue not already queued:
   - Create a shared Agent Teams task
   - Subject: issue title
   - Description: issue body + Linear URL + acceptance criteria
   - Include dedupe key = Linear issue ID
+  - For stuck `in progress` issues: add context about the previous attempt (check for existing branches, PRs, or Linear comments describing what went wrong)
 
 ### 2) Batch Analysis
 
@@ -98,6 +104,16 @@ After intake, group small related issues into batches before dispatch. This avoi
   2. Run required validation gates
   3. Run `/ship` to commit, push branch, and open PR
   4. Link PR back to the Linear issue
+
+#### Stuck/failed issues (re-intake from `in progress`)
+
+When picking up a stuck issue that a previous agent failed on:
+
+1. **Check for existing work** — look for branches matching the issue's `gitBranchName`, open/closed PRs, and Linear comments describing what was attempted
+2. **Assess salvageability** — if the existing branch has useful partial work, build on it. If it's broken or conflicts with main, start fresh from main
+3. **Start fresh by default** — create a new branch from main (e.g., `fix/jov-XXXX-<slug>`) rather than continuing on a potentially broken branch
+4. **Delete stale branches** — if the old branch has no useful commits, delete it to avoid confusion
+5. **Comment on the Linear issue** — note that the previous attempt stalled and a new attempt is starting, with a brief summary of what went wrong if discoverable
 
 #### Batched issues
 

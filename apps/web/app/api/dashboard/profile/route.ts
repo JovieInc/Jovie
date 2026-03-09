@@ -178,9 +178,9 @@ export async function PUT(req: Request) {
         avatarUrl,
       });
 
-      let updatedProfile;
+      let updateResult;
       try {
-        updatedProfile = await updateProfileRecords({
+        updateResult = await updateProfileRecords({
           clerkUserId,
           dbProfileUpdates,
           displayNameForUserUpdate,
@@ -189,10 +189,12 @@ export async function PUT(req: Request) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');
         throw error;
       }
-      if (updatedProfile instanceof NextResponse) {
+      if (updateResult instanceof NextResponse) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_response');
-        return updatedProfile;
+        return updateResult;
       }
+
+      const { updatedProfile, oldUsernameNormalized } = updateResult;
 
       await syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
         spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
@@ -205,6 +207,7 @@ export async function PUT(req: Request) {
 
       await finalizeProfileResponse({
         updatedProfile,
+        oldUsernameNormalized,
         clerkUserId,
       });
 
