@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
+  AdminBraggingRightsSection,
+  AdminBraggingRightsSectionSkeleton,
   AdminKpiSection,
   AdminKpiSectionSkeleton,
   AdminOutreachSection,
@@ -26,6 +28,11 @@ export default function AdminPage() {
           className='flex h-full flex-col gap-6'
           data-testid='admin-dashboard-content'
         >
+          {/* Row 0: Platform bragging rights — labels, distributors, stats */}
+          <Suspense fallback={<AdminBraggingRightsSectionSkeleton />}>
+            <AdminBraggingRightsSection />
+          </Suspense>
+
           {/* Row 1: Growth KPIs */}
           <Suspense fallback={<AdminKpiSectionSkeleton />}>
             <AdminKpiSection />
