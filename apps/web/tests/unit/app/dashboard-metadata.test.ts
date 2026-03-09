@@ -25,6 +25,14 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   getDashboardData: vi.fn().mockResolvedValue({}),
 }));
 
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  checkAppleMusicConnection: vi.fn().mockResolvedValue({
+    connected: false,
+    artistName: null,
+    artistId: null,
+  }),
+}));
+
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
@@ -55,7 +63,7 @@ describe('dashboard metadata generation', () => {
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Jovie Dashboard');
+    expect(metadata.title).toBe('Home | Jovie');
   });
 
   it('uses conversation title for chat thread metadata when present', async () => {
