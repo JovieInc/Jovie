@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, CommonDropdown, Label, SegmentControl } from '@jovie/ui';
-import { ExternalLink, Plus, Share2 } from 'lucide-react';
+import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
@@ -410,7 +410,7 @@ export function ProfileContactSidebar() {
                     className='h-8 w-8 shrink-0'
                     aria-label='Open profile share options'
                   >
-                    <Share2 className='h-4 w-4' aria-hidden='true' />
+                    <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
                   </Button>
                 }
               />

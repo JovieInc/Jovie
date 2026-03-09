@@ -4,6 +4,7 @@ import React from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { cn } from '@/lib/utils';
 import { getFallbackName } from '@/lib/utils/audience';
+import { safeDecodeURIComponent } from '@/lib/utils/string-utils';
 import type { AudienceMemberType } from '@/types';
 
 export interface AudienceUserCellProps {
@@ -31,7 +32,10 @@ function formatAnonymousVisitorLabel(
           ? 'Desktop'
           : 'Unknown';
 
-  const locationLabel = geoCity ?? geoCountry ?? null;
+  const rawLocation = geoCity ?? geoCountry ?? null;
+  const locationLabel = rawLocation
+    ? safeDecodeURIComponent(rawLocation)
+    : null;
   return locationLabel
     ? `${deviceLabel} visitor from ${locationLabel}`
     : `${deviceLabel} visitor`;
