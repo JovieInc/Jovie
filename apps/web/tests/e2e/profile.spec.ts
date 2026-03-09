@@ -1,4 +1,5 @@
-import { expect, type Page, test } from './setup';
+import { type Page, type Route } from '@playwright/test';
+import { expect, test } from './setup';
 import {
   checkElementVisibility,
   SMOKE_TIMEOUTS,
@@ -30,13 +31,15 @@ const runProfileTests = process.env.E2E_ARTIST_PROFILE === '1' || hasDatabase;
 const describeProfile = runProfileTests ? test.describe : test.describe.skip;
 
 async function interceptAnalytics(page: Page) {
-  await page.route('**/api/profile/view', r =>
+  await page.route('**/api/profile/view', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
   );
-  await page.route('**/api/audience/visit', r =>
+  await page.route('**/api/audience/visit', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
   );
-  await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+  await page.route('**/api/track', (r: Route) =>
+    r.fulfill({ status: 200, body: '{}' })
+  );
 }
 
 function isUnavailablePage(text: string): boolean {
