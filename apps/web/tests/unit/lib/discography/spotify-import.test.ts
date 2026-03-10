@@ -504,6 +504,101 @@ describe('spotify-import', () => {
       );
     });
 
+    it('falls back to safe defaults when Spotify omits numeric track fields', async () => {
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-missing-numbers',
+          name: 'Missing Numbers Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+          images: [],
+          uri: 'spotify:album:album-missing-numbers',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-missing-numbers',
+          },
+        },
+      ]);
+
+      mockGetSpotifyAlbums.mockResolvedValueOnce([
+        {
+          id: 'album-missing-numbers',
+          name: 'Missing Numbers Release',
+          album_type: 'single',
+          total_tracks: 1,
+          release_date: '2024-01-01',
+          release_date_precision: 'day',
+          artists: [
+            {
+              id: 'artist-1',
+              name: 'Artist Name',
+              external_urls: {
+                spotify: 'https://open.spotify.com/artist/artist-1',
+              },
+            },
+          ],
+          images: [],
+          uri: 'spotify:album:album-missing-numbers',
+          external_urls: {
+            spotify: 'https://open.spotify.com/album/album-missing-numbers',
+          },
+          tracks: {
+            items: [
+              {
+                id: 'track-missing-numbers',
+                name: 'Track Missing Numbers',
+                explicit: false,
+                external_urls: {
+                  spotify:
+                    'https://open.spotify.com/track/track-missing-numbers',
+                },
+                uri: 'spotify:track:track-missing-numbers',
+                preview_url: null,
+                artists: [{ id: 'artist-1', name: 'Artist Name' }],
+              },
+            ],
+            total: 1,
+            next: null,
+          },
+          label: 'Test Label',
+          popularity: 30,
+          copyrights: [],
+          external_ids: { upc: '123456789012' },
+        },
+      ]);
+
+      mockGetSpotifyTracks.mockResolvedValueOnce([
+        {
+          id: 'track-missing-numbers',
+          name: 'Track Missing Numbers',
+          explicit: false,
+          external_urls: {
+            spotify: 'https://open.spotify.com/track/track-missing-numbers',
+          },
+          uri: 'spotify:track:track-missing-numbers',
+          preview_url: null,
+          external_ids: { isrc: 'USABC2412345' },
+          artists: [{ id: 'artist-1', name: 'Artist Name' }],
+        },
+      ]);
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+
+      await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
+
+      expect(mockUpsertTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trackNumber: 1,
+          discNumber: 1,
+          durationMs: null,
+        })
+      );
+    });
+
     it('drops malformed ISRC values from full track metadata', async () => {
       mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
         {
