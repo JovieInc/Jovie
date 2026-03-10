@@ -21,6 +21,29 @@ interface GoogleCSEResponse {
   error?: { code: number; message: string };
 }
 
+async function handleCSEApiError(
+  error: { code: number; message: string },
+  context: { query: string; startIndex: number; attempt: number },
+  isLastAttempt: boolean
+): Promise<'retry' | 'empty'> {
+  if (error.code === 429) {
+    pipelineWarn('discovery', 'Google CSE quota exhausted (429)', {
+      query: context.query,
+      attempt: context.attempt,
+    });
+    return 'empty';
+  }
+  if (isRetryableStatus(error.code) && !isLastAttempt) {
+    await sleep(calculateRetryDelayMs(context.attempt));
+    return 'retry';
+  }
+  await captureError('Google CSE API error', new Error(error.message), {
+    route: 'leads/google-cse',
+    contextData: { code: error.code, ...context },
+  });
+  return 'empty';
+}
+
 /**
  * Searches Google Custom Search Engine for results.
  * @param query - Search query string (e.g. "site:linktr.ee musician spotify")
@@ -60,17 +83,12 @@ export async function searchGoogleCSE(
       const data = await fetchGoogleCSEWithTimeout(url.toString());
 
       if (data.error) {
-        const action = await handleGoogleCSEApiError(
+        const action = await handleCSEApiError(
           data.error,
-          query,
-          startIndex,
-          attempt,
+          { query, startIndex, attempt },
           isLastAttempt
         );
-        if (action === 'retry') {
-          await sleep(calculateRetryDelayMs(attempt));
-          continue;
-        }
+        if (action === 'retry') continue;
         return [];
       }
 
@@ -105,31 +123,6 @@ export async function searchGoogleCSE(
   }
 
   return [];
-}
-
-/** Returns true if the error was handled and no results should be returned, or false to retry. */
-async function handleGoogleCSEApiError(
-  error: { code: number; message: string },
-  query: string,
-  startIndex: number,
-  attempt: number,
-  isLastAttempt: boolean
-): Promise<'done' | 'retry'> {
-  if (error.code === 429) {
-    pipelineWarn('discovery', 'Google CSE quota exhausted (429)', {
-      query,
-      attempt,
-    });
-    return 'done';
-  }
-  if (isRetryableStatus(error.code) && !isLastAttempt) {
-    return 'retry';
-  }
-  await captureError('Google CSE API error', new Error(error.message), {
-    route: 'leads/google-cse',
-    contextData: { code: error.code, query, startIndex, attempt },
-  });
-  return 'done';
 }
 
 function isRetryableStatus(statusCode: number): boolean {
