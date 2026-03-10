@@ -1,23 +1,10 @@
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
-const FREE_FEATURES = [
-  'Smart link in bio',
-  'Artist profile page',
-  'Basic analytics',
-  'Unlimited link clicks',
-  'Email capture widget',
-];
-
-const PRO_FEATURES = [
-  'Everything in Free',
-  'Fan list with contacts & history',
-  'Tips & payments',
-  'Advanced analytics',
-  'Priority support',
-  'Custom domain (soon)',
-];
+const free = ENTITLEMENT_REGISTRY.free;
+const founding = ENTITLEMENT_REGISTRY.founding;
 
 export function PricingSection() {
   return (
@@ -33,8 +20,8 @@ export function PricingSection() {
               Start free. Pay when it pays you back.
             </h2>
             <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
-              Free gets an artist live fast. Founding Member adds the tools that
-              turn attention into revenue and repeat reach.
+              Free gets an artist live fast. {founding.marketing.displayName}{' '}
+              adds the tools that turn attention into revenue and repeat reach.
             </p>
           </div>
 
@@ -52,7 +39,7 @@ export function PricingSection() {
               }}
             >
               <p className='text-[13px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
-                Free
+                {free.marketing.displayName}
               </p>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
@@ -67,7 +54,7 @@ export function PricingSection() {
               </p>
 
               <ul className='mt-8 flex flex-col gap-3 flex-1'>
-                {FREE_FEATURES.map(feature => (
+                {free.marketing.features.map(feature => (
                   <li
                     key={feature}
                     className='flex items-center gap-3 text-[14px] text-[color:var(--linear-text-secondary)]'
@@ -113,7 +100,7 @@ export function PricingSection() {
               {/* Badge */}
               <div className='flex items-center justify-between'>
                 <p className='text-[13px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
-                  Founding Member
+                  {founding.marketing.displayName}
                 </p>
                 <span
                   className='rounded-full px-2.5 py-0.5 text-[11px] font-medium'
@@ -128,19 +115,18 @@ export function PricingSection() {
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
-                  $12
+                  ${founding.marketing.price!.monthly}
                 </span>
                 <span className='text-[14px] text-[color:var(--linear-text-tertiary)]'>
                   /mo
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                Early adopter pricing. Keep more fans, earn more from every
-                show.
+                {founding.marketing.tagline}
               </p>
 
               <ul className='mt-8 flex flex-col gap-3 flex-1'>
-                {PRO_FEATURES.map(feature => (
+                {founding.marketing.features.map(feature => (
                   <li
                     key={feature}
                     className='flex items-center gap-3 text-[14px] text-[color:var(--linear-text-secondary)]'
@@ -159,7 +145,7 @@ export function PricingSection() {
                   color: '#ffffff',
                 }}
               >
-                Lock in $12/mo
+                Choose {founding.marketing.displayName}
               </Link>
             </div>
           </div>

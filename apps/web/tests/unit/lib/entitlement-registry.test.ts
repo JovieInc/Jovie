@@ -135,11 +135,20 @@ describe('Entitlement Registry Consistency', () => {
     }
   });
 
-  it('every plan marketing list includes unlimited smart links', () => {
+  it('free plan marketing list includes unlimited smart links', () => {
+    expect(ENTITLEMENT_REGISTRY.free.marketing.features).toContain(
+      'Unlimited smart links'
+    );
+  });
+
+  it('paid plan marketing lists reference free features', () => {
     for (const planId of planIds) {
-      expect(ENTITLEMENT_REGISTRY[planId].marketing.features).toContain(
-        'Unlimited smart links'
+      if (planId === 'free') continue;
+      const features = ENTITLEMENT_REGISTRY[planId].marketing.features;
+      const referencesFreeTier = features.some(
+        f => f.includes('All Free features') || f.includes('All Pro features')
       );
+      expect(referencesFreeTier).toBe(true);
     }
   });
 
