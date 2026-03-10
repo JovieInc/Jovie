@@ -15,58 +15,12 @@ import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { TipDrawer } from '@/components/profile/TipDrawer';
 import { Container } from '@/components/site/Container';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
-import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
 import type { ProfileShellProps } from './types';
 import { useProfileShell } from './useProfileShell';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-
-const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
-  [
-    { keywords: ['spotify'], dspKey: 'spotify' },
-    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
-    { keywords: ['youtube'], dspKey: 'youtube' },
-    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
-    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
-    { keywords: ['tidal'], dspKey: 'tidal' },
-    { keywords: ['deezer'], dspKey: 'deezer' },
-    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
-    { keywords: ['pandora'], dspKey: 'pandora' },
-    { keywords: ['samsungmusic'], dspKey: 'samsung_music' },
-  ];
-
-function mapSocialPlatformToDSPKey(
-  platform: string | undefined
-): string | null {
-  if (typeof platform !== 'string' || !platform) return null;
-  const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-
-  for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {
-    if (
-      keywords.some(
-        keyword => normalized.includes(keyword) || normalized === keyword
-      )
-    ) {
-      return dspKey;
-    }
-  }
-
-  return null;
-}
-
-function getDspPreferenceLabel(platform: string, fallbackName: string): string {
-  return (
-    platform
-      .split(/[_\-\s]+/)
-      .filter(Boolean)
-      .map(
-        token => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()
-      )
-      .join(' ') || fallbackName
-  );
-}
 
 function extractVenmoUsername(url: string | null): string | null {
   if (!url) return null;
@@ -140,35 +94,10 @@ export function ProfileShell({
     [venmoLink]
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
-  const availableDspPreferences = useMemo(() => {
-    const socialDspByKey = new Map<string, { key: string; label: string }>();
-
-    socialLinks
-      .filter(link => link.url)
-      .forEach(link => {
-        const dspKey = mapSocialPlatformToDSPKey(link.platform);
-        if (!dspKey || socialDspByKey.has(dspKey)) return;
-
-        socialDspByKey.set(dspKey, {
-          key: dspKey,
-          label:
-            DSP_CONFIGS[dspKey]?.name ??
-            getDspPreferenceLabel(link.platform, dspKey),
-        });
-      });
-
-    const preferences =
-      socialDspByKey.size > 0
-        ? Array.from(socialDspByKey.values())
-        : getAvailableDSPs(artist).map(dsp => ({
-            key: dsp.key,
-            label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
-          }));
-
-    return preferences.sort((left, right) =>
-      left.label.localeCompare(right.label)
-    );
-  }, [artist, socialLinks]);
+  const availableDspPreferences = useMemo(
+    () => toDSPPreferences(getCanonicalProfileDSPs(artist)),
+    [artist]
+  );
 
   const {
     channelBusy,

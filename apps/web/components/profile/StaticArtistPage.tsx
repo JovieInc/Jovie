@@ -14,50 +14,16 @@ import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionCo
 import { TourModePanel } from '@/components/profile/TourModePanel';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import type { DiscogRelease } from '@/lib/db/schema/content';
-import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import type { AvailableDSP } from '@/lib/dsp';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 type PrimaryAction = 'subscribe' | 'listen';
 
-// Platform keyword to DSP key mappings
-const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
-  [
-    { keywords: ['spotify'], dspKey: 'spotify' },
-    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
-    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
-    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
-    { keywords: ['tidal'], dspKey: 'tidal' },
-    { keywords: ['deezer'], dspKey: 'deezer' },
-    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
-    { keywords: ['pandora'], dspKey: 'pandora' },
-  ];
-
 const TIP_AMOUNTS = [3, 5, 7];
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-
-function mapSocialPlatformToDSPKey(
-  platform: string | undefined
-): string | null {
-  if (typeof platform !== 'string' || !platform) {
-    return null;
-  }
-  const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-
-  for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {
-    if (
-      keywords.some(
-        keyword => normalized.includes(keyword) || normalized === keyword
-      )
-    ) {
-      return dspKey;
-    }
-  }
-
-  return null;
-}
 
 function extractVenmoUsername(url: string | null): string | null {
   if (!url) return null;
@@ -105,46 +71,8 @@ interface StaticArtistPageProps {
  * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
  * Artist DSPs take priority (listed first).
  */
-function getMergedDSPs(
-  artist: Artist,
-  socialLinks: LegacySocialLink[]
-): AvailableDSP[] {
-  const socialDSPs: AvailableDSP[] = (() => {
-    const mapped = socialLinks
-      .filter(link => link.url)
-      .map(link => {
-        const dspKey = mapSocialPlatformToDSPKey(link.platform);
-        if (!dspKey) return null;
-        const config = DSP_CONFIGS[dspKey] ?? {
-          name: dspKey,
-          color: '#0f111a',
-          textColor: '#ffffff',
-          logoSvg: '',
-        };
-        return {
-          key: dspKey,
-          name: config.name,
-          url: link.url,
-          config,
-        } satisfies AvailableDSP;
-      })
-      .filter(Boolean) as AvailableDSP[];
-
-    const deduped = new Map<string, AvailableDSP>();
-    mapped.forEach(item => {
-      if (!deduped.has(item.key)) {
-        deduped.set(item.key, item);
-      }
-    });
-    return Array.from(deduped.values());
-  })();
-
-  const artistDSPs = getAvailableDSPs(artist);
-  const byKey = new Map<string, AvailableDSP>();
-  [...artistDSPs, ...socialDSPs].forEach(dsp => {
-    if (!byKey.has(dsp.key)) byKey.set(dsp.key, dsp);
-  });
-  return Array.from(byKey.values());
+function getMergedDSPs(artist: Artist) {
+  return getCanonicalProfileDSPs(artist);
 }
 
 interface RenderContentOptions {
@@ -277,7 +205,7 @@ export function StaticArtistPage({
   tourDates = [],
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
-  const mergedDSPs = getMergedDSPs(artist, socialLinks);
+  const mergedDSPs = getMergedDSPs(artist);
 
   return (
     <div className='w-full'>
