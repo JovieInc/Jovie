@@ -48,7 +48,7 @@ export function ArmadaMusicLogo(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='50.078125 481.26843 599.84375 102.1875'
+      viewBox='0 0 599.84375 102.1875'
       fill='currentColor'
       aria-label='Armada Music'
       {...props}
