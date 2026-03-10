@@ -21,25 +21,6 @@ interface DiscoveryCandidate {
   discoveryQuery: string;
 }
 
-function buildDiscoveryCandidates(
-  results: { link: string }[],
-  keyword: DiscoveryKeyword
-): DiscoveryCandidate[] {
-  const byHandle = new Map<string, DiscoveryCandidate>();
-  for (const item of results) {
-    if (!isLinktreeUrl(item.link)) continue;
-    const handle = extractLinktreeHandle(item.link);
-    if (!handle) continue;
-    byHandle.set(handle, {
-      linktreeHandle: handle,
-      linktreeUrl: `https://linktr.ee/${handle}`,
-      discoverySource: 'google_cse',
-      discoveryQuery: keyword.query,
-    });
-  }
-  return Array.from(byHandle.values());
-}
-
 async function insertCandidates(
   candidates: DiscoveryCandidate[],
   result: DiscoveryResult
@@ -59,6 +40,41 @@ export interface DiscoveryResult {
   candidatesProcessed: number;
   newLeadsFound: number;
   duplicatesSkipped: number;
+}
+
+function buildCandidateMap(
+  results: { link: string }[],
+  query: string
+): Map<
+  string,
+  {
+    linktreeHandle: string;
+    linktreeUrl: string;
+    discoverySource: 'google_cse';
+    discoveryQuery: string;
+  }
+> {
+  const map = new Map<
+    string,
+    {
+      linktreeHandle: string;
+      linktreeUrl: string;
+      discoverySource: 'google_cse';
+      discoveryQuery: string;
+    }
+  >();
+  for (const item of results) {
+    if (!isLinktreeUrl(item.link)) continue;
+    const handle = extractLinktreeHandle(item.link);
+    if (!handle) continue;
+    map.set(handle, {
+      linktreeHandle: handle,
+      linktreeUrl: `https://linktr.ee/${handle}`,
+      discoverySource: 'google_cse',
+      discoveryQuery: query,
+    });
+  }
+  return map;
 }
 
 /**
@@ -95,7 +111,8 @@ export async function runDiscovery(
 
     try {
       const results = await searchGoogleCSE(keyword.query);
-      const candidates = buildDiscoveryCandidates(results, keyword);
+      const candidatesByHandle = buildCandidateMap(results, keyword.query);
+      const candidates = Array.from(candidatesByHandle.values());
       result.candidatesProcessed += candidates.length;
       await insertCandidates(candidates, result);
 
