@@ -141,7 +141,7 @@ export function useHandleValidation({
       }
 
       // Capture warning to Sentry for monitoring API failures
-      void captureWarning('Handle validation API failed', error, {
+      captureWarning('Handle validation API failed', error, {
         handle,
         route: '/onboarding',
         component: 'useHandleValidation',
@@ -245,7 +245,7 @@ export function useHandleValidation({
       });
 
       // Trigger API validation via Pacer (debounced, cached)
-      void validateApiRef.current(normalizedInput);
+      validateApiRef.current(normalizedInput);
     },
     [cancelValidation, normalizedInitialHandle]
   );

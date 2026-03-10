@@ -288,7 +288,7 @@ export const DashboardAudienceTableUnified = memo(
           if (selectedMember?.id === member.id) {
             setSelectedMember(null);
           }
-          void queryClient.invalidateQueries({
+          queryClient.invalidateQueries({
             queryKey: queryKeys.audience.all,
           });
         } catch {
