@@ -74,9 +74,6 @@ export async function generateInsights(
     prompt: buildUserPrompt(metrics, existingInsightTypes),
     temperature: 0.3,
     maxOutputTokens: 4096,
-    providerOptions: {
-      anthropic: { cacheControl: true },
-    },
     experimental_telemetry: {
       isEnabled: true,
       recordInputs: true,
