@@ -1,18 +1,15 @@
 (function () {
   try {
-    if (typeof globalThis.matchMedia !== 'function') return;
-    // Guard against null localStorage (private browsing, restricted contexts)
-    if (typeof localStorage === 'undefined' || !localStorage) return;
-    var ls = localStorage.getItem('jovie-theme');
-    var mql = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    var systemPref = mql.matches ? 'dark' : 'light';
-    var pref = ls && ls !== 'system' ? ls : systemPref;
     var root = document.documentElement;
-    if (pref === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
+    root.classList.add('dark');
+
+    // Persist dark theme to avoid hydration mismatch with next-themes.
+    if (typeof localStorage !== 'undefined' && localStorage) {
+      localStorage.setItem('jovie-theme', 'dark');
+    }
 
     // Update theme-color meta tag to match active theme (PWA system bar color)
-    var themeColor = pref === 'dark' ? '#0a0a0a' : '#ffffff';
+    var themeColor = '#0a0a0a';
     var metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) metaTheme.setAttribute('content', themeColor);
 

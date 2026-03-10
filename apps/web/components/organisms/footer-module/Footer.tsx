@@ -7,8 +7,6 @@ import { CookieSettingsFooterButton } from '@/components/molecules/CookieSetting
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/utils';
 
@@ -37,18 +35,13 @@ export function Footer({
   artistHandle,
   hideBranding = false,
   artistSettings,
-  showThemeToggle = false,
   themeShortcutKey,
   className = '',
   brandingMark = 'icon',
   containerSize = 'lg',
   links,
 }: FooterProps) {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-  const effectiveShowThemeToggle = showThemeToggle && isLightModeEnabled;
+  const effectiveShowThemeToggle = false;
   const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
   const maxWidthClass = CONTAINER_SIZES[containerSize];
 

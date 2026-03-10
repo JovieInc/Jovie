@@ -1,51 +1,19 @@
 'use client';
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@jovie/ui';
-import { useTheme } from 'next-themes';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
-import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
-
-const THEME_OPTIONS = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
-] as const;
+import { useHighContrastMutation } from '@/lib/queries';
 
 export function SettingsAppearanceSection() {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-  const { theme, setTheme } = useTheme();
-  const { updateTheme, isPending: isThemePending } = useThemeMutation();
   const { isHighContrast, setHighContrast } = useHighContrast();
   const { setHighContrast: saveHighContrast, isPending: isContrastPending } =
     useHighContrastMutation();
 
-  const handleThemeChange = (newTheme: string) => {
-    const validTheme = newTheme as 'light' | 'dark' | 'system';
-    setTheme(validTheme);
-    updateTheme(validTheme, isHighContrast);
-  };
-
   const handleHighContrastChange = (enabled: boolean) => {
     setHighContrast(enabled);
-    const currentTheme = (theme ?? 'system') as 'light' | 'dark' | 'system';
-    saveHighContrast(enabled, currentTheme);
+    saveHighContrast(enabled, 'dark');
   };
-
-  const currentLabel =
-    THEME_OPTIONS.find(o => o.value === theme)?.label ?? 'System';
 
   return (
     <DashboardCard
@@ -53,37 +21,6 @@ export function SettingsAppearanceSection() {
       padding='none'
       className='divide-y divide-subtle'
     >
-      {isLightModeEnabled && (
-        <div className='px-4 py-3 flex items-center justify-between'>
-          <div className='flex-1 min-w-0'>
-            <h3 className='text-[13px] font-[510] text-primary-token'>
-              Interface theme
-            </h3>
-            <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
-              Select or customize your interface color scheme
-            </p>
-          </div>
-          <div className='shrink-0'>
-            <Select
-              value={theme ?? 'system'}
-              onValueChange={handleThemeChange}
-              disabled={isThemePending}
-            >
-              <SelectTrigger className='w-[120px] h-8 text-[13px]'>
-                <SelectValue>{currentLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent position='item-aligned'>
-                {THEME_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-
       <div className='px-4 py-3'>
         <SettingsToggleRow
           title='High contrast'

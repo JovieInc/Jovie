@@ -5,7 +5,6 @@ import { CheckCircle2, X } from 'lucide-react';
 import Image from 'next/image';
 import { Combobox } from '@/components/organisms/Combobox';
 import { Container } from '@/components/site/Container';
-import { ThemeToggle } from '@/components/site/theme-toggle';
 import { useArtistSelectionForm } from './useArtistSelectionForm';
 
 export function ArtistSelectionForm() {
@@ -31,12 +30,6 @@ export function ArtistSelectionForm() {
       {/* Gradient orbs - more subtle like Linear */}
       <div className='absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl' />
       <div className='absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl' />
-
-      {/* Theme Toggle */}
-      <div className='absolute top-4 right-4 z-20'>
-        <ThemeToggle />
-      </div>
-
       <Container className='relative z-10'>
         <div className='flex min-h-screen items-center justify-center py-12'>
           <div className='w-full max-w-md'>

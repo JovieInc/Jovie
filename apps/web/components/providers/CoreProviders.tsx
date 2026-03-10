@@ -4,13 +4,10 @@ import { TooltipProvider } from '@jovie/ui';
 import { PacerProvider } from '@tanstack/react-pacer';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { ThemeProvider, useTheme } from 'next-themes';
+import { ThemeProvider } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
-import { isFormElement } from '@/lib/utils/keyboard';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
@@ -26,32 +23,6 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
 }
 
 function ThemeKeyboardShortcut() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-
-  useEffect(() => {
-    // Only register theme keyboard shortcut when light mode feature flag is on
-    if (!isLightModeEnabled) return;
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.defaultPrevented) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key.toLowerCase() !== 't') return;
-      if (isFormElement(event.target)) return;
-
-      event.preventDefault();
-      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-    }
-
-    globalThis.addEventListener('keydown', handleKeyDown);
-    return () => {
-      globalThis.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [resolvedTheme, setTheme, isLightModeEnabled]);
-
   return null;
 }
 
