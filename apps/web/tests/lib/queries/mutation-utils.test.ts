@@ -17,6 +17,7 @@ vi.mock('sonner', () => ({
 
 // Mock Sentry - must use factory function pattern for hoisting
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   addBreadcrumb: vi.fn(),
 }));

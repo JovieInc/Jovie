@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const sentry = vi.hoisted(() => ({
   addBreadcrumb: vi.fn(),
   captureMessage: vi.fn(),
+  getClient: vi.fn(() => undefined),
 }));
 
 vi.mock('@sentry/nextjs', () => sentry);

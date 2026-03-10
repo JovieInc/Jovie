@@ -46,6 +46,7 @@ vi.mock('@/lib/rate-limit/memory-limiter', () => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
 }));
 

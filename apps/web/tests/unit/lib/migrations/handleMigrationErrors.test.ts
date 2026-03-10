@@ -5,6 +5,7 @@ const { mockWarn } = vi.hoisted(() => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   logger: {
     warn: mockWarn,
   },

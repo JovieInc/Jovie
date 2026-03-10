@@ -130,12 +130,7 @@ function ProfileContent() {
       >
         Turn on notifications
       </div>
-      <div
-        className='flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5'
-        style={{
-          border: '1px solid rgba(255,255,255,0.06)',
-        }}
-      >
+      <div className='flex items-center justify-center gap-1.5 px-2 py-1.5'>
         {platforms.map(p => (
           <span
             key={p}

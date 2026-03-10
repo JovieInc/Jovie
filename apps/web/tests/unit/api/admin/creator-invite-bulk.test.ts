@@ -63,6 +63,7 @@ vi.mock('@/lib/utils/logger', () => ({
 
 // Mock heavy transitive dependencies to prevent slow module resolution timeouts
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   captureMessage: vi.fn(),
   addBreadcrumb: vi.fn(),

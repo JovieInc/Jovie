@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock Sentry before imports
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
 }));
 

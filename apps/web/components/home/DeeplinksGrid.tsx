@@ -29,28 +29,28 @@ const MODES: ModeData[] = [
     id: 'profile',
     headline: 'Your link, your fans.',
     description:
-      'First-time visitors join your list. Returning fans see the action most likely to convert. The profile adapts instead of making everyone hunt.',
+      'New visitors join your list. Returning fans see their most likely next action. The page adapts — nobody hunts.',
     slug: '',
   },
   {
     id: 'tour',
     headline: 'Put the nearest show first.',
     description:
-      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the closest date and ticket button first.',
+      "A fan in LA shouldn't scroll through 30 cities. Jovie surfaces the nearest show and ticket link first.",
     slug: 'tour',
   },
   {
     id: 'tip',
     headline: 'Turn the merch table into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie opens the fastest tip flow — not another menu of links.',
+      'Fan scans your QR after a set. Jovie opens the fastest tip flow — not another menu of links.',
     slug: 'tip',
   },
   {
     id: 'listen',
     headline: 'Open the right streaming app.',
     description:
-      'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music — no grid, no friction.',
+      'One tap. Jovie routes them to Spotify, Apple Music, or YouTube Music — no choice screen.',
     slug: 'listen',
   },
 ];
@@ -348,7 +348,7 @@ export function DeeplinksGrid() {
                       backgroundColor: 'transparent',
                     }}
                   >
-                    View a Real Page
+                    See it live — jov.ie/tim
                     <svg
                       width='14'
                       height='14'
@@ -439,9 +439,9 @@ export function DeeplinksGrid() {
                 One link. Adapts to every fan.
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Every visitor sees a personalized CTA based on the moment —
-                listen, tip, tour, or follow. AI that increases conversions on
-                autopilot.
+                Every visitor sees the right action for the moment — listen,
+                tip, buy tickets, or follow. Your page gets smarter with every
+                tap.
               </p>
             </div>
 

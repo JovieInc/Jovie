@@ -14,6 +14,7 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
 }));
 

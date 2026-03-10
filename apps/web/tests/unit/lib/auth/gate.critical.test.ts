@@ -120,6 +120,7 @@ vi.mock('drizzle-orm', () => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   addBreadcrumb: mockSentryAddBreadcrumb,
 }));
 

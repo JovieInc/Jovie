@@ -12,7 +12,7 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   'Everything in Free',
-  'Built-in fan CRM',
+  'Fan list with contacts & history',
   'Tips & payments',
   'Advanced analytics',
   'Priority support',
@@ -63,7 +63,7 @@ export function PricingSection() {
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                Get your page live and start capturing fan intent.
+                Get your page live and start growing your audience.
               </p>
 
               <ul className='mt-8 flex flex-col gap-3 flex-1'>
@@ -135,7 +135,8 @@ export function PricingSection() {
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                Early adopter pricing for artists ready to own the full funnel.
+                Early adopter pricing. Keep more fans, earn more from every
+                show.
               </p>
 
               <ul className='mt-8 flex flex-col gap-3 flex-1'>
@@ -158,7 +159,7 @@ export function PricingSection() {
                   color: '#ffffff',
                 }}
               >
-                Choose Founding Member
+                Lock in $12/mo
               </Link>
             </div>
           </div>
