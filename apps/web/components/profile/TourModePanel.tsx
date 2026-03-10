@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { Drawer } from 'vaul';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceMiles } from '@/lib/geo';
@@ -104,15 +103,17 @@ function TourDatesContent({
         <div className='mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface-2'>
           <Calendar className='h-5 w-5 text-tertiary-token' />
         </div>
-        <p className='text-base font-[var(--font-weight-medium)] text-primary-token'>
-          Not currently on tour
-        </p>
         <p className='mt-2 text-sm text-secondary-token'>
-          {artist.name} isn&apos;t on tour right now. Get notified when dates
-          are announced.
+          {artist.name} is not currently on tour. Get notified when dates are
+          announced.
         </p>
         <div className='mt-4 flex justify-center'>
-          <ArtistNotificationsCTA artist={artist} variant='button' />
+          <Link
+            href={`/${artist.handle}/notifications`}
+            className='inline-flex w-full items-center justify-center rounded-full bg-accent px-4 py-2.5 text-sm font-[var(--font-weight-medium)] text-white transition-colors hover:bg-accent/90'
+          >
+            Turn on notifications
+          </Link>
         </div>
       </div>
     );
@@ -196,18 +197,16 @@ export function TourModePanel({
     return { nearbyDates, remainingDates };
   }, [tourDates, location]);
 
+  const showSummaryHeader = tourDates.length > 0;
+
   const content = (
     <div className='space-y-4'>
-      <div>
-        <h1 className='text-base font-[var(--font-weight-medium)] text-primary-token'>
-          Tour dates
-        </h1>
+      {showSummaryHeader && (
         <p className='text-sm text-secondary-token'>
-          {tourDates.length === 0
-            ? 'No upcoming shows'
-            : `${tourDates.length} upcoming ${tourDates.length === 1 ? 'show' : 'shows'}`}
+          {tourDates.length} upcoming{' '}
+          {tourDates.length === 1 ? 'show' : 'shows'}
         </p>
-      </div>
+      )}
       <TourDatesContent
         artist={artist}
         nearby={nearbyDates}
