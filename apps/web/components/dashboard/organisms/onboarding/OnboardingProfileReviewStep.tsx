@@ -12,6 +12,7 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { useUserAvatarMutation } from '@/lib/queries';
+import { canProceedFromProfileReview } from './profile-review-guards';
 
 interface OnboardingProfileReviewStepProps {
   readonly title: string;
@@ -23,8 +24,7 @@ interface OnboardingProfileReviewStepProps {
 
 /**
  * Profile review step in onboarding.
- * JOV-1340: Photo is no longer required to proceed.
- * Users can always add/change their photo from the dashboard.
+ * JOV-1510: Profile photo is required before proceeding to dashboard.
  */
 export function OnboardingProfileReviewStep({
   title,
@@ -69,9 +69,8 @@ export function OnboardingProfileReviewStep({
   }, []);
 
   const hasName = Boolean(displayName.trim());
-  // JOV-1340: Only require a display name to proceed.
-  // Photo is optional — enrichment may still be running in background.
-  const canProceed = hasName;
+  const hasAvatar = Boolean(avatarUrl);
+  const canProceed = canProceedFromProfileReview(displayName, avatarUrl);
 
   const handleGoToDashboard = useCallback(async () => {
     setIsSaving(true);
@@ -82,8 +81,7 @@ export function OnboardingProfileReviewStep({
       });
       onGoToDashboard();
     } catch {
-      // If save fails, still proceed — profile data was already saved during enrichment
-      onGoToDashboard();
+      toast.error('Could not save your profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
@@ -183,9 +181,9 @@ export function OnboardingProfileReviewStep({
               Add your name to continue
             </span>
           )}
-          {hasName && !avatarUrl && (
+          {hasName && !hasAvatar && (
             <span className='text-[var(--linear-text-tertiary)]'>
-              You can add a profile photo now or later from settings.
+              Add a photo to continue
             </span>
           )}
         </div>
