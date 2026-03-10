@@ -198,7 +198,7 @@ export function ProfileShell({
                   hasActiveSubscriptions) && (
                   <div className='flex justify-center'>
                     <div
-                      className='flex flex-wrap items-center justify-center gap-3'
+                      className='flex flex-wrap items-center justify-center gap-3 px-1 py-1'
                       data-testid='social-links'
                     >
                       {/* Mail (contacts) — left */}
@@ -225,10 +225,10 @@ export function ProfileShell({
                           variant='ghost'
                           ariaLabel='Tour dates'
                           data-testid='tour-trigger'
-                          className={`border transition-colors ${
+                          className={`border transition-[background-color,border-color,color] ${
                             isTourModeActive
-                              ? 'border-subtle bg-surface-2 text-primary-token'
-                              : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                              ? 'border-subtle bg-surface-1 text-primary-token'
+                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
                           }`}
                           asChild
                         >
@@ -248,10 +248,10 @@ export function ProfileShell({
                               variant='ghost'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className={`border transition-colors ${
+                              className={`border transition-[background-color,border-color,color] ${
                                 isTipModeActive
-                                  ? 'border-subtle bg-surface-2 text-primary-token'
-                                  : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                                  ? 'border-subtle bg-surface-1 text-primary-token'
+                                  : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
                               }`}
                               onClick={() => setTipDrawerOpen(true)}
                             >
@@ -277,7 +277,7 @@ export function ProfileShell({
                             variant='ghost'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className={`border border-transparent transition-colors hover:border-subtle hover:bg-surface-2${isTipModeActive ? ' invisible' : ''}`}
+                            className={`border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token${isTipModeActive ? ' invisible' : ''}`}
                             aria-hidden={isTipModeActive || undefined}
                             tabIndex={isTipModeActive ? -1 : undefined}
                             asChild

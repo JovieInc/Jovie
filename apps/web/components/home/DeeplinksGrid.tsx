@@ -29,28 +29,28 @@ const MODES: ModeData[] = [
     id: 'profile',
     headline: 'Your link, your fans.',
     description:
-      'First-time visitors can join your list. Returning fans see the action they are most likely to take next. The profile adapts instead of making everyone hunt.',
+      'First-time visitors join your list. Returning fans see the action most likely to convert. The profile adapts instead of making everyone hunt.',
     slug: '',
   },
   {
     id: 'tour',
     headline: 'Put the nearest show first.',
     description:
-      'A fan in Los Angeles should not scroll through 30 cities. Jovie can surface the closest date and ticket button first.',
+      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the closest date and ticket button first.',
     slug: 'tour',
   },
   {
     id: 'tip',
     headline: 'Turn the merch table into revenue.',
     description:
-      'When someone scans your QR code after a set, Jovie can open the fastest tip flow available instead of another menu of links.',
+      'When someone scans your QR code after a set, Jovie opens the fastest tip flow — not another menu of links.',
     slug: 'tip',
   },
   {
     id: 'listen',
     headline: 'Open the right streaming app.',
     description:
-      'A new listener taps once. Jovie can route them to Spotify, Apple Music, or YouTube Music without making them choose from a grid first.',
+      'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music — no grid, no friction.',
     slug: 'listen',
   },
 ];
