@@ -16,7 +16,6 @@ import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 import { HandleStatusIcon } from './HandleStatusIcon';
 import type { ClaimHandleFormProps } from './types';
-import { useHandleSuggestions } from './useHandleSuggestions';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
@@ -37,10 +36,6 @@ export function ClaimHandleForm({
 
   const { handleError, checkingAvail, available, availError } =
     useHandleValidation(handle);
-  const { suggestions, checkingSuggestions } = useHandleSuggestions(
-    handle,
-    Boolean(handleError)
-  );
 
   useEffect(() => {
     onHandleChange?.(handle);
@@ -123,7 +118,6 @@ export function ClaimHandleForm({
   }, [navigating, available, handle]);
 
   const isAvailable = available === true;
-  const showSuggestions = handle.length >= 3 && !handleError;
   // Only block during navigation — never gate on availability check.
   // Availability is informational; server validates during onboarding.
   const hasClientError = !!handleError;
@@ -176,8 +170,9 @@ export function ClaimHandleForm({
                 : {
                     fontSize: '13px',
                     fontWeight: 400,
-                    color: 'var(--linear-text-tertiary)',
+                    color: 'var(--linear-text-quaternary)',
                     letterSpacing: '-0.02em',
+                    opacity: 0.7,
                     fontFamily: 'monospace',
                   }
             }
@@ -198,7 +193,7 @@ export function ClaimHandleForm({
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHero ? 'placeholder:text-[var(--linear-text-quaternary)]' : 'placeholder:text-[var(--linear-text-tertiary)]'}`}
+            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:text-[var(--linear-text-quaternary)]'
             style={
               isHero
                 ? {
@@ -258,57 +253,6 @@ export function ClaimHandleForm({
           </span>
         </button>
       </div>
-
-      {showSuggestions && (
-        <div
-          className='mt-3 rounded-xl border px-2 py-1.5'
-          style={{
-            borderColor: 'rgba(255,255,255,0.1)',
-            background: 'rgba(255,255,255,0.02)',
-          }}
-        >
-          <p
-            className='px-2 pb-1 text-xs'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Reserve your handle
-          </p>
-          {checkingSuggestions ? (
-            <p
-              className='px-2 py-2 text-xs'
-              style={{ color: 'var(--linear-text-tertiary)' }}
-            >
-              Checking handle availability…
-            </p>
-          ) : (
-            <ul className='space-y-1'>
-              {suggestions.map(suggestion => (
-                <li key={suggestion.handle}>
-                  <button
-                    type='button'
-                    onClick={() => setHandle(suggestion.handle)}
-                    className='flex w-full items-center justify-between rounded-lg px-2 py-2 text-left transition-colors hover:bg-white/5 focus-ring-themed'
-                  >
-                    <span className='text-sm text-[var(--linear-text-primary)]'>
-                      {displayDomain}/{suggestion.handle}
-                    </span>
-                    <span
-                      className={cn(
-                        'text-xs font-medium',
-                        suggestion.available
-                          ? 'text-[var(--linear-success)]'
-                          : 'text-[var(--linear-warning)]'
-                      )}
-                    >
-                      {suggestion.available ? 'Available' : 'Taken'}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
 
       {/* Helper text — minimal, surgical */}
       {helperState.text && (
