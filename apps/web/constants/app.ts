@@ -20,6 +20,8 @@ export { BASE_URL, DOMAINS_APP_URL as DASHBOARD_URL };
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
 export const COUNTRY_CODE_COOKIE = 'jv_country';
+export const HOMEPAGE_CITY_COOKIE = 'jv_city';
+export const HOMEPAGE_REGION_COOKIE = 'jv_region';
 export const AUDIENCE_ANON_COOKIE = 'jv_aid';
 export const AUDIENCE_IDENTIFIED_COOKIE = 'jv_identified';
 export const AUDIENCE_SPOTIFY_PREFERRED_COOKIE = 'jv_pref_spotify';
