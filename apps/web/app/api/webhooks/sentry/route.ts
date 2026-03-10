@@ -16,38 +16,24 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
+import {
+  hasRecentDispatch,
+  markRecentDispatch,
+} from '@/lib/webhooks/recent-dispatch';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const DEDUPE_TTL_SECONDS = 60;
+const DISPATCH_TIMEOUT_MS = 5000;
 
 /** Stack frame from Sentry payload */
 interface SentryFrame {
   filename?: string;
   function?: string;
   lineno?: number;
-}
-
-/**
- * Simple in-process dedupe cache to prevent Sentry retry storms
- * from triggering multiple dispatches for the same issue.
- */
-const recentDispatches = new Map<string, number>();
-const DEDUPE_TTL_MS = 60_000; // 1 minute
-
-function isDuplicate(issueId: string): boolean {
-  const now = Date.now();
-  // Evict stale entries
-  for (const [key, ts] of recentDispatches) {
-    if (now - ts > DEDUPE_TTL_MS) recentDispatches.delete(key);
-  }
-  return recentDispatches.has(issueId);
-}
-
-/** Mark an issue as dispatched — call AFTER successful dispatch only */
-function markDispatched(issueId: string): void {
-  recentDispatches.set(issueId, Date.now());
 }
 
 /**
@@ -124,7 +110,7 @@ export async function POST(request: NextRequest) {
     const issueId = String(issue.id);
 
     // Dedupe: skip if we already dispatched for this issue recently
-    if (isDuplicate(issueId)) {
+    if (await hasRecentDispatch('sentry', issueId)) {
       logger.info('[Sentry Webhook] Duplicate dispatch suppressed', {
         issueId,
       });
@@ -157,7 +143,7 @@ export async function POST(request: NextRequest) {
     const owner = process.env.VERCEL_GIT_REPO_OWNER || 'TheBlackFuture';
     const repo = process.env.VERCEL_GIT_REPO_SLUG || 'Jovie';
 
-    const dispatchResponse = await fetch(
+    const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
       {
         method: 'POST',
@@ -177,6 +163,7 @@ export async function POST(request: NextRequest) {
             stacktrace,
           },
         }),
+        timeoutMs: DISPATCH_TIMEOUT_MS,
       }
     );
 
@@ -193,7 +180,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark as dispatched AFTER success so failed dispatches can be retried
-    markDispatched(issueId);
+    await markRecentDispatch('sentry', issueId, DEDUPE_TTL_SECONDS);
 
     logger.info('[Sentry Webhook] Dispatched autofix', {
       issueId,
@@ -206,6 +193,17 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      await captureCriticalError('Sentry webhook dispatch timed out', error, {
+        route: '/api/webhooks/sentry',
+        timeoutMs: error.timeoutMs,
+      });
+      return NextResponse.json(
+        { error: 'Dispatch timed out' },
+        { status: 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
     await captureCriticalError('Sentry webhook processing failed', error, {
       route: '/api/webhooks/sentry',
     });
