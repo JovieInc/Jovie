@@ -54,6 +54,18 @@ export const TrackRow = memo(function TrackRow({
   onClick,
 }: TrackRowProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const rowStateClassName = isSelected
+    ? 'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)'
+    : 'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-150 ease-out';
+
+  const rowClassName = [
+    'group rounded-md',
+    onClick ? 'cursor-pointer' : '',
+    rowStateClassName,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   // Helper to check if a column is visible
   const isVisible = (id: string) => columnVisibility?.[id] !== false;
   // Format track number with disc number if multi-disc
@@ -101,10 +113,7 @@ export const TrackRow = memo(function TrackRow({
   );
 
   return (
-    <tr
-      className={`group border-l-2 border-l-transparent ${onClick ? 'cursor-pointer' : ''} ${isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'}`}
-      onClick={onClick}
-    >
+    <tr className={rowClassName} onClick={onClick}>
       {/* 1. Spacer for checkbox column (always visible) */}
       {isVisible('select') && (
         <td className='w-14 py-2'>
@@ -113,7 +122,7 @@ export const TrackRow = memo(function TrackRow({
               <button
                 type='button'
                 onClick={handleTogglePlayback}
-                className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-white/[0.06]'
+                className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-(--linear-bg-surface-2)'
                 aria-label={
                   isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
                 }
