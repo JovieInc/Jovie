@@ -34,7 +34,7 @@ export async function searchGoogleCSE(
       !engineId && 'GOOGLE_CSE_ENGINE_ID',
     ].filter(Boolean);
     pipelineWarn('discovery', 'Google CSE not configured', { missing });
-    throw new Error('GOOGLE_CSE_API_KEY and GOOGLE_CSE_ENGINE_ID must be set');
+    return [];
   }
 
   pipelineLog('discovery', 'CSE search started', { query, startIndex });
