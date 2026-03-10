@@ -132,7 +132,7 @@ export function transformImageUrl(
   if (!url) return url;
 
   // Return URL as-is — Next.js Image Optimization handles transformations
-  return url;
+  return url; // NOSONAR typescript:S3516 — intentional passthrough, options reserved for future use
 }
 
 /**
