@@ -40,7 +40,6 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
-import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const maxDuration = 30;
@@ -1057,38 +1056,12 @@ function createSubmitFeedbackTool(clerkUserId: string) {
         .describe('The feedback message from the artist'),
     }),
     execute: async ({ message }) => {
-      const userRecord = await db.query.users.findFirst({
-        where: eq(users.clerkId, clerkUserId),
-        columns: { id: true, name: true, email: true },
-      });
+      const { submitChatFeedback } = await import('@/lib/chat/submit-feedback');
 
-      const { createFeedbackItem } = await import('@/lib/feedback');
-      const { notifySlackFeedbackSubmission } = await import(
-        '@/lib/notifications/providers/slack'
-      );
-
-      await createFeedbackItem({
-        userId: userRecord?.id ?? null,
+      return submitChatFeedback({
+        clerkUserId,
         message,
-        source: 'chat',
-        context: {
-          pathname: '/app',
-          userAgent: null,
-          timestampIso: new Date().toISOString(),
-        },
       });
-
-      notifySlackFeedbackSubmission({
-        message,
-        name: userRecord?.name ?? 'Jovie user',
-        email: userRecord?.email,
-        source: 'chat',
-        pathname: '/app',
-      }).catch(err => {
-        logger.warn('[api/chat] Slack feedback notification failed', err);
-      });
-
-      return { success: true };
     },
   });
 }
