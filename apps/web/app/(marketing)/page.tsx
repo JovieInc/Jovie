@@ -1,16 +1,14 @@
 import type { Metadata } from 'next';
 import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { AutomaticReleaseSmartlinksSection } from '@/components/home/AutomaticReleaseSmartlinksSection';
 import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { LogoBar } from '@/components/home/LogoBar';
 import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { ReleaseNotificationsSection } from '@/components/home/ReleaseNotificationsSection';
+import { ReleasesSection } from '@/components/home/ReleasesSection';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
-import { SocialProofSection } from '@/components/home/SocialProofSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
@@ -241,16 +239,6 @@ export default function HomePage() {
         <LogoBar />
       </div>
 
-      <SocialProofSection />
-
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
-
       <AudienceCRMSection />
 
       <hr
@@ -271,17 +259,7 @@ export default function HomePage() {
         }}
       />
 
-      <ReleaseNotificationsSection />
-
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
-
-      <AutomaticReleaseSmartlinksSection />
+      <ReleasesSection />
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'

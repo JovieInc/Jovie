@@ -30,7 +30,10 @@ export function FinalCTASection() {
           >
             Give the next fan one clear place to go.
           </h2>
-          <p className='mt-4 max-w-xl marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p
+            className='mt-4 max-w-xl marketing-lead-linear'
+            style={{ color: 'rgba(255,255,255,0.6)' }}
+          >
             Claim your handle, launch your page, and start collecting the
             audience data every other profile page leaves behind.
           </p>
