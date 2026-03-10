@@ -24,6 +24,32 @@ interface EmailQueueResponse {
   limit: number;
 }
 
+function renderEmailRows(
+  loading: boolean,
+  leads: EmailQueueLead[],
+  renderRow: (lead: EmailQueueLead) => React.ReactNode
+): React.ReactNode {
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={6} className='py-8 text-center text-secondary-token'>
+          <LoadingSpinner size='sm' tone='muted' className='mx-auto' />
+        </td>
+      </tr>
+    );
+  }
+  if (leads.length === 0) {
+    return (
+      <tr>
+        <td colSpan={6} className='py-8 text-center text-secondary-token'>
+          No leads in email queue
+        </td>
+      </tr>
+    );
+  }
+  return leads.map(renderRow);
+}
+
 export default function AdminOutreachEmailPage() {
   const [leads, setLeads] = useState<EmailQueueLead[]>([]);
   const [total, setTotal] = useState(0);
@@ -83,61 +109,37 @@ export default function AdminOutreachEmailPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className='py-8 text-center text-secondary-token'
-                  >
-                    <LoadingSpinner
-                      size='sm'
-                      tone='muted'
-                      className='mx-auto'
-                    />
+              {renderEmailRows(loading, leads, lead => (
+                <tr
+                  key={lead.id}
+                  className='border-b border-subtle hover:bg-white/[0.03]'
+                >
+                  <td className='py-2.5 pr-3'>
+                    <span className='font-medium text-primary-token'>
+                      {lead.displayName || '-'}
+                    </span>
+                  </td>
+                  <td className='py-2.5 pr-3 tabular-nums'>
+                    {lead.priorityScore ?? '-'}
+                  </td>
+                  <td className='py-2.5 pr-3 tabular-nums'>
+                    {lead.fitScore ?? '-'}
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    <span className='text-secondary-token'>
+                      {lead.contactEmail || '-'}
+                    </span>
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    <OutreachStatusBadge status={lead.outreachStatus} />
+                  </td>
+                  <td className='py-2.5 text-secondary-token'>
+                    {lead.outreachQueuedAt
+                      ? new Date(lead.outreachQueuedAt).toLocaleDateString()
+                      : '-'}
                   </td>
                 </tr>
-              ) : leads.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className='py-8 text-center text-secondary-token'
-                  >
-                    No leads in email queue
-                  </td>
-                </tr>
-              ) : (
-                leads.map(lead => (
-                  <tr
-                    key={lead.id}
-                    className='border-b border-subtle hover:bg-white/[0.03]'
-                  >
-                    <td className='py-2.5 pr-3'>
-                      <span className='font-medium text-primary-token'>
-                        {lead.displayName || '-'}
-                      </span>
-                    </td>
-                    <td className='py-2.5 pr-3 tabular-nums'>
-                      {lead.priorityScore ?? '-'}
-                    </td>
-                    <td className='py-2.5 pr-3 tabular-nums'>
-                      {lead.fitScore ?? '-'}
-                    </td>
-                    <td className='py-2.5 pr-3'>
-                      <span className='text-secondary-token'>
-                        {lead.contactEmail || '-'}
-                      </span>
-                    </td>
-                    <td className='py-2.5 pr-3'>
-                      <OutreachStatusBadge status={lead.outreachStatus} />
-                    </td>
-                    <td className='py-2.5 text-secondary-token'>
-                      {lead.outreachQueuedAt
-                        ? new Date(lead.outreachQueuedAt).toLocaleDateString()
-                        : '-'}
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>

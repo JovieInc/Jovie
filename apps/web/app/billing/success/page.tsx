@@ -8,6 +8,12 @@ import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
 import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
 
+function getVerificationButtonLabel(state: string): string {
+  if (state === 'success') return 'Verification requested';
+  if (state === 'submitting') return 'Sending request...';
+  return 'Request Verification';
+}
+
 export default function CheckoutSuccessPage() {
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
@@ -90,11 +96,7 @@ export default function CheckoutSuccessPage() {
                 requestState === 'submitting' || requestState === 'success'
               }
             >
-              {requestState === 'success'
-                ? 'Verification requested'
-                : requestState === 'submitting'
-                  ? 'Sending request...'
-                  : 'Request Verification'}
+              {getVerificationButtonLabel(requestState)}
             </Button>
           ) : null}
 
