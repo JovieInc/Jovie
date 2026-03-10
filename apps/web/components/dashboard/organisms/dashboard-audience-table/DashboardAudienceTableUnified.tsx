@@ -49,11 +49,9 @@ import {
   MenuCell,
   QuickActionsCell,
   renderEmailCell,
-  renderIntentScoreCell,
   renderLastActionCell,
   renderLtvCell,
-  renderReturningCell,
-  renderSourceCell,
+  renderPlatformsCell,
   renderUserCell,
   SelectCell,
   TouringCityCell,
@@ -86,7 +84,7 @@ function getSrDescription(
 /**
  * Compact Linear-style column definitions for members mode.
  *
- * Layout: Select | User (primary label) | Intent dot | LTV ($) | Returning icon | Source icon | Touring badge | Last Action | Quick Actions
+ * Layout: Select | User (primary label) | LTV ($) | Platforms (icon cluster) | Touring badge | Last Action | Quick Actions
  *
  * Headers are hidden via `hideHeader` on the table. Icon columns use fixed widths
  * so layout never shifts when content appears/disappears.
@@ -104,29 +102,17 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     cell: renderUserCell,
     size: 260,
   }),
-  memberColumnHelper.accessor('intentLevel', {
-    id: 'intentScore',
-    header: 'Intent',
-    cell: renderIntentScoreCell,
-    size: 40,
-  }),
   memberColumnHelper.accessor('tipAmountTotalCents', {
     id: 'ltv',
     header: 'LTV',
     cell: renderLtvCell,
     size: 40,
   }),
-  memberColumnHelper.accessor('visits', {
-    id: 'returning',
-    header: 'Returning',
-    cell: renderReturningCell,
-    size: 40,
-  }),
-  memberColumnHelper.accessor('referrerHistory', {
-    id: 'source',
-    header: 'Source',
-    cell: renderSourceCell,
-    size: 40,
+  memberColumnHelper.display({
+    id: 'platforms',
+    header: 'Platforms',
+    cell: renderPlatformsCell,
+    size: 44,
   }),
   memberColumnHelper.display({
     id: 'touringCity',
