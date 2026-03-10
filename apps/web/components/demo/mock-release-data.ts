@@ -498,6 +498,13 @@ const NAMES = [
   'freq_rider',
 ];
 
+const INTENT_TAGS: Record<string, string[]> = {
+  high: ['superfan'],
+  medium: ['engaged'],
+};
+
+const DEMO_DEVICE_TYPES = ['mobile', 'desktop', 'tablet'] as const;
+
 function makeAudienceMember(index: number): AudienceMember {
   const name = NAMES[index % NAMES.length];
   const city = CITIES[index % CITIES.length];
@@ -546,14 +553,8 @@ function makeAudienceMember(index: number): AudienceMember {
     purchaseCount: index < 10 ? Math.floor(Math.random() * 3) : 0,
     tipAmountTotalCents: index < 15 ? Math.floor(Math.random() * 2000) : 0,
     tipCount: index < 15 ? Math.floor(Math.random() * 5) : 0,
-    tags:
-      intentLevel === 'high'
-        ? ['superfan']
-        : intentLevel === 'medium'
-          ? ['engaged']
-          : [],
-    deviceType:
-      index % 3 === 0 ? 'mobile' : index % 3 === 1 ? 'desktop' : 'tablet',
+    tags: INTENT_TAGS[intentLevel ?? ''] ?? [],
+    deviceType: DEMO_DEVICE_TYPES[index % 3],
     lastSeenAt: lastSeen.toISOString(),
   };
 }

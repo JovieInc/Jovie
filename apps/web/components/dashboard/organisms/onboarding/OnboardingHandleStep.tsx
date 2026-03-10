@@ -114,11 +114,9 @@ function ButtonContent({
   readonly autoSubmitClaimed: boolean;
 }) {
   const isLoading = isSubmitting || (isPendingSubmit && isChecking);
-  const buttonLabel = isSubmitting
-    ? 'Saving…'
-    : isLoading
-      ? 'Checking…'
-      : 'Continue';
+  let buttonLabel = 'Continue';
+  if (isSubmitting) buttonLabel = 'Saving…';
+  else if (isLoading) buttonLabel = 'Checking…';
 
   if (autoSubmitClaimed) {
     return (
