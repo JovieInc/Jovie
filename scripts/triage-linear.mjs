@@ -19,31 +19,33 @@
 
 const LINEAR_API_KEY = process.env.LINEAR_API_KEY;
 const GH_TOKEN = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-const DRY_RUN = !process.argv.includes("--apply");
-const TEAM_KEY = "JOV";
-const REPO = "JovieInc/Jovie";
+const DRY_RUN = !process.argv.includes('--apply');
+const TEAM_KEY = 'JOV';
+const REPO = 'JovieInc/Jovie';
 
 if (!LINEAR_API_KEY) {
-  console.error("ERROR: LINEAR_API_KEY is required");
-  console.error("  Set it via env var or use: doppler run -- node scripts/triage-linear.mjs");
+  console.error('ERROR: LINEAR_API_KEY is required');
+  console.error(
+    '  Set it via env var or use: doppler run -- node scripts/triage-linear.mjs'
+  );
   process.exit(1);
 }
 
 // ── Linear GraphQL helpers ───────────────────────────────────────────
 
 async function linearQuery(query, variables = {}) {
-  const res = await fetch("https://api.linear.app/graphql", {
-    method: "POST",
+  const res = await fetch('https://api.linear.app/graphql', {
+    method: 'POST',
     headers: {
       Authorization: LINEAR_API_KEY,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query, variables }),
   });
   const json = await res.json();
   if (json.errors) {
-    console.error("Linear API error:", JSON.stringify(json.errors, null, 2));
-    throw new Error("Linear API error");
+    console.error('Linear API error:', JSON.stringify(json.errors, null, 2));
+    throw new Error('Linear API error');
   }
   return json.data;
 }
@@ -103,13 +105,13 @@ async function fetchActiveIssues() {
 
 async function fetchMergedPRs() {
   if (!GH_TOKEN) {
-    console.warn("WARN: No GH_TOKEN — skipping GitHub PR cross-reference");
+    console.warn('WARN: No GH_TOKEN — skipping GitHub PR cross-reference');
     return [];
   }
 
   const headers = {
     Authorization: `Bearer ${GH_TOKEN}`,
-    Accept: "application/vnd.github+json",
+    Accept: 'application/vnd.github+json',
   };
 
   // Fetch last 100 merged PRs
@@ -121,7 +123,7 @@ async function fetchMergedPRs() {
     );
     const data = await res.json();
     if (!Array.isArray(data)) break;
-    const merged = data.filter((pr) => pr.merged_at);
+    const merged = data.filter(pr => pr.merged_at);
     prs.push(...merged);
     if (data.length < 100) break;
   }
@@ -137,16 +139,16 @@ function extractLinearIds(prBody) {
 
   // linear-issue-id marker
   const idMatch = prBody.match(/linear-issue-id:([^\s>-]+)/);
-  if (idMatch) ids.push({ type: "uuid", value: idMatch[1] });
+  if (idMatch) ids.push({ type: 'uuid', value: idMatch[1] });
 
   // linear-issue-identifier marker
   const identMatch = prBody.match(/linear-issue-identifier:([^\s>-]+)/);
-  if (identMatch) ids.push({ type: "identifier", value: identMatch[1] });
+  if (identMatch) ids.push({ type: 'identifier', value: identMatch[1] });
 
   // JOV-XXXX in title or body
   const jovMatches = prBody.match(/JOV-\d+/g) || [];
   for (const m of jovMatches) {
-    ids.push({ type: "identifier", value: m });
+    ids.push({ type: 'identifier', value: m });
   }
 
   return ids;
@@ -169,23 +171,25 @@ async function moveIssueToDone(issueId, doneStateId) {
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`\n🔍 Linear Triage Script ${DRY_RUN ? "(DRY RUN)" : "(APPLYING CHANGES)"}\n`);
+  console.log(
+    `\n🔍 Linear Triage Script ${DRY_RUN ? '(DRY RUN)' : '(APPLYING CHANGES)'}\n`
+  );
 
   // Step 1: Fetch active issues
-  console.log("Fetching active Linear issues...");
+  console.log('Fetching active Linear issues...');
   const { issues, states } = await fetchActiveIssues();
   console.log(`  Found ${issues.length} active issues\n`);
 
   const doneState = states.find(
-    (s) => s.type === "completed" || s.name.toLowerCase().includes("done")
+    s => s.type === 'completed' || s.name.toLowerCase().includes('done')
   );
   if (!doneState) {
-    console.error("ERROR: Could not find Done/Completed state");
+    console.error('ERROR: Could not find Done/Completed state');
     process.exit(1);
   }
 
   // Step 2: Fetch merged PRs
-  console.log("Fetching merged PRs from GitHub...");
+  console.log('Fetching merged PRs from GitHub...');
   const mergedPRs = await fetchMergedPRs();
   console.log(`  Found ${mergedPRs.length} recently merged PRs\n`);
 
@@ -194,13 +198,18 @@ async function main() {
   const mergedByUUID = new Map();
   for (const pr of mergedPRs) {
     const ids = [
-      ...extractLinearIds(pr.body || ""),
-      ...extractLinearIds(pr.title || ""),
+      ...extractLinearIds(pr.body || ''),
+      ...extractLinearIds(pr.title || ''),
     ];
     for (const id of ids) {
-      const info = { pr: pr.number, title: pr.title, mergedAt: pr.merged_at, url: pr.html_url };
-      if (id.type === "uuid") mergedByUUID.set(id.value, info);
-      if (id.type === "identifier") mergedByIdentifier.set(id.value, info);
+      const info = {
+        pr: pr.number,
+        title: pr.title,
+        mergedAt: pr.merged_at,
+        url: pr.html_url,
+      };
+      if (id.type === 'uuid') mergedByUUID.set(id.value, info);
+      if (id.type === 'identifier') mergedByIdentifier.set(id.value, info);
     }
   }
 
@@ -210,17 +219,20 @@ async function main() {
   const staleIssues = [];
   const skippedHumanReview = [];
 
-  const HUMAN_REVIEW_LABEL = "human-review-required";
-  const HUMAN_REVIEW_TEXT = "This issue requires human review";
+  const HUMAN_REVIEW_LABEL = 'human-review-required';
+  const HUMAN_REVIEW_TEXT = 'This issue requires human review';
   const STALE_DAYS = 14;
   const now = Date.now();
 
   for (const issue of issues) {
-    const labels = issue.labels.nodes.map((l) => l.name);
-    const desc = issue.description || "";
+    const labels = issue.labels.nodes.map(l => l.name);
+    const desc = issue.description || '';
 
     // Skip human-review-required
-    if (labels.includes(HUMAN_REVIEW_LABEL) || desc.includes(HUMAN_REVIEW_TEXT)) {
+    if (
+      labels.includes(HUMAN_REVIEW_LABEL) ||
+      desc.includes(HUMAN_REVIEW_TEXT)
+    ) {
       skippedHumanReview.push(issue);
       continue;
     }
@@ -238,12 +250,13 @@ async function main() {
     if (issue.priority <= 2 && issue.priority > 0) {
       flaggedImportant.push({
         issue,
-        reason: issue.priority === 1 ? "URGENT priority" : "HIGH priority",
+        reason: issue.priority === 1 ? 'URGENT priority' : 'HIGH priority',
       });
     }
 
     // Flag stale (no update in 14+ days)
-    const daysSinceUpdate = (now - new Date(issue.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
+    const daysSinceUpdate =
+      (now - new Date(issue.updatedAt).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSinceUpdate > STALE_DAYS) {
       staleIssues.push({
         issue,
@@ -253,60 +266,66 @@ async function main() {
   }
 
   // Step 4: Move merged issues to Done
-  console.log("═══════════════════════════════════════════════════");
-  console.log("  MERGED → MOVE TO DONE");
-  console.log("═══════════════════════════════════════════════════\n");
+  console.log('═══════════════════════════════════════════════════');
+  console.log('  MERGED → MOVE TO DONE');
+  console.log('═══════════════════════════════════════════════════\n');
 
   if (toMoveToDone.length === 0) {
-    console.log("  No issues to move — all merged PRs already synced.\n");
+    console.log('  No issues to move — all merged PRs already synced.\n');
   } else {
     for (const { issue, pr } of toMoveToDone) {
-      const action = DRY_RUN ? "[DRY RUN] Would move" : "Moving";
+      const action = DRY_RUN ? '[DRY RUN] Would move' : 'Moving';
       console.log(`  ${action}: ${issue.identifier} — ${issue.title}`);
-      console.log(`    Currently: ${issue.state.name} | Merged in: PR #${pr.pr} (${pr.mergedAt})`);
+      console.log(
+        `    Currently: ${issue.state.name} | Merged in: PR #${pr.pr} (${pr.mergedAt})`
+      );
       await moveIssueToDone(issue.id, doneState.id);
-      console.log(DRY_RUN ? "" : "    ✓ Done");
+      console.log(DRY_RUN ? '' : '    ✓ Done');
     }
-    console.log(`\n  Total: ${toMoveToDone.length} issues ${DRY_RUN ? "would be" : ""} moved to Done\n`);
+    console.log(
+      `\n  Total: ${toMoveToDone.length} issues ${DRY_RUN ? 'would be' : ''} moved to Done\n`
+    );
   }
 
   // Step 5: Flag important
-  console.log("═══════════════════════════════════════════════════");
-  console.log("  ⚠️  FLAGGED — IMPORTANT / NEEDS ATTENTION");
-  console.log("═══════════════════════════════════════════════════\n");
+  console.log('═══════════════════════════════════════════════════');
+  console.log('  ⚠️  FLAGGED — IMPORTANT / NEEDS ATTENTION');
+  console.log('═══════════════════════════════════════════════════\n');
 
   if (flaggedImportant.length === 0) {
-    console.log("  No urgent/high-priority issues in active states.\n");
+    console.log('  No urgent/high-priority issues in active states.\n');
   } else {
     for (const { issue, reason } of flaggedImportant) {
       console.log(`  ${issue.identifier} — ${issue.title}`);
       console.log(`    Status: ${issue.state.name} | Reason: ${reason}`);
-      console.log(`    Assignee: ${issue.assignee?.name || "Unassigned"}`);
+      console.log(`    Assignee: ${issue.assignee?.name || 'Unassigned'}`);
       console.log();
     }
   }
 
   // Step 6: Stale issues
-  console.log("═══════════════════════════════════════════════════");
-  console.log("  🕐 STALE — NO UPDATES IN 14+ DAYS");
-  console.log("═══════════════════════════════════════════════════\n");
+  console.log('═══════════════════════════════════════════════════');
+  console.log('  🕐 STALE — NO UPDATES IN 14+ DAYS');
+  console.log('═══════════════════════════════════════════════════\n');
 
   if (staleIssues.length === 0) {
-    console.log("  No stale issues.\n");
+    console.log('  No stale issues.\n');
   } else {
     for (const { issue, daysSinceUpdate } of staleIssues) {
       console.log(`  ${issue.identifier} — ${issue.title}`);
-      console.log(`    Status: ${issue.state.name} | Last updated: ${daysSinceUpdate} days ago`);
-      console.log(`    Assignee: ${issue.assignee?.name || "Unassigned"}`);
+      console.log(
+        `    Status: ${issue.state.name} | Last updated: ${daysSinceUpdate} days ago`
+      );
+      console.log(`    Assignee: ${issue.assignee?.name || 'Unassigned'}`);
       console.log();
     }
   }
 
   // Step 7: Skipped
   if (skippedHumanReview.length > 0) {
-    console.log("═══════════════════════════════════════════════════");
-    console.log("  SKIPPED — human-review-required");
-    console.log("═══════════════════════════════════════════════════\n");
+    console.log('═══════════════════════════════════════════════════');
+    console.log('  SKIPPED — human-review-required');
+    console.log('═══════════════════════════════════════════════════\n');
     for (const issue of skippedHumanReview) {
       console.log(`  ${issue.identifier} — ${issue.title}`);
     }
@@ -314,23 +333,27 @@ async function main() {
   }
 
   // Summary
-  console.log("═══════════════════════════════════════════════════");
-  console.log("  SUMMARY");
-  console.log("═══════════════════════════════════════════════════\n");
+  console.log('═══════════════════════════════════════════════════');
+  console.log('  SUMMARY');
+  console.log('═══════════════════════════════════════════════════\n');
   console.log(`  Active issues scanned:    ${issues.length}`);
-  console.log(`  Moved to Done:            ${toMoveToDone.length}${DRY_RUN ? " (dry run)" : ""}`);
+  console.log(
+    `  Moved to Done:            ${toMoveToDone.length}${DRY_RUN ? ' (dry run)' : ''}`
+  );
   console.log(`  Flagged important:        ${flaggedImportant.length}`);
   console.log(`  Stale (14+ days):         ${staleIssues.length}`);
   console.log(`  Skipped (human-review):   ${skippedHumanReview.length}`);
   console.log();
 
   if (DRY_RUN && toMoveToDone.length > 0) {
-    console.log("  Run with --apply to make changes:");
-    console.log("    LINEAR_API_KEY=... node scripts/triage-linear.mjs --apply\n");
+    console.log('  Run with --apply to make changes:');
+    console.log(
+      '    LINEAR_API_KEY=... node scripts/triage-linear.mjs --apply\n'
+    );
   }
 }
 
-main().catch((err) => {
-  console.error("Fatal error:", err);
+main().catch(err => {
+  console.error('Fatal error:', err);
   process.exit(1);
 });
