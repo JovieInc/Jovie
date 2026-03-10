@@ -196,7 +196,9 @@ describe('POST /api/audience/visit', () => {
           }),
         })
         .mockReturnValueOnce({
-          values: vi.fn().mockResolvedValue(undefined),
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
         });
 
       await callback({

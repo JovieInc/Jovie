@@ -301,26 +301,35 @@ export async function POST(request: NextRequest) {
         return;
       }
 
-      await tx.insert(audienceMembers).values({
-        creatorProfileId: profileId,
-        fingerprint,
-        type: 'anonymous',
-        displayName: 'Visitor',
-        firstSeenAt: now,
-        lastSeenAt: now,
-        visits: 1,
-        engagementScore: 1,
-        intentLevel: 'low',
-        geoCity: geoCityValue,
-        geoCountry: geoCountryValue,
-        deviceType: normalizedDevice,
-        referrerHistory,
-        utmParams: resolvedUtmParams,
-        tags: [],
-        latestActions: [],
-        updatedAt: now,
-        createdAt: now,
-      });
+      await tx
+        .insert(audienceMembers)
+        .values({
+          creatorProfileId: profileId,
+          fingerprint,
+          type: 'anonymous',
+          displayName: 'Visitor',
+          firstSeenAt: now,
+          lastSeenAt: now,
+          visits: 1,
+          engagementScore: 1,
+          intentLevel: 'low',
+          geoCity: geoCityValue,
+          geoCountry: geoCountryValue,
+          deviceType: normalizedDevice,
+          referrerHistory,
+          utmParams: resolvedUtmParams,
+          tags: [],
+          latestActions: [],
+          updatedAt: now,
+          createdAt: now,
+        })
+        .onConflictDoNothing({
+          target: [
+            audienceMembers.creatorProfileId,
+            audienceMembers.fingerprint,
+          ],
+          where: drizzleSql`${audienceMembers.fingerprint} IS NOT NULL`,
+        });
     });
 
     return NextResponse.json(
