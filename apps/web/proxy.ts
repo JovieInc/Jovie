@@ -252,6 +252,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // ========================================================================
     const pathInfo = categorizePath(pathname);
     const hostInfo = analyzeHost(hostname);
+    const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
 
     // ========================================================================
     // Generate CSP nonce early and set on request headers
@@ -382,6 +383,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathInfo.isAuthPath &&
       !pathInfo.isAuthCallbackPath &&
       !isRSCPrefetch &&
+      isNavigationMethod &&
       userState
     ) {
       const redirectUrl = sanitizeRedirectUrl(
@@ -438,16 +440,18 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         (!isWaitlistEnabled() || !userState.needsWaitlist) &&
         pathname === '/waitlist' &&
+        isNavigationMethod &&
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
+        isNavigationMethod &&
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (pathInfo.isAuthPath && !isRSCPrefetch) {
+      } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {
         // Redirect authenticated users away from any auth page (/signin, /sign-in,
         // /signup, /sign-up). Uses isAuthPath to cover all variants consistently.
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
