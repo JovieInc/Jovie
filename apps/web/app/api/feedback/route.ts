@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       logger.warn('[api/feedback] Slack notification failed', err);
     });
 
-    return NextResponse.json({ ok: true, id: feedback?.id ?? null });
+    return NextResponse.json({ ok: true, id: feedback.id });
   } catch {
     return NextResponse.json(
       { error: 'Unable to submit feedback' },
