@@ -149,6 +149,8 @@ function PlatformSuggestionItem({
   );
 }
 
+const randomWaveformLevel = () => 0.3 + Math.random() * 0.7;
+
 export const UniversalLinkInput = forwardRef<
   UniversalLinkInputRef,
   UniversalLinkInputProps
@@ -307,9 +309,7 @@ export const UniversalLinkInput = forwardRef<
           setRecordingDurationSeconds(current => current + 1);
         }, 1000);
         waveformTimerRef.current = globalThis.setInterval(() => {
-          setWaveformLevels(current =>
-            current.map(() => 0.3 + Math.random() * 0.7)
-          );
+          setWaveformLevels(current => current.map(randomWaveformLevel));
         }, 200);
       } catch {
         // Ignore permission errors until voice feature is enabled.
