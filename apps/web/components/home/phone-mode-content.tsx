@@ -22,7 +22,7 @@ export const MOCK_ARTIST = {
 } as const;
 
 export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-[color:var(--linear-text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.18)]';
+  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-[color:var(--linear-text-primary)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 
@@ -124,8 +124,7 @@ function ProfileContent() {
         aria-hidden='true'
         className={PHONE_CTA_CLASS}
         style={{
-          background:
-            'linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.05) 100%)',
+          backgroundColor: 'rgba(255,255,255,0.06)',
           borderColor: 'rgba(255,255,255,0.08)',
         }}
       >
@@ -134,15 +133,13 @@ function ProfileContent() {
       <div
         className='flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5'
         style={{
-          backgroundColor: 'rgba(255,255,255,0.025)',
-          border: '1px solid rgba(255,255,255,0.05)',
+          border: '1px solid rgba(255,255,255,0.06)',
         }}
       >
         {platforms.map(p => (
           <span
             key={p}
             className='inline-flex h-10 w-10 items-center justify-center rounded-full text-[color:var(--linear-text-tertiary)]'
-            style={{ backgroundColor: 'rgba(255,255,255,0.015)' }}
           >
             <SocialIcon platform={p} size={18} aria-hidden />
           </span>
