@@ -129,7 +129,12 @@ function ConnectedDspRows({
           label={entry.artistName || PROVIDER_LABELS[entry.provider]}
           url=''
           deepLinkPlatform={entry.provider}
-          badge='Connected'
+          trailingContent={
+            <span
+              className='ml-1 inline-flex h-2 w-2 shrink-0 rounded-full bg-success'
+              title='Connected'
+            />
+          }
           isEditable={Boolean(onDisconnect)}
           onRemove={
             onDisconnect ? () => onDisconnect(entry.provider) : undefined
