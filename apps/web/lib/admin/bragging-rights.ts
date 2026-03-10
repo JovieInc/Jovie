@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
-import { db } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import {
   clickEvents,
   dailyProfileViews,
@@ -92,6 +92,13 @@ async function getTopDistributors(): Promise<string[]> {
 
 async function getTotalProfileViews(): Promise<number> {
   try {
+    const hasDailyProfileViews = await doesTableExist(
+      TABLE_NAMES.dailyProfileViews
+    );
+    if (!hasDailyProfileViews) {
+      return 0;
+    }
+
     const [row] = await db
       .select({
         total: drizzleSql<number>`COALESCE(SUM(${dailyProfileViews.viewCount}), 0)::int`,
