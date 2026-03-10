@@ -1,7 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
@@ -90,7 +97,9 @@ export function useIngestProfile({
 
   // Use refs for stable access in effects to avoid re-render loops
   const artistSearchRef = useRef(artistSearch);
-  artistSearchRef.current = artistSearch;
+  useLayoutEffect(() => {
+    artistSearchRef.current = artistSearch;
+  });
 
   useEffect(() => {
     const detectedNetwork = getNetworkFromPlatform(detectedPlatform);
@@ -119,6 +128,39 @@ export function useIngestProfile({
 
   const ingestProfileMutation = useIngestProfileMutation();
 
+  const runIngestion = useCallback(
+    async (url: string): Promise<void> => {
+      const result = await ingestProfileMutation.mutateAsync({ url });
+      const profileId = result.profile?.id;
+      const profileUsername = result.profile?.username;
+      notifications.success(
+        profileUsername
+          ? `Created creator profile @${profileUsername}`
+          : 'Created new creator profile',
+        {
+          action: profileUsername
+            ? {
+                label: 'View profile',
+                onClick: () => router.push(`/${profileUsername}`),
+              }
+            : undefined,
+        }
+      );
+      if (profileId && profileUsername) {
+        onIngestPending?.({ id: profileId, username: profileUsername });
+      }
+      setIsSuccess(true);
+      setInputValue('');
+      artistSearchRef.current.clear();
+      router.refresh();
+      setTimeout(() => {
+        setOpen(false);
+        setIsSuccess(false);
+      }, 900);
+    },
+    [ingestProfileMutation, notifications, router, onIngestPending]
+  );
+
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -138,39 +180,9 @@ export function useIngestProfile({
           );
           return;
         }
-        // Use the top result's URL for ingestion
         setInputValue(topResult.url);
-        const normalizedUrl = getNormalizedInputUrl('spotify', topResult.url);
         try {
-          const result = await ingestProfileMutation.mutateAsync({
-            url: normalizedUrl,
-          });
-          const profileId = result.profile?.id;
-          const profileUsername = result.profile?.username;
-          notifications.success(
-            profileUsername
-              ? `Created creator profile @${profileUsername}`
-              : 'Created new creator profile',
-            {
-              action: profileUsername
-                ? {
-                    label: 'View profile',
-                    onClick: () => router.push(`/${profileUsername}`),
-                  }
-                : undefined,
-            }
-          );
-          if (profileId && profileUsername) {
-            onIngestPending?.({ id: profileId, username: profileUsername });
-          }
-          setIsSuccess(true);
-          setInputValue('');
-          artistSearchRef.current.clear();
-          router.refresh();
-          setTimeout(() => {
-            setOpen(false);
-            setIsSuccess(false);
-          }, 900);
+          await runIngestion(getNormalizedInputUrl('spotify', topResult.url));
         } catch (error) {
           console.error('Ingestion error', error);
           notifications.error(
@@ -192,39 +204,7 @@ export function useIngestProfile({
       }
 
       try {
-        const result = await ingestProfileMutation.mutateAsync({
-          url: normalizedUrl,
-        });
-
-        const profileId = result.profile?.id;
-        const profileUsername = result.profile?.username;
-        const successMessage = profileUsername
-          ? `Created creator profile @${profileUsername}`
-          : 'Created new creator profile';
-
-        notifications.success(successMessage, {
-          action: profileUsername
-            ? {
-                label: 'View profile',
-                onClick: () => router.push(`/${profileUsername}`),
-              }
-            : undefined,
-        });
-
-        if (profileId && profileUsername) {
-          onIngestPending?.({ id: profileId, username: profileUsername });
-        }
-
-        setIsSuccess(true);
-        setInputValue('');
-        artistSearchRef.current.clear();
-
-        router.refresh();
-
-        setTimeout(() => {
-          setOpen(false);
-          setIsSuccess(false);
-        }, 900);
+        await runIngestion(normalizedUrl);
       } catch (error) {
         console.error('Ingestion error', error);
         notifications.error(
@@ -233,14 +213,7 @@ export function useIngestProfile({
         setIsSuccess(false);
       }
     },
-    [
-      inputValue,
-      network,
-      notifications,
-      ingestProfileMutation,
-      router,
-      onIngestPending,
-    ]
+    [inputValue, network, notifications, runIngestion]
   );
 
   return {

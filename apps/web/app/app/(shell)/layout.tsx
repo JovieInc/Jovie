@@ -61,9 +61,7 @@ export default async function AppShellLayout({
             <AuthShellWrapper
               persistSidebarCollapsed={setSidebarCollapsed}
               sidebarDefaultOpen={sidebarDefaultOpen}
-              previewPanelDefaultOpen={
-                !isE2EClientRuntime && dashboardData.isFirstSession
-              }
+              previewPanelDefaultOpen
             >
               {children}
             </AuthShellWrapper>
