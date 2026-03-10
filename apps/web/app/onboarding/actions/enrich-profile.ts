@@ -16,6 +16,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   extractMusicFetchLinks,
+  type MusicFetchProfileFieldState,
   mapMusicFetchProfileFields,
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
 import {
@@ -120,6 +121,143 @@ async function processMusicFetchSocialLinks(
   }
 }
 
+async function loadMusicFetchData(
+  spotifyUrl: string
+): Promise<MusicFetchArtistResult | null> {
+  if (!isMusicFetchAvailable()) return null;
+
+  const [result] = await Promise.allSettled([
+    fetchArtistBySpotifyUrl(spotifyUrl),
+  ]);
+
+  if (result.status === 'rejected') {
+    await captureError(
+      'MusicFetch failed during onboarding enrichment',
+      result.reason,
+      { spotifyUrl }
+    );
+    return null;
+  }
+
+  return result.value;
+}
+
+async function loadSpotifyArtistIfNeeded(
+  spotifyArtistId: string,
+  profile: {
+    displayNameLocked: boolean | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean | null;
+    avatarUrl: string | null;
+  },
+  musicFetch: MusicFetchArtistResult | null
+): Promise<Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null> {
+  const needsData =
+    (!profile.displayNameLocked && !profile.displayName && !musicFetch?.name) ||
+    (!profile.avatarLockedByUser &&
+      !profile.avatarUrl &&
+      !musicFetch?.image?.url);
+
+  if (!needsData) return null;
+
+  const [result] = await Promise.allSettled([
+    getSpotifyArtistProfile(spotifyArtistId),
+  ]);
+
+  if (result.status === 'rejected') {
+    await captureError(
+      'Spotify artist fetch failed during onboarding enrichment',
+      result.reason,
+      { spotifyArtistId }
+    );
+    return null;
+  }
+
+  return result.value;
+}
+
+function buildEnrichmentUpdates(
+  profile: MusicFetchProfileFieldState & {
+    displayNameLocked: boolean | null;
+    displayName: string | null;
+  },
+  musicFetch: MusicFetchArtistResult | null,
+  artist: Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null,
+  spotifyUrl: string,
+  spotifyArtistId: string,
+  result: EnrichedProfileData,
+  profileUpdates: Partial<typeof creatorProfiles.$inferInsert>
+): void {
+  if (musicFetch) {
+    Object.assign(
+      profileUpdates,
+      mapMusicFetchProfileFields(
+        musicFetch,
+        profile,
+        spotifyUrl,
+        spotifyArtistId
+      )
+    );
+  }
+
+  // Display name from MusicFetch first, then Spotify fallback.
+  const enrichedName = musicFetch?.name ?? artist?.name;
+  if (enrichedName && !profile.displayNameLocked && !profile.displayName) {
+    profileUpdates.displayName = enrichedName;
+    result.name = enrichedName;
+  }
+
+  // Bio from MusicFetch (if not already set)
+  if (musicFetch?.bio && !profile.bio) {
+    profileUpdates.bio = musicFetch.bio;
+    result.bio = musicFetch.bio;
+  }
+
+  // Genres, followers, popularity from Spotify
+  if (artist?.genres && artist.genres.length > 0) {
+    profileUpdates.genres = artist.genres;
+    result.genres = artist.genres;
+  }
+  if (artist?.followers) {
+    profileUpdates.spotifyFollowers = artist.followers.total;
+    result.followers = artist.followers.total;
+  }
+  if (artist?.popularity != null) {
+    profileUpdates.spotifyPopularity = artist.popularity;
+  }
+
+  // Save Spotify URL and ID so DSP links render on the public profile
+  if (spotifyUrl) profileUpdates.spotifyUrl = spotifyUrl;
+  if (spotifyArtistId) profileUpdates.spotifyId = spotifyArtistId;
+}
+
+async function applyImageEnrichmentIfNeeded(
+  profile: {
+    id: string;
+    avatarLockedByUser: boolean | null;
+    avatarUrl: string | null;
+  },
+  musicFetch: MusicFetchArtistResult | null,
+  artist: Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null,
+  spotifyArtistId: string,
+  result: EnrichedProfileData,
+  profileUpdates: Partial<typeof creatorProfiles.$inferInsert>
+): Promise<void> {
+  if (profile.avatarLockedByUser || profile.avatarUrl) return;
+  const imageUrl =
+    musicFetch?.image?.url ?? getBestSpotifyImageUrl(artist?.images ?? []);
+  if (!imageUrl) return;
+  const imageSource = musicFetch?.image?.url ? 'musicfetch' : 'spotify';
+  await uploadProfileImage(
+    profile.id,
+    imageUrl,
+    imageSource,
+    spotifyArtistId,
+    result,
+    profileUpdates
+  );
+}
+
 /**
  * Enrich a creator profile from Spotify API + MusicFetch API.
  *
@@ -179,113 +317,34 @@ export async function enrichProfileFromDsp(
     followers: null,
   };
 
-  // Prioritize MusicFetch to reduce direct Spotify API load.
-  let musicFetch: Awaited<ReturnType<typeof fetchArtistBySpotifyUrl>> = null;
-  if (isMusicFetchAvailable()) {
-    const musicFetchData = await Promise.allSettled([
-      fetchArtistBySpotifyUrl(spotifyUrl),
-    ]);
-
-    const musicFetchResult = musicFetchData[0];
-    musicFetch =
-      musicFetchResult.status === 'fulfilled' ? musicFetchResult.value : null;
-
-    if (musicFetchResult.status === 'rejected') {
-      await captureError(
-        'MusicFetch failed during onboarding enrichment',
-        musicFetchResult.reason,
-        { spotifyUrl }
-      );
-    }
-  }
-
-  const needsSpotifyArtistData =
-    (!profile.displayNameLocked && !profile.displayName && !musicFetch?.name) ||
-    (!profile.avatarLockedByUser &&
-      !profile.avatarUrl &&
-      !musicFetch?.image?.url);
-
-  const spotifyArtist = needsSpotifyArtistData
-    ? await Promise.allSettled([getSpotifyArtistProfile(spotifyArtistId)])
-    : [];
-
-  const spotifyResult = spotifyArtist[0];
-  const artist =
-    spotifyResult?.status === 'fulfilled' ? spotifyResult.value : null;
-
-  if (spotifyResult?.status === 'rejected') {
-    await captureError(
-      'Spotify artist fetch failed during onboarding enrichment',
-      spotifyResult.reason,
-      { spotifyArtistId }
-    );
-  }
+  const musicFetch = await loadMusicFetchData(spotifyUrl);
+  const artist = await loadSpotifyArtistIfNeeded(
+    spotifyArtistId,
+    profile,
+    musicFetch
+  );
 
   // Build profile updates
   const profileUpdates: Partial<typeof creatorProfiles.$inferInsert> = {};
-
-  if (musicFetch) {
-    Object.assign(
-      profileUpdates,
-      mapMusicFetchProfileFields(
-        musicFetch,
-        profile,
-        spotifyUrl,
-        spotifyArtistId
-      )
-    );
-  }
-
-  // Display name from MusicFetch first, then Spotify fallback.
-  const enrichedName = musicFetch?.name ?? artist?.name;
-  if (enrichedName && !profile.displayNameLocked && !profile.displayName) {
-    profileUpdates.displayName = enrichedName;
-    result.name = enrichedName;
-  }
-
-  // Bio from MusicFetch (if not already set)
-  if (musicFetch?.bio && !profile.bio) {
-    profileUpdates.bio = musicFetch.bio;
-    result.bio = musicFetch.bio;
-  }
-
-  // Genres, followers, popularity from Spotify
-  if (artist?.genres && artist.genres.length > 0) {
-    profileUpdates.genres = artist.genres;
-    result.genres = artist.genres;
-  }
-  if (artist?.followers) {
-    profileUpdates.spotifyFollowers = artist.followers.total;
-    result.followers = artist.followers.total;
-  }
-  if (artist?.popularity != null) {
-    profileUpdates.spotifyPopularity = artist.popularity;
-  }
-
-  // Save Spotify URL and ID so DSP links render on the public profile
-  if (spotifyUrl) {
-    profileUpdates.spotifyUrl = spotifyUrl;
-  }
-  if (spotifyArtistId) {
-    profileUpdates.spotifyId = spotifyArtistId;
-  }
+  buildEnrichmentUpdates(
+    profile,
+    musicFetch,
+    artist,
+    spotifyUrl,
+    spotifyArtistId,
+    result,
+    profileUpdates
+  );
 
   // Upload profile image from MusicFetch first, then Spotify fallback.
-  if (!profile.avatarLockedByUser && !profile.avatarUrl) {
-    const imageUrl =
-      musicFetch?.image?.url ?? getBestSpotifyImageUrl(artist?.images ?? []);
-    if (imageUrl) {
-      const imageSource = musicFetch?.image?.url ? 'musicfetch' : 'spotify';
-      await uploadProfileImage(
-        profile.id,
-        imageUrl,
-        imageSource,
-        spotifyArtistId,
-        result,
-        profileUpdates
-      );
-    }
-  }
+  await applyImageEnrichmentIfNeeded(
+    profile,
+    musicFetch,
+    artist,
+    spotifyArtistId,
+    result,
+    profileUpdates
+  );
 
   // Apply profile updates
   if (Object.keys(profileUpdates).length > 0) {
