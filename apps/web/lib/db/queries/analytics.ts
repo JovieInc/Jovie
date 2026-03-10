@@ -1,6 +1,6 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getSessionSetupSql } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
@@ -340,6 +340,17 @@ export async function getUserDashboardAnalytics(
     const startDate = toStartDate(range);
     const recentThreshold = new Date();
     recentThreshold.setDate(recentThreshold.getDate() - 7);
+    const hasDailyProfileViews = await doesTableExist(
+      TABLE_NAMES.dailyProfileViews
+    );
+    const totalViewsSelect = hasDailyProfileViews
+      ? drizzleSql`(
+          select coalesce(sum(${dailyProfileViews.viewCount}), 0)
+          from ${dailyProfileViews}
+          where ${dailyProfileViews.creatorProfileId} = ${creatorProfile.id}
+            and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
+        )`
+      : drizzleSql`0`;
     // Consolidated dashboard analytics into one SQL round trip (previously eight queries).
     // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
     // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
@@ -447,15 +458,9 @@ export async function getUserDashboardAnalytics(
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.updatedAt} >= ${sqlTimestamp(startDate)}
                 and ${audienceMembers.email} is not null
-            ),
-            audience_views as (
-              select coalesce(sum(${dailyProfileViews.viewCount}), 0) as total_views
-              from ${dailyProfileViews}
-              where ${dailyProfileViews.creatorProfileId} = ${creatorProfile.id}
-                and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
             )
             select
-              (select total_views from audience_views) as total_views,
+              ${totalViewsSelect} as total_views,
               (select count(*) from audience_recent) as unique_users,
               (select count(*) from ranged_events) as total_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,

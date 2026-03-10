@@ -142,7 +142,7 @@ export function ReleaseTable({
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1)';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out';
+          'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-150 ease-out';
       }
 
       const refreshClassName = isRefreshing
@@ -152,7 +152,7 @@ export function ReleaseTable({
         ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
         : '';
 
-      return [baseClassName, refreshClassName, flashClassName]
+      return ['rounded-md', baseClassName, refreshClassName, flashClassName]
         .filter(Boolean)
         .join(' ');
     },

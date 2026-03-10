@@ -21,7 +21,9 @@ import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
 export function ClaimHandleForm({
   onHandleChange,
+  size = 'default',
 }: Readonly<ClaimHandleFormProps>) {
+  const isHero = size === 'hero';
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,33 +129,52 @@ export function ClaimHandleForm({
       <div
         className={cn(
           'claim-input-row',
-          'relative flex w-full items-center gap-2 rounded-[14px] p-1.5',
-          'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          isHero ? 'rounded-2xl p-2' : 'rounded-[14px] p-1.5',
           isAvailable && 'claim-input-row--available'
         )}
         style={{
-          minHeight: 52,
-          background: 'rgba(255,255,255,0.03)',
-          border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
-          boxShadow: [
-            'inset 0 1px 2px rgba(0,0,0,0.2)',
-            isAvailable
-              ? '0 0 20px rgba(74,222,128,0.06)'
-              : '0 1px 2px rgba(0,0,0,0.1)',
-          ].join(', '),
+          minHeight: isHero ? 72 : 52,
+          background: isHero
+            ? 'rgba(255,255,255,0.04)'
+            : 'rgba(255,255,255,0.03)',
+          border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.25)' : isHero ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}`,
+          boxShadow: isHero
+            ? [
+                'inset 0 1px 3px rgba(0,0,0,0.25)',
+                isAvailable
+                  ? '0 0 24px rgba(74,222,128,0.08)'
+                  : '0 2px 8px rgba(0,0,0,0.2)',
+              ].join(', ')
+            : [
+                'inset 0 1px 2px rgba(0,0,0,0.2)',
+                isAvailable
+                  ? '0 0 20px rgba(74,222,128,0.06)'
+                  : '0 1px 2px rgba(0,0,0,0.1)',
+              ].join(', '),
         }}
       >
         <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
           {/* Domain prefix — etched, permanent feel */}
           <span
-            className='shrink-0 select-none font-mono'
-            style={{
-              fontSize: '13px',
-              fontWeight: 400,
-              color: 'var(--linear-text-quaternary)',
-              letterSpacing: '-0.02em',
-              opacity: 0.7,
-            }}
+            className='shrink-0 select-none'
+            style={
+              isHero
+                ? {
+                    fontSize: '22px',
+                    fontWeight: 510,
+                    letterSpacing: '-0.03em',
+                    color: 'var(--linear-text-quaternary)',
+                    fontFamily: 'inherit',
+                  }
+                : {
+                    fontSize: '13px',
+                    fontWeight: 400,
+                    color: 'var(--linear-text-tertiary)',
+                    letterSpacing: '-0.02em',
+                    fontFamily: 'monospace',
+                  }
+            }
           >
             {displayDomain}/
           </span>
@@ -164,22 +185,33 @@ export function ClaimHandleForm({
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='your-name'
+            placeholder={isHero ? 'you' : 'your-name'}
             required
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-40 placeholder:text-[var(--linear-text-tertiary)]'
-            style={{
-              fontSize: '13px',
-              fontWeight: 450,
-              letterSpacing: '-0.01em',
-              color: isAvailable
-                ? 'rgb(74,222,128)'
-                : 'var(--linear-text-primary)',
-            }}
+            className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHero ? 'placeholder:text-[var(--linear-text-quaternary)]' : 'placeholder:text-[var(--linear-text-tertiary)]'}`}
+            style={
+              isHero
+                ? {
+                    fontSize: '22px',
+                    fontWeight: 510,
+                    letterSpacing: '-0.03em',
+                    color: isAvailable
+                      ? 'rgb(74,222,128)'
+                      : 'var(--linear-text-primary)',
+                  }
+                : {
+                    fontSize: '13px',
+                    fontWeight: 450,
+                    letterSpacing: '-0.01em',
+                    color: isAvailable
+                      ? 'rgb(74,222,128)'
+                      : 'var(--linear-text-primary)',
+                  }
+            }
           />
 
           <HandleStatusIcon
@@ -195,15 +227,16 @@ export function ClaimHandleForm({
           type='submit'
           disabled={isDisabled}
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[10px] px-4 sm:px-5 transition-all duration-200 focus-ring-themed',
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
+            isHero ? 'rounded-[14px] px-6' : 'rounded-[10px] px-4 sm:px-5',
             isDisabled
               ? 'cursor-not-allowed opacity-40'
               : 'hover:brightness-110 active:scale-[0.98]'
           )}
           style={{
-            height: 36,
-            fontSize: '13px',
-            fontWeight: 500,
+            height: isHero ? 52 : 36,
+            fontSize: isHero ? '15px' : '13px',
+            fontWeight: 510,
             letterSpacing: '-0.01em',
             background: isDisabled
               ? 'rgba(255,255,255,0.06)'

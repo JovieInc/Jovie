@@ -13,7 +13,7 @@ import { unstable_cache } from 'next/cache';
 
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
-import { discogReleases } from '@/lib/db/schema/content';
+import { discogReleases, discogTracks } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 const PLATFORM_STATS_CACHE_SECONDS = 60 * 10;
@@ -32,6 +32,7 @@ export interface AdminPlatformStats {
   readonly contactsCaptured: number;
   readonly creatorsOnPlatform: number;
   readonly releasesTracked: number;
+  readonly tracksTracked: number;
 }
 
 function normalizeName(value: string): string {
@@ -76,18 +77,32 @@ const getCachedAdminPlatformStats = unstable_cache(
       contacts,
       creators,
       releases,
+      tracks,
     ] = await Promise.all([
       db
         .select({ value: discogReleases.label })
         .from(discogReleases)
+        .innerJoin(
+          creatorProfiles,
+          eq(discogReleases.creatorProfileId, creatorProfiles.id)
+        )
         .where(
-          and(isNotNull(discogReleases.label), ne(discogReleases.label, ''))
+          and(
+            eq(creatorProfiles.isClaimed, true),
+            isNotNull(discogReleases.label),
+            ne(discogReleases.label, '')
+          )
         ),
       db
         .select({ value: discogReleases.distributor })
         .from(discogReleases)
+        .innerJoin(
+          creatorProfiles,
+          eq(discogReleases.creatorProfileId, creatorProfiles.id)
+        )
         .where(
           and(
+            eq(creatorProfiles.isClaimed, true),
             isNotNull(discogReleases.distributor),
             ne(discogReleases.distributor, '')
           )
@@ -114,8 +129,26 @@ const getCachedAdminPlatformStats = unstable_cache(
             count(DISTINCT phone) FILTER (WHERE phone IS NOT NULL AND phone <> '')::int AS phone_count
           FROM notification_subscriptions
         `),
-      db.select({ count: count() }).from(creatorProfiles),
-      db.select({ count: count() }).from(discogReleases),
+      db
+        .select({ count: count() })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.isClaimed, true)),
+      db
+        .select({ count: count() })
+        .from(discogReleases)
+        .innerJoin(
+          creatorProfiles,
+          eq(discogReleases.creatorProfileId, creatorProfiles.id)
+        )
+        .where(eq(creatorProfiles.isClaimed, true)),
+      db
+        .select({ count: count() })
+        .from(discogTracks)
+        .innerJoin(
+          creatorProfiles,
+          eq(discogTracks.creatorProfileId, creatorProfiles.id)
+        )
+        .where(eq(creatorProfiles.isClaimed, true)),
     ]);
 
     const combinedValues = [
@@ -137,6 +170,7 @@ const getCachedAdminPlatformStats = unstable_cache(
         Number(contacts.rows[0]?.phone_count ?? 0),
       creatorsOnPlatform: Number(creators[0]?.count ?? 0),
       releasesTracked: Number(releases[0]?.count ?? 0),
+      tracksTracked: Number(tracks[0]?.count ?? 0),
     };
   },
   ['admin-platform-stats'],

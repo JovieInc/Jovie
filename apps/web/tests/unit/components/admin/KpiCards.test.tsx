@@ -12,7 +12,20 @@ const defaultMetrics: AdminFunnelMetrics = {
   paidConversions7d: 2,
   paidConversionRate: 0.2,
   mrrUsd: 500,
+  arrUsd: 6000,
+  payingCustomers: 12,
   runwayMonths: null,
+  defaultAliveDate: null,
+  wowGrowthRate: null,
+  momGrowthRate: 0.25,
+  churnRate: null,
+  retention30d: null,
+  retention60d: null,
+  retention90d: null,
+  engagementActiveProfiles30d: null,
+  cacUsd: null,
+  ltvUsd: null,
+  paybackPeriodMonths: null,
   stripeAvailable: true,
   errors: [],
   outreachToSignupRate: 0.067,
@@ -24,22 +37,23 @@ describe('FunnelMetricsStrip', () => {
   it('renders growth KPI metrics', () => {
     render(<FunnelMetricsStrip metrics={defaultMetrics} />);
 
-    expect(screen.getByText('Signups (7d)')).toBeInTheDocument();
-    expect(screen.getByText('Paid Conversions (7d)')).toBeInTheDocument();
     expect(screen.getByText('MRR')).toBeInTheDocument();
+    expect(screen.getByText('ARR')).toBeInTheDocument();
     expect(screen.getByText('Runway')).toBeInTheDocument();
+    expect(screen.getByText('Paying customers')).toBeInTheDocument();
+    expect(screen.getByText('YC metrics')).toBeInTheDocument();
   });
 
-  it('displays correct signups count', () => {
+  it('displays paying customer count', () => {
     render(<FunnelMetricsStrip metrics={defaultMetrics} />);
 
-    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
   });
 
-  it('displays paid conversion rate in subtitle', () => {
+  it('displays growth rates summary', () => {
     render(<FunnelMetricsStrip metrics={defaultMetrics} />);
 
-    expect(screen.getByText('20.0% of signups')).toBeInTheDocument();
+    expect(screen.getByText('WoW — · MoM 25.0%')).toBeInTheDocument();
   });
 
   it('displays MRR formatted as currency', () => {
@@ -57,17 +71,9 @@ describe('FunnelMetricsStrip', () => {
 
     render(<FunnelMetricsStrip metrics={noStripeMetrics} />);
 
-    // MRR and Runway both show '--'
-    const dashes = screen.getAllByText('--');
+    // MRR and Runway both show fallback placeholders
+    const dashes = screen.getAllByText('—');
     expect(dashes.length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('does not render outreach funnel metrics (moved to pipeline card)', () => {
-    render(<FunnelMetricsStrip metrics={defaultMetrics} />);
-
-    expect(screen.queryByText('Outreach Sent (7d)')).not.toBeInTheDocument();
-    expect(screen.queryByText('Claim Rate')).not.toBeInTheDocument();
-    expect(screen.queryByText('Signup Rate')).not.toBeInTheDocument();
   });
 
   it('shows actionable message when runway cannot be calculated (no balance data)', () => {
