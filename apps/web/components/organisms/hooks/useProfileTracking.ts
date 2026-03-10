@@ -63,7 +63,10 @@ function extractUtmParams():
   return utm;
 }
 
-export function useProfileVisitTracking(artistId?: string) {
+export function useProfileVisitTracking(
+  artistId?: string,
+  trackingToken?: string
+) {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistId) return;
@@ -78,12 +81,13 @@ export function useProfileVisitTracking(artistId?: string) {
         profileId: artistId,
         referrer,
         ...(utmParams && { utmParams }),
+        ...(trackingToken && { trackingToken }),
       }),
       keepalive: true,
     }).catch(() => {
       // Ignore tracking errors
     });
-  }, [artistId]);
+  }, [artistId, trackingToken]);
 }
 
 export function usePopstateReset(callback: () => void) {
