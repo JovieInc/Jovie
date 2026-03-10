@@ -289,6 +289,12 @@ export function ReleaseSidebar({
     ? `${release.title} artwork`
     : 'Release artwork';
 
+  const previewAriaLabel = !sidebarPreviewUrl
+    ? 'No preview available'
+    : isReleasePlaying
+      ? 'Pause preview'
+      : 'Play preview';
+
   // Build the entity header: artwork (left) with play overlay + compact fields (right)
   const entityHeader =
     release && !selectedTrack ? (
@@ -351,13 +357,7 @@ export function ReleaseSidebar({
                 'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
                 'disabled:pointer-events-none disabled:hidden'
               )}
-              aria-label={
-                !sidebarPreviewUrl
-                  ? 'No preview available'
-                  : isReleasePlaying
-                    ? 'Pause preview'
-                    : 'Play preview'
-              }
+              aria-label={previewAriaLabel}
             >
               {isReleasePlaying ? (
                 <Pause className='h-5 w-5 text-white drop-shadow-sm' />
