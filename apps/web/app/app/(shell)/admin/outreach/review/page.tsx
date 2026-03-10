@@ -2,7 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
@@ -40,8 +40,8 @@ const SIGNAL_CONFIG: Record<
 function renderReviewRows(
   loading: boolean,
   leads: ReviewLead[],
-  renderRow: (lead: ReviewLead) => React.ReactNode
-): React.ReactNode {
+  renderRow: (lead: ReviewLead) => ReactNode
+): ReactNode {
   if (loading) {
     return (
       <tr>
