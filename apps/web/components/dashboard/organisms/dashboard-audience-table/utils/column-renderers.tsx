@@ -140,16 +140,16 @@ export function renderPlatformsCell({
 }: CellContext<AudienceMember, unknown>) {
   return (
     <div className='flex items-center justify-center'>
-      <div className='inline-flex items-center gap-0'>
+      <div className='inline-flex items-center gap-1'>
         <AudienceIntentScoreCell
           intentLevel={row.original.intentLevel}
-          className='w-3.5'
+          className='w-4'
         />
-        <AudienceReturningCell visits={row.original.visits} className='w-3.5' />
+        <AudienceReturningCell visits={row.original.visits} className='w-4' />
         <AudienceSourceCell
           referrerHistory={row.original.referrerHistory}
           utmParams={row.original.utmParams}
-          className='w-3.5'
+          className='w-4'
         />
       </div>
     </div>
