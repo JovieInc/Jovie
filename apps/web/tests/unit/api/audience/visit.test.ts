@@ -177,7 +177,7 @@ describe('POST /api/audience/visit', () => {
     expect(data.error).toBe('Profile is not public');
   });
 
-  it('records visit for valid public profile', async () => {
+  it('handles duplicate daily view insert race without failing request', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -187,13 +187,31 @@ describe('POST /api/audience/visit', () => {
         }),
       }),
     });
+
+    const duplicateError = Object.assign(new Error('duplicate key value'), {
+      code: '23505',
+    });
+
     mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockUpdate = vi
+        .fn()
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        });
+
       const mockInsert = vi
         .fn()
         .mockReturnValueOnce({
-          values: vi.fn().mockReturnValue({
-            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
-          }),
+          values: vi.fn().mockRejectedValue(duplicateError),
         })
         .mockReturnValueOnce({
           values: vi.fn().mockResolvedValue(undefined),
@@ -207,6 +225,59 @@ describe('POST /api/audience/visit', () => {
             }),
           }),
         }),
+        update: mockUpdate,
+        insert: mockInsert,
+      });
+    });
+
+    const { POST } = await import('@/app/api/audience/visit/route');
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+  });
+
+  it('records visit for valid public profile', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockUpdate = vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        update: mockUpdate,
         insert: mockInsert,
       });
     });
