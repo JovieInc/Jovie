@@ -58,6 +58,24 @@ function decodeCursor(raw: string): SubscriberCursor | null {
   }
 }
 
+function buildCursorFragment(
+  cursor: SubscriberCursor | null,
+  direction: string,
+  sortCol: string
+) {
+  if (!cursor) return drizzleSql``;
+  if (direction === 'asc') {
+    return drizzleSql`AND (
+              ${drizzleSql.raw(sortCol)} > ${cursor.sortValue}
+              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id > ${cursor.id})
+            )`;
+  }
+  return drizzleSql`AND (
+              ${drizzleSql.raw(sortCol)} < ${cursor.sortValue}
+              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id < ${cursor.id})
+            )`;
+}
+
 function extractSortValue(
   lastRow: {
     email: string | null;
@@ -123,17 +141,7 @@ export async function GET(request: Request) {
       //   OR (sortValue = cursor.sortValue AND id > cursor.id)
       // For (sortCol DESC, id DESC): after cursor means sortValue < cursor.sortValue
       //   OR (sortValue = cursor.sortValue AND id < cursor.id)
-      const cursorFragment = cursor
-        ? direction === 'asc'
-          ? drizzleSql`AND (
-              ${drizzleSql.raw(sortCol)} > ${cursor.sortValue}
-              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id > ${cursor.id})
-            )`
-          : drizzleSql`AND (
-              ${drizzleSql.raw(sortCol)} < ${cursor.sortValue}
-              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id < ${cursor.id})
-            )`
-        : drizzleSql``;
+      const cursorFragment = buildCursorFragment(cursor, direction, sortCol);
 
       // Deduplicate by contact identifier: keep the most recent subscription per
       // unique phone/email using DISTINCT ON. A subquery is required because

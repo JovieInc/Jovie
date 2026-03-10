@@ -174,7 +174,7 @@ export function PricingComparisonChart() {
               : 'var(--linear-text-tertiary)',
           }}
         >
-          Annual
+          {'Annual'}
           <span
             className='ml-1.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium'
             style={{

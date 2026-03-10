@@ -70,6 +70,16 @@ const ACTION_LABELS: Record<string, string> = {
   other: 'clicked a link',
 };
 
+function getRawTipAmount(
+  context: Record<string, unknown> | undefined
+): number | undefined {
+  if (typeof context?.tipAmountCents === 'number')
+    return context.tipAmountCents;
+  if (typeof context?.tipAmount === 'number')
+    return Math.round(context.tipAmount * 100);
+  return undefined;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting: Check IP-based rate limit for track events
@@ -267,12 +277,9 @@ export async function POST(request: NextRequest) {
         metadata.utmParams = utmParams;
       }
 
-      const rawTipAmount =
-        typeof context?.tipAmountCents === 'number'
-          ? context.tipAmountCents
-          : typeof context?.tipAmount === 'number'
-            ? Math.round(context.tipAmount * 100)
-            : undefined;
+      const rawTipAmount = getRawTipAmount(
+        context as Record<string, unknown> | undefined
+      );
 
       if (
         linkType === 'tip' &&
