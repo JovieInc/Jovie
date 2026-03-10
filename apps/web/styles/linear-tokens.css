@@ -365,6 +365,61 @@
 }
 
 /* ============================================
+   MARKETING LIGHT-THEME OVERRIDE
+   Applied to .linear-marketing to force light mode
+   regardless of the global html.dark class.
+   ============================================ */
+
+.linear-marketing {
+  /* Text — light mode values */
+  --linear-text-primary: oklch(12% 0.005 260);
+  --linear-text-secondary: oklch(45% 0.012 260);
+  --linear-text-tertiary: oklch(55% 0.01 260);
+  --linear-text-quaternary: oklch(70% 0.008 260);
+  --linear-text-inverse: oklch(97% 0.005 260);
+  /* Backgrounds — clean off-whites */
+  --linear-bg-page: oklch(98.5% 0.002 260);
+  --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
+  --linear-bg-surface-0: oklch(100% 0 0);
+  --linear-bg-surface-1: oklch(97% 0.002 260);
+  --linear-bg-surface-2: oklch(95% 0.003 260);
+  --linear-bg-button: oklch(92% 0.005 260);
+  --linear-bg-footer: oklch(98.5% 0.002 260);
+  --linear-border-footer: oklch(90% 0.005 260);
+  --linear-bg-hover: rgba(0, 0, 0, 0.04);
+  /* Borders — light mode */
+  --linear-border-subtle: rgba(0, 0, 0, 0.06);
+  --linear-border-default: rgba(0, 0, 0, 0.1);
+  --linear-border-strong: rgba(0, 0, 0, 0.15);
+  --linear-border-focus: oklch(55% 0.15 270);
+  /* Buttons */
+  --linear-btn-primary-bg: oklch(15% 0.005 260);
+  --linear-btn-primary-fg: oklch(98% 0 0);
+  --linear-btn-primary-hover: oklch(22% 0.005 260);
+  --linear-btn-primary-border: oklch(15% 0.005 260);
+  --linear-btn-secondary-bg: oklch(94% 0.005 260);
+  --linear-btn-secondary-fg: oklch(20% 0.005 260);
+  --linear-btn-secondary-hover: oklch(90% 0.005 260);
+  /* Hero tokens */
+  --linear-hero-glow: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    oklch(92% 0.02 270 / 0.25),
+    transparent 70%
+  );
+  --linear-hero-gradient-from: oklch(40% 0.06 270);
+  --linear-hero-gradient-to: oklch(55% 0.04 270);
+  --linear-separator-from: rgba(0, 0, 0, 0.08);
+  --linear-separator-via: rgba(0, 0, 0, 0.04);
+  /* Shadows */
+  --linear-shadow-button:
+    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
+    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
+    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
+  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
+  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================
    SEMANTIC ALIASES
    Map Linear tokens to semantic names for easier use
    ============================================ */
