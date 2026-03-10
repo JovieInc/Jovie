@@ -6,8 +6,8 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
 import {
-  hasRecentDispatch,
-  markRecentDispatch,
+  acquireRecentDispatch,
+  clearRecentDispatch,
 } from '@/lib/webhooks/recent-dispatch';
 
 export const runtime = 'nodejs';
@@ -174,6 +174,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let dedupeAcquired = false;
+  let dedupeKeyForRetry: string | null = null;
+
   try {
     const body = await request.text();
     const signature = request.headers.get('linear-signature');
@@ -214,7 +217,14 @@ export async function POST(request: NextRequest) {
     }
 
     const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'todo'}`;
-    if (await hasRecentDispatch('linear', dedupeKey)) {
+    dedupeKeyForRetry = dedupeKey;
+    dedupeAcquired = await acquireRecentDispatch(
+      'linear',
+      dedupeKey,
+      DEDUPE_TTL_SECONDS
+    );
+
+    if (!dedupeAcquired) {
       return NextResponse.json(
         { received: true, deduplicated: true },
         { headers: NO_STORE_HEADERS }
@@ -264,13 +274,12 @@ export async function POST(request: NextRequest) {
         status: dispatchResponse.status,
         error: errorText,
       });
+      await clearRecentDispatch('linear', dedupeKey);
       return NextResponse.json(
         { error: 'Dispatch failed' },
         { status: 502, headers: NO_STORE_HEADERS }
       );
     }
-
-    await markRecentDispatch('linear', dedupeKey, DEDUPE_TTL_SECONDS);
 
     return NextResponse.json(
       { received: true, dispatched: true },
@@ -278,6 +287,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     if (error instanceof ServerFetchTimeoutError) {
+      if (dedupeAcquired && dedupeKeyForRetry) {
+        await clearRecentDispatch('linear', dedupeKeyForRetry);
+      }
       await captureCriticalError('Linear webhook dispatch timed out', error, {
         route: '/api/webhooks/linear',
         timeoutMs: error.timeoutMs,
@@ -286,6 +298,10 @@ export async function POST(request: NextRequest) {
         { error: 'Dispatch timed out' },
         { status: 502, headers: NO_STORE_HEADERS }
       );
+    }
+
+    if (dedupeAcquired && dedupeKeyForRetry) {
+      await clearRecentDispatch('linear', dedupeKeyForRetry);
     }
 
     await captureCriticalError('Linear webhook processing failed', error, {

@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockServerFetch = vi.hoisted(() => vi.fn());
-const mockHasRecentDispatch = vi.hoisted(() => vi.fn());
-const mockMarkRecentDispatch = vi.hoisted(() => vi.fn());
+const mockAcquireRecentDispatch = vi.hoisted(() => vi.fn());
+const mockClearRecentDispatch = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
@@ -39,8 +39,8 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 vi.mock('@/lib/webhooks/recent-dispatch', () => ({
-  hasRecentDispatch: mockHasRecentDispatch,
-  markRecentDispatch: mockMarkRecentDispatch,
+  acquireRecentDispatch: mockAcquireRecentDispatch,
+  clearRecentDispatch: mockClearRecentDispatch,
 }));
 
 function sign(body: string): string {
@@ -54,7 +54,7 @@ describe('POST /api/webhooks/sentry', () => {
   });
 
   it('returns deduplicated response when a recent dispatch exists', async () => {
-    mockHasRecentDispatch.mockResolvedValue(true);
+    mockAcquireRecentDispatch.mockResolvedValue(false);
 
     const { POST } = await import('@/app/api/webhooks/sentry/route');
     const payload = {
@@ -80,13 +80,13 @@ describe('POST /api/webhooks/sentry', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ received: true, deduplicated: true });
     expect(mockServerFetch).not.toHaveBeenCalled();
-    expect(mockMarkRecentDispatch).not.toHaveBeenCalled();
+    expect(mockClearRecentDispatch).not.toHaveBeenCalled();
   });
 
   it('returns 502 when the GitHub dispatch times out', async () => {
     const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
 
-    mockHasRecentDispatch.mockResolvedValue(false);
+    mockAcquireRecentDispatch.mockResolvedValue(true);
     mockServerFetch.mockRejectedValue(
       new ServerFetchTimeoutError('timed out', 5000)
     );
@@ -114,6 +114,7 @@ describe('POST /api/webhooks/sentry', () => {
 
     expect(response.status).toBe(502);
     expect(data).toEqual({ error: 'Dispatch timed out' });
+    expect(mockClearRecentDispatch).toHaveBeenCalledWith('sentry', '42');
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Sentry webhook dispatch timed out',
       expect.any(ServerFetchTimeoutError),
