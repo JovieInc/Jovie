@@ -7,6 +7,7 @@ type BuildCspOptions = {
   nonce: string;
   isDev?: boolean;
   enableToolbar?: boolean;
+  allowTestRuntimeRelaxations?: boolean;
 };
 
 /**
@@ -138,11 +139,14 @@ const buildCspDirectives = ({
   nonce,
   isDev = isDevelopment(),
   enableToolbar = !process.env.NEXT_DISABLE_TOOLBAR,
+  allowTestRuntimeRelaxations = false,
 }: BuildCspOptions): string[] => {
   // 'unsafe-eval' is only needed when @vercel/toolbar is active (its client
   // runtime uses eval()). Nonce-based CSP still prevents script injection.
-  const evalDirective = enableToolbar ? " 'unsafe-eval'" : '';
-  const scriptSrc = `${STATIC_CSP_PARTS.scriptSrcPrefix} 'nonce-${nonce}'${evalDirective} ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
+  const evalDirective =
+    enableToolbar || allowTestRuntimeRelaxations ? " 'unsafe-eval'" : '';
+  const inlineDirective = allowTestRuntimeRelaxations ? " 'unsafe-inline'" : '';
+  const scriptSrc = `${STATIC_CSP_PARTS.scriptSrcPrefix}${inlineDirective} 'nonce-${nonce}'${evalDirective} ${STATIC_CSP_PARTS.scriptSrcSuffix}`;
 
   // Build connect-src with optional dev localhost
   // Note: localhost:25000 is Turbopack HMR, localhost:25011 is Vercel toolbar

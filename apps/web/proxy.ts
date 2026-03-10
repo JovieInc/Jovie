@@ -411,6 +411,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/') &&
+        pathname !== '/app' &&
         !pathname.startsWith('/app/')
       ) {
         res = NextResponse.rewrite(new URL('/waitlist', req.url), {
@@ -420,6 +421,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         userState.needsOnboarding &&
         pathname !== '/onboarding' &&
         !pathname.startsWith('/api/') &&
+        pathname !== '/app' &&
         !pathname.startsWith('/app/')
       ) {
         const onboardingJustCompleted =
@@ -504,16 +506,18 @@ function buildFinalResponse(
   // Set CSP headers using the pre-generated nonce
   // The nonce was already set on request headers for Server Components
   if (nonce && pathInfo.needsNonce) {
+    const allowTestRuntimeRelaxations = process.env.E2E_ALLOW_DEV_CSP === '1';
     res.headers.set(SCRIPT_NONCE_HEADER, nonce);
     res.headers.set(
       'Content-Security-Policy',
-      buildContentSecurityPolicy({ nonce })
+      buildContentSecurityPolicy({ nonce, allowTestRuntimeRelaxations })
     );
 
     const cspReportUri = getCspReportUri();
     if (cspReportUri) {
       const reportOnlyPolicy = buildContentSecurityPolicyReportOnly({
         nonce,
+        allowTestRuntimeRelaxations,
         reportUri: cspReportUri,
       });
       if (reportOnlyPolicy) {

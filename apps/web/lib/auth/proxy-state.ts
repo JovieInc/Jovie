@@ -177,7 +177,6 @@ function hasCompleteProfile(result: {
     !!result.profileUsername &&
     !!result.profileUsernameNormalized &&
     !!result.profileDisplayName?.trim() &&
-    !!result.profileAvatarUrl?.trim() &&
     result.profileIsPublic !== false
   );
 }

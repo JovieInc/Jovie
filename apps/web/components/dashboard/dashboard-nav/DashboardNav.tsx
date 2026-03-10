@@ -13,6 +13,7 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
+import { env } from '@/lib/env-client';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
@@ -187,7 +188,7 @@ export function DashboardNav(_: DashboardNavProps) {
         </div>
       )}
 
-      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && (
+      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && !env.IS_E2E && (
         <div className='mt-3'>
           <RecentChats />
         </div>

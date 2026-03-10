@@ -20,6 +20,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
@@ -73,16 +74,19 @@ export function ChatPageClient({
   const isProfileSetupRace =
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
+  const enablePreviewPanel = !env.IS_E2E;
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
-    <ErrorBoundary fallback={null}>
-      <ProfileContactSidebar />
-    </ErrorBoundary>
+    enablePreviewPanel ? (
+      <ErrorBoundary fallback={null}>
+        <ProfileContactSidebar />
+      </ErrorBoundary>
+    ) : null
   );
 
   // Fetch social links for the selected profile
-  const profileId = activeProfile?.id ?? '';
+  const profileId = enablePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
 
   // Convert API links to preview panel format
@@ -100,7 +104,7 @@ export function ChatPageClient({
 
   // Hydrate preview panel with profile data and links
   useEffect(() => {
-    if (!activeProfile) return;
+    if (!enablePreviewPanel || !activeProfile) return;
     const profileSettings = activeProfile.settings as Record<
       string,
       unknown
@@ -127,6 +131,7 @@ export function ChatPageClient({
     });
   }, [
     activeProfile,
+    enablePreviewPanel,
     previewLinks,
     setPreviewData,
     appleMusicConnected,
@@ -170,10 +175,15 @@ export function ChatPageClient({
             />
           </SimpleTooltip>
         )}
-        <PreviewToggleButton />
+        {enablePreviewPanel ? <PreviewToggleButton /> : null}
       </>
     ),
-    [conversationId, sessionIdCopied, handleCopyConversationId]
+    [
+      conversationId,
+      enablePreviewPanel,
+      sessionIdCopied,
+      handleCopyConversationId,
+    ]
   );
 
   const handleConversationCreate = useCallback(
@@ -209,16 +219,17 @@ export function ChatPageClient({
 
   // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
   useEffect(() => {
+    if (!enablePreviewPanel) return;
     if (searchParams.get('panel') === 'profile') {
       openPreviewPanel();
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- only on mount
+  }, [enablePreviewPanel, openPreviewPanel, searchParams]);
 
   // Pick up ?q= param (e.g. from profile page chat fallback) and pre-fill the input.
   // We pass it as initialQuery so JovieChat can auto-submit it.
   const rawQuery = searchParams.get('q');
   const initialQuery =
-    !initialQueryHandled && !conversationId ? rawQuery : null;
+    !env.IS_E2E && !initialQueryHandled && !conversationId ? rawQuery : null;
 
   // Mark as handled after first render so re-renders don't re-submit
   useEffect(() => {

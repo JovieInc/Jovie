@@ -95,6 +95,29 @@ export type UpsertProviderLinkInput =
   | UpsertReleaseProviderLinkInput
   | UpsertTrackProviderLinkInput;
 
+function isUniqueConstraintViolation(
+  error: unknown,
+  constraint: string
+): boolean {
+  const getField = (value: unknown, key: string): unknown =>
+    typeof value === 'object' && value !== null && key in value
+      ? (value as Record<string, unknown>)[key]
+      : undefined;
+
+  const code = getField(error, 'code');
+  const actualConstraint = getField(error, 'constraint');
+  const sourceError = getField(error, 'sourceError');
+  const sourceCode = getField(sourceError, 'code');
+  const sourceConstraint = getField(sourceError, 'constraint');
+  const message = getField(error, 'message');
+
+  return (
+    (code === '23505' && actualConstraint === constraint) ||
+    (sourceCode === '23505' && sourceConstraint === constraint) ||
+    (typeof message === 'string' && message.includes(constraint))
+  );
+}
+
 /**
  * Get track summaries (total duration, primary ISRC) for releases
  */
@@ -481,24 +504,64 @@ export async function upsertProviderLink(
     ? [providerLinks.providerId, providerLinks.trackId]
     : [providerLinks.providerId, providerLinks.releaseId];
 
-  // Try to insert, on conflict update
-  const [result] = await db
-    .insert(providerLinks)
-    .values(insertData)
-    .onConflictDoUpdate({
-      target: conflictTarget,
-      set: {
-        url: input.url,
-        externalId: input.externalId ?? null,
-        sourceType: input.sourceType ?? 'ingested',
-        isPrimary: input.isPrimary ?? false,
-        metadata: input.metadata ?? {},
-        updatedAt: now,
-      },
-    })
-    .returning();
+  try {
+    const [result] = await db
+      .insert(providerLinks)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: conflictTarget,
+        set: {
+          url: input.url,
+          externalId: input.externalId ?? null,
+          sourceType: input.sourceType ?? 'ingested',
+          isPrimary: input.isPrimary ?? false,
+          metadata: input.metadata ?? {},
+          updatedAt: now,
+        },
+      })
+      .returning();
 
-  return result;
+    return result;
+  } catch (error) {
+    if (
+      !input.externalId ||
+      !isUniqueConstraintViolation(error, 'provider_links_provider_external')
+    ) {
+      throw error;
+    }
+
+    // `provider_links_provider_external` is globally unique, but the same DSP
+    // album/track can legitimately appear on multiple creators (collabs,
+    // compilations, label samplers). Preserve the URL on this owner-specific
+    // row and keep the provider external ID in metadata instead.
+    const fallbackMetadata = {
+      ...(input.metadata ?? {}),
+      providerExternalId: input.externalId,
+      providerExternalIdDeferred: true,
+    };
+
+    const [fallbackResult] = await db
+      .insert(providerLinks)
+      .values({
+        ...insertData,
+        externalId: null,
+        metadata: fallbackMetadata,
+      })
+      .onConflictDoUpdate({
+        target: conflictTarget,
+        set: {
+          url: input.url,
+          externalId: null,
+          sourceType: input.sourceType ?? 'ingested',
+          isPrimary: input.isPrimary ?? false,
+          metadata: fallbackMetadata,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    return fallbackResult;
+  }
 }
 
 /**
@@ -632,15 +695,7 @@ export async function upsertTrack(input: {
 
     return result;
   } catch (error) {
-    const isIsrcConflict =
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === '23505' &&
-      'constraint' in error &&
-      error.constraint === 'discog_tracks_isrc_unique';
-
-    if (!isIsrcConflict) {
+    if (!isUniqueConstraintViolation(error, 'discog_tracks_isrc_unique')) {
       throw error;
     }
 

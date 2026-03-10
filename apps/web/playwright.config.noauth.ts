@@ -4,9 +4,13 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright configuration for tests that don't require authentication
  * This config bypasses Clerk authentication for faster test execution
  */
+const stableLocalServerCommand =
+  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:local:playwright';
 const webServerCommand = process.env.DATABASE_URL
-  ? 'pnpm run dev:local'
-  : 'doppler run -- pnpm run dev:local';
+  ? stableLocalServerCommand
+  : `doppler run -- ${stableLocalServerCommand}`;
+
+process.env.PUBLIC_NOAUTH_SMOKE = '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -53,10 +57,14 @@ export default defineConfig({
             ...process.env,
             NODE_ENV: 'test',
             PORT: '3100',
+            NEXT_PUBLIC_E2E_MODE: '1',
+            PUBLIC_NOAUTH_SMOKE: '1',
             NEXT_DISABLE_TOOLBAR: '1',
+            E2E_FAST_ONBOARDING: '1',
             NODE_OPTIONS:
-              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=12288`.trim(),
           },
         },
       }),
+  globalSetup: require.resolve('./tests/global-setup.ts'),
 });

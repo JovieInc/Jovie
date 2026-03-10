@@ -86,8 +86,13 @@ export const billingStatusQueryOptions = {
  *   return data?.isPro ? <ProBadge /> : null;
  * }
  */
-export function useBillingStatusQuery() {
-  return useQuery<BillingStatusData, Error>(billingStatusQueryOptions);
+export function useBillingStatusQuery(options?: { enabled?: boolean }) {
+  const { enabled = true } = options ?? {};
+
+  return useQuery<BillingStatusData, Error>({
+    ...billingStatusQueryOptions,
+    enabled,
+  });
 }
 
 /**

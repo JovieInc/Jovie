@@ -33,6 +33,10 @@ interface TestProfile {
   avatarUrl?: string;
 }
 
+interface SeedTestDataOptions {
+  readonly publicProfilesOnly?: boolean;
+}
+
 const TEST_PROFILES: TestProfile[] = [
   {
     username: 'dualipa',
@@ -394,7 +398,7 @@ async function seedTracksForRelease(
   console.log(`      ✓ Ensured ${tracks.length} tracks`);
 }
 
-export async function seedTestData() {
+export async function seedTestData(options: SeedTestDataOptions = {}) {
   console.log('🌱 Seeding test data for E2E smoke tests...');
 
   const databaseUrl = process.env.DATABASE_URL;
@@ -409,85 +413,86 @@ export async function seedTestData() {
   const db = drizzle(sql, { schema });
 
   try {
-    // Create E2E test user (for authenticated dashboard tests)
-    // These values come from the setup script: scripts/setup-e2e-users.ts
-    const E2E_CLERK_USER_ID = process.env.E2E_CLERK_USER_ID;
-    const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
-    const E2E_USERNAME = 'e2e-test-user';
+    if (!options.publicProfilesOnly) {
+      // Create E2E test user (for authenticated dashboard tests)
+      // These values come from the setup script: scripts/setup-e2e-users.ts
+      const E2E_CLERK_USER_ID = process.env.E2E_CLERK_USER_ID;
+      const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
+      const E2E_USERNAME = 'e2e-test-user';
 
-    if (!E2E_CLERK_USER_ID) {
-      console.log('  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation');
-      console.log(
-        '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
-      );
-    } else {
-      console.log('  Creating E2E test user...');
-      const [existingUser] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, E2E_CLERK_USER_ID))
-        .limit(1);
-
-      if (!existingUser) {
-        // Create the user record with admin privileges for E2E tests
-        const [createdUser] = await db
-          .insert(users)
-          .values({
-            clerkId: E2E_CLERK_USER_ID,
-            email: E2E_EMAIL,
-            name: 'E2E Test',
-            userStatus: 'active', // Active user with completed onboarding
-            isAdmin: true, // Grant admin for E2E admin tests
-          })
-          .returning({ id: users.id });
-
+      if (!E2E_CLERK_USER_ID) {
         console.log(
-          `    ✓ Created E2E user with admin privileges (ID: ${createdUser.id})`
+          '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
         );
-
-        // Create a creator profile for the E2E user
-        const [createdProfile] = await db
-          .insert(creatorProfiles)
-          .values({
-            userId: createdUser.id,
-            username: E2E_USERNAME,
-            usernameNormalized: E2E_USERNAME.toLowerCase(),
-            displayName: 'E2E Test User',
-            bio: 'Automated test user',
-            creatorType: 'artist',
-            isPublic: true,
-            isVerified: false,
-            isClaimed: true,
-            ingestionStatus: 'idle',
-            onboardingCompletedAt: new Date(), // Mark onboarding as complete
-          })
-          .returning({ id: creatorProfiles.id });
-
         console.log(
-          `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
+          '    Run scripts/setup-e2e-users.ts to create test users in Clerk'
         );
-
-        // Seed releases for E2E user
-        await seedReleasesForProfile(db, createdProfile.id);
       } else {
-        // Ensure existing user has admin privileges
-        await db
-          .update(users)
-          .set({ isAdmin: true, name: 'E2E Test' })
-          .where(eq(users.clerkId, E2E_CLERK_USER_ID));
-        console.log('    ✓ E2E test user exists, ensured admin privileges');
-
-        // Get the existing profile ID to seed releases
-        const [existingProfile] = await db
-          .select({ id: creatorProfiles.id })
-          .from(creatorProfiles)
-          .where(
-            eq(creatorProfiles.usernameNormalized, E2E_USERNAME.toLowerCase())
-          )
+        console.log('  Creating E2E test user...');
+        const [existingUser] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, E2E_CLERK_USER_ID))
           .limit(1);
 
-        if (existingProfile) {
-          await seedReleasesForProfile(db, existingProfile.id);
+        if (!existingUser) {
+          // Create the user record with admin privileges for E2E tests
+          const [createdUser] = await db
+            .insert(users)
+            .values({
+              clerkId: E2E_CLERK_USER_ID,
+              email: E2E_EMAIL,
+              name: 'E2E Test',
+              userStatus: 'active', // Active user with completed onboarding
+              isAdmin: true, // Grant admin for E2E admin tests
+            })
+            .returning({ id: users.id });
+
+          console.log(
+            `    ✓ Created E2E user with admin privileges (ID: ${createdUser.id})`
+          );
+
+          // Create a creator profile for the E2E user
+          const [createdProfile] = await db
+            .insert(creatorProfiles)
+            .values({
+              userId: createdUser.id,
+              username: E2E_USERNAME,
+              usernameNormalized: E2E_USERNAME.toLowerCase(),
+              displayName: 'E2E Test User',
+              bio: 'Automated test user',
+              creatorType: 'artist',
+              isPublic: true,
+              isVerified: false,
+              isClaimed: true,
+              ingestionStatus: 'idle',
+              onboardingCompletedAt: new Date(), // Mark onboarding as complete
+            })
+            .returning({ id: creatorProfiles.id });
+
+          console.log(
+            `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
+          );
+
+          await seedReleasesForProfile(db, createdProfile.id);
+        } else {
+          await db
+            .update(users)
+            .set({ isAdmin: true, name: 'E2E Test' })
+            .where(eq(users.clerkId, E2E_CLERK_USER_ID));
+          console.log('    ✓ E2E test user exists, ensured admin privileges');
+
+          const [existingProfile] = await db
+            .select({ id: creatorProfiles.id })
+            .from(creatorProfiles)
+            .where(
+              eq(creatorProfiles.usernameNormalized, E2E_USERNAME.toLowerCase())
+            )
+            .limit(1);
+
+          if (existingProfile) {
+            await seedReleasesForProfile(db, existingProfile.id);
+          }
         }
       }
     }
