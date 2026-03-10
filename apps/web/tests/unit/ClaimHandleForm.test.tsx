@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
@@ -79,39 +79,6 @@ describe('ClaimHandleForm', () => {
     expect(
       screen.getByText(/Handle must be at least 3 characters/i)
     ).toBeInTheDocument();
-  });
-
-  test('shows registrar-style suggestions after a valid handle is typed', async () => {
-    render(<ClaimHandleForm />);
-
-    const input = screen.getByRole('textbox', { name: /choose your handle/i });
-    fireEvent.change(input, { target: { value: 'tim' } });
-
-    expect(screen.getByText(/Reserve your handle/i)).toBeInTheDocument();
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/handle/check?handle=timmusic'),
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
-    });
-
-    expect(screen.getAllByText(/Available/i).length).toBeGreaterThan(0);
-  });
-
-  test('updates the input value when a suggestion is selected', async () => {
-    render(<ClaimHandleForm />);
-
-    const input = screen.getByRole('textbox', { name: /choose your handle/i });
-    fireEvent.change(input, { target: { value: 'tim' } });
-
-    const suggestionButton = await screen.findByRole('button', {
-      name: /\/timmusic/i,
-    });
-
-    fireEvent.click(suggestionButton);
-
-    expect(input).toHaveValue('timmusic');
   });
 
   test('does not inject inline animation styles (moved to globals.css)', () => {

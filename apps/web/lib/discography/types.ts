@@ -2,6 +2,7 @@ export type ProviderKey =
   | 'spotify'
   | 'apple_music'
   | 'youtube'
+  | 'youtube_music'
   | 'soundcloud'
   | 'deezer'
   | 'tidal'

@@ -66,24 +66,6 @@ export function HeroProfilePreview() {
           </div>
         </div>
 
-        {/* Mode dots */}
-        <div className='flex items-center justify-center gap-1.5 py-2.5'>
-          {MODE_IDS.map((mode, i) => (
-            <div
-              key={mode}
-              className='rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
-              style={{
-                width: i === activeIndex ? 16 : 6,
-                height: 6,
-                backgroundColor:
-                  i === activeIndex
-                    ? 'rgb(247,248,248)'
-                    : 'rgba(255,255,255,0.2)',
-              }}
-            />
-          ))}
-        </div>
-
         {/* Content — crossfade between modes */}
         <div
           className='relative overflow-hidden'

@@ -79,7 +79,7 @@ export function PricingSection() {
               </ul>
 
               <Link
-                href='/claim'
+                href='/signup'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-2)',
@@ -151,7 +151,7 @@ export function PricingSection() {
               </ul>
 
               <Link
-                href='/claim'
+                href='/signup'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
                   backgroundColor: '#5e6ad2',

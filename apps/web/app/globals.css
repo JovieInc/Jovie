@@ -482,7 +482,10 @@ body {
   }
 }
 
-.reveal-on-scroll {
+/* reveal-on-scroll: only hide elements once JS has confirmed it's available.
+   Without the .reveal-js root class (set by ScrollRevealInit), content stays
+   visible so JS-blocked or slow-hydration users always see the page. */
+.reveal-js .reveal-on-scroll {
   opacity: 0;
   transform: translateY(20px);
   transition:
@@ -491,7 +494,7 @@ body {
   will-change: opacity, transform;
 }
 
-.reveal-on-scroll.revealed {
+.reveal-js .reveal-on-scroll.revealed {
   opacity: 1;
   transform: translateY(0);
 }
@@ -507,7 +510,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-on-scroll {
+  .reveal-js .reveal-on-scroll {
     opacity: 1;
     transform: none;
     transition: none;

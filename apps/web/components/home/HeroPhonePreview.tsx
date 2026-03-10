@@ -65,7 +65,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
             <div className='mt-2.5 text-center'>
               <ArtistName
                 name={MOCK_ARTIST.name}
-                handle={MOCK_ARTIST.handle}
+                handle={displayHandle}
                 isVerified={MOCK_ARTIST.isVerified}
                 size='md'
                 showLink={false}

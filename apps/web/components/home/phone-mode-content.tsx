@@ -120,8 +120,8 @@ function ProfileContent() {
   const platforms = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
   return (
     <div className='flex h-full flex-col justify-center gap-4'>
-      <button
-        type='button'
+      <div
+        aria-hidden='true'
         className={PHONE_CTA_CLASS}
         style={{
           background:
@@ -130,7 +130,7 @@ function ProfileContent() {
         }}
       >
         Turn on notifications
-      </button>
+      </div>
       <div
         className='flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5'
         style={{
