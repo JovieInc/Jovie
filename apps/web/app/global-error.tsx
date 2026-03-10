@@ -77,40 +77,22 @@ export default function GlobalError({
                 padding: 0;
               }
 
+              /* Force dark mode app-wide (JOV-1479) */
               :root {
-                --bg: #ffffff;
-                --text: #111827;
-                --text-muted: #6b7280;
-                --text-subtle: #9ca3af;
-                --border: #e5e7eb;
-                --btn-primary-bg: #111827;
-                --btn-primary-text: #ffffff;
-                --btn-primary-hover: #374151;
+                --bg: #0f0f0f;
+                --text: #f9fafb;
+                --text-muted: #9ca3af;
+                --text-subtle: #6b7280;
+                --border: #374151;
+                --btn-primary-bg: #ffffff;
+                --btn-primary-text: #111827;
+                --btn-primary-hover: #f3f4f6;
                 --btn-secondary-bg: transparent;
-                --btn-secondary-text: #111827;
-                --btn-secondary-border: #d1d5db;
-                --btn-secondary-hover: #f9fafb;
-                --logo-bg: #111827;
-                --logo-text: #ffffff;
-              }
-
-              @media (prefers-color-scheme: dark) {
-                :root {
-                  --bg: #0f0f0f;
-                  --text: #f9fafb;
-                  --text-muted: #9ca3af;
-                  --text-subtle: #6b7280;
-                  --border: #374151;
-                  --btn-primary-bg: #ffffff;
-                  --btn-primary-text: #111827;
-                  --btn-primary-hover: #f3f4f6;
-                  --btn-secondary-bg: transparent;
-                  --btn-secondary-text: #f9fafb;
-                  --btn-secondary-border: #4b5563;
-                  --btn-secondary-hover: #1f2937;
-                  --logo-bg: #ffffff;
-                  --logo-text: #111827;
-                }
+                --btn-secondary-text: #f9fafb;
+                --btn-secondary-border: #4b5563;
+                --btn-secondary-hover: #1f2937;
+                --logo-bg: #ffffff;
+                --logo-text: #111827;
               }
 
               body {

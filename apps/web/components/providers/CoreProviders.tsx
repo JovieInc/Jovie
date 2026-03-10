@@ -149,8 +149,9 @@ function CoreProvidersInner({
   const content = (
     <ThemeProvider
       attribute='class'
-      defaultTheme={initialThemeMode}
-      enableSystem
+      forcedTheme='dark'
+      defaultTheme='dark'
+      enableSystem={false}
       disableTransitionOnChange
       storageKey='jovie-theme'
     >
