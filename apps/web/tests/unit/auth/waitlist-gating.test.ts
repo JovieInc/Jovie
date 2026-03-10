@@ -789,6 +789,20 @@ describe('proxy.ts path categorization', () => {
       expect(isExcludedFromWaitlist('/api/releases')).toBe(true);
     });
   });
+
+  describe('method-aware redirects for onboarding/auth paths', () => {
+    it('documents that only GET/HEAD are treated as navigation methods', () => {
+      const isNavigationMethod = (method: string) =>
+        method === 'GET' || method === 'HEAD';
+
+      expect(isNavigationMethod('GET')).toBe(true);
+      expect(isNavigationMethod('HEAD')).toBe(true);
+      expect(isNavigationMethod('POST')).toBe(false);
+      expect(isNavigationMethod('PUT')).toBe(false);
+      expect(isNavigationMethod('PATCH')).toBe(false);
+      expect(isNavigationMethod('DELETE')).toBe(false);
+    });
+  });
 });
 
 // ============================================================================

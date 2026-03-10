@@ -40,7 +40,9 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           message: trimmed,
           source: 'chat',
           pathname:
-            typeof window !== 'undefined' ? window.location.pathname : null,
+            typeof globalThis.window === 'undefined'
+              ? null
+              : globalThis.window.location.pathname,
         }),
       });
 
