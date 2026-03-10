@@ -170,9 +170,8 @@ export function ClaimHandleForm({
                 : {
                     fontSize: '13px',
                     fontWeight: 400,
-                    color: 'var(--linear-text-quaternary)',
+                    color: 'var(--linear-text-tertiary)',
                     letterSpacing: '-0.02em',
-                    opacity: 0.7,
                     fontFamily: 'monospace',
                   }
             }
@@ -193,7 +192,7 @@ export function ClaimHandleForm({
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:text-[var(--linear-text-quaternary)]'
+            className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHero ? 'placeholder:text-[var(--linear-text-quaternary)]' : 'placeholder:text-[var(--linear-text-tertiary)]'}`}
             style={
               isHero
                 ? {

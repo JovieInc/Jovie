@@ -21,17 +21,15 @@ interface ModeData {
   id: string;
   headline: string;
   description: string;
-  stat: { value: string; label: string };
   slug: string;
 }
 
 const MODES: ModeData[] = [
   {
     id: 'profile',
-    headline: 'Make every tap feel intentional.',
+    headline: 'Your link, your fans.',
     description:
       'First-time visitors can join your list. Returning fans see the action they are most likely to take next. The profile adapts instead of making everyone hunt.',
-    stat: { value: '342', label: 'new fan contacts this month' },
     slug: '',
   },
   {
@@ -39,7 +37,6 @@ const MODES: ModeData[] = [
     headline: 'Put the nearest show first.',
     description:
       'A fan in Los Angeles should not scroll through 30 cities. Jovie can surface the closest date and ticket button first.',
-    stat: { value: '847', label: 'ticket clicks this month' },
     slug: 'tour',
   },
   {
@@ -47,7 +44,6 @@ const MODES: ModeData[] = [
     headline: 'Turn the merch table into revenue.',
     description:
       'When someone scans your QR code after a set, Jovie can open the fastest tip flow available instead of another menu of links.',
-    stat: { value: '$1,204', label: 'in tips this month' },
     slug: 'tip',
   },
   {
@@ -55,7 +51,6 @@ const MODES: ModeData[] = [
     headline: 'Open the right streaming app.',
     description:
       'A new listener taps once. Jovie can route them to Spotify, Apple Music, or YouTube Music without making them choose from a grid first.',
-    stat: { value: '3,421', label: 'platform clicks this month' },
     slug: 'listen',
   },
 ];
@@ -199,17 +194,9 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
       <p className='mt-2 text-[14px] leading-[1.6] text-[var(--linear-text-secondary)]'>
         {mode.description}
       </p>
-      <div className='mt-4 flex items-baseline justify-between'>
-        <div>
-          <span className='text-xl font-semibold text-[var(--linear-text-primary)] tabular-nums tracking-tight'>
-            {mode.stat.value}
-          </span>
-          <span className='ml-2 text-[12px] text-[var(--linear-text-tertiary)]'>
-            {mode.stat.label}
-          </span>
-        </div>
+      <div className='mt-4 flex items-center justify-end'>
         <span className='font-mono text-[12px] text-[var(--linear-text-tertiary)]'>
-          /tim{mode.slug ? `/${mode.slug}` : ''}
+          jov.ie/tim{mode.slug ? `/${mode.slug}` : ''}
         </span>
       </div>
     </div>
@@ -316,7 +303,7 @@ export function DeeplinksGrid() {
                 <div className='flex flex-col gap-6'>
                   {/* Section label */}
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                    Adaptive fan paths
+                    One link, infinite modes
                   </span>
 
                   {/* Dynamic headline */}
@@ -328,35 +315,6 @@ export function DeeplinksGrid() {
                   <CrossfadeBlock activeIndex={activeIndex}>
                     {descriptions}
                   </CrossfadeBlock>
-
-                  {/* Dynamic stat */}
-                  <div
-                    className='rounded-xl px-5 py-4 self-start'
-                    style={{
-                      backgroundColor: 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(255,255,255,0.06)',
-                    }}
-                  >
-                    <div className='grid'>
-                      {MODES.map((mode, i) => (
-                        <div
-                          key={mode.id}
-                          className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
-                          style={{
-                            opacity: i === activeIndex ? 1 : 0,
-                            gridArea: '1 / 1',
-                          }}
-                        >
-                          <span className='text-2xl font-semibold text-[var(--linear-text-primary)] tabular-nums tracking-tight'>
-                            {mode.stat.value}
-                          </span>
-                          <p className='mt-1 text-[12px] text-[var(--linear-text-tertiary)]'>
-                            {mode.stat.label}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
                   {/* Progress dots */}
                   <div className='flex gap-2'>
@@ -475,10 +433,10 @@ export function DeeplinksGrid() {
             {/* Section header */}
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
               <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                AI Personalization
+                One link, infinite modes
               </span>
               <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-                One link. Every moment.
+                One link. Adapts to every fan.
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Every visitor sees a personalized CTA based on the moment —
