@@ -83,7 +83,7 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [release.providers]);
 
   return (
-    <div className='grid min-w-0 items-center gap-x-3 grid-cols-[24px_minmax(0,1fr)_minmax(88px,120px)_auto_minmax(0,72px)]'>
+    <div className='grid min-w-0 items-center gap-x-2 grid-cols-[24px_minmax(0,1fr)_minmax(88px,120px)_auto]'>
       <div className='flex w-6 items-center justify-center'>
         {hasPreview ? (
           <button
@@ -143,10 +143,10 @@ export const ReleaseCell = memo(function ReleaseCell({
         ) : null}
       </div>
 
-      <div className='flex min-w-0 items-center justify-start'>
+      <div className='flex min-w-0 items-center justify-end'>
         {platformInfo ? (
-          <div className='inline-flex h-6 shrink-0 items-center gap-1 text-[11px] text-(--linear-text-tertiary)'>
-            <span className='flex items-center gap-0.5'>
+          <div className='inline-flex h-6 shrink-0 items-center justify-end gap-1 text-[11px] text-(--linear-text-tertiary)'>
+            <span className='flex items-center -space-x-0.5'>
               {platformInfo.visible.map(p => (
                 <SocialIcon
                   key={p.key}
