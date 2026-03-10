@@ -35,7 +35,7 @@ export async function RedesignedHero() {
         {/* Centered text block — Linear layout */}
         <div className='hero-stagger flex flex-col items-center text-center max-w-2xl mx-auto'>
           <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
-            Built for artists
+            AI built for artists
           </span>
           <h1 className='marketing-h1-linear text-[var(--linear-text-primary)]'>
             The link music <br className='hidden sm:block' />
