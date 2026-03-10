@@ -177,7 +177,7 @@ describe('POST /api/audience/visit', () => {
     expect(data.error).toBe('Profile is not public');
   });
 
-  it('handles duplicate daily view insert race without failing request', async () => {
+  it('handles duplicate daily view upsert without failing request', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -188,30 +188,13 @@ describe('POST /api/audience/visit', () => {
       }),
     });
 
-    const duplicateError = Object.assign(new Error('duplicate key value'), {
-      code: '23505',
-    });
-
     mockWithSystemIngestionSession.mockImplementation(async callback => {
-      const mockUpdate = vi
-        .fn()
-        .mockReturnValueOnce({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              returning: vi.fn().mockResolvedValue([]),
-            }),
-          }),
-        })
-        .mockReturnValueOnce({
-          set: vi.fn().mockReturnValue({
-            where: vi.fn().mockResolvedValue(undefined),
-          }),
-        });
-
       const mockInsert = vi
         .fn()
         .mockReturnValueOnce({
-          values: vi.fn().mockRejectedValue(duplicateError),
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          }),
         })
         .mockReturnValueOnce({
           values: vi.fn().mockReturnValue({
@@ -227,7 +210,6 @@ describe('POST /api/audience/visit', () => {
             }),
           }),
         }),
-        update: mockUpdate,
         insert: mockInsert,
       });
     });
@@ -259,16 +241,15 @@ describe('POST /api/audience/visit', () => {
       }),
     });
     mockWithSystemIngestionSession.mockImplementation(async callback => {
-      const mockUpdate = vi.fn().mockReturnValue({
-        set: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      });
-
       const mockInsert = vi.fn().mockReturnValue({
-        values: vi.fn().mockResolvedValue(undefined),
+        values: vi
+          .fn()
+          .mockReturnValueOnce({
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          })
+          .mockReturnValueOnce({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
       });
 
       await callback({
@@ -279,7 +260,6 @@ describe('POST /api/audience/visit', () => {
             }),
           }),
         }),
-        update: mockUpdate,
         insert: mockInsert,
       });
     });
