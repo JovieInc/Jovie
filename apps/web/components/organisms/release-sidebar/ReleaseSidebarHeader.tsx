@@ -30,6 +30,82 @@ interface UseReleaseHeaderPartsProps {
   readonly onClose?: () => void;
 }
 
+function buildOverflowActions({
+  showActions,
+  hasRelease,
+  release,
+  isCopied,
+  isIdCopied,
+  isRefreshing,
+  onRefresh,
+  handleCopySmartLink,
+  handleCopyReleaseId,
+}: {
+  showActions: string | boolean | null | undefined;
+  hasRelease: boolean;
+  release: Release | null;
+  isCopied: boolean;
+  isIdCopied: boolean;
+  isRefreshing: boolean;
+  onRefresh?: () => void;
+  handleCopySmartLink: () => void;
+  handleCopyReleaseId: () => void;
+}): DrawerHeaderAction[] {
+  const actions: DrawerHeaderAction[] = [];
+
+  if (showActions) {
+    actions.push(
+      {
+        id: 'copy',
+        label: isCopied ? 'Copied!' : 'Copy smart link',
+        icon: Copy,
+        activeIcon: Check,
+        isActive: isCopied,
+        onClick: handleCopySmartLink,
+      },
+      {
+        id: 'open',
+        label: 'Open smart link',
+        icon: ExternalLink,
+        onClick: () => {
+          if (!release?.smartLinkPath) return;
+          globalThis.open(
+            release.smartLinkPath,
+            '_blank',
+            'noopener,noreferrer'
+          );
+        },
+      },
+      {
+        id: 'refresh',
+        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
+        icon: RefreshCw,
+        onClick: () => {
+          if (isRefreshing) return;
+          if (onRefresh) {
+            onRefresh();
+            return;
+          }
+          globalThis.location.reload();
+        },
+      }
+    );
+  }
+
+  if (hasRelease && release?.id) {
+    actions.push({
+      id: 'copy-id',
+      label: isIdCopied ? 'Copied!' : 'Copy release ID',
+      icon: Hash,
+      activeIcon: Check,
+      isActive: isIdCopied,
+      onClick: handleCopyReleaseId,
+    });
+  }
+
+  return actions;
+}
+
 /**
  * Hook that returns the title and actions for the release sidebar header.
  * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
@@ -84,60 +160,19 @@ export function useReleaseHeaderParts({
       });
   }, [release]);
 
-  const overflowActions: DrawerHeaderAction[] = [];
-
-  if (showActions) {
-    /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
-    overflowActions.push(
-      {
-        id: 'copy',
-        label: isCopied ? 'Copied!' : 'Copy smart link',
-        icon: Copy,
-        activeIcon: Check,
-        isActive: isCopied,
-        onClick: handleCopySmartLink,
-      },
-      {
-        id: 'open',
-        label: 'Open smart link',
-        icon: ExternalLink,
-        onClick: () => {
-          if (!release?.smartLinkPath) return;
-          globalThis.open(
-            release.smartLinkPath,
-            '_blank',
-            'noopener,noreferrer'
-          );
-        },
-      },
-      {
-        id: 'refresh',
-        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
-        icon: RefreshCw,
-        onClick: () => {
-          if (isRefreshing) return;
-          if (onRefresh) {
-            onRefresh();
-            return;
-          }
-          globalThis.location.reload();
-        },
-      }
-    );
-    /* eslint-enable react-hooks/refs */
-  }
-
-  if (hasRelease && release?.id) {
-    /* eslint-disable-next-line react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
-    overflowActions.push({
-      id: 'copy-id',
-      label: isIdCopied ? 'Copied!' : 'Copy release ID',
-      icon: Hash,
-      activeIcon: Check,
-      isActive: isIdCopied,
-      onClick: handleCopyReleaseId,
-    });
-  }
+  /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
+  const overflowActions = buildOverflowActions({
+    showActions,
+    hasRelease,
+    release,
+    isCopied,
+    isIdCopied,
+    isRefreshing,
+    onRefresh,
+    handleCopySmartLink,
+    handleCopyReleaseId,
+  });
+  /* eslint-enable react-hooks/refs */
 
   const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
   const titleText = isrcValue
