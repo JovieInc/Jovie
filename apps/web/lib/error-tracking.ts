@@ -105,7 +105,7 @@ function sendToSentry(params: {
   // sentry.server.config.ts calls Sentry.init() directly without updating the
   // custom state tracker, so isSentryInitialized() returns false on the server
   // even though Sentry IS initialized via @sentry/nextjs.
-  if (!isSentryInitialized() && !Sentry.getClient()) {
+  if (!isSentryInitialized() && !Sentry.getClient?.()) {
     console.warn(
       '[Error Tracking] Sentry not initialized, error will only be logged to console:',
       {
