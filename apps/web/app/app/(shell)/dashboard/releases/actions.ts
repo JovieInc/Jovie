@@ -1063,6 +1063,18 @@ export async function pollReleasesCount(): Promise<{
   };
 }
 
+function resolveSpotifyImportStatus(
+  storedStatus: string | undefined,
+  hasSpotifyProfile: boolean,
+  releaseCount: number
+): 'idle' | 'importing' | 'complete' | 'failed' {
+  if (storedStatus === 'complete') return 'complete';
+  if (storedStatus === 'failed') return 'failed';
+  const hasData = hasSpotifyProfile && releaseCount > 0;
+  if (storedStatus === 'importing') return hasData ? 'complete' : 'importing';
+  return hasData ? 'complete' : 'idle';
+}
+
 /**
  * Get Spotify import status from profile settings (uncached).
  */
@@ -1096,18 +1108,11 @@ export async function getSpotifyImportStatus(): Promise<{
   const releaseCount = Number(row?.releaseCount ?? 0);
   const hasSpotifyProfile = Boolean(row?.spotifyId);
 
-  const status =
-    storedStatus === 'complete'
-      ? 'complete'
-      : storedStatus === 'failed'
-        ? 'failed'
-        : storedStatus === 'importing'
-          ? hasSpotifyProfile && releaseCount > 0
-            ? 'complete'
-            : 'importing'
-          : hasSpotifyProfile && releaseCount > 0
-            ? 'complete'
-            : 'idle';
+  const status = resolveSpotifyImportStatus(
+    storedStatus,
+    hasSpotifyProfile,
+    releaseCount
+  );
 
   return { status, releaseCount };
 }
@@ -1865,6 +1870,30 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
+async function upsertReleaseProviderUrls(
+  releaseId: string,
+  providerUrls: Record<string, string>
+): Promise<void> {
+  const providerLabels = buildProviderLabels();
+  const entries = Object.entries(providerUrls).filter(
+    ([, url]) => url.trim().length > 0
+  );
+  for (const [key, url] of entries) {
+    const provider = key as ProviderKey;
+    const providerLabel = providerLabels[provider];
+    if (!providerLabel) continue;
+    const trimmedUrl = url.trim();
+    const validation = validateProviderUrl(trimmedUrl, provider, providerLabel);
+    if (!validation.valid) continue;
+    await upsertProviderLink({
+      releaseId,
+      providerId: provider,
+      url: trimmedUrl,
+      sourceType: 'manual',
+    });
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  createRelease — manually add a release to the creator's discography */
 /* ------------------------------------------------------------------ */
@@ -1916,30 +1945,7 @@ export async function createRelease(formData: {
 
     // Upsert any provider URLs the user supplied
     if (formData.providerUrls) {
-      const providerLabels = buildProviderLabels();
-      const entries = Object.entries(formData.providerUrls).filter(
-        ([, url]) => url.trim().length > 0
-      );
-
-      for (const [key, url] of entries) {
-        const provider = key as ProviderKey;
-        const providerLabel = providerLabels[provider];
-        if (!providerLabel) continue;
-        const trimmedUrl = url.trim();
-        const validation = validateProviderUrl(
-          trimmedUrl,
-          provider,
-          providerLabel
-        );
-        if (!validation.valid) continue;
-
-        await upsertProviderLink({
-          releaseId,
-          providerId: provider,
-          url: trimmedUrl,
-          sourceType: 'manual',
-        });
-      }
+      await upsertReleaseProviderUrls(releaseId, formData.providerUrls);
     }
 
     revalidatePath(APP_ROUTES.RELEASES);

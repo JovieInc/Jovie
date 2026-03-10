@@ -106,19 +106,47 @@ interface UpdateCampaignSettingsBody {
   };
 }
 
-function isThrottlingConfigInvalid(config: {
-  minDelayMs: number;
-  maxDelayMs: number;
-  maxPerHour: number;
+function isThrottlingConfigInvalid(cfg: {
+  minDelayMs: unknown;
+  maxDelayMs: unknown;
+  maxPerHour: unknown;
 }): boolean {
   return (
-    typeof config.minDelayMs !== 'number' ||
-    typeof config.maxDelayMs !== 'number' ||
-    typeof config.maxPerHour !== 'number' ||
-    config.minDelayMs < 0 ||
-    config.maxDelayMs < config.minDelayMs ||
-    config.maxPerHour < 1
+    typeof cfg.minDelayMs !== 'number' ||
+    typeof cfg.maxDelayMs !== 'number' ||
+    typeof cfg.maxPerHour !== 'number' ||
+    cfg.minDelayMs < 0 ||
+    cfg.maxDelayMs < cfg.minDelayMs ||
+    cfg.maxPerHour < 1
   );
+}
+
+function validateCampaignSettingsBody(
+  body: UpdateCampaignSettingsBody
+): string | null {
+  if (
+    body.fitScoreThreshold !== undefined &&
+    (typeof body.fitScoreThreshold !== 'number' ||
+      body.fitScoreThreshold < 0 ||
+      body.fitScoreThreshold > 100)
+  ) {
+    return 'fitScoreThreshold must be a number between 0 and 100';
+  }
+  if (
+    body.batchLimit !== undefined &&
+    (typeof body.batchLimit !== 'number' ||
+      body.batchLimit < 1 ||
+      body.batchLimit > 500)
+  ) {
+    return 'batchLimit must be a number between 1 and 500';
+  }
+  if (
+    body.throttlingConfig !== undefined &&
+    isThrottlingConfigInvalid(body.throttlingConfig)
+  ) {
+    return 'Invalid throttlingConfig values';
+  }
+  return null;
 }
 
 /**
@@ -147,35 +175,10 @@ export async function POST(request: NextRequest) {
 
     const body = parsed.data as UpdateCampaignSettingsBody;
 
-    // Validate fields if provided
-    if (
-      body.fitScoreThreshold !== undefined &&
-      (typeof body.fitScoreThreshold !== 'number' ||
-        body.fitScoreThreshold < 0 ||
-        body.fitScoreThreshold > 100)
-    ) {
+    const validationError = validateCampaignSettingsBody(body);
+    if (validationError) {
       return NextResponse.json(
-        { error: 'fitScoreThreshold must be a number between 0 and 100' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-    if (
-      body.batchLimit !== undefined &&
-      (typeof body.batchLimit !== 'number' ||
-        body.batchLimit < 1 ||
-        body.batchLimit > 500)
-    ) {
-      return NextResponse.json(
-        { error: 'batchLimit must be a number between 1 and 500' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-    if (
-      body.throttlingConfig !== undefined &&
-      isThrottlingConfigInvalid(body.throttlingConfig)
-    ) {
-      return NextResponse.json(
-        { error: 'Invalid throttlingConfig values' },
+        { error: validationError },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
