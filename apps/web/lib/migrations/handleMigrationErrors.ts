@@ -83,6 +83,26 @@ function logMigrationWarning(message: string, context: MigrationErrorContext) {
   });
 }
 
+function handleSocialLinksError(
+  hasMigrationErrorCode: boolean,
+  message: string,
+  context: MigrationErrorContext,
+  columnMissingLabel: string
+): MigrationErrorHandlingResult | null {
+  if (hasMigrationErrorCode) {
+    logMigrationWarning(
+      '[Dashboard] social_links migration in progress',
+      context
+    );
+    return { shouldRetry: false, fallbackData: false };
+  }
+  if (isSocialLinksColumnMissing(message)) {
+    logMigrationWarning(columnMissingLabel, context);
+    return { shouldRetry: false, fallbackData: false };
+  }
+  return null;
+}
+
 export function handleMigrationErrors(
   error: unknown,
   context: MigrationErrorContext
@@ -113,23 +133,23 @@ export function handleMigrationErrors(
       break;
     }
     case 'social_links_count': {
-      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
-        logMigrationWarning(
-          '[Dashboard] social_links migration in progress; treating as no links',
-          context
-        );
-        return { shouldRetry: false, fallbackData: false };
-      }
+      const result = handleSocialLinksError(
+        hasMigrationErrorCode,
+        message,
+        context,
+        '[Dashboard] social_links.state column missing; treating as no links'
+      );
+      if (result) return result;
       break;
     }
     case 'music_links_count': {
-      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
-        logMigrationWarning(
-          '[Dashboard] social_links migration in progress; treating as no music links',
-          context
-        );
-        return { shouldRetry: false, fallbackData: false };
-      }
+      const result = handleSocialLinksError(
+        hasMigrationErrorCode,
+        message,
+        context,
+        '[Dashboard] social_links.state column missing; treating as no music links'
+      );
+      if (result) return result;
       break;
     }
     // Combined existence query (hasLinks + hasMusicLinks in one SQL statement).

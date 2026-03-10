@@ -29,6 +29,21 @@ import {
 } from '../services/youtube-handler';
 import { sectionOf } from '../utils';
 
+function isAtLinkCapacity(
+  section: string,
+  modeCount: number,
+  socialCount: number,
+  totalCount: number
+): boolean {
+  const socialCapacity = Math.max(
+    0,
+    MAX_PROFILE_LINKS - Math.min(modeCount, MAX_MODE_LINKS)
+  );
+  if (section === 'dsp') return modeCount >= MAX_MODE_LINKS;
+  if (section === 'social') return socialCount >= socialCapacity;
+  return totalCount >= MAX_PROFILE_LINKS;
+}
+
 type DuplicateResolution<T> = {
   next: T[];
   emittedLink: T | null;
@@ -122,24 +137,6 @@ export interface UseLinksManagerReturn<T extends DetectedLink> {
   mapIdToIndex: Map<string, number>;
   /** Check if a link is visible */
   linkIsVisible: (link: T) => boolean;
-}
-
-function validateLinkCapacity(
-  section: string,
-  modeCount: number,
-  socialCount: number,
-  totalCount: number,
-  socialCapacity: number
-): boolean {
-  if (section === 'dsp' && modeCount >= MAX_MODE_LINKS) return false;
-  if (section === 'social' && socialCount >= socialCapacity) return false;
-  if (
-    section !== 'dsp' &&
-    section !== 'social' &&
-    totalCount >= MAX_PROFILE_LINKS
-  )
-    return false;
-  return true;
 }
 
 /**
@@ -290,20 +287,7 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       const modeCount = links.filter(l => sectionOf(l) === 'dsp').length;
       const socialCount = links.filter(l => sectionOf(l) === 'social').length;
       const totalCount = modeCount + socialCount;
-      const socialCapacity = Math.max(
-        0,
-        MAX_PROFILE_LINKS - Math.min(modeCount, MAX_MODE_LINKS)
-      );
-
-      if (
-        !validateLinkCapacity(
-          section,
-          modeCount,
-          socialCount,
-          totalCount,
-          socialCapacity
-        )
-      ) {
+      if (isAtLinkCapacity(section, modeCount, socialCount, totalCount)) {
         return;
       }
 
