@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockHealthLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 const mockValidateEnvironment = vi.hoisted(() => vi.fn());
 const mockGetEnvironmentInfo = vi.hoisted(() => vi.fn());
@@ -9,10 +8,9 @@ const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   healthLimiter: {
-    getStatus: mockHealthLimiterGetStatus,
     limit: mockHealthLimiterLimit,
   },
-  createRateLimitHeadersFromStatus: vi.fn().mockReturnValue({}),
+  createRateLimitHeaders: vi.fn().mockReturnValue({}),
   getClientIP: vi.fn().mockReturnValue('127.0.0.1'),
 }));
 
@@ -32,14 +30,12 @@ describe('@critical GET /api/health/env', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockHealthLimiterGetStatus.mockReturnValue({
-      blocked: false,
+    mockHealthLimiterLimit.mockResolvedValue({
+      success: true,
       limit: 30,
       remaining: 29,
-      resetTime: Date.now() + 60000,
-      retryAfterSeconds: 0,
+      reset: new Date(Date.now() + 60000),
     });
-    mockHealthLimiterLimit.mockResolvedValue({ success: true });
     mockValidateEnvironment.mockReturnValue({
       valid: true,
       errors: [],

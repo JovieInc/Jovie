@@ -145,50 +145,50 @@ export const trackingIpVisitsLimiter = createRateLimiter(
 );
 
 // ============================================================================
-// Public & Health Endpoints (Memory-only for high throughput)
+// Public & Health Endpoints (Durable Redis-backed enforcement)
 // ============================================================================
 
 /**
  * Rate limiter for public profile requests
- * Limit: 100 requests per minute per IP (in-memory only)
+ * Limit: 100 requests per minute per IP
  */
 export const publicProfileLimiter = createRateLimiter(
   RATE_LIMITERS.publicProfile,
   {
-    preferRedis: false, // Use memory for high-throughput public endpoints
+    requireRedis: true,
   }
 );
 
 /**
  * Rate limiter for public click endpoint
- * Limit: 50 requests per minute per IP (in-memory only)
+ * Limit: 50 requests per minute per IP
  */
 export const publicClickLimiter = createRateLimiter(RATE_LIMITERS.publicClick, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 /**
  * Rate limiter for public visit endpoint
- * Limit: 50 requests per minute per IP (in-memory only)
+ * Limit: 50 requests per minute per IP
  */
 export const publicVisitLimiter = createRateLimiter(RATE_LIMITERS.publicVisit, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 /**
  * Rate limiter for health endpoints
- * Limit: 30 requests per minute per IP (in-memory only)
+ * Limit: 30 requests per minute per IP
  */
 export const healthLimiter = createRateLimiter(RATE_LIMITERS.health, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 /**
  * General purpose rate limiter
- * Limit: 60 requests per minute per IP (in-memory only)
+ * Limit: 60 requests per minute per IP
  */
 export const generalLimiter = createRateLimiter(RATE_LIMITERS.general, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 // ============================================================================

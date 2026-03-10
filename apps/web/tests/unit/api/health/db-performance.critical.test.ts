@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCheckDbPerformance = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockHealthLimiterLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   checkDbPerformance: mockCheckDbPerformance,
@@ -21,10 +22,9 @@ vi.mock('@/lib/db/config', () => ({
 vi.mock('@/lib/env-server', () => ({ env: { DATABASE_URL: 'postgres://x' } }));
 vi.mock('@/lib/rate-limit', () => ({
   healthLimiter: {
-    getStatus: vi.fn(() => ({ blocked: false })),
-    limit: vi.fn(),
+    limit: mockHealthLimiterLimit,
   },
-  createRateLimitHeadersFromStatus: vi.fn(() => ({})),
+  createRateLimitHeaders: vi.fn(() => ({})),
   getClientIP: vi.fn(() => '127.0.0.1'),
 }));
 vi.mock('@/lib/startup/environment-validator', () => ({
@@ -39,6 +39,12 @@ describe('@critical GET /api/health/db/performance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    mockHealthLimiterLimit.mockResolvedValue({
+      success: true,
+      limit: 30,
+      remaining: 29,
+      reset: new Date(Date.now() + 60000),
+    });
   });
 
   it('captures warning when db performance check fails', async () => {

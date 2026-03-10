@@ -4,7 +4,7 @@ import { HEALTH_CHECK_CONFIG, PERFORMANCE_THRESHOLDS } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
-  createRateLimitHeadersFromStatus,
+  createRateLimitHeaders,
   getClientIP,
   healthLimiter,
 } from '@/lib/rate-limit';
@@ -51,9 +51,9 @@ export async function GET(request: Request) {
 
   // Rate limiting check
   const clientIP = getClientIP(request);
-  const rateLimitStatus = healthLimiter.getStatus(clientIP);
+  const rateLimitResult = await healthLimiter.limit(clientIP);
 
-  if (rateLimitStatus.blocked) {
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       {
         service: 'db-performance',
@@ -71,14 +71,11 @@ export async function GET(request: Request) {
         status: 429,
         headers: {
           ...HEALTH_CHECK_CONFIG.cacheHeaders,
-          ...createRateLimitHeadersFromStatus(rateLimitStatus),
+          ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
   }
-
-  // Trigger rate limit counter increment (fire-and-forget)
-  void healthLimiter.limit(clientIP);
 
   // Validate database environment first
   const dbValidation = validateDatabaseEnvironment();
@@ -111,7 +108,7 @@ export async function GET(request: Request) {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeadersFromStatus(rateLimitStatus),
+        ...createRateLimitHeaders(rateLimitResult),
       },
     });
   }
@@ -188,7 +185,7 @@ export async function GET(request: Request) {
       : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
     headers: {
       ...HEALTH_CHECK_CONFIG.cacheHeaders,
-      ...createRateLimitHeadersFromStatus(rateLimitStatus),
+      ...createRateLimitHeaders(rateLimitResult),
     },
   });
 }
