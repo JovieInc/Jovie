@@ -106,6 +106,21 @@ interface UpdateCampaignSettingsBody {
   };
 }
 
+function isThrottlingConfigInvalid(config: {
+  minDelayMs: number;
+  maxDelayMs: number;
+  maxPerHour: number;
+}): boolean {
+  return (
+    typeof config.minDelayMs !== 'number' ||
+    typeof config.maxDelayMs !== 'number' ||
+    typeof config.maxPerHour !== 'number' ||
+    config.minDelayMs < 0 ||
+    config.maxDelayMs < config.minDelayMs ||
+    config.maxPerHour < 1
+  );
+}
+
 /**
  * POST /api/admin/campaigns/settings — Upserts campaign settings.
  */
@@ -155,21 +170,14 @@ export async function POST(request: NextRequest) {
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-    if (body.throttlingConfig !== undefined) {
-      const { minDelayMs, maxDelayMs, maxPerHour } = body.throttlingConfig;
-      if (
-        typeof minDelayMs !== 'number' ||
-        typeof maxDelayMs !== 'number' ||
-        typeof maxPerHour !== 'number' ||
-        minDelayMs < 0 ||
-        maxDelayMs < minDelayMs ||
-        maxPerHour < 1
-      ) {
-        return NextResponse.json(
-          { error: 'Invalid throttlingConfig values' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
+    if (
+      body.throttlingConfig !== undefined &&
+      isThrottlingConfigInvalid(body.throttlingConfig)
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid throttlingConfig values' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const updatedBy = entitlements.userId ?? null;

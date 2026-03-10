@@ -113,16 +113,9 @@ export function handleMigrationErrors(
       break;
     }
     case 'social_links_count': {
-      if (hasMigrationErrorCode) {
+      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
         logMigrationWarning(
-          '[Dashboard] social_links migration in progress',
-          context
-        );
-        return { shouldRetry: false, fallbackData: false };
-      }
-      if (isSocialLinksColumnMissing(message)) {
-        logMigrationWarning(
-          '[Dashboard] social_links.state column missing; treating as no links',
+          '[Dashboard] social_links migration in progress; treating as no links',
           context
         );
         return { shouldRetry: false, fallbackData: false };
@@ -130,16 +123,9 @@ export function handleMigrationErrors(
       break;
     }
     case 'music_links_count': {
-      if (hasMigrationErrorCode) {
+      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
         logMigrationWarning(
-          '[Dashboard] social_links migration in progress',
-          context
-        );
-        return { shouldRetry: false, fallbackData: false };
-      }
-      if (isSocialLinksColumnMissing(message)) {
-        logMigrationWarning(
-          '[Dashboard] social_links.state column missing; treating as no music links',
+          '[Dashboard] social_links migration in progress; treating as no music links',
           context
         );
         return { shouldRetry: false, fallbackData: false };
