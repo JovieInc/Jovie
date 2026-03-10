@@ -8,8 +8,8 @@
  * Uses Neon WebSocket driver for stateful connection pooling.
  * This is the serverless-native pattern:
  * - Stateful WebSocket connections required for Row Level Security (RLS)
- * - db.transaction() is supported and maintains connection state
- * - set_config applies properly within the transaction
+ * - Keep app-level transaction usage isolated via legacy wrappers
+ * - Prefer sequential/batch operations for new application code
  *
  * DO NOT create additional database connections elsewhere in the app.
  * Scripts in apps/web/scripts/ are exempt since they run standalone.
@@ -36,7 +36,7 @@ let _pool: Pool | undefined;
 
 /**
  * Initialize the database connection using Neon WebSocket driver.
- * Uses a Pool for stateful connections that support transactions and RLS.
+ * Uses a Pool for stateful connections and RLS-compatible session setup.
  */
 export function initializeDb(): DbType {
   const databaseUrl = env.DATABASE_URL;
@@ -66,7 +66,7 @@ export function initializeDb(): DbType {
     }
   );
 
-  // Create Neon WebSocket pool - stateful, supports transactions for RLS
+  // Create Neon WebSocket pool for stateful connections and RLS context
   //
   // Pool settings tuned for Neon serverless to prevent
   // "Connection terminated unexpectedly" errors:
@@ -148,7 +148,8 @@ export function setInternalDb(db: DbType): void {
 }
 
 // Export a lazy-initializing proxy that forwards all access to the real db instance.
-// The WebSocket driver supports db.transaction() for RLS session isolation.
+// Transactions remain available at the driver level but should stay behind
+// audited legacy wrappers rather than app-level call-sites.
 export const db = new Proxy({} as DbType, {
   get(_target, prop) {
     if (!_db) {

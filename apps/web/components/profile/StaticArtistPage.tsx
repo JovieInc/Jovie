@@ -65,6 +65,8 @@ interface StaticArtistPageProps {
   /** Artist genres for the about section */
   readonly genres?: string[] | null;
   readonly tourDates?: TourDateViewModel[];
+  /** HMAC-signed tracking token for authenticating visit tracking requests */
+  readonly visitTrackingToken?: string;
 }
 
 /**
@@ -203,6 +205,7 @@ export function StaticArtistPage({
   subscribeTwoStep = false,
   genres,
   tourDates = [],
+  visitTrackingToken,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist);
@@ -224,6 +227,7 @@ export function StaticArtistPage({
         showNotificationButton={true}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
+        visitTrackingToken={visitTrackingToken}
       >
         <div>
           <Suspense>

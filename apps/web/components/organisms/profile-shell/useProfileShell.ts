@@ -70,9 +70,10 @@ export function useProfileShell({
   artist,
   socialLinks,
   contacts = [],
+  visitTrackingToken,
 }: Pick<
   ProfileShellProps,
-  'artist' | 'socialLinks' | 'contacts'
+  'artist' | 'socialLinks' | 'contacts' | 'visitTrackingToken'
 >): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
@@ -98,7 +99,7 @@ export function useProfileShell({
     mode,
     source,
   });
-  useProfileVisitTracking(artist.id);
+  useProfileVisitTracking(artist.id, visitTrackingToken);
   usePopstateReset(() => setIsTipNavigating(false));
 
   // Reset tip loading on navigation/back

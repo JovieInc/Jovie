@@ -55,6 +55,8 @@ export interface ProfileShellProps {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  /** HMAC-signed tracking token for authenticating visit tracking requests */
+  readonly visitTrackingToken?: string;
 }
 
 export const SOCIAL_NETWORK_PLATFORMS = [

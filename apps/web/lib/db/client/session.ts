@@ -2,7 +2,8 @@
  * Database Session Helpers
  *
  * Helper functions for database sessions and RLS.
- * The Neon WebSocket driver supports transactions for RLS isolation.
+ * New app code should avoid direct transaction usage; legacy transaction
+ * exceptions are centralized in `lib/db/legacy-transaction.ts`.
  */
 
 import { sql as drizzleSql } from 'drizzle-orm';
@@ -36,8 +37,7 @@ export async function withDb<T>(
  * Set session user ID for RLS policies with retry logic.
  *
  * Uses set_config with is_local=false (session-scoped) so the setting
- * persists for the lifetime of the connection. For transaction-scoped
- * isolation, wrap in db.transaction() with is_local=true instead.
+ * persists for the lifetime of the connection.
  */
 export async function setSessionUser(userId: string): Promise<void> {
   if (!userId) {

@@ -2,6 +2,7 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getSessionSetupSql } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
@@ -235,7 +236,7 @@ export async function getUserAnalytics(
 ) {
   // Run inside a transaction to ensure the RLS session variable is set on the
   // same connection that queries the users table (which has RLS enabled).
-  return db.transaction(async tx => {
+  return runLegacyDbTransaction(async tx => {
     await tx.execute(getSessionSetupSql(clerkUserId));
 
     // Single JOIN query to get user and profile in one round-trip
@@ -306,7 +307,7 @@ export async function getUserDashboardAnalytics(
   //    causing RLS-protected tables (audience_members, notification_subscriptions,
   //    users) to return 0 rows — the root cause of JOV-1349.
   // 2. All CTEs see a consistent snapshot of the data.
-  return db.transaction(async tx => {
+  return runLegacyDbTransaction(async tx => {
     // Set the RLS session variable on this transaction's connection
     await tx.execute(getSessionSetupSql(clerkUserId));
 

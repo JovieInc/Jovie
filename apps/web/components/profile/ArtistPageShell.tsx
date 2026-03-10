@@ -27,6 +27,8 @@ type ArtistPageShellProps = {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  /** HMAC-signed tracking token for authenticating visit tracking requests */
+  readonly visitTrackingToken?: string;
 };
 
 // Using React.memo to prevent unnecessary re-renders when only children content changes
@@ -48,6 +50,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   showNotificationButton = false,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  visitTrackingToken,
 }: ArtistPageShellProps) {
   return (
     <ProfileShell
@@ -69,6 +72,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       showGradientBlurs={true}
       photoDownloadSizes={photoDownloadSizes}
       allowPhotoDownloads={allowPhotoDownloads}
+      visitTrackingToken={visitTrackingToken}
     >
       {children}
     </ProfileShell>

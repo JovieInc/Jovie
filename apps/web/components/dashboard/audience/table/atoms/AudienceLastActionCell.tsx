@@ -27,9 +27,7 @@ export function AudienceLastActionCell({
   className,
 }: AudienceLastActionCellProps) {
   if (!actions.length) {
-    return (
-      <div className={cn('text-[13px] text-tertiary-token', className)}>—</div>
-    );
+    return null;
   }
 
   const lastAction = actions[0];

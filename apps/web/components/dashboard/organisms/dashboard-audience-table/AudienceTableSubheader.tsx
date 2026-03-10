@@ -89,7 +89,7 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
               disabled={!hasData && subscriberCount === 0}
               variant='ghost'
               size='sm'
-              className='focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1 whitespace-nowrap [&>span]:hidden [&>span]:sm:inline'
+              className='h-7 gap-1.5 rounded-md border border-transparent text-secondary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1 whitespace-nowrap [&>span]:hidden [&>span]:sm:inline'
             />
           </ActionBarItem>
         </ActionBar>

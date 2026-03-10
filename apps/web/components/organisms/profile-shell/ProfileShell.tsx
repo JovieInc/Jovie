@@ -57,6 +57,7 @@ export function ProfileShell({
   showGradientBlurs = true,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  visitTrackingToken,
 }: ProfileShellProps) {
   const {
     handleNotificationsTrigger,
@@ -69,6 +70,7 @@ export function ProfileShell({
     artist,
     socialLinks,
     contacts,
+    visitTrackingToken,
   });
 
   const isMobile = useBreakpointDown('md');
