@@ -215,6 +215,14 @@ async function uploadAvatarFile(
   return { blobUrl, photoId };
 }
 
+function normalizeError(error: unknown, fallback: string): Error {
+  return error instanceof Error ? error : new Error(fallback);
+}
+
+function isAbortError(e: Error): boolean {
+  return e.name === 'AbortError' || e.message.includes('aborted');
+}
+
 /**
  * Exponential backoff with jitter for retry delays.
  * Returns a promise that resolves after the computed delay.
@@ -240,15 +248,8 @@ async function fetchAvatarWithRetry(
       if (attempt > 0) await backoffDelay(attempt);
       return await fetchAvatarImage(imageUrl);
     } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error('Unknown fetch error');
-
-      if (
-        lastError.name === 'AbortError' ||
-        lastError.message.includes('aborted')
-      ) {
-        return null;
-      }
+      lastError = normalizeError(error, 'Unknown fetch error');
+      if (isAbortError(lastError)) return null;
 
       if (lastError.message.includes('Invalid content type')) {
         Sentry.captureMessage('Avatar upload: invalid content type', {
@@ -297,15 +298,8 @@ async function uploadAvatarWithRetry(
       );
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error('Unknown upload error');
-
-      if (
-        lastError.name === 'AbortError' ||
-        lastError.message.includes('aborted')
-      ) {
-        return null;
-      }
+      lastError = normalizeError(error, 'Unknown upload error');
+      if (isAbortError(lastError)) return null;
 
       if (lastError.message.includes('401')) {
         Sentry.addBreadcrumb({

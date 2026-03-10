@@ -87,25 +87,23 @@ export function useReleaseHeaderParts({
     globalThis.location.reload();
   }, [isRefreshing, onRefresh]);
 
-  const handleCopyReleaseId = useCallback(() => {
+  const handleCopyReleaseId = useCallback(async () => {
     const releaseId = release?.id ?? '';
     if (!releaseId) {
       alert('No release ID available to copy.');
       return;
     }
 
-    navigator.clipboard
-      ?.writeText(releaseId)
-      .then(() => {
-        setIsIdCopied(true);
-        if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
-        idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
-      })
-      .catch(() => {
-        alert(
-          'Failed to copy the release ID. Your browser may not allow clipboard access.'
-        );
-      });
+    try {
+      await navigator.clipboard?.writeText(releaseId);
+      setIsIdCopied(true);
+      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+      idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
+    } catch {
+      alert(
+        'Failed to copy the release ID. Your browser may not allow clipboard access.'
+      );
+    }
   }, [release]);
 
   const overflowActions: DrawerHeaderAction[] = [];
@@ -152,16 +150,16 @@ export function useReleaseHeaderParts({
   const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
   const titleText = buildTitleText(isrcValue, hasRelease, release);
 
-  const handleCopyIsrc = useCallback(() => {
+  const handleCopyIsrc = useCallback(async () => {
     if (!isrcValue) return;
-    navigator.clipboard
-      ?.writeText(isrcValue)
-      .then(() => {
-        setIsIdCopied(true);
-        if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
-        idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
-      })
-      .catch(() => {});
+    try {
+      await navigator.clipboard?.writeText(isrcValue);
+      setIsIdCopied(true);
+      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+      idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
+    } catch {
+      // ignore clipboard errors
+    }
   }, [isrcValue]);
 
   const title = (

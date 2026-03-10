@@ -50,10 +50,9 @@ async function attemptLeadPush(
       return instantlyLeadId;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (
-        attempt === 0 &&
-        !(error instanceof Error && error.message.includes('429'))
-      ) {
+      const isRateLimitError =
+        error instanceof Error && error.message.includes('429');
+      if (attempt === 0 && !isRateLimitError) {
         throw lastError;
       }
     }
