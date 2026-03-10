@@ -84,19 +84,38 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div>
-      <div className='min-h-[60px]'>
+    <div className='min-h-[188px]'>
+      <div>
         {showSkeleton && (
-          <div className='grid grid-cols-2 rounded-md border border-subtle bg-surface-1 p-3'>
-            <div className='space-y-1'>
-              <div className='h-[10px] w-14 rounded skeleton' />
-              <div className='h-5 w-10 rounded skeleton' />
-              <div className='h-[11px] w-10 rounded skeleton' />
+          <div className='space-y-2'>
+            <div className='grid grid-cols-2 rounded-md border border-subtle bg-surface-1 p-3'>
+              <div className='space-y-1'>
+                <div className='h-[10px] w-14 rounded skeleton' />
+                <div className='h-5 w-10 rounded skeleton' />
+                <div className='h-[11px] w-10 rounded skeleton' />
+              </div>
+              <div className='space-y-1 border-l border-subtle pl-3'>
+                <div className='h-[10px] w-14 rounded skeleton' />
+                <div className='h-5 w-10 rounded skeleton' />
+                <div className='h-[11px] w-10 rounded skeleton' />
+              </div>
             </div>
-            <div className='space-y-1 border-l border-subtle pl-3'>
-              <div className='h-[10px] w-14 rounded skeleton' />
-              <div className='h-5 w-10 rounded skeleton' />
-              <div className='h-[11px] w-10 rounded skeleton' />
+            <div className='space-y-2'>
+              <div className='h-[10px] w-20 rounded skeleton' />
+              <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>
+                {[1, 2, 3].map(item => (
+                  <div
+                    key={`provider-skeleton-${item}`}
+                    className='flex items-center justify-between px-3 py-2'
+                  >
+                    <div className='flex items-center gap-2'>
+                      <div className='h-2 w-2 rounded-full skeleton' />
+                      <div className='h-3 w-16 rounded skeleton' />
+                    </div>
+                    <div className='h-3 w-8 rounded skeleton' />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

@@ -146,6 +146,21 @@ export function handleMigrationErrors(
       }
       break;
     }
+    // Combined existence query (hasLinks + hasMusicLinks in one SQL statement).
+    // Both booleans are fetched atomically so a single case covers the failure.
+    case 'social_links_existence': {
+      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
+        logMigrationWarning(
+          '[Dashboard] social_links migration in progress; treating as no links',
+          context
+        );
+        return {
+          shouldRetry: false,
+          fallbackData: { hasLinks: false, hasMusicLinks: false },
+        };
+      }
+      break;
+    }
     default:
       break;
   }

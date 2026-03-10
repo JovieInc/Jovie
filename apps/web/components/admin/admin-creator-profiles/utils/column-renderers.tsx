@@ -1,9 +1,9 @@
 import type { CellContext } from '@tanstack/react-table';
-import {
-  AvatarCell,
-  DateCell,
-  SocialLinksCell,
-} from '@/components/organisms/table';
+import { CalendarDays, Copy, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
+import { AvatarCell, SocialLinksCell } from '@/components/organisms/table';
+import { getProfileUrl } from '@/constants/domains';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 /**
@@ -15,6 +15,7 @@ export function renderAvatarCell({
   const profile = row.original;
   const displayName =
     'displayName' in profile ? (profile.displayName ?? null) : null;
+  const profileUrl = getProfileUrl(profile.username);
 
   return (
     <AvatarCell
@@ -24,6 +25,38 @@ export function renderAvatarCell({
       displayName={displayName}
       verified={profile.isVerified}
       isFeatured={profile.isFeatured}
+      disableUsernameLink
+      usernameActions={
+        <span className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100'>
+          <button
+            type='button'
+            className='rounded p-0.5 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+            aria-label={`Copy link for @${profile.username}`}
+            onClick={event => {
+              event.stopPropagation();
+              copyToClipboard(profileUrl).then(ok => {
+                if (ok) {
+                  toast.success('Profile link copied', { duration: 2000 });
+                } else {
+                  toast.error('Failed to copy link');
+                }
+              });
+            }}
+          >
+            <Copy className='h-3 w-3' />
+          </button>
+          <a
+            href={profileUrl}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='rounded p-0.5 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+            aria-label={`Open profile for @${profile.username}`}
+            onClick={event => event.stopPropagation()}
+          >
+            <ExternalLink className='h-3 w-3' />
+          </a>
+        </span>
+      }
     />
   );
 }
@@ -66,6 +99,20 @@ export function renderMusicLinksCell({
 export function renderCreatedDateCell({
   row,
 }: CellContext<AdminCreatorProfileRow, Date | null>) {
-  const profile = row.original;
-  return <DateCell date={profile.createdAt} />;
+  const createdAt = row.original.createdAt;
+
+  return (
+    <span className='inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-[450] tabular-nums text-secondary-token'>
+      <CalendarDays
+        className='h-3.5 w-3.5 text-tertiary-token'
+        aria-hidden='true'
+      />
+      {createdAt
+        ? createdAt.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+          })
+        : '—'}
+    </span>
+  );
 }

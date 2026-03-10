@@ -19,6 +19,7 @@ import {
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
@@ -28,6 +29,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { AvailableDSP } from '@/lib/dsp';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
@@ -86,6 +88,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   appleMusicArtistName = null,
   allowArtworkDownloads = false,
   initialImporting = false,
+  connectedDSPs = [],
 }: ReleaseProviderMatrixProps) {
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(spotifyConnected);
@@ -536,6 +539,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [artistName, isConnected, isSyncing, setSpotifySearchOpen]
   );
 
+  const connectedDspList = useMemo(() => connectedDSPs, [connectedDSPs]);
+
   const appleMusicBadge = useMemo(
     () => (
       <DspConnectionPill
@@ -549,15 +554,37 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [isAmConnected, amArtistName, isAmSyncing, setAmPaletteOpen]
   );
 
+  const renderConnectedDspBadge = useCallback(
+    (dsp: AvailableDSP) => {
+      if (dsp.key === 'spotify') {
+        return <div key={dsp.key}>{spotifyBadge}</div>;
+      }
+
+      if (dsp.key === 'apple_music') {
+        return <div key={dsp.key}>{appleMusicBadge}</div>;
+      }
+
+      return (
+        <span
+          key={dsp.key}
+          className='inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-2 px-2.5 py-1 text-[13px] text-secondary-token'
+        >
+          <SocialIcon platform={dsp.key} className='h-4 w-4' />
+          <span>{dsp.name}</span>
+        </span>
+      );
+    },
+    [appleMusicBadge, spotifyBadge]
+  );
+
   // DSP badges for subheader (moved from header)
   const dspBadges = useMemo(
     () => (
       <div className='flex items-center gap-2'>
-        {spotifyBadge}
-        {appleMusicBadge}
+        {connectedDspList.map(renderConnectedDspBadge)}
       </div>
     ),
-    [spotifyBadge, appleMusicBadge]
+    [connectedDspList, renderConnectedDspBadge]
   );
 
   // Header search input — shown when search is open

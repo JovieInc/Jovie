@@ -20,27 +20,35 @@ vi.mock('@/lib/leads/pipeline-logger', () => ({
 describe('searchGoogleCSE', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    delete process.env.GOOGLE_CSE_API_KEY;
-    delete process.env.GOOGLE_CSE_ENGINE_ID;
+    vi.unstubAllEnvs();
   });
 
-  it('returns an empty result and logs a warning when CSE env vars are missing', async () => {
+  it('returns an empty list when Google CSE env vars are missing', async () => {
+    vi.stubEnv('GOOGLE_CSE_API_KEY', '');
+    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', '');
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
     const { searchGoogleCSE } = await import('@/lib/leads/google-cse');
 
-    const results = await searchGoogleCSE('site:linktr.ee musician spotify');
+    await expect(
+      searchGoogleCSE('site:linktr.ee artist spotify')
+    ).resolves.toEqual([]);
 
-    expect(results).toEqual([]);
     expect(pipelineWarnMock).toHaveBeenCalledWith(
       'discovery',
       'Google CSE not configured',
       { missing: ['GOOGLE_CSE_API_KEY', 'GOOGLE_CSE_ENGINE_ID'] }
     );
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(captureErrorMock).not.toHaveBeenCalled();
+
+    fetchSpy.mockRestore();
   });
 
   it('captures API errors and returns an empty array', async () => {
-    process.env.GOOGLE_CSE_API_KEY = 'test-api-key';
-    process.env.GOOGLE_CSE_ENGINE_ID = 'test-engine-id';
+    vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
+    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
 
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(

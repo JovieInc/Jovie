@@ -394,7 +394,7 @@ async function fetchDashboardCoreWithSession(
           .catch((error: unknown) => {
             const migrationResult = handleMigrationErrors(error, {
               userId: userData.id,
-              operation: 'social_links_count',
+              operation: 'social_links_existence',
             });
 
             if (!migrationResult.shouldRetry) {

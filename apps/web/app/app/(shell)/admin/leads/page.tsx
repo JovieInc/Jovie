@@ -26,7 +26,7 @@ function KpisSkeleton() {
 
 export default function AdminLeadsPage() {
   return (
-    <PageShell>
+    <PageShell className='bg-background shadow-none'>
       <PageContent noPadding>
         <div className='flex flex-col gap-6 p-4 sm:p-6'>
           <Suspense fallback={<KpisSkeleton />}>
