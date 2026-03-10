@@ -9,6 +9,7 @@ import { syncPrimaryMusicUrlsFromSocialLinks } from '@/lib/db/social-links-sync'
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { capProfileLinkInputs } from '@/lib/profile/social-link-limits';
 import {
   applyRateLimiting,
   buildSocialLinksInsertPayload,
@@ -92,7 +93,7 @@ export async function PUT(req: Request) {
         idempotencyKey,
         expectedVersion,
       } = validationResult.data;
-      const links = parsedLinks ?? [];
+      const links = capProfileLinkInputs(parsedLinks ?? []);
       if (!profileId) {
         return NextResponse.json(
           { error: 'Profile ID is required' },
