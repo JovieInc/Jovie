@@ -1,5 +1,6 @@
 import { getFeaturedCreators } from '@/lib/featured-creators';
 import { ClaimHandleForm } from './claim-handle';
+import { HeroPhonePreview } from './HeroPhonePreview';
 
 const DEMO_HANDLES = ['tim', 'tiesto', 'x'];
 
@@ -19,9 +20,12 @@ export async function RedesignedHero() {
     // fall back to demo handles
   }
 
+  // First handle drives the phone URL chip
+  const featuredHandle = previewHandles[0] ?? 'tim';
+
   return (
     <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[8rem] pb-[5rem]'>
-      {/* Primary ambient glow — barely perceptible warmth */}
+      {/* Primary ambient glow */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -32,65 +36,48 @@ export async function RedesignedHero() {
       />
 
       <div className='relative w-full max-w-[var(--linear-content-max)] z-10'>
-        {/* Centered text block — Linear layout */}
-        <div className='hero-stagger flex flex-col items-center text-center max-w-2xl mx-auto'>
-          <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
-            AI built for artists
-          </span>
-          <h1 className='marketing-h1-linear text-[var(--linear-text-primary)]'>
-            The link music <br className='hidden sm:block' />
-            deserves.
-          </h1>
+        {/* Two-column on desktop: left = text/form, right = phone */}
+        <div className='flex flex-col lg:flex-row lg:items-center lg:gap-12 xl:gap-20'>
+          {/* Left column — headline, form, chips */}
+          <div className='hero-stagger flex flex-col items-center text-center lg:items-start lg:text-left lg:flex-1 max-w-2xl mx-auto lg:mx-0'>
+            <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
+              AI built for artists
+            </span>
+            <h1 className='marketing-h1-linear text-[var(--linear-text-primary)]'>
+              The link your <br className='hidden sm:block' />
+              music deserves.
+            </h1>
 
-          <p className='mt-5 max-w-[480px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
-            Connect your Spotify, capture every fan, and keep marketing your
-            music automatically — forever.
-          </p>
+            <p className='mt-5 max-w-[480px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              Connect your Spotify, capture every fan, and keep marketing your
+              music automatically — forever.
+            </p>
 
-          <div className='mt-8 w-full max-w-[560px]'>
-            <ClaimHandleForm size='hero' />
-          </div>
+            <div className='mt-8 w-full max-w-[560px] lg:max-w-full'>
+              <ClaimHandleForm size='hero' />
+            </div>
 
-          {/* Handle preview chips — pulls from featured creators */}
-          <div className='mt-4 flex items-center justify-center gap-x-3 flex-wrap'>
-            {previewHandles.map((handle, i) => (
+            <p
+              className='mt-3 flex items-center justify-center lg:justify-start gap-2'
+              style={{
+                fontSize: '12px',
+                fontWeight: 450,
+                letterSpacing: '0.01em',
+                color: 'var(--linear-text-tertiary)',
+              }}
+            >
               <span
-                key={handle}
-                className='flex items-center gap-x-3 text-[12px]'
-              >
-                {i > 0 && (
-                  <span
-                    aria-hidden='true'
-                    className='text-[var(--linear-text-quaternary)]'
-                  >
-                    ·
-                  </span>
-                )}
-                <span className='text-[var(--linear-text-tertiary)]'>
-                  jov.ie/
-                  <span className='font-medium text-[var(--linear-text-secondary)]'>
-                    {handle}
-                  </span>
-                </span>
-              </span>
-            ))}
+                aria-hidden='true'
+                className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
+              />{' '}
+              Free to start. Your page can be live in 60 seconds.
+            </p>
           </div>
 
-          <p
-            className='mt-3 flex items-center justify-center gap-2'
-            style={{
-              fontSize: '12px',
-              fontWeight: 450,
-              letterSpacing: '0.01em',
-              color: 'var(--linear-text-tertiary)',
-            }}
-          >
-            <span
-              aria-hidden='true'
-              className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-            />{' '}
-            Free to start. Your page can be live in 60 seconds.
-          </p>
+          {/* Right column — real Jovie profile phone (desktop only) */}
+          <div className='hidden lg:flex lg:shrink-0 lg:items-center lg:justify-center lg:pt-4'>
+            <HeroPhonePreview handle={featuredHandle} />
+          </div>
         </div>
       </div>
     </section>
