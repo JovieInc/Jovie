@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "doppler run -- next dev",
     "dev:local": "next dev",
+    "dev:local:playwright": "next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "build": "next build --turbopack",
     "build:validate": "npm run validate-env && next build --turbopack",

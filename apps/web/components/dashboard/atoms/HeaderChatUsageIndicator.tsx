@@ -4,13 +4,15 @@ import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { memo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { env } from '@/lib/env-client';
 import { useChatUsageQuery } from '@/lib/queries/useChatUsageQuery';
 
 export const HeaderChatUsageIndicator = memo(
   function HeaderChatUsageIndicator() {
-    const { data } = useChatUsageQuery();
+    const isPassiveRuntime = env.IS_E2E;
+    const { data } = useChatUsageQuery({ enabled: !isPassiveRuntime });
 
-    if (!data || (!data.isNearLimit && !data.isExhausted)) {
+    if (isPassiveRuntime || !data || (!data.isNearLimit && !data.isExhausted)) {
       return null;
     }
 

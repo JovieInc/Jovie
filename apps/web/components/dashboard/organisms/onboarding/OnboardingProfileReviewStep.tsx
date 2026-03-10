@@ -21,6 +21,8 @@ interface OnboardingProfileReviewStepProps {
   readonly onGoToDashboard: () => void;
 }
 
+const PROFILE_SAVE_TIMEOUT_MS = 5000;
+
 /**
  * Profile review step in onboarding.
  * JOV-1340: Photo is no longer required to proceed.
@@ -76,10 +78,17 @@ export function OnboardingProfileReviewStep({
   const handleGoToDashboard = useCallback(async () => {
     setIsSaving(true);
     try {
-      await updateOnboardingProfile({
-        displayName: displayName.trim(),
-        bio: bio.trim(),
-      });
+      await Promise.race([
+        updateOnboardingProfile({
+          displayName: displayName.trim(),
+          bio: bio.trim(),
+        }),
+        new Promise((_, reject) => {
+          globalThis.setTimeout(() => {
+            reject(new Error('Onboarding profile save timed out'));
+          }, PROFILE_SAVE_TIMEOUT_MS);
+        }),
+      ]);
       onGoToDashboard();
     } catch {
       // If save fails, still proceed — profile data was already saved during enrichment

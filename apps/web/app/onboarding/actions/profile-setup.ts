@@ -53,6 +53,50 @@ export async function createUserAndProfile(
 }
 
 /**
+ * Creates a profile for an already-existing user row.
+ */
+export async function createProfileForExistingUser(
+  tx: DbTransaction,
+  userId: string,
+  normalizedUsername: string,
+  trimmedDisplayName: string
+): Promise<CompletionResult> {
+  try {
+    const [profile] = await tx
+      .insert(creatorProfiles)
+      .values({
+        userId,
+        creatorType: 'creator',
+        username: normalizedUsername,
+        usernameNormalized: normalizedUsername,
+        displayName: trimmedDisplayName,
+        isPublic: true,
+        isClaimed: true,
+        claimedAt: new Date(),
+        onboardingCompletedAt: new Date(),
+        settings: {},
+        theme: {},
+        ingestionStatus: 'idle',
+      })
+      .returning({
+        id: creatorProfiles.id,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      });
+
+    return {
+      username: profile?.usernameNormalized || normalizedUsername,
+      status: 'created',
+      profileId: profile?.id ?? null,
+    };
+  } catch (error) {
+    await captureError('createProfileForExistingUser failed', error, {
+      route: 'profile-setup',
+    });
+    throw error;
+  }
+}
+
+/**
  * Updates an existing profile with new onboarding data.
  */
 export async function updateExistingProfile(
@@ -79,7 +123,9 @@ export async function updateExistingProfile(
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profile.id))
-      .returning();
+      .returning({
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      });
 
     return {
       username: updated?.usernameNormalized || normalizedUsername,

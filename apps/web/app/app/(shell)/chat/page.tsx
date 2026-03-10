@@ -24,16 +24,23 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function ChatPage() {
   const dashboardData = await getDashboardData();
+  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
   if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
-  const appleMusicResult = await checkAppleMusicConnection().catch(() => ({
-    connected: false,
-    artistName: null,
-    artistId: null,
-  }));
+  const appleMusicResult = isE2EClientRuntime
+    ? {
+        connected: false,
+        artistName: null,
+        artistId: null,
+      }
+    : await checkAppleMusicConnection().catch(() => ({
+        connected: false,
+        artistName: null,
+        artistId: null,
+      }));
 
   return (
     <ChatPageClient

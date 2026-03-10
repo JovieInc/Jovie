@@ -3,6 +3,7 @@
 import { Download, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { env } from '@/lib/env-client';
 import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 import {
   useVersionMonitor,
@@ -22,6 +23,8 @@ const NOTIFICATION_DELAY_MS = 10_000;
  * Hidden when the sidebar is collapsed to icon-only mode.
  */
 export function SidebarInstallBanner() {
+  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+
   const { canPrompt, isIOS, install, dismiss: dismissPwa } = usePWAInstall();
 
   const [versionUpdate, setVersionUpdate] =
@@ -47,7 +50,10 @@ export function SidebarInstallBanner() {
     }, NOTIFICATION_DELAY_MS);
   }, []);
 
-  useVersionMonitor({ onVersionMismatch: handleVersionMismatch });
+  useVersionMonitor({
+    onVersionMismatch: handleVersionMismatch,
+    enabled: !isPassiveRuntime,
+  });
 
   useEffect(() => {
     return () => {
@@ -70,6 +76,10 @@ export function SidebarInstallBanner() {
   const reload = useCallback(() => {
     globalThis.location.reload();
   }, []);
+
+  if (isPassiveRuntime) {
+    return null;
+  }
 
   // Priority: version update > PWA install
   // Never show both simultaneously

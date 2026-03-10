@@ -6,6 +6,7 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
+import { env } from '@/lib/env-client';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
@@ -230,11 +231,13 @@ export function CoreProviders({
   const pathname = usePathname() ?? '';
   const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
   const isPublicVariant = variant === 'public';
+  const isTestRuntime = env.IS_TEST || env.IS_E2E;
   const enableAnalytics = useMemo(
     () =>
+      !isTestRuntime &&
       pathname !== '/' &&
       !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
-    [pathname]
+    [isTestRuntime, pathname]
   );
 
   const providers = (
@@ -242,7 +245,7 @@ export function CoreProviders({
       <QueryProvider>
         <CoreProvidersInner
           enableAnalytics={enableAnalytics}
-          enableMonitoring={!isPublicVariant}
+          enableMonitoring={!isPublicVariant && !isTestRuntime}
           initialThemeMode={initialThemeMode}
           usePacer={!isPublicVariant}
         >
@@ -252,7 +255,7 @@ export function CoreProviders({
     </NuqsProvider>
   );
 
-  if (isPublicVariant) {
+  if (isPublicVariant || isTestRuntime) {
     return providers;
   }
 

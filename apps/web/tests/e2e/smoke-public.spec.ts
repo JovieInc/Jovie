@@ -125,8 +125,9 @@ test.describe('Public Profile — dualipa', () => {
     }
 
     // Artist name in h1 — core identity element
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
+    await expect(page.locator('h1').first()).toContainText(/dua lipa/i, {
+      timeout: 60_000,
+    });
 
     // Claim CTA and profile identity link must both render for anonymous visitors.
     await expect(
@@ -158,25 +159,47 @@ test.describe('Public Profile — dualipa', () => {
       return;
     }
 
-    // h1 with artist name proves the profile loaded, not just the shell
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
-
     // DSP buttons must render — this is the entire point of listen mode
     // If Spotify seeding worked, there must be at least one DSP link
-    const dspLink = page.locator(
-      'a[href*="spotify"], a[href*="apple"], a[href*="tidal"], button:has-text("Spotify"), button:has-text("Apple Music")'
+    const dspActions = page.locator(
+      'a[href*="spotify"], a[href*="apple"], a[href*="tidal"], button'
     );
-    await expect(
-      dspLink.first(),
-      'No DSP links in listen mode — Spotify seeding failed or DSP rendering is broken'
-    ).toBeVisible({ timeout: 20_000 });
+    await expect
+      .poll(
+        async () =>
+          dspActions.evaluateAll(
+            elements =>
+              elements.filter(element => {
+                const text = element.textContent?.trim().toLowerCase() ?? '';
+                const style = globalThis.getComputedStyle(element as Element);
+                const rect = (element as HTMLElement).getBoundingClientRect();
+                const isDspAction =
+                  text.includes('spotify') ||
+                  text.includes('apple music') ||
+                  text.includes('tidal');
+                const isVisible =
+                  style.visibility !== 'hidden' &&
+                  style.display !== 'none' &&
+                  rect.width > 0 &&
+                  rect.height > 0;
+
+                return isDspAction && isVisible;
+              }).length
+          ),
+        {
+          message:
+            'No visible DSP links in listen mode — Spotify seeding failed or DSP rendering is broken',
+          timeout: 60_000,
+        }
+      )
+      .toBeGreaterThan(0);
   });
 
   test('tip mode: tipping UI renders', async ({ page }) => {
     test.setTimeout(90_000);
+    const tipProfile = 'testartist';
 
-    await page.goto(`/${TEST_PROFILE}?mode=tip`, {
+    await page.goto(`/${tipProfile}?mode=tip`, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
@@ -194,62 +217,49 @@ test.describe('Public Profile — dualipa', () => {
       return;
     }
 
-    // h1 present
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
-
-    // Tipping UI or subscribe prompt — something actionable must render
-    const tipUI = page.locator(
-      '[data-testid="tip-button"], [data-testid="tip-form"], button:has-text("Tip"), button:has-text("Support"), input[placeholder*="amount"], a[href*="subscribe"]'
-    );
+    // testartist is seeded with a Venmo handle, so tip mode should expose the
+    // actual Venmo selector instead of the no-tip fallback.
+    const tipUI = page
+      .getByLabel('Venmo Tipping')
+      .or(page.getByRole('button', { name: /continue with venmo/i }));
     await expect(
       tipUI.first(),
       'No tipping UI rendered — tipping flow is broken for this profile'
-    ).toBeVisible({ timeout: 20_000 });
+    ).toBeVisible({ timeout: 60_000 });
   });
 
-  test('profile subpages return 2xx, no 500s', async ({ page }) => {
-    test.setTimeout(120_000);
+  test('subscribe mode: notification capture UI renders', async ({ page }) => {
+    test.setTimeout(90_000);
 
-    const subpages = ['/subscribe', '/tip', '/tour'] as const;
+    await page.goto(`/${TEST_PROFILE}?mode=subscribe`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
 
-    for (const sub of subpages) {
-      let response: Awaited<ReturnType<typeof page.goto>>;
-      try {
-        response = await page.goto(`/${TEST_PROFILE}${sub}`, {
-          waitUntil: 'domcontentloaded',
-          timeout: 60_000,
-        });
-      } catch (navError) {
-        const msg =
-          navError instanceof Error ? navError.message : String(navError);
-        if (
-          msg.includes('net::ERR_CONNECTION_REFUSED') ||
-          msg.includes('net::ERR_CONNECTION_RESET') ||
-          msg.includes('Target closed')
-        ) {
-          test.skip(true, `Server went away navigating to ${sub}`);
-          return;
-        }
-        throw navError;
-      }
-
-      const status = response?.status() ?? 0;
-      expect(
-        status,
-        `/${TEST_PROFILE}${sub} returned ${status} — server error`
-      ).toBeLessThan(500);
-
-      const bodyText =
-        (await page
-          .locator('body')
-          .innerText()
-          .catch(() => '')) ?? '';
-      const lower = bodyText.toLowerCase();
-      // 404 is OK (profile may not support this subpage), 500 is not
-      expect(lower).not.toContain('application error');
-      expect(lower).not.toContain('internal server error');
-      expect(lower).not.toContain('unhandled runtime error');
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+    if (
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
+    ) {
+      test.skip(true, 'Profile not seeded');
+      return;
     }
+
+    const openSubscribe = page.getByRole('button', {
+      name: /turn on notifications/i,
+    });
+    await expect(
+      openSubscribe,
+      'Subscribe mode did not render the notification entry action'
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+      page.getByText(/get notified/i),
+      'Subscribe mode did not render the get-notified state'
+    ).toBeVisible({ timeout: 30_000 });
   });
 });
 

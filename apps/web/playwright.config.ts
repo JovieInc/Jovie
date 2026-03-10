@@ -24,9 +24,11 @@ const sentryE2eEnabled =
 const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
 
+const stableLocalServerCommand =
+  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:local:playwright';
 const webServerCommand = process.env.DATABASE_URL
-  ? 'pnpm run dev:local'
-  : 'doppler run -- pnpm run dev:local';
+  ? stableLocalServerCommand
+  : `doppler run -- ${stableLocalServerCommand}`;
 
 function getRetries(): number {
   if (!isCI) return 0;
@@ -138,7 +140,10 @@ export default defineConfig({
             ...process.env,
             NODE_ENV: 'test',
             PORT: '3100',
+            NEXT_PUBLIC_E2E_MODE: '1',
             NEXT_DISABLE_TOOLBAR: '1',
+            E2E_FAST_ONBOARDING: '1',
+            E2E_ALLOW_DEV_CSP: '1',
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },

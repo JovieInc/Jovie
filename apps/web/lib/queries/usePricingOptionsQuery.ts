@@ -61,10 +61,13 @@ async function fetchPricingOptions({
  * Uses STABLE_CACHE (15 min stale) since pricing rarely changes.
  * Returns normalized `data.options` array.
  */
-export function usePricingOptionsQuery() {
+export function usePricingOptionsQuery(options?: { enabled?: boolean }) {
+  const { enabled = true } = options ?? {};
+
   return useQuery<PricingOptionsResponse, Error>({
     queryKey: queryKeys.billing.pricingOptions(),
     queryFn: fetchPricingOptions,
+    enabled,
     ...STABLE_CACHE,
   });
 }
