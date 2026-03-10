@@ -30,15 +30,11 @@ export interface YouTubeCrossCategoryResult {
  * @returns YouTube cross-category result
  */
 export function checkYouTubeCrossCategory(
-  platformId: string,
-  sameSectionHas: boolean,
-  otherSectionHas: boolean,
-  otherSection: 'social' | 'dsp' | null
+  _platformId: string,
+  _sameSectionHas: boolean,
+  _otherSectionHas: boolean,
+  _otherSection: 'social' | 'dsp' | null
 ): YouTubeCrossCategoryResult {
-  void platformId;
-  void sameSectionHas;
-  void otherSectionHas;
-  void otherSection;
   return { shouldPrompt: false, targetSection: null, shouldSkip: false };
 }
 

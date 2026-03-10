@@ -74,7 +74,7 @@ export function SidebarUpgradeBanner() {
             </p>
             <button
               type='button'
-              onClick={() => void handleUpgrade()}
+              onClick={() => handleUpgrade()}
               disabled={!selectedPrice?.priceId || checkoutMutation.isPending}
               className='mt-1.5 inline-flex h-6 items-center rounded px-2 text-2xs font-medium text-sidebar-item-foreground bg-surface-3 transition-colors duration-normal hover:bg-interactive-hover disabled:cursor-not-allowed disabled:opacity-60'
             >

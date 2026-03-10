@@ -71,9 +71,7 @@ export default function AdminOutreachDmPage() {
             <DmQueueCard
               key={lead.id}
               lead={lead}
-              onMarkedSent={() => {
-                fetchQueue();
-              }}
+              onMarkedSent={() => fetchQueue()}
             />
           ))}
         </div>
