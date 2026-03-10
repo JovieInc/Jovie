@@ -71,65 +71,28 @@ function inferDeviceType(
   return 'desktop';
 }
 
-function getPgErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') {
-    return undefined;
-  }
-
-  const err = error as { code?: string; cause?: { code?: string } };
-  return err.code ?? err.cause?.code;
-}
-
 async function incrementDailyProfileViews(
   tx: DbOrTransaction,
   profileId: string,
   viewDate: string,
   now: Date
 ): Promise<void> {
-  const updatedRows = await tx
-    .update(dailyProfileViews)
-    .set({
-      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(dailyProfileViews.creatorProfileId, profileId),
-        eq(dailyProfileViews.viewDate, viewDate)
-      )
-    )
-    .returning({ id: dailyProfileViews.id });
-
-  if (updatedRows.length > 0) {
-    return;
-  }
-
-  try {
-    await tx.insert(dailyProfileViews).values({
+  await tx
+    .insert(dailyProfileViews)
+    .values({
       creatorProfileId: profileId,
       viewDate,
       viewCount: 1,
       createdAt: now,
       updatedAt: now,
-    });
-  } catch (error) {
-    if (getPgErrorCode(error) !== '23505') {
-      throw error;
-    }
-
-    await tx
-      .update(dailyProfileViews)
-      .set({
+    })
+    .onConflictDoUpdate({
+      target: [dailyProfileViews.creatorProfileId, dailyProfileViews.viewDate],
+      set: {
         viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
         updatedAt: now,
-      })
-      .where(
-        and(
-          eq(dailyProfileViews.creatorProfileId, profileId),
-          eq(dailyProfileViews.viewDate, viewDate)
-        )
-      );
-  }
+      },
+    });
 }
 
 export async function POST(request: NextRequest) {
