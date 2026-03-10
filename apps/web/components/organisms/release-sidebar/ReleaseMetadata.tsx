@@ -48,6 +48,28 @@ function PopularityScore({ value }: { readonly value: number }) {
   );
 }
 
+function ReleaseTypeBadges({ release }: { readonly release: Release }) {
+  const typeStyle = getReleaseTypeStyle(release.releaseType);
+  return (
+    <div className='flex items-center gap-1.5'>
+      <Badge
+        size='sm'
+        className={`${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+      >
+        {typeStyle.label}
+      </Badge>
+      {release.isExplicit && (
+        <Badge
+          size='sm'
+          className='border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-300'
+        >
+          E
+        </Badge>
+      )}
+    </div>
+  );
+}
+
 interface ReleaseMetadataProps {
   readonly release: Release;
   readonly onCanvasStatusChange?: (status: CanvasStatus) => void;
@@ -98,27 +120,7 @@ export function ReleaseMetadata({
     <div className='space-y-0.5'>
       <DrawerPropertyRow
         label='Type'
-        value={(() => {
-          const typeStyle = getReleaseTypeStyle(release.releaseType);
-          return (
-            <div className='flex items-center gap-1.5'>
-              <Badge
-                size='sm'
-                className={`${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
-              >
-                {typeStyle.label}
-              </Badge>
-              {release.isExplicit && (
-                <Badge
-                  size='sm'
-                  className='border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-300'
-                >
-                  E
-                </Badge>
-              )}
-            </div>
-          );
-        })()}
+        value={<ReleaseTypeBadges release={release} />}
       />
 
       <DrawerPropertyRow

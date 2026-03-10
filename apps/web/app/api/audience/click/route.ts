@@ -106,6 +106,17 @@ async function findAudienceMember(
   return member ?? null;
 }
 
+function resolveTipAmountCents(
+  metadata: Record<string, unknown> | null | undefined,
+  defaultCents = 500
+): number {
+  if (typeof metadata?.tipAmountCents === 'number')
+    return metadata.tipAmountCents;
+  if (typeof metadata?.tipAmount === 'number')
+    return Math.round(metadata.tipAmount * 100);
+  return defaultCents;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Extract client IP for rate limiting
@@ -312,12 +323,9 @@ export async function POST(request: NextRequest) {
         linkType === 'tip'
           ? {
               ...(metadata ?? {}),
-              tipAmountCents:
-                typeof metadata?.tipAmountCents === 'number'
-                  ? metadata.tipAmountCents
-                  : typeof metadata?.tipAmount === 'number'
-                    ? Math.round(metadata.tipAmount * 100)
-                    : 500,
+              tipAmountCents: resolveTipAmountCents(
+                metadata as Record<string, unknown> | null
+              ),
             }
           : (metadata ?? {});
 
