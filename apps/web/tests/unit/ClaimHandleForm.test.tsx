@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
 const { mockPush, mockPrefetch, mockFetch } = vi.hoisted(() => ({
@@ -29,6 +29,12 @@ vi.mock('next/navigation', () => ({
 global.fetch = mockFetch as unknown as typeof fetch;
 
 import { ClaimHandleForm } from '@/components/home/claim-handle';
+
+beforeEach(() => {
+  mockPush.mockReset();
+  mockPrefetch.mockReset();
+  mockFetch.mockClear();
+});
 
 describe('ClaimHandleForm', () => {
   test('renders with proper accessibility attributes', () => {

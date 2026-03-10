@@ -1,4 +1,5 @@
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { AvailableDSP } from '@/lib/dsp';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export interface ReleaseProviderMatrixProps {
@@ -16,6 +17,7 @@ export interface ReleaseProviderMatrixProps {
   readonly allowArtworkDownloads?: boolean;
   /** Whether a Spotify import is currently in progress (from server) */
   readonly initialImporting?: boolean;
+  readonly connectedDSPs?: readonly AvailableDSP[];
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;

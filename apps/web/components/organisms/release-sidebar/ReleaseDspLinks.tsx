@@ -23,6 +23,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import {
+  DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
@@ -63,7 +64,8 @@ interface ReleaseDspLinksProps {
 const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
-  youtube: 'youtube_music',
+  youtube: null,
+  youtube_music: 'youtube_music',
   soundcloud: 'soundcloud',
   deezer: 'deezer',
   tidal: 'tidal',
@@ -82,6 +84,8 @@ const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
 
 // Maps ProviderKey to SocialIcon platform name for providers without a DspProviderId
 const PROVIDER_TO_SOCIAL_ICON: Partial<Record<ProviderKey, string>> = {
+  youtube: 'youtube',
+  youtube_music: 'youtube',
   bandcamp: 'bandcamp',
   beatport: 'beatport',
   tiktok: 'tiktok',
@@ -196,6 +200,7 @@ export function ReleaseDspLinks({
           aria-label={rescanTooltip}
           onClick={handleRescan}
           disabled={isRescanDisabled}
+          className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
         >
           {isRescanningIsrc ? (
             <Loader2 className='h-4 w-4 animate-spin' />

@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
   canonicalIdentity,
@@ -32,9 +32,9 @@ import {
  * Safely insert an ingestion job with dedup handling.
  *
  * The `dedup_key` unique index is partial (`WHERE dedup_key IS NOT NULL`),
- * which means Drizzle's `onConflictDoNothing` may not fully match the
- * constraint under concurrent inserts. This wrapper catches the PostgreSQL
- * unique violation (23505) and falls back to returning the existing job.
+ * so targeting `dedup_key` in `ON CONFLICT` can fail to infer the constraint.
+ * This wrapper uses generic conflict handling, then catches PostgreSQL unique
+ * violations (23505) and falls back to returning the existing job.
  */
 async function insertJobWithDedup(
   values: typeof ingestionJobs.$inferInsert
@@ -46,7 +46,7 @@ async function insertJobWithDedup(
     const result = await db
       .insert(ingestionJobs)
       .values(values)
-      .onConflictDoNothing({ target: ingestionJobs.dedupKey })
+      .onConflictDoNothing()
       .returning({ id: ingestionJobs.id });
 
     if (result.length > 0) {
@@ -651,4 +651,33 @@ export async function enqueueMusicFetchEnrichmentJob(params: {
     priority: 1, // Higher priority for user-triggered enrichment
     attempts: 0,
   });
+}
+
+/**
+ * Get queue depth: counts of pending + processing jobs grouped by job type.
+ */
+export async function getQueueDepth(
+  dbOrTx: DbOrTransaction = db
+): Promise<Record<string, { pending: number; processing: number }>> {
+  const rows = await dbOrTx.execute(
+    drizzleSql`
+      SELECT
+        job_type,
+        COUNT(*) FILTER (WHERE status = 'pending') AS pending,
+        COUNT(*) FILTER (WHERE status = 'processing') AS processing
+      FROM ingestion_jobs
+      WHERE status IN ('pending', 'processing')
+      GROUP BY job_type
+    `
+  );
+
+  const result: Record<string, { pending: number; processing: number }> = {};
+  for (const row of rows.rows) {
+    const r = row as { job_type: string; pending: string; processing: string };
+    result[r.job_type] = {
+      pending: Number(r.pending),
+      processing: Number(r.processing),
+    };
+  }
+  return result;
 }

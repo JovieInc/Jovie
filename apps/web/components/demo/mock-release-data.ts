@@ -18,7 +18,8 @@ export const DEMO_PROVIDER_CONFIG: Record<
 > = {
   spotify: { label: 'Spotify', accent: '#1DB954' },
   apple_music: { label: 'Apple Music', accent: '#FA2D48' },
-  youtube: { label: 'YouTube Music', accent: '#FF0000' },
+  youtube: { label: 'YouTube', accent: '#FF0000' },
+  youtube_music: { label: 'YouTube Music', accent: '#FF0000' },
   soundcloud: { label: 'SoundCloud', accent: '#FF5500' },
   deezer: { label: 'Deezer', accent: '#A238FF' },
   tidal: { label: 'Tidal', accent: '#000000' },

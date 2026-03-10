@@ -18,6 +18,7 @@ const PROVIDER_PLATFORM_MAP: Record<ProviderKey, string> = {
   spotify: 'spotify',
   apple_music: 'applemusic',
   youtube: 'youtube',
+  youtube_music: 'youtube',
   soundcloud: 'soundcloud',
   deezer: 'deezer',
   tidal: 'tidal',

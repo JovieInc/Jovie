@@ -366,28 +366,34 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
+    /* Exact Linear.app values — measured live 2026-03-10:
+       font-size: 64px, weight: 510, letter-spacing: -1.408px, line-height: 64px */
     font-size: clamp(
       var(--linear-h1-size-sm),
       5vw +
       1rem,
       var(--linear-h1-size-lg)
     );
-    font-weight: var(--linear-font-weight-semibold);
-    letter-spacing: var(--linear-tracking-headline);
-    line-height: var(--linear-leading-snug);
+    font-weight: 510;
+    letter-spacing: -0.022em;
+    /* -1.408px at 64px = -0.022em */
+    line-height: 1;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
   .marketing-h2-linear {
+    /* Exact Linear.app values:
+       font-size: 48px, weight: 510, letter-spacing: -1.056px, line-height: 48px */
     font-size: clamp(
       var(--linear-h2-size-sm),
       3vw +
       1rem,
       var(--linear-h2-size-lg)
     );
-    font-weight: 590;
-    letter-spacing: var(--linear-tracking-headline);
+    font-weight: 510;
+    letter-spacing: -0.022em;
+    /* -1.056px at 48px = -0.022em */
     line-height: 1.05;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
@@ -407,12 +413,14 @@ body {
     }
   }
   .marketing-lead-linear {
-    font-size: clamp(15px, 1.2vw + 0.4rem, 17px);
+    /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */
+    font-size: 15px;
     font-weight: 400;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     letter-spacing: -0.011em;
-    line-height: 1.65;
+    /* -0.165px at 15px = -0.011em */
+    line-height: 1.6;
   }
   .marketing-body {
     font-feature-settings:
@@ -454,6 +462,58 @@ body {
   }
   .hero-stagger > *:nth-child(5) {
     animation-delay: 240ms;
+  }
+}
+
+/* ============================================
+   SCROLL-REVEAL ANIMATION
+   Triggered by IntersectionObserver (ScrollRevealInit client component).
+   .reveal-on-scroll starts hidden; .revealed plays the entrance.
+   ============================================ */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* reveal-on-scroll: only hide elements once JS has confirmed it's available.
+   Without the .reveal-js root class (set by ScrollRevealInit), content stays
+   visible so JS-blocked or slow-hydration users always see the page. */
+.reveal-js .reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.reveal-js .reveal-on-scroll.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-on-scroll[data-delay="80"] {
+  transition-delay: 80ms;
+}
+.reveal-on-scroll[data-delay="160"] {
+  transition-delay: 160ms;
+}
+.reveal-on-scroll[data-delay="240"] {
+  transition-delay: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-js .reveal-on-scroll {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 

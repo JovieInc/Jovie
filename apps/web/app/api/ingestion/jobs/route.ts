@@ -68,8 +68,27 @@ export async function POST(request: NextRequest) {
     ): Promise<boolean> => {
       const result = await withSystemIngestionSession(async tx => {
         try {
-          await processJob(tx, job);
+          const jobResult = await processJob(tx, job);
           await succeedJob(tx, job);
+
+          // Log partial errors from otherwise-successful jobs
+          if (
+            jobResult &&
+            typeof jobResult === 'object' &&
+            'errors' in jobResult &&
+            Array.isArray((jobResult as { errors?: string[] }).errors) &&
+            (jobResult as { errors: string[] }).errors.length > 0
+          ) {
+            await captureError(
+              'Ingestion job succeeded with errors',
+              new Error((jobResult as { errors: string[] }).errors.join('; ')),
+              {
+                route: '/api/ingestion/jobs',
+                jobId: job.id,
+                jobType: job.jobType,
+              }
+            );
+          }
 
           return { ok: true as const };
         } catch (error) {

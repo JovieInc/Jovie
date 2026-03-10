@@ -67,6 +67,8 @@ export function ChatPageClient({
 
   const hasProfilesButNoSelection =
     creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
+  const fallbackProfile = hasProfilesButNoSelection ? creatorProfiles[0] : null;
+  const activeProfile = selectedProfile ?? fallbackProfile;
   const hasDashboardLoadFailure = Boolean(dashboardLoadError);
   const isProfileSetupRace =
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
@@ -80,7 +82,7 @@ export function ChatPageClient({
   );
 
   // Fetch social links for the selected profile
-  const profileId = selectedProfile?.id ?? '';
+  const profileId = activeProfile?.id ?? '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
 
   // Convert API links to preview panel format
@@ -98,22 +100,22 @@ export function ChatPageClient({
 
   // Hydrate preview panel with profile data and links
   useEffect(() => {
-    if (!selectedProfile) return;
-    const profileSettings = selectedProfile.settings as Record<
+    if (!activeProfile) return;
+    const profileSettings = activeProfile.settings as Record<
       string,
       unknown
     > | null;
     setPreviewData({
-      username: selectedProfile.username,
-      displayName: selectedProfile.displayName ?? selectedProfile.username,
-      avatarUrl: selectedProfile.avatarUrl ?? null,
-      bio: selectedProfile.bio ?? null,
-      genres: selectedProfile.genres ?? null,
+      username: activeProfile.username,
+      displayName: activeProfile.displayName ?? activeProfile.username,
+      avatarUrl: activeProfile.avatarUrl ?? null,
+      bio: activeProfile.bio ?? null,
+      genres: activeProfile.genres ?? null,
       links: previewLinks,
-      profilePath: `/${selectedProfile.username}`,
+      profilePath: `/${activeProfile.username}`,
       dspConnections: {
         spotify: {
-          connected: Boolean(selectedProfile.spotifyId),
+          connected: Boolean(activeProfile.spotifyId),
           artistName:
             (profileSettings?.spotifyArtistName as string | null) ?? null,
         },
@@ -124,7 +126,7 @@ export function ChatPageClient({
       },
     });
   }, [
-    selectedProfile,
+    activeProfile,
     previewLinks,
     setPreviewData,
     appleMusicConnected,
@@ -229,7 +231,7 @@ export function ChatPageClient({
   // This happens when billing/entitlements fail or the DB query times out,
   // causing getDashboardData to return selectedProfile: null.
   useEffect(() => {
-    if (selectedProfile) {
+    if (activeProfile) {
       setAutoRetryCount(0);
       return;
     }
@@ -301,10 +303,10 @@ export function ChatPageClient({
     needsOnboarding,
     router,
     searchParams,
-    selectedProfile,
+    activeProfile,
   ]);
 
-  if (!selectedProfile) {
+  if (!activeProfile) {
     const profileMessage = isProfileSetupRace
       ? 'Finishing your dashboard setup…'
       : 'We hit a problem loading your profile. Please retry in a moment.';
@@ -360,14 +362,14 @@ export function ChatPageClient({
       }
     >
       <JovieChat
-        profileId={selectedProfile.id}
+        profileId={activeProfile.id}
         conversationId={conversationId}
         onConversationCreate={handleConversationCreate}
         onTitleChange={handleTitleChange}
         initialQuery={initialQuery ?? undefined}
-        displayName={selectedProfile.displayName ?? undefined}
-        avatarUrl={selectedProfile.avatarUrl}
-        username={selectedProfile.username ?? undefined}
+        displayName={activeProfile.displayName ?? undefined}
+        avatarUrl={activeProfile.avatarUrl}
+        username={activeProfile.username ?? undefined}
         isFirstSession={isFirstSession}
       />
     </ErrorBoundary>

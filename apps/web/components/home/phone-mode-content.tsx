@@ -22,7 +22,7 @@ export const MOCK_ARTIST = {
 } as const;
 
 export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-xl px-8 py-3 text-[13px] font-semibold shadow-sm bg-[var(--linear-bg-surface-2)] text-[color:var(--linear-text-primary)] border border-[var(--linear-border-subtle)]';
+  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-[color:var(--linear-text-primary)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 
@@ -120,10 +120,22 @@ function ProfileContent() {
   const platforms = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
   return (
     <div className='flex h-full flex-col justify-center gap-4'>
-      <button type='button' className={PHONE_CTA_CLASS}>
+      <div
+        aria-hidden='true'
+        className={PHONE_CTA_CLASS}
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.06)',
+          borderColor: 'rgba(255,255,255,0.08)',
+        }}
+      >
         Turn on notifications
-      </button>
-      <div className='flex items-center justify-center gap-1.5'>
+      </div>
+      <div
+        className='flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5'
+        style={{
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
         {platforms.map(p => (
           <span
             key={p}

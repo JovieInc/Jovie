@@ -15,7 +15,7 @@ import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { TipDrawer } from '@/components/profile/TipDrawer';
 import { Container } from '@/components/site/Container';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
-import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
 import type { ProfileShellProps } from './types';
 import { useProfileShell } from './useProfileShell';
@@ -57,18 +57,20 @@ export function ProfileShell({
   showGradientBlurs = true,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  visitTrackingToken,
 }: ProfileShellProps) {
   const {
     handleNotificationsTrigger,
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
-    socialNetworkLinks,
-    hasSocialLinks,
+    modeLinks,
+    socialLinks: prioritizedSocialLinks,
   } = useProfileShell({
     artist,
     socialLinks,
     contacts,
+    visitTrackingToken,
   });
 
   const isMobile = useBreakpointDown('md');
@@ -95,12 +97,8 @@ export function ProfileShell({
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
   const availableDspPreferences = useMemo(
-    () =>
-      getAvailableDSPs(artist).map(dsp => ({
-        key: dsp.key,
-        label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
-      })),
-    [artist]
+    () => toDSPPreferences(getCanonicalProfileDSPs(artist, socialLinks)),
+    [artist, socialLinks]
   );
 
   const {
@@ -202,7 +200,7 @@ export function ProfileShell({
                   hasActiveSubscriptions) && (
                   <div className='flex justify-center'>
                     <div
-                      className='flex flex-wrap items-center justify-center gap-3'
+                      className='flex flex-wrap items-center justify-center gap-3 px-1 py-1'
                       data-testid='social-links'
                     >
                       {/* Mail (contacts) — left */}
@@ -214,8 +212,7 @@ export function ProfileShell({
                       {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
                       {(!mode || mode === 'profile') &&
                         showSocialBar &&
-                        hasSocialLinks &&
-                        socialNetworkLinks.map(link => (
+                        modeLinks.map(link => (
                           <SocialLinkComponent
                             key={link.id}
                             link={link}
@@ -230,10 +227,10 @@ export function ProfileShell({
                           variant='ghost'
                           ariaLabel='Tour dates'
                           data-testid='tour-trigger'
-                          className={`border transition-colors ${
+                          className={`border transition-[background-color,border-color,color] ${
                             isTourModeActive
-                              ? 'border-subtle bg-surface-2 text-primary-token'
-                              : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                              ? 'border-subtle bg-surface-1 text-primary-token'
+                              : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
                           }`}
                           asChild
                         >
@@ -253,10 +250,10 @@ export function ProfileShell({
                               variant='ghost'
                               ariaLabel='Tip'
                               data-testid='tip-trigger'
-                              className={`border transition-colors ${
+                              className={`border transition-[background-color,border-color,color] ${
                                 isTipModeActive
-                                  ? 'border-subtle bg-surface-2 text-primary-token'
-                                  : 'border-transparent hover:border-subtle hover:bg-surface-2'
+                                  ? 'border-subtle bg-surface-1 text-primary-token'
+                                  : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
                               }`}
                               onClick={() => setTipDrawerOpen(true)}
                             >
@@ -282,7 +279,7 @@ export function ProfileShell({
                             variant='ghost'
                             ariaLabel='Tip'
                             data-testid='tip-trigger'
-                            className={`border border-transparent transition-colors hover:border-subtle hover:bg-surface-2${isTipModeActive ? ' invisible' : ''}`}
+                            className={`border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token${isTipModeActive ? ' invisible' : ''}`}
                             aria-hidden={isTipModeActive || undefined}
                             tabIndex={isTipModeActive ? -1 : undefined}
                             asChild
@@ -294,6 +291,16 @@ export function ProfileShell({
                               />
                             </Link>
                           </CircleIconButton>
+                        ))}
+                      {(!mode || mode === 'profile') &&
+                        showSocialBar &&
+                        prioritizedSocialLinks.map(link => (
+                          <SocialLinkComponent
+                            key={link.id}
+                            link={link}
+                            handle={artist.handle}
+                            artistName={artist.name}
+                          />
                         ))}
                     </div>
                   </div>

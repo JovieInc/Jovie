@@ -9,6 +9,7 @@ import {
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { applyPublicProfileLinkCaps } from '@/lib/profile/social-link-limits';
 import {
   detectSourcePlatform,
   getContextAwareLinks,
@@ -59,6 +60,8 @@ export interface UseProfileShellReturn {
   handleNotificationsTrigger: () => void;
   notificationsContextValue: ProfileNotificationsContextValue;
   socialNetworkLinks: LegacySocialLink[];
+  modeLinks: LegacySocialLink[];
+  socialLinks: LegacySocialLink[];
   hasSocialLinks: boolean;
   hasContacts: boolean;
 }
@@ -67,9 +70,10 @@ export function useProfileShell({
   artist,
   socialLinks,
   contacts = [],
+  visitTrackingToken,
 }: Pick<
   ProfileShellProps,
-  'artist' | 'socialLinks' | 'contacts'
+  'artist' | 'socialLinks' | 'contacts' | 'visitTrackingToken'
 >): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
@@ -95,7 +99,7 @@ export function useProfileShell({
     mode,
     source,
   });
-  useProfileVisitTracking(artist.id);
+  useProfileVisitTracking(artist.id, visitTrackingToken);
   usePopstateReset(() => setIsTipNavigating(false));
 
   // Reset tip loading on navigation/back
@@ -201,7 +205,12 @@ export function useProfileShell({
 
     return getContextAwareLinks(visibleLinks, sourcePlatform);
   }, [socialLinks, searchParams]);
-  const hasSocialLinks = socialNetworkLinks.length > 0;
+  const cappedLinks = useMemo(
+    () => applyPublicProfileLinkCaps(socialNetworkLinks),
+    [socialNetworkLinks]
+  );
+  const hasSocialLinks =
+    cappedLinks.modeLinks.length > 0 || cappedLinks.socialLinks.length > 0;
   const hasContacts = contacts.length > 0;
 
   return {
@@ -212,6 +221,8 @@ export function useProfileShell({
     handleNotificationsTrigger,
     notificationsContextValue,
     socialNetworkLinks,
+    modeLinks: cappedLinks.modeLinks,
+    socialLinks: cappedLinks.socialLinks,
     hasSocialLinks,
     hasContacts,
   };

@@ -177,6 +177,59 @@ describe('POST /api/audience/visit', () => {
     expect(data.error).toBe('Profile is not public');
   });
 
+  it('handles duplicate daily view upsert without failing request', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi
+        .fn()
+        .mockReturnValueOnce({
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          }),
+        })
+        .mockReturnValueOnce({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
+        });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+      });
+    });
+
+    const { POST } = await import('@/app/api/audience/visit/route');
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+  });
+
   it('records visit for valid public profile', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -188,16 +241,16 @@ describe('POST /api/audience/visit', () => {
       }),
     });
     mockWithSystemIngestionSession.mockImplementation(async callback => {
-      const mockInsert = vi
-        .fn()
-        .mockReturnValueOnce({
-          values: vi.fn().mockReturnValue({
+      const mockInsert = vi.fn().mockReturnValue({
+        values: vi
+          .fn()
+          .mockReturnValueOnce({
             onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          })
+          .mockReturnValueOnce({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
           }),
-        })
-        .mockReturnValueOnce({
-          values: vi.fn().mockResolvedValue(undefined),
-        });
+      });
 
       await callback({
         select: vi.fn().mockReturnValue({

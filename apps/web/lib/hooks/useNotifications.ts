@@ -362,7 +362,10 @@ export function useNotifications() {
         // Map common error patterns (safely check message exists)
         if (err.message) {
           const lowerMessage = err.message.toLowerCase();
-          if (lowerMessage.includes('network')) {
+          if (
+            lowerMessage.includes('network') ||
+            lowerMessage.includes('failed to fetch')
+          ) {
             message = TOAST_MESSAGES.NETWORK_ERROR;
           } else if (lowerMessage.includes('rate limit')) {
             message = TOAST_MESSAGES.RATE_LIMIT;

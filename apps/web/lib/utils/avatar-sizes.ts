@@ -11,11 +11,10 @@ export interface AvatarSize {
   readonly url: string;
 }
 
-/** Standard download size presets: Small, Medium, Large */
+/** Standard download size presets aligned to profile photo export UX */
 const SIZE_PRESETS = [
-  { key: 'small', label: 'Small (150 x 150)', dimension: 150 },
   { key: 'medium', label: 'Medium (400 x 400)', dimension: 400 },
-  { key: 'large', label: 'Large (800 x 800)', dimension: 800 },
+  { key: 'large', label: 'Large (1000 x 1000)', dimension: 1000 },
 ] as const;
 
 /**

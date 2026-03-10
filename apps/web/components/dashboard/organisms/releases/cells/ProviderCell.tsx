@@ -9,6 +9,7 @@ import {
 } from '@jovie/ui';
 import {
   type FormEvent,
+  type MouseEvent,
   memo,
   useCallback,
   useEffect,
@@ -232,17 +233,13 @@ function AddProviderUrlPopover({
 
 interface ProviderActionButtonsProps {
   readonly provider: { url: string; path?: string };
-  readonly releaseTitle: string;
-  readonly providerLabel: string;
   readonly testId: string;
   readonly isCopied: boolean;
-  readonly onCopyClick: () => void;
+  readonly onCopyClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
 function ProviderActionButtons({
   provider,
-  releaseTitle,
-  providerLabel,
   testId,
   isCopied,
   onCopyClick,
@@ -253,7 +250,8 @@ function ProviderActionButtons({
       <button
         type='button'
         title='Open'
-        onClick={() => {
+        onClick={event => {
+          event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
         className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
@@ -391,11 +389,10 @@ export const ProviderCell = memo(function ProviderCell({
       return (
         <ProviderActionButtons
           provider={{ url: provider.url, path: provider.path }}
-          releaseTitle={release.title}
-          providerLabel={config.label}
           testId={testId}
           isCopied={isCopied}
-          onCopyClick={() => {
+          onCopyClick={event => {
+            event.stopPropagation();
             if (!provider.path) return;
             handleCopyWithFeedback(
               provider.path,

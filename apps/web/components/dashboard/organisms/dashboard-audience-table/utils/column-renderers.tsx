@@ -133,6 +133,30 @@ export function renderSourceCell({
 }
 
 /**
+ * Renders tightly grouped icon indicators for platform/engagement signals.
+ */
+export function renderPlatformsCell({
+  row,
+}: CellContext<AudienceMember, unknown>) {
+  return (
+    <div className='flex items-center justify-center'>
+      <div className='inline-flex items-center gap-1'>
+        <AudienceIntentScoreCell
+          intentLevel={row.original.intentLevel}
+          className='w-4'
+        />
+        <AudienceReturningCell visits={row.original.visits} className='w-4' />
+        <AudienceSourceCell
+          referrerHistory={row.original.referrerHistory}
+          utmParams={row.original.utmParams}
+          className='w-4'
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
  * Renders the last action cell (most recent action only)
  */
 export function renderLastActionCell({

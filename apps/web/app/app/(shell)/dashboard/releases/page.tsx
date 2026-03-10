@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
 import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 import {
@@ -78,6 +79,9 @@ export default async function ReleasesPage() {
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
   const spotifyImportStatus =
     (profileSettings.spotifyImportStatus as string) ?? 'idle';
+  const connectedDSPs = dashboardData.selectedProfile
+    ? getCanonicalProfileDSPs(dashboardData.selectedProfile)
+    : [];
 
   return (
     <ReleasesClientBoundary>
@@ -91,6 +95,7 @@ export default async function ReleasesPage() {
         appleMusicArtistName={appleMusicStatus.artistName}
         allowArtworkDownloads={allowArtworkDownloads}
         initialImporting={spotifyImportStatus === 'importing'}
+        connectedDSPs={connectedDSPs}
       />
     </ReleasesClientBoundary>
   );

@@ -63,6 +63,7 @@ interface LeadTableProps {
 export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -73,6 +74,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams({
         page: String(page),
@@ -91,7 +93,9 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
       setLeads(data.items);
       setTotal(data.total);
     } catch {
-      toast.error('Failed to load leads');
+      setLeads([]);
+      setTotal(0);
+      setLoadError('Unable to load leads right now. Try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -212,6 +216,15 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
                   className='py-8 text-center text-secondary-token'
                 >
                   <Loader2 className='mx-auto h-5 w-5 animate-spin' />
+                </td>
+              </tr>
+            ) : loadError ? (
+              <tr>
+                <td
+                  colSpan={6}
+                  className='py-8 text-center text-secondary-token'
+                >
+                  {loadError}
                 </td>
               </tr>
             ) : leads.length === 0 ? (

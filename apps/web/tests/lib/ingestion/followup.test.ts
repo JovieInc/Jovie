@@ -67,5 +67,6 @@ describe('enqueueFollowupIngestionJobs', () => {
     ]);
 
     expect(onConflictDoNothing).toHaveBeenCalledTimes(1);
+    expect(onConflictDoNothing).toHaveBeenCalledWith();
   });
 });

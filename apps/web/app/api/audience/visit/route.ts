@@ -8,7 +8,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -69,6 +69,30 @@ function inferDeviceType(
     return 'mobile';
   }
   return 'desktop';
+}
+
+async function incrementDailyProfileViews(
+  tx: DbOrTransaction,
+  profileId: string,
+  viewDate: string,
+  now: Date
+): Promise<void> {
+  await tx
+    .insert(dailyProfileViews)
+    .values({
+      creatorProfileId: profileId,
+      viewDate,
+      viewCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [dailyProfileViews.creatorProfileId, dailyProfileViews.viewDate],
+      set: {
+        viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+        updatedAt: now,
+      },
+    });
 }
 
 export async function POST(request: NextRequest) {
@@ -214,25 +238,7 @@ export async function POST(request: NextRequest) {
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      await tx
-        .insert(dailyProfileViews)
-        .values({
-          creatorProfileId: profileId,
-          viewDate,
-          viewCount: 1,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            dailyProfileViews.creatorProfileId,
-            dailyProfileViews.viewDate,
-          ],
-          set: {
-            viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-            updatedAt: now,
-          },
-        });
+      await incrementDailyProfileViews(tx, profileId, viewDate, now);
 
       const [existing] = await tx
         .select({
@@ -301,26 +307,35 @@ export async function POST(request: NextRequest) {
         return;
       }
 
-      await tx.insert(audienceMembers).values({
-        creatorProfileId: profileId,
-        fingerprint,
-        type: 'anonymous',
-        displayName: 'Visitor',
-        firstSeenAt: now,
-        lastSeenAt: now,
-        visits: 1,
-        engagementScore: 1,
-        intentLevel: 'low',
-        geoCity: geoCityValue,
-        geoCountry: geoCountryValue,
-        deviceType: normalizedDevice,
-        referrerHistory,
-        utmParams: resolvedUtmParams,
-        tags: [],
-        latestActions: [],
-        updatedAt: now,
-        createdAt: now,
-      });
+      await tx
+        .insert(audienceMembers)
+        .values({
+          creatorProfileId: profileId,
+          fingerprint,
+          type: 'anonymous',
+          displayName: 'Visitor',
+          firstSeenAt: now,
+          lastSeenAt: now,
+          visits: 1,
+          engagementScore: 1,
+          intentLevel: 'low',
+          geoCity: geoCityValue,
+          geoCountry: geoCountryValue,
+          deviceType: normalizedDevice,
+          referrerHistory,
+          utmParams: resolvedUtmParams,
+          tags: [],
+          latestActions: [],
+          updatedAt: now,
+          createdAt: now,
+        })
+        .onConflictDoNothing({
+          target: [
+            audienceMembers.creatorProfileId,
+            audienceMembers.fingerprint,
+          ],
+          where: drizzleSql`${audienceMembers.fingerprint} IS NOT NULL`,
+        });
     });
 
     return NextResponse.json(

@@ -56,7 +56,7 @@ export function PlatformStatsStrip({
       className='border-subtle bg-surface'
     >
       <CardContent className='space-y-6 p-5'>
-        <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6'>
+        <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7'>
           <StatItem value={stats.labelsOnPlatform} label='Labels on platform' />
           <StatItem
             value={stats.totalUniqueVisitors}
@@ -69,6 +69,7 @@ export function PlatformStatsStrip({
             label='Creators on platform'
           />
           <StatItem value={stats.releasesTracked} label='Releases tracked' />
+          <StatItem value={stats.tracksTracked} label='Tracks tracked' />
         </div>
 
         <div className='space-y-3 border-t border-subtle pt-4'>
@@ -93,10 +94,23 @@ export function PlatformStatsStrip({
                   )}
                 </div>
               </TooltipTrigger>
-              <TooltipContent side='top' className='max-w-lg'>
-                <p className='text-xs text-secondary-token'>
-                  {stats.allLabelsAndDistributors.join(', ')}
+              <TooltipContent
+                side='top'
+                className='w-[min(32rem,calc(100vw-2rem))] p-3'
+              >
+                <p className='mb-2 text-xs font-medium text-tertiary-token'>
+                  All labels and distributors
                 </p>
+                <ul className='max-h-60 space-y-1 overflow-y-auto pr-1'>
+                  {stats.allLabelsAndDistributors.map(name => (
+                    <li
+                      key={name}
+                      className='truncate text-xs text-secondary-token'
+                    >
+                      {name}
+                    </li>
+                  ))}
+                </ul>
               </TooltipContent>
             </Tooltip>
           )}
