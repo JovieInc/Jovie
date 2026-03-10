@@ -124,6 +124,24 @@ export interface UseLinksManagerReturn<T extends DetectedLink> {
   linkIsVisible: (link: T) => boolean;
 }
 
+function validateLinkCapacity(
+  section: string,
+  modeCount: number,
+  socialCount: number,
+  totalCount: number,
+  socialCapacity: number
+): boolean {
+  if (section === 'dsp' && modeCount >= MAX_MODE_LINKS) return false;
+  if (section === 'social' && socialCount >= socialCapacity) return false;
+  if (
+    section !== 'dsp' &&
+    section !== 'social' &&
+    totalCount >= MAX_PROFILE_LINKS
+  )
+    return false;
+  return true;
+}
+
 /**
  * Custom hook for managing links state with full CRUD operations.
  *
@@ -277,16 +295,14 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
         MAX_PROFILE_LINKS - Math.min(modeCount, MAX_MODE_LINKS)
       );
 
-      if (section === 'dsp' && modeCount >= MAX_MODE_LINKS) {
-        return;
-      }
-      if (section === 'social' && socialCount >= socialCapacity) {
-        return;
-      }
       if (
-        section !== 'dsp' &&
-        section !== 'social' &&
-        totalCount >= MAX_PROFILE_LINKS
+        !validateLinkCapacity(
+          section,
+          modeCount,
+          socialCount,
+          totalCount,
+          socialCapacity
+        )
       ) {
         return;
       }

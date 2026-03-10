@@ -58,6 +58,25 @@ function decodeCursor(raw: string): SubscriberCursor | null {
   }
 }
 
+function extractSortValue(
+  lastRow: {
+    email: string | null;
+    phone: string | null;
+    countryCode: string | null;
+    createdAt: Date | string;
+  },
+  sortCol: string
+): string | null {
+  if (sortCol === 'created_at') {
+    const v = lastRow.createdAt;
+    return v instanceof Date ? v.toISOString() : String(v);
+  }
+  if (sortCol === 'email') return lastRow.email;
+  if (sortCol === 'phone') return lastRow.phone;
+  if (sortCol === 'country_code') return lastRow.countryCode;
+  return null;
+}
+
 export async function GET(request: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -147,19 +166,10 @@ export async function GET(request: Request) {
       const lastRow = rows[rows.length - 1];
       let nextCursor: string | null = null;
       if (rows.length === pageSize && lastRow) {
-        // Pick the sort column value for the cursor
-        let sortValue: string | null = null;
-        if (sortCol === 'created_at') {
-          const v = lastRow.createdAt;
-          sortValue = v instanceof Date ? v.toISOString() : String(v);
-        } else if (sortCol === 'email') {
-          sortValue = lastRow.email;
-        } else if (sortCol === 'phone') {
-          sortValue = lastRow.phone;
-        } else if (sortCol === 'country_code') {
-          sortValue = lastRow.countryCode;
-        }
-        nextCursor = encodeCursor(sortValue, lastRow.id);
+        nextCursor = encodeCursor(
+          extractSortValue(lastRow, sortCol),
+          lastRow.id
+        );
       }
 
       // Only run the exact COUNT on the first page to avoid per-page overhead.
