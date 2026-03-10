@@ -29,6 +29,15 @@ const ANALYTICS_TAB_OPTIONS = [
 
 const numberFormatter = new Intl.NumberFormat();
 
+function formatEngagementValue(
+  loading: boolean,
+  value: number | undefined | null
+): string {
+  if (loading) return '';
+  if (typeof value === 'number') return numberFormatter.format(value);
+  return '--';
+}
+
 function SidebarRangeToggle({
   value,
   onChange,
@@ -329,35 +338,17 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         <div className='grid grid-cols-3 gap-2'>
           <EngagementMetricCard
             label='Total Clicks'
-            value={
-              loading
-                ? ''
-                : typeof data?.total_clicks === 'number'
-                  ? numberFormatter.format(data.total_clicks)
-                  : '--'
-            }
+            value={formatEngagementValue(loading, data?.total_clicks)}
             loading={loading}
           />
           <EngagementMetricCard
             label='Listen Clicks'
-            value={
-              loading
-                ? ''
-                : typeof data?.listen_clicks === 'number'
-                  ? numberFormatter.format(data.listen_clicks)
-                  : '--'
-            }
+            value={formatEngagementValue(loading, data?.listen_clicks)}
             loading={loading}
           />
           <EngagementMetricCard
             label='Captures'
-            value={
-              loading
-                ? ''
-                : typeof data?.subscribers === 'number'
-                  ? numberFormatter.format(data.subscribers)
-                  : '--'
-            }
+            value={formatEngagementValue(loading, data?.subscribers)}
             loading={loading}
           />
         </div>

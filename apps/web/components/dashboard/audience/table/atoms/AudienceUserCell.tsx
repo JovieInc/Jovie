@@ -18,19 +18,18 @@ export interface AudienceUserCellProps {
   readonly className?: string;
 }
 
+const DEVICE_LABELS: Record<string, string> = {
+  mobile: 'Mobile',
+  tablet: 'Tablet',
+  desktop: 'Desktop',
+};
+
 function formatAnonymousVisitorLabel(
   deviceType?: string | null,
   geoCity?: string | null,
   geoCountry?: string | null
 ): string {
-  const deviceLabel =
-    deviceType === 'mobile'
-      ? 'Mobile'
-      : deviceType === 'tablet'
-        ? 'Tablet'
-        : deviceType === 'desktop'
-          ? 'Desktop'
-          : 'Unknown';
+  const deviceLabel = (deviceType && DEVICE_LABELS[deviceType]) ?? 'Unknown';
 
   const rawLocation = geoCity ?? geoCountry ?? null;
   const locationLabel = rawLocation

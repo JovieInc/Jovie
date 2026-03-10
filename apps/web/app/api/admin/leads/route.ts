@@ -20,6 +20,13 @@ function toIsoStringOrNull(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
 
+function getLeadSortColumn(sortBy: string) {
+  if (sortBy === 'fitScore') return leads.fitScore;
+  if (sortBy === 'priorityScore') return leads.priorityScore;
+  if (sortBy === 'displayName') return leads.displayName;
+  return leads.createdAt;
+}
+
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
@@ -57,14 +64,7 @@ export async function GET(request: NextRequest) {
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const orderColumn =
-      query.sortBy === 'fitScore'
-        ? leads.fitScore
-        : query.sortBy === 'priorityScore'
-          ? leads.priorityScore
-          : query.sortBy === 'displayName'
-            ? leads.displayName
-            : leads.createdAt;
+    const orderColumn = getLeadSortColumn(query.sortBy);
 
     const orderFn = query.sortOrder === 'asc' ? asc : desc;
 
