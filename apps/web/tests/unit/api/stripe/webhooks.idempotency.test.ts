@@ -41,9 +41,7 @@ describe('/api/stripe/webhooks - Idempotency Handling', () => {
       {
         method: 'POST',
         body: 'test-body',
-        headers: {
-          'stripe-signature': 'sig_test',
-        },
+        headers: { 'stripe-signature': 'sig_test' },
       }
     );
 
