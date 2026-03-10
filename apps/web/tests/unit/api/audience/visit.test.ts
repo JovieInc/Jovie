@@ -214,7 +214,9 @@ describe('POST /api/audience/visit', () => {
           values: vi.fn().mockRejectedValue(duplicateError),
         })
         .mockReturnValueOnce({
-          values: vi.fn().mockResolvedValue(undefined),
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
         });
 
       await callback({
