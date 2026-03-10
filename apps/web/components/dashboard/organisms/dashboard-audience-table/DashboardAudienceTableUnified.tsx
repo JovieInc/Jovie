@@ -107,6 +107,9 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     header: 'LTV',
     cell: renderLtvCell,
     size: 40,
+    meta: {
+      className: 'px-2',
+    },
   }),
   memberColumnHelper.display({
     id: 'platforms',
