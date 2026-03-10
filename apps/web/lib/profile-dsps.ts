@@ -30,7 +30,8 @@ const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
   [
     { keywords: ['spotify'], dspKey: 'spotify' },
     { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtube', 'youtubemusic'], dspKey: 'youtube_music' },
+    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
+    { keywords: ['youtube'], dspKey: 'youtube' },
     { keywords: ['soundcloud'], dspKey: 'soundcloud' },
     { keywords: ['bandcamp'], dspKey: 'bandcamp' },
     { keywords: ['tidal'], dspKey: 'tidal' },

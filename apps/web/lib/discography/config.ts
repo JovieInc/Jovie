@@ -7,6 +7,7 @@ export const PROVIDER_CONFIG: Record<
   spotify: { label: 'Spotify', accent: '#1DB954' },
   apple_music: { label: 'Apple Music', accent: '#FA243C' },
   youtube: { label: 'YouTube', accent: '#FF0000' },
+  youtube_music: { label: 'YouTube Music', accent: '#FF0000' },
   soundcloud: { label: 'SoundCloud', accent: '#FF5500' },
   deezer: { label: 'Deezer', accent: '#2F9AFF' },
   tidal: { label: 'Tidal', accent: '#000000' },
@@ -41,7 +42,7 @@ export const DEFAULT_RELEASE_TEMPLATES: ReleaseTemplate[] = [
       spotify: 'https://open.spotify.com/track/6zSpb8dQRaw0M1dK8PBwQz',
       apple_music:
         'https://music.apple.com/us/album/neon-skyline/1492291454?i=1492291455',
-      youtube: 'https://music.youtube.com/watch?v=HhjHYkPQ8F0',
+      youtube_music: 'https://music.youtube.com/watch?v=HhjHYkPQ8F0',
       soundcloud: 'https://soundcloud.com/afrojack/neon-skyline',
       deezer: 'https://www.deezer.com/track/864163182',
     },
@@ -56,7 +57,7 @@ export const DEFAULT_RELEASE_TEMPLATES: ReleaseTemplate[] = [
       spotify: 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC',
       apple_music:
         'https://music.apple.com/us/album/midnight-parade/1690822920?i=1690822921',
-      youtube: 'https://music.youtube.com/watch?v=VbfpW0pbvaU',
+      youtube_music: 'https://music.youtube.com/watch?v=VbfpW0pbvaU',
       soundcloud: 'https://soundcloud.com/odesza/midnight-parade',
       tidal: 'https://tidal.com/browse/track/243887547',
     },
@@ -71,7 +72,7 @@ export const DEFAULT_RELEASE_TEMPLATES: ReleaseTemplate[] = [
       spotify: 'https://open.spotify.com/track/0VjIjW4GlUZAMYd2vXMi3b',
       apple_music:
         'https://music.apple.com/us/album/stillness/1499825570?i=1499825571',
-      youtube: 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+      youtube_music: 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
       soundcloud: 'https://soundcloud.com/porter-robinson/stillness',
       amazon_music: 'https://music.amazon.com/albums/B083PHSB48',
     },
