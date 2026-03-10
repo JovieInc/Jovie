@@ -15,12 +15,7 @@ const forwardedArgs =
 
 const result = spawnSync(
   process.execPath,
-  [
-    playwrightCli,
-    'test',
-    'tests/e2e/sentry-red-lane.spec.ts',
-    ...forwardedArgs,
-  ],
+  [playwrightCli, 'test', 'tests/e2e/sentry-red-lane.spec.ts', ...forwardedArgs],
   {
     stdio: 'inherit',
     env: {
