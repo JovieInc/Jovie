@@ -3,9 +3,10 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { users } from '@/lib/db/schema/auth';
 import { createFeedbackItem } from '@/lib/feedback';
 import { notifySlackFeedbackSubmission } from '@/lib/notifications/providers/slack';
+import { logger } from '@/lib/utils/logger';
 
 const payloadSchema = z.object({
   message: z.string().trim().min(5).max(2000),
@@ -47,12 +48,14 @@ export async function POST(request: Request) {
       },
     });
 
-    await notifySlackFeedbackSubmission({
+    notifySlackFeedbackSubmission({
       message,
       name: userRecord?.name ?? 'Jovie user',
       email: userRecord?.email,
       source,
       pathname,
+    }).catch(err => {
+      logger.warn('[api/feedback] Slack notification failed', err);
     });
 
     return NextResponse.json({ ok: true, id: feedback?.id ?? null });
