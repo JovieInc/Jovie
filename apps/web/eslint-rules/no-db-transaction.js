@@ -1,9 +1,8 @@
 /**
- * ESLint rule to prevent db.transaction() usage with Neon HTTP driver.
+ * ESLint rule to prevent direct app-level db.transaction() usage.
  *
- * The Neon HTTP driver does not support interactive transactions.
- * Use batch operations (db.insert().values([...items])) or sequential
- * operations instead.
+ * Canonical policy: new application code should avoid direct transaction
+ * calls and use sequential/batch operations or approved wrappers.
  *
  * Bad:  await db.transaction(async (tx) => { ... });
  * Good: await db.insert(table).values([item1, item2, item3]);
@@ -13,13 +12,12 @@ module.exports = {
   meta: {
     type: 'problem',
     docs: {
-      description:
-        'Disallow db.transaction() - incompatible with Neon HTTP driver',
+      description: 'Disallow direct db.transaction() usage in app code',
       recommended: true,
     },
     messages: {
       noTransaction:
-        'db.transaction() is not supported with Neon HTTP driver. Use batch operations (db.insert().values([...items])) or sequential operations instead.',
+        'Direct db.transaction() usage is restricted. Use sequential/batch operations or an approved legacy wrapper.',
     },
     schema: [],
   },

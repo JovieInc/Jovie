@@ -22,6 +22,7 @@ import {
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
@@ -275,7 +276,7 @@ async function repairProUserWithoutSubscription(user: {
 
     if (activeSubscription) {
       // They have an active subscription - link it
-      await db.transaction(async tx => {
+      await runLegacyDbTransaction(async tx => {
         await tx
           .update(users)
           .set({
@@ -301,7 +302,7 @@ async function repairProUserWithoutSubscription(user: {
   }
 
   // No active subscription found - they shouldn't be Pro
-  await db.transaction(async tx => {
+  await runLegacyDbTransaction(async tx => {
     await tx
       .update(users)
       .set({
