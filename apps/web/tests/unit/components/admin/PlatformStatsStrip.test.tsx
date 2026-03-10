@@ -14,6 +14,7 @@ const baseStats: AdminPlatformStats = {
   contactsCaptured: 110,
   creatorsOnPlatform: 64,
   releasesTracked: 523,
+  tracksTracked: 1742,
 };
 
 describe('PlatformStatsStrip', () => {
@@ -32,6 +33,8 @@ describe('PlatformStatsStrip', () => {
     expect(screen.getByText('950')).toBeInTheDocument();
     expect(screen.getByText('Contacts captured')).toBeInTheDocument();
     expect(screen.getByText('110')).toBeInTheDocument();
+    expect(screen.getByText('Tracks tracked')).toBeInTheDocument();
+    expect(screen.getByText('1,742')).toBeInTheDocument();
   });
 
   it('shows investor-facing label usage copy', () => {
