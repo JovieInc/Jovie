@@ -286,30 +286,38 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    if (error instanceof ServerFetchTimeoutError) {
-      if (dedupeAcquired && dedupeKeyForRetry) {
-        await clearRecentDispatch('linear', dedupeKeyForRetry);
-      }
-      await captureCriticalError('Linear webhook dispatch timed out', error, {
-        route: '/api/webhooks/linear',
-        timeoutMs: error.timeoutMs,
-      });
-      return NextResponse.json(
-        { error: 'Dispatch timed out' },
-        { status: 502, headers: NO_STORE_HEADERS }
-      );
-    }
+    return handleLinearWebhookError(error, dedupeAcquired, dedupeKeyForRetry);
+  }
+}
 
+async function handleLinearWebhookError(
+  error: unknown,
+  dedupeAcquired: boolean,
+  dedupeKeyForRetry: string | null
+): Promise<NextResponse> {
+  if (error instanceof ServerFetchTimeoutError) {
     if (dedupeAcquired && dedupeKeyForRetry) {
       await clearRecentDispatch('linear', dedupeKeyForRetry);
     }
-
-    await captureCriticalError('Linear webhook processing failed', error, {
+    await captureCriticalError('Linear webhook dispatch timed out', error, {
       route: '/api/webhooks/linear',
+      timeoutMs: error.timeoutMs,
     });
     return NextResponse.json(
-      { error: 'Webhook processing failed' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { error: 'Dispatch timed out' },
+      { status: 502, headers: NO_STORE_HEADERS }
     );
   }
+
+  if (dedupeAcquired && dedupeKeyForRetry) {
+    await clearRecentDispatch('linear', dedupeKeyForRetry);
+  }
+
+  await captureCriticalError('Linear webhook processing failed', error, {
+    route: '/api/webhooks/linear',
+  });
+  return NextResponse.json(
+    { error: 'Webhook processing failed' },
+    { status: 500, headers: NO_STORE_HEADERS }
+  );
 }
