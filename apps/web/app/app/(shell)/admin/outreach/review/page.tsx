@@ -70,7 +70,7 @@ export default function AdminOutreachReviewPage() {
   }, [page]);
 
   useEffect(() => {
-    void fetchQueue();
+    fetchQueue();
   }, [fetchQueue]);
 
   async function handleSkip(id: string) {

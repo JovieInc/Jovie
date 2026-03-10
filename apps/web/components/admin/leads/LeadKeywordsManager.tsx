@@ -38,7 +38,7 @@ export function LeadKeywordsManager() {
   }, []);
 
   useEffect(() => {
-    void fetchKeywords();
+    fetchKeywords();
   }, [fetchKeywords]);
 
   async function addKeywords() {

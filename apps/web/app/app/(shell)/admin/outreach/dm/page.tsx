@@ -48,7 +48,7 @@ export default function AdminOutreachDmPage() {
   }, []);
 
   useEffect(() => {
-    void fetchQueue();
+    fetchQueue();
   }, [fetchQueue]);
 
   return (
@@ -71,7 +71,9 @@ export default function AdminOutreachDmPage() {
             <DmQueueCard
               key={lead.id}
               lead={lead}
-              onMarkedSent={() => void fetchQueue()}
+              onMarkedSent={() => {
+                fetchQueue();
+              }}
             />
           ))}
         </div>

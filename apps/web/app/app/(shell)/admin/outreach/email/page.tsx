@@ -56,7 +56,7 @@ export default function AdminOutreachEmailPage() {
   }, [page]);
 
   useEffect(() => {
-    void fetchQueue();
+    fetchQueue();
   }, [fetchQueue]);
 
   const totalPages = Math.ceil(total / limit);
