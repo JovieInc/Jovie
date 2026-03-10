@@ -8,9 +8,11 @@ import { LogoBar } from '@/components/home/LogoBar';
 import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { ReleasesSection } from '@/components/home/ReleasesSection';
+import { ReplacesSection } from '@/components/home/ReplacesSection';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -43,6 +45,9 @@ export async function generateMetadata(): Promise<Metadata> {
     'fan conversion',
     'smart links',
     'pre-save links',
+    'linkfire alternative',
+    'mailchimp alternative for artists',
+    'replace linktree linkfire mailchimp',
   ];
 
   return {
@@ -260,6 +265,20 @@ export default function HomePage() {
       />
 
       <ReleasesSection />
+
+      {FEATURE_FLAGS.SHOW_REPLACES_SECTION && (
+        <>
+          <hr
+            className='mx-auto max-w-lg border-0 h-px'
+            style={{
+              background:
+                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+            }}
+          />
+
+          <ReplacesSection />
+        </>
+      )}
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'
