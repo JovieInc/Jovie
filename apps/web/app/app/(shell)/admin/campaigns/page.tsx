@@ -27,7 +27,7 @@ export const runtime = 'nodejs';
 
 export default function AdminCampaignsPage() {
   return (
-    <PageShell>
+    <PageShell className='bg-background shadow-none'>
       <PageContent>
         <div className='mb-6'>
           <p className='text-sm text-secondary-token'>
