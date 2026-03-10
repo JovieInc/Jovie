@@ -116,7 +116,7 @@ setup('authenticate', async ({ page, baseURL }) => {
   // DASHBOARD_PROFILE is deprecated (it just redirects to CHAT), so navigate
   // directly to CHAT to avoid a 307 → 404 chain on certain server configs.
   // Use 'domcontentloaded' to avoid Sentry blocking 'load'/'networkidle'
-  await page.goto(APP_ROUTES.CHAT, {
+  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
     waitUntil: 'domcontentloaded',
     timeout: 120_000,
   });
@@ -153,11 +153,13 @@ setup('authenticate', async ({ page, baseURL }) => {
     // If nav still not visible and we haven't reloaded, try a full page reload
     // This reliably recovers from stuck error overlays and Turbopack issues
     const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
-    if (!(await dashNav.isVisible().catch(() => false)) && !hasReloaded) {
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    const shellReady = dashNav.or(userButton);
+    if (!(await shellReady.isVisible().catch(() => false)) && !hasReloaded) {
       hasReloaded = true;
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
     }
-    await expect(dashNav).toBeVisible({ timeout: 5000 });
+    await expect(shellReady).toBeVisible({ timeout: 5000 });
   }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
 
   // 7. Save authenticated session

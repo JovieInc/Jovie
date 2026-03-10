@@ -4,6 +4,10 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright configuration for tests that don't require authentication
  * This config bypasses Clerk authentication for faster test execution
  */
+const webServerCommand = process.env.DATABASE_URL
+  ? 'pnpm run dev:local'
+  : 'doppler run -- pnpm run dev:local';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -12,7 +16,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+    baseURL: process.env.BASE_URL || 'http://localhost:3100',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
     // Add custom headers to bypass Clerk in test mode
@@ -39,16 +43,19 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="" pnpm dev',
-          url: 'http://localhost:3000',
+          command: webServerCommand,
+          url: 'http://localhost:3100',
           reuseExistingServer: !process.env.CI,
-          timeout: 60000,
+          timeout: 300000,
           stdout: 'pipe',
           stderr: 'pipe',
           env: {
+            ...process.env,
             NODE_ENV: 'test',
-            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
-            CLERK_SECRET_KEY: '',
+            PORT: '3100',
+            NEXT_DISABLE_TOOLBAR: '1',
+            NODE_OPTIONS:
+              `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },
         },
       }),
