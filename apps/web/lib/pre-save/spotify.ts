@@ -1,8 +1,10 @@
 import { Buffer } from 'node:buffer';
 import { env } from '@/lib/env-server';
+import { serverFetch } from '@/lib/http/server-fetch';
 
 const SPOTIFY_ACCOUNTS_BASE = 'https://accounts.spotify.com';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
+const SPOTIFY_TIMEOUT_MS = 10_000;
 
 export interface SpotifyTokenResponse {
   access_token: string;
@@ -43,8 +45,9 @@ export async function exchangeSpotifyCode(params: {
     redirect_uri: params.redirectUri,
   });
 
-  const response = await fetch(`${SPOTIFY_ACCOUNTS_BASE}/api/token`, {
+  const response = await serverFetch(`${SPOTIFY_ACCOUNTS_BASE}/api/token`, {
     method: 'POST',
+    timeoutMs: SPOTIFY_TIMEOUT_MS,
     headers: {
       Authorization: spotifyAuthHeader(),
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -65,8 +68,9 @@ export async function refreshSpotifyAccessToken(refreshToken: string) {
     refresh_token: refreshToken,
   });
 
-  const response = await fetch(`${SPOTIFY_ACCOUNTS_BASE}/api/token`, {
+  const response = await serverFetch(`${SPOTIFY_ACCOUNTS_BASE}/api/token`, {
     method: 'POST',
+    timeoutMs: SPOTIFY_TIMEOUT_MS,
     headers: {
       Authorization: spotifyAuthHeader(),
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -85,7 +89,8 @@ export async function fetchSpotifyMe(accessToken: string): Promise<{
   id: string;
   email?: string;
 }> {
-  const response = await fetch(`${SPOTIFY_API_BASE}/me`, {
+  const response = await serverFetch(`${SPOTIFY_API_BASE}/me`, {
+    timeoutMs: SPOTIFY_TIMEOUT_MS,
     headers: { Authorization: `Bearer ${accessToken}` },
   });
 
@@ -105,8 +110,9 @@ export async function saveReleaseToSpotifyLibrary(params: {
   const key = 'ids';
   const url = `${SPOTIFY_API_BASE}/me/${endpoint}?${key}=${encodeURIComponent(params.spotifyReleaseId)}`;
 
-  const response = await fetch(url, {
+  const response = await serverFetch(url, {
     method: 'PUT',
+    timeoutMs: SPOTIFY_TIMEOUT_MS,
     headers: { Authorization: `Bearer ${params.accessToken}` },
   });
 
