@@ -246,7 +246,7 @@ async function executePersistLinks({
     void captureError('Failed to save social links', error, {
       profileId,
       linkCount: normalized.length,
-      route: APP_ROUTES.PROFILE,
+      route: APP_ROUTES.CHAT,
     });
 
     toast.error(extractErrorMessage(error));

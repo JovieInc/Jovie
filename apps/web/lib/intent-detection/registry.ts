@@ -10,8 +10,7 @@ import { IntentCategory, type IntentPattern } from './types';
  * All known platform names for link add/remove matching.
  * Kept in sync with platform-detection registry.
  */
-const PLATFORM_NAMES =
-  'instagram|twitter|x|tiktok|youtube|spotify|soundcloud|bandcamp|facebook|linkedin|twitch|discord|patreon|apple\\s*music|amazon\\s*music|tidal|deezer|snapchat|pinterest|reddit|venmo|paypal|cashapp|ko-?fi|buymeacoffee|telegram|whatsapp|substack|medium|github|behance|dribbble|threads';
+const PLATFORM_NAMES = String.raw`instagram|twitter|x|tiktok|youtube|spotify|soundcloud|bandcamp|facebook|linkedin|twitch|discord|patreon|apple\s*music|amazon\s*music|tidal|deezer|snapchat|pinterest|reddit|venmo|paypal|cashapp|ko-?fi|buymeacoffee|telegram|whatsapp|substack|medium|github|behance|dribbble|threads`;
 
 const platformPattern = new RegExp(`(${PLATFORM_NAMES})`, 'i');
 
