@@ -231,7 +231,7 @@ export async function GET(
     .where(eq(creatorProfiles.usernameNormalized, normalizedSlug))
     .limit(1);
 
-  if (!profile || !profile.isPublic) {
+  if (!profile?.isPublic) {
     return brandedFallback(normalizedSlug);
   }
 

@@ -108,7 +108,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
         }}
       >
         <span className='text-[12px] text-[var(--linear-text-tertiary)]'>
-          jov.ie/
+          {'jov.ie/'}
           <span className='font-semibold text-[var(--linear-text-secondary)]'>
             {displayHandle}
           </span>

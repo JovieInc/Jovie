@@ -108,10 +108,7 @@ export function buildCopyMenuItems(
   onClick: () => void;
 }> {
   return fields
-    .filter(
-      (f): f is CopyableFieldDef =>
-        f != null && f.value != null && f.value !== ''
-    )
+    .filter((f): f is CopyableFieldDef => f?.value != null && f.value !== '')
     .map(field => ({
       id: `copy-${field.id}`,
       label: `Copy ${field.label}`,

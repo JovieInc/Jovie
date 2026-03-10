@@ -214,7 +214,7 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
   if (stripeAvailable) {
     const netBurn = BASELINE_BURN_USD - mrrUsd;
     if (netBurn <= 0) {
-      runwayMonths = null; // Revenue covers burn
+      // Revenue covers burn — leave runwayMonths as null
     } else {
       // Without Mercury balance, estimate based on burn rate alone
       // Show 0 if we can't calculate (no balance data)
