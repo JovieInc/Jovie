@@ -1,10 +1,9 @@
 'use client';
 
 import { Mail } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { getProfileModeHref } from '@/components/profile/registry';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { ContactDrawer } from './ContactDrawer';
 import type { ArtistContactsButtonProps } from './types';
@@ -16,11 +15,16 @@ export function ArtistContactsButton({
   artistName,
   onNavigate,
 }: ArtistContactsButtonProps) {
-  const { available, onIconClick, primaryChannel, isEnabled } =
-    useArtistContacts({ contacts, artistHandle, onNavigate });
+  const {
+    available,
+    performAction,
+    onIconClick,
+    primaryChannel,
+    buildTerritoryLabel,
+    isEnabled,
+  } = useArtistContacts({ contacts, artistHandle, onNavigate });
 
   const isMobile = useBreakpointDown('md');
-  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (!isEnabled) {
@@ -50,7 +54,9 @@ export function ArtistContactsButton({
           artistName={artistName}
           artistHandle={artistHandle}
           contacts={available}
+          performAction={performAction}
           primaryChannel={primaryChannel}
+          buildTerritoryLabel={buildTerritoryLabel}
         />
       </>
     );
@@ -64,11 +70,11 @@ export function ArtistContactsButton({
       ariaLabel='Contacts'
       data-testid='contacts-trigger'
       className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-      onClick={() => {
-        router.push(getProfileModeHref(artistHandle, 'contact'));
-      }}
+      asChild
     >
-      <Mail className='h-4 w-4' aria-hidden='true' />
+      <Link href={`/${artistHandle}?mode=contact`}>
+        <Mail className='h-4 w-4' aria-hidden='true' />
+      </Link>
     </CircleIconButton>
   );
 }

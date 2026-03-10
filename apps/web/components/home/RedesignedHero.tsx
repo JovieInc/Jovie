@@ -8,7 +8,6 @@ export async function RedesignedHero() {
   let previewHandles: string[] = DEMO_HANDLES;
   try {
     const creators = await getFeaturedCreators();
-    // Only use clean handles (no internal IDs like artist_abc123)
     const cleanHandles = creators
       .map(c => c.handle)
       .filter(h => h && h.length <= 20 && /^[a-z0-9-]+$/.test(h))
@@ -20,12 +19,10 @@ export async function RedesignedHero() {
     // fall back to demo handles
   }
 
-  // First handle drives the phone URL chip
   const featuredHandle = previewHandles[0] ?? 'tim';
 
   return (
-    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[8rem] pb-[5rem]'>
-      {/* Primary ambient glow */}
+    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 pt-[7.25rem] pb-[4rem] sm:px-6 sm:pt-[7.75rem] sm:pb-[4.75rem] lg:pt-[8rem] lg:pb-[5rem]'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -35,35 +32,34 @@ export async function RedesignedHero() {
         }}
       />
 
-      <div className='relative w-full max-w-[var(--linear-content-max)] z-10'>
-        {/* Two-column on desktop: left = text/form, right = phone */}
+      <div className='relative z-10 w-full max-w-[var(--linear-content-max)]'>
         <div className='flex flex-col lg:flex-row lg:items-center lg:gap-12 xl:gap-20'>
-          {/* Left column — headline, form, chips */}
-          <div className='hero-stagger flex flex-col items-center text-center lg:items-start lg:text-left lg:flex-1 max-w-2xl mx-auto lg:mx-0'>
-            <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
-              AI built for artists
+          <div className='hero-stagger mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:max-w-[36rem] lg:flex-1 lg:items-start lg:text-left'>
+            <span className='mb-5 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-1.5 text-[11px] font-medium tracking-[0.01em] text-[color:var(--linear-text-tertiary)] backdrop-blur-sm'>
+              Built for artists
             </span>
-            <h1 className='marketing-h1-linear text-[var(--linear-text-primary)]'>
+
+            <h1 className='marketing-h1-linear max-w-[18rem] text-balance text-[var(--linear-text-primary)] sm:max-w-[28rem] lg:max-w-none'>
               The link your <br className='hidden sm:block' />
               music deserves.
             </h1>
 
-            <p className='mt-5 max-w-[480px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+            <p className='marketing-lead-linear mt-4 max-w-[19rem] px-1 text-balance text-[var(--linear-text-secondary)] sm:mt-5 sm:max-w-[31rem] sm:px-0'>
               Connect your Spotify, capture every fan, and keep marketing your
               music automatically — forever.
             </p>
 
-            <div className='mt-8 w-full max-w-[560px] lg:max-w-full'>
+            <div className='mt-6 w-full max-w-[35rem] sm:mt-8 lg:max-w-full'>
               <ClaimHandleForm size='hero' />
             </div>
 
             <p
-              className='mt-3 flex items-center justify-center lg:justify-start gap-2'
+              className='mt-3 flex items-center justify-center gap-2 self-stretch lg:justify-start'
               style={{
                 fontSize: '12px',
                 fontWeight: 450,
                 letterSpacing: '0.01em',
-                color: 'var(--linear-text-tertiary)',
+                color: 'rgba(255,255,255,0.58)',
               }}
             >
               <span
@@ -74,8 +70,7 @@ export async function RedesignedHero() {
             </p>
           </div>
 
-          {/* Right column — real Jovie profile phone (desktop only) */}
-          <div className='hidden lg:flex lg:shrink-0 lg:items-center lg:justify-center lg:pt-4'>
+          <div className='hidden lg:flex lg:shrink-0 lg:items-center lg:justify-center lg:pt-4 lg:pl-4 xl:pl-8'>
             <HeroPhonePreview handle={featuredHandle} />
           </div>
         </div>
