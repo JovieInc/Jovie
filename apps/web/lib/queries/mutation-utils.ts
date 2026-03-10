@@ -38,6 +38,19 @@ const HTTP_STATUS_MESSAGES: Record<number, string> = {
   429: 'Too many requests. Please try again later.',
 };
 
+function getPermissionErrorMessage(message: string): string | null {
+  const normalized = message.toLowerCase();
+
+  const looksLikePermissionError =
+    normalized.includes('403 forbidden') ||
+    normalized.includes('you do not have permission') ||
+    normalized.includes('permission to perform this action');
+
+  if (!looksLikePermissionError) return null;
+
+  return HTTP_STATUS_MESSAGES[403];
+}
+
 function getFetchErrorMessage(error: FetchError): string | null {
   if (HTTP_STATUS_MESSAGES[error.status])
     return HTTP_STATUS_MESSAGES[error.status];
@@ -52,6 +65,9 @@ export function getErrorMessage(error: unknown, fallback: string): string {
   }
 
   if (error instanceof Error && error.message) {
+    const permissionMessage = getPermissionErrorMessage(error.message);
+    if (permissionMessage) return permissionMessage;
+
     if (isTechnicalError(error.message)) {
       console.error('[mutation error]', error.message);
       return fallback;

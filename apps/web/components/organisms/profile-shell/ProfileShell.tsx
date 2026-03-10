@@ -63,8 +63,8 @@ export function ProfileShell({
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
-    socialNetworkLinks,
-    hasSocialLinks,
+    modeLinks,
+    socialLinks: prioritizedSocialLinks,
   } = useProfileShell({
     artist,
     socialLinks,
@@ -210,8 +210,7 @@ export function ProfileShell({
                       {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
                       {(!mode || mode === 'profile') &&
                         showSocialBar &&
-                        hasSocialLinks &&
-                        socialNetworkLinks.map(link => (
+                        modeLinks.map(link => (
                           <SocialLinkComponent
                             key={link.id}
                             link={link}
@@ -290,6 +289,16 @@ export function ProfileShell({
                               />
                             </Link>
                           </CircleIconButton>
+                        ))}
+                      {(!mode || mode === 'profile') &&
+                        showSocialBar &&
+                        prioritizedSocialLinks.map(link => (
+                          <SocialLinkComponent
+                            key={link.id}
+                            link={link}
+                            handle={artist.handle}
+                            artistName={artist.name}
+                          />
                         ))}
                     </div>
                   </div>

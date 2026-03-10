@@ -236,8 +236,8 @@ describe('useLinksManager - add', () => {
     });
   });
 
-  describe('MAX_SOCIAL_LINKS visibility enforcement', () => {
-    it('should hide social links beyond MAX_SOCIAL_LINKS limit', async () => {
+  describe('profile link cap enforcement', () => {
+    it('should prevent adding social links when social capacity is full', async () => {
       const existingLinks = Array.from(
         { length: 6 },
         (_, i) =>
@@ -265,11 +265,7 @@ describe('useLinksManager - add', () => {
         await addLinkAndFlushTimers(result, newLink);
       });
 
-      expect(result.current.links).toHaveLength(7);
-      const addedLink = result.current.links[6] as DetectedLink & {
-        isVisible?: boolean;
-      };
-      expect(addedLink.isVisible).toBe(false);
+      expect(result.current.links).toHaveLength(6);
     });
   });
 });

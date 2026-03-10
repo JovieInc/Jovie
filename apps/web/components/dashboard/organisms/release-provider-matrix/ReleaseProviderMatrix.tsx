@@ -16,7 +16,6 @@ import {
 import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
-  rescanAppleMusicLinks,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
@@ -405,29 +404,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     []
   );
 
-  // Apple Music refresh handler
-  const [isAmSyncing, setIsAmSyncing] = useState(false);
-  const handleAppleMusicRescan = useCallback(async () => {
-    setIsAmSyncing(true);
-    try {
-      const result = await rescanAppleMusicLinks();
-      if (result.rateLimited) {
-        toast.error(
-          `Apple Music refresh is rate limited. Available again in ${result.retryAfter}.`
-        );
-      } else if (result.success) {
-        toast.success(result.message);
-        // Reload the page to pick up any new links
-        router.refresh();
-      } else {
-        toast.error(result.message);
-      }
-    } catch {
-      toast.error('Failed to refresh Apple Music links');
-    } finally {
-      setIsAmSyncing(false);
-    }
-  }, [router]);
+  const isAmSyncing = false;
 
   const handleNewRelease = useCallback(() => {
     setAddReleaseOpen(true);
@@ -549,54 +526,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [handleNewRelease, canCreateManualReleases]
   );
 
-  const spotifyBadge = useMemo(() => {
-    if (isConnected) {
-      return (
-        <button
-          type='button'
-          onClick={handleSync}
-          disabled={isSyncing}
-          className='group relative inline-flex items-center gap-1.5 rounded-md border border-[#1DB954]/28 bg-[#1DB954]/12 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-white transition-colors hover:bg-[#1DB954]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/45 focus-visible:ring-offset-2 disabled:opacity-60'
-          aria-label={
-            isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
-          }
-        >
-          <SocialIcon platform='spotify' className='h-4 w-4 text-white' />
-          <span>{artistName || 'Connected'}</span>
-          {/* Status dot - visible when not hovered/syncing */}
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
-              'group-hover:opacity-0 group-focus-visible:opacity-0',
-              isSyncing && 'opacity-0'
-            )}
-            aria-hidden='true'
-          />
-          {/* Refresh icon - visible on hover or when syncing */}
-          <Icon
-            name={isSyncing ? 'Loader2' : 'RefreshCw'}
-            className={cn(
-              'absolute right-2 h-4 w-4 opacity-0 transition-opacity duration-150',
-              'group-hover:opacity-100 group-focus-visible:opacity-100',
-              isSyncing && 'animate-spin opacity-100'
-            )}
-            aria-hidden='true'
-          />
-        </button>
-      );
-    }
-
-    return (
+  const spotifyBadge = useMemo(
+    () => (
       <DspConnectionPill
         provider='spotify'
         connected={isConnected}
         artistName={artistName}
         onClick={isConnected ? undefined : () => setSpotifySearchOpen(true)}
-        onSyncNow={isConnected ? handleSync : undefined}
         disabled={isSyncing}
       />
-    );
-  }, [artistName, handleSync, isConnected, isSyncing, setSpotifySearchOpen]);
+    ),
+    [artistName, isConnected, isSyncing, setSpotifySearchOpen]
+  );
 
   const connectedDspList = useMemo(() => connectedDSPs, [connectedDSPs]);
 
@@ -607,11 +548,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         connected={isAmConnected}
         artistName={amArtistName}
         onClick={isAmConnected ? undefined : () => setAmPaletteOpen(true)}
-        onSyncNow={isAmConnected ? handleAppleMusicRescan : undefined}
         disabled={isAmSyncing}
       />
     ),
-    [isAmConnected, amArtistName, handleAppleMusicRescan, isAmSyncing]
+    [isAmConnected, amArtistName, isAmSyncing, setAmPaletteOpen]
   );
 
   const renderConnectedDspBadge = useCallback(

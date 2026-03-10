@@ -64,18 +64,6 @@ const ACTION_PLATFORMS = new Set([
 ]);
 
 /**
- * Cross-promotion pairs: if a visitor comes from platform A,
- * platform B should be surfaced (and vice versa).
- */
-const CROSS_PROMOTE_PAIRS: Record<string, string[]> = {
-  instagram: ['tiktok', 'youtube'],
-  tiktok: ['instagram', 'youtube'],
-  youtube: ['instagram', 'tiktok'],
-  twitter: ['instagram', 'tiktok', 'youtube'],
-  facebook: ['instagram', 'youtube'],
-};
-
-/**
  * Detect which platform the visitor came from using referrer or UTM params.
  * Returns the platform ID or null if unknown.
  */
@@ -108,9 +96,9 @@ export function detectSourcePlatform(
  * Filter and reorder social links based on the visitor's source platform.
  *
  * Rules:
- * 1. Hide the source platform (visitor from Instagram -> hide Instagram link)
- * 2. Prioritize action links (stream, tip, merch, website) over social links
- * 3. Surface cross-promotion alternatives (from Instagram -> show TikTok first)
+ * 1. Prioritize the matching source platform first.
+ * 2. Prioritize action links (stream, tip, merch, website) next.
+ * 3. Preserve original order for all remaining links.
  */
 export function getContextAwareLinks(
   links: LegacySocialLink[],
@@ -118,30 +106,20 @@ export function getContextAwareLinks(
 ): LegacySocialLink[] {
   if (!sourcePlatform) return links;
 
-  // Filter out the source platform
-  const filtered = links.filter(link => {
-    const platform = link.platform?.toLowerCase();
-    return platform !== sourcePlatform;
-  });
-
-  // Sort: action links first, then cross-promoted platforms, then the rest
-  const crossPromoted = new Set(CROSS_PROMOTE_PAIRS[sourcePlatform] ?? []);
-
-  return filtered.sort((a, b) => {
+  return [...links].sort((a, b) => {
     const aPlatform = a.platform?.toLowerCase() ?? '';
     const bPlatform = b.platform?.toLowerCase() ?? '';
+    const aMatchesSource = aPlatform === sourcePlatform;
+    const bMatchesSource = bPlatform === sourcePlatform;
     const aIsAction = ACTION_PLATFORMS.has(aPlatform);
     const bIsAction = ACTION_PLATFORMS.has(bPlatform);
-    const aIsCross = crossPromoted.has(aPlatform);
-    const bIsCross = crossPromoted.has(bPlatform);
+
+    if (aMatchesSource && !bMatchesSource) return -1;
+    if (!aMatchesSource && bMatchesSource) return 1;
 
     // Action links first
     if (aIsAction && !bIsAction) return -1;
     if (!aIsAction && bIsAction) return 1;
-
-    // Cross-promoted platforms next
-    if (aIsCross && !bIsCross) return -1;
-    if (!aIsCross && bIsCross) return 1;
 
     return 0;
   });
