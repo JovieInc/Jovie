@@ -261,7 +261,25 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
-### 7. Marketing Pages Must Be Fully Static
+### 7. Public/Webhook Coordination Must Be Durable
+
+- **NEVER** rely on in-memory rate-limit, dedupe, or coordination state for public endpoints, webhooks, or automation triggers
+- Public traffic controls and webhook dedupe MUST use durable storage (Redis, database, or another cross-instance store)
+- Cold starts, deploys, and horizontal scale must not reset critical protections or duplicate suppression
+
+### 8. Server-Side External HTTP Must Be Bounded
+
+- **ALWAYS** use a shared timeout + retry wrapper for server-side external HTTP on request handlers, webhooks, cron jobs, and admin/HUD paths
+- Raw `fetch()` is forbidden on these paths unless the PR explicitly documents why timeout/retry is intentionally omitted
+- Non-critical notifications and observability sinks must not sit on revenue-critical or user-facing success paths without bounded failure handling
+
+### 9. Persistence-Critical Success Must Fail Closed
+
+- Helpers performing persistence-critical writes must throw on failure; they must not swallow errors and return `undefined`, `null`, or empty-success sentinels
+- User-facing success responses must only be returned after the critical write succeeds
+- If a follow-up side effect is optional, isolate it explicitly so the primary success path stays truthful
+
+### 10. Marketing Pages Must Be Fully Static
 
 - All marketing, blog, and legal pages **must be fully static** (`export const revalidate = false`): no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` and `app/(dynamic)/legal` pages/layouts.
 - Any non-`false` `revalidate` value under `app/(marketing)` is a bug unless a human explicitly documents an exception in the PR.
@@ -275,7 +293,7 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
 
-### 8. Global UI Components Render Once
+### 11. Global UI Components Render Once
 
 Global UI elements must only render in root `app/layout.tsx`:
 - Cookie banners
@@ -286,7 +304,7 @@ Global UI elements must only render in root `app/layout.tsx`:
 **NEVER** render these in individual pages or nested layouts—causes duplicate overlapping UI elements.
 - Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, `ClerkAnalytics`, or other analytics/provider singletons directly.
 
-### 9. Entitlements: Single Source of Truth
+### 12. Entitlements: Single Source of Truth
 
 Entitlements behavior must stay centralized and predictable. Use these files as the canonical chain:
 

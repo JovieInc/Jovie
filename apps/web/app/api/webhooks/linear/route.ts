@@ -3,14 +3,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
+import {
+  hasRecentDispatch,
+  markRecentDispatch,
+} from '@/lib/webhooks/recent-dispatch';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const recentDispatches = new Map<string, number>();
-const DEDUPE_TTL_MS = 60_000;
+const DEDUPE_TTL_SECONDS = 60;
+const DISPATCH_TIMEOUT_MS = 5000;
 
 interface LinearIssueState {
   id?: string;
@@ -58,20 +62,6 @@ interface AutomationContract {
   verifyRequired: boolean;
   simplifyBounded: boolean;
   modelTier: 'premium' | 'economy';
-}
-
-function isDuplicate(dedupeKey: string): boolean {
-  const now = Date.now();
-  for (const [key, ts] of recentDispatches) {
-    if (now - ts > DEDUPE_TTL_MS) {
-      recentDispatches.delete(key);
-    }
-  }
-  return recentDispatches.has(dedupeKey);
-}
-
-function markDispatched(dedupeKey: string): void {
-  recentDispatches.set(dedupeKey, Date.now());
 }
 
 function verifySignature(
@@ -224,7 +214,7 @@ export async function POST(request: NextRequest) {
     }
 
     const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'todo'}`;
-    if (isDuplicate(dedupeKey)) {
+    if (await hasRecentDispatch('linear', dedupeKey)) {
       return NextResponse.json(
         { received: true, deduplicated: true },
         { headers: NO_STORE_HEADERS }
@@ -235,7 +225,7 @@ export async function POST(request: NextRequest) {
     const repo = process.env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
     const automationContract = getAutomationContract(payload, isPlanReadyEvent);
 
-    const dispatchResponse = await fetch(
+    const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
       {
         method: 'POST',
@@ -263,6 +253,7 @@ export async function POST(request: NextRequest) {
             model_tier: automationContract.modelTier,
           },
         }),
+        timeoutMs: DISPATCH_TIMEOUT_MS,
       }
     );
 
@@ -279,13 +270,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    markDispatched(dedupeKey);
+    await markRecentDispatch('linear', dedupeKey, DEDUPE_TTL_SECONDS);
 
     return NextResponse.json(
       { received: true, dispatched: true },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      await captureCriticalError('Linear webhook dispatch timed out', error, {
+        route: '/api/webhooks/linear',
+        timeoutMs: error.timeoutMs,
+      });
+      return NextResponse.json(
+        { error: 'Dispatch timed out' },
+        { status: 502, headers: NO_STORE_HEADERS }
+      );
+    }
+
     await captureCriticalError('Linear webhook processing failed', error, {
       route: '/api/webhooks/linear',
     });
