@@ -7,6 +7,7 @@ import { users } from '@/lib/db/schema/auth';
 import { providerLinks } from '@/lib/db/schema/content';
 import { preSaveTokens } from '@/lib/db/schema/pre-save';
 import { env } from '@/lib/env-server';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { encryptPII } from '@/lib/utils/pii-encryption';
 
 const applePreSaveSchema = z.object({
@@ -59,20 +60,35 @@ export async function POST(request: Request) {
   }
 
   if (env.APPLE_MUSIC_DEVELOPER_TOKEN) {
-    const response = await fetch(
-      `https://api.music.apple.com/v1/me/library?ids[albums]=${encodeURIComponent(appleLink.externalId)}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${env.APPLE_MUSIC_DEVELOPER_TOKEN}`,
-          'Music-User-Token': parsed.data.appleMusicUserToken,
-        },
-      }
-    );
+    try {
+      const response = await serverFetch(
+        `https://api.music.apple.com/v1/me/library?ids[albums]=${encodeURIComponent(appleLink.externalId)}`,
+        {
+          method: 'POST',
+          timeoutMs: 10_000,
+          headers: {
+            Authorization: `Bearer ${env.APPLE_MUSIC_DEVELOPER_TOKEN}`,
+            'Music-User-Token': parsed.data.appleMusicUserToken,
+          },
+        }
+      );
 
-    if (!response.ok) {
+      if (!response.ok) {
+        return NextResponse.json(
+          { error: 'Apple Music pre-add failed' },
+          { status: 502 }
+        );
+      }
+    } catch (error) {
+      if (error instanceof ServerFetchTimeoutError) {
+        return NextResponse.json(
+          { error: 'Apple Music pre-add timed out' },
+          { status: 504 }
+        );
+      }
+
       return NextResponse.json(
-        { error: 'Apple Music pre-add failed' },
+        { error: 'Apple Music pre-add unavailable' },
         { status: 502 }
       );
     }
