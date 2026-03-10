@@ -32,7 +32,7 @@ export function ReleaseNotificationsSection() {
           height: '600px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(90% 0.04 75 / 0.5), transparent 65%)',
+            'radial-gradient(ellipse at center, oklch(22% 0.04 75 / 0.15), transparent 65%)',
         }}
       />
 
@@ -92,10 +92,24 @@ export function ReleaseNotificationsSection() {
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
-                  boxShadow:
-                    '0 4px 24px rgba(0,0,0,0.08), 0 12px 48px rgba(0,0,0,0.06)',
+                  boxShadow: 'var(--linear-shadow-card-elevated)',
                 }}
               >
+                {/* Shine border overlay */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
+                  style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+                />
+                {/* Top edge highlight */}
+                <div
+                  aria-hidden='true'
+                  className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
+                  style={{
+                    background:
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
+                  }}
+                />
                 {/* ── Left half: The Old Way (faded) ── */}
                 <div className='relative px-5 sm:px-6 py-6 sm:py-8 opacity-[0.38]'>
                   <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)] mb-5'>

@@ -99,7 +99,7 @@ export function AudienceCRMSection() {
           height: '500px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(92% 0.015 260 / 0.5), transparent 65%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.2), transparent 65%)',
         }}
       />
 
@@ -135,10 +135,15 @@ export function AudienceCRMSection() {
               style={{
                 border: '1px solid var(--linear-border-subtle)',
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                boxShadow:
-                  '0 4px 24px rgba(0,0,0,0.08), 0 12px 48px rgba(0,0,0,0.06)',
+                boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >
+              {/* Shine border overlay */}
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
+                style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+              />
               {/* Mac window chrome */}
               <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                 <div className='flex gap-2'>

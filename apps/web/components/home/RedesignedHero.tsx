@@ -2,14 +2,14 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function RedesignedHero() {
   return (
-    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[10rem] pb-[7rem]'>
+    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[8rem] pb-[5rem]'>
       {/* Primary ambient glow — barely perceptible warmth */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{
           background:
-            'radial-gradient(ellipse 80% 50% at 50% 25%, oklch(85% 0.04 270 / 0.4), transparent 65%)',
+            'radial-gradient(ellipse 80% 60% at 50% -10%, oklch(20% 0.025 265 / 0.9) 0%, oklch(15% 0.015 260 / 0.4) 50%, transparent 75%)',
         }}
       />
 
@@ -40,8 +40,8 @@ export function RedesignedHero() {
                 key={item}
                 className='rounded-2xl px-4 py-3 text-left text-[13px] leading-5 text-[var(--linear-text-secondary)]'
                 style={{
-                  backgroundColor: 'var(--linear-bg-surface-1)',
-                  border: '1px solid var(--linear-border-subtle)',
+                  backgroundColor: 'var(--linear-bg-surface-0)',
+                  border: '1px solid var(--linear-border-default)',
                 }}
               >
                 {item}
