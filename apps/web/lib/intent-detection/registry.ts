@@ -19,15 +19,6 @@ function extractValue(match: RegExpMatchArray): Record<string, string> {
   return { value: match[1].trim() };
 }
 
-function extractPlatformAndUrl(
-  match: RegExpMatchArray
-): Record<string, string> {
-  return {
-    platform: match[1]?.trim() ?? '',
-    url: match[2].trim(),
-  };
-}
-
 function extractPlatform(match: RegExpMatchArray): Record<string, string> {
   return { platform: match[1].trim().toLowerCase() };
 }
@@ -75,9 +66,11 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   // --- Priority 9: Link addition with URL ---
   {
     category: IntentCategory.LINK_ADD,
-    pattern:
-      /^(?:add|connect|link|set\s+up)\s+(?:my\s+)?(?:(\S+)\s+)?(?:link|url|account)?\s*(?:to|:|=|as)?\s*(https?:\/\/\S+)/i,
-    extract: extractPlatformAndUrl,
+    pattern: /^(?:add|connect|link|set\s+up)\s+.*?(https?:\/\/\S+)/i,
+    extract: (match: RegExpMatchArray) => ({
+      platform: '',
+      url: match[1].trim(),
+    }),
     priority: 9,
   },
 
