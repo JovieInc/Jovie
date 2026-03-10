@@ -5,10 +5,7 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
   return (
-    <section
-      className='bg-[var(--linear-bg-surface-1)] text-white relative z-10 pt-[var(--linear-section-pt-md)] pb-32'
-      style={{ borderTop: '1px solid var(--linear-border-subtle)' }}
-    >
+    <section className='bg-[#09090b] text-white relative z-10 pt-[var(--linear-section-pt-md)] pb-32'>
       {/* Ambient glow behind CTA — larger, more diffuse */}
       <div
         aria-hidden='true'
@@ -30,10 +27,7 @@ export function FinalCTASection() {
           >
             Give the next fan one clear place to go.
           </h2>
-          <p
-            className='mt-4 max-w-xl marketing-lead-linear'
-            style={{ color: 'rgba(255,255,255,0.6)' }}
-          >
+          <p className='mt-4 max-w-xl marketing-lead-linear text-[var(--linear-text-secondary)]'>
             Claim your handle, launch your page, and start collecting the
             audience data every other profile page leaves behind.
           </p>

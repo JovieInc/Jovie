@@ -366,35 +366,19 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Exact Linear.app values — measured live 2026-03-10:
-       font-size: 64px, weight: 510, letter-spacing: -1.408px, line-height: 64px */
-    font-size: clamp(
-      var(--linear-h1-size-sm),
-      5vw +
-      1rem,
-      var(--linear-h1-size-lg)
-    );
-    font-weight: 510;
-    letter-spacing: -0.022em;
-    /* -1.408px at 64px = -0.022em */
-    line-height: 1;
+    font-size: clamp(3rem, 6vw, 5.5rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
   .marketing-h2-linear {
-    /* Exact Linear.app values:
-       font-size: 48px, weight: 510, letter-spacing: -1.056px, line-height: 48px */
-    font-size: clamp(
-      var(--linear-h2-size-sm),
-      3vw +
-      1rem,
-      var(--linear-h2-size-lg)
-    );
-    font-weight: 510;
-    letter-spacing: -0.022em;
-    /* -1.056px at 48px = -0.022em */
-    line-height: 1.05;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
@@ -413,14 +397,12 @@ body {
     }
   }
   .marketing-lead-linear {
-    /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */
-    font-size: 15px;
+    font-size: clamp(15px, 1.2vw + 0.4rem, 17px);
     font-weight: 400;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     letter-spacing: -0.011em;
-    /* -0.165px at 15px = -0.011em */
-    line-height: 1.6;
+    line-height: 1.65;
   }
   .marketing-body {
     font-feature-settings:
