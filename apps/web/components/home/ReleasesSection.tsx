@@ -338,6 +338,7 @@ export function ReleasesSection() {
                 key={release.id}
                 type='button'
                 onClick={() => setActiveIndex(i)}
+                aria-pressed={i === activeIndex}
                 className='flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-all duration-300'
                 style={{
                   backgroundColor:
