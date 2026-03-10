@@ -343,7 +343,7 @@ export function ArtistNotificationsCTA({
   return (
     <div className='space-y-3'>
       <p
-        className='text-center text-[13px] font-[450] tracking-wide text-tertiary-token'
+        className='text-center text-[13px] font-[550] tracking-[0.01em] text-primary-token/88'
         style={noFontSynthesisStyle}
       >
         {otpStep === 'verify'
@@ -351,7 +351,7 @@ export function ArtistNotificationsCTA({
           : 'Never miss a release.'}
       </p>
 
-      <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
+      <div className='overflow-hidden rounded-xl bg-transparent ring-1 ring-(--color-border-subtle) transition-[ring,background-color] focus-within:bg-surface-1/30 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
         <div className='flex items-center'>
           {shouldShowCountrySelector ? (
             <CountrySelector
@@ -394,7 +394,7 @@ export function ArtistNotificationsCTA({
                   aria-describedby={disclaimerId}
                   type={inputConfig.type}
                   inputMode={inputConfig.inputMode}
-                  className='w-full h-12 px-4 bg-transparent text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 border-none focus-visible:outline-none focus-visible:ring-0'
+                  className='h-12 w-full border-none bg-transparent px-4 text-[15px] text-primary-token placeholder:text-tertiary-token placeholder:opacity-80 focus-visible:outline-none focus-visible:ring-0'
                   placeholder={inputConfig.placeholder}
                   value={inputValue}
                   onChange={event => handleInputChange(event.target.value)}
@@ -418,7 +418,7 @@ export function ArtistNotificationsCTA({
           void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe())
         }
         disabled={isSubmitting}
-        className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
+        className='inline-flex h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white text-base font-semibold text-black transition-[opacity,background-color,border-color] duration-150 hover:border-white/20 hover:bg-white/96 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
         style={noFontSynthesisStyle}
       >
         {getSubmitButtonLabel(isSubmitting, otpStep)}

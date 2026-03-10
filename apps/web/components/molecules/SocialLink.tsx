@@ -70,7 +70,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
     <a
       href={link.url}
       onClick={handleClick}
-      className='group flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent text-secondary-token transition-colors hover:border-subtle hover:bg-surface-2 hover:text-primary-token cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+      className='group flex h-10 w-10 items-center justify-center rounded-full border border-subtle/40 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
       title={`Follow on ${link.platform}`}
       aria-label={`Follow ${artistName} on ${link.platform}`}
     >
