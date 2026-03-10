@@ -45,4 +45,35 @@ describe('searchGoogleCSE', () => {
 
     fetchSpy.mockRestore();
   });
+
+  it('captures API errors and returns an empty array', async () => {
+    vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
+    vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { code: 500, message: 'Internal Error' } }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    const { searchGoogleCSE } = await import('@/lib/leads/google-cse');
+
+    const results = await searchGoogleCSE('site:linktr.ee songwriter');
+
+    expect(results).toEqual([]);
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      'Google CSE API error',
+      expect.any(Error),
+      expect.objectContaining({
+        route: 'leads/google-cse',
+        contextData: expect.objectContaining({ code: 500 }),
+      })
+    );
+
+    fetchMock.mockRestore();
+  });
 });

@@ -8,6 +8,7 @@ export {
 } from './DrawerEmptyState';
 export { DrawerHeader, type DrawerHeaderProps } from './DrawerHeader';
 export {
+  DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
   type DrawerLinkSectionProps,
 } from './DrawerLinkSection';
