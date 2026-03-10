@@ -29,15 +29,6 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const DEDUPE_TTL_SECONDS = 60;
 const DISPATCH_TIMEOUT_MS = 5000;
 
-async function clearDedupeIfNeeded(
-  acquired: boolean,
-  issueId: string | null
-): Promise<void> {
-  if (acquired && issueId) {
-    await clearRecentDispatch('sentry', issueId);
-  }
-}
-
 /** Stack frame from Sentry payload */
 interface SentryFrame {
   filename?: string;
@@ -210,8 +201,11 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    if (dedupeAcquired && issueIdForDedupe) {
+      await clearRecentDispatch('sentry', issueIdForDedupe);
+    }
+
     if (error instanceof ServerFetchTimeoutError) {
-      await clearDedupeIfNeeded(dedupeAcquired, issueIdForDedupe);
       await captureCriticalError('Sentry webhook dispatch timed out', error, {
         route: '/api/webhooks/sentry',
         timeoutMs: error.timeoutMs,
@@ -222,7 +216,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await clearDedupeIfNeeded(dedupeAcquired, issueIdForDedupe);
     await captureCriticalError('Sentry webhook processing failed', error, {
       route: '/api/webhooks/sentry',
     });

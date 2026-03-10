@@ -88,34 +88,32 @@ async function processProfile(
   return { insightsGenerated: persisted };
 }
 
-function processProfileBatchResults(
+function processChunkResults(
   results: PromiseSettledResult<{
     profileId: string;
     profileResult: ProfileProcessResult;
   }>[],
-  chunk: Array<{ profile_id: string }>,
-  errors: string[]
-): { processed: number; insightsTotal: number } {
-  let processed = 0;
+  chunk: { profile_id: string }[]
+): { insightsTotal: number; processed: number; errors: string[] } {
   let insightsTotal = 0;
+  let processed = 0;
+  const errors: string[] = [];
   for (const [resultIndex, result] of results.entries()) {
     if (result.status === 'fulfilled') {
       insightsTotal += result.value.profileResult.insightsGenerated;
       processed++;
-    } else {
-      const profileId = chunk[resultIndex]?.profile_id ?? 'unknown-profile';
-      const msg =
-        result.reason instanceof Error
-          ? result.reason.message
-          : 'Unknown error';
-      errors.push(`Profile ${profileId}: ${msg}`);
-      logger.error(
-        `[insights-cron] Failed for profile ${profileId}:`,
-        result.reason
-      );
+      continue;
     }
+    const profileId = chunk[resultIndex]?.profile_id ?? 'unknown-profile';
+    const msg =
+      result.reason instanceof Error ? result.reason.message : 'Unknown error';
+    errors.push(`Profile ${profileId}: ${msg}`);
+    logger.error(
+      `[insights-cron] Failed for profile ${profileId}:`,
+      result.reason
+    );
   }
-  return { processed, insightsTotal };
+  return { insightsTotal, processed, errors };
 }
 
 /**
@@ -223,9 +221,10 @@ export async function GET(request: Request) {
         )
       );
 
-      const batchStats = processProfileBatchResults(results, chunk, errors);
-      processed += batchStats.processed;
-      insightsTotal += batchStats.insightsTotal;
+      const chunkStats = processChunkResults(results, chunk);
+      insightsTotal += chunkStats.insightsTotal;
+      processed += chunkStats.processed;
+      errors.push(...chunkStats.errors);
     }
 
     const duration = Date.now() - startTime;
