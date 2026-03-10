@@ -309,6 +309,35 @@ Forbidden patterns:
 
 For deeper implementation guidance, use `.claude/skills/entitlements.md`.
 
+### 10. Self-Improvement Loop
+
+After any correction from a human reviewer:
+
+1. **Identify the root cause** — what rule or assumption led to the mistake?
+2. **Add a rule** to `AGENTS.md` (or the relevant skill file) that prevents the same mistake from recurring.
+3. **Add a lesson** to `LESSONS.md` with the pattern and fix.
+4. **Never repeat the same mistake** — the correction should be the last time that error occurs.
+
+If you realize mid-task that you've made an assumption that turned out wrong, document it immediately without being asked.
+
+### 11. Plan Before Executing Complex Tasks
+
+For any task with 3 or more steps, architectural decisions, schema changes, or significant refactors:
+
+- Use plan mode (Shift+Tab twice in Claude Code) to outline the approach
+- Wait for human approval before executing
+- Single-step bug fixes and trivial copy changes do not require plan mode
+
+### 12. Verify Before Marking Done
+
+Never mark a task complete without confirming the fix works:
+
+- Run the relevant test file: `pnpm --filter web exec vitest run <test-file>`
+- Run typecheck: `pnpm --filter web exec tsc --noEmit`
+- For UI changes: confirm the component renders without errors
+- For API changes: confirm the endpoint returns expected shape
+- Paste the passing output as evidence in the PR description
+
 ---
 
 ## Linear Issue Gating
