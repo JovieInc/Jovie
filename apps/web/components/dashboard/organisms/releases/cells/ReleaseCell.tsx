@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, SimpleTooltip } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import { Pause, Play } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -19,27 +19,6 @@ const PROVIDER_ICON_MAP: Partial<Record<ProviderKey, string>> = {
   bandcamp: 'bandcamp',
   beatport: 'beatport',
   tiktok: 'tiktok',
-};
-
-/** Friendly display names for providers */
-const PROVIDER_NAMES: Record<ProviderKey, string> = {
-  spotify: 'Spotify',
-  apple_music: 'Apple Music',
-  youtube: 'YouTube',
-  soundcloud: 'SoundCloud',
-  deezer: 'Deezer',
-  tidal: 'Tidal',
-  amazon_music: 'Amazon Music',
-  bandcamp: 'Bandcamp',
-  beatport: 'Beatport',
-  pandora: 'Pandora',
-  napster: 'Napster',
-  audiomack: 'Audiomack',
-  qobuz: 'Qobuz',
-  anghami: 'Anghami',
-  boomplay: 'Boomplay',
-  iheartradio: 'iHeartRadio',
-  tiktok: 'TikTok',
 };
 
 const MAX_VISIBLE_ICONS = 3;
@@ -95,15 +74,12 @@ export const ReleaseCell = memo(function ReleaseCell({
       .map(p => ({
         key: p.key,
         icon: PROVIDER_ICON_MAP[p.key],
-        name: PROVIDER_NAMES[p.key] || p.key,
       }))
-      .filter((p): p is IconProviderInfo & { name: string } => Boolean(p.icon));
+      .filter((p): p is IconProviderInfo => Boolean(p.icon));
 
     const visible = withIcons.slice(0, MAX_VISIBLE_ICONS);
     const remaining = withIcons.length - visible.length;
-    const allNames = providers.map(p => PROVIDER_NAMES[p.key] || p.key);
-
-    return { visible, remaining, allNames };
+    return { visible, remaining };
   }, [release.providers]);
 
   return (
@@ -169,25 +145,23 @@ export const ReleaseCell = memo(function ReleaseCell({
 
       <div className='flex min-w-0 items-center justify-start'>
         {platformInfo ? (
-          <SimpleTooltip content={platformInfo.allNames.join(', ')} side='top'>
-            <div className='inline-flex h-6 shrink-0 items-center gap-1 text-[11px] text-(--linear-text-tertiary)'>
-              <span className='flex items-center gap-0.5'>
-                {platformInfo.visible.map(p => (
-                  <SocialIcon
-                    key={p.key}
-                    platform={p.icon}
-                    className='h-3.5 w-3.5 text-(--linear-text-secondary)'
-                    aria-hidden
-                  />
-                ))}
+          <div className='inline-flex h-6 shrink-0 items-center gap-1 text-[11px] text-(--linear-text-tertiary)'>
+            <span className='flex items-center gap-0.5'>
+              {platformInfo.visible.map(p => (
+                <SocialIcon
+                  key={p.key}
+                  platform={p.icon}
+                  className='h-3.5 w-3.5 text-(--linear-text-secondary)'
+                  aria-hidden
+                />
+              ))}
+            </span>
+            {platformInfo.remaining > 0 && (
+              <span className='tabular-nums text-[10px] text-(--linear-text-tertiary)'>
+                +{platformInfo.remaining}
               </span>
-              {platformInfo.remaining > 0 && (
-                <span className='tabular-nums text-[10px] text-(--linear-text-tertiary)'>
-                  +{platformInfo.remaining}
-                </span>
-              )}
-            </div>
-          </SimpleTooltip>
+            )}
+          </div>
         ) : null}
       </div>
     </div>
