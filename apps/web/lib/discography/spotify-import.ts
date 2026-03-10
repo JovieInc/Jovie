@@ -54,6 +54,31 @@ const MAX_TRACKS_PER_RELEASE = 100;
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
+function sanitizeBoundedInteger(
+  value: number | null | undefined,
+  min: number,
+  max: number,
+  fallback: number
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(Math.trunc(value), max));
+}
+
+function sanitizeBoundedNullableInteger(
+  value: number | null | undefined,
+  min: number,
+  max: number
+): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(min, Math.min(Math.trunc(value), max));
+}
+
 export interface SpotifyImportResult {
   success: boolean;
   imported: number;
@@ -504,9 +529,13 @@ async function processTracksForRelease(
       creatorProfileId,
       title: sanitizedTrackTitle,
       slug: trackSlug,
-      trackNumber: Math.max(1, Math.min(track.track_number, 999)),
-      discNumber: Math.max(1, Math.min(track.disc_number, 99)),
-      durationMs: Math.max(0, Math.min(track.duration_ms, 60 * 60 * 1000)),
+      trackNumber: sanitizeBoundedInteger(track.track_number, 1, 999, 1),
+      discNumber: sanitizeBoundedInteger(track.disc_number, 1, 99, 1),
+      durationMs: sanitizeBoundedNullableInteger(
+        track.duration_ms,
+        0,
+        60 * 60 * 1000
+      ),
       isExplicit: track.explicit,
       isrc: sanitizedIsrc,
       previewUrl: sanitizedPreviewUrl,
