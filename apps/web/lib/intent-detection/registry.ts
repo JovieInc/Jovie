@@ -76,7 +76,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   {
     category: IntentCategory.LINK_ADD,
     pattern:
-      /^(?:add|connect|link|set\s+up)\s+(?:my\s+)?(?:(\S+)\s+)?(?:link|url|account)?\s*(?:to|:|=|as)?\s*(https?:\/\/\S+)/i,
+      /^(?:add|connect|link|set\s+up)\s+(?:my\s+)?(?:(\S+)\s+)?(?:link|url)?\s*(https?:\/\/\S+)/i,
     extract: extractPlatformAndUrl,
     priority: 9,
   },
