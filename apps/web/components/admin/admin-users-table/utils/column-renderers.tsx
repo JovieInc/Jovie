@@ -28,12 +28,48 @@ export function renderNameCell({
   const user = row.original;
   const name = getValue();
   const displayName = name || 'Email Subscriber';
+  const profileUrl = user.profileUsername
+    ? getProfileUrl(user.profileUsername)
+    : null;
 
   return (
     <div className='min-w-0'>
-      <TruncatedText lines={1} className='font-semibold text-primary-token'>
-        {displayName}
-      </TruncatedText>
+      <div className='group/name flex min-w-0 items-center gap-1.5'>
+        <TruncatedText lines={1} className='font-semibold text-primary-token'>
+          {displayName}
+        </TruncatedText>
+        {profileUrl ? (
+          <span className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/name:opacity-100'>
+            <button
+              type='button'
+              className='rounded p-0.5 text-tertiary-token hover:text-primary-token hover:bg-surface-2'
+              aria-label={`Copy link for @${user.profileUsername}`}
+              onClick={e => {
+                e.stopPropagation();
+                copyToClipboard(profileUrl).then(ok => {
+                  if (ok) {
+                    toast.success('Profile link copied', { duration: 2000 });
+                  } else {
+                    toast.error('Failed to copy link');
+                  }
+                });
+              }}
+            >
+              <Copy className='h-3 w-3' />
+            </button>
+            <a
+              href={profileUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='rounded p-0.5 text-tertiary-token hover:text-primary-token hover:bg-surface-2'
+              aria-label={`Open profile for @${user.profileUsername}`}
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink className='h-3 w-3' />
+            </a>
+          </span>
+        ) : null}
+      </div>
       {name && user.email ? (
         <TruncatedText lines={1} className='text-xs text-secondary-token'>
           {user.email}
