@@ -227,21 +227,21 @@ describe('musicfetch-enrichment', () => {
   });
 
   describe('processMusicFetchEnrichmentJob', () => {
-    it('returns error when MusicFetch is unavailable', async () => {
+    it('throws when MusicFetch is unavailable', async () => {
       mockIsMusicFetchAvailable.mockReturnValue(false);
 
       const { processMusicFetchEnrichmentJob } = await import(
         '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
       );
 
-      const result = await processMusicFetchEnrichmentJob(
-        mockTx as unknown as Parameters<
-          typeof processMusicFetchEnrichmentJob
-        >[0],
-        makePayload()
-      );
-
-      expect(result.errors).toContain('MusicFetch API token not configured');
+      await expect(
+        processMusicFetchEnrichmentJob(
+          mockTx as unknown as Parameters<
+            typeof processMusicFetchEnrichmentJob
+          >[0],
+          makePayload()
+        )
+      ).rejects.toThrow('MusicFetch API token not configured');
     });
 
     it('returns error when profile is not found', async () => {
@@ -262,21 +262,21 @@ describe('musicfetch-enrichment', () => {
       expect(result.errors).toContain('Creator profile not found');
     });
 
-    it('returns error when MusicFetch API returns no data', async () => {
+    it('throws when MusicFetch API returns no data', async () => {
       mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
 
       const { processMusicFetchEnrichmentJob } = await import(
         '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
       );
 
-      const result = await processMusicFetchEnrichmentJob(
-        mockTx as unknown as Parameters<
-          typeof processMusicFetchEnrichmentJob
-        >[0],
-        makePayload()
-      );
-
-      expect(result.errors).toContain('MusicFetch API returned no data');
+      await expect(
+        processMusicFetchEnrichmentJob(
+          mockTx as unknown as Parameters<
+            typeof processMusicFetchEnrichmentJob
+          >[0],
+          makePayload()
+        )
+      ).rejects.toThrow('MusicFetch API returned no data');
     });
 
     it('maps DSP fields from MusicFetch to profile when all fields are null', async () => {
