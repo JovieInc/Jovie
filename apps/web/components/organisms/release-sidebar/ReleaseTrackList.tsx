@@ -391,10 +391,10 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          className='mt-0.5 shrink-0 self-start rounded p-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          className='shrink-0 self-center rounded p-1 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
           aria-label={`Actions for ${track.title}`}
         >
-          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
+          <MoreHorizontal className='h-4 w-4 text-tertiary-token' />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-48'>

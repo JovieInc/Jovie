@@ -1,14 +1,6 @@
 'use client';
 
-/**
- * TrackSidebar Component
- *
- * A right drawer for displaying individual track details.
- * Opens when clicking a track in the release sidebar's track list
- * or when clicking a track row in "tracks" view mode.
- */
-
-import { Badge } from '@jovie/ui';
+import { Badge, SegmentControl } from '@jovie/ui';
 import {
   ArrowLeft,
   Check,
@@ -32,7 +24,13 @@ import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
-/** Track data needed by the sidebar - subset of TrackViewModel plus parent release info */
+type TrackSidebarTab = 'details' | 'platforms';
+
+const TRACK_SIDEBAR_TAB_OPTIONS = [
+  { value: 'details' as const, label: 'Details' },
+  { value: 'platforms' as const, label: 'Platforms' },
+];
+
 export interface TrackSidebarData {
   id: string;
   title: string;
@@ -66,6 +64,7 @@ export function TrackSidebar({
   onBackToRelease,
 }: TrackSidebarProps) {
   const [isSmartLinkCopied, setIsSmartLinkCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<TrackSidebarTab>('details');
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isrcCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -80,6 +79,7 @@ export function TrackSidebar({
 
   useEffect(() => {
     setIsSmartLinkCopied(false);
+    setActiveTab('details');
   }, [track?.id]);
 
   const smartLinkUrl = track ? `${getBaseUrl()}${track.smartLinkPath}` : '';
@@ -148,13 +148,6 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
-  const headerActions = (
-    <DrawerHeaderActions
-      primaryActions={[]}
-      overflowActions={overflowActions}
-    />
-  );
-
   return (
     <EntitySidebarShell
       isOpen={isOpen}
@@ -162,7 +155,12 @@ export function TrackSidebar({
       data-testid='track-sidebar'
       title={track?.title ?? 'No track selected'}
       onClose={onClose}
-      headerActions={headerActions}
+      headerActions={
+        <DrawerHeaderActions
+          primaryActions={[]}
+          overflowActions={overflowActions}
+        />
+      }
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
       entityHeader={
@@ -222,6 +220,17 @@ export function TrackSidebar({
           </div>
         ) : undefined
       }
+      tabs={
+        track ? (
+          <SegmentControl
+            value={activeTab}
+            onValueChange={value => setActiveTab(value as TrackSidebarTab)}
+            options={TRACK_SIDEBAR_TAB_OPTIONS}
+            size='sm'
+            aria-label='Track sidebar tabs'
+          />
+        ) : undefined
+      }
     >
       {track && (
         <div className='space-y-5'>
@@ -229,52 +238,64 @@ export function TrackSidebar({
             <button
               type='button'
               onClick={handleBackToRelease}
-              className='flex items-center gap-1.5 text-[13px] text-secondary-token hover:text-primary-token transition-colors rounded focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+              className='flex items-center gap-1.5 rounded text-[13px] text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
             >
               <ArrowLeft className='h-3.5 w-3.5' />
-              <span className='truncate max-w-[200px]'>
+              <span className='max-w-[200px] truncate'>
                 {track.releaseTitle}
               </span>
             </button>
           )}
 
-          <DrawerSection>
-            <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-              Smart link
-            </p>
-            <button
-              type='button'
-              onClick={handleCopySmartLink}
-              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-            >
-              <Link2 className='h-3.5 w-3.5 shrink-0' />
-              <span className='truncate'>{smartLinkUrl}</span>
-              <Copy className='ml-auto h-3 w-3 shrink-0 text-tertiary-token' />
-            </button>
-          </DrawerSection>
+          {activeTab === 'details' && (
+            <DrawerSection>
+              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+                Smart link
+              </p>
+              <button
+                type='button'
+                onClick={handleCopySmartLink}
+                className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token'
+              >
+                <Link2 className='h-3.5 w-3.5 shrink-0' />
+                <span className='truncate'>{smartLinkUrl}</span>
+                <Copy className='ml-auto h-3 w-3 shrink-0 text-tertiary-token' />
+              </button>
+            </DrawerSection>
+          )}
 
-          <DrawerSection>
-            <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-              Actions
-            </p>
-            <div className='space-y-1'>
-              {track.isrc && (
-                <button
-                  type='button'
-                  onClick={handleCopyIsrc}
-                  className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-                >
-                  <Hash className='h-3.5 w-3.5 shrink-0' />
-                  <span>Copy ISRC</span>
-                  <span className='ml-auto font-mono text-[10px] text-tertiary-token'>
-                    {track.isrc}
-                  </span>
-                </button>
-              )}
-            </div>
-          </DrawerSection>
+          {activeTab === 'details' && (
+            <DrawerSection>
+              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+                Actions
+              </p>
+              <div className='space-y-1'>
+                {track.isrc && (
+                  <button
+                    type='button'
+                    onClick={handleCopyIsrc}
+                    className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token'
+                  >
+                    <Hash className='h-3.5 w-3.5 shrink-0' />
+                    <span>Copy ISRC</span>
+                    <span className='ml-auto font-mono text-[10px] text-tertiary-token'>
+                      {track.isrc}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </DrawerSection>
+          )}
 
-          {streamingProviders.length > 0 && (
+          {activeTab === 'platforms' && streamingProviders.length === 0 && (
+            <DrawerSection>
+              <p className='py-2 text-[13px] text-tertiary-token'>
+                No platform links available.
+              </p>
+            </DrawerSection>
+          )}
+
+          {activeTab === 'platforms' && streamingProviders.length > 0 && (
             <DrawerSection>
               <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                 Available on
@@ -286,7 +307,7 @@ export function TrackSidebar({
                     href={provider.url}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
+                    className='flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token'
                   >
                     <SocialIcon
                       platform={provider.key}

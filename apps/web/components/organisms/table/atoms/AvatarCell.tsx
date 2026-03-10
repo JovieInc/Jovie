@@ -41,6 +41,16 @@ interface AvatarCellProps {
    * Additional CSS classes
    */
   readonly className?: string;
+
+  /**
+   * Disable username navigation link rendering
+   */
+  readonly disableUsernameLink?: boolean;
+
+  /**
+   * Optional actions rendered next to username
+   */
+  readonly usernameActions?: React.ReactNode;
 }
 
 /**
@@ -85,6 +95,8 @@ export const AvatarCell = React.memo(function AvatarCell({
   verified = false,
   isFeatured = false,
   className,
+  disableUsernameLink = false,
+  usernameActions,
 }: AvatarCellProps) {
   return (
     <div className={cn('flex items-center gap-3', className)}>
@@ -114,18 +126,34 @@ export const AvatarCell = React.memo(function AvatarCell({
             {displayName}
           </div>
         )}
-        <Link
-          href={`/${username}`}
-          className={cn(
-            'text-secondary-token transition-colors hover:text-primary-token line-clamp-1 overflow-hidden text-ellipsis',
-            displayName
-              ? 'text-[11px]'
-              : 'font-[510] text-primary-token text-[13px]'
+        <div className='flex min-w-0 items-center gap-1.5'>
+          {disableUsernameLink ? (
+            <span
+              className={cn(
+                'line-clamp-1 overflow-hidden text-ellipsis',
+                displayName
+                  ? 'text-[11px] text-secondary-token'
+                  : 'text-[13px] font-[510] text-primary-token'
+              )}
+            >
+              @{username}
+            </span>
+          ) : (
+            <Link
+              href={`/${username}`}
+              className={cn(
+                'line-clamp-1 overflow-hidden text-ellipsis text-secondary-token transition-colors hover:text-primary-token',
+                displayName
+                  ? 'text-[11px]'
+                  : 'text-[13px] font-[510] text-primary-token'
+              )}
+              onClick={event => event.stopPropagation()}
+            >
+              @{username}
+            </Link>
           )}
-          onClick={event => event.stopPropagation()}
-        >
-          @{username}
-        </Link>
+          {usernameActions}
+        </div>
       </div>
     </div>
   );

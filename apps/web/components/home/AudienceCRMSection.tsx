@@ -99,7 +99,7 @@ export function AudienceCRMSection() {
           height: '500px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.15), transparent 65%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.2), transparent 65%)',
         }}
       />
 
@@ -107,12 +107,12 @@ export function AudienceCRMSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
+            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)] reveal-on-scroll'>
               Stop renting your audience.
               <br />
               Start building it.
             </h2>
-            <div className='max-w-lg'>
+            <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Most artist pages leak demand to streaming apps and social
                 platforms. Jovie turns each visit into first-party audience data
@@ -125,39 +125,25 @@ export function AudienceCRMSection() {
           </div>
 
           {/* Product demo */}
-          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
+          <div
+            className='relative mt-16 md:mt-20 mx-auto w-full reveal-on-scroll'
+            data-delay='160'
+          >
             {/* Dashboard window */}
             <div
               className='relative overflow-hidden rounded-xl md:rounded-2xl'
               style={{
                 border: '1px solid var(--linear-border-subtle)',
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                boxShadow: [
-                  '0 0 0 1px rgba(255,255,255,0.03)',
-                  '0 8px 40px rgba(0,0,0,0.35)',
-                  '0 24px 80px rgba(0,0,0,0.25)',
-                ].join(', '),
+                boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >
               {/* Shine border overlay */}
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
-                style={{
-                  border: '1px solid rgba(255,255,255,0.04)',
-                }}
+                style={{ border: '1px solid rgba(255,255,255,0.04)' }}
               />
-
-              {/* Top edge highlight — Linear glass reflection */}
-              <div
-                aria-hidden='true'
-                className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
-                }}
-              />
-
               {/* Mac window chrome */}
               <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                 <div className='flex gap-2'>

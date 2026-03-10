@@ -4,15 +4,12 @@ import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {
   getDashboardData,
   getProfileSocialLinks,
 } from '../../dashboard/actions';
 import { ProfilePreviewOpener } from '../../dashboard/profile/ProfilePreviewOpener';
-import {
-  checkAppleMusicConnection,
-  checkSpotifyConnection,
-} from '../../dashboard/releases/actions';
 
 export const runtime = 'nodejs';
 
@@ -33,29 +30,16 @@ export default async function SettingsArtistProfilePage() {
     ? await getProfileSocialLinks(profileId).catch(() => [])
     : [];
 
-  const [spotifyResult, appleMusicResult] = await Promise.allSettled([
-    checkSpotifyConnection(),
-    checkAppleMusicConnection(),
-  ]);
-
-  const spotifyStatus =
-    spotifyResult.status === 'fulfilled'
-      ? spotifyResult.value
-      : { connected: false, spotifyId: null, artistName: null };
-  const appleMusicStatus =
-    appleMusicResult.status === 'fulfilled'
-      ? appleMusicResult.value
-      : { connected: false, artistName: null, artistId: null };
+  const connectedDSPs = dashboardData.selectedProfile
+    ? getCanonicalProfileDSPs(dashboardData.selectedProfile, initialLinks)
+    : [];
 
   return (
     <>
       <ProfilePreviewOpener />
       <PreviewDataHydrator
         initialLinks={initialLinks}
-        spotifyConnected={spotifyStatus.connected}
-        spotifyArtistName={spotifyStatus.artistName}
-        appleMusicConnected={appleMusicStatus.connected}
-        appleMusicArtistName={appleMusicStatus.artistName}
+        connectedDSPs={connectedDSPs}
       />
       <DashboardSettings focusSection='artist-profile' />
     </>

@@ -15,7 +15,7 @@ import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { TipDrawer } from '@/components/profile/TipDrawer';
 import { Container } from '@/components/site/Container';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
-import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
 import type { ProfileShellProps } from './types';
 import { useProfileShell } from './useProfileShell';
@@ -63,8 +63,8 @@ export function ProfileShell({
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
-    socialNetworkLinks,
-    hasSocialLinks,
+    modeLinks,
+    socialLinks: prioritizedSocialLinks,
   } = useProfileShell({
     artist,
     socialLinks,
@@ -95,11 +95,7 @@ export function ProfileShell({
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
   const availableDspPreferences = useMemo(
-    () =>
-      getAvailableDSPs(artist).map(dsp => ({
-        key: dsp.key,
-        label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
-      })),
+    () => toDSPPreferences(getCanonicalProfileDSPs(artist)),
     [artist]
   );
 
@@ -214,8 +210,7 @@ export function ProfileShell({
                       {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
                       {(!mode || mode === 'profile') &&
                         showSocialBar &&
-                        hasSocialLinks &&
-                        socialNetworkLinks.map(link => (
+                        modeLinks.map(link => (
                           <SocialLinkComponent
                             key={link.id}
                             link={link}
@@ -294,6 +289,16 @@ export function ProfileShell({
                               />
                             </Link>
                           </CircleIconButton>
+                        ))}
+                      {(!mode || mode === 'profile') &&
+                        showSocialBar &&
+                        prioritizedSocialLinks.map(link => (
+                          <SocialLinkComponent
+                            key={link.id}
+                            link={link}
+                            handle={artist.handle}
+                            artistName={artist.name}
+                          />
                         ))}
                     </div>
                   </div>

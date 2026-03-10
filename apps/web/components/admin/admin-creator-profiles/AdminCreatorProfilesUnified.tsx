@@ -15,6 +15,7 @@ import {
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
+import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -235,6 +236,18 @@ export function AdminCreatorProfilesUnified({
     [setDraftContact]
   );
 
+  const handleOpenProfile = useCallback(() => {
+    const activeProfile = filteredProfiles.find(
+      profile => profile.id === selectedId
+    );
+    if (!activeProfile?.username) return;
+    globalThis.open(
+      getProfileUrl(activeProfile.username),
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }, [filteredProfiles, selectedId]);
+
   // Contact hydration now happens automatically via TanStack Query
   // when selectedId changes and sidebarOpen is true (enabled prop)
 
@@ -243,6 +256,7 @@ export function AdminCreatorProfilesUnified({
     selectedId,
     onSelect: setSelectedId,
     onToggleSidebar: () => setSidebarOpen(open => !open),
+    onActivate: handleOpenProfile,
     onCloseSidebar: () => setSidebarOpen(false),
     isSidebarOpen: sidebarOpen,
     getId: profile => profile.id,
@@ -345,13 +359,15 @@ export function AdminCreatorProfilesUnified({
     const isChecked = selectedIdsRef.current.has(profile.id);
     const isSelected = profile.id === selectedIdRef.current;
 
-    const getSelectionClass = () => {
-      if (isChecked) return 'bg-white/[0.04]';
-      if (isSelected) return 'bg-white/[0.04]';
-      return 'hover:bg-white/[0.02]';
-    };
+    if (isChecked || isSelected) {
+      return cn(
+        'group bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)'
+      );
+    }
 
-    return cn('group', getSelectionClass());
+    return cn(
+      'group bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out'
+    );
   }, []);
 
   // Register right panel with AuthShell instead of rendering inline.

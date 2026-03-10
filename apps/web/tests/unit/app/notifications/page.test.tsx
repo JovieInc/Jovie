@@ -1,90 +1,117 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
-import NotificationsPage from '../../../../app/[username]/notifications/page';
+// Mock server-only modules before importing the page
+vi.mock('@/lib/services/profile', () => ({
+  getProfileWithLinks: vi.fn(),
+}));
 
 vi.mock('next/navigation', () => ({
-  useParams: () => ({ username: 'testartist' }),
+  notFound: vi.fn(() => {
+    throw new Error('NEXT_NOT_FOUND');
+  }),
 }));
 
-vi.mock('@/lib/analytics', () => ({
-  track: vi.fn(),
+vi.mock('@/lib/utils/date', () => ({
+  toISOStringSafe: vi.fn((d: unknown) =>
+    d ? new Date(d as string).toISOString() : new Date().toISOString()
+  ),
 }));
 
-vi.mock('@/lib/hooks/useNotifications', () => ({
-  useNotifications: () => ({ success: vi.fn(), error: vi.fn() }),
-}));
+// Mock TwoStepNotificationsCTA to avoid its heavy dependency tree
+vi.mock(
+  '@/components/profile/artist-notifications-cta/TwoStepNotificationsCTA',
+  () => ({
+    TwoStepNotificationsCTA: ({
+      artist,
+    }: {
+      artist: { handle: string; name: string };
+    }) => (
+      <div
+        data-testid='two-step-cta'
+        data-handle={artist.handle}
+        data-name={artist.name}
+      />
+    ),
+  })
+);
 
-const fetchMock = vi.fn();
+import { getProfileWithLinks } from '@/lib/services/profile';
+import NotificationsPage from '../../../../app/[username]/notifications/page';
 
-global.fetch = fetchMock as unknown as typeof fetch;
+const baseProfile = {
+  id: 'profile-1',
+  userId: 'user-1',
+  creatorType: 'musician',
+  username: 'testartist',
+  usernameNormalized: 'testartist',
+  displayName: 'Test Artist',
+  bio: null,
+  avatarUrl: null,
+  spotifyUrl: null,
+  appleMusicUrl: null,
+  youtubeUrl: null,
+  spotifyId: null,
+  appleMusicId: null,
+  youtubeMusicId: null,
+  deezerId: null,
+  tidalId: null,
+  soundcloudId: null,
+  isPublic: true,
+  isVerified: false,
+  isClaimed: false,
+  isFeatured: false,
+  marketingOptOut: false,
+  profileViews: 0,
+  settings: null,
+  theme: null,
+  location: null,
+  activeSinceYear: null,
+  venmoHandle: null,
+  genres: null,
+  spotifyPopularity: null,
+  claimToken: null,
+  socialLinks: [],
+  contacts: [],
+  latestRelease: null,
+  userIsPro: false,
+  userClerkId: null,
+  userEmail: null,
+  createdAt: new Date('2024-01-01'),
+  updatedAt: new Date('2024-01-01'),
+};
 
 describe('NotificationsPage', () => {
-  const renderPage = async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-    return render(
-      <QueryClientProvider client={queryClient}>
-        <NotificationsPage />
-      </QueryClientProvider>
-    );
-  };
+  it('calls notFound when profile is missing', async () => {
+    vi.mocked(getProfileWithLinks).mockResolvedValue(null);
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    fetchMock.mockReset();
+    await expect(
+      NotificationsPage({ params: Promise.resolve({ username: 'unknown' }) })
+    ).rejects.toThrow('NEXT_NOT_FOUND');
   });
 
-  it('shows artist not found state when creator lookup fails', async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      json: async () => ({}),
-    });
+  it('calls notFound when profile is not public', async () => {
+    vi.mocked(getProfileWithLinks).mockResolvedValue({
+      ...baseProfile,
+      isPublic: false,
+    } as never);
 
-    await renderPage();
-
-    await waitFor(() => {
-      expect(
-        screen.getByTestId('notifications-artist-missing')
-      ).toBeInTheDocument();
-    });
+    await expect(
+      NotificationsPage({ params: Promise.resolve({ username: 'testartist' }) })
+    ).rejects.toThrow('NEXT_NOT_FOUND');
   });
 
-  it('subscribes successfully and shows success state', async () => {
-    fetchMock.mockImplementation(url => {
-      if (String(url).includes('/api/creator')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ id: 'artist-1' }),
-        });
-      }
-      if (String(url).includes('/api/notifications/subscribe')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ success: true }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
+  it('renders TwoStepNotificationsCTA for a valid public profile', async () => {
+    vi.mocked(getProfileWithLinks).mockResolvedValue(baseProfile as never);
+
+    const jsx = await NotificationsPage({
+      params: Promise.resolve({ username: 'testartist' }),
     });
+    render(jsx as React.ReactElement);
 
-    await renderPage();
-
-    const emailInput = await screen.findByLabelText(/email/i);
-    fireEvent.change(emailInput, { target: { value: 'User@Example.com ' } });
-
-    fireEvent.click(
-      screen.getByRole('button', { name: /turn on notifications/i })
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId('notifications-success')).toBeInTheDocument();
-    });
+    const cta = screen.getByTestId('two-step-cta');
+    expect(cta).toBeInTheDocument();
+    expect(cta).toHaveAttribute('data-handle', 'testartist');
+    expect(cta).toHaveAttribute('data-name', 'Test Artist');
   });
 });

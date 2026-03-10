@@ -45,6 +45,15 @@ describe('mutation-utils', () => {
       );
     });
 
+    it('normalizes raw 403 permission copy to a user-friendly message', () => {
+      const error = new Error(
+        'Error: 403 Forbidden — You do not have permission to perform this action.'
+      );
+      expect(getErrorMessage(error, 'Fallback')).toBe(
+        'You do not have permission to do this.'
+      );
+    });
+
     it('returns specific message for 404 not found', () => {
       const error = new FetchError('Not Found', 404);
       expect(getErrorMessage(error, 'Fallback')).toBe(
