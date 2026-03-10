@@ -19,22 +19,11 @@ vi.mock('@/lib/sentry/client-lite', () => ({
 vi.mock('lucide-react', () => ({
   Download: (props: Record<string, unknown>) =>
     React.createElement('svg', { ...props, 'data-testid': 'download-icon' }),
-  FileCode2: (props: Record<string, unknown>) =>
-    React.createElement('svg', { ...props, 'data-testid': 'filecode-icon' }),
   ImageDown: (props: Record<string, unknown>) =>
     React.createElement('svg', { ...props, 'data-testid': 'imagedown-icon' }),
-  QrCode: (props: Record<string, unknown>) =>
-    React.createElement('svg', { ...props, 'data-testid': 'qrcode-icon' }),
-  ChevronRight: (props: Record<string, unknown>) =>
-    React.createElement('svg', { ...props, 'data-testid': 'chevron-icon' }),
 }));
 
 const multipleSizes: AvatarSize[] = [
-  {
-    key: 'small',
-    label: 'Small (150 x 150)',
-    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=150&q=90',
-  },
   {
     key: 'medium',
     label: 'Medium (400 x 400)',
@@ -42,8 +31,8 @@ const multipleSizes: AvatarSize[] = [
   },
   {
     key: 'large',
-    label: 'Large (800 x 800)',
-    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=800&q=90',
+    label: 'Large (1000 x 1000)',
+    url: '/_next/image?url=https%3A%2F%2Fcdn.jov.ie%2Favatar-original.png&w=1000&q=90',
   },
   {
     key: 'original',
@@ -66,14 +55,13 @@ describe('ProfilePhotoContextMenu', () => {
     );
   });
 
-  it('renders download submenu with S/M/L and original options', async () => {
+  it('renders direct download menu with size options and original', async () => {
     const user = userEvent.setup({ delay: null });
 
     render(
       <ProfilePhotoContextMenu
         name='Test Artist'
         handle='testartist'
-        tagline='Future pop artist'
         sizes={multipleSizes}
         allowDownloads={true}
       >
@@ -86,28 +74,17 @@ describe('ProfilePhotoContextMenu', () => {
       keys: '[MouseRight]',
     });
 
-    await user.hover(screen.getByRole('menuitem', { name: 'Download' }));
-
     expect(
-      await screen.findByRole('menuitem', { name: 'Download as VXAR' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('menuitem', { name: 'Download QR Code' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('menuitem', { name: 'Small (150 x 150)' })
+      await screen.findByText('Download Profile Photo')
     ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Medium (400 x 400)' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('menuitem', { name: 'Large (800 x 800)' })
+      screen.getByRole('menuitem', { name: 'Large (1000 x 1000)' })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('menuitem', { name: 'Original' })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('menuitem', { name: 'Download Profile as JSON' })
     ).toBeInTheDocument();
   });
 
