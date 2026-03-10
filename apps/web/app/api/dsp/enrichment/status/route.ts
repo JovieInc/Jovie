@@ -174,7 +174,10 @@ export async function GET(request: Request) {
         '[DSP Enrichment Status - fetch discoveryJob] Failed to fetch discovery job',
         { profileId, dbError }
       );
-      throw dbError;
+      return NextResponse.json(
+        { error: 'Internal Server Error' },
+        { status: 500 }
+      );
     }
 
     const hasPendingDiscoveryJob =
