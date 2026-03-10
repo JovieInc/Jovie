@@ -184,12 +184,14 @@ export function renderProfileCell({
 export function renderFunnelCell({ row }: CellContext<AdminUserRow, string>) {
   const status = row.original.userStatus;
   const label = status.replace(/_/g, ' ');
-  const variant =
-    status === 'active'
-      ? 'success'
-      : status === 'banned' || status === 'suspended'
-        ? 'warning'
-        : ('secondary' as const);
+  let variant: 'success' | 'warning' | 'secondary';
+  if (status === 'active') {
+    variant = 'success';
+  } else if (status === 'banned' || status === 'suspended') {
+    variant = 'warning';
+  } else {
+    variant = 'secondary';
+  }
   return (
     <Badge size='sm' variant={variant}>
       {label}

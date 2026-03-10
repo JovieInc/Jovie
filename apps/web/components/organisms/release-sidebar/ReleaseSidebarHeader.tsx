@@ -30,6 +30,16 @@ interface UseReleaseHeaderPartsProps {
   readonly onClose?: () => void;
 }
 
+function buildTitleText(
+  isrcValue: string | null | undefined,
+  hasRelease: boolean,
+  release: Release | null
+): string {
+  if (isrcValue) return isrcValue;
+  if (hasRelease && release?.title) return release.title;
+  return 'No release selected';
+}
+
 /**
  * Hook that returns the title and actions for the release sidebar header.
  * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
@@ -140,11 +150,7 @@ export function useReleaseHeaderParts({
   }
 
   const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
-  const titleText = isrcValue
-    ? isrcValue
-    : hasRelease && release?.title
-      ? release.title
-      : 'No release selected';
+  const titleText = buildTitleText(isrcValue, hasRelease, release);
 
   const handleCopyIsrc = useCallback(() => {
     if (!isrcValue) return;

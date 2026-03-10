@@ -37,6 +37,32 @@ const SIGNAL_CONFIG: Record<
   hasRepresentation: { label: 'Has Representation', variant: 'primary' },
 };
 
+function renderReviewRows(
+  loading: boolean,
+  leads: ReviewLead[],
+  renderRow: (lead: ReviewLead) => React.ReactNode
+): React.ReactNode {
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={7} className='py-8 text-center text-secondary-token'>
+          <LoadingSpinner size='sm' tone='muted' className='mx-auto' />
+        </td>
+      </tr>
+    );
+  }
+  if (leads.length === 0) {
+    return (
+      <tr>
+        <td colSpan={7} className='py-8 text-center text-secondary-token'>
+          No leads pending review
+        </td>
+      </tr>
+    );
+  }
+  return leads.map(renderRow);
+}
+
 export default function AdminOutreachReviewPage() {
   const [leads, setLeads] = useState<ReviewLead[]>([]);
   const [total, setTotal] = useState(0);
@@ -114,101 +140,77 @@ export default function AdminOutreachReviewPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className='py-8 text-center text-secondary-token'
-                  >
-                    <LoadingSpinner
-                      size='sm'
-                      tone='muted'
-                      className='mx-auto'
-                    />
+              {renderReviewRows(loading, leads, lead => (
+                <tr
+                  key={lead.id}
+                  className='border-b border-subtle hover:bg-white/[0.03]'
+                >
+                  <td className='py-2.5 pr-3'>
+                    <span className='font-medium text-primary-token'>
+                      {lead.displayName || '-'}
+                    </span>
                   </td>
-                </tr>
-              ) : leads.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className='py-8 text-center text-secondary-token'
-                  >
-                    No leads pending review
+                  <td className='py-2.5 pr-3 tabular-nums'>
+                    {lead.priorityScore ?? '-'}
                   </td>
-                </tr>
-              ) : (
-                leads.map(lead => (
-                  <tr
-                    key={lead.id}
-                    className='border-b border-subtle hover:bg-white/[0.03]'
-                  >
-                    <td className='py-2.5 pr-3'>
-                      <span className='font-medium text-primary-token'>
-                        {lead.displayName || '-'}
-                      </span>
-                    </td>
-                    <td className='py-2.5 pr-3 tabular-nums'>
-                      {lead.priorityScore ?? '-'}
-                    </td>
-                    <td className='py-2.5 pr-3 tabular-nums'>
-                      {lead.fitScore ?? '-'}
-                    </td>
-                    <td className='py-2.5 pr-3 text-secondary-token'>
-                      {lead.contactEmail || '-'}
-                    </td>
-                    <td className='py-2.5 pr-3'>
-                      {lead.instagramHandle ? (
-                        <a
-                          href={`https://instagram.com/${lead.instagramHandle}`}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-                        >
-                          @{lead.instagramHandle}
-                          <ExternalLink className='size-3' />
-                        </a>
-                      ) : (
-                        <span className='text-tertiary-token'>-</span>
-                      )}
-                    </td>
-                    <td className='py-2.5 pr-3'>
-                      <div className='flex flex-wrap gap-1'>
-                        {lead.signals &&
-                          Object.entries(lead.signals).map(
-                            ([key, value]) =>
-                              value &&
-                              SIGNAL_CONFIG[key] && (
-                                <Badge
-                                  key={key}
-                                  variant={SIGNAL_CONFIG[key].variant}
-                                  className='text-2xs'
-                                >
-                                  {SIGNAL_CONFIG[key].label}
-                                </Badge>
-                              )
-                          )}
-                      </div>
-                    </td>
-                    <td className='py-2.5'>
-                      <Button
-                        variant='outline'
-                        size='sm'
-                        onClick={() => void handleSkip(lead.id)}
-                        disabled={skippingId === lead.id}
+                  <td className='py-2.5 pr-3 tabular-nums'>
+                    {lead.fitScore ?? '-'}
+                  </td>
+                  <td className='py-2.5 pr-3 text-secondary-token'>
+                    {lead.contactEmail || '-'}
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    {lead.instagramHandle ? (
+                      <a
+                        href={`https://instagram.com/${lead.instagramHandle}`}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
                       >
-                        {skippingId === lead.id ? (
-                          <LoadingSpinner
-                            size='sm'
-                            tone='muted'
-                            className='mr-1.5'
-                          />
-                        ) : null}
-                        Skip
-                      </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
+                        @{lead.instagramHandle}
+                        <ExternalLink className='size-3' />
+                      </a>
+                    ) : (
+                      <span className='text-tertiary-token'>-</span>
+                    )}
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    <div className='flex flex-wrap gap-1'>
+                      {lead.signals &&
+                        Object.entries(lead.signals).map(
+                          ([key, value]) =>
+                            value &&
+                            SIGNAL_CONFIG[key] && (
+                              <Badge
+                                key={key}
+                                variant={SIGNAL_CONFIG[key].variant}
+                                className='text-2xs'
+                              >
+                                {SIGNAL_CONFIG[key].label}
+                              </Badge>
+                            )
+                        )}
+                    </div>
+                  </td>
+                  <td className='py-2.5'>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => void handleSkip(lead.id)}
+                      disabled={skippingId === lead.id}
+                    >
+                      {skippingId === lead.id ? (
+                        <LoadingSpinner
+                          size='sm'
+                          tone='muted'
+                          className='mr-1.5'
+                        />
+                      ) : null}
+                      Skip
+                    </Button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
