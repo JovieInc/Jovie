@@ -93,13 +93,23 @@ export function PricingSection() {
 
             {/* Founding Member tier */}
             <div
-              className='relative rounded-xl p-8 flex flex-col'
+              className='relative rounded-xl p-8 flex flex-col overflow-hidden'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                border: '1px solid var(--linear-border-default)',
-                boxShadow: 'var(--linear-shadow-card-elevated)',
+                border: '1px solid rgba(94,106,210,0.4)',
+                boxShadow:
+                  'var(--linear-shadow-card-elevated), 0 0 0 1px rgba(94,106,210,0.15)',
               }}
             >
+              {/* Top accent bar */}
+              <div
+                aria-hidden='true'
+                className='absolute inset-x-0 top-0 h-px'
+                style={{
+                  background:
+                    'linear-gradient(90deg, transparent, #5e6ad2 40%, #5e6ad2 60%, transparent)',
+                }}
+              />
               {/* Badge */}
               <div className='flex items-center justify-between'>
                 <p className='text-[13px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
