@@ -4,3 +4,7 @@ export const DEFAULT_DM_TEMPLATE =
 export const LEAD_QUALIFICATION_CONCURRENCY = 3;
 
 export const LINKTREE_FETCH_DELAY_MS = 1000;
+
+export const GOOGLE_CSE_TIMEOUT_MS = 8_000;
+export const GOOGLE_CSE_MAX_RETRIES = 2;
+export const GOOGLE_CSE_RETRY_BASE_DELAY_MS = 500;

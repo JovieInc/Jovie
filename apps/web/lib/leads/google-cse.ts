@@ -1,4 +1,9 @@
 import { captureError } from '@/lib/error-tracking';
+import {
+  GOOGLE_CSE_MAX_RETRIES,
+  GOOGLE_CSE_RETRY_BASE_DELAY_MS,
+  GOOGLE_CSE_TIMEOUT_MS,
+} from './constants';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
 export interface GoogleCSEResult {
@@ -46,36 +51,111 @@ export async function searchGoogleCSE(
   url.searchParams.set('start', String(startIndex));
   url.searchParams.set('num', '10');
 
-  const response = await fetch(url.toString());
-  const data = (await response.json()) as GoogleCSEResponse;
+  const lastAttempt = GOOGLE_CSE_MAX_RETRIES + 1;
 
-  if (!response.ok || data.error) {
-    const code = data.error?.code ?? response.status;
-    const message = data.error?.message ?? response.statusText;
+  for (let attempt = 1; attempt <= lastAttempt; attempt++) {
+    const isLastAttempt = attempt === lastAttempt;
 
-    // 429 = quota exceeded — not an error, just budget exhausted
-    if (code === 429) {
-      pipelineWarn('discovery', 'Google CSE quota exhausted (429)', { query });
+    try {
+      const data = await fetchGoogleCSEWithTimeout(url.toString());
+
+      if (data.error) {
+        const code = data.error.code;
+        const message = data.error.message;
+
+        // 429 = quota exceeded — not an error, just budget exhausted
+        if (code === 429) {
+          pipelineWarn('discovery', 'Google CSE quota exhausted (429)', {
+            query,
+            attempt,
+          });
+          return [];
+        }
+
+        if (isRetryableStatus(code) && !isLastAttempt) {
+          await sleep(calculateRetryDelayMs(attempt));
+          continue;
+        }
+
+        await captureError('Google CSE API error', new Error(message), {
+          route: 'leads/google-cse',
+          contextData: { code, query, startIndex, attempt },
+        });
+        return [];
+      }
+
+      const results = (data.items ?? []).map(item => ({
+        link: item.link,
+        title: item.title,
+        snippet: item.snippet,
+      }));
+
+      pipelineLog('discovery', 'CSE search complete', {
+        query,
+        resultCount: results.length,
+      });
+
+      return results;
+    } catch (error) {
+      if (!isLastAttempt) {
+        await sleep(calculateRetryDelayMs(attempt));
+        continue;
+      }
+
+      await captureError('Google CSE request failed', error, {
+        route: 'leads/google-cse',
+        contextData: {
+          query,
+          startIndex,
+          attempts: attempt,
+        },
+      });
       return [];
     }
-
-    await captureError('Google CSE API error', new Error(message), {
-      route: 'leads/google-cse',
-      contextData: { code, query, startIndex },
-    });
-    return [];
   }
 
-  const results = (data.items ?? []).map(item => ({
-    link: item.link,
-    title: item.title,
-    snippet: item.snippet,
-  }));
+  return [];
+}
 
-  pipelineLog('discovery', 'CSE search complete', {
-    query,
-    resultCount: results.length,
-  });
+function isRetryableStatus(statusCode: number): boolean {
+  return statusCode === 408 || statusCode === 429 || statusCode >= 500;
+}
 
-  return results;
+function calculateRetryDelayMs(attempt: number): number {
+  return GOOGLE_CSE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
+}
+
+async function fetchGoogleCSEWithTimeout(
+  url: string
+): Promise<GoogleCSEResponse> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GOOGLE_CSE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    const data = (await response.json()) as GoogleCSEResponse;
+
+    if (!response.ok && !data.error) {
+      data.error = {
+        code: response.status,
+        message: response.statusText || 'Google CSE request failed',
+      };
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(
+        `Google CSE request timed out after ${GOOGLE_CSE_TIMEOUT_MS}ms`
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
 }
