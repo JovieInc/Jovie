@@ -47,10 +47,8 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
 
   // Warmup pre-compiles this route in global-setup.ts
   // 180s handles cold start under parallel test load (SSR render ~7s + compilation overhead)
-  let navigated = false;
   try {
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 150_000 });
-    navigated = true;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
@@ -64,7 +62,7 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
   }
 
   const currentUrl = page.url();
-  if (!navigated || isClerkRedirect(currentUrl)) {
+  if (isClerkRedirect(currentUrl)) {
     test.skip(true, 'Clerk handshake redirect in CI');
     return;
   }
