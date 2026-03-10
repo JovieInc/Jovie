@@ -3,8 +3,9 @@ import { expect, test } from '@playwright/test';
 /**
  * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
  *
- * Tests as an ANONYMOUS VISITOR. No auth. No API mocks except analytics.
- * Every assertion would FAIL if the corresponding user experience is broken.
+ * Tests as an ANONYMOUS VISITOR. No auth. No API mocks except analytics fire-and-forget.
+ *
+ * Each test would FAIL if the corresponding user experience is broken.
  * No warnings-instead-of-failures. No theater.
  *
  * Run headed to visually verify:
@@ -39,98 +40,22 @@ function isClerkRedirect(url: string): boolean {
 // HOMEPAGE
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('homepage loads with hero heading, CTA, sections, and footer', async ({
+test('homepage: hero heading, CTA, multiple sections, footer', async ({
   page,
 }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(120_000);
   await blockAnalytics(page);
 
-  // Warmup pre-compiles this route in global-setup.ts
-  // 180s handles cold start under parallel test load (SSR render ~7s + compilation overhead)
-  try {
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 150_000 });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
-      test.skip(
-        true,
-        'Homepage timed out under parallel test load — transient'
-      );
-      return;
-    }
-    throw e;
-  }
+  // Warmup pre-compiles this route — 120s timeout handles cold-start on first run
+  await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120_000 });
 
-  const currentUrl = page.url();
-  if (isClerkRedirect(currentUrl)) {
+  if (isClerkRedirect(page.url())) {
     test.skip(true, 'Clerk handshake redirect in CI');
     return;
   }
 
-  // If the page redirected away from / (e.g. Clerk dev-browser loop), skip
-  if (
-    !currentUrl.includes('localhost') &&
-    !currentUrl.startsWith('http://localhost')
-  ) {
-    test.skip(true, `Redirected to external URL: ${currentUrl}`);
-    return;
-  }
-
-  // Wait for page to have meaningful content (h1 or any loading indicator)
-  // Under parallel load the page may render a Clerk loading state first
-  await page
-    .waitForSelector('h1, main[class], [data-clerk-loaded], footer', {
-      timeout: 60_000,
-    })
-    .catch(() => null);
-
-  // If still showing Clerk dev-browser state, skip
-  const afterWaitText =
-    (await page
-      .locator('body')
-      .innerText()
-      .catch(() => '')) ?? '';
-  if (
-    afterWaitText.toLowerCase().includes('loading') &&
-    afterWaitText.trim().length < 100
-  ) {
-    test.skip(
-      true,
-      'Homepage showing Clerk loading state under parallel test load'
-    );
-    return;
-  }
-
   // h1 must be visible — if missing, the hero is broken
-  const h1Visible = await page
-    .locator('h1')
-    .first()
-    .isVisible({ timeout: 30_000 })
-    .catch(() => false);
-
-  if (!h1Visible) {
-    // Check if this is a Clerk or infrastructure issue (not app bug)
-    const bodyNow =
-      (await page
-        .locator('body')
-        .innerText()
-        .catch(() => '')) ?? '';
-    if (
-      bodyNow.toLowerCase().includes('clerk') ||
-      bodyNow.trim().length < 200
-    ) {
-      test.skip(
-        true,
-        'Homepage not rendering app content — likely Clerk parallel load issue'
-      );
-      return;
-    }
-    // Real failure: page loaded real content but no h1
-    expect(h1Visible, 'Homepage h1 not visible — hero heading is missing').toBe(
-      true
-    );
-    return;
-  }
+  await expect(page.locator('h1').first()).toBeVisible({ timeout: 30_000 });
 
   // CTA must be present — if no signup entry point, users can't convert
   const cta = page
@@ -140,17 +65,17 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  // At least 2 sections — proves page rendered beyond just the shell
+  // At least 2 sections — proves the page rendered beyond just the shell
   const sectionCount = await page.locator('section').count();
   expect(
     sectionCount,
     'Homepage missing sections — page may be blank'
   ).toBeGreaterThanOrEqual(2);
 
-  // Footer — proves the full page loaded
+  // Footer — proves the full page loaded (not a loading skeleton)
   await expect(page.locator('footer').first()).toBeVisible({ timeout: 20_000 });
 
-  // No error text
+  // No error text in visible content
   const bodyText =
     (await page
       .locator('body')
@@ -161,15 +86,21 @@ test('homepage loads with hero heading, CTA, sections, and footer', async ({
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC PROFILE EXPERIENCE — core fan journey
+// PUBLIC PROFILE EXPERIENCE
+// Anonymous visitor hits a profile. This is the primary user journey for fans.
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('Public Profile', () => {
+test.describe('Public Profile — dualipa', () => {
   const TEST_PROFILE = 'dualipa';
 
-  test('profile page shows artist name and DSP links', async ({ page }) => {
-    test.setTimeout(90_000);
+  test.beforeEach(async ({ page }) => {
     await blockAnalytics(page);
+  });
+
+  test('default view: artist name in h1, profile identity link, claim banner', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}`, {
       waitUntil: 'domcontentloaded',
@@ -182,10 +113,9 @@ test.describe('Public Profile', () => {
         .locator('body')
         .innerText()
         .catch(() => '')) ?? '';
-    const lower = bodyText.toLowerCase();
     if (
-      lower.includes('not found') ||
-      lower.includes('temporarily unavailable')
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
     ) {
       test.fail(
         true,
@@ -198,20 +128,17 @@ test.describe('Public Profile', () => {
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
 
-    // Profile image must be visible — empty profile means the avatar pipeline is broken
-    // (DSP links are shown only in listen mode — tested separately)
-    const profileImage = page.locator(
-      'img[alt*="avatar"], img[alt*="Dua"], img[alt*="profile"], [data-testid="profile-avatar"], img'
-    );
+    // Claim CTA and profile identity link must both render for anonymous visitors.
     await expect(
-      profileImage.first(),
-      'Profile has no image — avatar pipeline or SSR is broken'
-    ).toBeVisible({ timeout: 20_000 });
+      page.getByRole('link', { name: /claim profile for dua lipa/i })
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole('link', { name: /go to dua lipa's profile/i })
+    ).toBeVisible({ timeout: 15_000 });
   });
 
-  test('profile listen mode renders DSP options', async ({ page }) => {
+  test('listen mode: DSP streaming links render', async ({ page }) => {
     test.setTimeout(90_000);
-    await blockAnalytics(page);
 
     await page.goto(`/${TEST_PROFILE}?mode=listen`, {
       waitUntil: 'domcontentloaded',
@@ -223,33 +150,65 @@ test.describe('Public Profile', () => {
         .locator('body')
         .innerText()
         .catch(() => '')) ?? '';
-    const lower = bodyText.toLowerCase();
-    if (lower.includes('not found') || lower.includes('temporarily')) {
+    if (
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
+    ) {
       test.skip(true, 'Profile not seeded');
       return;
     }
 
-    // h1 proves the profile loaded, not just the shell
+    // h1 with artist name proves the profile loaded, not just the shell
     await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
     await expect(page.locator('h1').first()).toContainText(/dua lipa/i);
 
-    // DSP links must render — this IS listen mode's purpose
-    // 30s timeout handles SSR under parallel test load
+    // DSP buttons must render — this is the entire point of listen mode
+    // If Spotify seeding worked, there must be at least one DSP link
+    const dspLink = page.locator(
+      'a[href*="spotify"], a[href*="apple"], a[href*="tidal"], button:has-text("Spotify"), button:has-text("Apple Music")'
+    );
     await expect(
-      page
-        .locator(
-          'a[href*="spotify"], a[href*="apple"], button:has-text("Spotify"), button:has-text("Apple Music")'
-        )
-        .first(),
-      'No DSP links in listen mode — Spotify seeding failed or rendering is broken'
-    ).toBeVisible({ timeout: 30_000 });
+      dspLink.first(),
+      'No DSP links in listen mode — Spotify seeding failed or DSP rendering is broken'
+    ).toBeVisible({ timeout: 20_000 });
   });
 
-  test('profile subpages (/subscribe, /tip, /tour) load without 500', async ({
-    page,
-  }) => {
+  test('tip mode: tipping UI renders', async ({ page }) => {
+    test.setTimeout(90_000);
+
+    await page.goto(`/${TEST_PROFILE}?mode=tip`, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+    if (
+      bodyText.toLowerCase().includes('not found') ||
+      bodyText.toLowerCase().includes('temporarily unavailable')
+    ) {
+      test.skip(true, 'Profile not seeded');
+      return;
+    }
+
+    // h1 present
+    await expect(page.locator('h1').first()).toBeVisible({ timeout: 20_000 });
+
+    // Tipping UI or subscribe prompt — something actionable must render
+    const tipUI = page.locator(
+      '[data-testid="tip-button"], [data-testid="tip-form"], button:has-text("Tip"), button:has-text("Support"), input[placeholder*="amount"], a[href*="subscribe"]'
+    );
+    await expect(
+      tipUI.first(),
+      'No tipping UI rendered — tipping flow is broken for this profile'
+    ).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('profile subpages return 2xx, no 500s', async ({ page }) => {
     test.setTimeout(120_000);
-    await blockAnalytics(page);
 
     const subpages = ['/subscribe', '/tip', '/tour'] as const;
 
@@ -266,10 +225,9 @@ test.describe('Public Profile', () => {
         if (
           msg.includes('net::ERR_CONNECTION_REFUSED') ||
           msg.includes('net::ERR_CONNECTION_RESET') ||
-          msg.includes('Timeout') ||
           msg.includes('Target closed')
         ) {
-          test.skip(true, `Transient nav error on /${TEST_PROFILE}${sub}`);
+          test.skip(true, `Server went away navigating to ${sub}`);
           return;
         }
         throw navError;
@@ -288,9 +246,6 @@ test.describe('Public Profile', () => {
           .catch(() => '')) ?? '';
       const lower = bodyText.toLowerCase();
       // 404 is OK (profile may not support this subpage), 500 is not
-      if (lower.includes('not found') || lower.includes('temporarily')) {
-        continue;
-      }
       expect(lower).not.toContain('application error');
       expect(lower).not.toContain('internal server error');
       expect(lower).not.toContain('unhandled runtime error');
@@ -299,36 +254,26 @@ test.describe('Public Profile', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CRITICAL PUBLIC PAGES
+// SIGNIN / SIGNUP — critical conversion pages
 // ─────────────────────────────────────────────────────────────────────────────
 
-test('signin and signup pages load without server errors', async ({ page }) => {
-  test.setTimeout(120_000);
+test('signin and signup pages load', async ({ page }) => {
   await blockAnalytics(page);
 
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   if (!pk || pk.includes('mock') || pk.includes('dummy')) {
-    test.skip(true, 'No real Clerk config');
+    test.skip(true, 'No real Clerk config — skipping auth page tests');
     return;
   }
 
   for (const route of ['/signin', '/sign-up']) {
-    let response: Awaited<ReturnType<typeof page.goto>>;
-    try {
-      response = await page.goto(route, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
-        test.skip(true, `Server too slow for ${route} under parallel load`);
-        return;
-      }
-      throw e;
-    }
+    const response = await page.goto(route, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
     expect(response?.status() ?? 0, `${route} returned 5xx`).toBeLessThan(500);
 
+    // Something must render — empty page = broken Clerk integration
     const bodyText = await page.locator('body').textContent();
     expect(
       bodyText?.trim().length,
@@ -337,28 +282,21 @@ test('signin and signup pages load without server errors', async ({ page }) => {
   }
 });
 
-test('non-existent routes return 404, not 500', async ({ page }) => {
-  test.setTimeout(120_000);
+// ─────────────────────────────────────────────────────────────────────────────
+// ERROR HANDLING — unknown routes must not 500
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('unknown routes return <500, not server crash', async ({ page }) => {
   await blockAnalytics(page);
 
   for (const route of [
     '/nonexistent-handle-xyz-123',
     '/non-existent-route-456',
   ]) {
-    let response: Awaited<ReturnType<typeof page.goto>>;
-    try {
-      response = await page.goto(route, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
-        test.skip(true, `Server too slow for ${route} — transient`);
-        return;
-      }
-      throw e;
-    }
+    const response = await page.goto(route, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
 
     const status = response?.status() ?? 0;
     expect(
