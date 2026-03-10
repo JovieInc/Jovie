@@ -4,6 +4,7 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -81,9 +82,9 @@ async function applySessionUserId(userId: string): Promise<void> {
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
  *
- * Note: Since we use the Neon WebSocket driver, db.transaction() is fully
- * supported and is the recommended way to ensure session setup and queries
- * execute on the same stateful connection.
+ * Uses session-scoped `set_config` calls and retry logic.
+ * Avoid introducing new transaction usage in app code; keep legacy
+ * transaction wrappers isolated in `lib/db/legacy-transaction.ts`.
  */
 export async function setupDbSession(clerkUserId?: string) {
   let userId: string;
@@ -153,9 +154,9 @@ export async function withDbSessionTx<T>(
 ): Promise<T> {
   const userId = await resolveClerkUserId(options?.clerkUserId);
 
-  // Since we use the Neon WebSocket driver, we can use db.transaction()
-  // to ensure session setup and queries execute on the same stateful connection.
-  return db.transaction(
+  // Legacy exception: this path still requires transaction-scoped session state.
+  // Keep usage centralized through runLegacyDbTransaction for auditability.
+  return runLegacyDbTransaction(
     async tx => {
       // Set the session variable within the transaction
       try {

@@ -2,13 +2,15 @@ import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { type IsolationLevel, validateClerkUserId } from '@/lib/auth/session';
-import { type DbOrTransaction, db } from '@/lib/db';
+import { type DbOrTransaction } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 
 export const SYSTEM_INGESTION_USER = 'system_ingestion';
 
 /**
  * Execute an operation with system ingestion session context.
- * Uses a transaction to ensure session state is maintained across queries.
+ * Uses the centralized legacy transaction wrapper to preserve behavior while
+ * preventing direct app-level transaction calls from spreading.
  */
 export async function withSystemIngestionSession<T>(
   operation: (tx: DbOrTransaction) => Promise<T>,
@@ -16,7 +18,7 @@ export async function withSystemIngestionSession<T>(
 ): Promise<T> {
   validateClerkUserId(SYSTEM_INGESTION_USER);
 
-  return db.transaction(
+  return runLegacyDbTransaction(
     async tx => {
       // Set the session variable within the transaction
       try {
