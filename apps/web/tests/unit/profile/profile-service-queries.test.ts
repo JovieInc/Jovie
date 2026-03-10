@@ -247,6 +247,7 @@ describe('Profile Service Queries', () => {
 
       expect(mockCaptureWarning).toHaveBeenCalledWith(
         '[profile-service] MAX_SOCIAL_LINKS limit hit',
+        undefined,
         expect.objectContaining({ profileId: 'profile-123', count: 100 })
       );
     });
@@ -446,7 +447,7 @@ describe('Profile Service Queries', () => {
       expect(result).toBeTruthy();
       expect(mockCaptureWarning).toHaveBeenCalledWith(
         '[profile-service] Redis cache read failed',
-        expect.any(Object)
+        expect.any(Error)
       );
     });
   });
