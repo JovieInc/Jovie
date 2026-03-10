@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
   captureMessage: vi.fn(),
+  getClient: vi.fn(() => undefined),
   startSpan: vi.fn((_, callback) => callback({ setAttribute: vi.fn() })),
 }));
 

@@ -4,7 +4,6 @@ import { Button, CommonDropdown, Label, SegmentControl } from '@jovie/ui';
 import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
   type PreviewPanelLink,
@@ -13,10 +12,7 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
-import {
-  DrawerAsyncToggle,
-  EntitySidebarShell,
-} from '@/components/molecules/drawer';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import {
   useAvatarMutation,
@@ -334,23 +330,9 @@ export function ProfileContactSidebar() {
     },
   });
 
-  const photoSettingsFooter =
-    resolvedCategory !== 'about' ? (
-      <DrawerAsyncToggle
-        label='Photo downloads'
-        ariaLabel='Allow profile photo downloads on public pages'
-        checked={
-          (selectedProfile?.settings as Record<string, unknown> | null)
-            ?.allowProfilePhotoDownloads === true
-        }
-        onToggle={updateAllowProfilePhotoDownloads}
-        successMessage={on =>
-          on
-            ? 'Photo downloads enabled for visitors'
-            : 'Photo downloads disabled'
-        }
-      />
-    ) : undefined;
+  const allowPhotoDownloads =
+    (selectedProfile?.settings as Record<string, unknown> | null)
+      ?.allowProfilePhotoDownloads === true;
 
   return (
     <EntitySidebarShell
@@ -442,10 +424,13 @@ export function ProfileContactSidebar() {
           </div>
         </div>
       }
-      footer={photoSettingsFooter}
     >
       {resolvedCategory === 'about' ? (
-        <ProfileAboutTab bio={bio} genres={genres} />
+        <ProfileAboutTab
+          bio={bio}
+          genres={genres}
+          allowPhotoDownloads={allowPhotoDownloads}
+        />
       ) : (
         <>
           <ProfileLinkList

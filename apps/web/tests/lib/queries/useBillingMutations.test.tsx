@@ -24,6 +24,7 @@ vi.mock('sonner', () => ({
 
 // Mock Sentry (used by handleMutationError)
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   addBreadcrumb: vi.fn(),
 }));

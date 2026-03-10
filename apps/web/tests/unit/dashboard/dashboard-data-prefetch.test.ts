@@ -64,6 +64,7 @@ vi.mock('react', async () => {
 });
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   logger: {
     error: vi.fn(),

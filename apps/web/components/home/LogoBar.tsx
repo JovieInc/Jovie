@@ -2,7 +2,6 @@ import {
   ArmadaMusicLogo,
   AwalLogo,
   BlackHoleRecordingsLogo,
-  DiscoWaxLogo,
   TheOrchardLogo,
   UniversalMusicGroupLogo,
 } from './label-logos';
@@ -34,12 +33,11 @@ export function LogoBar() {
               'inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 40px rgba(0,0,0,0.18)',
           }}
         >
-          <AwalLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
           <UniversalMusicGroupLogo className='h-[10px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[12px]' />
+          <AwalLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
           <TheOrchardLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
           <ArmadaMusicLogo className='h-[12px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[14px]' />
           <BlackHoleRecordingsLogo className='h-[11px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-65 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-90 sm:h-[12px]' />
-          <DiscoWaxLogo className='h-[11px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-65 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-90 sm:h-[12px]' />
         </div>
       </div>
     </section>

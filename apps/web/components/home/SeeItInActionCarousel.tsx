@@ -22,7 +22,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
             See it in action
           </h2>
           <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
-            Real profiles, real artists. See how creators use Jovie.
+            Real profiles, real artists. See how artists use Jovie.
           </p>
         </div>
 
@@ -63,7 +63,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
                   color: 'var(--linear-text-secondary)',
                 }}
               >
-                View Profile
+                Visit their page
               </span>
             </Link>
           ))}

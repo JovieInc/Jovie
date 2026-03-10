@@ -113,6 +113,7 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: (...args: any[]) => mockCaptureException(...args),
 }));
 
@@ -351,7 +352,7 @@ describe('Dashboard API contracts', () => {
 
       expectStatusOk(response, body);
       expect(body).toMatchObject({
-        total: 1,
+        total: null,
         rows: [
           expect.objectContaining({
             id: 'member_1',
@@ -406,6 +407,7 @@ describe('Dashboard API contracts', () => {
       expectStatusOk(response, body);
       expect(body).toEqual({
         total: 1,
+        nextCursor: null,
         rows: [
           {
             id: 'sub_1',

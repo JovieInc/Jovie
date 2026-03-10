@@ -1,14 +1,23 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { DrawerSection } from '@/components/molecules/drawer';
+import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
+import {
+  DrawerAsyncToggle,
+  DrawerSection,
+} from '@/components/molecules/drawer';
 
 interface ProfileAboutTabProps {
   readonly bio: string | null;
   readonly genres: string[] | null;
+  readonly allowPhotoDownloads: boolean;
 }
 
-export function ProfileAboutTab({ bio, genres }: ProfileAboutTabProps) {
+export function ProfileAboutTab({
+  bio,
+  genres,
+  allowPhotoDownloads,
+}: ProfileAboutTabProps) {
   const hasGenres = genres && genres.length > 0;
 
   return (
@@ -39,6 +48,20 @@ export function ProfileAboutTab({ bio, genres }: ProfileAboutTabProps) {
             Auto-detected from your music connections.
           </p>
         )}
+      </DrawerSection>
+
+      <DrawerSection title='Settings'>
+        <DrawerAsyncToggle
+          label='Photo downloads'
+          ariaLabel='Allow profile photo downloads on public pages'
+          checked={allowPhotoDownloads}
+          onToggle={updateAllowProfilePhotoDownloads}
+          successMessage={on =>
+            on
+              ? 'Photo downloads enabled for visitors'
+              : 'Photo downloads disabled'
+          }
+        />
       </DrawerSection>
     </div>
   );

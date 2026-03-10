@@ -119,7 +119,7 @@ export function AudienceCRMSection() {
                 platform tax.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                Built-in fan CRM
+                Fan list with contacts & history
               </span>
             </div>
           </div>

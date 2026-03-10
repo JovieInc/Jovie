@@ -61,8 +61,8 @@ export function FinalCTASection() {
             className='mt-5 max-w-md marketing-lead-linear'
             style={{ color: 'rgba(255,255,255,0.5)' }}
           >
-            Claim your handle, launch your page, and start collecting the
-            audience data every other profile page leaves behind.
+            Claim your handle, launch your page, and finally own the data other
+            platforms keep from you.
           </p>
 
           {/* Form */}

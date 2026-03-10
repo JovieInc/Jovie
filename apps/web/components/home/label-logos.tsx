@@ -116,27 +116,37 @@ export function TheOrchardLogo(props: React.SVGProps<SVGSVGElement>) {
 }
 
 /**
- * Black Hole Recordings — wordmark
+ * Black Hole Recordings — 4-arm galaxy spiral mark + wordmark
+ * Spiral: 4 filled teardrop arms rotated 90° apart, tapered inward
  */
 export function BlackHoleRecordingsLogo(props: React.SVGProps<SVGSVGElement>) {
+  // One arm shape: tip at top, outer edge sweeps clockwise, narrows to center
+  const arm =
+    'M8,1.2 C12,1.2 14.8,4.2 13.2,7.4 C12,9.2 9.8,9.5 8,8 C7.4,6.8 7.4,3.8 8,1.2 Z';
   return (
     <svg
       xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 160 14'
+      viewBox='0 0 108 16'
       fill='currentColor'
       aria-label='Black Hole Recordings'
       {...props}
     >
       <title>Black Hole Recordings</title>
+
+      {/* 4-arm galaxy spiral — arms meet and merge at center naturally */}
+      <path d={arm} />
+      <path d={arm} transform='rotate(90 8 8)' />
+      <path d={arm} transform='rotate(180 8 8)' />
+      <path d={arm} transform='rotate(270 8 8)' />
+
+      {/* Wordmark */}
       <text
-        x='0'
-        y='11'
+        x='21'
+        y='12'
         fontFamily='system-ui, -apple-system, Arial, sans-serif'
-        fontSize='10'
-        fontWeight='600'
-        letterSpacing='1.8'
-        textLength='155'
-        lengthAdjust='spacing'
+        fontSize='9'
+        fontWeight='700'
+        letterSpacing='1.4'
       >
         BLACK HOLE
       </text>

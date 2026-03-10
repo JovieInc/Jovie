@@ -4,9 +4,7 @@ import { Check, Zap } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import { Container } from '@/components/site/Container';
-import { PhoneFrame } from './PhoneFrame';
 
 /* ------------------------------------------------------------------ */
 /*  Mock release data — 3 Tim White releases                           */
@@ -46,20 +44,134 @@ const RELEASES = [
 ] as const;
 
 const SMART_LINK_DSPS = [
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'amazon_music',
+  { key: 'spotify', label: 'Spotify' },
+  { key: 'apple_music', label: 'Apple Music' },
+  { key: 'youtube_music', label: 'YouTube Music' },
+  { key: 'amazon_music', label: 'Amazon Music' },
 ] as const;
 
 /* ------------------------------------------------------------------ */
-/*  Dashboard mockup                                                   */
+/*  Floating smart link card — mirrors the actual jov.ie page style   */
 /* ------------------------------------------------------------------ */
 
-function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
+function SmartLinkCard({
+  release,
+}: {
+  readonly release: (typeof RELEASES)[number];
+}) {
   return (
     <div
-      className='relative overflow-hidden rounded-xl md:rounded-2xl'
+      className='w-64 overflow-hidden rounded-2xl'
+      style={{
+        backgroundColor: 'oklch(14% 0.003 260)',
+        border: '1px solid rgba(255,255,255,0.09)',
+        boxShadow:
+          '0 24px 64px rgba(0,0,0,0.6), 0 6px 20px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04)',
+      }}
+    >
+      {/* Mini browser chrome */}
+      <div
+        className='flex items-center gap-2 px-3 py-2'
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}
+      >
+        <div className='flex shrink-0 gap-1'>
+          <div className='h-2 w-2 rounded-full bg-[#ED6A5E]' />
+          <div className='h-2 w-2 rounded-full bg-[#F4BF4F]' />
+          <div className='h-2 w-2 rounded-full bg-[#61C554]' />
+        </div>
+        <span className='flex-1 truncate text-center font-mono text-[9px] text-[var(--linear-text-quaternary)]'>
+          jov.ie/{release.slug}
+        </span>
+      </div>
+
+      {/* Artwork — square, fills width */}
+      <div className='px-4 pt-4 pb-3'>
+        <div
+          className='relative w-full overflow-hidden rounded-xl'
+          style={{
+            aspectRatio: '1 / 1',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
+        >
+          <Image
+            src={release.artwork}
+            alt={release.title}
+            fill
+            className='object-cover'
+            sizes='232px'
+          />
+        </div>
+      </div>
+
+      {/* Title + artist */}
+      <div className='px-4 pb-3 text-center'>
+        <p className='text-[13px] font-semibold leading-tight text-[var(--linear-text-primary)]'>
+          {release.title}
+        </p>
+        <p className='mt-0.5 text-[11px] text-[var(--linear-text-tertiary)]'>
+          {release.artist}
+        </p>
+      </div>
+
+      {/* DSP buttons — match SmartLinkProviderButton visual style */}
+      <div className='flex flex-col gap-1.5 px-3 pb-4'>
+        {SMART_LINK_DSPS.map(({ key, label }) => {
+          const config = DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG];
+          if (!config) return null;
+          return (
+            <div
+              key={key}
+              className='flex items-center gap-2.5 rounded-xl px-3 py-2'
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
+              }}
+            >
+              <svg
+                viewBox='0 0 24 24'
+                fill='currentColor'
+                className='h-4 w-4 shrink-0 text-[var(--linear-text-tertiary)]'
+                aria-hidden='true'
+              >
+                <path d={config.iconPath} />
+              </svg>
+              <span className='flex-1 text-[11px] font-semibold text-[var(--linear-text-primary)]'>
+                {label}
+              </span>
+              <svg
+                viewBox='0 0 24 24'
+                fill='none'
+                stroke='currentColor'
+                strokeWidth='2'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                className='h-3 w-3 text-[var(--linear-text-quaternary)]'
+                aria-hidden='true'
+              >
+                <path d='m9 18 6-6-6-6' />
+              </svg>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Dashboard mockup — full width with floating smart link overlay     */
+/* ------------------------------------------------------------------ */
+
+function DashboardMockup({
+  activeIndex,
+  release,
+}: {
+  readonly activeIndex: number;
+  readonly release: (typeof RELEASES)[number];
+}) {
+  return (
+    <div
+      className='relative overflow-visible rounded-xl md:rounded-2xl'
       style={{
         border: '1px solid var(--linear-border-subtle)',
         backgroundColor: 'var(--linear-bg-surface-0)',
@@ -73,7 +185,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
       {/* Top edge highlight */}
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
+        className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px rounded-t-2xl'
         style={{
           background:
             'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
@@ -81,7 +193,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
       />
 
       {/* Mac window chrome */}
-      <div className='flex items-center px-5 h-11 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
+      <div className='flex items-center px-5 h-11 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] rounded-t-xl md:rounded-t-2xl'>
         <div className='flex gap-2'>
           <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
           <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
@@ -108,11 +220,11 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       {/* Release rows */}
-      {RELEASES.map((release, i) => {
+      {RELEASES.map((r, i) => {
         const isActive = i === activeIndex;
         return (
           <div
-            key={release.id}
+            key={r.id}
             className='grid grid-cols-[auto_1fr_auto] gap-4 items-center px-5 py-3 transition-colors duration-300'
             style={{
               backgroundColor: isActive
@@ -127,8 +239,8 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
             {/* Artwork */}
             <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
               <Image
-                src={release.artwork}
-                alt={release.title}
+                src={r.artwork}
+                alt={r.title}
                 fill
                 className='object-cover'
                 sizes='40px'
@@ -139,16 +251,16 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
             <div className='min-w-0'>
               <div className='flex items-center gap-2'>
                 <p className='truncate text-[13px] font-medium text-[var(--linear-text-primary)]'>
-                  {release.title}
+                  {r.title}
                 </p>
-                {release.isNew && (
+                {r.isNew && (
                   <span className='shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-400'>
                     New
                   </span>
                 )}
               </div>
               <p className='text-[11px] text-[var(--linear-text-tertiary)]'>
-                {release.type} · {release.year}
+                {r.type} · {r.year}
               </p>
             </div>
 
@@ -185,103 +297,28 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
                     : 'var(--linear-text-tertiary)',
                 }}
               >
-                jov.ie/{release.slug}
+                jov.ie/{r.slug}
               </span>
             </div>
           </div>
         );
       })}
 
-      {/* Footer row — hint that more releases exist */}
+      {/* Footer row */}
       <div className='flex items-center justify-center px-5 py-3'>
         <p className='text-[11px] text-[var(--linear-text-quaternary)]'>
           + every past &amp; future release, automatically
         </p>
       </div>
-    </div>
-  );
-}
 
-/* ------------------------------------------------------------------ */
-/*  Phone — smart link page for selected release                       */
-/* ------------------------------------------------------------------ */
-
-function ReleasePhone({
-  release,
-}: {
-  readonly release: (typeof RELEASES)[number];
-}) {
-  return (
-    <PhoneFrame>
-      {/* URL bar */}
+      {/* Floating smart link card — desktop only */}
       <div
-        className='mx-4 mt-10 mb-1 flex items-center justify-center rounded-full bg-[var(--linear-bg-surface-1)] px-3 py-1.5'
-        style={{ border: '1px solid var(--linear-border-subtle)' }}
+        className='absolute -bottom-6 -right-6 hidden lg:block transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+        style={{ zIndex: 20 }}
       >
-        <span className='truncate text-[10px] text-[var(--linear-text-tertiary)]'>
-          jov.ie/{release.slug}
-        </span>
+        <SmartLinkCard release={release} />
       </div>
-
-      {/* Album artwork */}
-      <div className='px-6 py-4'>
-        <div
-          className='relative w-full aspect-square overflow-hidden rounded-2xl'
-          style={{
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
-          }}
-        >
-          <Image
-            src={release.artwork}
-            alt={release.title}
-            fill
-            className='object-cover'
-            sizes='220px'
-          />
-        </div>
-      </div>
-
-      {/* Title */}
-      <div className='px-6 pb-4 text-center'>
-        <p className='text-[15px] font-semibold tracking-tight text-[var(--linear-text-primary)]'>
-          {release.title}
-        </p>
-        <p className='mt-0.5 text-[12px] text-[var(--linear-text-tertiary)]'>
-          {release.artist}
-        </p>
-      </div>
-
-      {/* Streaming buttons */}
-      <div className='flex flex-col gap-2 px-5'>
-        {SMART_LINK_DSPS.map(key => {
-          const config = DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG];
-          if (!config) return null;
-          return (
-            <SmartLinkProviderButton
-              key={key}
-              label={
-                key === 'apple_music'
-                  ? 'Apple Music'
-                  : key === 'youtube_music'
-                    ? 'YouTube Music'
-                    : key === 'amazon_music'
-                      ? 'Amazon Music'
-                      : 'Spotify'
-              }
-              iconPath={config.iconPath}
-              className='bg-[var(--linear-bg-surface-1)] ring-[color:var(--linear-border-subtle)] hover:bg-[var(--linear-bg-hover)]'
-            />
-          );
-        })}
-      </div>
-
-      {/* Powered by Jovie */}
-      <div className='pb-3 pt-3 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
-          Powered by Jovie
-        </p>
-      </div>
-    </PhoneFrame>
+    </div>
   );
 }
 
@@ -374,25 +411,20 @@ export function ReleasesSection() {
             ))}
           </div>
 
-          {/* Main content — dashboard + phone */}
+          {/* Dashboard — full width, smart link card floats over it */}
           <div
-            className='mt-8 flex flex-col lg:flex-row gap-6 lg:items-start reveal-on-scroll'
+            className='relative mt-8 pb-10 pr-10 reveal-on-scroll'
             data-delay='120'
           >
-            {/* Dashboard mockup — takes most of the width */}
-            <div className='flex-1 min-w-0'>
-              <DashboardMockup activeIndex={activeIndex} />
-            </div>
-
-            {/* Phone — smart link preview */}
-            <div className='hidden lg:block shrink-0'>
-              <ReleasePhone release={activeRelease} />
-            </div>
+            <DashboardMockup
+              activeIndex={activeIndex}
+              release={activeRelease}
+            />
           </div>
 
           {/* Auto-email notification strip */}
           <div
-            className='mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl px-6 py-4 reveal-on-scroll'
+            className='mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl px-6 py-4 reveal-on-scroll'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',

@@ -173,6 +173,7 @@ describe('checkUserStatus', () => {
     }));
 
     vi.mock('@sentry/nextjs', () => ({
+      getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
       addBreadcrumb: vi.fn(),
@@ -307,6 +308,7 @@ describe('resolveProfileState', () => {
       ne: (a: unknown, b: unknown) => [a, b],
     }));
     vi.mock('@sentry/nextjs', () => ({
+      getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
       addBreadcrumb: vi.fn(),
@@ -614,6 +616,7 @@ describe('gate.ts utility functions', () => {
       ne: (a: unknown, b: unknown) => [a, b],
     }));
     vi.mock('@sentry/nextjs', () => ({
+      getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
       addBreadcrumb: vi.fn(),
@@ -935,6 +938,7 @@ describe('UserState enum', () => {
       ne: (a: unknown, b: unknown) => [a, b],
     }));
     vi.mock('@sentry/nextjs', () => ({
+      getClient: vi.fn(() => undefined),
       captureMessage: vi.fn(),
       captureException: vi.fn(),
       addBreadcrumb: vi.fn(),

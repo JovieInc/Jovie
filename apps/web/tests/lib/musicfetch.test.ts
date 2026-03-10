@@ -14,6 +14,7 @@ vi.mock('@/lib/env-server', () => ({
 
 // Mock Sentry
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
 }));
 

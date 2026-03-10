@@ -14,6 +14,7 @@ const mockStartSpan = vi.hoisted(() =>
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: mockCaptureException,
   startSpan: mockStartSpan,
 }));
