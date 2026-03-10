@@ -22,7 +22,7 @@ export async function notifyVerificationRequest(
     : `${APP_ROUTES.ADMIN_CREATORS}?profileId=${payload.profileId}`;
   const profileUrl = `${APP_URL}${profilePath}`;
 
-  await sendSlackMessage({
+  sendSlackMessage({
     text: `${payload.name} requested profile verification`,
     blocks: [
       {
@@ -33,6 +33,11 @@ export async function notifyVerificationRequest(
         },
       },
     ],
+  }).catch(err => {
+    logger.warn(
+      '[verification] Slack verification request notification failed',
+      err
+    );
   });
 }
 

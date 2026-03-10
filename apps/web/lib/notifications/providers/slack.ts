@@ -37,6 +37,7 @@ export interface SlackNotificationResult {
 }
 
 export const SLACK_ENABLED = Boolean(env.SLACK_WEBHOOK_URL);
+const SLACK_TIMEOUT_MS = 5_000;
 
 /**
  * Send a message to Slack via webhook.
@@ -61,6 +62,7 @@ export async function sendSlackMessage(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(message),
+      signal: AbortSignal.timeout(SLACK_TIMEOUT_MS),
     });
 
     if (!response.ok) {

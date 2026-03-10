@@ -40,6 +40,7 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
+import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 
 export const maxDuration = 30;
@@ -1077,12 +1078,14 @@ function createSubmitFeedbackTool(clerkUserId: string) {
         },
       });
 
-      await notifySlackFeedbackSubmission({
+      notifySlackFeedbackSubmission({
         message,
         name: userRecord?.name ?? 'Jovie user',
         email: userRecord?.email,
         source: 'chat',
         pathname: '/app',
+      }).catch(err => {
+        logger.warn('[api/chat] Slack feedback notification failed', err);
       });
 
       return { success: true };
