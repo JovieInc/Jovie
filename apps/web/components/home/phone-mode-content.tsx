@@ -25,14 +25,95 @@ export const PHONE_CTA_CLASS =
   'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-[color:var(--linear-text-primary)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
+export const FALLBACK_CITY = 'Los Angeles';
+export const FALLBACK_REGION = 'CA';
+
+const TOUR_VENUES_BY_CITY = {
+  'los angeles': ['Academy LA', 'Avalon Hollywood'],
+  'new york': ['Brooklyn Steel', 'Webster Hall'],
+  nashville: ['Exit/In', 'Marathon Music Works'],
+  austin: ['Mohawk', "Emo's"],
+  philadelphia: ['The TLA', 'Union Transfer'],
+  richmond: ['The National'],
+  atlanta: ['The Masquerade', 'Terminal West'],
+  chicago: ['Metro', 'Thalia Hall'],
+  denver: ['Gothic Theatre', 'Bluebird Theater'],
+  toronto: ['The Danforth', 'Velvet Underground'],
+  london: ['Village Underground', 'Electric Brixton'],
+} as const;
+
+const CITY_ALIASES: Record<string, keyof typeof TOUR_VENUES_BY_CITY> = {
+  la: 'los angeles',
+  'los angeles': 'los angeles',
+  'new york city': 'new york',
+  nyc: 'new york',
+  philly: 'philadelphia',
+};
+
+export interface TourPersonalizationInput {
+  city?: string | null;
+  region?: string | null;
+  artistCity?: string | null;
+}
+
+export interface TourPersonalization {
+  city: string;
+  region: string;
+  venue: string;
+}
+
+const formatCityKey = (city: string): string => city.trim().toLowerCase();
+
+const resolveCityKey = (
+  city: string
+): keyof typeof TOUR_VENUES_BY_CITY | null => {
+  const normalized = formatCityKey(city);
+  if (normalized in TOUR_VENUES_BY_CITY) {
+    return normalized as keyof typeof TOUR_VENUES_BY_CITY;
+  }
+  return CITY_ALIASES[normalized] ?? null;
+};
+
+const CITY_DISPLAY_NAMES: Record<keyof typeof TOUR_VENUES_BY_CITY, string> = {
+  'los angeles': 'Los Angeles',
+  'new york': 'New York',
+  nashville: 'Nashville',
+  austin: 'Austin',
+  philadelphia: 'Philadelphia',
+  richmond: 'Richmond',
+  atlanta: 'Atlanta',
+  chicago: 'Chicago',
+  denver: 'Denver',
+  toronto: 'Toronto',
+  london: 'London',
+};
+
+export function getTourPersonalization({
+  city,
+  region,
+  artistCity,
+}: TourPersonalizationInput): TourPersonalization {
+  const preferredCity = artistCity?.trim() || city?.trim() || '';
+  const cityKey = preferredCity ? resolveCityKey(preferredCity) : null;
+
+  if (!cityKey) {
+    return {
+      city: FALLBACK_CITY,
+      region: FALLBACK_REGION,
+      venue: TOUR_VENUES_BY_CITY['los angeles'][0],
+    };
+  }
+
+  return {
+    city: CITY_DISPLAY_NAMES[cityKey],
+    region: region?.trim() || FALLBACK_REGION,
+    venue: TOUR_VENUES_BY_CITY[cityKey][0],
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Mode content panels                                                */
 /* ------------------------------------------------------------------ */
-
-export const MOCK_TOUR_DATES = [
-  { city: 'Los Angeles, CA', venue: 'Academy LA', date: 'Apr 12' },
-] as const;
 
 function ListenContent() {
   const dsps = [
@@ -89,21 +170,24 @@ function TipContent() {
   );
 }
 
-function TourContent() {
-  const show = MOCK_TOUR_DATES[0];
+function TourContent({
+  personalization,
+}: {
+  readonly personalization: TourPersonalization;
+}) {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
       <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)]'>
         <div className='min-w-0'>
           <p className='text-[13px] font-medium text-[color:var(--linear-text-primary)] truncate'>
-            {show.venue}
+            {personalization.venue}
           </p>
           <p className='text-[11px] text-[color:var(--linear-text-tertiary)]'>
-            {show.city}
+            {`${personalization.city}, ${personalization.region}`}
           </p>
         </div>
         <span className='shrink-0 text-[11px] font-medium text-[color:var(--linear-text-secondary)]'>
-          {show.date}
+          Apr 12
         </span>
       </div>
       <button
@@ -148,9 +232,17 @@ function ProfileContent() {
 export const MODE_CONTENT: Record<string, React.ReactNode> = {
   listen: <ListenContent />,
   tip: <TipContent />,
-  tour: <TourContent />,
   profile: <ProfileContent />,
 };
+
+export function getModeContent(
+  personalization: TourPersonalization
+): Record<string, React.ReactNode> {
+  return {
+    ...MODE_CONTENT,
+    tour: <TourContent personalization={personalization} />,
+  };
+}
 
 /** Mode IDs in display order. */
 export const MODE_IDS = ['profile', 'tour', 'tip', 'listen'] as const;

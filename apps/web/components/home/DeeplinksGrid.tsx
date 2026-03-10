@@ -6,11 +6,16 @@ import { ArtistName } from '@/components/atoms/ArtistName';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { Avatar } from '@/components/molecules/Avatar';
 import { Container } from '@/components/site/Container';
+import { HOMEPAGE_CITY_COOKIE, HOMEPAGE_REGION_COOKIE } from '@/constants/app';
 import { PhoneFrame } from './PhoneFrame';
 import {
+  FALLBACK_CITY,
+  FALLBACK_REGION,
+  getModeContent,
+  getTourPersonalization,
   MOCK_ARTIST,
-  MODE_CONTENT,
   PHONE_CONTENT_HEIGHT,
+  type TourPersonalization,
 } from './phone-mode-content';
 
 /* ------------------------------------------------------------------ */
@@ -20,7 +25,7 @@ import {
 interface ModeData {
   id: string;
   headline: string;
-  description: string;
+  getDescription: (city: string) => string;
   slug: string;
 }
 
@@ -28,29 +33,29 @@ const MODES: ModeData[] = [
   {
     id: 'profile',
     headline: 'Your link, your fans.',
-    description:
-      'New visitors join your list. Returning fans see their most likely next action. The page adapts — nobody hunts.',
+    getDescription: () =>
+      'New visitors join your list. Returning fans see their most likely next action. The page adapts\u00A0\u2014\u00A0nobody hunts.',
     slug: '',
   },
   {
     id: 'tour',
     headline: 'Put the nearest show first.',
-    description:
-      "A fan in LA shouldn't scroll through 30 cities. Jovie surfaces the nearest show and ticket link first.",
+    getDescription: city =>
+      `A fan in ${city} taps your link and sees the nearest show first. Jovie surfaces the closest date and ticket CTA before they bounce.`,
     slug: 'tour',
   },
   {
     id: 'tip',
     headline: 'Turn the merch table into revenue.',
-    description:
-      'Fan scans your QR after a set. Jovie opens the fastest tip flow — not another menu of links.',
+    getDescription: () =>
+      'Fan scans your QR after a set. Jovie opens the fastest tip flow\u00A0\u2014\u00A0not another menu of links.',
     slug: 'tip',
   },
   {
     id: 'listen',
     headline: 'Open the right streaming app.',
-    description:
-      'One tap. Jovie routes them to Spotify, Apple Music, or YouTube Music — no choice screen.',
+    getDescription: () =>
+      'One tap. Jovie routes them to Spotify, Apple Music, or YouTube Music\u00A0\u2014\u00A0no choice screen.',
     slug: 'listen',
   },
 ];
@@ -61,7 +66,17 @@ const MODES: ModeData[] = [
 /*  Scroll-driven phone (desktop only)                                 */
 /* ------------------------------------------------------------------ */
 
-function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
+function StickyPhone({
+  activeIndex,
+  personalization,
+}: {
+  readonly activeIndex: number;
+  readonly personalization: TourPersonalization;
+}) {
+  const modeContent = useMemo(
+    () => getModeContent(personalization),
+    [personalization]
+  );
   return (
     <PhoneFrame>
       {/* Nav bar */}
@@ -129,7 +144,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
               pointerEvents: i === activeIndex ? 'auto' : 'none',
             }}
           >
-            {MODE_CONTENT[mode.id]}
+            {modeContent[mode.id]}
           </div>
         ))}
       </div>
@@ -192,7 +207,7 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
         {mode.headline}
       </h3>
       <p className='mt-2 text-[14px] leading-[1.6] text-[var(--linear-text-secondary)]'>
-        {mode.description}
+        {mode.getDescription(FALLBACK_CITY)}
       </p>
       <div className='mt-4 flex items-center justify-end'>
         <span className='font-mono text-[12px] text-[var(--linear-text-tertiary)]'>
@@ -203,6 +218,17 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
   );
 }
 
+function readGeoCookie(name: string): string | null {
+  const cookie = globalThis.document.cookie
+    .split('; ')
+    .find(item => item.startsWith(`${name}=`));
+
+  if (!cookie) return null;
+
+  const [, value = ''] = cookie.split('=');
+  return decodeURIComponent(value);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main section                                                       */
 /* ------------------------------------------------------------------ */
@@ -210,6 +236,12 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
 export function DeeplinksGrid() {
   const sectionRef = useRef<HTMLElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [tourPersonalization, setTourPersonalization] =
+    useState<TourPersonalization>({
+      city: FALLBACK_CITY,
+      region: FALLBACK_REGION,
+      venue: 'Academy LA',
+    });
 
   const handleScroll = useCallback(() => {
     const section = sectionRef.current;
@@ -232,6 +264,10 @@ export function DeeplinksGrid() {
   }, []);
 
   useEffect(() => {
+    const city = readGeoCookie(HOMEPAGE_CITY_COOKIE);
+    const region = readGeoCookie(HOMEPAGE_REGION_COOKIE);
+    setTourPersonalization(getTourPersonalization({ city, region }));
+
     globalThis.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => globalThis.removeEventListener('scroll', handleScroll);
@@ -258,10 +294,10 @@ export function DeeplinksGrid() {
           key={mode.id}
           className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'
         >
-          {mode.description}
+          {mode.getDescription(tourPersonalization.city)}
         </p>
       )),
-    []
+    [tourPersonalization.city]
   );
 
   return (
@@ -336,7 +372,10 @@ export function DeeplinksGrid() {
 
                 {/* Center — phone */}
                 <div className='flex flex-col items-center gap-4'>
-                  <StickyPhone activeIndex={activeIndex} />
+                  <StickyPhone
+                    activeIndex={activeIndex}
+                    personalization={tourPersonalization}
+                  />
                   <a
                     href='https://jov.ie/tim'
                     target='_blank'

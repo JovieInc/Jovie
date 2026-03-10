@@ -8,6 +8,8 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
   COUNTRY_CODE_COOKIE,
+  HOMEPAGE_CITY_COOKIE,
+  HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
@@ -470,6 +472,25 @@ async function handleRequest(req: NextRequest, userId: string | null) {
  * The nonce is pre-generated and set on request headers for Server Components.
  * Here we set it on response headers for the CSP policy.
  */
+
+function getGeoFromRequest(req: NextRequest): {
+  city: string | null;
+  region: string | null;
+} {
+  const geoRequest = req as NextRequest & {
+    geo?: { city?: string | null; region?: string | null };
+  };
+
+  const cityFromHeader = req.headers.get('x-vercel-ip-city')?.trim() ?? null;
+  const regionFromHeader =
+    req.headers.get('x-vercel-ip-country-region')?.trim() ?? null;
+
+  return {
+    city: cityFromHeader || geoRequest.geo?.city?.trim() || null,
+    region: regionFromHeader || geoRequest.geo?.region?.trim() || null,
+  };
+}
+
 function buildFinalResponse(
   req: NextRequest,
   res: NextResponse,
@@ -507,6 +528,31 @@ function buildFinalResponse(
         );
       }
     }
+  }
+
+  const geo = getGeoFromRequest(req);
+
+  if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
+    res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
+  }
+
+  if (
+    geo.region &&
+    req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
+  ) {
+    res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
   }
 
   const countryCode =
