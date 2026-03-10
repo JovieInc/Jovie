@@ -8,7 +8,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
-import { db } from '@/lib/db';
+import { type DbOrTransaction, db } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -69,6 +69,67 @@ function inferDeviceType(
     return 'mobile';
   }
   return 'desktop';
+}
+
+function getPgErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const err = error as { code?: string; cause?: { code?: string } };
+  return err.code ?? err.cause?.code;
+}
+
+async function incrementDailyProfileViews(
+  tx: DbOrTransaction,
+  profileId: string,
+  viewDate: string,
+  now: Date
+): Promise<void> {
+  const updatedRows = await tx
+    .update(dailyProfileViews)
+    .set({
+      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(dailyProfileViews.creatorProfileId, profileId),
+        eq(dailyProfileViews.viewDate, viewDate)
+      )
+    )
+    .returning({ id: dailyProfileViews.id });
+
+  if (updatedRows.length > 0) {
+    return;
+  }
+
+  try {
+    await tx.insert(dailyProfileViews).values({
+      creatorProfileId: profileId,
+      viewDate,
+      viewCount: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+  } catch (error) {
+    if (getPgErrorCode(error) !== '23505') {
+      throw error;
+    }
+
+    await tx
+      .update(dailyProfileViews)
+      .set({
+        viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(dailyProfileViews.creatorProfileId, profileId),
+          eq(dailyProfileViews.viewDate, viewDate)
+        )
+      );
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -214,25 +275,7 @@ export async function POST(request: NextRequest) {
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      await tx
-        .insert(dailyProfileViews)
-        .values({
-          creatorProfileId: profileId,
-          viewDate,
-          viewCount: 1,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            dailyProfileViews.creatorProfileId,
-            dailyProfileViews.viewDate,
-          ],
-          set: {
-            viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-            updatedAt: now,
-          },
-        });
+      await incrementDailyProfileViews(tx, profileId, viewDate, now);
 
       const [existing] = await tx
         .select({
