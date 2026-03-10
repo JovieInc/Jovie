@@ -41,7 +41,7 @@ function formatFeedbackAsMarkdown(item: FeedbackRow): string {
   const context = (item.context as { pathname?: string })?.pathname;
 
   let md = `## Feedback from @${userName} — ${date}\n\n`;
-  md += `> ${item.message.replace(/\n/g, '\n> ')}\n\n`;
+  md += `> ${item.message.replaceAll('\n', '\n> ')}\n\n`;
   if (context) {
     md += `**Context:** ${context}\n`;
   }
@@ -194,7 +194,7 @@ export function AdminFeedbackTable({
         <AdminTableSubheader>
           <div className='flex items-center justify-between'>
             <span className='text-xs text-secondary-token'>
-              {rows.length} item{rows.length !== 1 ? 's' : ''}
+              {rows.length} item{rows.length === 1 ? '' : 's'}
             </span>
             <Button
               type='button'
