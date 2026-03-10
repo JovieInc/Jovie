@@ -23,6 +23,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
 import {
+  DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
@@ -196,6 +197,7 @@ export function ReleaseDspLinks({
           aria-label={rescanTooltip}
           onClick={handleRescan}
           disabled={isRescanDisabled}
+          className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
         >
           {isRescanningIsrc ? (
             <Loader2 className='h-4 w-4 animate-spin' />

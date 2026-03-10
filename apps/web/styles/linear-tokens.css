@@ -220,12 +220,12 @@
   --linear-gap-nav: 4px;
   --linear-gap-buttons: 8px;
   --linear-gap-cards: 24px;
-  --linear-section-pt-sm: 64px;
-  --linear-section-pb-sm: 72px;
-  --linear-section-pt-md: 96px;
-  --linear-section-pb-md: 112px;
-  --linear-section-pt-lg: 128px;
-  --linear-section-pb-lg: 144px;
+  --linear-section-pt-sm: 48px;
+  --linear-section-pb-sm: 56px;
+  --linear-section-pt-md: 72px;
+  --linear-section-pb-md: 80px;
+  --linear-section-pt-lg: 96px;
+  --linear-section-pb-lg: 96px;
   --linear-content-gap-sm: 40px;
   --linear-content-gap-md: 56px;
   --linear-content-gap-lg: 72px;
@@ -259,57 +259,58 @@
    ============================================ */
 
 :root.dark {
-  /* Text — extracted from Linear CSS vars (2026-02-17):
-     Primary:   lch(100% 0 272)       = pure white
-     Secondary: lch(90.65% 1.35 272)  = #E3E4E6 (very bright — Linear's actual default text)
-     Tertiary:  lch(62.6% 1.35 272)   = #969799 (icons, shortcuts, meta) */
-  --linear-text-primary: lch(100% 0 272);
-  --linear-text-secondary: lch(90.65% 1.35 272);
-  --linear-text-tertiary: lch(62.6% 1.35 272);
-  --linear-text-quaternary: lch(45% 1.35 272);
+  /* Text — extracted directly from linear.app computed styles (2026-03-10):
+     --color-text-primary: #f7f8f8  (rgb 247,248,248)
+     --color-text-secondary: #d0d6e0 (much brighter than previous)
+     --color-text-tertiary: #8a8f98  (rgb 138,143,152) */
+  --linear-text-primary: #f7f8f8;
+  --linear-text-secondary: #d0d6e0;
+  --linear-text-tertiary: #8a8f98;
+  --linear-text-quaternary: #5a5f6a;
   --linear-text-inverse: oklch(5% 0.005 260);
-  /* Backgrounds — re-extracted from linear.app/demo dark mode (2026-03-05) */
-  /* Linear's exact dark token values: --bg-sidebar-dark:#090909, --bg-base-color:#101012 */
-  /* --color-bg-primary:lch(4.8%), --color-bg-secondary:lch(10.633%), --color-bg-tertiary:lch(14.133%) */
-  --linear-bg-page: #090909;
-  /* Linear exact --bg-sidebar-dark */
-  --linear-bg-header: rgba(9, 9, 9, 0.8);
-  --linear-bg-surface-0: lch(14.133 4.2 272);
-  /* Linear --color-bg-tertiary — elevated menus/popovers */
-  --linear-bg-surface-1: lch(18.6 3.033 272);
-  /* Linear content views — rgb(18,19,20) */
-  --linear-bg-surface-2: lch(10.633 3.033 272);
-  /* Linear --color-bg-secondary — cards/panels */
-  --linear-bg-button: oklch(26.5% 0.01 265);
-  --linear-bg-footer: #090909;
-  --linear-border-footer: oklch(26.5% 0.01 265);
-  --linear-bg-hover: rgba(255, 255, 255, 0.08);
-  /* Borders — rebalanced: subtle for separators/dividers, default for container rings */
+  /* Backgrounds — extracted from linear.app computed styles (2026-03-10):
+     --color-bg-primary: #08090a  body bg
+     --color-bg-secondary: #1c1c1f  cards/panels
+     --color-bg-tertiary: #232326  elevated surfaces */
+  --linear-bg-page: #08090a;
+  --linear-bg-header: rgba(8, 9, 10, 0.85);
+  --linear-bg-surface-0: #232326;
+  /* elevated menus/popovers = bg-tertiary */
+  --linear-bg-surface-1: #1c1c1f;
+  /* cards/panels = bg-secondary */
+  --linear-bg-surface-2: #141416;
+  /* deeper — between primary and secondary */
+  --linear-bg-button: #2a2a2e;
+  --linear-bg-footer: #08090a;
+  --linear-border-footer: #2a2a2e;
+  --linear-bg-hover: rgba(255, 255, 255, 0.06);
+  /* Borders */
   --linear-border-subtle: rgba(255, 255, 255, 0.06);
   --linear-border-default: rgba(255, 255, 255, 0.1);
-  --linear-border-strong: rgba(255, 255, 255, 0.12);
+  --linear-border-strong: rgba(255, 255, 255, 0.14);
   --linear-border-focus: oklch(60% 0.12 260);
-  /* Buttons */
-  --linear-btn-primary-bg: oklch(92% 0 0);
-  --linear-btn-primary-fg: oklch(5% 0.005 260);
-  --linear-btn-primary-hover: oklch(100% 0 0);
-  --linear-btn-primary-border: oklch(92% 0 0);
-  --linear-btn-secondary-bg: oklch(20% 0.01 260);
-  --linear-btn-secondary-fg: oklch(97% 0.005 260);
-  --linear-btn-secondary-hover: oklch(25% 0.01 260);
+  /* Buttons — primary is near-white on dark (Linear pattern) */
+  --linear-btn-primary-bg: #f7f8f8;
+  --linear-btn-primary-fg: #08090a;
+  --linear-btn-primary-hover: #ffffff;
+  --linear-btn-primary-border: #f7f8f8;
+  --linear-btn-secondary-bg: #232326;
+  --linear-btn-secondary-fg: #f7f8f8;
+  --linear-btn-secondary-hover: #2a2a2e;
   /* Hero-specific */
   --linear-hero-glow: radial-gradient(
-    ellipse 60% 50% at 50% 40%,
-    oklch(22% 0.025 260 / 0.35),
+    ellipse 80% 60% at 50% 0%,
+    oklch(20% 0.02 265 / 0.6),
     transparent 70%
   );
-  --linear-hero-gradient-from: oklch(72% 0.015 260);
-  --linear-hero-gradient-to: oklch(58% 0.01 260);
+  --linear-hero-gradient-from: #f7f8f8;
+  --linear-hero-gradient-to: #8a8f98;
   --linear-separator-from: rgba(255, 255, 255, 0.06);
   --linear-separator-via: rgba(255, 255, 255, 0.03);
-  /* Shadows */
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.2);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.35);
+  /* Shadows — deeper on dark */
+  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
+  --linear-shadow-card-elevated:
+    0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* ============================================

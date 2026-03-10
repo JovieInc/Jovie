@@ -583,6 +583,19 @@ export async function upsertTrack(input: {
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
   const now = new Date();
+  const baseSet = {
+    title: input.title,
+    slug: input.slug,
+    durationMs: input.durationMs ?? null,
+    isExplicit: input.isExplicit ?? false,
+    isrc: input.isrc ?? null,
+    previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    updatedAt: now,
+  };
 
   const insertData: NewDiscogTrack = {
     releaseId: input.releaseId,
@@ -603,32 +616,55 @@ export async function upsertTrack(input: {
     updatedAt: now,
   };
 
-  const [result] = await db
-    .insert(discogTracks)
-    .values(insertData)
-    .onConflictDoUpdate({
-      target: [
-        discogTracks.releaseId,
-        discogTracks.discNumber,
-        discogTracks.trackNumber,
-      ],
-      set: {
-        title: input.title,
-        slug: input.slug,
-        durationMs: input.durationMs ?? null,
-        isExplicit: input.isExplicit ?? false,
-        isrc: input.isrc ?? null,
-        previewUrl: input.previewUrl ?? null,
-        audioUrl: input.audioUrl ?? null,
-        audioFormat: input.audioFormat ?? null,
-        sourceType: input.sourceType ?? 'ingested',
-        metadata: input.metadata ?? {},
-        updatedAt: now,
-      },
-    })
-    .returning();
+  try {
+    const [result] = await db
+      .insert(discogTracks)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: [
+          discogTracks.releaseId,
+          discogTracks.discNumber,
+          discogTracks.trackNumber,
+        ],
+        set: baseSet,
+      })
+      .returning();
 
-  return result;
+    return result;
+  } catch (error) {
+    const isIsrcConflict =
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === '23505' &&
+      'constraint' in error &&
+      error.constraint === 'discog_tracks_isrc_unique';
+
+    if (!isIsrcConflict) {
+      throw error;
+    }
+
+    const [result] = await db
+      .insert(discogTracks)
+      .values({
+        ...insertData,
+        isrc: null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          discogTracks.releaseId,
+          discogTracks.discNumber,
+          discogTracks.trackNumber,
+        ],
+        set: {
+          ...baseSet,
+          isrc: null,
+        },
+      })
+      .returning();
+
+    return result;
+  }
 }
 
 /**
