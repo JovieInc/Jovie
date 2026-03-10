@@ -226,38 +226,23 @@ function backoffDelay(attempt: number): Promise<void> {
 }
 
 /**
- * Upload a remote avatar with retry mechanism.
- *
- * Separates the fetch and upload steps so that a successful image fetch
- * is not repeated when only the upload fails. Uses exponential backoff
- * with jitter for reliability. Intermediate failures are recorded as
- * breadcrumbs; only final exhaustion is reported as a Sentry event.
- *
- * @returns Upload result or null if all retries fail
+ * Fetches a remote avatar image with retry and backoff.
+ * Returns null if all attempts fail.
  */
-export async function uploadRemoteAvatar(params: {
-  imageUrl: string;
-  cookieHeader: string | null;
-  maxRetries?: number;
-}): Promise<AvatarUploadResult | null> {
-  const maxRetries = params.maxRetries ?? 3;
+async function fetchAvatarWithRetry(
+  imageUrl: string,
+  maxRetries: number
+): Promise<AvatarFetchResult | null> {
   let lastError: Error | null = null;
 
-  // Step 1: Fetch the remote image (retry separately from upload)
-  let fetchResult: AvatarFetchResult | null = null;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      if (attempt > 0) {
-        await backoffDelay(attempt);
-      }
-
-      fetchResult = await fetchAvatarImage(params.imageUrl);
-      break;
+      if (attempt > 0) await backoffDelay(attempt);
+      return await fetchAvatarImage(imageUrl);
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown fetch error');
 
-      // Don't retry abort errors — the request was intentionally cancelled
       if (
         lastError.name === 'AbortError' ||
         lastError.message.includes('aborted')
@@ -265,7 +250,6 @@ export async function uploadRemoteAvatar(params: {
         return null;
       }
 
-      // Don't retry for invalid content type — it won't change on retry
       if (lastError.message.includes('Invalid content type')) {
         Sentry.captureMessage('Avatar upload: invalid content type', {
           level: 'warning',
@@ -274,7 +258,6 @@ export async function uploadRemoteAvatar(params: {
         return null;
       }
 
-      // Record intermediate failures as breadcrumbs (less noisy than events)
       if (attempt < maxRetries - 1) {
         Sentry.addBreadcrumb({
           category: 'avatar',
@@ -285,34 +268,38 @@ export async function uploadRemoteAvatar(params: {
     }
   }
 
-  if (!fetchResult) {
-    if (lastError) {
-      Sentry.captureException(lastError, {
-        extra: { maxRetries, context: 'avatar_fetch_retries_exhausted' },
-      });
-    }
-    return null;
+  if (lastError) {
+    Sentry.captureException(lastError, {
+      extra: { maxRetries, context: 'avatar_fetch_retries_exhausted' },
+    });
   }
+  return null;
+}
 
-  // Step 2: Upload the fetched image (retry separately — no need to re-fetch)
+/**
+ * Uploads a fetched avatar image with retry and backoff.
+ * Returns null if all attempts fail.
+ */
+async function uploadAvatarWithRetry(
+  fetchResult: AvatarFetchResult,
+  cookieHeader: string | null,
+  maxRetries: number
+): Promise<AvatarUploadResult | null> {
+  let lastError: Error | null = null;
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      if (attempt > 0) {
-        await backoffDelay(attempt);
-      }
-
+      if (attempt > 0) await backoffDelay(attempt);
       const { blobUrl, photoId } = await uploadAvatarFile(
         fetchResult.buffer,
         fetchResult.contentType,
-        params.cookieHeader
+        cookieHeader
       );
-
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
       lastError =
         error instanceof Error ? error : new Error('Unknown upload error');
 
-      // Don't retry abort errors
       if (
         lastError.name === 'AbortError' ||
         lastError.message.includes('aborted')
@@ -320,7 +307,6 @@ export async function uploadRemoteAvatar(params: {
         return null;
       }
 
-      // Don't retry 401 errors — auth won't fix itself on retry
       if (lastError.message.includes('401')) {
         Sentry.addBreadcrumb({
           category: 'avatar',
@@ -340,13 +326,33 @@ export async function uploadRemoteAvatar(params: {
     }
   }
 
-  // All upload retries exhausted
   if (lastError) {
     Sentry.captureException(lastError, {
       extra: { maxRetries, context: 'avatar_upload_retries_exhausted' },
     });
   }
   return null;
+}
+
+/**
+ * Upload a remote avatar with retry mechanism.
+ *
+ * Separates the fetch and upload steps so that a successful image fetch
+ * is not repeated when only the upload fails. Uses exponential backoff
+ * with jitter for reliability. Intermediate failures are recorded as
+ * breadcrumbs; only final exhaustion is reported as a Sentry event.
+ *
+ * @returns Upload result or null if all retries fail
+ */
+export async function uploadRemoteAvatar(params: {
+  imageUrl: string;
+  cookieHeader: string | null;
+  maxRetries?: number;
+}): Promise<AvatarUploadResult | null> {
+  const maxRetries = params.maxRetries ?? 3;
+  const fetchResult = await fetchAvatarWithRetry(params.imageUrl, maxRetries);
+  if (!fetchResult) return null;
+  return uploadAvatarWithRetry(fetchResult, params.cookieHeader, maxRetries);
 }
 
 /**

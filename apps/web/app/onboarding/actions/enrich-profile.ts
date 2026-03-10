@@ -21,6 +21,7 @@ import {
 import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
+  type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
 import {
   getBestSpotifyImageUrl,
@@ -28,7 +29,6 @@ import {
 } from '@/lib/dsp-enrichment/providers/spotify';
 import { captureError } from '@/lib/error-tracking';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
-import type { ExtractedLink } from '@/lib/ingestion/types';
 import { logger } from '@/lib/utils/logger';
 import { uploadRemoteAvatar } from './avatar';
 
@@ -38,6 +38,86 @@ export interface EnrichedProfileData {
   bio: string | null;
   genres: string[];
   followers: number | null;
+}
+
+async function uploadProfileImage(
+  profileId: string,
+  imageUrl: string,
+  imageSource: 'musicfetch' | 'spotify',
+  spotifyArtistId: string,
+  result: EnrichedProfileData,
+  profileUpdates: Partial<typeof creatorProfiles.$inferInsert>
+): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    const uploaded = await uploadRemoteAvatar({
+      imageUrl,
+      cookieHeader: cookieStore.toString(),
+      maxRetries: 2,
+    });
+    if (uploaded) {
+      profileUpdates.avatarUrl = uploaded.blobUrl;
+      result.imageUrl = uploaded.blobUrl;
+      logger.info('Artist image uploaded during onboarding enrichment', {
+        profileId,
+        spotifyArtistId,
+        source: imageSource,
+      });
+    }
+  } catch (error) {
+    await captureError(
+      'Failed to upload artist image during onboarding enrichment',
+      error,
+      { profileId, spotifyArtistId }
+    );
+  }
+}
+
+async function processMusicFetchSocialLinks(
+  profile: {
+    id: string;
+    usernameNormalized: string;
+    avatarUrl: string | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean | null;
+    displayNameLocked: boolean | null;
+  },
+  musicFetch: MusicFetchArtistResult,
+  spotifyUrl: string,
+  result: EnrichedProfileData
+): Promise<void> {
+  const socialLinks = extractMusicFetchLinks(
+    musicFetch,
+    spotifyUrl,
+    'onboarding_enrichment'
+  );
+  if (socialLinks.length === 0) return;
+  try {
+    await withDbSessionTx(async tx => {
+      await normalizeAndMergeExtraction(
+        tx,
+        {
+          id: profile.id,
+          usernameNormalized: profile.usernameNormalized,
+          avatarUrl: result.imageUrl ?? profile.avatarUrl,
+          displayName: result.name ?? profile.displayName,
+          avatarLockedByUser: profile.avatarLockedByUser,
+          displayNameLocked: profile.displayNameLocked,
+        },
+        {
+          links: socialLinks,
+          sourcePlatform: 'musicfetch',
+          sourceUrl: spotifyUrl,
+        }
+      );
+    });
+  } catch (error) {
+    await captureError(
+      'Failed to merge social links during onboarding enrichment',
+      error,
+      { profileId: profile.id }
+    );
+  }
 }
 
 /**
@@ -195,32 +275,15 @@ export async function enrichProfileFromDsp(
     const imageUrl =
       musicFetch?.image?.url ?? getBestSpotifyImageUrl(artist?.images ?? []);
     if (imageUrl) {
-      try {
-        const cookieStore = await cookies();
-        const cookieHeader = cookieStore.toString();
-        const uploaded = await uploadRemoteAvatar({
-          imageUrl,
-          cookieHeader,
-          maxRetries: 2,
-        });
-
-        if (uploaded) {
-          profileUpdates.avatarUrl = uploaded.blobUrl;
-          result.imageUrl = uploaded.blobUrl;
-
-          logger.info('Artist image uploaded during onboarding enrichment', {
-            profileId: profile.id,
-            spotifyArtistId,
-            source: musicFetch?.image?.url ? 'musicfetch' : 'spotify',
-          });
-        }
-      } catch (error) {
-        await captureError(
-          'Failed to upload artist image during onboarding enrichment',
-          error,
-          { profileId: profile.id, spotifyArtistId }
-        );
-      }
+      const imageSource = musicFetch?.image?.url ? 'musicfetch' : 'spotify';
+      await uploadProfileImage(
+        profile.id,
+        imageUrl,
+        imageSource,
+        spotifyArtistId,
+        result,
+        profileUpdates
+      );
     }
   }
 
@@ -235,40 +298,7 @@ export async function enrichProfileFromDsp(
 
   // Process social links from MusicFetch
   if (musicFetch) {
-    const socialLinks: ExtractedLink[] = extractMusicFetchLinks(
-      musicFetch,
-      spotifyUrl,
-      'onboarding_enrichment'
-    );
-
-    if (socialLinks.length > 0) {
-      try {
-        await withDbSessionTx(async tx => {
-          await normalizeAndMergeExtraction(
-            tx,
-            {
-              id: profile.id,
-              usernameNormalized: profile.usernameNormalized,
-              avatarUrl: result.imageUrl ?? profile.avatarUrl,
-              displayName: result.name ?? profile.displayName,
-              avatarLockedByUser: profile.avatarLockedByUser,
-              displayNameLocked: profile.displayNameLocked,
-            },
-            {
-              links: socialLinks,
-              sourcePlatform: 'musicfetch',
-              sourceUrl: spotifyUrl,
-            }
-          );
-        });
-      } catch (error) {
-        await captureError(
-          'Failed to merge social links during onboarding enrichment',
-          error,
-          { profileId: profile.id }
-        );
-      }
-    }
+    await processMusicFetchSocialLinks(profile, musicFetch, spotifyUrl, result);
   }
 
   return result;
