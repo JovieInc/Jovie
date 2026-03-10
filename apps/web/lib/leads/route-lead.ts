@@ -86,8 +86,8 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
       "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}";
 
     dmCopy = template
-      .replace(/{displayName}/g, lead.displayName ?? lead.linktreeHandle)
-      .replace(/{claimLink}/g, claimUrl);
+      .replaceAll('{displayName}', lead.displayName ?? lead.linktreeHandle)
+      .replaceAll('{claimLink}', claimUrl);
   }
 
   // 8. Update lead row

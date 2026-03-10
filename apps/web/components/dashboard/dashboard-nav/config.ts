@@ -38,7 +38,7 @@ export const dashboardHome: NavItem = {
 
 export const profileNavItem: NavItem = {
   name: 'Profile',
-  href: APP_ROUTES.PROFILE,
+  href: APP_ROUTES.CHAT,
   id: 'profile',
   icon: UserCircle,
   description: 'Update your profile and links',

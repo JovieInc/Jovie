@@ -97,7 +97,7 @@ function getEmptyStateAction(
   }
   return {
     label: 'Open profile settings',
-    href: APP_ROUTES.PROFILE,
+    href: APP_ROUTES.CHAT,
   };
 }
 
