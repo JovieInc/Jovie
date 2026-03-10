@@ -2,6 +2,7 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
+import { SocialBioNudge } from '@/components/dashboard/molecules/SocialBioNudge';
 import { DashboardOverviewControlsProvider } from '@/components/dashboard/organisms/DashboardOverviewControlsProvider';
 import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/organisms/DashboardOverviewHeaderToolbarClient';
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
@@ -235,6 +236,10 @@ export function DashboardOverview({
     <DashboardOverviewControlsProvider>
       <div className='space-y-6' data-testid='dashboard-overview'>
         {header}
+
+        {profileUrl && (
+          <SocialBioNudge profileId={artist.id} profileUrl={profileUrl} />
+        )}
 
         <DashboardOverviewMetricsClient
           profileId={artist.id}
