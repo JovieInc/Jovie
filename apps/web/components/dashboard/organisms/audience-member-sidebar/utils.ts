@@ -37,8 +37,10 @@ export function formatActionLabel(label: string): string {
 /**
  * Resolve icon name for audience action
  */
-export function resolveAudienceActionIcon(label: string): string {
-  const normalized = label.trim().toLowerCase();
+export function resolveAudienceActionIcon(
+  label: string | null | undefined
+): string {
+  const normalized = label?.trim().toLowerCase() ?? '';
   if (normalized.includes('sms')) return 'MessageSquare';
   if (normalized.includes('email') && normalized.includes('open'))
     return 'MailOpen';

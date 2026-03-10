@@ -9,8 +9,8 @@ export interface AudienceLastActionCellProps {
   readonly className?: string;
 }
 
-function resolveActionIcon(label: string): string {
-  const normalized = label.trim().toLowerCase();
+function resolveActionIcon(label: string | null | undefined): string {
+  const normalized = label?.trim().toLowerCase() ?? '';
   if (normalized.includes('visit')) return 'Eye';
   if (normalized.includes('view')) return 'Eye';
   if (normalized.includes('tip')) return 'HandCoins';
@@ -31,6 +31,7 @@ export function AudienceLastActionCell({
   }
 
   const lastAction = actions[0];
+  const actionLabel = lastAction.label?.trim() || 'Unknown action';
   const iconName = resolveActionIcon(lastAction.label);
 
   return (
@@ -43,7 +44,7 @@ export function AudienceLastActionCell({
       <span className='inline-flex h-5 w-5 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'>
         <Icon name={iconName} className='h-2.5 w-2.5' aria-hidden='true' />
       </span>
-      <span className='truncate'>{lastAction.label}</span>
+      <span className='truncate'>{actionLabel}</span>
     </div>
   );
 }
