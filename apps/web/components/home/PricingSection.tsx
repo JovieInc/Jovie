@@ -25,7 +25,7 @@ export function PricingSection() {
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
-          <div className='flex flex-col items-center text-center gap-5 mb-16'>
+          <div className='reveal-on-scroll flex flex-col items-center text-center gap-5 mb-16'>
             <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
               Pricing
             </span>
@@ -39,7 +39,10 @@ export function PricingSection() {
           </div>
 
           {/* Cards */}
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto'>
+          <div
+            className='reveal-on-scroll grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto'
+            data-delay='80'
+          >
             {/* Free tier */}
             <div
               className='relative rounded-xl p-8 flex flex-col'
@@ -79,7 +82,7 @@ export function PricingSection() {
                 href='/claim'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.06)',
+                  backgroundColor: 'var(--linear-bg-surface-2)',
                   border: '1px solid var(--linear-border-subtle)',
                   color: 'var(--linear-text-primary)',
                 }}
@@ -94,8 +97,7 @@ export function PricingSection() {
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-default)',
-                boxShadow:
-                  '0 0 0 1px rgba(255,255,255,0.04), 0 8px 40px rgba(0,0,0,0.25)',
+                boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >
               {/* Badge */}
@@ -106,7 +108,7 @@ export function PricingSection() {
                 <span
                   className='rounded-full px-2.5 py-0.5 text-[11px] font-medium'
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.06)',
+                    backgroundColor: 'var(--linear-bg-surface-2)',
                     border: '1px solid var(--linear-border-subtle)',
                     color: 'var(--linear-text-secondary)',
                   }}
@@ -142,8 +144,8 @@ export function PricingSection() {
                 href='/claim'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
-                  backgroundColor: 'rgb(230,230,230)',
-                  color: 'rgb(10,10,10)',
+                  backgroundColor: '#5e6ad2',
+                  color: '#ffffff',
                 }}
               >
                 Choose Founding Member

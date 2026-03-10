@@ -32,7 +32,7 @@ export function ReleaseNotificationsSection() {
           height: '600px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(22% 0.04 75 / 0.12), transparent 65%)',
+            'radial-gradient(ellipse at center, oklch(90% 0.04 75 / 0.5), transparent 65%)',
         }}
       />
 
@@ -41,7 +41,7 @@ export function ReleaseNotificationsSection() {
           {/* ── Desktop: side-by-side · Mobile: stacked ── */}
           <div className='grid lg:grid-cols-[0.4fr_0.6fr] gap-12 lg:gap-16 lg:items-start'>
             {/* ─── Left column: copy + stat ─── */}
-            <div className='flex flex-col'>
+            <div className='flex flex-col reveal-on-scroll'>
               <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 <Zap className='h-3 w-3' aria-hidden='true' />
                 Automatic
@@ -86,35 +86,16 @@ export function ReleaseNotificationsSection() {
             </div>
 
             {/* ─── Right column: Mailchimp contrast ─── */}
-            <div className='relative'>
+            <div className='relative reveal-on-scroll' data-delay='80'>
               <div
                 className='relative grid grid-cols-[1fr_auto_1fr] gap-0 overflow-hidden rounded-xl md:rounded-2xl'
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
-                  boxShadow: [
-                    '0 0 0 1px rgba(255,255,255,0.03)',
-                    '0 8px 40px rgba(0,0,0,0.35)',
-                    '0 24px 80px rgba(0,0,0,0.25)',
-                  ].join(', '),
+                  boxShadow:
+                    '0 4px 24px rgba(0,0,0,0.08), 0 12px 48px rgba(0,0,0,0.06)',
                 }}
               >
-                {/* Shine border overlay */}
-                <div
-                  aria-hidden='true'
-                  className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
-                  style={{ border: '1px solid rgba(255,255,255,0.04)' }}
-                />
-                {/* Top edge highlight */}
-                <div
-                  aria-hidden='true'
-                  className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
-                  style={{
-                    background:
-                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
-                  }}
-                />
-
                 {/* ── Left half: The Old Way (faded) ── */}
                 <div className='relative px-5 sm:px-6 py-6 sm:py-8 opacity-[0.38]'>
                   <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)] mb-5'>
@@ -189,7 +170,7 @@ export function ReleaseNotificationsSection() {
                           style={{
                             background:
                               'linear-gradient(135deg, oklch(55% 0.15 75), oklch(50% 0.12 195))',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                           }}
                         />
                         <div className='min-w-0 flex-1'>
@@ -215,8 +196,7 @@ export function ReleaseNotificationsSection() {
                           background:
                             'linear-gradient(135deg, oklch(72% 0.16 75), oklch(68% 0.14 60))',
                           color: 'oklch(18% 0.01 75)',
-                          boxShadow:
-                            '0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
                         }}
                         tabIndex={-1}
                         aria-hidden='true'
@@ -248,22 +228,6 @@ export function ReleaseNotificationsSection() {
                   </div>
                 </div>
               </div>
-
-              {/* Reflection */}
-              <div
-                aria-hidden='true'
-                className='pointer-events-none mt-0 h-16 w-full rounded-xl'
-                style={{
-                  background:
-                    'linear-gradient(to bottom, rgba(255,255,255,0.02), transparent)',
-                  transform: 'rotateX(180deg) scaleY(0.3)',
-                  opacity: 0.3,
-                  maskImage:
-                    'linear-gradient(to bottom, black 20%, transparent)',
-                  WebkitMaskImage:
-                    'linear-gradient(to bottom, black 20%, transparent)',
-                }}
-              />
             </div>
           </div>
         </div>

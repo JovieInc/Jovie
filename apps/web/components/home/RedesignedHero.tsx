@@ -2,14 +2,14 @@ import { ClaimHandleForm } from './claim-handle';
 
 export function RedesignedHero() {
   return (
-    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[max(16vh,100px)] pb-0'>
+    <section className='relative flex flex-1 flex-col items-center overflow-hidden px-5 sm:px-6 pt-[10rem] pb-[7rem]'>
       {/* Primary ambient glow — barely perceptible warmth */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{
           background:
-            'radial-gradient(ellipse 80% 50% at 50% 25%, oklch(18% 0.015 260 / 0.2), transparent 65%)',
+            'radial-gradient(ellipse 80% 50% at 50% 25%, oklch(85% 0.04 270 / 0.4), transparent 65%)',
         }}
       />
 
@@ -19,10 +19,7 @@ export function RedesignedHero() {
           <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)] mb-5'>
             Built for independent artists
           </span>
-          <h1
-            className='marketing-h1-linear text-[var(--linear-text-primary)]'
-            style={{ fontWeight: 590 }}
-          >
+          <h1 className='marketing-h1-linear text-[var(--linear-text-primary)]'>
             Turn profile visits into <br className='hidden sm:block' />
             fans you can reach.
           </h1>
@@ -43,7 +40,7 @@ export function RedesignedHero() {
                 key={item}
                 className='rounded-2xl px-4 py-3 text-left text-[13px] leading-5 text-[var(--linear-text-secondary)]'
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.02)',
+                  backgroundColor: 'var(--linear-bg-surface-1)',
                   border: '1px solid var(--linear-border-subtle)',
                 }}
               >
@@ -56,10 +53,9 @@ export function RedesignedHero() {
             <div
               className='relative rounded-2xl p-2'
               style={{
-                backgroundColor: 'rgba(255,255,255,0.02)',
+                backgroundColor: 'var(--linear-bg-surface-1)',
                 border: '1px solid var(--linear-border-subtle)',
-                boxShadow:
-                  '0 0 0 1px rgba(255,255,255,0.03), 0 8px 32px rgba(0,0,0,0.3)',
+                boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >
               <ClaimHandleForm />

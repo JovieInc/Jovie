@@ -247,7 +247,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
@@ -257,7 +257,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
@@ -267,7 +267,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
@@ -277,7 +277,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
@@ -287,7 +287,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
@@ -297,7 +297,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
@@ -307,7 +307,7 @@ export default function HomePage() {
         className='mx-auto max-w-lg border-0 h-px'
         style={{
           background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
         }}
       />
 
