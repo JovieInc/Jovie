@@ -83,10 +83,9 @@ export async function processMusicFetchEnrichmentJob(
     errors: [],
   };
 
-  // Check availability
+  // Check availability — throw so the job fails and retries
   if (!isMusicFetchAvailable()) {
-    result.errors.push('MusicFetch API token not configured');
-    return result;
+    throw new Error('MusicFetch API token not configured');
   }
 
   // Fetch existing profile
@@ -118,11 +117,10 @@ export async function processMusicFetchEnrichmentJob(
     return result;
   }
 
-  // Call MusicFetch API
+  // Call MusicFetch API — throw so the job fails and retries
   const artistData = await fetchArtistBySpotifyUrl(spotifyUrl);
   if (!artistData) {
-    result.errors.push('MusicFetch API returned no data');
-    return result;
+    throw new Error('MusicFetch API returned no data');
   }
 
   // Map DSP services to profile fields
