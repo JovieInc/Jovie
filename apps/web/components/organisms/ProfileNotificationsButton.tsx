@@ -1,7 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import { Bell, Check } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import React from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { NotificationSubscriptionState } from '@/types/notifications';
@@ -35,6 +35,7 @@ export function ProfileNotificationsButton({
   subscribedChannels,
 }: ProfileNotificationsButtonProps) {
   const isEditing = notificationsState === 'editing';
+  const isActive = hasActiveSubscriptions;
 
   const button = (
     <CircleIconButton
@@ -51,18 +52,14 @@ export function ProfileNotificationsButton({
       aria-pressed={isEditing}
       onClick={onClick}
     >
-      <Bell className='h-4 w-4 text-primary-token' aria-hidden='true' />
-      {hasActiveSubscriptions ? (
-        <span
-          aria-hidden
-          className='absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white dark:bg-white'
-        >
-          <Check
-            className='h-2.5 w-2.5 text-black dark:text-black'
-            strokeWidth={3}
-          />
-        </span>
-      ) : null}
+      <Bell
+        className={
+          isActive
+            ? 'h-4 w-4 fill-current text-accent'
+            : 'h-4 w-4 text-primary-token'
+        }
+        aria-hidden='true'
+      />
     </CircleIconButton>
   );
 
