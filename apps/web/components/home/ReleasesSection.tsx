@@ -16,6 +16,7 @@ const RELEASES = [
   {
     id: 'never-say-a-word',
     title: 'Never Say A Word',
+    artist: 'Tim White',
     year: '2024',
     type: 'Single',
     artwork: 'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
@@ -25,6 +26,7 @@ const RELEASES = [
   {
     id: 'deep-end',
     title: 'The Deep End',
+    artist: 'Cosmic Gate & Tim White',
     year: '2017',
     type: 'Single',
     artwork: 'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
@@ -34,6 +36,7 @@ const RELEASES = [
   {
     id: 'take-me-over',
     title: 'Take Me Over',
+    artist: 'Tim White',
     year: '2014',
     type: 'Single',
     artwork: 'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
@@ -244,7 +247,7 @@ function ReleasePhone({
           {release.title}
         </p>
         <p className='mt-0.5 text-[12px] text-[var(--linear-text-tertiary)]'>
-          Tim White
+          {release.artist}
         </p>
       </div>
 
@@ -287,7 +290,7 @@ function ReleasePhone({
 /* ------------------------------------------------------------------ */
 
 export function ReleasesSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(1);
   const activeRelease = RELEASES[activeIndex];
 
   return (
