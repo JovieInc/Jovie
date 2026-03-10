@@ -108,17 +108,18 @@ export function AudienceCRMSection() {
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Your audience.
+              Stop renting your audience.
               <br />
-              Finally yours.
+              Start building it.
             </h2>
             <div className='max-w-lg'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Every visit captures an email, a city, a referral source. No
-                integrations, no extra tools — just a CRM that fills itself.
+                Most artist pages leak demand to streaming apps and social
+                platforms. Jovie turns each visit into first-party audience data
+                you can actually use later.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                Built-in CRM
+                Built-in fan CRM
               </span>
             </div>
           </div>

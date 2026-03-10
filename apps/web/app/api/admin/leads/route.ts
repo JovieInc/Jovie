@@ -5,11 +5,8 @@ import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import {
-  extractLinktreeHandle,
-  validateLinktreeUrl,
-} from '@/lib/ingestion/strategies/linktree';
 import { processLeadBatch } from '@/lib/leads/process-batch';
+import { seedLeadFromUrl } from '@/lib/leads/url-intake';
 import {
   leadListQuerySchema,
   manualLeadSubmitSchema,
@@ -18,6 +15,10 @@ import {
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export const runtime = 'nodejs';
+
+function toIsoStringOrNull(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
 
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
@@ -78,9 +79,28 @@ export async function GET(request: NextRequest) {
       db.select({ count: count() }).from(leads).where(where),
     ]);
 
+    const normalizedItems = items.map(item => ({
+      ...item,
+      hasSpotifyLink: item.hasSpotifyLink ?? false,
+      hasInstagram: item.hasInstagram ?? false,
+      musicToolsDetected: item.musicToolsDetected ?? [],
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
+      qualifiedAt: toIsoStringOrNull(item.qualifiedAt),
+      disqualifiedAt: toIsoStringOrNull(item.disqualifiedAt),
+      approvedAt: toIsoStringOrNull(item.approvedAt),
+      ingestedAt: toIsoStringOrNull(item.ingestedAt),
+      rejectedAt: toIsoStringOrNull(item.rejectedAt),
+      latestReleaseDate: toIsoStringOrNull(item.latestReleaseDate),
+      scrapedAt: toIsoStringOrNull(item.scrapedAt),
+      outreachQueuedAt: toIsoStringOrNull(item.outreachQueuedAt),
+      claimTokenExpiresAt: toIsoStringOrNull(item.claimTokenExpiresAt),
+      dmSentAt: toIsoStringOrNull(item.dmSentAt),
+    }));
+
     return NextResponse.json(
       {
-        items,
+        items: normalizedItems,
         total: totalRow?.count ?? 0,
         page: query.page,
         limit: query.limit,
@@ -139,22 +159,12 @@ export async function POST(request: NextRequest) {
     const newLeadIds: string[] = [];
 
     for (const url of validated.data.urls) {
-      const validated = validateLinktreeUrl(url);
-      if (!validated) {
+      const seed = seedLeadFromUrl(url);
+      if (!seed) {
         results.push({
           url,
           status: 'invalid',
-          reason: 'Invalid Linktree URL',
-        });
-        continue;
-      }
-
-      const handle = extractLinktreeHandle(url);
-      if (!handle) {
-        results.push({
-          url,
-          status: 'invalid',
-          reason: 'Could not extract handle',
+          reason: 'Invalid URL',
         });
         continue;
       }
@@ -163,7 +173,7 @@ export async function POST(request: NextRequest) {
       const [existing] = await db
         .select({ id: leads.id })
         .from(leads)
-        .where(eq(leads.linktreeHandle, handle))
+        .where(eq(leads.linktreeHandle, seed.handle))
         .limit(1);
 
       if (existing) {
@@ -174,9 +184,15 @@ export async function POST(request: NextRequest) {
       const [inserted] = await db
         .insert(leads)
         .values({
-          linktreeHandle: handle,
-          linktreeUrl: validated,
+          linktreeHandle: seed.handle,
+          linktreeUrl: seed.normalizedUrl,
           discoverySource: 'manual',
+          hasSpotifyLink: seed.hasSpotifyLink,
+          spotifyUrl: seed.spotifyUrl,
+          hasInstagram: seed.hasInstagram,
+          instagramHandle: seed.instagramHandle,
+          musicToolsDetected:
+            seed.kind === 'apple_music' ? ['apple_music'] : [],
         })
         .returning({ id: leads.id });
 

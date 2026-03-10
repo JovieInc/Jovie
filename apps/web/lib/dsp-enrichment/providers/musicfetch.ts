@@ -10,6 +10,7 @@
 
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
 import { env } from '@/lib/env-server';
 import {
   MusicfetchRequestError,
@@ -97,36 +98,75 @@ export async function fetchArtistBySpotifyUrl(
     services: ARTIST_LOOKUP_SERVICES,
   });
 
-  try {
-    const data = await musicfetchRequest<MusicFetchResponse>('/url', params, {
-      timeoutMs: REQUEST_TIMEOUT_MS,
-    });
+  return Sentry.startSpan(
+    {
+      op: 'music.fetch',
+      name: 'MusicFetch: fetch artist by Spotify URL',
+      attributes: { 'music.fetch.url': spotifyUrl },
+    },
+    async span => {
+      Sentry.addBreadcrumb({
+        category: 'music.fetch',
+        message: `Fetching MusicFetch data for Spotify URL`,
+        data: { spotifyUrl, timestamp: new Date().toISOString() },
+        level: 'info',
+      });
 
-    if (!data.result || data.result?.type !== 'artist') {
-      logger.warn('MusicFetch returned non-artist result', {
-        type: data.result?.type,
-        spotifyUrl,
-      });
-      return null;
-    }
+      try {
+        const data = await musicfetchRequest<MusicFetchResponse>(
+          '/url',
+          params,
+          {
+            timeoutMs: REQUEST_TIMEOUT_MS,
+          }
+        );
 
-    return data.result;
-  } catch (error) {
-    if (error instanceof MusicfetchRequestError) {
-      logger.warn('MusicFetch request failed', {
-        spotifyUrl,
-        statusCode: error.statusCode,
-        retryAfterSeconds: error.retryAfterSeconds,
-        message: error.message,
-      });
-    } else {
-      logger.warn('MusicFetch request failed', {
-        spotifyUrl,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+        if (!data.result || data.result?.type !== 'artist') {
+          logger.warn('MusicFetch returned non-artist result', {
+            type: data.result?.type,
+            spotifyUrl,
+          });
+          span.setStatus({ code: 2, message: 'non-artist result' });
+          return null;
+        }
+
+        span.setStatus({ code: 1, message: 'ok' });
+        return data.result;
+      } catch (error) {
+        span.setStatus({ code: 2, message: 'error' });
+
+        const statusCode =
+          error instanceof MusicfetchRequestError
+            ? error.statusCode
+            : undefined;
+
+        Sentry.captureException(error, {
+          tags: { 'music.fetch.source': 'musicfetch' },
+          extra: {
+            spotifyUrl,
+            statusCode,
+            errorMessage:
+              error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+
+        if (error instanceof MusicfetchRequestError) {
+          logger.warn('MusicFetch request failed', {
+            spotifyUrl,
+            statusCode: error.statusCode,
+            retryAfterSeconds: error.retryAfterSeconds,
+            message: error.message,
+          });
+        } else {
+          logger.warn('MusicFetch request failed', {
+            spotifyUrl,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+        return null;
+      }
     }
-    return null;
-  }
+  );
 }
 
 // ============================================================================

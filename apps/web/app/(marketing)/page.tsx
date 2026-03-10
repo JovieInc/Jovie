@@ -10,6 +10,7 @@ import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { ReleaseNotificationsSection } from '@/components/home/ReleaseNotificationsSection';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
+import { SocialProofSection } from '@/components/home/SocialProofSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 
@@ -17,9 +18,9 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The link in bio your music deserves.`;
+  const title = `${APP_NAME} | Turn profile visits into fans you can reach`;
   const description =
-    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.';
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -141,7 +142,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.',
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -170,7 +171,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'A conversion-first link-in-bio platform for artists to capture fan contacts and drive clear next actions.',
+    'A conversion-first profile platform for artists to capture fan contacts and drive clear next actions.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -208,7 +209,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'The link in bio built for musicians. Capture emails, direct streams, earn tips — all on autopilot. Free to start.',
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -240,6 +241,18 @@ export default function HomePage() {
         <LogoBar />
       </div>
 
+      <SocialProofSection />
+
+      <hr
+        className='mx-auto max-w-lg border-0 h-px'
+        style={{
+          background:
+            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
+        }}
+      />
+
+      <AudienceCRMSection />
+
       <hr
         className='mx-auto max-w-lg border-0 h-px'
         style={{
@@ -249,16 +262,6 @@ export default function HomePage() {
       />
 
       <DeeplinksGrid />
-
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, rgba(255,255,255,0.08), transparent)',
-        }}
-      />
-
-      <AutomaticReleaseSmartlinksSection />
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'
@@ -278,7 +281,7 @@ export default function HomePage() {
         }}
       />
 
-      <AudienceCRMSection />
+      <AutomaticReleaseSmartlinksSection />
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'
