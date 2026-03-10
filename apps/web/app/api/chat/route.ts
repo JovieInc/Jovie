@@ -1401,9 +1401,6 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools,
       abortSignal: req.signal,
-      providerOptions: {
-        anthropic: { cacheControl: true },
-      },
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: true,
