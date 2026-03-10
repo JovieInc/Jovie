@@ -98,6 +98,39 @@ function buildProviderLabels() {
   );
 }
 
+function normalizeSpotifyArtistUrl(rawUrl: string, spotifyArtistId: string) {
+  const trimmedUrl = rawUrl.trim();
+  if (!trimmedUrl) {
+    return `https://open.spotify.com/artist/${encodeURIComponent(spotifyArtistId)}`;
+  }
+
+  try {
+    const parsed = new URL(trimmedUrl);
+    const hostOk =
+      parsed.hostname === 'open.spotify.com' ||
+      parsed.hostname === 'spotify.com' ||
+      parsed.hostname.endsWith('.spotify.com');
+    const protocolOk = ['http:', 'https:'].includes(parsed.protocol);
+    const pathOk = parsed.pathname.includes('/artist/');
+
+    if (protocolOk && hostOk && pathOk) {
+      return parsed.toString();
+    }
+  } catch {
+    // Fall back to canonical Spotify artist URL below.
+  }
+
+  return `https://open.spotify.com/artist/${encodeURIComponent(spotifyArtistId)}`;
+}
+
+function deriveSpotifyImportStatus(result: SpotifyImportResult) {
+  if (result.success || result.releases.length > 0 || result.imported > 0) {
+    return 'complete' as const;
+  }
+
+  return 'failed' as const;
+}
+
 async function requireProfile(profileId?: string): Promise<{
   id: string;
   spotifyId: string | null;
@@ -1046,6 +1079,7 @@ export async function getSpotifyImportStatus(): Promise<{
   const [row] = await db
     .select({
       settings: creatorProfiles.settings,
+      spotifyId: creatorProfiles.spotifyId,
       releaseCount: count(discogReleases.id),
     })
     .from(creatorProfiles)
@@ -1058,22 +1092,31 @@ export async function getSpotifyImportStatus(): Promise<{
     .limit(1);
 
   const settings = (row?.settings ?? {}) as Record<string, unknown>;
-  const status =
-    (settings.spotifyImportStatus as string) === 'importing'
-      ? 'importing'
-      : (settings.spotifyImportStatus as string) === 'complete'
-        ? 'complete'
-        : (settings.spotifyImportStatus as string) === 'failed'
-          ? 'failed'
-          : 'idle';
+  const storedStatus = settings.spotifyImportStatus as string | undefined;
+  const releaseCount = Number(row?.releaseCount ?? 0);
+  const hasSpotifyProfile = Boolean(row?.spotifyId);
 
-  return { status, releaseCount: Number(row?.releaseCount ?? 0) };
+  const status =
+    storedStatus === 'complete'
+      ? 'complete'
+      : storedStatus === 'failed'
+        ? 'failed'
+        : storedStatus === 'importing'
+          ? hasSpotifyProfile && releaseCount > 0
+            ? 'complete'
+            : 'importing'
+          : hasSpotifyProfile && releaseCount > 0
+            ? 'complete'
+            : 'idle';
+
+  return { status, releaseCount };
 }
 
 export async function connectSpotifyArtist(params: {
   spotifyArtistId: string;
   spotifyArtistUrl: string;
   artistName: string;
+  includeTracks?: boolean;
 }): Promise<{
   success: boolean;
   importing: boolean;
@@ -1101,6 +1144,7 @@ export async function connectSpotifyArtist(params: {
     string,
     unknown
   >;
+  const shouldRunInlineImport = process.env.E2E_FAST_ONBOARDING === '1';
 
   // Update the profile with Spotify ID and mark import as in-progress
   try {
@@ -1132,92 +1176,157 @@ export async function connectSpotifyArtist(params: {
     throw error;
   }
 
+  const finalizeSpotifyImport = async (
+    result: SpotifyImportResult
+  ): Promise<void> => {
+    const spotifyImportStatus = deriveSpotifyImportStatus(result);
+
+    // Update import status and re-assert the canonical Spotify identity fields.
+    // The import itself is async and can overlap with other profile writes during
+    // onboarding; writing these fields again keeps the profile aligned with the
+    // imported release data even if an intermediate update raced with the connect.
+    const [latest] = await db
+      .select({ settings: creatorProfiles.settings })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profile.id))
+      .limit(1);
+    const latestSettings = (latest?.settings ?? {}) as Record<string, unknown>;
+
+    await db
+      .update(creatorProfiles)
+      .set({
+        spotifyId: params.spotifyArtistId,
+        spotifyUrl: normalizeSpotifyArtistUrl(
+          params.spotifyArtistUrl,
+          params.spotifyArtistId
+        ),
+        settings: {
+          ...latestSettings,
+          spotifyArtistName:
+            params.artistName || (latestSettings.spotifyArtistName as string),
+          spotifyImportStatus,
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    revalidateTag(`releases:${userId}:${profile.id}`, 'max');
+
+    revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+    revalidatePath(APP_ROUTES.RELEASES);
+
+    if (result.success) {
+      void trackServerEvent('releases_synced', {
+        profileId: profile.id,
+        imported: result.imported,
+        source: 'spotify',
+        isInitialConnect: true,
+      });
+
+      // Auto-trigger DSP artist discovery
+      void enqueueDspArtistDiscoveryJob({
+        creatorProfileId: profile.id,
+        spotifyArtistId: params.spotifyArtistId,
+        targetProviders: ['apple_music'],
+      }).catch(err => {
+        void captureError(
+          'DSP artist discovery enqueue failed on connect',
+          err,
+          { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
+        );
+      });
+
+      // Auto-trigger MusicFetch enrichment
+      const spotifyUrlForEnrichment = normalizeSpotifyArtistUrl(
+        params.spotifyArtistUrl,
+        params.spotifyArtistId
+      );
+
+      void enqueueMusicFetchEnrichmentJob({
+        creatorProfileId: profile.id,
+        spotifyUrl: spotifyUrlForEnrichment,
+      }).catch(err => {
+        void captureError('MusicFetch enrichment enqueue failed', err, {
+          action: 'connectSpotifyArtist',
+          creatorProfileId: profile.id,
+        });
+      });
+    }
+  };
+
+  const runSpotifyImport = async (): Promise<SpotifyImportResult> => {
+    return syncReleasesFromSpotify(profile.id, {
+      includeTracks: params.includeTracks ?? true,
+    });
+  };
+
+  if (shouldRunInlineImport) {
+    try {
+      const result = await runSpotifyImport();
+      await finalizeSpotifyImport(result);
+
+      return {
+        success: result.success,
+        importing: false,
+        message: result.success
+          ? 'Imported releases from Spotify.'
+          : 'Spotify import finished with errors.',
+        imported: result.imported,
+        releases: result.releases.map(release =>
+          mapReleaseToViewModel(
+            release,
+            buildProviderLabels(),
+            profile.id,
+            profile.handle
+          )
+        ),
+        artistName: params.artistName,
+      };
+    } catch (error) {
+      // Mark import as failed on unexpected error
+      try {
+        const [latest] = await db
+          .select({ settings: creatorProfiles.settings })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.id, profile.id))
+          .limit(1);
+        const latestSettings = (latest?.settings ?? {}) as Record<
+          string,
+          unknown
+        >;
+
+        await db
+          .update(creatorProfiles)
+          .set({
+            settings: { ...latestSettings, spotifyImportStatus: 'failed' },
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, profile.id));
+      } catch {
+        // DB update best-effort in error path
+      }
+
+      void captureError('Background Spotify import failed', error, {
+        action: 'connectSpotifyArtist',
+        creatorProfileId: profile.id,
+      });
+
+      return {
+        success: false,
+        importing: false,
+        message: 'Spotify import failed.',
+        imported: 0,
+        releases: [],
+        artistName: params.artistName,
+      };
+    }
+  }
+
   // Fire-and-forget: start import in background, return immediately
   void (async () => {
     try {
-      const result: SpotifyImportResult = await syncReleasesFromSpotify(
-        profile.id
-      );
-
-      // Update import status to complete or failed
-      const [latest] = await db
-        .select({ settings: creatorProfiles.settings })
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.id, profile.id))
-        .limit(1);
-      const latestSettings = (latest?.settings ?? {}) as Record<
-        string,
-        unknown
-      >;
-
-      await db
-        .update(creatorProfiles)
-        .set({
-          settings: {
-            ...latestSettings,
-            spotifyImportStatus: result.success ? 'complete' : 'failed',
-          },
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, profile.id));
-
-      revalidateTag(`releases:${userId}:${profile.id}`, 'max');
-
-      revalidateTag(createSmartLinkContentTag(profile.id), 'max');
-      revalidatePath(APP_ROUTES.RELEASES);
-
-      if (result.success) {
-        void trackServerEvent('releases_synced', {
-          profileId: profile.id,
-          imported: result.imported,
-          source: 'spotify',
-          isInitialConnect: true,
-        });
-
-        // Auto-trigger DSP artist discovery
-        void enqueueDspArtistDiscoveryJob({
-          creatorProfileId: profile.id,
-          spotifyArtistId: params.spotifyArtistId,
-          targetProviders: ['apple_music'],
-        }).catch(err => {
-          void captureError(
-            'DSP artist discovery enqueue failed on connect',
-            err,
-            { action: 'connectSpotifyArtist', creatorProfileId: profile.id }
-          );
-        });
-
-        // Auto-trigger MusicFetch enrichment
-        const normalizedSpotifyUrl = (() => {
-          const raw = params.spotifyArtistUrl.trim();
-          try {
-            const parsed = new URL(raw);
-            const hostOk =
-              parsed.hostname === 'open.spotify.com' ||
-              parsed.hostname === 'spotify.com' ||
-              parsed.hostname.endsWith('.spotify.com');
-            if (!['http:', 'https:'].includes(parsed.protocol)) return null;
-            if (!hostOk || !parsed.pathname.includes('/artist/')) return null;
-            return parsed.toString();
-          } catch {
-            return null;
-          }
-        })();
-
-        const spotifyUrlForEnrichment =
-          normalizedSpotifyUrl ??
-          `https://open.spotify.com/artist/${encodeURIComponent(params.spotifyArtistId)}`;
-
-        void enqueueMusicFetchEnrichmentJob({
-          creatorProfileId: profile.id,
-          spotifyUrl: spotifyUrlForEnrichment,
-        }).catch(err => {
-          void captureError('MusicFetch enrichment enqueue failed', err, {
-            action: 'connectSpotifyArtist',
-            creatorProfileId: profile.id,
-          });
-        });
-      }
+      const result = await runSpotifyImport();
+      await finalizeSpotifyImport(result);
     } catch (error) {
       // Mark import as failed on unexpected error
       try {

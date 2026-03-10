@@ -32,6 +32,7 @@ export interface ProfileStateResult {
 /**
  * Determines if a creator profile is considered "complete" for access purposes.
  * A complete profile has: username, display name, is public, and has completed onboarding.
+ * Avatar is intentionally optional because onboarding no longer requires a photo.
  *
  * @param profile - Profile data to check
  * @returns Whether the profile is complete
@@ -40,11 +41,10 @@ export function isProfileComplete(profile: ProfileData): boolean {
   const hasHandle =
     Boolean(profile.usernameNormalized) && Boolean(profile.username);
   const hasName = Boolean(profile.displayName?.trim());
-  const hasAvatar = Boolean(profile.avatarUrl?.trim());
   const isPublic = profile.isPublic !== false;
   const hasCompleted = Boolean(profile.onboardingCompletedAt);
 
-  return hasHandle && hasName && hasAvatar && isPublic && hasCompleted;
+  return hasHandle && hasName && isPublic && hasCompleted;
 }
 
 /**

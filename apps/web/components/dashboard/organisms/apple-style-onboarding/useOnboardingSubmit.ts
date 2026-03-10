@@ -95,6 +95,7 @@ function tryAutoConnectSpotify(
         spotifyArtistId: artistId,
         spotifyArtistUrl: normalizedUrl,
         artistName,
+        includeTracks: false,
       })
         .then(result => {
           if (result.success) {

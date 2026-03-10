@@ -7,6 +7,7 @@ import {
   formatVerifiedPriceLabel,
   getPreferredVerifiedPrice,
 } from '@/lib/billing/verified-upgrade';
+import { env } from '@/lib/env-client';
 import {
   useBillingStatusQuery,
   useCheckoutMutation,
@@ -14,8 +15,10 @@ import {
 } from '@/lib/queries';
 
 export function SidebarUpgradeBanner() {
-  const billingStatus = useBillingStatusQuery();
-  const pricing = usePricingOptionsQuery();
+  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+
+  const billingStatus = useBillingStatusQuery({ enabled: !isPassiveRuntime });
+  const pricing = usePricingOptionsQuery({ enabled: !isPassiveRuntime });
   const checkoutMutation = useCheckoutMutation();
 
   const selectedPrice = useMemo(
@@ -49,7 +52,11 @@ export function SidebarUpgradeBanner() {
     globalThis.location.href = checkout.url;
   }, [checkoutMutation, selectedPrice]);
 
-  if (billingStatus.isLoading || billingStatus.data?.isPro) {
+  if (
+    isPassiveRuntime ||
+    billingStatus.isLoading ||
+    billingStatus.data?.isPro
+  ) {
     return null;
   }
 

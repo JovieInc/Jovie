@@ -14,6 +14,7 @@ config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
+const isPublicNoAuthOnly = process.env.PUBLIC_NOAUTH_SMOKE === '1';
 
 const SENSITIVE_PATTERNS = [
   'dummy',
@@ -115,7 +116,7 @@ async function globalSetup() {
   if (process.env.DATABASE_URL) {
     try {
       console.log('🌱 Seeding test data...');
-      await seedTestData();
+      await seedTestData({ publicProfilesOnly: isPublicNoAuthOnly });
       console.log('✓ Test data seeded successfully');
     } catch (error) {
       console.warn('⚠ Failed to seed test data:', error);
@@ -134,33 +135,47 @@ async function globalSetup() {
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';
   console.log('🔥 Warming up Turbopack routes...');
   const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
-  const warmupRoutes = [
-    '/',
-    '/signin',
-    APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
-    APP_ROUTES.DASHBOARD_PROFILE,
-    `/${testProfile}`,
-    `/${testProfile}?mode=listen`,
-    `/${testProfile}?mode=tip`,
-    APP_ROUTES.ADMIN,
-    APP_ROUTES.ADMIN_CREATORS,
-    APP_ROUTES.ADMIN_USERS,
-  ];
-  await Promise.all(
-    warmupRoutes.map(async route => {
-      try {
-        const res = await fetch(`${baseURL}${route}`, {
-          signal: AbortSignal.timeout(120_000),
-          redirect: 'follow',
-        });
-        console.log(`  ✓ ${route} (${res.status}) warmed up`);
-      } catch {
-        console.log(
-          `  ⚠ ${route} warmup failed (will compile on first test visit)`
-        );
-      }
-    })
-  );
+  const warmupRoutes = isPublicNoAuthOnly
+    ? [
+        '/',
+        '/api/stripe/pricing-options',
+        `/${testProfile}`,
+        `/${testProfile}?mode=listen`,
+        `/${testProfile}?mode=subscribe`,
+        '/testartist?mode=tip',
+        '/signin',
+        '/signup',
+        '/nonexistent-handle-xyz-123',
+      ]
+    : [
+        '/',
+        '/api/stripe/pricing-options',
+        '/signin',
+        APP_ROUTES.DASHBOARD,
+        APP_ROUTES.CHAT, // auth.setup.ts navigates here — warm up to avoid cold-compile 404
+        APP_ROUTES.DASHBOARD_PROFILE,
+        `/${testProfile}`,
+        `/${testProfile}?mode=listen`,
+        `/${testProfile}?mode=subscribe`,
+        `/${testProfile}?mode=tip`,
+        '/testartist?mode=tip',
+        APP_ROUTES.ADMIN,
+        APP_ROUTES.ADMIN_CREATORS,
+        APP_ROUTES.ADMIN_USERS,
+      ];
+  for (const route of warmupRoutes) {
+    try {
+      const res = await fetch(`${baseURL}${route}`, {
+        signal: AbortSignal.timeout(120_000),
+        redirect: 'follow',
+      });
+      console.log(`  ✓ ${route} (${res.status}) warmed up`);
+    } catch {
+      console.log(
+        `  ⚠ ${route} warmup failed (will compile on first test visit)`
+      );
+    }
+  }
 
   const elapsed = Date.now() - startTime;
   console.log(`✅ E2E global setup complete in ${elapsed}ms`);

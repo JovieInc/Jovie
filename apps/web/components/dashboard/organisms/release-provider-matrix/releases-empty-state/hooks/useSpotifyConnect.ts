@@ -68,6 +68,7 @@ export function useSpotifyConnect({
           spotifyArtistId: artistId,
           spotifyArtistUrl: artistUrl,
           artistName: '',
+          includeTracks: false,
         }).catch(() => {
           // Import failure is non-critical during onboarding
         });
@@ -124,6 +125,7 @@ export function useSpotifyConnect({
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
           artistName: artist.name,
+          includeTracks: false,
         }).catch(() => {
           // Import failure is non-critical during onboarding
         });

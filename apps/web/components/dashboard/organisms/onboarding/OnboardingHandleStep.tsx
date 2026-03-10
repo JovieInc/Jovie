@@ -172,6 +172,8 @@ export function OnboardingHandleStep({
   isPendingSubmit = false,
   autoSubmitClaimed = false,
 }: OnboardingHandleStepProps) {
+  const disabledReasonId = 'handle-step-disabled-reason';
+
   function renderValidationStatus(): React.ReactNode {
     if (autoSubmitClaimed && handleInput) {
       return (
@@ -289,8 +291,10 @@ export function OnboardingHandleStep({
           </div>
 
           <AuthButton
-            type='submit'
+            type='button'
             disabled={Boolean(ctaDisabledReason) || isTransitioning}
+            aria-describedby={ctaDisabledReason ? disabledReasonId : undefined}
+            onClick={() => onSubmit()}
             variant='primary'
           >
             <ButtonContent
@@ -305,6 +309,9 @@ export function OnboardingHandleStep({
         <output className={FORM_LAYOUT.footerHint} aria-live='polite'>
           {stateError ?? null}
         </output>
+        <span id={disabledReasonId} className='sr-only' aria-live='polite'>
+          {ctaDisabledReason ?? ''}
+        </span>
       </div>
     </div>
   );

@@ -38,6 +38,7 @@ export function AppleStyleOnboardingForm({
   const [profileReadyHandle, setProfileReadyHandle] = useState(
     normalizedInitialHandle
   );
+  const [isClientReady, setIsClientReady] = useState(false);
   const handleInputRef = useRef<HTMLInputElement | null>(null);
 
   const { currentStepIndex, isTransitioning, goToNextStep, goBack } =
@@ -48,6 +49,7 @@ export function AppleStyleOnboardingForm({
       normalizedInitialHandle,
       fullName,
     });
+  const validateHandleRef = useRef(validateHandle);
 
   const {
     state,
@@ -79,6 +81,10 @@ export function AppleStyleOnboardingForm({
       });
     }
   }, [userId]);
+
+  useEffect(() => {
+    setIsClientReady(true);
+  }, []);
 
   useEffect(() => {
     const currentStep = ONBOARDING_STEPS[currentStepIndex];
@@ -155,6 +161,10 @@ export function AppleStyleOnboardingForm({
   // Trigger handle validation when input changes
   // Pacer hook handles debouncing (400ms) and caching internally
   useEffect(() => {
+    validateHandleRef.current = validateHandle;
+  }, [validateHandle]);
+
+  useEffect(() => {
     if (!handleInput) {
       setHandleValidation({
         available: false,
@@ -167,11 +177,16 @@ export function AppleStyleOnboardingForm({
     }
 
     // Call validateHandle directly - Pacer handles debouncing
-    validateHandle(handleInput);
-  }, [handleInput, setHandleValidation, validateHandle]);
+    validateHandleRef.current(handleInput);
+  }, [handleInput, setHandleValidation]);
 
   const goToDashboard = useCallback(() => {
     if (globalThis.window === undefined) return;
+
+    if (process.env.NEXT_PUBLIC_E2E_MODE === '1') {
+      globalThis.location.href = APP_ROUTES.DASHBOARD;
+      return;
+    }
 
     const initialQuery = getOnboardingDashboardInitialQuery(
       spotifyImportState.status
@@ -291,6 +306,7 @@ export function AppleStyleOnboardingForm({
           {ONBOARDING_STEPS[currentStepIndex]?.title} step content
         </div>
         <div
+          data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
           className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
             isTransitioning
               ? 'opacity-0 translate-y-4'

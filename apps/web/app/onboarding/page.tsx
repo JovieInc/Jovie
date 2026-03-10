@@ -28,6 +28,9 @@ export default async function OnboardingPage({
   searchParams,
 }: Readonly<OnboardingPageProps>) {
   const resolvedSearchParams = await searchParams;
+  const shouldSkipDashboardPrefetch =
+    process.env.E2E_FAST_ONBOARDING === '1' &&
+    Boolean(resolvedSearchParams?.handle);
 
   // proxy.ts already ensured user needsOnboarding
   // Just get user data and render the form
@@ -68,21 +71,23 @@ export default async function OnboardingPage({
   // Try to get existing profile data if available (user might be partially onboarded)
   // This is optional - if it fails, we just don't pre-fill
   let existingProfile = null;
-  try {
-    const dashboardData = await getDashboardData();
-    existingProfile = dashboardData.selectedProfile;
-  } catch (error) {
-    // Capture database/connection errors to Sentry (but not "no profile" errors)
-    const errorMessage = extractErrorMessage(error, 'Unknown error');
-    if (
-      errorMessage.includes('database') ||
-      errorMessage.includes('connection') ||
-      errorMessage.includes('timeout')
-    ) {
-      Sentry.captureException(error, {
-        tags: { context: 'onboarding_profile_load' },
-        extra: { clerkUserId: authResult.clerkUserId },
-      });
+  if (!shouldSkipDashboardPrefetch) {
+    try {
+      const dashboardData = await getDashboardData();
+      existingProfile = dashboardData.selectedProfile;
+    } catch (error) {
+      // Capture database/connection errors to Sentry (but not "no profile" errors)
+      const errorMessage = extractErrorMessage(error, 'Unknown error');
+      if (
+        errorMessage.includes('database') ||
+        errorMessage.includes('connection') ||
+        errorMessage.includes('timeout')
+      ) {
+        Sentry.captureException(error, {
+          tags: { context: 'onboarding_profile_load' },
+          extra: { clerkUserId: authResult.clerkUserId },
+        });
+      }
     }
   }
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const validateApiState = vi.hoisted(() => ({
   current: vi.fn<(input: string) => Promise<void>>(),
+  cancel: vi.fn(),
 }));
 
 vi.mock('@/lib/pacer/hooks', () => ({
@@ -13,6 +14,7 @@ vi.mock('@/lib/pacer/hooks', () => ({
   },
   useAsyncValidation: () => ({
     validate: validateApiState.current,
+    cancel: validateApiState.cancel,
     isPending: false,
     isValidating: false,
   }),
@@ -40,6 +42,7 @@ import { useHandleValidation } from '@/components/dashboard/organisms/apple-styl
 describe('useHandleValidation', () => {
   beforeEach(() => {
     validateApiState.current = vi.fn().mockResolvedValue(undefined);
+    validateApiState.cancel = vi.fn();
   });
 
   it('keeps validateHandle stable across rerenders while calling the latest validateApi ref', async () => {

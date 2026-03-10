@@ -67,6 +67,7 @@ interface StaticArtistPageProps {
   readonly tourDates?: TourDateViewModel[];
   /** HMAC-signed tracking token for authenticating visit tracking requests */
   readonly visitTrackingToken?: string;
+  readonly showSubscriptionConfirmedBanner?: boolean;
 }
 
 /**
@@ -206,6 +207,7 @@ export function StaticArtistPage({
   genres,
   tourDates = [],
   visitTrackingToken,
+  showSubscriptionConfirmedBanner = true,
 }: StaticArtistPageProps) {
   const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
   const mergedDSPs = getMergedDSPs(artist);
@@ -230,9 +232,11 @@ export function StaticArtistPage({
         visitTrackingToken={visitTrackingToken}
       >
         <div>
-          <Suspense>
-            <SubscriptionConfirmedBanner />
-          </Suspense>
+          {showSubscriptionConfirmedBanner ? (
+            <Suspense>
+              <SubscriptionConfirmedBanner />
+            </Suspense>
+          ) : null}
           {mode === 'profile' ? (
             <div className='space-y-3'>
               {latestRelease && (
