@@ -19,8 +19,8 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
 import {
-  hasRecentDispatch,
-  markRecentDispatch,
+  acquireRecentDispatch,
+  clearRecentDispatch,
 } from '@/lib/webhooks/recent-dispatch';
 
 export const runtime = 'nodejs';
@@ -72,6 +72,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let dedupeAcquired = false;
+  let issueIdForDedupe: string | null = null;
+
   try {
     const body = await request.text();
     const signature = request.headers.get('sentry-hook-signature');
@@ -108,9 +111,16 @@ export async function POST(request: NextRequest) {
     }
 
     const issueId = String(issue.id);
+    issueIdForDedupe = issueId;
 
-    // Dedupe: skip if we already dispatched for this issue recently
-    if (await hasRecentDispatch('sentry', issueId)) {
+    // Dedupe: acquire cross-instance lock before dispatch
+    dedupeAcquired = await acquireRecentDispatch(
+      'sentry',
+      issueId,
+      DEDUPE_TTL_SECONDS
+    );
+
+    if (!dedupeAcquired) {
       logger.info('[Sentry Webhook] Duplicate dispatch suppressed', {
         issueId,
       });
@@ -173,14 +183,12 @@ export async function POST(request: NextRequest) {
         status: dispatchResponse.status,
         error: errorText,
       });
+      await clearRecentDispatch('sentry', issueId);
       return NextResponse.json(
         { error: 'Dispatch failed' },
         { status: 502, headers: NO_STORE_HEADERS }
       );
     }
-
-    // Mark as dispatched AFTER success so failed dispatches can be retried
-    await markRecentDispatch('sentry', issueId, DEDUPE_TTL_SECONDS);
 
     logger.info('[Sentry Webhook] Dispatched autofix', {
       issueId,
@@ -194,6 +202,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     if (error instanceof ServerFetchTimeoutError) {
+      if (dedupeAcquired && issueIdForDedupe) {
+        await clearRecentDispatch('sentry', issueIdForDedupe);
+      }
       await captureCriticalError('Sentry webhook dispatch timed out', error, {
         route: '/api/webhooks/sentry',
         timeoutMs: error.timeoutMs,
@@ -202,6 +213,10 @@ export async function POST(request: NextRequest) {
         { error: 'Dispatch timed out' },
         { status: 502, headers: NO_STORE_HEADERS }
       );
+    }
+
+    if (dedupeAcquired && issueIdForDedupe) {
+      await clearRecentDispatch('sentry', issueIdForDedupe);
     }
 
     await captureCriticalError('Sentry webhook processing failed', error, {
