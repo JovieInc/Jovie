@@ -74,6 +74,58 @@ function isUserSettingsSchemaIssue(message: string): boolean {
   );
 }
 
+function resolveOperationFallback(
+  operation: string,
+  message: string,
+  hasMigrationErrorCode: boolean
+): { log: string; fallbackData: unknown } | null {
+  switch (operation) {
+    case 'creator_profiles':
+      if (hasMigrationErrorCode || isCreatorProfilesColumnMissing(message)) {
+        return {
+          log: '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding',
+          fallbackData: [],
+        };
+      }
+      break;
+    case 'user_settings':
+      if (hasMigrationErrorCode || isUserSettingsSchemaIssue(message)) {
+        return {
+          log: '[Dashboard] user_settings migration in progress',
+          fallbackData: undefined,
+        };
+      }
+      break;
+    case 'social_links_count':
+      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
+        return {
+          log: '[Dashboard] social_links migration in progress; treating as no links',
+          fallbackData: false,
+        };
+      }
+      break;
+    case 'music_links_count':
+      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
+        return {
+          log: '[Dashboard] social_links migration in progress; treating as no music links',
+          fallbackData: false,
+        };
+      }
+      break;
+    case 'social_links_existence':
+      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
+        return {
+          log: '[Dashboard] social_links migration in progress; treating as no links',
+          fallbackData: { hasLinks: false, hasMusicLinks: false },
+        };
+      }
+      break;
+    default:
+      break;
+  }
+  return null;
+}
+
 function logMigrationWarning(message: string, context: MigrationErrorContext) {
   const { logger } = Sentry;
 
@@ -83,26 +135,6 @@ function logMigrationWarning(message: string, context: MigrationErrorContext) {
   });
 }
 
-function handleSocialLinksError(
-  hasMigrationErrorCode: boolean,
-  message: string,
-  context: MigrationErrorContext,
-  columnMissingLabel: string
-): MigrationErrorHandlingResult | null {
-  if (hasMigrationErrorCode) {
-    logMigrationWarning(
-      '[Dashboard] social_links migration in progress',
-      context
-    );
-    return { shouldRetry: false, fallbackData: false };
-  }
-  if (isSocialLinksColumnMissing(message)) {
-    logMigrationWarning(columnMissingLabel, context);
-    return { shouldRetry: false, fallbackData: false };
-  }
-  return null;
-}
-
 export function handleMigrationErrors(
   error: unknown,
   context: MigrationErrorContext
@@ -110,65 +142,14 @@ export function handleMigrationErrors(
   const { code, message } = extractMigrationErrorDetails(error);
   const hasMigrationErrorCode = code ? MIGRATION_ERROR_CODES.has(code) : false;
 
-  switch (context.operation) {
-    case 'creator_profiles': {
-      const hasMissingColumn = isCreatorProfilesColumnMissing(message);
-      if (hasMigrationErrorCode || hasMissingColumn) {
-        logMigrationWarning(
-          '[Dashboard] creator_profiles schema migration in progress; treating as needs onboarding',
-          context
-        );
-        return { shouldRetry: false, fallbackData: [] };
-      }
-      break;
-    }
-    case 'user_settings': {
-      if (hasMigrationErrorCode || isUserSettingsSchemaIssue(message)) {
-        logMigrationWarning(
-          '[Dashboard] user_settings migration in progress',
-          context
-        );
-        return { shouldRetry: false, fallbackData: undefined };
-      }
-      break;
-    }
-    case 'social_links_count': {
-      const result = handleSocialLinksError(
-        hasMigrationErrorCode,
-        message,
-        context,
-        '[Dashboard] social_links.state column missing; treating as no links'
-      );
-      if (result) return result;
-      break;
-    }
-    case 'music_links_count': {
-      const result = handleSocialLinksError(
-        hasMigrationErrorCode,
-        message,
-        context,
-        '[Dashboard] social_links.state column missing; treating as no music links'
-      );
-      if (result) return result;
-      break;
-    }
-    // Combined existence query (hasLinks + hasMusicLinks in one SQL statement).
-    // Both booleans are fetched atomically so a single case covers the failure.
-    case 'social_links_existence': {
-      if (hasMigrationErrorCode || isSocialLinksColumnMissing(message)) {
-        logMigrationWarning(
-          '[Dashboard] social_links migration in progress; treating as no links',
-          context
-        );
-        return {
-          shouldRetry: false,
-          fallbackData: { hasLinks: false, hasMusicLinks: false },
-        };
-      }
-      break;
-    }
-    default:
-      break;
+  const fallback = resolveOperationFallback(
+    context.operation,
+    message,
+    hasMigrationErrorCode
+  );
+  if (fallback) {
+    logMigrationWarning(fallback.log, context);
+    return { shouldRetry: false, fallbackData: fallback.fallbackData };
   }
 
   return { shouldRetry: true, error: message };

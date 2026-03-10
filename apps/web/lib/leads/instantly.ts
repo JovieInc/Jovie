@@ -12,25 +12,54 @@ interface PushLeadParams {
   priorityScore: number;
 }
 
-async function postLeadToInstantly(
+async function attemptLeadPush(
+  apiKey: string,
   body: object,
-  apiKey: string
+  email: string
 ): Promise<string> {
-  const response = await fetch(`${INSTANTLY_API_BASE}/leads`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-  if (response.status === 429) throw new Error('429 rate limited');
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`Instantly API error ${response.status}: ${errorText}`);
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(`${INSTANTLY_API_BASE}/leads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (response.status === 429 && attempt === 0) {
+        pipelineLog('instantly', 'Rate limited, retrying after 2s', { email });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Instantly API error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const instantlyLeadId = data.id ?? data.lead_id ?? '';
+      pipelineLog('instantly', 'Lead pushed successfully', {
+        email,
+        instantlyLeadId,
+      });
+      return instantlyLeadId;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (
+        attempt === 0 &&
+        !(error instanceof Error && error.message.includes('429'))
+      ) {
+        throw lastError;
+      }
+    }
   }
-  const data = await response.json();
-  return data.id ?? data.lead_id ?? '';
+
+  throw lastError ?? new Error('Instantly push failed after retries');
 }
 
 export async function pushLeadToInstantly(
@@ -71,28 +100,5 @@ export async function pushLeadToInstantly(
     },
   };
 
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const instantlyLeadId = await postLeadToInstantly(body, apiKey);
-      pipelineLog('instantly', 'Lead pushed successfully', {
-        email: params.email,
-        instantlyLeadId,
-      });
-      return instantlyLeadId;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      const isRateLimit = lastError.message.startsWith('429');
-      if (!isRateLimit) throw lastError;
-      if (attempt === 0) {
-        pipelineLog('instantly', 'Rate limited, retrying after 2s', {
-          email: params.email,
-        });
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-  }
-
-  throw lastError ?? new Error('Instantly push failed after retries');
+  return attemptLeadPush(apiKey, body, params.email);
 }

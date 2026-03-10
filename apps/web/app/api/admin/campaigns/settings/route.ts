@@ -106,21 +106,6 @@ interface UpdateCampaignSettingsBody {
   };
 }
 
-function isThrottlingConfigInvalid(cfg: {
-  minDelayMs: unknown;
-  maxDelayMs: unknown;
-  maxPerHour: unknown;
-}): boolean {
-  return (
-    typeof cfg.minDelayMs !== 'number' ||
-    typeof cfg.maxDelayMs !== 'number' ||
-    typeof cfg.maxPerHour !== 'number' ||
-    cfg.minDelayMs < 0 ||
-    cfg.maxDelayMs < cfg.minDelayMs ||
-    cfg.maxPerHour < 1
-  );
-}
-
 function validateCampaignSettingsBody(
   body: UpdateCampaignSettingsBody
 ): string | null {
@@ -149,6 +134,41 @@ function validateCampaignSettingsBody(
   return null;
 }
 
+function buildCampaignSettingsUpdates(
+  body: UpdateCampaignSettingsBody,
+  updatedBy: string | null
+): Partial<typeof campaignSettings.$inferInsert> {
+  const updates: Partial<typeof campaignSettings.$inferInsert> = {
+    updatedAt: new Date(),
+    updatedBy,
+  };
+  if (body.fitScoreThreshold !== undefined) {
+    updates.fitScoreThreshold = String(body.fitScoreThreshold);
+  }
+  if (body.batchLimit !== undefined) {
+    updates.batchLimit = body.batchLimit;
+  }
+  if (body.throttlingConfig !== undefined) {
+    updates.throttlingConfig = body.throttlingConfig;
+  }
+  return updates;
+}
+
+function isThrottlingConfigInvalid(config: {
+  minDelayMs: number;
+  maxDelayMs: number;
+  maxPerHour: number;
+}): boolean {
+  return (
+    typeof config.minDelayMs !== 'number' ||
+    typeof config.maxDelayMs !== 'number' ||
+    typeof config.maxPerHour !== 'number' ||
+    config.minDelayMs < 0 ||
+    config.maxDelayMs < config.minDelayMs ||
+    config.maxPerHour < 1
+  );
+}
+
 /**
  * POST /api/admin/campaigns/settings — Upserts campaign settings.
  */
@@ -175,6 +195,7 @@ export async function POST(request: NextRequest) {
 
     const body = parsed.data as UpdateCampaignSettingsBody;
 
+    // Validate fields if provided
     const validationError = validateCampaignSettingsBody(body);
     if (validationError) {
       return NextResponse.json(
@@ -184,20 +205,7 @@ export async function POST(request: NextRequest) {
     }
 
     const updatedBy = entitlements.userId ?? null;
-
-    const updates: Partial<typeof campaignSettings.$inferInsert> = {
-      updatedAt: new Date(),
-      updatedBy,
-    };
-    if (body.fitScoreThreshold !== undefined) {
-      updates.fitScoreThreshold = String(body.fitScoreThreshold);
-    }
-    if (body.batchLimit !== undefined) {
-      updates.batchLimit = body.batchLimit;
-    }
-    if (body.throttlingConfig !== undefined) {
-      updates.throttlingConfig = body.throttlingConfig;
-    }
+    const updates = buildCampaignSettingsUpdates(body, updatedBy);
 
     const [row] = await db
       .insert(campaignSettings)

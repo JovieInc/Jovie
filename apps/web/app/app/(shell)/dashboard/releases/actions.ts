@@ -1063,18 +1063,6 @@ export async function pollReleasesCount(): Promise<{
   };
 }
 
-function resolveSpotifyImportStatus(
-  storedStatus: string | undefined,
-  hasSpotifyProfile: boolean,
-  releaseCount: number
-): 'idle' | 'importing' | 'complete' | 'failed' {
-  if (storedStatus === 'complete') return 'complete';
-  if (storedStatus === 'failed') return 'failed';
-  const hasData = hasSpotifyProfile && releaseCount > 0;
-  if (storedStatus === 'importing') return hasData ? 'complete' : 'importing';
-  return hasData ? 'complete' : 'idle';
-}
-
 /**
  * Get Spotify import status from profile settings (uncached).
  */
@@ -1108,11 +1096,16 @@ export async function getSpotifyImportStatus(): Promise<{
   const releaseCount = Number(row?.releaseCount ?? 0);
   const hasSpotifyProfile = Boolean(row?.spotifyId);
 
-  const status = resolveSpotifyImportStatus(
-    storedStatus,
-    hasSpotifyProfile,
-    releaseCount
-  );
+  let status: 'idle' | 'importing' | 'complete' | 'failed';
+  if (storedStatus === 'complete') {
+    status = 'complete';
+  } else if (storedStatus === 'failed') {
+    status = 'failed';
+  } else if (storedStatus === 'importing') {
+    status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'importing';
+  } else {
+    status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'idle';
+  }
 
   return { status, releaseCount };
 }

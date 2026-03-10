@@ -153,15 +153,10 @@ export function ReleaseTrackList({
         <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
           {isLoading && (
             <div className='space-y-0.5'>
-              {Array.from({ length: Math.min(release.totalTracks, 6) }).map(
-                (_, i) => (
-                  <div
-                    key={`skeleton-${
-                      // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholder
-                      i
-                    }`}
-                    className='flex items-start gap-2 px-1 py-1.5'
-                  >
+              {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
+                .slice(0, Math.min(release.totalTracks, 6))
+                .map(id => (
+                  <div key={id} className='flex items-start gap-2 px-1 py-1.5'>
                     <div className='w-6 shrink-0 pt-0.5'>
                       <div className='ml-auto h-3 w-4 rounded skeleton' />
                     </div>
@@ -170,8 +165,7 @@ export function ReleaseTrackList({
                       <div className='h-2.5 w-1/3 rounded skeleton' />
                     </div>
                   </div>
-                )
-              )}
+                ))}
             </div>
           )}
 

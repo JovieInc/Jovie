@@ -279,7 +279,9 @@ export function ReleaseSidebar({
     artistName: artistName ?? undefined,
     onRefresh,
     isRefreshing,
-    onCopySmartLink: handleCopySmartLink,
+    onCopySmartLink: () => {
+      handleCopySmartLink();
+    },
     onClose,
   });
 
