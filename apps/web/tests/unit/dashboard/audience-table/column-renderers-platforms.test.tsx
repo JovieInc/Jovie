@@ -45,7 +45,7 @@ describe('renderPlatformsCell', () => {
     );
 
     const iconCluster = container.querySelector(
-      '.inline-flex.items-center.gap-0'
+      '.inline-flex.items-center.gap-1'
     );
     expect(iconCluster).toBeTruthy();
 
