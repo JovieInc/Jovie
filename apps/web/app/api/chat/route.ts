@@ -1205,6 +1205,46 @@ function buildChatErrorResponse(
   );
 }
 
+async function handleDeterministicIntent(
+  uiMessages: UIMessage[],
+  profileId: unknown,
+  userId: string,
+  corsHeaders: Record<string, string>,
+  requestId: string
+): Promise<NextResponse | null> {
+  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return null;
+
+  const userText = lastUserMsg.parts
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('')
+    .trim();
+
+  const intent = classifyIntent(userText);
+  if (!isDeterministicIntent(intent)) return null;
+
+  const resolvedProfileId = toNullableString(profileId);
+  const result = await routeIntent(intent, {
+    clerkUserId: userId,
+    profileId: resolvedProfileId,
+  });
+  if (!result) return null;
+
+  return NextResponse.json(result, {
+    status: result.success ? 200 : 400,
+    headers: {
+      ...corsHeaders,
+      'x-request-id': requestId,
+      'x-intent-routed': 'true',
+      'x-intent-category': intent.category,
+    },
+  });
+}
+
 export async function POST(req: Request) {
   const requestId = extractRequestId(req);
   const corsHeaders = createAuthenticatedCorsHeaders(
@@ -1292,38 +1332,14 @@ export async function POST(req: Request) {
   const uiMessages = messages as UIMessage[];
 
   // --- Deterministic intent routing (skip AI for simple CRUD) ---
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  if (lastUserMsg) {
-    const userText = lastUserMsg.parts
-      .filter(
-        (p): p is { type: 'text'; text: string } =>
-          p.type === 'text' && typeof p.text === 'string'
-      )
-      .map(p => p.text)
-      .join('')
-      .trim();
-
-    const intent = classifyIntent(userText);
-    if (isDeterministicIntent(intent)) {
-      const resolvedProfileId = toNullableString(profileId);
-      const result = await routeIntent(intent, {
-        clerkUserId: userId,
-        profileId: resolvedProfileId,
-      });
-
-      if (result) {
-        return NextResponse.json(result, {
-          status: result.success ? 200 : 400,
-          headers: {
-            ...corsHeaders,
-            'x-request-id': requestId,
-            'x-intent-routed': 'true',
-            'x-intent-category': intent.category,
-          },
-        });
-      }
-    }
-  }
+  const intentResponse = await handleDeterministicIntent(
+    uiMessages,
+    profileId,
+    userId,
+    corsHeaders,
+    requestId
+  );
+  if (intentResponse) return intentResponse;
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(

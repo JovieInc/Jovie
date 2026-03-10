@@ -45,7 +45,10 @@ import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { Release, ReleaseSidebarProps } from './types';
-import { useReleaseSidebar } from './useReleaseSidebar';
+import {
+  type UseReleaseSidebarReturn,
+  useReleaseSidebar,
+} from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 /** Tab for organizing sidebar content into focused views */
@@ -146,6 +149,265 @@ function buildContextMenuItems(
   );
 
   return items;
+}
+
+interface ReleaseEntityHeaderProps {
+  readonly release: Release;
+  readonly allowDownloads: boolean;
+  readonly canUploadArtwork: boolean;
+  readonly handleArtworkUpload: UseReleaseSidebarReturn['handleArtworkUpload'];
+  readonly canRevertArtwork: boolean;
+  readonly handleArtworkRevert: UseReleaseSidebarReturn['handleArtworkRevert'];
+  readonly artworkAlt: string;
+  readonly sidebarPreviewUrl: string | null | undefined;
+  readonly isReleasePlaying: boolean;
+  readonly handleToggleReleasePreview: () => void;
+  readonly artistName: string | null | undefined;
+  readonly providerConfig: ReleaseSidebarProps['providerConfig'];
+}
+
+function ReleaseEntityHeader({
+  release,
+  allowDownloads,
+  canUploadArtwork,
+  handleArtworkUpload,
+  canRevertArtwork,
+  handleArtworkRevert,
+  artworkAlt,
+  sidebarPreviewUrl,
+  isReleasePlaying,
+  handleToggleReleasePreview,
+  artistName,
+  providerConfig,
+}: ReleaseEntityHeaderProps) {
+  return (
+    <div className='space-y-3'>
+      <div className='flex items-start gap-3'>
+        {/* Artwork with hover play overlay */}
+        <div className='group/artwork relative shrink-0'>
+          <AlbumArtworkContextMenu
+            title={release.title}
+            sizes={buildArtworkSizes(undefined, release.artworkUrl)}
+            allowDownloads={allowDownloads}
+            releaseId={release.id}
+            canRevert={canRevertArtwork}
+            onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
+          >
+            {canUploadArtwork && handleArtworkUpload ? (
+              <AvatarUploadable
+                src={release.artworkUrl}
+                alt={artworkAlt}
+                name={release.title}
+                size='2xl'
+                rounded='md'
+                uploadable={canUploadArtwork}
+                onUpload={handleArtworkUpload}
+                showHoverOverlay
+              />
+            ) : (
+              <div className='relative h-24 w-24 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+                {release.artworkUrl ? (
+                  <Image
+                    src={release.artworkUrl}
+                    alt={artworkAlt}
+                    fill
+                    className='object-cover'
+                    sizes='96px'
+                  />
+                ) : (
+                  <div className='flex h-full w-full items-center justify-center'>
+                    <Icon
+                      name='Disc3'
+                      className='h-12 w-12 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </AlbumArtworkContextMenu>
+
+          {/* Play/pause overlay — appears on hover or when playing */}
+          <button
+            type='button'
+            onClick={handleToggleReleasePreview}
+            disabled={!sidebarPreviewUrl}
+            aria-pressed={isReleasePlaying}
+            className={cn(
+              'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
+              'bg-black/0 opacity-0',
+              'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
+              'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
+              'disabled:pointer-events-none disabled:hidden'
+            )}
+            aria-label={
+              !sidebarPreviewUrl
+                ? 'No preview available'
+                : isReleasePlaying
+                  ? 'Pause preview'
+                  : 'Play preview'
+            }
+          >
+            {isReleasePlaying ? (
+              <Pause className='h-5 w-5 text-white drop-shadow-sm' />
+            ) : (
+              <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
+            )}
+          </button>
+        </div>
+
+        {/* Compact property stack */}
+        <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
+          <div>
+            <p className='truncate text-sm font-medium text-primary-token'>
+              {release.title}
+            </p>
+            {artistName && (
+              <p className='truncate text-xs text-secondary-token'>
+                {artistName}
+              </p>
+            )}
+          </div>
+          <ReleaseFields
+            releaseDate={release.releaseDate}
+            releaseType={release.releaseType}
+            totalTracks={release.totalTracks}
+            platformCount={release.providers.length}
+          />
+        </div>
+      </div>
+
+      {/* Smart link — full width */}
+      <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
+
+      {/* Analytics card — above tabs, always visible */}
+      <ReleaseSmartLinkAnalytics
+        release={release}
+        providerConfig={providerConfig}
+      />
+    </div>
+  );
+}
+
+interface ReleaseSidebarContentProps {
+  readonly selectedTrack: TrackForDetail | null;
+  readonly release: Release;
+  readonly activeTab: SidebarTab;
+  readonly isEditable: boolean;
+  readonly providerConfig: ReleaseSidebarProps['providerConfig'];
+  readonly isAddingLink: boolean;
+  readonly newLinkUrl: string;
+  readonly selectedProvider: UseReleaseSidebarReturn['selectedProvider'];
+  readonly isAddingDspLink: boolean;
+  readonly isRemovingDspLink: UseReleaseSidebarReturn['isRemovingDspLink'];
+  readonly setIsAddingLink: UseReleaseSidebarReturn['setIsAddingLink'];
+  readonly setNewLinkUrl: UseReleaseSidebarReturn['setNewLinkUrl'];
+  readonly setSelectedProvider: UseReleaseSidebarReturn['setSelectedProvider'];
+  readonly handleAddLink: UseReleaseSidebarReturn['handleAddLink'];
+  readonly handleRemoveLink: UseReleaseSidebarReturn['handleRemoveLink'];
+  readonly handleNewLinkKeyDown: UseReleaseSidebarReturn['handleNewLinkKeyDown'];
+  readonly onRescanIsrc: ReleaseSidebarProps['onRescanIsrc'];
+  readonly isRescanningIsrc: boolean;
+  readonly handleTrackClick: (
+    track: TrackForDetail & Record<string, unknown>
+  ) => void;
+  readonly handleBackToRelease: () => void;
+  readonly canEditCanvasStatus: boolean;
+  readonly handleCanvasStatusChange: (status: CanvasStatus) => void;
+  readonly isLyricsSaving: boolean;
+  readonly onSaveLyrics: ReleaseSidebarProps['onSaveLyrics'];
+  readonly onFormatLyrics: ReleaseSidebarProps['onFormatLyrics'];
+}
+
+function ReleaseSidebarContent({
+  selectedTrack,
+  release,
+  activeTab,
+  isEditable,
+  providerConfig,
+  isAddingLink,
+  newLinkUrl,
+  selectedProvider,
+  isAddingDspLink,
+  isRemovingDspLink,
+  setIsAddingLink,
+  setNewLinkUrl,
+  setSelectedProvider,
+  handleAddLink,
+  handleRemoveLink,
+  handleNewLinkKeyDown,
+  onRescanIsrc,
+  isRescanningIsrc,
+  handleTrackClick,
+  handleBackToRelease,
+  canEditCanvasStatus,
+  handleCanvasStatusChange,
+  isLyricsSaving,
+  onSaveLyrics,
+  onFormatLyrics,
+}: ReleaseSidebarContentProps) {
+  return (
+    <>
+      {selectedTrack && (
+        <TrackDetailPanel
+          track={selectedTrack}
+          releaseTitle={release.title}
+          onBack={handleBackToRelease}
+        />
+      )}
+      {!selectedTrack && (
+        <>
+          {activeTab === 'tracklist' && (
+            <ReleaseTrackList
+              release={release}
+              onTrackClick={handleTrackClick}
+            />
+          )}
+
+          {activeTab === 'links' && (
+            <ReleaseDspLinks
+              release={release}
+              providerConfig={providerConfig}
+              isEditable={isEditable}
+              isAddingLink={isAddingLink}
+              newLinkUrl={newLinkUrl}
+              selectedProvider={selectedProvider}
+              isAddingDspLink={isAddingDspLink}
+              isRemovingDspLink={isRemovingDspLink}
+              onSetIsAddingLink={setIsAddingLink}
+              onSetNewLinkUrl={setNewLinkUrl}
+              onSetSelectedProvider={setSelectedProvider}
+              onAddLink={handleAddLink}
+              onRemoveLink={handleRemoveLink}
+              onNewLinkKeyDown={handleNewLinkKeyDown}
+              onRescanIsrc={onRescanIsrc}
+              isRescanningIsrc={isRescanningIsrc}
+            />
+          )}
+
+          {activeTab === 'details' && (
+            <ReleaseMetadata
+              release={release}
+              onCanvasStatusChange={
+                canEditCanvasStatus ? handleCanvasStatusChange : undefined
+              }
+            />
+          )}
+
+          {activeTab === 'lyrics' && (
+            <ReleaseLyricsSection
+              releaseId={release.id}
+              lyrics={release.lyrics}
+              isEditable={isEditable}
+              isSaving={isLyricsSaving}
+              onSaveLyrics={onSaveLyrics}
+              onFormatLyrics={onFormatLyrics}
+            />
+          )}
+        </>
+      )}
+    </>
+  );
 }
 
 export function ReleaseSidebar({
@@ -292,111 +554,20 @@ export function ReleaseSidebar({
   // Build the entity header: artwork (left) with play overlay + compact fields (right)
   const entityHeader =
     release && !selectedTrack ? (
-      <div className='space-y-3'>
-        <div className='flex items-start gap-3'>
-          {/* Artwork with hover play overlay */}
-          <div className='group/artwork relative shrink-0'>
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={buildArtworkSizes(undefined, release.artworkUrl)}
-              allowDownloads={allowDownloads}
-              releaseId={release.id}
-              canRevert={canRevertArtwork}
-              onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
-            >
-              {canUploadArtwork && handleArtworkUpload ? (
-                <AvatarUploadable
-                  src={release.artworkUrl}
-                  alt={artworkAlt}
-                  name={release.title}
-                  size='2xl'
-                  rounded='md'
-                  uploadable={canUploadArtwork}
-                  onUpload={handleArtworkUpload}
-                  showHoverOverlay
-                />
-              ) : (
-                <div className='relative h-24 w-24 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-                  {release.artworkUrl ? (
-                    <Image
-                      src={release.artworkUrl}
-                      alt={artworkAlt}
-                      fill
-                      className='object-cover'
-                      sizes='96px'
-                    />
-                  ) : (
-                    <div className='flex h-full w-full items-center justify-center'>
-                      <Icon
-                        name='Disc3'
-                        className='h-12 w-12 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </AlbumArtworkContextMenu>
-
-            {/* Play/pause overlay — appears on hover or when playing */}
-            <button
-              type='button'
-              onClick={handleToggleReleasePreview}
-              disabled={!sidebarPreviewUrl}
-              aria-pressed={isReleasePlaying}
-              className={cn(
-                'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
-                'bg-black/0 opacity-0',
-                'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
-                'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
-                'disabled:pointer-events-none disabled:hidden'
-              )}
-              aria-label={
-                !sidebarPreviewUrl
-                  ? 'No preview available'
-                  : isReleasePlaying
-                    ? 'Pause preview'
-                    : 'Play preview'
-              }
-            >
-              {isReleasePlaying ? (
-                <Pause className='h-5 w-5 text-white drop-shadow-sm' />
-              ) : (
-                <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
-              )}
-            </button>
-          </div>
-
-          {/* Compact property stack */}
-          <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
-            <div>
-              <p className='truncate text-sm font-medium text-primary-token'>
-                {release.title}
-              </p>
-              {artistName && (
-                <p className='truncate text-xs text-secondary-token'>
-                  {artistName}
-                </p>
-              )}
-            </div>
-            <ReleaseFields
-              releaseDate={release.releaseDate}
-              releaseType={release.releaseType}
-              totalTracks={release.totalTracks}
-              platformCount={release.providers.length}
-            />
-          </div>
-        </div>
-
-        {/* Smart link — full width */}
-        <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
-
-        {/* Analytics card — above tabs, always visible */}
-        <ReleaseSmartLinkAnalytics
-          release={release}
-          providerConfig={providerConfig}
-        />
-      </div>
+      <ReleaseEntityHeader
+        release={release}
+        allowDownloads={allowDownloads}
+        canUploadArtwork={canUploadArtwork}
+        handleArtworkUpload={handleArtworkUpload}
+        canRevertArtwork={canRevertArtwork}
+        handleArtworkRevert={handleArtworkRevert}
+        artworkAlt={artworkAlt}
+        sidebarPreviewUrl={sidebarPreviewUrl}
+        isReleasePlaying={isReleasePlaying}
+        handleToggleReleasePreview={handleToggleReleasePreview}
+        artistName={artistName}
+        providerConfig={providerConfig}
+      />
     ) : undefined;
 
   return (
@@ -440,63 +611,34 @@ export function ReleaseSidebar({
         ) : undefined
       }
     >
-      {selectedTrack && release && (
-        <TrackDetailPanel
-          track={selectedTrack}
-          releaseTitle={release.title}
-          onBack={handleBackToRelease}
+      {release && (
+        <ReleaseSidebarContent
+          selectedTrack={selectedTrack}
+          release={release}
+          activeTab={activeTab}
+          isEditable={isEditable}
+          providerConfig={providerConfig}
+          isAddingLink={isAddingLink}
+          newLinkUrl={newLinkUrl}
+          selectedProvider={selectedProvider}
+          isAddingDspLink={isAddingDspLink}
+          isRemovingDspLink={isRemovingDspLink}
+          setIsAddingLink={setIsAddingLink}
+          setNewLinkUrl={setNewLinkUrl}
+          setSelectedProvider={setSelectedProvider}
+          handleAddLink={handleAddLink}
+          handleRemoveLink={handleRemoveLink}
+          handleNewLinkKeyDown={handleNewLinkKeyDown}
+          onRescanIsrc={onRescanIsrc}
+          isRescanningIsrc={isRescanningIsrc}
+          handleTrackClick={handleTrackClick}
+          handleBackToRelease={handleBackToRelease}
+          canEditCanvasStatus={canEditCanvasStatus}
+          handleCanvasStatusChange={handleCanvasStatusChange}
+          isLyricsSaving={isLyricsSaving}
+          onSaveLyrics={onSaveLyrics}
+          onFormatLyrics={onFormatLyrics}
         />
-      )}
-      {!(selectedTrack && release) && release && (
-        <>
-          {activeTab === 'tracklist' && (
-            <ReleaseTrackList
-              release={release}
-              onTrackClick={handleTrackClick}
-            />
-          )}
-
-          {activeTab === 'links' && (
-            <ReleaseDspLinks
-              release={release}
-              providerConfig={providerConfig}
-              isEditable={isEditable}
-              isAddingLink={isAddingLink}
-              newLinkUrl={newLinkUrl}
-              selectedProvider={selectedProvider}
-              isAddingDspLink={isAddingDspLink}
-              isRemovingDspLink={isRemovingDspLink}
-              onSetIsAddingLink={setIsAddingLink}
-              onSetNewLinkUrl={setNewLinkUrl}
-              onSetSelectedProvider={setSelectedProvider}
-              onAddLink={handleAddLink}
-              onRemoveLink={handleRemoveLink}
-              onNewLinkKeyDown={handleNewLinkKeyDown}
-              onRescanIsrc={onRescanIsrc}
-              isRescanningIsrc={isRescanningIsrc}
-            />
-          )}
-
-          {activeTab === 'details' && (
-            <ReleaseMetadata
-              release={release}
-              onCanvasStatusChange={
-                canEditCanvasStatus ? handleCanvasStatusChange : undefined
-              }
-            />
-          )}
-
-          {activeTab === 'lyrics' && (
-            <ReleaseLyricsSection
-              releaseId={release.id}
-              lyrics={release.lyrics}
-              isEditable={isEditable}
-              isSaving={isLyricsSaving}
-              onSaveLyrics={onSaveLyrics}
-              onFormatLyrics={onFormatLyrics}
-            />
-          )}
-        </>
       )}
     </EntitySidebarShell>
   );
