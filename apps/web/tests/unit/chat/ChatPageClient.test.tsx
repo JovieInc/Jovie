@@ -248,9 +248,10 @@ describe('ChatPageClient', () => {
     expect(mockSetHeaderActions).toHaveBeenCalledWith(null);
   });
 
-  it('shows loading state when no profile is selected', () => {
+  it('shows retry state when no profile data is available', () => {
     const dataWithoutProfile: DashboardData = {
       ...baseDashboardData,
+      creatorProfiles: [],
       selectedProfile: null,
     };
 
@@ -260,19 +261,41 @@ describe('ChatPageClient', () => {
       </DashboardDataProvider>
     );
 
-    // Should show spinner, not JovieChat
+    // Should show retry state, not JovieChat
     expect(container.querySelector('[data-testid="jovie-chat"]')).toBeNull();
-    expect(container.textContent).toContain('Finishing your dashboard setup…');
+    expect(container.textContent).toContain(
+      'We hit a problem loading your profile. Please retry in a moment.'
+    );
     const retryButton = Array.from(container.querySelectorAll('button')).find(
       button => button.textContent?.trim() === 'Retry'
     );
-    expect(retryButton).toBeUndefined();
+    expect(retryButton).toBeDefined();
     expect(mockSentryAddBreadcrumb).toHaveBeenCalled();
+  });
+
+  it('uses the first creator profile when selectedProfile is temporarily null', () => {
+    const dataWithoutSelection: DashboardData = {
+      ...baseDashboardData,
+      selectedProfile: null,
+    };
+
+    const { getByTestId, container } = fastRender(
+      <DashboardDataProvider value={dataWithoutSelection}>
+        <ChatPageClient />
+      </DashboardDataProvider>
+    );
+
+    const chat = getByTestId('jovie-chat');
+    expect(chat.getAttribute('data-profile-id')).toBe('profile-1');
+    expect(container.textContent).not.toContain(
+      'Finishing your dashboard setup…'
+    );
   });
 
   it('shows load failed message when dashboard load error exists', () => {
     const dataWithoutProfile: DashboardData = {
       ...baseDashboardData,
+      creatorProfiles: [],
       selectedProfile: null,
       dashboardLoadError: {
         stage: 'core_fetch',
