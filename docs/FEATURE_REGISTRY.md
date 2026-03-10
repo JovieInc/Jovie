@@ -25,26 +25,44 @@ This document is the canonical feature list for Jovie. It is designed for onboar
 | Smart Links | Unlimited smart links | Shipped | Free+ | None | Core product capability |
 | Smart Links | Smart deep links | Shipped | Free+ | None | Included in all plans |
 | Smart Links | Smart link editing and customization | Shipped | Free+ | None | Entitlement-backed (`canEditSmartLinks`) |
+| Smart Links | Release pages with listen links per DSP | Shipped | Free+ | None | Public route per release |
+| Smart Links | Short link redirects | Shipped | Free+ | None | /r/slug redirect |
+| Smart Links | Vanity URLs / content slugs | Shipped | Free+ | None | Custom slug support |
+| Smart Links | Auto DSP detection & linking | Shipped | Free+ | None | MusicFetch integration |
 | Smart Links | Spotify pre-save campaigns | Shipped (flagged) | Free+ | `smartlink_pre_save_campaigns` | Controlled via Statsig |
 | Release Workflows | Auto-sync from Spotify | Shipped | Free+ | None | Base ingestion flow |
 | Release Workflows | Manual release creation | Shipped | Free+ | None | Entitlement-backed (`canCreateManualReleases`) |
 | Release Workflows | Pre-release and countdown pages | Shipped | Pro+ | None | Entitlement-backed (`canAccessFutureReleases`) |
 | Profile | Public profile pages | Shipped | Free+ | None | ISR-backed public route |
+| Profile | Artist bio & social links | Shipped | Free+ | None | Auto-suggested from DSPs |
+| Profile | Subscribe / follow page | Shipped | Free+ | None | /username/subscribe |
+| Profile | Contact page | Shipped | Free+ | None | /username/contact |
+| Profile | About page | Shipped | Free+ | None | /username/about |
+| Profile | Tour dates (Bandsintown) | Shipped | Free+ | None | /username/tour |
 | Profile | Latest release card on profile | Shipped (flagged) | Free+ | `feature_latest_release_card` | Rollout-controlled UI module |
 | Profile | Verified badge | Shipped | Pro+ | None | Entitlement-backed (`canBeVerified`) |
+| Analytics | Click & visit tracking | Shipped | Free+ | None | Default analytics |
 | Analytics | Basic analytics (30-day retention) | Shipped | Free+ | None | Default retention on free |
+| Analytics | Audience intelligence (device, location, intent) | Shipped | Free+ | None | Audience table |
 | Analytics | Advanced analytics and geo insights | Shipped | Pro+ | None | Entitlement-backed (`canAccessAdvancedAnalytics`) |
 | Analytics | Self-traffic filtering | Shipped | Pro+ | None | Entitlement-backed (`canFilterSelfFromAnalytics`) |
-| Growth | Contact capture and management | Shipped | Free+ | None | Contact limit varies by plan |
+| Analytics | AI-powered insights | Shipped | Pro+ | None | Insights dashboard (city growth, markets, momentum) |
+| Analytics | Ad pixel tracking | Shipped | Pro+ | None | Entitlement-backed (`canAccessAdPixels`) |
+| Growth | Contact / subscriber capture | Shipped | Free+ | None | Contact limit varies by plan (100 / unlimited) |
 | Growth | Contact export | Shipped | Pro+ | None | Entitlement-backed (`canExportContacts`) |
+| Growth | Fan CRM | Shipped | Pro+ | None | Contact management dashboard |
 | Growth | Release notifications | Shipped | Free+ | None | Entitlement-backed (`canSendNotifications`) |
-| Integrations | Ad pixel integration | Shipped | Pro+ | None | Entitlement-backed (`canAccessAdPixels`) |
+| Monetization | Tips & payments (Venmo) | Shipped | Pro+ | None | Venmo today, Stripe Connect coming |
+| Monetization | Earnings dashboard | Shipped | Pro+ | None | /dashboard/earnings |
+| AI Assistant | AI assistant (daily message limits by plan) | Shipped | Free+/Pro+/Growth | None | Plan limits: 25/100/500 msgs |
+| Brand | Remove Jovie branding | Shipped | Pro+ | None | Entitlement-backed (`canRemoveBranding`) |
+| Growth (Coming Soon) | A/B testing | Planned | Growth | None | Smart link variant testing |
+| Growth (Coming Soon) | Automated follow-ups | Planned | Growth | None | Auto-follow-up emails to fans |
+| Growth (Coming Soon) | Catalog monitoring | Planned | Growth | None | Monitor catalog across DSPs |
 | Integrations | Spotify OAuth sign-in method | In rollout | Flag-gated | `feature_spotify_oauth` | Available in auth method selector |
 | Billing | Direct upgrade checkout flow | In rollout | Flag-gated | `billing.upgradeDirect` | Billing UX experiment |
 | Conversion | Subscribe CTA variant experiment | In rollout | Flag-gated | `experiment_subscribe_cta_variant` | Variant defaults to `inline` |
 | Mobile UX | iOS Apple Music destination prioritization | In rollout | Flag-gated | `feature_ios_apple_music_priority` | Listen interface optimization |
-| AI Assistant | AI assistant (daily message limits by plan) | Shipped | Free+/Pro+/Growth | None | Plan limits: 25/100/500 msgs |
-| Brand | Remove Jovie branding | Shipped | Pro+ | None | Entitlement-backed (`canRemoveBranding`) |
 | Marketing Site | Modular homepage sections | Shipped (flagged) | Internal flags | `homepage_*` flags | Controlled through `flags/next` |
 
 ## Homepage Section Flags (`flags/next`)

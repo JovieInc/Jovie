@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
 export const revalidate = false;
@@ -30,38 +31,12 @@ export async function generateMetadata(): Promise<Metadata> {
 const WRAP = 'mx-auto max-w-[1100px] px-6';
 const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
-const FREE_FEATURES = [
-  'One-click Spotify import',
-  '5 active smart links',
-  'Link-in-bio with adaptive CTA',
-  'All deeplinks (/tip, /tour, /contact, etc.)',
-  'Email fan capture',
-  'Basic analytics',
-  'AI assistant (10 queries/mo)',
-];
-
-const PRO_FEATURES = [
-  'Unlimited smart links',
-  'Unlimited AI assistant',
-  'SMS fan capture',
-  'Advanced fan analytics + engagement scoring',
-  'Custom domain (yourdomain.com)',
-  'Remove Jovie branding',
-  'Pre-save pages',
-];
-
-const GROWTH_FEATURES = [
-  'Priority support',
-  'Advanced fan segmentation',
-  'Webhook integrations',
-  'API access',
-  'White-label embeds',
-  'Bulk import tools',
-  'Dedicated account manager',
-];
+const free = ENTITLEMENT_REGISTRY.free;
+const pro = ENTITLEMENT_REGISTRY.pro;
+const growth = ENTITLEMENT_REGISTRY.growth;
 
 interface FeatureListProps {
-  readonly features: string[];
+  readonly features: readonly string[];
 }
 
 function FeatureList({ features }: FeatureListProps) {
@@ -99,19 +74,19 @@ export default function PricingPage() {
           {/* Free */}
           <div className='py-12 md:pr-8 md:border-r md:border-subtle'>
             <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-              Free
+              {free.marketing.displayName}
             </div>
             <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
               $0
             </div>
             <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-              Everything you need to get live and start capturing fans.
+              {free.marketing.tagline}
             </div>
             <div className='mt-6 pt-5 border-t border-subtle'>
               <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
                 Included
               </div>
-              <FeatureList features={FREE_FEATURES} />
+              <FeatureList features={free.marketing.features} />
             </div>
             <Link
               href={APP_ROUTES.SIGNUP}
@@ -124,22 +99,22 @@ export default function PricingPage() {
           {/* Pro */}
           <div className='py-12 md:px-8 md:border-r md:border-subtle'>
             <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-              Pro
+              {pro.marketing.displayName}
             </div>
             <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
-              $39{' '}
+              ${pro.marketing.price!.monthly}{' '}
               <span className='text-base font-normal text-tertiary-token'>
                 /mo
               </span>
             </div>
             <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-              For artists serious about growing an audience they own.
+              {pro.marketing.tagline}
             </div>
             <div className='mt-6 pt-5 border-t border-subtle'>
               <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
                 Everything in Free, plus
               </div>
-              <FeatureList features={PRO_FEATURES} />
+              <FeatureList features={pro.marketing.features} />
             </div>
             <Link
               href={`${APP_ROUTES.SIGNUP}?plan=pro`}
@@ -147,30 +122,27 @@ export default function PricingPage() {
             >
               Get started
             </Link>
-            <div className='mt-4 text-xs text-tertiary-token leading-snug'>
-              Pays for itself after 1 new subscriber per month at $100 LTV.
-            </div>
           </div>
 
           {growthPlanEnabled && (
             <div className='py-12 md:pl-8'>
               <div className='uppercase tracking-widest font-medium mb-3 text-xs text-tertiary-token'>
-                Growth
+                {growth.marketing.displayName}
               </div>
               <div className='font-medium text-[2.5rem] tracking-tight leading-none'>
-                $99{' '}
+                ${growth.marketing.price!.monthly}{' '}
                 <span className='text-base font-normal text-tertiary-token'>
                   /mo
                 </span>
               </div>
               <div className='mt-3 text-sm text-secondary-token leading-normal min-h-[2.5em]'>
-                For artists scaling their fanbase and revenue.
+                {growth.marketing.tagline}
               </div>
               <div className='mt-6 pt-5 border-t border-subtle'>
                 <div className='uppercase tracking-widest mb-3 text-[0.7rem] text-tertiary-token'>
                   Everything in Pro, plus
                 </div>
-                <FeatureList features={GROWTH_FEATURES} />
+                <FeatureList features={growth.marketing.features} />
               </div>
               <Link
                 href={`${APP_ROUTES.SIGNUP}?plan=growth`}
