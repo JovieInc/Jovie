@@ -12,6 +12,10 @@ interface PushLeadParams {
   priorityScore: number;
 }
 
+function is429Error(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('429');
+}
+
 async function attemptLeadPush(
   apiKey: string,
   body: object,
@@ -50,12 +54,7 @@ async function attemptLeadPush(
       return instantlyLeadId;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (
-        attempt === 0 &&
-        !(error instanceof Error && error.message.includes('429'))
-      ) {
-        throw lastError;
-      }
+      if (attempt === 0 && !is429Error(error)) throw lastError;
     }
   }
 
