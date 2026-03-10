@@ -413,6 +413,7 @@ export function ReleaseSidebar({
       footer={
         release && !selectedTrack && isEditable ? (
           <DrawerAsyncToggle
+            density='compact'
             label='Art downloads'
             ariaLabel='Allow artwork downloads on public pages'
             checked={allowDownloads}

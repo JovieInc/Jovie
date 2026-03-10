@@ -15,6 +15,8 @@ export interface DrawerSettingsToggleProps {
   readonly disabled?: boolean;
   /** Accessible label for the switch */
   readonly ariaLabel: string;
+  /** Visual density for compact footer usage */
+  readonly density?: 'default' | 'compact';
   readonly className?: string;
 }
 
@@ -31,6 +33,7 @@ export function DrawerSettingsToggle({
   onCheckedChange,
   disabled = false,
   ariaLabel,
+  density = 'default',
   className,
 }: DrawerSettingsToggleProps) {
   const id = React.useId();
@@ -38,13 +41,17 @@ export function DrawerSettingsToggle({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 min-h-[44px] lg:min-h-0 py-1',
+        'flex items-center justify-between gap-3 py-1',
+        density === 'compact' ? 'min-h-[32px]' : 'min-h-[44px] lg:min-h-0',
         className
       )}
     >
       <label
         htmlFor={id}
-        className='text-xs text-secondary-token select-none cursor-pointer'
+        className={cn(
+          'select-none cursor-pointer text-secondary-token',
+          density === 'compact' ? 'text-[11px]' : 'text-xs'
+        )}
       >
         {label}
       </label>
