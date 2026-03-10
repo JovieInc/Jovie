@@ -60,7 +60,7 @@ export default function AdminOutreachPage() {
   }, []);
 
   useEffect(() => {
-    void fetchCounts();
+    fetchCounts();
   }, [fetchCounts]);
 
   if (loading) {

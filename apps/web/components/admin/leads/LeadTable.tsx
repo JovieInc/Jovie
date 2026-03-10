@@ -102,7 +102,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   }, [page, statusFilter, search, sortBy]);
 
   useEffect(() => {
-    void fetchLeads();
+    fetchLeads();
   }, [fetchLeads, refreshKey]);
 
   async function updateLeadStatus(id: string, status: 'approved' | 'rejected') {
