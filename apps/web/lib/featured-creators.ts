@@ -47,20 +47,48 @@ function shuffle<T>(arr: T[], seed: number): T[] {
   return a;
 }
 
+export async function withTimeoutFallback<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallbackValue: T,
+  onTimeout: () => void
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<T>(resolve => {
+    timeoutId = setTimeout(() => {
+      onTimeout();
+      resolve(fallbackValue);
+    }, timeoutMs);
+  });
+
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    return result;
+  } catch (error) {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    throw error;
+  }
+}
+
 async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
   try {
     // Add timeout to table existence check (15s) to prevent false negatives during cold starts
-    const tableExists = await Promise.race([
+    const tableExists = await withTimeoutFallback(
       doesTableExist(TABLE_NAMES.creatorProfiles),
-      new Promise<boolean>(resolve =>
-        setTimeout(() => {
-          captureWarning(
-            '[FeaturedCreators] Table check timed out after 15s, assuming table does not exist'
-          );
-          resolve(false);
-        }, 15000)
-      ),
-    ]);
+      15000,
+      false,
+      () => {
+        captureWarning(
+          '[FeaturedCreators] Table check timed out after 15s, assuming table does not exist'
+        );
+      }
+    );
 
     if (!tableExists) {
       captureWarning(
