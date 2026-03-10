@@ -32,9 +32,9 @@ import {
  * Safely insert an ingestion job with dedup handling.
  *
  * The `dedup_key` unique index is partial (`WHERE dedup_key IS NOT NULL`),
- * which means Drizzle's `onConflictDoNothing` may not fully match the
- * constraint under concurrent inserts. This wrapper catches the PostgreSQL
- * unique violation (23505) and falls back to returning the existing job.
+ * so targeting `dedup_key` in `ON CONFLICT` can fail to infer the constraint.
+ * This wrapper uses generic conflict handling, then catches PostgreSQL unique
+ * violations (23505) and falls back to returning the existing job.
  */
 async function insertJobWithDedup(
   values: typeof ingestionJobs.$inferInsert
@@ -46,7 +46,7 @@ async function insertJobWithDedup(
     const result = await db
       .insert(ingestionJobs)
       .values(values)
-      .onConflictDoNothing({ target: ingestionJobs.dedupKey })
+      .onConflictDoNothing()
       .returning({ id: ingestionJobs.id });
 
     if (result.length > 0) {
