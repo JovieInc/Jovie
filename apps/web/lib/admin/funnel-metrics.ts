@@ -29,8 +29,27 @@ export interface AdminFunnelMetrics {
   paidConversionRate: number | null;
   /** Current monthly recurring revenue in USD */
   mrrUsd: number;
+  /** Annual recurring revenue in USD */
+  arrUsd: number;
+  /** Current paying customers */
+  payingCustomers: number;
   /** Months of runway at baseline burn ($5K/mo) */
   runwayMonths: number | null;
+  /** Default alive date as YYYY-MM-DD when runway can be projected */
+  defaultAliveDate: string | null;
+  /** Week-over-week growth placeholder (0-1), null until tracked */
+  wowGrowthRate: number | null;
+  /** Month-over-month MRR growth rate (0-1), null when unavailable */
+  momGrowthRate: number | null;
+  /** YC metric placeholders and computed engagement proxies */
+  churnRate: number | null;
+  retention30d: number | null;
+  retention60d: number | null;
+  retention90d: number | null;
+  engagementActiveProfiles30d: number | null;
+  cacUsd: number | null;
+  ltvUsd: number | null;
+  paybackPeriodMonths: number | null;
   /** Whether Stripe data is available */
   stripeAvailable: boolean;
   /** Errors encountered during fetch (non-fatal) */
@@ -185,6 +204,8 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
 
   const mrrUsd = stripeMetrics?.mrrUsd ?? 0;
   const stripeAvailable = stripeMetrics?.isAvailable ?? false;
+  const payingCustomers = stripeMetrics?.activeSubscribers ?? 0;
+  const arrUsd = mrrUsd * 12;
 
   // Runway: MRR offsets burn. If MRR >= burn, runway is infinite (null).
   // Otherwise, runway = 0 because we don't have a balance to draw down.
@@ -201,6 +222,18 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     }
   }
 
+  const defaultAliveDate =
+    runwayMonths !== null && runwayMonths > 0
+      ? new Date(Date.now() + runwayMonths * 30 * MS_PER_DAY)
+          .toISOString()
+          .slice(0, 10)
+      : null;
+
+  const momGrowthRate =
+    stripeMetrics && stripeMetrics.mrrUsd30dAgo > 0
+      ? mrrUsd / stripeMetrics.mrrUsd30dAgo - 1
+      : null;
+
   return {
     outreachSent7d,
     claimClicks7d,
@@ -210,7 +243,20 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     paidConversions7d,
     paidConversionRate: safeRate(paidConversions7d, signups7d),
     mrrUsd,
+    arrUsd,
+    payingCustomers,
     runwayMonths,
+    defaultAliveDate,
+    wowGrowthRate: null,
+    momGrowthRate,
+    churnRate: null,
+    retention30d: null,
+    retention60d: null,
+    retention90d: null,
+    engagementActiveProfiles30d: null,
+    cacUsd: null,
+    ltvUsd: null,
+    paybackPeriodMonths: null,
     stripeAvailable,
     errors,
     outreachToSignupRate: safeRate(signups7d, outreachSent7d),
