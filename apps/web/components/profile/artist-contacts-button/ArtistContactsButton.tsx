@@ -40,7 +40,7 @@ export function ArtistContactsButton({
           variant='ghost'
           ariaLabel='Contacts'
           data-testid='contacts-trigger'
-          className='border border-transparent hover:border-subtle hover:bg-surface-2'
+          className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
           onClick={() => {
             onIconClick();
             setDrawerOpen(true);
@@ -69,7 +69,7 @@ export function ArtistContactsButton({
       variant='ghost'
       ariaLabel='Contacts'
       data-testid='contacts-trigger'
-      className='border border-transparent hover:border-subtle hover:bg-surface-2'
+      className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
       asChild
     >
       <Link href={`/${artistHandle}?mode=contact`}>

@@ -130,17 +130,18 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
-          isHero ? 'rounded-2xl p-2' : 'rounded-[14px] p-1.5',
+          isHero ? 'rounded-2xl p-1.5 sm:p-2' : 'rounded-[14px] p-1.5',
           isAvailable && 'claim-input-row--available'
         )}
         style={{
-          minHeight: isHero ? 72 : 52,
+          minHeight: isHero ? 68 : 52,
           background: isHero
-            ? 'rgba(255,255,255,0.04)'
+            ? 'linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.032) 100%)'
             : 'rgba(255,255,255,0.03)',
           border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.25)' : isHero ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}`,
           boxShadow: isHero
             ? [
+                '0 20px 50px rgba(0,0,0,0.22)',
                 'inset 0 1px 3px rgba(0,0,0,0.25)',
                 isAvailable
                   ? '0 0 24px rgba(74,222,128,0.08)'
@@ -154,6 +155,27 @@ export function ClaimHandleForm({
               ].join(', '),
         }}
       >
+        {isHero && (
+          <>
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-x-2 top-0 h-px rounded-full'
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0.18) 80%, transparent)',
+              }}
+            />
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-y-2 right-[5rem] hidden w-px sm:block'
+              style={{
+                background:
+                  'linear-gradient(180deg, transparent, rgba(255,255,255,0.08), transparent)',
+              }}
+            />
+          </>
+        )}
+
         <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
           {/* Domain prefix — etched, permanent feel */}
           <span
@@ -161,7 +183,7 @@ export function ClaimHandleForm({
             style={
               isHero
                 ? {
-                    fontSize: '22px',
+                    fontSize: '19px',
                     fontWeight: 510,
                     letterSpacing: '-0.03em',
                     color: 'var(--linear-text-quaternary)',
@@ -196,7 +218,7 @@ export function ClaimHandleForm({
             style={
               isHero
                 ? {
-                    fontSize: '22px',
+                    fontSize: '19px',
                     fontWeight: 510,
                     letterSpacing: '-0.03em',
                     color: isAvailable
@@ -234,17 +256,20 @@ export function ClaimHandleForm({
               : 'hover:brightness-110 active:scale-[0.98]'
           )}
           style={{
-            height: isHero ? 52 : 36,
-            fontSize: isHero ? '15px' : '13px',
+            height: isHero ? 50 : 36,
+            fontSize: isHero ? '14px' : '13px',
             fontWeight: 510,
             letterSpacing: '-0.01em',
             background: isDisabled
               ? 'rgba(255,255,255,0.06)'
-              : 'rgb(237,238,238)',
+              : 'linear-gradient(180deg, rgb(244,245,246) 0%, rgb(228,230,232) 100%)',
             color: isDisabled ? 'var(--linear-text-quaternary)' : 'rgb(8,9,10)',
             boxShadow: isDisabled
               ? 'none'
-              : '0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
+              : '0 10px 24px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.4)',
+            border: isDisabled
+              ? '1px solid transparent'
+              : '1px solid rgba(255,255,255,0.18)',
           }}
         >
           <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
