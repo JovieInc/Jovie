@@ -14,6 +14,46 @@ import {
 } from '@/lib/ingestion/strategies/linktree';
 import { searchGoogleCSE } from './google-cse';
 
+interface DiscoveryCandidate {
+  linktreeHandle: string;
+  linktreeUrl: string;
+  discoverySource: 'google_cse';
+  discoveryQuery: string;
+}
+
+function buildDiscoveryCandidates(
+  results: { link: string }[],
+  keyword: DiscoveryKeyword
+): DiscoveryCandidate[] {
+  const byHandle = new Map<string, DiscoveryCandidate>();
+  for (const item of results) {
+    if (!isLinktreeUrl(item.link)) continue;
+    const handle = extractLinktreeHandle(item.link);
+    if (!handle) continue;
+    byHandle.set(handle, {
+      linktreeHandle: handle,
+      linktreeUrl: `https://linktr.ee/${handle}`,
+      discoverySource: 'google_cse',
+      discoveryQuery: keyword.query,
+    });
+  }
+  return Array.from(byHandle.values());
+}
+
+async function insertCandidates(
+  candidates: DiscoveryCandidate[],
+  result: DiscoveryResult
+): Promise<void> {
+  if (candidates.length === 0) return;
+  const insertedRows = await db
+    .insert(leads)
+    .values(candidates)
+    .onConflictDoNothing({ target: leads.linktreeHandle })
+    .returning({ id: leads.id });
+  result.newLeadsFound += insertedRows.length;
+  result.duplicatesSkipped += candidates.length - insertedRows.length;
+}
+
 export interface DiscoveryResult {
   queriesUsed: number;
   candidatesProcessed: number;
@@ -55,43 +95,9 @@ export async function runDiscovery(
 
     try {
       const results = await searchGoogleCSE(keyword.query);
-      const candidatesByHandle = new Map<
-        string,
-        {
-          linktreeHandle: string;
-          linktreeUrl: string;
-          discoverySource: 'google_cse';
-          discoveryQuery: string;
-        }
-      >();
-
-      for (const item of results) {
-        if (!isLinktreeUrl(item.link)) continue;
-
-        const handle = extractLinktreeHandle(item.link);
-        if (!handle) continue;
-
-        candidatesByHandle.set(handle, {
-          linktreeHandle: handle,
-          linktreeUrl: `https://linktr.ee/${handle}`,
-          discoverySource: 'google_cse',
-          discoveryQuery: keyword.query,
-        });
-      }
-
-      const candidates = Array.from(candidatesByHandle.values());
+      const candidates = buildDiscoveryCandidates(results, keyword);
       result.candidatesProcessed += candidates.length;
-
-      if (candidates.length > 0) {
-        const insertedRows = await db
-          .insert(leads)
-          .values(candidates)
-          .onConflictDoNothing({ target: leads.linktreeHandle })
-          .returning({ id: leads.id });
-
-        result.newLeadsFound += insertedRows.length;
-        result.duplicatesSkipped += candidates.length - insertedRows.length;
-      }
+      await insertCandidates(candidates, result);
 
       // Update keyword stats
       await db

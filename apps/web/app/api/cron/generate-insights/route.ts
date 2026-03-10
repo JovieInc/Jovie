@@ -88,6 +88,36 @@ async function processProfile(
   return { insightsGenerated: persisted };
 }
 
+function processProfileBatchResults(
+  results: PromiseSettledResult<{
+    profileId: string;
+    profileResult: ProfileProcessResult;
+  }>[],
+  chunk: Array<{ profile_id: string }>,
+  errors: string[]
+): { processed: number; insightsTotal: number } {
+  let processed = 0;
+  let insightsTotal = 0;
+  for (const [resultIndex, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      insightsTotal += result.value.profileResult.insightsGenerated;
+      processed++;
+    } else {
+      const profileId = chunk[resultIndex]?.profile_id ?? 'unknown-profile';
+      const msg =
+        result.reason instanceof Error
+          ? result.reason.message
+          : 'Unknown error';
+      errors.push(`Profile ${profileId}: ${msg}`);
+      logger.error(
+        `[insights-cron] Failed for profile ${profileId}:`,
+        result.reason
+      );
+    }
+  }
+  return { processed, insightsTotal };
+}
+
 /**
  * GET /api/cron/generate-insights
  *
@@ -193,24 +223,9 @@ export async function GET(request: Request) {
         )
       );
 
-      for (const [resultIndex, result] of results.entries()) {
-        if (result.status === 'fulfilled') {
-          insightsTotal += result.value.profileResult.insightsGenerated;
-          processed++;
-          continue;
-        }
-
-        const profileId = chunk[resultIndex]?.profile_id ?? 'unknown-profile';
-        const msg =
-          result.reason instanceof Error
-            ? result.reason.message
-            : 'Unknown error';
-        errors.push(`Profile ${profileId}: ${msg}`);
-        logger.error(
-          `[insights-cron] Failed for profile ${profileId}:`,
-          result.reason
-        );
-      }
+      const batchStats = processProfileBatchResults(results, chunk, errors);
+      processed += batchStats.processed;
+      insightsTotal += batchStats.insightsTotal;
     }
 
     const duration = Date.now() - startTime;

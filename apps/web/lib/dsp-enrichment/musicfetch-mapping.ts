@@ -42,6 +42,20 @@ const DSP_ID_MAPPINGS: Array<{
   },
 ] as const;
 
+function applyAppleMusicUpdates(
+  updates: Partial<Record<keyof MusicFetchProfileFieldState, string>>,
+  existingProfile: MusicFetchProfileFieldState,
+  appleMusicUrl: string
+): void {
+  if (!existingProfile.appleMusicId) {
+    const appleMusicId = extractAppleMusicId(appleMusicUrl);
+    if (appleMusicId) updates.appleMusicId = appleMusicId;
+  }
+  if (!existingProfile.appleMusicUrl) {
+    updates.appleMusicUrl = appleMusicUrl;
+  }
+}
+
 export function mapMusicFetchProfileFields(
   artistData: MusicFetchArtistResult,
   existingProfile: MusicFetchProfileFieldState,
@@ -62,13 +76,7 @@ export function mapMusicFetchProfileFields(
 
   const appleMusicUrl = services.appleMusic?.url;
   if (appleMusicUrl) {
-    if (!existingProfile.appleMusicId) {
-      const appleMusicId = extractAppleMusicId(appleMusicUrl);
-      if (appleMusicId) updates.appleMusicId = appleMusicId;
-    }
-    if (!existingProfile.appleMusicUrl) {
-      updates.appleMusicUrl = appleMusicUrl;
-    }
+    applyAppleMusicUpdates(updates, existingProfile, appleMusicUrl);
   }
 
   for (const mapping of DSP_ID_MAPPINGS) {

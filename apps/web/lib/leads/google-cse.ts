@@ -60,27 +60,17 @@ export async function searchGoogleCSE(
       const data = await fetchGoogleCSEWithTimeout(url.toString());
 
       if (data.error) {
-        const code = data.error.code;
-        const message = data.error.message;
-
-        // 429 = quota exceeded — not an error, just budget exhausted
-        if (code === 429) {
-          pipelineWarn('discovery', 'Google CSE quota exhausted (429)', {
-            query,
-            attempt,
-          });
-          return [];
-        }
-
-        if (isRetryableStatus(code) && !isLastAttempt) {
+        const action = await handleGoogleCSEApiError(
+          data.error,
+          query,
+          startIndex,
+          attempt,
+          isLastAttempt
+        );
+        if (action === 'retry') {
           await sleep(calculateRetryDelayMs(attempt));
           continue;
         }
-
-        await captureError('Google CSE API error', new Error(message), {
-          route: 'leads/google-cse',
-          contextData: { code, query, startIndex, attempt },
-        });
         return [];
       }
 
@@ -115,6 +105,31 @@ export async function searchGoogleCSE(
   }
 
   return [];
+}
+
+/** Returns true if the error was handled and no results should be returned, or false to retry. */
+async function handleGoogleCSEApiError(
+  error: { code: number; message: string },
+  query: string,
+  startIndex: number,
+  attempt: number,
+  isLastAttempt: boolean
+): Promise<'done' | 'retry'> {
+  if (error.code === 429) {
+    pipelineWarn('discovery', 'Google CSE quota exhausted (429)', {
+      query,
+      attempt,
+    });
+    return 'done';
+  }
+  if (isRetryableStatus(error.code) && !isLastAttempt) {
+    return 'retry';
+  }
+  await captureError('Google CSE API error', new Error(error.message), {
+    route: 'leads/google-cse',
+    contextData: { code: error.code, query, startIndex, attempt },
+  });
+  return 'done';
 }
 
 function isRetryableStatus(statusCode: number): boolean {
