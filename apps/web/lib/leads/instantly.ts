@@ -12,6 +12,16 @@ interface PushLeadParams {
   priorityScore: number;
 }
 
+function isRateLimitRetry(status: number, attempt: number): boolean {
+  return status === 429 && attempt === 0;
+}
+
+function shouldRethrowImmediately(error: unknown, attempt: number): boolean {
+  return (
+    attempt === 0 && !(error instanceof Error && error.message.includes('429'))
+  );
+}
+
 async function attemptLeadPush(
   apiKey: string,
   body: object,
@@ -30,7 +40,7 @@ async function attemptLeadPush(
         body: JSON.stringify(body),
       });
 
-      if (response.status === 429 && attempt === 0) {
+      if (isRateLimitRetry(response.status, attempt)) {
         pipelineLog('instantly', 'Rate limited, retrying after 2s', { email });
         await new Promise(resolve => setTimeout(resolve, 2000));
         continue;
@@ -50,10 +60,7 @@ async function attemptLeadPush(
       return instantlyLeadId;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      if (
-        attempt === 0 &&
-        !(error instanceof Error && error.message.includes('429'))
-      ) {
+      if (shouldRethrowImmediately(error, attempt)) {
         throw lastError;
       }
     }

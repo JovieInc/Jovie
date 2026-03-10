@@ -9,7 +9,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Lead {
@@ -64,8 +64,8 @@ function renderLeadRows(
   loading: boolean,
   loadError: string | null,
   leads: Lead[],
-  renderRow: (lead: Lead) => React.ReactNode
-): React.ReactNode {
+  renderRow: (lead: Lead) => ReactNode
+): ReactNode {
   if (loading) {
     return (
       <tr>
