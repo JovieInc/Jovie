@@ -245,6 +245,28 @@ describe('Profile Service Mutations', () => {
       );
     });
 
+    it('sanitizes flushed redis counts before writing to DB', async () => {
+      createRedisMock();
+      mockRedisIncr.mockResolvedValue(10);
+      mockRedisGetset.mockResolvedValue('2.9');
+      mockRedisExpire.mockResolvedValue(true);
+      const chain = createUpdateChain([]);
+
+      const { incrementProfileViews } = await import(
+        '@/lib/services/profile/mutations'
+      );
+      await incrementProfileViews('testartist');
+
+      expect(chain.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileViews: {
+            type: 'sql',
+            args: expect.arrayContaining([expect.anything(), 2]),
+          },
+        })
+      );
+    });
+
     it('falls back to direct DB write when Redis unavailable', async () => {
       mockGetRedis.mockReturnValue(null);
       createUpdateChain([]);

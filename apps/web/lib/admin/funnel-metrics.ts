@@ -76,7 +76,7 @@ async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
       .from(leads)
       .where(
         and(
-          drizzleSql`${leads.outreachStatus} IN ('sent', 'dm_sent')`,
+          drizzleSql`${leads.outreachStatus}::text IN ('sent', 'dm_sent')`,
           gte(leads.updatedAt, sevenDaysAgo)
         )
       );

@@ -4,6 +4,9 @@ import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
+  'min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-tertiary-token transition-colors active:bg-surface-2/50 hover:text-primary-token hover:bg-surface-2 lg:min-h-0 lg:min-w-0 lg:p-1 lg:active:bg-transparent';
+
 export interface DrawerLinkSectionProps {
   /** Section heading text */
   readonly title: string;
@@ -58,13 +61,7 @@ export function DrawerLinkSection({
             <button
               type='button'
               onClick={onAdd}
-              className={[
-                'min-h-[44px] min-w-[44px] flex items-center justify-center',
-                'lg:min-h-0 lg:min-w-0 lg:p-1 rounded-md text-tertiary-token',
-                'active:bg-surface-2/50 lg:active:bg-transparent',
-                'lg:hover:text-primary-token lg:hover:bg-surface-2',
-                'transition-colors',
-              ].join(' ')}
+              className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
               aria-label={addLabel}
             >
               <Plus className='h-4 w-4' />

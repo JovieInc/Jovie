@@ -39,11 +39,11 @@ export function ContactSection({
   }
 
   return (
-    <main className='space-y-4' aria-labelledby='contact-title'>
+    <main className='-mt-1 space-y-3' aria-labelledby='contact-title'>
       <h1 id='contact-title' className='sr-only'>
         Contact {artistName}
       </h1>
-      <div className='rounded-2xl border border-subtle bg-surface-1 p-2 shadow-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 p-2 shadow-sm ring-1 ring-black/5 dark:ring-white/5'>
         <div className='space-y-2'>
           {available.map(contact => {
             const primary = primaryChannel(contact);
