@@ -9,6 +9,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { popularityIndex } from '@/constants/app';
+import {
+  MAX_MODE_LINKS,
+  MAX_PROFILE_LINKS,
+} from '@/lib/profile/social-link-limits';
 import { fetchWithTimeout } from '@/lib/queries/fetch';
 import { captureException } from '@/lib/sentry/client-lite';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -263,6 +267,29 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
               sectionOf(l) === otherSection
           )
         : false;
+
+      // Enforce public profile caps at add time.
+      const modeCount = links.filter(l => sectionOf(l) === 'dsp').length;
+      const socialCount = links.filter(l => sectionOf(l) === 'social').length;
+      const totalCount = modeCount + socialCount;
+      const socialCapacity = Math.max(
+        0,
+        MAX_PROFILE_LINKS - Math.min(modeCount, MAX_MODE_LINKS)
+      );
+
+      if (section === 'dsp' && modeCount >= MAX_MODE_LINKS) {
+        return;
+      }
+      if (section === 'social' && socialCount >= socialCapacity) {
+        return;
+      }
+      if (
+        section !== 'dsp' &&
+        section !== 'social' &&
+        totalCount >= MAX_PROFILE_LINKS
+      ) {
+        return;
+      }
 
       // Step 4: Check YouTube cross-category logic
       const ytCrossCategory = checkYouTubeCrossCategory(
