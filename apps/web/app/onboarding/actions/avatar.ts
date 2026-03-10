@@ -226,6 +226,74 @@ function backoffDelay(attempt: number): Promise<void> {
 }
 
 /**
+ * Handles a fetch attempt error during avatar retrieval.
+ * Returns null to signal "abort and return null", or the Error to continue the loop.
+ */
+function onFetchError(
+  error: unknown,
+  attempt: number,
+  maxRetries: number
+): Error | null {
+  const err = error instanceof Error ? error : new Error('Unknown fetch error');
+
+  if (err.name === 'AbortError' || err.message.includes('aborted')) {
+    return null;
+  }
+
+  if (err.message.includes('Invalid content type')) {
+    Sentry.captureMessage('Avatar upload: invalid content type', {
+      level: 'warning',
+      extra: { errorMessage: err.message },
+    });
+    return null;
+  }
+
+  if (attempt < maxRetries - 1) {
+    Sentry.addBreadcrumb({
+      category: 'avatar',
+      message: `Avatar fetch attempt ${attempt + 1}/${maxRetries} failed: ${err.message}`,
+      level: 'info',
+    });
+  }
+  return err;
+}
+
+/**
+ * Handles an upload attempt error during avatar upload.
+ * Returns null to signal "abort and return null", or the Error to continue the loop.
+ */
+function onUploadError(
+  error: unknown,
+  attempt: number,
+  maxRetries: number
+): Error | null {
+  const err =
+    error instanceof Error ? error : new Error('Unknown upload error');
+
+  if (err.name === 'AbortError' || err.message.includes('aborted')) {
+    return null;
+  }
+
+  if (err.message.includes('401')) {
+    Sentry.addBreadcrumb({
+      category: 'avatar',
+      message: `Avatar upload auth failed: ${err.message}`,
+      level: 'warning',
+    });
+    return null;
+  }
+
+  if (attempt < maxRetries - 1) {
+    Sentry.addBreadcrumb({
+      category: 'avatar',
+      message: `Avatar upload attempt ${attempt + 1}/${maxRetries} failed: ${err.message}`,
+      level: 'info',
+    });
+  }
+  return err;
+}
+
+/**
  * Fetches a remote avatar image with retry and backoff.
  * Returns null if all attempts fail.
  */
@@ -240,31 +308,9 @@ async function fetchAvatarWithRetry(
       if (attempt > 0) await backoffDelay(attempt);
       return await fetchAvatarImage(imageUrl);
     } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error('Unknown fetch error');
-
-      if (
-        lastError.name === 'AbortError' ||
-        lastError.message.includes('aborted')
-      ) {
-        return null;
-      }
-
-      if (lastError.message.includes('Invalid content type')) {
-        Sentry.captureMessage('Avatar upload: invalid content type', {
-          level: 'warning',
-          extra: { errorMessage: lastError.message },
-        });
-        return null;
-      }
-
-      if (attempt < maxRetries - 1) {
-        Sentry.addBreadcrumb({
-          category: 'avatar',
-          message: `Avatar fetch attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}`,
-          level: 'info',
-        });
-      }
+      const err = onFetchError(error, attempt, maxRetries);
+      if (err === null) return null;
+      lastError = err;
     }
   }
 
@@ -297,32 +343,9 @@ async function uploadAvatarWithRetry(
       );
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
-      lastError =
-        error instanceof Error ? error : new Error('Unknown upload error');
-
-      if (
-        lastError.name === 'AbortError' ||
-        lastError.message.includes('aborted')
-      ) {
-        return null;
-      }
-
-      if (lastError.message.includes('401')) {
-        Sentry.addBreadcrumb({
-          category: 'avatar',
-          message: `Avatar upload auth failed: ${lastError.message}`,
-          level: 'warning',
-        });
-        return null;
-      }
-
-      if (attempt < maxRetries - 1) {
-        Sentry.addBreadcrumb({
-          category: 'avatar',
-          message: `Avatar upload attempt ${attempt + 1}/${maxRetries} failed: ${lastError.message}`,
-          level: 'info',
-        });
-      }
+      const err = onUploadError(error, attempt, maxRetries);
+      if (err === null) return null;
+      lastError = err;
     }
   }
 
