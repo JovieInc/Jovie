@@ -114,9 +114,9 @@ export function AudienceCRMSection() {
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Most artist pages leak demand to streaming apps and social
-                platforms. Jovie turns each visit into first-party audience data
-                you can actually use later.
+                Every visit captures first-party fan data — emails, streaming
+                preferences, locations. Message fans directly. No algorithm. No
+                platform tax.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in fan CRM
@@ -181,6 +181,12 @@ export function AudienceCRMSection() {
                   </div>
                 ))}
               </div>
+
+              {/* Urgency line */}
+              <p className='px-5 pt-4 pb-2 text-[13px] text-[var(--linear-text-tertiary)] italic'>
+                Every show, every release, every link tap — fans you&apos;d
+                never hear from again, captured.
+              </p>
 
               {/* Real audience table (lazy-loaded, clipped to ~5 visible rows) */}
               <div className='relative max-h-[360px] overflow-hidden'>
