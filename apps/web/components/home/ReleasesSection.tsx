@@ -360,10 +360,9 @@ export function ReleasesSection() {
                 <br />a perfect link.
               </h2>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)] max-w-md'>
-                Connect Spotify once. Every song you&apos;ve ever released gets
-                its own smart link across every platform — automatically. And
-                every time you drop something new, your fans are notified.
-                Without you lifting a finger.
+                Connect Spotify once. Every release — past and future — gets its
+                own smart link across every platform. Drop something new, and
+                your fans know instantly.
               </p>
             </div>
           </div>
