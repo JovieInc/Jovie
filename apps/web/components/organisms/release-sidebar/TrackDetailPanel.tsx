@@ -1,10 +1,11 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { ArrowLeft, Copy, ExternalLink, Link2 } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import { DrawerSection } from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -44,13 +45,6 @@ export function TrackDetailPanel({
       );
     }
   }, [track.isrc]);
-
-  const handleCopySmartLink = useCallback(() => {
-    navigator.clipboard.writeText(smartLinkUrl).then(
-      () => toast.success('Smart link copied'),
-      () => toast.error('Failed to copy link')
-    );
-  }, [smartLinkUrl]);
 
   const trackLabel =
     track.discNumber > 1
@@ -116,14 +110,17 @@ export function TrackDetailPanel({
               </span>
             </button>
           )}
-          <button
-            type='button'
-            onClick={handleCopySmartLink}
-            className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-          >
-            <Link2 className='h-3.5 w-3.5 shrink-0' />
-            <span>Copy smart link</span>
-          </button>
+          <CopyableUrlRow
+            url={smartLinkUrl}
+            copyButtonTitle='Copy smart link'
+            openButtonTitle='Open smart link'
+            onCopySuccess={() => {
+              toast.success('Smart link copied');
+            }}
+            onCopyError={() => {
+              toast.error('Failed to copy link');
+            }}
+          />
         </div>
       </DrawerSection>
 
