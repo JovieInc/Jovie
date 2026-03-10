@@ -181,7 +181,6 @@ export const TrackRow = memo(function TrackRow({
                       <div
                         key={providerKey}
                         className='relative flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-1'
-                        title={config.label}
                       >
                         {dspId ? (
                           <DspProviderIcon provider={dspId} size='sm' />
