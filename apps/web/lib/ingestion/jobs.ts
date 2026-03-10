@@ -46,7 +46,7 @@ async function insertJobWithDedup(
     const result = await db
       .insert(ingestionJobs)
       .values(values)
-      .onConflictDoNothing({ target: ingestionJobs.dedupKey })
+      .onConflictDoNothing()
       .returning({ id: ingestionJobs.id });
 
     if (result.length > 0) {

@@ -54,7 +54,7 @@ export async function enqueueClaimInviteJob(
       createdAt: new Date(),
       updatedAt: new Date(),
     })
-    .onConflictDoNothing({ target: [ingestionJobs.dedupKey] })
+    .onConflictDoNothing()
     .returning({ id: ingestionJobs.id });
 
   if (job) {
@@ -156,7 +156,7 @@ export async function enqueueBulkClaimInviteJobs(
     const jobs = await tx
       .insert(ingestionJobs)
       .values(valuesToInsert)
-      .onConflictDoNothing({ target: [ingestionJobs.dedupKey] })
+      .onConflictDoNothing()
       .returning({ id: ingestionJobs.id });
 
     enqueued = jobs.length;
