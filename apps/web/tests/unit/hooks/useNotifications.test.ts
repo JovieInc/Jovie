@@ -541,6 +541,19 @@ describe('useNotifications', () => {
       );
     });
 
+    it('should map fetch TypeErrors to NETWORK_ERROR message', () => {
+      const { result } = renderHook(() => useNotifications());
+
+      act(() => {
+        result.current.handleError(new TypeError('Failed to fetch'));
+      });
+
+      expect(mockToast.error).toHaveBeenCalledWith(
+        TOAST_MESSAGES.NETWORK_ERROR,
+        { duration: TOAST_DURATIONS.LONG }
+      );
+    });
+
     it('should map rate limit errors to RATE_LIMIT message', () => {
       const { result } = renderHook(() => useNotifications());
 
