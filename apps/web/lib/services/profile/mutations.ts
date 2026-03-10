@@ -160,10 +160,14 @@ async function flushViewsToDatabase(
   normalizedUsername: string,
   count: number
 ): Promise<void> {
+  const sanitizedCount = Number.isFinite(count)
+    ? Math.max(1, Math.trunc(count))
+    : 1;
+
   await db
     .update(creatorProfiles)
     .set({
-      profileViews: drizzleSql`${creatorProfiles.profileViews} + ${count}`,
+      profileViews: drizzleSql`coalesce(${creatorProfiles.profileViews}, 0) + ${sanitizedCount}`,
       updatedAt: new Date(),
     })
     .where(eq(creatorProfiles.usernameNormalized, normalizedUsername));
@@ -184,7 +188,7 @@ async function incrementViewsDirectly(
       await db
         .update(creatorProfiles)
         .set({
-          profileViews: drizzleSql`${creatorProfiles.profileViews} + 1`,
+          profileViews: drizzleSql`coalesce(${creatorProfiles.profileViews}, 0) + 1`,
           updatedAt: new Date(),
         })
         .where(eq(creatorProfiles.usernameNormalized, normalizedUsername));
