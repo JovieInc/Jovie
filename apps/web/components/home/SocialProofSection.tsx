@@ -14,8 +14,9 @@ export function SocialProofSection() {
             <span className='font-medium text-[var(--linear-text-primary)]'>
               Tim White
             </span>
-            , who has released music on Sony, Universal, AWAL, and Armada. Every
-            feature is designed from real artist experience.
+            {
+              ', who has released music on Sony, Universal, AWAL, and Armada. Every feature is designed from real artist experience.'
+            }
           </p>
         </div>
 

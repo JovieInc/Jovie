@@ -60,11 +60,7 @@ export function SmartLinkProviderButton({
       );
     }
 
-    return (
-      <div className={sharedClassName} role='presentation'>
-        {content}
-      </div>
-    );
+    return <div className={sharedClassName}>{content}</div>;
   }
 
   return (
