@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import { PencilLine, QrCode, Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -255,51 +256,20 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
         {/* Smart link cell */}
         <td className='px-4 py-2.5 align-middle'>
-          {(() => {
-            const smartLinkTestId = `smart-link-copy-${release.id}`;
-            const isCopied = copiedId === smartLinkTestId;
-            return (
-              <Button
-                variant='secondary'
-                size='sm'
-                data-testid={smartLinkTestId}
-                data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-                onClick={() =>
-                  void handleCopyWithFeedback(
-                    release.smartLinkPath,
-                    `${release.title} smart link`,
-                    smartLinkTestId
-                  )
-                }
-                className={cn(
-                  'inline-flex items-center text-[13px] transition-colors',
-                  isCopied && 'bg-success/10 text-success hover:bg-success/10'
-                )}
-              >
-                <span className='relative mr-1 flex h-3.5 w-3.5 items-center justify-center'>
-                  <Icon
-                    name='Link'
-                    className={cn(
-                      'absolute h-3.5 w-3.5 transition-all duration-150',
-                      isCopied ? 'scale-50 opacity-0' : 'scale-100 opacity-100'
-                    )}
-                    aria-hidden='true'
-                  />
-                  <Icon
-                    name='Check'
-                    className={cn(
-                      'absolute h-3.5 w-3.5 transition-all duration-150',
-                      isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
-                    )}
-                    aria-hidden='true'
-                  />
-                </span>
-                <span className='line-clamp-1'>
-                  {isCopied ? 'Copied!' : 'Copy link'}
-                </span>
-              </Button>
-            );
-          })()}
+          <CopyableUrlRow
+            url={smartLinkUrl}
+            displayValue={release.smartLinkPath}
+            className='min-w-[180px]'
+            copyButtonTitle='Copy smart link'
+            openButtonTitle='Open smart link'
+            testId={`smart-link-copy-${release.id}`}
+            onCopySuccess={() => {
+              toast.success(`${release.title} smart link copied`);
+            }}
+            onCopyError={() => {
+              toast.error('Failed to copy link');
+            }}
+          />
         </td>
 
         {/* Provider cells */}

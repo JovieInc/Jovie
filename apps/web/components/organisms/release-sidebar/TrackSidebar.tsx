@@ -9,19 +9,13 @@
  */
 
 import { Badge } from '@jovie/ui';
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  ExternalLink,
-  Hash,
-  Link2,
-} from 'lucide-react';
+import { ArrowLeft, Check, Copy, ExternalLink, Hash } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerSection,
   EntitySidebarShell,
@@ -84,21 +78,25 @@ export function TrackSidebar({
 
   const smartLinkUrl = track ? `${getBaseUrl()}${track.smartLinkPath}` : '';
 
+  const showSmartLinkCopied = useCallback(() => {
+    toast.success('Smart link copied');
+    setIsSmartLinkCopied(true);
+    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    copyTimeoutRef.current = setTimeout(
+      () => setIsSmartLinkCopied(false),
+      2000
+    );
+  }, []);
+
   const handleCopySmartLink = useCallback(() => {
     if (!smartLinkUrl) return;
     navigator.clipboard.writeText(smartLinkUrl).then(
       () => {
-        toast.success('Smart link copied');
-        setIsSmartLinkCopied(true);
-        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-        copyTimeoutRef.current = setTimeout(
-          () => setIsSmartLinkCopied(false),
-          2000
-        );
+        showSmartLinkCopied();
       },
       () => toast.error('Failed to copy link')
     );
-  }, [smartLinkUrl]);
+  }, [showSmartLinkCopied, smartLinkUrl]);
 
   const handleCopyIsrc = useCallback(() => {
     if (!track?.isrc) return;
@@ -242,15 +240,17 @@ export function TrackSidebar({
             <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               Smart link
             </p>
-            <button
-              type='button'
-              onClick={handleCopySmartLink}
-              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token hover:bg-surface-2/50 hover:text-primary-token transition-colors'
-            >
-              <Link2 className='h-3.5 w-3.5 shrink-0' />
-              <span className='truncate'>{smartLinkUrl}</span>
-              <Copy className='ml-auto h-3 w-3 shrink-0 text-tertiary-token' />
-            </button>
+            <CopyableUrlRow
+              url={smartLinkUrl}
+              copyButtonTitle='Copy smart link'
+              openButtonTitle='Open smart link'
+              onCopySuccess={() => {
+                showSmartLinkCopied();
+              }}
+              onCopyError={() => {
+                toast.error('Failed to copy link');
+              }}
+            />
           </DrawerSection>
 
           <DrawerSection>
