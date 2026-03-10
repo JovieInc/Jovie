@@ -10,6 +10,7 @@ import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
 import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
+import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
 import type {
@@ -451,6 +452,16 @@ export default async function ArtistPage({
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
+  // Generate a short-lived HMAC token so the client can authenticate its visit
+  // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
+  // Falls back to undefined gracefully if the secret is not configured.
+  let visitTrackingToken: string | undefined;
+  try {
+    visitTrackingToken = getClientTrackingToken(profile.id).token;
+  } catch {
+    // Secret not configured — visit tracking will proceed without token auth
+  }
+
   // Cache Statsig decisions for public profile traffic to avoid per-request latency.
   const [showLatestRelease, subscribeCTAVariant] = await Promise.all([
     getCachedLatestReleaseGate(),
@@ -534,6 +545,7 @@ export default async function ArtistPage({
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
         tourDates={tourDates}
+        visitTrackingToken={visitTrackingToken}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>
