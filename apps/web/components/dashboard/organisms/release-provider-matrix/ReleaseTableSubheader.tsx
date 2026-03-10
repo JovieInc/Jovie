@@ -9,7 +9,6 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
-import type React from 'react';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -75,8 +74,6 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
-  /** DSP connection badges to display on the left */
-  readonly dspBadges?: React.ReactNode;
   /** Whether search is currently active */
   readonly isSearchOpen?: boolean;
   /** Callback to toggle search open/close */
@@ -316,7 +313,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
-  dspBadges,
   isSearchOpen,
   onSearchToggle,
 }: ReleaseTableSubheaderProps) {
@@ -325,9 +321,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <div className='flex items-center justify-between border-b border-subtle/80 bg-surface/20 px-4 py-1.5'>
-      {/* Left: DSP connection badges */}
-      <div className='flex items-center gap-2'>{dspBadges}</div>
-
       {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
       <ActionBar className='hidden items-center md:flex'>
         {onSearchToggle && (
