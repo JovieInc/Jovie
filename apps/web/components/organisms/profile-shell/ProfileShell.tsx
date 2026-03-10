@@ -95,8 +95,8 @@ export function ProfileShell({
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
   const availableDspPreferences = useMemo(
-    () => toDSPPreferences(getCanonicalProfileDSPs(artist)),
-    [artist]
+    () => toDSPPreferences(getCanonicalProfileDSPs(artist, socialLinks)),
+    [artist, socialLinks]
   );
 
   const {

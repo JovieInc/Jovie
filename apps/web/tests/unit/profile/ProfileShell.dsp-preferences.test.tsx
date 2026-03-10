@@ -9,8 +9,21 @@ vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
 }));
 
+const mockModeLinks: LegacySocialLink[] = [
+  {
+    id: 'social-sc',
+    artist_id: 'artist-1',
+    platform: 'soundcloud',
+    url: 'https://soundcloud.com/testartist',
+    clicks: 0,
+    created_at: new Date().toISOString(),
+  } as LegacySocialLink,
+];
+
 vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
   useProfileShell: () => ({
+    isTipNavigating: false,
+    setIsTipNavigating: vi.fn(),
     handleNotificationsTrigger: vi.fn(),
     notificationsEnabled: true,
     notificationsContextValue: {
@@ -30,8 +43,11 @@ vi.mock('@/components/organisms/profile-shell/useProfileShell', () => ({
       isNotificationMenuOpen: true,
       setIsNotificationMenuOpen: vi.fn(),
     },
-    socialNetworkLinks: [],
-    hasSocialLinks: false,
+    socialNetworkLinks: mockModeLinks,
+    modeLinks: mockModeLinks,
+    socialLinks: [],
+    hasSocialLinks: true,
+    hasContacts: false,
     notificationsController: {
       channelBusy: {},
       contentPreferences: {},
@@ -59,8 +75,8 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
     id: 'artist-1',
     owner_user_id: 'owner-1',
     handle: 'testartist',
-    spotify_id: 'spotify-artist-id',
-    youtube_url: 'https://youtube.com/@artist',
+    spotify_id: '',
+    youtube_url: undefined,
     name: 'Test Artist',
     published: true,
     is_verified: false,
@@ -73,16 +89,16 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
 
 describe('ProfileShell DSP preferences', () => {
   it('uses connected social DSPs for listening preference options when present', () => {
-    const socialLinks = [
+    const socialLinks: LegacySocialLink[] = [
       {
-        id: 'social-1',
+        id: 'social-sc',
         artist_id: 'artist-1',
-        platform: 'samsung_music',
-        url: 'https://music.samsung.com/artist/123',
+        platform: 'soundcloud',
+        url: 'https://soundcloud.com/testartist',
         clicks: 0,
         created_at: new Date().toISOString(),
-      },
-    ] as LegacySocialLink[];
+      } as LegacySocialLink,
+    ];
 
     renderWithQueryClient(
       <TooltipProvider>
@@ -98,7 +114,7 @@ describe('ProfileShell DSP preferences', () => {
     const options = screen
       .getAllByRole('option')
       .map(option => option.textContent);
-    expect(options).toContain('Samsung Music');
+    expect(options).toContain('SoundCloud');
     expect(options).not.toContain('Spotify');
     expect(options).not.toContain('YouTube');
   });
