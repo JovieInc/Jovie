@@ -64,13 +64,16 @@ function BadgeRow({
                   +{overflow.length} others
                 </button>
               </TooltipTrigger>
-              <TooltipContent side='top' className='max-w-xs'>
-                <p className='mb-1 text-2xs font-semibold text-tertiary-token'>
+              <TooltipContent
+                side='top'
+                className='w-[min(22rem,calc(100vw-2rem))] p-3'
+              >
+                <p className='mb-2 text-2xs font-semibold text-tertiary-token'>
                   All {title}
                 </p>
-                <ul className='space-y-0.5'>
+                <ul className='max-h-60 space-y-1 overflow-y-auto pr-1'>
                   {items.map(item => (
-                    <li key={item} className='text-2xs'>
+                    <li key={item} className='truncate text-2xs'>
                       {item}
                     </li>
                   ))}

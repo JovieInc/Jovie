@@ -22,6 +22,52 @@ import { useProfileShell } from './useProfileShell';
 
 const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 
+const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
+  [
+    { keywords: ['spotify'], dspKey: 'spotify' },
+    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
+    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
+    { keywords: ['youtube'], dspKey: 'youtube' },
+    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
+    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
+    { keywords: ['tidal'], dspKey: 'tidal' },
+    { keywords: ['deezer'], dspKey: 'deezer' },
+    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
+    { keywords: ['pandora'], dspKey: 'pandora' },
+    { keywords: ['samsungmusic'], dspKey: 'samsung_music' },
+  ];
+
+function mapSocialPlatformToDSPKey(
+  platform: string | undefined
+): string | null {
+  if (typeof platform !== 'string' || !platform) return null;
+  const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
+
+  for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {
+    if (
+      keywords.some(
+        keyword => normalized.includes(keyword) || normalized === keyword
+      )
+    ) {
+      return dspKey;
+    }
+  }
+
+  return null;
+}
+
+function getDspPreferenceLabel(platform: string, fallbackName: string): string {
+  return (
+    platform
+      .split(/[_\-\s]+/)
+      .filter(Boolean)
+      .map(
+        token => token.charAt(0).toUpperCase() + token.slice(1).toLowerCase()
+      )
+      .join(' ') || fallbackName
+  );
+}
+
 function extractVenmoUsername(url: string | null): string | null {
   if (!url) return null;
   try {
@@ -63,8 +109,8 @@ export function ProfileShell({
     notificationsEnabled,
     notificationsController,
     notificationsContextValue,
-    socialNetworkLinks,
-    hasSocialLinks,
+    modeLinks,
+    socialLinks: prioritizedSocialLinks,
   } = useProfileShell({
     artist,
     socialLinks,
@@ -94,14 +140,35 @@ export function ProfileShell({
     [venmoLink]
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
-  const availableDspPreferences = useMemo(
-    () =>
-      getAvailableDSPs(artist).map(dsp => ({
-        key: dsp.key,
-        label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
-      })),
-    [artist]
-  );
+  const availableDspPreferences = useMemo(() => {
+    const socialDspByKey = new Map<string, { key: string; label: string }>();
+
+    socialLinks
+      .filter(link => link.url)
+      .forEach(link => {
+        const dspKey = mapSocialPlatformToDSPKey(link.platform);
+        if (!dspKey || socialDspByKey.has(dspKey)) return;
+
+        socialDspByKey.set(dspKey, {
+          key: dspKey,
+          label:
+            DSP_CONFIGS[dspKey]?.name ??
+            getDspPreferenceLabel(link.platform, dspKey),
+        });
+      });
+
+    const preferences =
+      socialDspByKey.size > 0
+        ? Array.from(socialDspByKey.values())
+        : getAvailableDSPs(artist).map(dsp => ({
+            key: dsp.key,
+            label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
+          }));
+
+    return preferences.sort((left, right) =>
+      left.label.localeCompare(right.label)
+    );
+  }, [artist, socialLinks]);
 
   const {
     channelBusy,
@@ -214,8 +281,7 @@ export function ProfileShell({
                       {/* Social icons — only in profile mode to reduce distractions during conversion flows */}
                       {(!mode || mode === 'profile') &&
                         showSocialBar &&
-                        hasSocialLinks &&
-                        socialNetworkLinks.map(link => (
+                        modeLinks.map(link => (
                           <SocialLinkComponent
                             key={link.id}
                             link={link}
@@ -294,6 +360,16 @@ export function ProfileShell({
                               />
                             </Link>
                           </CircleIconButton>
+                        ))}
+                      {(!mode || mode === 'profile') &&
+                        showSocialBar &&
+                        prioritizedSocialLinks.map(link => (
+                          <SocialLinkComponent
+                            key={link.id}
+                            link={link}
+                            handle={artist.handle}
+                            artistName={artist.name}
+                          />
                         ))}
                     </div>
                   </div>
