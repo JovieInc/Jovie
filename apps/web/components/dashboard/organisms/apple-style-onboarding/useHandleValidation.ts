@@ -245,7 +245,7 @@ export function useHandleValidation({
       });
 
       // Trigger API validation via Pacer (debounced, cached)
-      void validateApiRef.current(normalizedInput);
+      validateApiRef.current(normalizedInput);
     },
     [cancelValidation, normalizedInitialHandle]
   );

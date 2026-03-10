@@ -109,7 +109,7 @@ export function useImportPolling({
 
     const id = setInterval(poll, POLL_INTERVAL_MS);
     // Immediately poll on mount
-    void poll();
+    poll();
 
     return () => clearInterval(id);
   }, [enabled, poll]);
