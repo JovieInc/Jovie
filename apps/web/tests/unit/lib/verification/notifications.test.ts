@@ -24,7 +24,7 @@ describe('verification notifications', () => {
   });
 
   it('sends a Slack notification for verification requests', async () => {
-    await notifyVerificationRequest({
+    const result = await notifyVerificationRequest({
       name: 'Alex Artist',
       email: 'alex@example.com',
       username: 'alex',
@@ -44,6 +44,7 @@ describe('verification notifications', () => {
     expect(slackPayload.blocks?.[0]?.text?.text).toContain(
       `<${APP_URL}/alex|Open profile>`
     );
+    expect(result).toEqual({ status: 'sent' });
   });
 
   it('sends Tim-style plain email after verification is approved', async () => {

@@ -4,7 +4,10 @@ import { APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { sendEmail } from '@/lib/email/send';
 import { EMAIL_FROM_ADDRESS } from '@/lib/notifications/config';
-import { sendSlackMessage } from '@/lib/notifications/providers/slack';
+import {
+  type SlackNotificationResult,
+  sendSlackMessage,
+} from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
 
 interface VerificationRequestPayload {
@@ -16,13 +19,13 @@ interface VerificationRequestPayload {
 
 export async function notifyVerificationRequest(
   payload: VerificationRequestPayload
-): Promise<void> {
+): Promise<SlackNotificationResult> {
   const profilePath = payload.username
     ? `/${payload.username}`
     : `${APP_ROUTES.ADMIN_CREATORS}?profileId=${payload.profileId}`;
   const profileUrl = `${APP_URL}${profilePath}`;
 
-  sendSlackMessage({
+  return sendSlackMessage({
     text: `${payload.name} requested profile verification`,
     blocks: [
       {
@@ -33,11 +36,6 @@ export async function notifyVerificationRequest(
         },
       },
     ],
-  }).catch(err => {
-    logger.warn(
-      '[verification] Slack verification request notification failed',
-      err
-    );
   });
 }
 
