@@ -10,6 +10,7 @@ import {
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import type { AvailableDSP } from '@/lib/dsp';
 
 function convertSocialLinksToPreviewLinks(
   links: ProfileSocialLink[]
@@ -32,16 +33,10 @@ function convertSocialLinksToPreviewLinks(
  */
 export function PreviewDataHydrator({
   initialLinks,
-  spotifyConnected,
-  spotifyArtistName,
-  appleMusicConnected,
-  appleMusicArtistName,
+  connectedDSPs,
 }: {
   readonly initialLinks: ProfileSocialLink[];
-  readonly spotifyConnected: boolean;
-  readonly spotifyArtistName: string | null;
-  readonly appleMusicConnected: boolean;
-  readonly appleMusicArtistName: string | null;
+  readonly connectedDSPs: readonly AvailableDSP[];
 }) {
   const { setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
@@ -70,24 +65,20 @@ export function PreviewDataHydrator({
       profilePath: `/${selectedProfile.username}`,
       dspConnections: {
         spotify: {
-          connected: spotifyConnected,
-          artistName: spotifyArtistName,
+          connected: connectedDSPs.some(dsp => dsp.key === 'spotify'),
+          artistName: selectedProfile.spotifyId
+            ? selectedProfile.displayName
+            : null,
         },
         appleMusic: {
-          connected: appleMusicConnected,
-          artistName: appleMusicArtistName,
+          connected: connectedDSPs.some(dsp => dsp.key === 'apple_music'),
+          artistName: selectedProfile.appleMusicId
+            ? selectedProfile.displayName
+            : null,
         },
       },
     });
-  }, [
-    selectedProfile,
-    previewLinks,
-    setPreviewData,
-    spotifyConnected,
-    spotifyArtistName,
-    appleMusicConnected,
-    appleMusicArtistName,
-  ]);
+  }, [selectedProfile, previewLinks, setPreviewData, connectedDSPs]);
 
   return null;
 }

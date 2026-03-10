@@ -15,7 +15,7 @@ import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { TipDrawer } from '@/components/profile/TipDrawer';
 import { Container } from '@/components/site/Container';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
-import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
 import type { ProfileShellProps } from './types';
 import { useProfileShell } from './useProfileShell';
@@ -95,11 +95,7 @@ export function ProfileShell({
   );
   const hasTipSupport = showTipButton && Boolean(venmoLink);
   const availableDspPreferences = useMemo(
-    () =>
-      getAvailableDSPs(artist).map(dsp => ({
-        key: dsp.key,
-        label: DSP_CONFIGS[dsp.key]?.name ?? dsp.name,
-      })),
+    () => toDSPPreferences(getCanonicalProfileDSPs(artist)),
     [artist]
   );
 
