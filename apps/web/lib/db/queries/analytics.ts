@@ -365,34 +365,34 @@ export async function getUserDashboardAnalytics(
     const aggregates = await cacheQuery(
       `analytics:dashboard:${creatorProfile.id}:${range}`,
       () =>
-        dashboardQuery(() =>
-          db
-            .execute<{
-              top_cities: JsonArray<{ city: string | null; count: number }>;
-              top_countries: JsonArray<{
-                country: string | null;
-                count: number;
-              }>;
-              top_referrers: JsonArray<{
-                referrer: string | null;
-                count: number;
-              }>;
-              total_views: AggregateValue;
-              unique_users: AggregateValue;
-              total_clicks: AggregateValue;
-              spotify_clicks: AggregateValue;
-              social_clicks: AggregateValue;
-              recent_clicks: AggregateValue;
-              listen_clicks: AggregateValue;
-              subscribers: AggregateValue;
-              identified_users: AggregateValue;
-              top_links: JsonArray<{
-                id: string | null;
-                url: string | null;
-                clicks: number;
-              }>;
-            }>(
-              drizzleSql`
+        dashboardQuery(async () => {
+          type AggRow = {
+            top_cities: JsonArray<{ city: string | null; count: number }>;
+            top_countries: JsonArray<{
+              country: string | null;
+              count: number;
+            }>;
+            top_referrers: JsonArray<{
+              referrer: string | null;
+              count: number;
+            }>;
+            total_views: AggregateValue;
+            unique_users: AggregateValue;
+            total_clicks: AggregateValue;
+            spotify_clicks: AggregateValue;
+            social_clicks: AggregateValue;
+            recent_clicks: AggregateValue;
+            listen_clicks: AggregateValue;
+            subscribers: AggregateValue;
+            identified_users: AggregateValue;
+            top_links: JsonArray<{
+              id: string | null;
+              url: string | null;
+              clicks: number;
+            }>;
+          };
+          const result = await db.execute<AggRow>(
+            drizzleSql`
             with base_events as (
               select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
@@ -476,9 +476,9 @@ export async function getUserDashboardAnalytics(
               coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
             ;
           `
-            )
-            .then(res => res.rows?.[0])
-        ),
+          );
+          return result.rows?.[0];
+        }),
       { ttlSeconds: 300 }
     );
 
