@@ -138,7 +138,7 @@ export function LeadKeywordsManager() {
           </h2>
           <p className='mt-1 text-xs text-secondary-token'>
             Google CSE queries used to find new Linktree leads.{' '}
-            {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}{' '}
+            {keywords.length} keyword{keywords.length === 1 ? '' : 's'}{' '}
             configured.
           </p>
         </div>

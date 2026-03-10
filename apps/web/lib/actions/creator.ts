@@ -33,7 +33,7 @@ export async function updateCreatorProfileAction(
 ): Promise<{ success: boolean; data?: CreatorProfile; error?: string }> {
   try {
     const updated = await updateProfile(userId, updates);
-    revalidatePath(APP_ROUTES.PROFILE);
+    revalidatePath(APP_ROUTES.CHAT);
     return { success: true, data: updated };
   } catch (error) {
     captureError('Error updating creator profile', error, { userId });

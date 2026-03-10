@@ -230,6 +230,93 @@ describe('POST /api/audience/visit', () => {
     expect(data.success).toBe(true);
   });
 
+  it('falls back when daily profile views conflict target is missing', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      const mockInsert = vi
+        .fn()
+        .mockReturnValueOnce({
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi
+              .fn()
+              .mockRejectedValue(
+                new Error(
+                  '42P10: there is no unique or exclusion constraint matching the ON CONFLICT specification'
+                )
+              ),
+          }),
+        })
+        .mockReturnValueOnce({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
+        });
+
+      const mockUpdate = vi
+        .fn()
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([{ id: 'daily_row' }]),
+            }),
+          }),
+        })
+        .mockReturnValueOnce({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue(undefined),
+          }),
+        });
+
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: 'aud_123',
+                  visits: 1,
+                  latestActions: [],
+                  referrerHistory: [],
+                  engagementScore: 1,
+                  geoCity: null,
+                  geoCountry: null,
+                  deviceType: 'unknown',
+                  utmParams: {},
+                },
+              ]),
+            }),
+          }),
+        }),
+        insert: mockInsert,
+        update: mockUpdate,
+      });
+    });
+
+    const { POST } = await import('@/app/api/audience/visit/route');
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+  });
+
   it('records visit for valid public profile', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({

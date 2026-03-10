@@ -471,6 +471,68 @@ function mapProfileResultToCreatorProfile(result: {
   };
 }
 
+async function renderListenMode(
+  username: string,
+  isPublicNoAuthSmoke: boolean
+) {
+  const profileResult = await getLightweightProfile(username);
+  if (!profileResult) {
+    notFound();
+  }
+
+  const artist = convertCreatorProfileToArtist(profileResult.profile);
+  const subtitle = PAGE_SUBTITLES.listen ?? PAGE_SUBTITLES.profile;
+  const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
+    profileResult.profile,
+    profileResult.genres,
+    []
+  );
+
+  return (
+    <>
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(musicGroupSchema)}
+      </script>
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(breadcrumbSchema)}
+      </script>
+
+      {!isPublicNoAuthSmoke ? (
+        <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
+      ) : null}
+      {!profileResult.profile.is_claimed && (
+        <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
+      )}
+      {!isPublicNoAuthSmoke ? (
+        <JoviePixel profileId={profileResult.profile.id} />
+      ) : null}
+      <StaticArtistPage
+        mode='listen'
+        artist={artist}
+        socialLinks={[]}
+        contacts={[]}
+        subtitle={subtitle}
+        showTipButton={profileResult.hasVenmoLink}
+        isTipModeActive={false}
+        showBackButton={true}
+        showTourButton={true}
+        isTourModeActive={false}
+        enableDynamicEngagement={profileResult.creatorIsPro}
+        latestRelease={null}
+        photoDownloadSizes={[]}
+        allowPhotoDownloads={false}
+        subscribeTwoStep={false}
+        genres={profileResult.genres}
+        tourDates={[]}
+        showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
+      />
+      {!isPublicNoAuthSmoke ? (
+        <DesktopQrOverlayClient handle={artist.handle} />
+      ) : null}
+    </>
+  );
+}
+
 const getLightweightProfile = cache(async (username: string) => {
   const result = await getCreatorProfileWithUser(username.toLowerCase());
   if (!result || !result.isPublic) {
@@ -510,66 +572,7 @@ export default async function ArtistPage({
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
   // via the StaticArtistPage component which reads cookies on hydration.
   if (mode === 'listen') {
-    const profileResult = await getLightweightProfile(username);
-    if (!profileResult) {
-      notFound();
-    }
-
-    const artist = convertCreatorProfileToArtist(profileResult.profile);
-    const subtitle = PAGE_SUBTITLES[mode] ?? PAGE_SUBTITLES.profile;
-    const { musicGroupSchema, breadcrumbSchema } =
-      generateProfileStructuredData(
-        profileResult.profile,
-        profileResult.genres,
-        []
-      );
-
-    return (
-      <>
-        <script type='application/ld+json'>
-          {safeJsonLdStringify(musicGroupSchema)}
-        </script>
-        <script type='application/ld+json'>
-          {safeJsonLdStringify(breadcrumbSchema)}
-        </script>
-
-        {!isPublicNoAuthSmoke ? (
-          <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
-        ) : null}
-        {!profileResult.profile.is_claimed && (
-          <ClaimBanner
-            profileHandle={artist.handle}
-            displayName={artist.name}
-          />
-        )}
-        {!isPublicNoAuthSmoke ? (
-          <JoviePixel profileId={profileResult.profile.id} />
-        ) : null}
-        <StaticArtistPage
-          mode={mode}
-          artist={artist}
-          socialLinks={[]}
-          contacts={[]}
-          subtitle={subtitle}
-          showTipButton={profileResult.hasVenmoLink}
-          isTipModeActive={false}
-          showBackButton={true}
-          showTourButton={true}
-          isTourModeActive={false}
-          enableDynamicEngagement={profileResult.creatorIsPro}
-          latestRelease={null}
-          photoDownloadSizes={[]}
-          allowPhotoDownloads={false}
-          subscribeTwoStep={false}
-          genres={profileResult.genres}
-          tourDates={[]}
-          showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
-        />
-        {!isPublicNoAuthSmoke ? (
-          <DesktopQrOverlayClient handle={artist.handle} />
-        ) : null}
-      </>
-    );
+    return renderListenMode(username, isPublicNoAuthSmoke);
   }
 
   const profileResult = await getProfileAndLinks(username);

@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { OutreachStatusBadge } from '@/components/admin/outreach/OutreachStatusBadge';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
@@ -27,8 +27,8 @@ interface EmailQueueResponse {
 function renderEmailRows(
   loading: boolean,
   leads: EmailQueueLead[],
-  renderRow: (lead: EmailQueueLead) => React.ReactNode
-): React.ReactNode {
+  renderRow: (lead: EmailQueueLead) => ReactNode
+): ReactNode {
   if (loading) {
     return (
       <tr>

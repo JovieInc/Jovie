@@ -59,6 +59,145 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'lyrics' as const, label: 'Lyrics' },
 ];
 
+function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
+  if (!hasPreview) return 'No preview available';
+  return isPlaying ? 'Pause preview' : 'Play preview';
+}
+
+interface ReleaseEntityHeaderProps {
+  readonly release: Release;
+  readonly artistName: string | null | undefined;
+  readonly canUploadArtwork: boolean;
+  readonly canRevertArtwork: boolean;
+  readonly onArtworkUpload: ((file: File) => Promise<string>) | undefined;
+  readonly onArtworkRevert: (() => void) | undefined;
+  readonly allowDownloads: boolean;
+  readonly previewUrl: string | null | undefined;
+  readonly isPlaying: boolean;
+  readonly onTogglePreview: () => void;
+  readonly providerConfig: ReleaseSidebarProps['providerConfig'];
+}
+
+function ReleaseEntityHeader({
+  release,
+  artistName,
+  canUploadArtwork,
+  canRevertArtwork,
+  onArtworkUpload,
+  onArtworkRevert,
+  allowDownloads,
+  previewUrl,
+  isPlaying,
+  onTogglePreview,
+  providerConfig,
+}: ReleaseEntityHeaderProps) {
+  const artworkAlt = release.title
+    ? `${release.title} artwork`
+    : 'Release artwork';
+
+  return (
+    <div className='space-y-3'>
+      <div className='flex items-start gap-3'>
+        {/* Artwork with hover play overlay */}
+        <div className='group/artwork relative shrink-0'>
+          <AlbumArtworkContextMenu
+            title={release.title}
+            sizes={buildArtworkSizes(undefined, release.artworkUrl)}
+            allowDownloads={allowDownloads}
+            releaseId={release.id}
+            canRevert={canRevertArtwork}
+            onRevert={canRevertArtwork ? onArtworkRevert : undefined}
+          >
+            {canUploadArtwork && onArtworkUpload ? (
+              <AvatarUploadable
+                src={release.artworkUrl}
+                alt={artworkAlt}
+                name={release.title}
+                size='2xl'
+                rounded='md'
+                uploadable={canUploadArtwork}
+                onUpload={onArtworkUpload}
+                showHoverOverlay
+              />
+            ) : (
+              <div className='relative h-24 w-24 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+                {release.artworkUrl ? (
+                  <Image
+                    src={release.artworkUrl}
+                    alt={artworkAlt}
+                    fill
+                    className='object-cover'
+                    sizes='96px'
+                  />
+                ) : (
+                  <div className='flex h-full w-full items-center justify-center'>
+                    <Icon
+                      name='Disc3'
+                      className='h-12 w-12 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </AlbumArtworkContextMenu>
+
+          {/* Play/pause overlay — appears on hover or when playing */}
+          <button
+            type='button'
+            onClick={onTogglePreview}
+            disabled={!previewUrl}
+            aria-pressed={isPlaying}
+            className={cn(
+              'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
+              'bg-black/0 opacity-0',
+              'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
+              'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
+              'disabled:pointer-events-none disabled:hidden'
+            )}
+            aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
+          >
+            {isPlaying ? (
+              <Pause className='h-5 w-5 text-white drop-shadow-sm' />
+            ) : (
+              <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
+            )}
+          </button>
+        </div>
+
+        {/* Compact property stack */}
+        <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
+          <div>
+            <p className='truncate text-sm font-medium text-primary-token'>
+              {release.title}
+            </p>
+            {artistName && (
+              <p className='truncate text-xs text-secondary-token'>
+                {artistName}
+              </p>
+            )}
+          </div>
+          <ReleaseFields
+            releaseDate={release.releaseDate}
+            releaseType={release.releaseType}
+            totalTracks={release.totalTracks}
+            platformCount={release.providers.length}
+          />
+        </div>
+      </div>
+
+      {/* Smart link — full width */}
+      <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
+
+      {/* Analytics card — above tabs, always visible */}
+      <ReleaseSmartLinkAnalytics
+        release={release}
+        providerConfig={providerConfig}
+      />
+    </div>
+  );
+}
+
 function buildContextMenuItems(
   release: Release | null,
   artistName: string | null | undefined,
@@ -285,118 +424,22 @@ export function ReleaseSidebar({
     onClose,
   });
 
-  const artworkAlt = release?.title
-    ? `${release.title} artwork`
-    : 'Release artwork';
-
   // Build the entity header: artwork (left) with play overlay + compact fields (right)
   const entityHeader =
     release && !selectedTrack ? (
-      <div className='space-y-3'>
-        <div className='flex items-start gap-3'>
-          {/* Artwork with hover play overlay */}
-          <div className='group/artwork relative shrink-0'>
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={buildArtworkSizes(undefined, release.artworkUrl)}
-              allowDownloads={allowDownloads}
-              releaseId={release.id}
-              canRevert={canRevertArtwork}
-              onRevert={canRevertArtwork ? handleArtworkRevert : undefined}
-            >
-              {canUploadArtwork && handleArtworkUpload ? (
-                <AvatarUploadable
-                  src={release.artworkUrl}
-                  alt={artworkAlt}
-                  name={release.title}
-                  size='2xl'
-                  rounded='md'
-                  uploadable={canUploadArtwork}
-                  onUpload={handleArtworkUpload}
-                  showHoverOverlay
-                />
-              ) : (
-                <div className='relative h-24 w-24 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
-                  {release.artworkUrl ? (
-                    <Image
-                      src={release.artworkUrl}
-                      alt={artworkAlt}
-                      fill
-                      className='object-cover'
-                      sizes='96px'
-                    />
-                  ) : (
-                    <div className='flex h-full w-full items-center justify-center'>
-                      <Icon
-                        name='Disc3'
-                        className='h-12 w-12 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </AlbumArtworkContextMenu>
-
-            {/* Play/pause overlay — appears on hover or when playing */}
-            <button
-              type='button'
-              onClick={handleToggleReleasePreview}
-              disabled={!sidebarPreviewUrl}
-              aria-pressed={isReleasePlaying}
-              className={cn(
-                'absolute inset-0 flex items-center justify-center rounded-lg transition-all duration-160',
-                'bg-black/0 opacity-0',
-                'group-hover/artwork:bg-black/40 group-hover/artwork:opacity-100',
-                'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
-                'disabled:pointer-events-none disabled:hidden'
-              )}
-              aria-label={
-                !sidebarPreviewUrl
-                  ? 'No preview available'
-                  : isReleasePlaying
-                    ? 'Pause preview'
-                    : 'Play preview'
-              }
-            >
-              {isReleasePlaying ? (
-                <Pause className='h-5 w-5 text-white drop-shadow-sm' />
-              ) : (
-                <Play className='h-5 w-5 translate-x-px text-white drop-shadow-sm' />
-              )}
-            </button>
-          </div>
-
-          {/* Compact property stack */}
-          <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
-            <div>
-              <p className='truncate text-sm font-medium text-primary-token'>
-                {release.title}
-              </p>
-              {artistName && (
-                <p className='truncate text-xs text-secondary-token'>
-                  {artistName}
-                </p>
-              )}
-            </div>
-            <ReleaseFields
-              releaseDate={release.releaseDate}
-              releaseType={release.releaseType}
-              totalTracks={release.totalTracks}
-              platformCount={release.providers.length}
-            />
-          </div>
-        </div>
-
-        {/* Smart link — full width */}
-        <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
-
-        {/* Analytics card — above tabs, always visible */}
-        <ReleaseSmartLinkAnalytics
-          release={release}
-          providerConfig={providerConfig}
-        />
-      </div>
+      <ReleaseEntityHeader
+        release={release}
+        artistName={artistName}
+        canUploadArtwork={canUploadArtwork}
+        canRevertArtwork={canRevertArtwork}
+        onArtworkUpload={handleArtworkUpload}
+        onArtworkRevert={handleArtworkRevert}
+        allowDownloads={allowDownloads}
+        previewUrl={sidebarPreviewUrl}
+        isPlaying={isReleasePlaying}
+        onTogglePreview={handleToggleReleasePreview}
+        providerConfig={providerConfig}
+      />
     ) : undefined;
 
   return (
