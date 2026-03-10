@@ -39,10 +39,9 @@ const SMART_LINK_DSPS = [
 function ReleasesTableSkeleton() {
   return (
     <div className='bg-[var(--linear-bg-surface-0)] p-5'>
-      {Array.from({ length: 6 }).map((_, i) => (
+      {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const).map((id, i) => (
         <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton
-          key={i}
+          key={id}
           className='flex items-center gap-4 py-3'
           style={{
             borderBottom:

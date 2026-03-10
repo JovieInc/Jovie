@@ -213,9 +213,7 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
   let runwayMonths: number | null = null;
   if (stripeAvailable) {
     const netBurn = BASELINE_BURN_USD - mrrUsd;
-    if (netBurn <= 0) {
-      // Revenue covers burn — leave runwayMonths as null
-    } else {
+    if (netBurn > 0) {
       // Without Mercury balance, estimate based on burn rate alone
       // Show 0 if we can't calculate (no balance data)
       runwayMonths = 0;

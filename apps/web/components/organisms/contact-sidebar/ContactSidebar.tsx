@@ -67,7 +67,9 @@ export const ContactSidebar = memo(function ContactSidebar({
     contact,
     hasContact,
     onRefresh,
-    onCopyProfileUrl: handleCopyProfileUrl,
+    onCopyProfileUrl: () => {
+      handleCopyProfileUrl();
+    },
     onClose,
   });
 

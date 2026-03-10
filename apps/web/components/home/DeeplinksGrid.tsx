@@ -175,7 +175,7 @@ function CrossfadeBlock({
       {children.map((child, i) => (
         <div
           // biome-ignore lint/suspicious/noArrayIndexKey: static array, order never changes
-          key={i}
+          key={i} // NOSONAR typescript:S6479
           aria-hidden={i !== activeIndex}
           className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
           style={{
