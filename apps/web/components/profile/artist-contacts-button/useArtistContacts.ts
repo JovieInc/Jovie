@@ -60,6 +60,11 @@ export function useArtistContacts({
     }
 
     const normalized = (decoded.value ?? '').replaceAll(/[^\d+]/g, '');
+
+    if (decoded.type === 'sms') {
+      return `sms:${normalized}`;
+    }
+
     return `tel:${normalized}`;
   };
 

@@ -1,8 +1,6 @@
 // Minimal service worker to satisfy PWA install criteria.
-// Chrome no longer requires a fetch handler for beforeinstallprompt (since ~M120),
-// so we only need install + activate. Removing the no-op fetch handler eliminates
-// the "Fetch event handler is recognized as no-op" console warning and avoids
-// navigation overhead.
+// Keep a basic pass-through fetch handler for maximum desktop Chrome installability
+// compatibility across versions/platforms.
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -10,4 +8,8 @@ self.addEventListener('install', () => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(fetch(event.request));
 });

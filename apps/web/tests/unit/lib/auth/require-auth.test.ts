@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockAuth, mockNextResponse, mockNoStoreHeaders } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
-  mockNextResponse: {
-    json: vi.fn(),
-  },
-  mockNoStoreHeaders: new Headers({
-    'Cache-Control': 'no-store',
-    Pragma: 'no-cache',
-  }),
-}));
+const { mockAuth, mockNextResponse, mockNoStoreHeaders, mockHeaders } =
+  vi.hoisted(() => ({
+    mockAuth: vi.fn(),
+    mockHeaders: vi.fn(),
+    mockNextResponse: {
+      json: vi.fn(),
+    },
+    mockNoStoreHeaders: new Headers({
+      'Cache-Control': 'no-store',
+      Pragma: 'no-cache',
+    }),
+  }));
 
 // Mock Clerk auth
 vi.mock('@clerk/nextjs/server', () => ({
@@ -22,6 +24,10 @@ vi.mock('next/server', () => ({
   NextResponse: mockNextResponse,
 }));
 
+vi.mock('next/headers', () => ({
+  headers: mockHeaders,
+}));
+
 // Mock HTTP headers
 vi.mock('@/lib/http/headers', () => ({
   NO_STORE_HEADERS: mockNoStoreHeaders,
@@ -30,7 +36,9 @@ vi.mock('@/lib/http/headers', () => ({
 describe('require-auth.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     vi.resetModules();
+    mockHeaders.mockResolvedValue(new Headers());
 
     // Reset the mock implementation
     mockNextResponse.json.mockImplementation((body, options) => ({
@@ -118,6 +126,22 @@ describe('require-auth.ts', () => {
       expect(result.userId).toBe('user_456');
       expect(result.error).toBeNull();
     });
+
+    it('bypasses Clerk auth in test mode when bypass header is present', async () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          'x-test-mode': 'bypass-auth',
+          'x-test-user-id': 'user_test_header',
+        })
+      );
+
+      const { requireAuth } = await import('@/lib/auth/require-auth');
+      const result = await requireAuth();
+
+      expect(result).toEqual({ userId: 'user_test_header', error: null });
+      expect(mockAuth).not.toHaveBeenCalled();
+    });
   });
 
   describe('getAuthUserId', () => {
@@ -137,6 +161,22 @@ describe('require-auth.ts', () => {
       const result = await getAuthUserId();
 
       expect(result).toBeNull();
+    });
+
+    it('returns bypassed user id in test mode with bypass header', async () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          'x-test-mode': 'bypass-auth',
+          'x-test-user-id': 'user_test_header',
+        })
+      );
+
+      const { getAuthUserId } = await import('@/lib/auth/require-auth');
+      const result = await getAuthUserId();
+
+      expect(result).toBe('user_test_header');
+      expect(mockAuth).not.toHaveBeenCalled();
     });
   });
 
