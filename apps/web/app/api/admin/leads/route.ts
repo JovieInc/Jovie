@@ -118,7 +118,6 @@ async function insertLeadWithLegacyFallback(seed: {
 
   return result.rows[0]?.id ?? null;
 }
-
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
