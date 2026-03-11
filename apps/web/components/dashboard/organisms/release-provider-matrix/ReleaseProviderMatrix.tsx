@@ -192,15 +192,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Table display preferences (column visibility)
-  const {
-    columnVisibility,
-    rowHeight,
-    availableColumns,
-    onColumnVisibilityChange,
-    resetToDefaults,
-    groupByYear,
-    onGroupByYearChange,
-  } = useReleaseTablePreferences();
+  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
+    useReleaseTablePreferences();
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
@@ -687,10 +680,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             <ReleaseTableSubheader
               releases={filteredRows}
               selectedIds={selectedIds}
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={onColumnVisibilityChange}
-              availableColumns={availableColumns}
-              onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
               groupByYear={groupByYear}
