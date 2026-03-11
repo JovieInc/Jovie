@@ -18,6 +18,8 @@ import {
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
+import type { ProfileMode } from '@/components/profile/contracts';
+import { profileModes } from '@/components/profile/registry';
 
 export { parseAsString as sortFieldParser } from 'nuqs/server';
 
@@ -273,13 +275,6 @@ export const adminWaitlistSearchParams = createSearchParamsCache({
 // ============================================================================
 
 /**
- * Valid modes for profile page view.
- */
-export const profileModes = ['profile', 'listen', 'tip', 'subscribe'] as const;
-
-export type ProfileMode = (typeof profileModes)[number];
-
-/**
  * Parser for profile mode.
  */
 export const profileModeParser =
@@ -343,3 +338,6 @@ export {
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
+
+export { profileModes };
+export type { ProfileMode };

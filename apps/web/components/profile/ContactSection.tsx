@@ -91,7 +91,7 @@ export function ContactSection({
                         key={`${contact.id}-${channel.type}`}
                         href={channelHref}
                         className='flex h-9 w-9 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-surface-1 active:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                        aria-label={`${channel.type === 'email' ? 'Email' : 'Call'} ${contact.roleLabel}`}
+                        aria-label={`${channel.type === 'email' ? 'Email' : channel.type === 'sms' ? 'Text' : 'Call'} ${contact.roleLabel}`}
                         onClick={() => trackAction(channel, contact)}
                         data-testid='contact-channel-action'
                       >
