@@ -5,7 +5,7 @@ import { captureError } from '@/lib/error-tracking';
 
 const SENTRY_API_BASE_URL = 'https://sentry.io/api/0';
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const UNRESOLVED_ERROR_QUERY = 'is:unresolved (level:error OR level:fatal)';
+const UNRESOLVED_ERROR_QUERY = 'is:unresolved level:[error,fatal]';
 
 type CachedEntry = {
   expiresAt: number;
