@@ -34,6 +34,7 @@ interface AppleMusicSyncBannerProps {
   readonly spotifyConnected: boolean;
   readonly releases: ReleaseViewModel[];
   readonly className?: string;
+  readonly compact?: boolean;
   readonly onMatchStatusChange?: (
     connected: boolean,
     artistName: string | null
@@ -63,6 +64,7 @@ export function AppleMusicSyncBanner({
   spotifyConnected,
   releases,
   className,
+  compact = false,
   onMatchStatusChange,
 }: AppleMusicSyncBannerProps) {
   const { data: matches = [] as DspMatch[], isLoading } = useDspMatchesQuery({
@@ -120,6 +122,60 @@ export function AppleMusicSyncBanner({
   );
 
   if (syncState === 'hidden') return null;
+
+  if (compact) {
+    if (syncState === 'no_match') {
+      return (
+        <div
+          className={cn(
+            'inline-flex h-8 items-center gap-2 rounded-full border border-[#FA243C]/25 bg-[#FA243C]/10 px-3 text-[12px] text-secondary-token',
+            className
+          )}
+        >
+          <DspProviderIcon provider='apple_music' size='sm' />
+          <span>No Apple Music match</span>
+        </div>
+      );
+    }
+
+    const match = appleMusicMatch!;
+
+    return (
+      <div
+        className={cn(
+          'inline-flex h-8 items-center gap-2 rounded-full border border-[#FA243C]/25 bg-[#FA243C]/10 px-2 text-[12px] text-primary-token',
+          className
+        )}
+      >
+        <DspProviderIcon provider='apple_music' size='sm' />
+        <span className='max-w-[160px] truncate text-secondary-token'>
+          Match: {match.externalArtistName}
+        </span>
+        <Button
+          variant='ghost'
+          size='sm'
+          onClick={() =>
+            rejectMutation.mutate({ matchId: match.id, profileId })
+          }
+          disabled={rejectMutation.isPending || confirmMutation.isPending}
+          className='h-6 px-2 text-[11px]'
+        >
+          Dismiss
+        </Button>
+        <Button
+          variant='primary'
+          size='sm'
+          onClick={() =>
+            confirmMutation.mutate({ matchId: match.id, profileId })
+          }
+          disabled={confirmMutation.isPending || rejectMutation.isPending}
+          className='h-6 bg-[#FA243C] px-2 text-[11px] hover:bg-[#FA243C]/90'
+        >
+          Confirm
+        </Button>
+      </div>
+    );
+  }
 
   if (syncState === 'no_match') {
     return (
