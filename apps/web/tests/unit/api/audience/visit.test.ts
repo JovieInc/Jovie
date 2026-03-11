@@ -5,9 +5,11 @@ const mockPublicVisitLimiterGetStatus = vi.hoisted(() => vi.fn());
 const mockPublicVisitLimiterLimit = vi.hoisted(() => vi.fn());
 const mockDetectBot = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockDoesTableExist = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 const mockCheckVisitRateLimit = vi.hoisted(() => vi.fn());
 const mockIsTrackingTokenEnabled = vi.hoisted(() => vi.fn());
+const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/rate-limit', () => ({
   publicVisitLimiter: {
@@ -24,6 +26,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
   },
+  doesTableExist: mockDoesTableExist,
 }));
 
 vi.mock('@/lib/db/schema', () => ({
@@ -38,6 +41,11 @@ vi.mock('@/lib/ingestion/session', () => ({
 vi.mock('@/lib/analytics/tracking-rate-limit', () => ({
   checkVisitRateLimit: mockCheckVisitRateLimit,
   getRateLimitHeaders: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureWarning: mockCaptureWarning,
+  captureError: vi.fn(),
 }));
 
 vi.mock('@/lib/analytics/tracking-token', () => ({
@@ -64,6 +72,7 @@ describe('POST /api/audience/visit', () => {
     mockDetectBot.mockReturnValue({ isBot: false });
     mockIsTrackingTokenEnabled.mockReturnValue(false);
     mockCheckVisitRateLimit.mockResolvedValue({ success: true });
+    mockDoesTableExist.mockResolvedValue(true);
   });
 
   it('returns 429 when rate limited', async () => {
@@ -279,5 +288,50 @@ describe('POST /api/audience/visit', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(data.fingerprint).toBeDefined();
+  });
+
+  it('skips the aggregate write when daily_profile_views is missing', async () => {
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi
+            .fn()
+            .mockResolvedValue([{ id: 'profile_123', isPublic: true }]),
+        }),
+      }),
+    });
+    mockDoesTableExist.mockResolvedValue(false);
+    mockWithSystemIngestionSession.mockImplementation(async callback => {
+      await callback({
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          }),
+        }),
+      });
+    });
+
+    const { POST } = await import('@/app/api/audience/visit/route');
+    const request = new NextRequest('http://localhost/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: '123e4567-e89b-12d3-a456-426614174000',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 });
