@@ -361,9 +361,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
 
-    // Only page routes need user state — API routes don't make routing decisions
+    // Only non-/app page routes need user state for middleware rewrites.
+    // /app and /app/* perform auth and onboarding/waitlist gating deeper in
+    // route handlers/layouts, so proxy-level state lookups are unnecessary.
     const needsUserState =
-      !pathname.startsWith('/api/') && !pathInfo.isAuthCallbackPath;
+      !pathname.startsWith('/api/') &&
+      !pathInfo.isAuthCallbackPath &&
+      pathname !== '/app' &&
+      !pathname.startsWith('/app/');
 
     // Skip the getUserState call for RSC prefetch requests when the user is
     // already known-active from the in-memory cache. Active users don't need
