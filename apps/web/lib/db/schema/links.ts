@@ -64,6 +64,10 @@ export const socialLinks = pgTable(
       table.isActive,
       table.state
     ),
+    // Performance index: profile music-link sync lookup by canonical platform
+    creatorProfilePlatformIdx: index(
+      'social_links_creator_profile_platform_idx'
+    ).on(table.creatorProfileId, table.platform),
   })
 );
 

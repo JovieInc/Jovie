@@ -192,15 +192,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Table display preferences (column visibility)
-  const {
-    columnVisibility,
-    rowHeight,
-    availableColumns,
-    onColumnVisibilityChange,
-    resetToDefaults,
-    groupByYear,
-    onGroupByYearChange,
-  } = useReleaseTablePreferences();
+  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
+    useReleaseTablePreferences();
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
@@ -501,7 +494,23 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-1'>
+      <div className='flex items-center gap-2'>
+        {showImportProgress && (
+          <ImportProgressBanner
+            artistName={artistName}
+            importedCount={importedCount}
+            compact
+          />
+        )}
+        {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
+          <AppleMusicSyncBanner
+            profileId={rows[0].profileId}
+            spotifyConnected={isConnected}
+            releases={rows}
+            compact
+            onMatchStatusChange={handleMatchStatusChange}
+          />
+        )}
         {canCreateManualReleases && (
           <Button
             variant='ghost'
@@ -516,7 +525,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <DrawerToggleButton />
       </div>
     ),
-    [handleNewRelease, canCreateManualReleases]
+    [
+      showImportProgress,
+      artistName,
+      importedCount,
+      showReleasesTable,
+      rows,
+      isAmConnected,
+      isConnected,
+      handleMatchStatusChange,
+      canCreateManualReleases,
+      handleNewRelease,
+    ]
   );
 
   // Header search input — shown when search is open
@@ -684,10 +704,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             <ReleaseTableSubheader
               releases={filteredRows}
               selectedIds={selectedIds}
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={onColumnVisibilityChange}
-              availableColumns={availableColumns}
-              onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
               groupByYear={groupByYear}
@@ -701,27 +717,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            {showImportProgress && (
-              <ImportProgressBanner
-                artistName={artistName}
-                importedCount={importedCount}
-              />
-            )}
-
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnectSpotify={() => setSpotifySearchOpen(true)}
-              />
-            )}
-
-            {/* Apple Music sync status banner — only when not already connected */}
-            {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
-              <AppleMusicSyncBanner
-                profileId={rows[0].profileId}
-                spotifyConnected={isConnected}
-                releases={rows}
-                className='mx-4 mt-2'
-                onMatchStatusChange={handleMatchStatusChange}
               />
             )}
 

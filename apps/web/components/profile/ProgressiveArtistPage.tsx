@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import type { ProfileMode } from '@/components/profile/contracts';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
@@ -20,7 +21,7 @@ const AnimatedArtistPage = dynamic(
 );
 
 interface ProgressiveArtistPageProps {
-  readonly mode: string;
+  readonly mode: ProfileMode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];

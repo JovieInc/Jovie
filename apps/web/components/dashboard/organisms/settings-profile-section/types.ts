@@ -1,3 +1,7 @@
+import type {
+  ProfileIdentityFields,
+  ProfileSaveState,
+} from '@/components/profile/contracts';
 import type { Artist } from '@/types/db';
 
 export interface SettingsProfileSectionProps {
@@ -6,13 +10,9 @@ export interface SettingsProfileSectionProps {
   readonly onRefresh: () => void;
 }
 
-export interface ProfileSaveStatus {
-  saving: boolean;
-  success: boolean | null;
-  error: string | null;
-}
+export type ProfileSaveStatus = ProfileSaveState;
 
-export interface ProfileFormData {
-  username: string;
-  displayName: string;
-}
+export type ProfileFormData = Pick<
+  ProfileIdentityFields,
+  'username' | 'displayName'
+>;

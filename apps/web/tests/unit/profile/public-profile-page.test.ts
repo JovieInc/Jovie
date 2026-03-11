@@ -11,6 +11,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import {
+  getProfileModeSubtitle,
+  profileModes,
+} from '@/components/profile/registry';
 
 // --- Mock data used across tests ---
 
@@ -325,30 +329,17 @@ describe('Public Profile Page Logic', () => {
   });
 
   describe('Profile page mode logic', () => {
-    const PAGE_SUBTITLES = {
-      profile: 'Artist',
-      tip: 'Tip with Venmo',
-      listen: 'Choose a Service',
-      subscribe: 'Get notified',
-    };
-
     it.each([
       ['profile', 'Artist'],
       ['tip', 'Tip with Venmo'],
       ['listen', 'Choose a Service'],
       ['subscribe', 'Get notified'],
     ])('mode "%s" maps to subtitle "%s"', (mode, expectedSubtitle) => {
-      const subtitle =
-        PAGE_SUBTITLES[mode as keyof typeof PAGE_SUBTITLES] ??
-        PAGE_SUBTITLES.profile;
-      expect(subtitle).toBe(expectedSubtitle);
+      expect(getProfileModeSubtitle(mode)).toBe(expectedSubtitle);
     });
 
     it('defaults to "Artist" subtitle for unknown modes', () => {
-      const subtitle =
-        PAGE_SUBTITLES['unknown' as keyof typeof PAGE_SUBTITLES] ??
-        PAGE_SUBTITLES.profile;
-      expect(subtitle).toBe('Artist');
+      expect(getProfileModeSubtitle('unknown')).toBe('Artist');
     });
 
     it('shows tip button whenever a venmo link exists', () => {
@@ -373,9 +364,9 @@ describe('Public Profile Page Logic', () => {
     });
 
     it('shows back button only for non-profile modes', () => {
-      const modes = ['profile', 'listen', 'tip', 'subscribe'];
+      const modes = profileModes.filter(mode => mode !== 'contact');
       const showBackButton = modes.map(m => m !== 'profile');
-      expect(showBackButton).toEqual([false, true, true, true]);
+      expect(showBackButton).toEqual([false, true, true, true, true, true]);
     });
   });
 

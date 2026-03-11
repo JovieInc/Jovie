@@ -2,6 +2,7 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { buildProfileIdentityFields } from '@/components/profile/view-models';
 import { useProfileMutation } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { ProfileFormData, UseProfileFormReturn } from './types';
@@ -26,12 +27,13 @@ export function useProfileForm({
 
   const hasRemoveBrandingFeature =
     has?.({ feature: 'remove_branding' }) ?? false;
+  const identityFields = buildProfileIdentityFields(artist);
 
   const [formData, setFormData] = useState<ProfileFormData>({
-    name: artist.name || '',
-    tagline: artist.tagline || '',
-    image_url: artist.image_url || '',
-    hide_branding: artist.settings?.hide_branding ?? false,
+    name: identityFields.name,
+    tagline: identityFields.tagline,
+    imageUrl: identityFields.imageUrl,
+    hideBranding: identityFields.hideBranding,
   });
 
   // TanStack Query mutation for profile updates
@@ -100,14 +102,14 @@ export function useProfileForm({
     }
 
     const settingsUpdates = hasRemoveBrandingFeature
-      ? { hide_branding: formData.hide_branding }
+      ? { hide_branding: formData.hideBranding }
       : undefined;
 
     await updateProfile({
       updates: {
         displayName: formData.name,
         bio: formData.tagline,
-        avatarUrl: formData.image_url || undefined,
+        avatarUrl: formData.imageUrl || undefined,
         ...(settingsUpdates ? { settings: settingsUpdates } : {}),
       },
     });
