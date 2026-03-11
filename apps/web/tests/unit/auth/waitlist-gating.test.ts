@@ -790,6 +790,31 @@ describe('proxy.ts path categorization', () => {
     });
   });
 
+  describe('middleware user-state lookup scope', () => {
+    const needsUserStateLookup = (pathname: string) =>
+      !pathname.startsWith('/api/') &&
+      pathname !== '/app' &&
+      !pathname.startsWith('/app/') &&
+      pathname !== '/sso-callback' &&
+      pathname !== '/signup/sso-callback' &&
+      pathname !== '/signin/sso-callback' &&
+      pathname !== '/sign-up/sso-callback' &&
+      pathname !== '/sign-in/sso-callback';
+
+    it('documents that /app routes skip middleware proxy-state resolution', () => {
+      expect(needsUserStateLookup('/app')).toBe(false);
+      expect(needsUserStateLookup('/app/profile')).toBe(false);
+      expect(needsUserStateLookup('/app/settings/billing')).toBe(false);
+    });
+
+    it('documents that non-/app pages still use middleware proxy-state resolution', () => {
+      expect(needsUserStateLookup('/')).toBe(true);
+      expect(needsUserStateLookup('/waitlist')).toBe(true);
+      expect(needsUserStateLookup('/onboarding')).toBe(true);
+      expect(needsUserStateLookup('/signin')).toBe(true);
+    });
+  });
+
   describe('method-aware redirects for onboarding/auth paths', () => {
     it('documents that only GET/HEAD are treated as navigation methods', () => {
       const isNavigationMethod = (method: string) =>
