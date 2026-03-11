@@ -1087,3 +1087,27 @@ daemon|daemon: false|background process for optimization (disabled in Jovie due 
 ---
 
 **Remember: When in doubt, verify your Node version (`node --version`) and use pnpm from the repository root.**
+
+---
+
+## Cursor Cloud specific instructions
+
+The VM snapshot includes Node.js 22.x, pnpm 9.15.4, and Doppler CLI pre-installed. The update script runs `pnpm install` on startup.
+
+### Secrets (Doppler)
+
+- Without `DOPPLER_TOKEN`, the dev server starts but database/auth/billing features are unavailable. All env vars in `lib/env-server-schema.ts` are optional, so the app degrades gracefully.
+- If `DOPPLER_TOKEN` is set as a Cursor secret, generate `.env.local` before running the dev server: `doppler setup --project jovie-web --config dev --no-interactive && doppler secrets download --no-file --format env-no-quotes > apps/web/.env.local`
+- Alternatively, prefix commands: `doppler run -- pnpm --filter web dev:local`
+
+### Running services
+
+- **Dev server**: `pnpm --filter web dev:local` (starts Next.js on port 3000 without Doppler wrapper). Use `doppler run -- pnpm --filter web dev:local` if secrets are configured.
+- No Docker or local database required — all data services (Neon Postgres, Upstash Redis, Clerk, Stripe) are cloud-hosted.
+
+### Lint / Typecheck / Test
+
+- Lint: `pnpm biome check apps/web` (fast, ~3s)
+- Typecheck: `pnpm turbo typecheck` (runs across all 4 workspace packages, ~40s)
+- Tests: `pnpm turbo test --concurrency=1` (6800+ unit tests, ~3min). Some Clerk mock tests may fail pre-existing; these are not environment issues.
+- All commands run from repo root. See `package.json` scripts and AGENTS.md "Monorepo Commands" section for the full list.
