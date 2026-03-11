@@ -9,6 +9,7 @@ const mockIlike = vi.hoisted(() => vi.fn(() => 'ilike-clause'));
 const mockAsc = vi.hoisted(() => vi.fn(() => 'asc-clause'));
 const mockDesc = vi.hoisted(() => vi.fn(() => 'desc-clause'));
 const mockCount = vi.hoisted(() => vi.fn(() => 'count-clause'));
+const mockCaptureWarning = vi.hoisted(() => vi.fn());
 
 const { mockDb, mockSelect, mockListOffset, mockCountWhere } = vi.hoisted(
   () => {
@@ -67,6 +68,7 @@ vi.mock('@/lib/entitlements/server', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
+  captureWarning: mockCaptureWarning,
   getSafeErrorMessage: () => 'safe-error',
 }));
 
@@ -137,5 +139,83 @@ describe('GET /api/admin/leads', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
       })
     );
+  });
+
+  it('falls back to the legacy select when lead enrichment columns are missing', async () => {
+    mockSelect.mockReset();
+    mockSelect
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                offset: vi
+                  .fn()
+                  .mockRejectedValue(
+                    new Error('column "spotify_popularity" does not exist')
+                  ),
+              })),
+            })),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ count: 1 }]),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                offset: vi.fn().mockResolvedValue([
+                  {
+                    id: 'lead-1',
+                    hasSpotifyLink: null,
+                    hasInstagram: null,
+                    musicToolsDetected: null,
+                    createdAt: new Date('2025-01-01T00:00:00.000Z'),
+                    updatedAt: new Date('2025-01-02T00:00:00.000Z'),
+                    qualifiedAt: null,
+                    disqualifiedAt: null,
+                    approvedAt: null,
+                    ingestedAt: null,
+                    rejectedAt: null,
+                    latestReleaseDate: null,
+                    scrapedAt: null,
+                    outreachQueuedAt: null,
+                    claimTokenExpiresAt: null,
+                    dmSentAt: null,
+                  },
+                ]),
+              })),
+            })),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ count: 1 }]),
+        })),
+      }));
+
+    const request = {
+      nextUrl: new URL('http://localhost/api/admin/leads?page=1&limit=25'),
+    } as never;
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.items[0]).toEqual(
+      expect.objectContaining({
+        spotifyPopularity: null,
+        spotifyFollowers: null,
+        releaseCount: null,
+        priorityScore: null,
+      })
+    );
+    expect(mockCaptureWarning).toHaveBeenCalled();
   });
 });
