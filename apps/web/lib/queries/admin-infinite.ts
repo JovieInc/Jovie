@@ -56,6 +56,8 @@ export interface AdminCreatorProfileRow {
   usernameNormalized: string;
   avatarUrl: string | null;
   displayName?: string | null;
+  bio?: string | null;
+  genres?: string[] | null;
   isVerified: boolean;
   isFeatured: boolean;
   marketingOptOut: boolean;
