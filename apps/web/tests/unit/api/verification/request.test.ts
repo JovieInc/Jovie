@@ -136,4 +136,36 @@ describe('POST /api/verification/request', () => {
       })
     );
   });
+
+  it('captures unexpected route failures', async () => {
+    mockWithDbSession.mockRejectedValueOnce(new Error('Database unavailable'));
+
+    const response = await POST();
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Unable to submit verification request',
+    });
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Verification request route failed',
+      expect.any(Error),
+      expect.objectContaining({
+        route: '/api/verification/request',
+      })
+    );
+  });
+
+  it('does not capture expected unauthorized failures', async () => {
+    mockWithDbSession.mockRejectedValueOnce(new Error('Unauthorized'));
+
+    const response = await POST();
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(mockCaptureError).not.toHaveBeenCalledWith(
+      'Verification request route failed',
+      expect.anything(),
+      expect.anything()
+    );
+  });
 });

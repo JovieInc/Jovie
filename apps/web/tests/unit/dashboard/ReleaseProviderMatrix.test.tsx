@@ -1,5 +1,10 @@
 import { TooltipProvider } from '@jovie/ui';
-import { type RenderOptions, render, screen } from '@testing-library/react';
+import {
+  act,
+  type RenderOptions,
+  render,
+  screen,
+} from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
@@ -122,7 +127,9 @@ vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
     ReleaseTable: ({ releases }: { releases: Array<{ id: string }> }) => (
-      <div data-testid='release-table'>rows:{releases.length}</div>
+      <div data-testid='release-table'>
+        ids:{releases.map(release => release.id).join(',')}
+      </div>
     ),
   })
 );
@@ -381,7 +388,7 @@ describe('ReleaseProviderMatrix', () => {
   });
 
   describe('release view filtering', () => {
-    it('filters to single-track entries when switched to tracks view', () => {
+    it('defaults to tracks rows on first render', () => {
       const single = makeRelease('single-track');
       const album = {
         ...makeRelease('album-track'),
@@ -398,9 +405,35 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
 
-      latestSubheaderProps?.onReleaseViewChange?.('tracks');
+      expect(screen.getByTestId('release-table')).toHaveTextContent(
+        'ids:single-track'
+      );
+    });
 
-      expect(screen.getByTestId('release-table')).toHaveTextContent('rows:1');
+    it('filters to multi-track releases when switched to releases view', () => {
+      const single = makeRelease('single-track');
+      const album = {
+        ...makeRelease('album-track'),
+        releaseType: 'album' as const,
+        totalTracks: 12,
+      };
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[single, album]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      act(() => {
+        latestSubheaderProps?.onReleaseViewChange?.('releases');
+      });
+
+      expect(screen.getByTestId('release-table')).toHaveTextContent(
+        'ids:album-track'
+      );
     });
   });
 });
