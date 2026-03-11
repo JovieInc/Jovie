@@ -62,7 +62,11 @@ export function AdminProfileSidebar({
         ariaLabel='Creator profile'
         title='Creator profile'
         onClose={onClose}
-      />
+        isEmpty
+        emptyMessage='Select a creator profile to view details.'
+      >
+        {null}
+      </EntitySidebarShell>
     );
   }
 
