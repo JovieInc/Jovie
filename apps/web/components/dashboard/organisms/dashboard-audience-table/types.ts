@@ -4,7 +4,7 @@ import type { AudienceMember } from '@/types';
 
 export type { AudienceMode };
 
-export type AudienceView = 'all' | 'subscribers' | 'anonymous';
+export type AudienceView = 'all' | 'identified' | 'anonymous';
 
 export type AudienceRow = AudienceMember;
 
@@ -39,7 +39,7 @@ export interface DashboardAudienceTableProps {
   readonly onFiltersChange: (filters: AudienceFilters) => void;
   readonly profileUrl?: string;
   readonly profileId?: string;
-  /** Null when the subscriber COUNT query was skipped for performance (JOV-1262). */
+  /** Null when the identified COUNT query was skipped for performance (JOV-1262). */
   readonly subscriberCount: number | null;
   /** Null when the audience COUNT query was skipped for performance (JOV-1262). */
   readonly totalAudienceCount?: number | null;

@@ -118,10 +118,10 @@ export const releaseSearchParams = createSearchParamsCache({
 /**
  * Valid view filters for the audience table.
  * - 'all': All audience members (visitors + identified)
- * - 'subscribers': Notification subscribers only
+ * - 'identified': Identified audience members only
  * - 'anonymous': Anonymous visitors only
  */
-export const audienceViews = ['all', 'subscribers', 'anonymous'] as const;
+export const audienceViews = ['all', 'identified', 'anonymous'] as const;
 
 export type AudienceView = (typeof audienceViews)[number];
 
