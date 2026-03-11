@@ -1,6 +1,8 @@
 import 'server-only';
 import { auth } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 /**
@@ -57,6 +59,18 @@ export async function requireAuth(options?: {
 }): Promise<AuthResult> {
   const { message = 'Unauthorized', noCache = true } = options ?? {};
 
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      const headerStore = await headers();
+      const testUserId = resolveTestBypassUserId(headerStore);
+      if (testUserId) {
+        return { userId: testUserId, error: null };
+      }
+    } catch {
+      // Ignore missing request context in test-only paths.
+    }
+  }
+
   const { userId } = await auth();
 
   if (!userId) {
@@ -88,6 +102,18 @@ export async function requireAuth(options?: {
  * ```
  */
 export async function getAuthUserId(): Promise<string | null> {
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      const headerStore = await headers();
+      const testUserId = resolveTestBypassUserId(headerStore);
+      if (testUserId) {
+        return testUserId;
+      }
+    } catch {
+      // Ignore missing request context in test-only paths.
+    }
+  }
+
   const { userId } = await auth();
   return userId;
 }
