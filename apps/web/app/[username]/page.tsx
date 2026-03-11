@@ -5,11 +5,16 @@ import { cache } from 'react';
 import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
+import type { ProfileMode } from '@/components/profile/contracts';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
+import {
+  getProfileMode,
+  getProfileModeSubtitle,
+} from '@/components/profile/registry';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { JoviePixel } from '@/components/tracking';
-import { BASE_URL, PAGE_SUBTITLES } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
@@ -388,14 +393,7 @@ interface Props {
     readonly username: string;
   }>;
   readonly searchParams?: Promise<{
-    mode?:
-      | 'profile'
-      | 'listen'
-      | 'tip'
-      | 'tour'
-      | 'subscribe'
-      | 'about'
-      | 'contact';
+    mode?: ProfileMode;
   }>;
 }
 
@@ -481,22 +479,15 @@ async function renderListenMode(
   }
 
   const artist = convertCreatorProfileToArtist(profileResult.profile);
-  const subtitle = PAGE_SUBTITLES.listen ?? PAGE_SUBTITLES.profile;
-  const { musicGroupSchema, breadcrumbSchema } = generateProfileStructuredData(
+  const subtitle = getProfileModeSubtitle('listen');
+  const schemas = generateProfileStructuredData(
     profileResult.profile,
     profileResult.genres,
     []
   );
 
-  return (
+  const body = (
     <>
-      <script type='application/ld+json'>
-        {safeJsonLdStringify(musicGroupSchema)}
-      </script>
-      <script type='application/ld+json'>
-        {safeJsonLdStringify(breadcrumbSchema)}
-      </script>
-
       {!isPublicNoAuthSmoke ? (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       ) : null}
@@ -513,10 +504,8 @@ async function renderListenMode(
         contacts={[]}
         subtitle={subtitle}
         showTipButton={profileResult.hasVenmoLink}
-        isTipModeActive={false}
         showBackButton={true}
         showTourButton={true}
-        isTourModeActive={false}
         enableDynamicEngagement={profileResult.creatorIsPro}
         latestRelease={null}
         photoDownloadSizes={[]}
@@ -531,6 +520,8 @@ async function renderListenMode(
       ) : null}
     </>
   );
+
+  return { schemas, body };
 }
 
 const getLightweightProfile = cache(async (username: string) => {
@@ -565,14 +556,28 @@ export default async function ArtistPage({
   }
 
   const resolvedSearchParams = await searchParams;
-  const { mode = 'profile' } = resolvedSearchParams || {};
+  const mode = getProfileMode(resolvedSearchParams?.mode);
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
 
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
   // via the StaticArtistPage component which reads cookies on hydration.
   if (mode === 'listen') {
-    return renderListenMode(username, isPublicNoAuthSmoke);
+    const { schemas, body } = await renderListenMode(
+      username,
+      isPublicNoAuthSmoke
+    );
+    return (
+      <>
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(schemas.musicGroupSchema)}
+        </script>
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(schemas.breadcrumbSchema)}
+        </script>
+        {body}
+      </>
+    );
   }
 
   const profileResult = await getProfileAndLinks(username);
@@ -633,7 +638,7 @@ export default async function ArtistPage({
     artist.name
   );
 
-  const subtitle = PAGE_SUBTITLES[mode] ?? PAGE_SUBTITLES.profile;
+  const subtitle = getProfileModeSubtitle(mode);
 
   const tourDates =
     mode === 'tour' ? await loadUpcomingTourDates(profile.id) : [];
@@ -685,10 +690,8 @@ export default async function ArtistPage({
         contacts={publicContacts}
         subtitle={subtitle}
         showTipButton={showTipButton}
-        isTipModeActive={mode === 'tip'}
         showBackButton={showBackButton}
         showTourButton={true}
-        isTourModeActive={mode === 'tour'}
         enableDynamicEngagement={creatorIsPro}
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
@@ -868,7 +871,7 @@ export async function generateMetadata({
 }: Props): Promise<Metadata> {
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
-  const mode = resolvedSearchParams?.mode ?? 'profile';
+  const mode = getProfileMode(resolvedSearchParams?.mode);
 
   if (mode === 'listen') {
     const lightweightProfile = await getLightweightProfile(username);

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type DiscoveryKeyword,
@@ -7,6 +7,7 @@ import {
   leadPipelineSettings,
   leads,
 } from '@/lib/db/schema/leads';
+import { sqlArray } from '@/lib/db/sql-helpers';
 import { captureError } from '@/lib/error-tracking';
 import {
   extractLinktreeHandle,
@@ -21,18 +22,86 @@ interface DiscoveryCandidate {
   discoveryQuery: string;
 }
 
+function isMissingLeadInsertColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes(
+      'column "spotify_popularity" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "spotify_followers" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "release_count" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "latest_release_date" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "priority_score" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "is_linktree_verified" of relation "leads" does not exist'
+    )
+  );
+}
+
+async function insertCandidatesWithLegacyFallback(
+  candidates: DiscoveryCandidate[],
+  result: DiscoveryResult
+): Promise<void> {
+  let insertedCount = 0;
+
+  for (const candidate of candidates) {
+    const insertResult = await db.execute<{ id: string }>(drizzleSql`
+      insert into "leads" (
+        "linktree_handle",
+        "linktree_url",
+        "discovery_source",
+        "discovery_query",
+        "music_tools_detected"
+      ) values (
+        ${candidate.linktreeHandle},
+        ${candidate.linktreeUrl},
+        ${candidate.discoverySource},
+        ${candidate.discoveryQuery},
+        ${sqlArray([])}
+      )
+      on conflict ("linktree_handle") do nothing
+      returning "id"
+    `);
+
+    if (insertResult.rows[0]?.id) {
+      insertedCount++;
+    }
+  }
+
+  result.newLeadsFound += insertedCount;
+  result.duplicatesSkipped += candidates.length - insertedCount;
+}
+
 async function insertCandidates(
   candidates: DiscoveryCandidate[],
   result: DiscoveryResult
 ): Promise<void> {
   if (candidates.length === 0) return;
-  const insertedRows = await db
-    .insert(leads)
-    .values(candidates)
-    .onConflictDoNothing({ target: leads.linktreeHandle })
-    .returning({ id: leads.id });
-  result.newLeadsFound += insertedRows.length;
-  result.duplicatesSkipped += candidates.length - insertedRows.length;
+  try {
+    const insertedRows = await db
+      .insert(leads)
+      .values(candidates)
+      .onConflictDoNothing({ target: leads.linktreeHandle })
+      .returning({ id: leads.id });
+    result.newLeadsFound += insertedRows.length;
+    result.duplicatesSkipped += candidates.length - insertedRows.length;
+  } catch (error) {
+    if (!isMissingLeadInsertColumnError(error)) {
+      throw error;
+    }
+
+    await insertCandidatesWithLegacyFallback(candidates, result);
+  }
 }
 
 export interface DiscoveryResult {
