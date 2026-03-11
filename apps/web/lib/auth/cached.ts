@@ -1,7 +1,9 @@
 import 'server-only';
 
 import { auth, currentUser } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
 import { cache } from 'react';
+import { resolveTestBypassUserId } from '@/lib/auth/test-mode';
 
 /**
  * Cached version of Clerk's auth() function.
@@ -22,6 +24,22 @@ import { cache } from 'react';
  * @returns The same AuthObject that Clerk's auth() returns
  */
 export const getCachedAuth = cache(async () => {
+  if (process.env.NODE_ENV === 'test') {
+    try {
+      const headerStore = await headers();
+      const testUserId = resolveTestBypassUserId(headerStore);
+      if (testUserId) {
+        return {
+          userId: testUserId,
+          sessionId: 'sess_test_bypass',
+          orgId: null,
+        };
+      }
+    } catch {
+      // Ignore missing request context in test-only paths.
+    }
+  }
+
   return auth();
 });
 

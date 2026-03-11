@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getProfileModeHref } from '@/components/profile/registry';
 
 interface Props {
   readonly params: Promise<{
@@ -8,5 +9,5 @@ interface Props {
 
 export default async function AboutPage({ params }: Props) {
   const { username } = await params;
-  redirect(`/${username}?mode=about`);
+  redirect(getProfileModeHref(username, 'about'));
 }

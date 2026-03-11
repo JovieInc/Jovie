@@ -2,8 +2,8 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
+import { PublicProfileTemplate } from '@/components/profile/templates/PublicProfileTemplate';
+import { buildProfilePublicViewModel } from '@/components/profile/view-models';
 import {
   getFadeUpMotionProps,
   getPageWrapperMotionProps,
@@ -50,26 +50,30 @@ export function AnimatedArtistPage({
   showBackButton,
   enableDynamicEngagement = false,
 }: AnimatedArtistPageProps) {
-  const _router = useRouter();
-  const {
-    isNavigating: _isNavigating,
-    setIsNavigating: _setIsNavigating,
-    prefersReducedMotion,
-    tippingEnabled,
-    pageVariants,
-  } = useAnimatedArtistPage();
+  const { prefersReducedMotion, tippingEnabled, pageVariants } =
+    useAnimatedArtistPage();
+  const viewModel = buildProfilePublicViewModel({
+    mode,
+    artist,
+    socialLinks,
+    contacts,
+    subtitle,
+    showTipButton: showTipButton && tippingEnabled,
+    showBackButton,
+    enableDynamicEngagement,
+  });
 
   const renderContent = () => {
     const fadeUpProps = getFadeUpMotionProps(prefersReducedMotion);
 
-    switch (mode) {
+    switch (viewModel.mode) {
       case 'listen':
         return (
           <div className='flex justify-center'>
             <AnimatedListenInterface
-              artist={artist}
-              handle={artist.handle}
-              enableDynamicEngagement={enableDynamicEngagement}
+              artist={viewModel.artist}
+              handle={viewModel.artist.handle}
+              enableDynamicEngagement={viewModel.enableDynamicEngagement}
             />
           </div>
         );
@@ -98,7 +102,7 @@ export function AnimatedArtistPage({
           <motion.div {...fadeUpProps}>
             <main className='space-y-4' aria-labelledby='tipping-title'>
               <h1 id='tipping-title' className='sr-only'>
-                Tip {artist.name}
+                Tip {viewModel.artist.name}
               </h1>
 
               {venmoLink ? (
@@ -126,7 +130,10 @@ export function AnimatedArtistPage({
         return (
           <motion.div {...fadeUpProps}>
             <div className='space-y-4'>
-              <ArtistNotificationsCTA artist={artist} variant='button' />
+              <ArtistNotificationsCTA
+                artist={viewModel.artist}
+                variant='button'
+              />
             </div>
           </motion.div>
         );
@@ -134,34 +141,25 @@ export function AnimatedArtistPage({
   };
 
   return (
-    <div className='w-full'>
-      <ArtistPageShell
-        artist={artist}
-        socialLinks={socialLinks}
-        contacts={contacts}
-        subtitle={subtitle}
-        showTipButton={showTipButton && tippingEnabled}
-        showBackButton={showBackButton}
+    <PublicProfileTemplate viewModel={viewModel}>
+      <div
+        className='content-pane'
+        style={{
+          contain: 'layout paint',
+          willChange: 'transform',
+          minHeight: '150px',
+        }}
       >
-        <div
-          className='content-pane'
-          style={{
-            contain: 'layout paint',
-            willChange: 'transform',
-            minHeight: '150px',
-          }}
-        >
-          <AnimatePresence mode='wait'>
-            <motion.div
-              key={mode}
-              {...getPageWrapperMotionProps(prefersReducedMotion, pageVariants)}
-              className='w-full'
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </ArtistPageShell>
-    </div>
+        <AnimatePresence mode='wait'>
+          <motion.div
+            key={viewModel.mode}
+            {...getPageWrapperMotionProps(prefersReducedMotion, pageVariants)}
+            className='w-full'
+          >
+            {renderContent()}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </PublicProfileTemplate>
   );
 }

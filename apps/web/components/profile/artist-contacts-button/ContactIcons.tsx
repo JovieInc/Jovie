@@ -37,6 +37,24 @@ export function ChannelIcon({
     );
   }
 
+  if (type === 'sms') {
+    return (
+      <svg
+        aria-hidden='true'
+        viewBox='0 0 24 24'
+        className='h-4 w-4'
+        stroke='currentColor'
+        fill='none'
+        strokeWidth={1.5}
+        strokeLinecap='round'
+        strokeLinejoin='round'
+      >
+        <path d='M4.5 6.75A2.25 2.25 0 0 1 6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v7.5A2.25 2.25 0 0 1 17.25 16.5H9l-4.5 3v-12.75Z' />
+        <path d='M8.25 8.5h7.5M8.25 11.5h4.5' />
+      </svg>
+    );
+  }
+
   return (
     <svg
       aria-hidden='true'

@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
+import { getProfileModePath } from '@/components/profile/registry';
 import { BASE_URL } from '@/constants/domains';
 
 interface UseProfileHeaderResult {
@@ -62,7 +63,11 @@ export function useProfileHeaderParts({
     };
   }, []);
 
-  const profileUrl = `${BASE_URL}${profilePath}`;
+  const resolvedProfilePath =
+    profilePath.trim().length > 0
+      ? profilePath
+      : getProfileModePath(username, 'profile');
+  const profileUrl = `${BASE_URL}${resolvedProfilePath}`;
 
   const handleCopyUrl = async () => {
     try {

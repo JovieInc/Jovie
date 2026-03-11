@@ -59,13 +59,6 @@ export default function manifest(): MetadataRoute.Manifest {
         src: '/web-app-manifest-512x512.png',
         sizes: '512x512',
         type: 'image/png',
-        form_factor: 'wide',
-        label: `${APP_NAME} - Artist profiles for music artists`,
-      },
-      {
-        src: '/web-app-manifest-512x512.png',
-        sizes: '512x512',
-        type: 'image/png',
         form_factor: 'narrow',
         label: `${APP_NAME} - Artist profiles for music artists`,
       },
