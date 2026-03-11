@@ -218,9 +218,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     if (node) node.focus();
   }, []);
 
-  // Derive showTracks from releaseView toggle
-  const showTracksFromView = releaseView === 'tracks';
-
   // Apply filters and search to rows
   const filteredRows = useMemo(() => {
     const baseRows = filterReleases(rows, filters, deferredSearchQuery);
@@ -762,7 +759,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   onEdit={openEditor}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
-                  showTracks={showTracksFromView}
                   groupByYear={groupByYear}
                   selectedReleaseId={editingRelease?.id}
                   selectedTrackId={editingTrack?.id}
