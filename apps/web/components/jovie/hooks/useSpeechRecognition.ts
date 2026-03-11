@@ -40,9 +40,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   stop(): void;
 }
 
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognitionInstance;
-}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
 declare global {
   interface Window {
@@ -82,19 +80,24 @@ export function useSpeechRecognition({
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onTranscriptRef = useRef(onTranscript);
+  const browserWindow =
+    typeof globalThis.window === 'undefined' ? undefined : globalThis.window;
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
   const isSupported =
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+    browserWindow !== undefined &&
+    ('SpeechRecognition' in browserWindow ||
+      'webkitSpeechRecognition' in browserWindow);
 
   const getRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;
     if (!isSupported) return null;
 
-    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    const Ctor =
+      browserWindow?.SpeechRecognition ??
+      browserWindow?.webkitSpeechRecognition;
     if (!Ctor) return null;
 
     const recognition = new Ctor();
@@ -130,7 +133,7 @@ export function useSpeechRecognition({
 
     recognitionRef.current = recognition;
     return recognition;
-  }, [isSupported, lang]);
+  }, [browserWindow, isSupported, lang]);
 
   const start = useCallback(() => {
     const recognition = getRecognition();
