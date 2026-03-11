@@ -1114,6 +1114,20 @@ function toNullableString(value: unknown): string | null {
   return value && typeof value === 'string' ? value : null;
 }
 
+async function fetchOptionalReleases(
+  profileId: string | null
+): Promise<ReleaseContext[]> {
+  if (!profileId) {
+    return [];
+  }
+
+  try {
+    return await fetchReleasesForChat(profileId);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Regex patterns for messages that can be handled by the lightweight model.
  * These are simple, tool-invocation-oriented requests that don't need
@@ -1355,15 +1369,7 @@ export async function POST(req: Request) {
 
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
-
-  let releases: ReleaseContext[] = [];
-  if (resolvedProfileId) {
-    try {
-      releases = await fetchReleasesForChat(resolvedProfileId);
-    } catch {
-      releases = [];
-    }
-  }
+  const releases = await fetchOptionalReleases(resolvedProfileId);
 
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
