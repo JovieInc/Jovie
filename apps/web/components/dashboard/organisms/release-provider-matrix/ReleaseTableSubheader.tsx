@@ -322,7 +322,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   return (
     <div className='flex items-center justify-between border-b border-subtle/80 bg-surface/20 px-4 py-1.5'>
       {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
-      <ActionBar className='hidden items-center md:flex'>
+      <ActionBar className='ml-auto hidden items-center md:flex'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
