@@ -1,7 +1,17 @@
-import { and, asc, count, desc, eq, ilike, or } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  ilike,
+  or,
+} from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
+import { sqlArray } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
@@ -45,6 +55,69 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
   );
 }
 
+function isMissingLeadInsertColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes(
+      'column "spotify_popularity" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "spotify_followers" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "release_count" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "latest_release_date" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "priority_score" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "is_linktree_verified" of relation "leads" does not exist'
+    )
+  );
+}
+
+async function insertLeadWithLegacyFallback(seed: {
+  handle: string;
+  normalizedUrl: string;
+  hasSpotifyLink: boolean;
+  spotifyUrl: string | null;
+  hasInstagram: boolean;
+  instagramHandle: string | null;
+  kind: string;
+}): Promise<string | null> {
+  const legacyMusicToolsDetected =
+    seed.kind === 'apple_music' ? ['apple_music'] : [];
+
+  const result = await db.execute<{ id: string }>(drizzleSql`
+    insert into "leads" (
+      "linktree_handle",
+      "linktree_url",
+      "discovery_source",
+      "has_spotify_link",
+      "spotify_url",
+      "has_instagram",
+      "instagram_handle",
+      "music_tools_detected"
+    ) values (
+      ${seed.handle},
+      ${seed.normalizedUrl},
+      ${'manual'},
+      ${seed.hasSpotifyLink},
+      ${seed.spotifyUrl},
+      ${seed.hasInstagram},
+      ${seed.instagramHandle},
+      ${sqlArray(legacyMusicToolsDetected)}
+    )
+    returning "id"
+  `);
+
+  return result.rows[0]?.id ?? null;
+}
 /**
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
@@ -333,23 +406,41 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const [inserted] = await db
-        .insert(leads)
-        .values({
-          linktreeHandle: seed.handle,
-          linktreeUrl: seed.normalizedUrl,
-          discoverySource: 'manual',
-          hasSpotifyLink: seed.hasSpotifyLink,
-          spotifyUrl: seed.spotifyUrl,
-          hasInstagram: seed.hasInstagram,
-          instagramHandle: seed.instagramHandle,
-          musicToolsDetected:
-            seed.kind === 'apple_music' ? ['apple_music'] : [],
-        })
-        .returning({ id: leads.id });
+      let insertedId: string | null = null;
 
-      if (inserted) {
-        newLeadIds.push(inserted.id);
+      try {
+        const [inserted] = await db
+          .insert(leads)
+          .values({
+            linktreeHandle: seed.handle,
+            linktreeUrl: seed.normalizedUrl,
+            discoverySource: 'manual',
+            hasSpotifyLink: seed.hasSpotifyLink,
+            spotifyUrl: seed.spotifyUrl,
+            hasInstagram: seed.hasInstagram,
+            instagramHandle: seed.instagramHandle,
+            musicToolsDetected:
+              seed.kind === 'apple_music' ? ['apple_music'] : [],
+          })
+          .returning({ id: leads.id });
+
+        insertedId = inserted?.id ?? null;
+      } catch (error) {
+        if (!isMissingLeadInsertColumnError(error)) {
+          throw error;
+        }
+
+        await captureWarning(
+          '[admin/leads] leads insert columns missing; falling back to legacy insert',
+          error,
+          { route: '/api/admin/leads', handle: seed.handle }
+        );
+
+        insertedId = await insertLeadWithLegacyFallback(seed);
+      }
+
+      if (insertedId) {
+        newLeadIds.push(insertedId);
         results.push({ url, status: 'created' });
       }
     }

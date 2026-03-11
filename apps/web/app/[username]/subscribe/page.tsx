@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getProfileModeHref } from '@/components/profile/registry';
 
 interface Props {
   readonly params: Promise<{
@@ -8,6 +9,5 @@ interface Props {
 
 export default async function SubscribePage({ params }: Props) {
   const { username } = await params;
-  // Redirect to profile with notifications/subscribe mode
-  redirect(`/${username}?mode=subscribe`);
+  redirect(getProfileModeHref(username, 'subscribe'));
 }

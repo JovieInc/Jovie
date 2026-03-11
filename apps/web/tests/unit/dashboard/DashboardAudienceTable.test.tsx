@@ -215,11 +215,11 @@ describe('DashboardAudienceTable', () => {
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
-  it('shows subscriber empty state in subscribers mode', () => {
+  it('shows unified empty state in subscribers mode', () => {
     renderWithProviders(
       <DashboardAudienceTable {...defaultProps} mode='subscribers' rows={[]} />
     );
-    expect(screen.getByText('Get Your First Subscriber')).toBeInTheDocument();
+    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
   it('renders table when rows are provided', () => {

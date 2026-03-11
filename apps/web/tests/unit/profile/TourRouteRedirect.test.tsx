@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getProfileModeHref } from '@/components/profile/registry';
 import TourPage from '../../../app/[username]/tour/page';
 
 const { replaceMock, searchParamsMock } = vi.hoisted(() => ({
@@ -30,7 +31,9 @@ describe('/[username]/tour redirect', () => {
     );
 
     await vi.waitFor(() => {
-      expect(replaceMock).toHaveBeenCalledWith('/testartist?mode=tour');
+      expect(replaceMock).toHaveBeenCalledWith(
+        getProfileModeHref('testartist', 'tour')
+      );
     });
   });
 
@@ -47,7 +50,7 @@ describe('/[username]/tour redirect', () => {
 
     await vi.waitFor(() => {
       expect(replaceMock).toHaveBeenCalledWith(
-        '/testartist?mode=tour&source=qr'
+        getProfileModeHref('testartist', 'tour', '&source=qr')
       );
     });
   });

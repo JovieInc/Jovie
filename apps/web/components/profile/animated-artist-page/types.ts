@@ -1,9 +1,10 @@
 import type { Variants } from 'motion/react';
+import type { ProfileMode } from '@/components/profile/contracts';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 export interface AnimatedArtistPageProps {
-  readonly mode: string;
+  readonly mode: ProfileMode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];

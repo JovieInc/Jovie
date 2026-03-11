@@ -8,10 +8,10 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
-import { type DbOrTransaction, db } from '@/lib/db';
+import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicVisitLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
@@ -77,22 +77,85 @@ async function incrementDailyProfileViews(
   viewDate: string,
   now: Date
 ): Promise<void> {
-  await tx
-    .insert(dailyProfileViews)
-    .values({
-      creatorProfileId: profileId,
-      viewDate,
-      viewCount: 1,
-      createdAt: now,
+  const values = {
+    creatorProfileId: profileId,
+    viewDate,
+    viewCount: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    await tx
+      .insert(dailyProfileViews)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          dailyProfileViews.creatorProfileId,
+          dailyProfileViews.viewDate,
+        ],
+        set: {
+          viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+          updatedAt: now,
+        },
+      });
+    return;
+  } catch (error) {
+    const isMissingConflictTarget =
+      error instanceof Error &&
+      (error.message.includes('42P10') ||
+        error.message.includes(
+          'there is no unique or exclusion constraint matching the ON CONFLICT specification'
+        ));
+
+    if (!isMissingConflictTarget) {
+      throw error;
+    }
+
+    logger.warn(
+      '[Audience Visit] Missing conflict target for daily_profile_views upsert, using safe fallback update path'
+    );
+  }
+
+  const [updatedExisting] = await tx
+    .update(dailyProfileViews)
+    .set({
+      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
       updatedAt: now,
     })
-    .onConflictDoUpdate({
-      target: [dailyProfileViews.creatorProfileId, dailyProfileViews.viewDate],
-      set: {
-        viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
-        updatedAt: now,
-      },
-    });
+    .where(
+      and(
+        eq(dailyProfileViews.creatorProfileId, profileId),
+        eq(dailyProfileViews.viewDate, viewDate)
+      )
+    )
+    .returning({ id: dailyProfileViews.id });
+
+  if (updatedExisting) {
+    return;
+  }
+
+  await tx.insert(dailyProfileViews).values(values).onConflictDoNothing();
+
+  await tx
+    .update(dailyProfileViews)
+    .set({
+      viewCount: drizzleSql`${dailyProfileViews.viewCount} + 1`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(dailyProfileViews.creatorProfileId, profileId),
+        eq(dailyProfileViews.viewDate, viewDate)
+      )
+    );
+}
+
+function isMissingDailyProfileViewsTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .toLowerCase()
+    .includes('relation "daily_profile_views" does not exist');
 }
 
 export async function POST(request: NextRequest) {
@@ -235,10 +298,28 @@ export async function POST(request: NextRequest) {
       ? [{ url: resolvedReferrer.trim(), timestamp: now.toISOString() }]
       : [];
 
+    const hasDailyProfileViewsTable = await doesTableExist(
+      'daily_profile_views'
+    );
+
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      await incrementDailyProfileViews(tx, profileId, viewDate, now);
+      if (hasDailyProfileViewsTable) {
+        try {
+          await incrementDailyProfileViews(tx, profileId, viewDate, now);
+        } catch (error) {
+          if (!isMissingDailyProfileViewsTableError(error)) {
+            throw error;
+          }
+
+          await captureWarning(
+            '[audience/visit] daily_profile_views table missing; skipping aggregate write',
+            error,
+            { profileId, viewDate }
+          );
+        }
+      }
 
       const [existing] = await tx
         .select({

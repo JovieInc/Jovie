@@ -370,20 +370,20 @@ describe('resolveProfileState', () => {
     expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
   });
 
-  it('returns NEEDS_ONBOARDING when profile has no avatar', () => {
+  it('returns ACTIVE when profile has no avatar (avatar optional)', () => {
     const result = resolveProfileState({
       ...completeProfile,
       avatarUrl: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(UserState.ACTIVE);
   });
 
-  it('returns NEEDS_ONBOARDING when profile has blank avatar', () => {
+  it('returns ACTIVE when profile has blank avatar (avatar optional)', () => {
     const result = resolveProfileState({
       ...completeProfile,
       avatarUrl: '   ',
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(UserState.ACTIVE);
   });
 
   it('returns NEEDS_ONBOARDING when onboarding not completed', () => {
@@ -425,15 +425,15 @@ describe('resolveProfileState', () => {
       );
     });
 
-    it('returns false when missing avatarUrl', () => {
+    it('returns true when missing avatarUrl (avatar optional)', () => {
       expect(isProfileComplete({ ...completeProfile, avatarUrl: null })).toBe(
-        false
+        true
       );
     });
 
-    it('returns false when avatarUrl is whitespace-only', () => {
+    it('returns true when avatarUrl is whitespace-only (avatar optional)', () => {
       expect(isProfileComplete({ ...completeProfile, avatarUrl: '  ' })).toBe(
-        false
+        true
       );
     });
   });
@@ -787,6 +787,45 @@ describe('proxy.ts path categorization', () => {
       expect(isExcludedFromWaitlist('/api/waitlist')).toBe(true);
       expect(isExcludedFromWaitlist('/api/chat/conversations')).toBe(true);
       expect(isExcludedFromWaitlist('/api/releases')).toBe(true);
+    });
+  });
+
+  describe('middleware user-state lookup scope', () => {
+    const needsUserStateLookup = (pathname: string) =>
+      !pathname.startsWith('/api/') &&
+      pathname !== '/app' &&
+      !pathname.startsWith('/app/') &&
+      pathname !== '/sso-callback' &&
+      pathname !== '/signup/sso-callback' &&
+      pathname !== '/signin/sso-callback' &&
+      pathname !== '/sign-up/sso-callback' &&
+      pathname !== '/sign-in/sso-callback';
+
+    it('documents that /app routes skip middleware proxy-state resolution', () => {
+      expect(needsUserStateLookup('/app')).toBe(false);
+      expect(needsUserStateLookup('/app/profile')).toBe(false);
+      expect(needsUserStateLookup('/app/settings/billing')).toBe(false);
+    });
+
+    it('documents that non-/app pages still use middleware proxy-state resolution', () => {
+      expect(needsUserStateLookup('/')).toBe(true);
+      expect(needsUserStateLookup('/waitlist')).toBe(true);
+      expect(needsUserStateLookup('/onboarding')).toBe(true);
+      expect(needsUserStateLookup('/signin')).toBe(true);
+    });
+  });
+
+  describe('method-aware redirects for onboarding/auth paths', () => {
+    it('documents that only GET/HEAD are treated as navigation methods', () => {
+      const isNavigationMethod = (method: string) =>
+        method === 'GET' || method === 'HEAD';
+
+      expect(isNavigationMethod('GET')).toBe(true);
+      expect(isNavigationMethod('HEAD')).toBe(true);
+      expect(isNavigationMethod('POST')).toBe(false);
+      expect(isNavigationMethod('PUT')).toBe(false);
+      expect(isNavigationMethod('PATCH')).toBe(false);
+      expect(isNavigationMethod('DELETE')).toBe(false);
     });
   });
 });

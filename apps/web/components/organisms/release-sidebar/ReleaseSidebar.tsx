@@ -59,6 +59,11 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'lyrics' as const, label: 'Lyrics' },
 ];
 
+function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
+  if (!hasPreview) return 'No preview available';
+  return isPlaying ? 'Pause preview' : 'Play preview';
+}
+
 interface ReleaseEntityHeaderProps {
   readonly release: Release;
   readonly artistName: string | null | undefined;
@@ -150,13 +155,7 @@ function ReleaseEntityHeader({
               'aria-[pressed=true]:bg-black/40 aria-[pressed=true]:opacity-100',
               'disabled:pointer-events-none disabled:hidden'
             )}
-            aria-label={
-              !previewUrl
-                ? 'No preview available'
-                : isPlaying
-                  ? 'Pause preview'
-                  : 'Play preview'
-            }
+            aria-label={getPreviewAriaLabel(Boolean(previewUrl), isPlaying)}
           >
             {isPlaying ? (
               <Pause className='h-5 w-5 text-white drop-shadow-sm' />

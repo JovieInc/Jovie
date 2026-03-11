@@ -11,8 +11,8 @@ export interface AudienceActionsCellProps {
   readonly className?: string;
 }
 
-function resolveAudienceActionIcon(label: string): string {
-  const normalized = label.trim().toLowerCase();
+function resolveAudienceActionIcon(label: string | null | undefined): string {
+  const normalized = label?.trim().toLowerCase() ?? '';
   if (normalized.includes('visit')) return 'Eye';
   if (normalized.includes('view')) return 'Eye';
   if (normalized.includes('tip')) return 'HandCoins';
@@ -39,14 +39,15 @@ export function AudienceActionsCell({
     >
       {actions.slice(0, maxActions).map((action, idx) => {
         const iconName = resolveAudienceActionIcon(action.label);
+        const actionLabel = action.label?.trim() || 'Unknown action';
         return (
           <span
-            key={`${rowId}-${action.label}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}-${idx}`}
+            key={`${rowId}-${actionLabel}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}-${idx}`}
             className='inline-flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
-            title={action.label}
+            title={actionLabel}
           >
             <Icon name={iconName} className='h-3 w-3' aria-hidden='true' />
-            <span className='sr-only'>{action.label}</span>
+            <span className='sr-only'>{actionLabel}</span>
           </span>
         );
       })}

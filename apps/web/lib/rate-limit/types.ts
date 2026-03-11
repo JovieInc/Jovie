@@ -79,6 +79,12 @@ export type PlanRateLimitConfig = Partial<Record<PlanId, RateLimitConfig>> & {
 };
 
 /**
+ * Plan values accepted by plan-aware rate limiters.
+ * Supports known plan IDs plus arbitrary persisted string values.
+ */
+export type PlanInput = PlanId | (string & {}) | null | undefined;
+
+/**
  * Options for creating a plan-aware rate limiter
  */
 export interface PlanAwareLimiterOptions {
@@ -102,10 +108,7 @@ export interface PlanAwareRateLimiter {
    * @param identifier - The unique identifier for the rate limit (e.g., userId)
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
-  limit(
-    identifier: string,
-    plan: PlanId | string | null | undefined
-  ): Promise<RateLimitResult>;
+  limit(identifier: string, plan: PlanInput): Promise<RateLimitResult>;
 
   /**
    * Get current status without incrementing the counter.
@@ -114,10 +117,7 @@ export interface PlanAwareRateLimiter {
    * @param identifier - The unique identifier for the rate limit
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
-  getStatus(
-    identifier: string,
-    plan: PlanId | string | null | undefined
-  ): RateLimitStatus;
+  getStatus(identifier: string, plan: PlanInput): RateLimitStatus;
 
   /**
    * Check if the request would be rate limited (without incrementing).
@@ -125,15 +125,12 @@ export interface PlanAwareRateLimiter {
    * @param identifier - The unique identifier for the rate limit
    * @param plan - The user's plan tier (null/undefined defaults to 'free')
    */
-  wouldBeRateLimited(
-    identifier: string,
-    plan: PlanId | string | null | undefined
-  ): Promise<boolean>;
+  wouldBeRateLimited(identifier: string, plan: PlanInput): Promise<boolean>;
 
   /**
    * Get the configuration for a specific plan.
    *
    * @param plan - The plan tier to get config for
    */
-  getConfigForPlan(plan: PlanId | string | null | undefined): RateLimitConfig;
+  getConfigForPlan(plan: PlanInput): RateLimitConfig;
 }

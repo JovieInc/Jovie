@@ -217,17 +217,19 @@ export function ChatPageClient({
     };
   }, [headerActions, setHeaderBadge, setHeaderActions]);
 
+  const panelParam = useMemo(() => searchParams.get('panel'), [searchParams]);
+  const rawQuery = useMemo(() => searchParams.get('q'), [searchParams]);
+
   // Auto-open the profile drawer when redirected from /dashboard/profile (?panel=profile)
   useEffect(() => {
     if (!enablePreviewPanel) return;
-    if (searchParams.get('panel') === 'profile') {
+    if (panelParam === 'profile') {
       openPreviewPanel();
     }
-  }, [enablePreviewPanel, openPreviewPanel, searchParams]);
+  }, [enablePreviewPanel, openPreviewPanel, panelParam]);
 
   // Pick up ?q= param (e.g. from profile page chat fallback) and pre-fill the input.
   // We pass it as initialQuery so JovieChat can auto-submit it.
-  const rawQuery = searchParams.get('q');
   const initialQuery =
     !env.IS_E2E && !initialQueryHandled && !conversationId ? rawQuery : null;
 
@@ -247,9 +249,10 @@ export function ChatPageClient({
       return;
     }
 
+    const fromParam = searchParams.get('from');
+    const onboardingParam = searchParams.get('onboarding');
     const wasLikelyJustOnboarded =
-      searchParams.get('from') === 'onboarding' ||
-      searchParams.get('onboarding') === 'complete';
+      fromParam === 'onboarding' || onboardingParam === 'complete';
 
     addBreadcrumb({
       category: 'dashboard.chat',

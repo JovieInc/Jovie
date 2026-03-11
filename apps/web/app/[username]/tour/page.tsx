@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
+import { getProfileModeHref } from '@/components/profile/registry';
 
 interface Props {
   readonly params: Promise<{
@@ -17,7 +18,7 @@ export default function TourPage({ params }: Readonly<Props>) {
     params.then(({ username }) => {
       const source = searchParams?.get('source');
       const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
-      router.replace(`/${username}?mode=tour${sourceParam}`);
+      router.replace(getProfileModeHref(username, 'tour', sourceParam));
     });
   }, [params, router, searchParams]);
 

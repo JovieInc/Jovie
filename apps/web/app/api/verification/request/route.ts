@@ -91,18 +91,23 @@ export async function POST() {
       return NextResponse.json({ success: true });
     });
   } catch (error) {
+    const isUnauthorized =
+      error instanceof Error && error.message === 'Unauthorized';
+
+    if (!isUnauthorized) {
+      await captureError('Verification request route failed', error, {
+        route: '/api/verification/request',
+      });
+    }
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error && error.message === 'Unauthorized'
-            ? 'Unauthorized'
-            : 'Unable to submit verification request',
+        error: isUnauthorized
+          ? 'Unauthorized'
+          : 'Unable to submit verification request',
       },
       {
-        status:
-          error instanceof Error && error.message === 'Unauthorized'
-            ? 401
-            : 500,
+        status: isUnauthorized ? 401 : 500,
       }
     );
   }

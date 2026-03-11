@@ -1,6 +1,7 @@
 'use client';
 
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import { buildProfilePreviewLinks } from '@/components/profile/view-models';
 import { cn } from '@/lib/utils';
 import { Artist } from '@/types/db';
 
@@ -52,7 +53,7 @@ export function ProfilePreview({
   };
 
   // Convert links to LegacySocialLink format
-  const socialLinks = links.map(link => ({
+  const socialLinks = buildProfilePreviewLinks(links).map(link => ({
     id: link.id,
     platform: link.platform,
     url: link.url,

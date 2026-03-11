@@ -15,6 +15,11 @@ import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import {
+  resolveTestBypassUserId,
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_HEADER,
+} from '@/lib/auth/test-mode';
 import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
 import {
   COOKIE_BANNER_REQUIRED_COOKIE,
@@ -252,6 +257,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // ========================================================================
     const pathInfo = categorizePath(pathname);
     const hostInfo = analyzeHost(hostname);
+    const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
 
     // ========================================================================
     // Generate CSP nonce early and set on request headers
@@ -360,9 +366,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
 
-    // Only page routes need user state — API routes don't make routing decisions
+    // Only non-/app page routes need user state for middleware rewrites.
+    // /app and /app/* perform auth and onboarding/waitlist gating deeper in
+    // route handlers/layouts, so proxy-level state lookups are unnecessary.
     const needsUserState =
-      !pathname.startsWith('/api/') && !pathInfo.isAuthCallbackPath;
+      !pathname.startsWith('/api/') &&
+      !pathInfo.isAuthCallbackPath &&
+      pathname !== '/app' &&
+      !pathname.startsWith('/app/');
 
     // Skip the getUserState call for RSC prefetch requests when the user is
     // already known-active from the in-memory cache. Active users don't need
@@ -382,6 +393,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathInfo.isAuthPath &&
       !pathInfo.isAuthCallbackPath &&
       !isRSCPrefetch &&
+      isNavigationMethod &&
       userState
     ) {
       const redirectUrl = sanitizeRedirectUrl(
@@ -438,16 +450,18 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         (!isWaitlistEnabled() || !userState.needsWaitlist) &&
         pathname === '/waitlist' &&
+        isNavigationMethod &&
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
+        isNavigationMethod &&
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (pathInfo.isAuthPath && !isRSCPrefetch) {
+      } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {
         // Redirect authenticated users away from any auth page (/signin, /sign-in,
         // /signup, /sign-up). Uses isAuthPath to cover all variants consistently.
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
@@ -644,6 +658,13 @@ const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
 });
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (process.env.NODE_ENV === 'test') {
+    const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
+    if (testMode === TEST_AUTH_BYPASS_MODE) {
+      return handleRequest(req, resolveTestBypassUserId(req.headers));
+    }
+  }
+
   // Check if Clerk config is missing or mocked
   const clerkConfigMissing = isMockOrMissingClerkConfig();
 

@@ -9,25 +9,12 @@ import { eq } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { publicEnv } from '@/lib/env-public';
+import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import type { AvatarFetchResult, AvatarUploadResult } from './types';
 
 /** Known Vercel project prefixes for this workspace. */
 const VERCEL_PROJECT_PREFIXES = ['jovie-', 'shouldimake-'] as const;
-
-/** OAuth provider hostnames that serve user avatar images. */
-const OAUTH_AVATAR_HOSTNAMES = [
-  'lh3.googleusercontent.com', // Google
-  'platform-lookaside.fbsbx.com', // Facebook
-  'avatars.githubusercontent.com', // GitHub
-  'img.clerk.com', // Clerk
-  'images.clerk.dev', // Clerk (legacy)
-  'gravatar.com', // Gravatar
-  'www.gravatar.com', // Gravatar
-  'cdn.discordapp.com', // Discord
-  'i.scdn.co', // Spotify CDN
-  'mosaic.scdn.co', // Spotify mosaic CDN
-] as const;
 
 /**
  * Builds the set of allowed hostnames for avatar uploads.
@@ -38,7 +25,7 @@ const OAUTH_AVATAR_HOSTNAMES = [
  * - Known OAuth provider hostnames (Google, GitHub, Clerk, etc.)
  */
 function buildAllowedHostnames(): Set<string> {
-  const allowed = new Set<string>(['localhost', ...OAUTH_AVATAR_HOSTNAMES]);
+  const allowed = new Set<string>(['localhost']);
 
   // Add hostname from NEXT_PUBLIC_APP_URL
   const appUrl = publicEnv.NEXT_PUBLIC_APP_URL;
@@ -84,7 +71,10 @@ function getSafeImageUrl(imageUrl: string): string {
   }
 
   const allowedHostnames = buildAllowedHostnames();
-  if (!allowedHostnames.has(url.hostname)) {
+  if (
+    !allowedHostnames.has(url.hostname) &&
+    !isAllowedAvatarHostname(url.hostname)
+  ) {
     throw new TypeError('Avatar image host is not allowed');
   }
 

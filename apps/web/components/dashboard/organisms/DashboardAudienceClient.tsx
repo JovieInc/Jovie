@@ -72,7 +72,7 @@ export interface DashboardAudienceClientProps {
   readonly direction: 'asc' | 'desc';
   readonly profileUrl?: string;
   readonly profileId?: string;
-  /** Null when the subscriber COUNT query was skipped for performance (JOV-1262). */
+  /** Null when the identified COUNT query was skipped for performance (JOV-1262). */
   readonly subscriberCount: number | null;
   /** Null when the audience COUNT query was skipped for performance (JOV-1262). */
   readonly totalAudienceCount: number | null;
@@ -209,7 +209,7 @@ function DashboardAudienceClientInner({
   const { data, hasNextPage, isFetchingNextPage, fetchNextPage } =
     useAudienceInfiniteQuery({
       profileId: profileId ?? '',
-      mode,
+      view,
       sort,
       direction,
       filters: initialFilters,

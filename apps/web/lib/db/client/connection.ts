@@ -18,7 +18,7 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
-import { env } from '@/lib/env-server';
+import { env, isTestEnv } from '@/lib/env-server';
 import * as schema from '../schema';
 import { logDbError, logDbInfo } from './logging';
 import type { DbType, PoolMetrics } from './types';
@@ -33,6 +33,21 @@ declare global {
 // Lazy initialization of database connection
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
+
+const DEFAULT_POOL_MAX = 10;
+const TEST_POOL_MAX = 1;
+
+export function resolvePoolConfig(connectionString: string) {
+  const runningInTest = isTestEnv();
+
+  return {
+    connectionString,
+    max: runningInTest ? TEST_POOL_MAX : DEFAULT_POOL_MAX,
+    idleTimeoutMillis: 20_000,
+    connectionTimeoutMillis: 15_000,
+    allowExitOnIdle: true,
+  };
+}
 
 /**
  * Initialize the database connection using Neon WebSocket driver.
@@ -78,12 +93,15 @@ export function initializeDb(): DbType {
   //     without waiting forever
   //   - allowExitOnIdle: true — let the Node process exit even if pool connections
   //     remain (important for serverless/edge runtimes)
-  const pool = new Pool({
-    connectionString: databaseUrl,
-    max: 10,
-    idleTimeoutMillis: 20_000,
-    connectionTimeoutMillis: 15_000,
-    allowExitOnIdle: true,
+  const poolConfig = resolvePoolConfig(databaseUrl);
+  const pool = new Pool(poolConfig);
+
+  logDbInfo('pool_config', 'Initialized Neon pool configuration', {
+    environment: env.NODE_ENV,
+    maxConnections: poolConfig.max,
+    playwrightWorkerIndex: process.env.TEST_WORKER_INDEX ?? null,
+    vitestWorkerId: process.env.VITEST_POOL_ID ?? null,
+    pid: process.pid,
   });
 
   // Handle pool-level errors so unexpected connection terminations

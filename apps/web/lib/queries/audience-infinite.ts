@@ -5,17 +5,17 @@ import {
   keepPreviousData,
   useInfiniteQuery,
 } from '@tanstack/react-query';
-import type { AudienceFilters } from '@/components/dashboard/organisms/dashboard-audience-table/types';
+import type {
+  AudienceFilters,
+  AudienceView,
+} from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import type { AudienceMember } from '@/types';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
 
 interface AudiencePageResponse {
   rows: AudienceMember[];
-  /**
-   * Members: always null — pagination is cursor-based (JOV-1263).
-   * Subscribers: count on page 1 only; null on subsequent pages.
-   */
+  /** Always null — pagination is cursor-based (JOV-1263). */
   total: number | null;
   /** Members only: true when another page exists (JOV-1260, JOV-1263). */
   hasMore?: boolean;
@@ -23,15 +23,9 @@ interface AudiencePageResponse {
   nextCursor?: string | null;
 }
 
-/**
- * Opaque page parameter union.
- * Members use a string cursor; subscribers fall back to a numeric page number.
- */
-type PageParam = string | number;
-
 interface UseAudienceInfiniteQueryParams {
   profileId: string;
-  mode: 'members' | 'subscribers';
+  view: AudienceView;
   sort: string;
   direction: 'asc' | 'desc';
   filters: AudienceFilters;
@@ -41,7 +35,7 @@ interface UseAudienceInfiniteQueryParams {
 
 export function useAudienceInfiniteQuery({
   profileId,
-  mode,
+  view,
   sort,
   direction,
   filters,
@@ -57,18 +51,13 @@ export function useAudienceInfiniteQuery({
   return useInfiniteQuery<
     AudiencePageResponse,
     Error,
-    InfiniteData<AudiencePageResponse, PageParam>,
+    InfiniteData<AudiencePageResponse, string>,
     unknown[],
-    PageParam
+    string
   >({
-    queryKey:
-      mode === 'members'
-        ? ([
-            ...queryKeys.audience.members(profileId, filterParams),
-          ] as unknown[])
-        : ([
-            ...queryKeys.audience.subscribers(profileId, filterParams),
-          ] as unknown[]),
+    queryKey: [
+      ...queryKeys.audience.members(profileId, { ...filterParams, view }),
+    ] as unknown[],
     queryFn: async ({ pageParam, signal }) => {
       const params = new URLSearchParams({
         pageSize: String(pageSize),
@@ -77,26 +66,19 @@ export function useAudienceInfiniteQuery({
         profileId,
       });
 
-      if (mode === 'members') {
-        // Cursor-based pagination for members (JOV-1263).
-        // pageParam is a cursor string on subsequent pages, or the sentinel 'first' on page 1.
-        if (typeof pageParam === 'string' && pageParam !== 'first') {
-          params.set('cursor', pageParam);
-        }
-      } else {
-        // Page-number pagination for subscribers (unchanged).
-        params.set(
-          'page',
-          String(typeof pageParam === 'number' ? pageParam : 1)
-        );
+      // Cursor-based pagination for members (JOV-1263).
+      if (pageParam !== 'first') {
+        params.set('cursor', pageParam);
       }
+
+      params.set('view', view);
 
       for (const segment of filters.segments) {
         params.append('segments', segment);
       }
 
       const res = await fetch(
-        `/api/dashboard/audience/${mode}?${params.toString()}`,
+        `/api/dashboard/audience/members?${params.toString()}`,
         { signal }
       );
       if (!res.ok) {
@@ -104,28 +86,17 @@ export function useAudienceInfiniteQuery({
       }
       return res.json() as Promise<AudiencePageResponse>;
     },
-    getNextPageParam: (lastPage, allPages) => {
-      if (mode === 'members') {
-        // Cursor-based: use nextCursor when another page exists (JOV-1263).
-        return lastPage.hasMore && lastPage.nextCursor
-          ? lastPage.nextCursor
-          : undefined;
-      }
-      // Subscribers: page-number fallback using total or rows-length heuristic.
-      if (lastPage.total !== null && lastPage.total !== undefined) {
-        const loaded = allPages.length * pageSize;
-        return loaded < lastPage.total ? allPages.length + 1 : undefined;
-      }
-      return lastPage.rows.length >= pageSize ? allPages.length + 1 : undefined;
+    getNextPageParam: lastPage => {
+      // Cursor-based: use nextCursor when another page exists (JOV-1263).
+      return lastPage.hasMore && lastPage.nextCursor
+        ? lastPage.nextCursor
+        : undefined;
     },
-    initialPageParam:
-      mode === 'members' ? ('first' as PageParam) : (1 as PageParam),
+    initialPageParam: 'first' as string,
     initialData: initialData
       ? {
           pages: [{ rows: initialData.rows, total: initialData.total }],
-          pageParams: [
-            mode === 'members' ? ('first' as PageParam) : (1 as PageParam),
-          ],
+          pageParams: ['first' as string],
         }
       : undefined,
     placeholderData: keepPreviousData,

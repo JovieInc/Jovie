@@ -7,17 +7,58 @@
  * @deprecated Import from '@/lib/rate-limit' instead
  */
 
+import { RATE_LIMIT_CONFIG } from '@/lib/db/config';
 import {
   getClientIP as _getClientIP,
   createRateLimitHeadersFromStatus,
-  generalLimiter,
-  healthLimiter,
   publicClickLimiter,
   publicProfileLimiter,
   publicVisitLimiter,
 } from '@/lib/rate-limit';
 
 export type { PublicEndpointType, RateLimitStatus } from '@/lib/rate-limit';
+
+type LegacyRateLimitState = {
+  count: number;
+  resetTime: number;
+};
+
+const legacyRateLimitState = new Map<string, LegacyRateLimitState>();
+
+function getLegacyRateLimitConfig(isHealthEndpoint: boolean): {
+  limit: number;
+  windowSeconds: number;
+} {
+  return isHealthEndpoint
+    ? {
+        limit: RATE_LIMIT_CONFIG.healthRequests,
+        windowSeconds: RATE_LIMIT_CONFIG.healthWindow,
+      }
+    : {
+        limit: RATE_LIMIT_CONFIG.requests,
+        windowSeconds: RATE_LIMIT_CONFIG.window,
+      };
+}
+
+function getOrCreateLegacyState(
+  identifier: string,
+  isHealthEndpoint: boolean
+): LegacyRateLimitState {
+  const now = Date.now();
+  const { windowSeconds } = getLegacyRateLimitConfig(isHealthEndpoint);
+  const existing = legacyRateLimitState.get(identifier);
+
+  if (!existing || existing.resetTime <= now) {
+    const nextState: LegacyRateLimitState = {
+      count: 0,
+      resetTime: now + windowSeconds * 1000,
+    };
+    legacyRateLimitState.set(identifier, nextState);
+    return nextState;
+  }
+
+  return existing;
+}
 
 /**
  * @deprecated Use generalLimiter or healthLimiter from '@/lib/rate-limit' instead
@@ -26,13 +67,13 @@ export function checkRateLimit(
   identifier: string,
   isHealthEndpoint = false
 ): boolean {
-  const limiter = isHealthEndpoint ? healthLimiter : generalLimiter;
-  const status = limiter.getStatus(identifier);
+  const state = getOrCreateLegacyState(identifier, isHealthEndpoint);
+  const { limit } = getLegacyRateLimitConfig(isHealthEndpoint);
 
-  // Trigger the limit check to increment counter
-  void limiter.limit(identifier);
+  state.count += 1;
+  legacyRateLimitState.set(identifier, state);
 
-  return status.blocked;
+  return state.count > limit;
 }
 
 /**
@@ -47,14 +88,16 @@ export function getRateLimitStatus(
   resetTime: number;
   blocked: boolean;
 } {
-  const limiter = isHealthEndpoint ? healthLimiter : generalLimiter;
-  const status = limiter.getStatus(identifier);
+  const state = getOrCreateLegacyState(identifier, isHealthEndpoint);
+  const { limit } = getLegacyRateLimitConfig(isHealthEndpoint);
+  const remaining = Math.max(limit - state.count, 0);
+  const blocked = state.count > limit;
 
   return {
-    limit: status.limit,
-    remaining: status.remaining,
-    resetTime: status.resetTime,
-    blocked: status.blocked,
+    limit,
+    remaining,
+    resetTime: state.resetTime,
+    blocked,
   };
 }
 
@@ -99,7 +142,8 @@ export function checkPublicRateLimit(
   // Trigger the limit check to increment counter
   void limiter.limit(identifier);
 
-  return status.blocked;
+  // Account for callers that expect the current attempt to be blocked once the bucket is exhausted.
+  return status.blocked || status.remaining <= 0;
 }
 
 /**

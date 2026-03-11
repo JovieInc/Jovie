@@ -51,17 +51,6 @@ interface ReleaseTableSubheaderProps {
   readonly releases: ReleaseViewModel[];
   /** Selected release IDs for filtered export */
   readonly selectedIds: Set<string>;
-  /** Column visibility state */
-  readonly columnVisibility: Record<string, boolean>;
-  /** Callback when column visibility changes */
-  readonly onColumnVisibilityChange: (
-    columnId: string,
-    visible: boolean
-  ) => void;
-  /** Available columns to toggle */
-  readonly availableColumns: readonly { id: string; label: string }[];
-  /** Callback to reset display settings to defaults */
-  readonly onResetToDefaults?: () => void;
   /** Current filter state */
   readonly filters: ReleaseFilters;
   /** Callback when filters change */
@@ -158,24 +147,16 @@ function ToggleSwitch({
  * LinearStyleDisplayMenu - Compact display settings popover
  *
  * Features:
- * - Display properties as pill toggles (tightened spacing)
- * - Show tracks toggle for expandable album rows
+ * - Tracks/releases view toggle
+ * - Group by year toggle
  */
 function LinearStyleDisplayMenu({
-  columnVisibility,
-  onColumnVisibilityChange,
-  availableColumns,
-  onResetToDefaults,
   groupByYear,
   onGroupByYearChange,
   releaseView,
   onReleaseViewChange,
   triggerClassName,
 }: {
-  columnVisibility: Record<string, boolean>;
-  onColumnVisibilityChange: (columnId: string, visible: boolean) => void;
-  availableColumns: readonly { id: string; label: string }[];
-  onResetToDefaults?: () => void;
   groupByYear?: boolean;
   onGroupByYearChange?: (group: boolean) => void;
   releaseView?: ReleaseView;
@@ -240,73 +221,17 @@ function LinearStyleDisplayMenu({
             />
           </div>
         )}
-
-        {/* Column visibility (Properties) */}
-        {availableColumns.length > 0 && (
-          <div
-            className={cn(
-              'px-3 py-2',
-              onResetToDefaults && 'border-b border-subtle'
-            )}
-          >
-            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-              Display properties
-            </p>
-            <div className='flex flex-wrap gap-1 px-0.5'>
-              {availableColumns.map(col => {
-                const isVisible = columnVisibility[col.id] !== false;
-                return (
-                  <button
-                    key={col.id}
-                    type='button'
-                    onClick={() => onColumnVisibilityChange(col.id, !isVisible)}
-                    aria-pressed={isVisible}
-                    aria-label={`${isVisible ? 'Hide' : 'Show'} ${col.label} column`}
-                    className={cn(
-                      'rounded-md px-2 py-0.5 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
-                      isVisible
-                        ? 'bg-interactive-active text-secondary-token'
-                        : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
-                    )}
-                  >
-                    {col.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Reset to defaults */}
-        {onResetToDefaults && (
-          <div className='px-3 py-1.5'>
-            <button
-              type='button'
-              onClick={onResetToDefaults}
-              className='text-[11px] text-tertiary-token hover:text-secondary-token transition-colors rounded px-1 py-1 focus-visible:outline-none focus-visible:bg-interactive-hover'
-            >
-              Reset to defaults
-            </button>
-          </div>
-        )}
       </PopoverContent>
     </Popover>
   );
 }
 
 /**
- * ReleaseTableSubheader - Subheader with right-aligned Filter, Display, and Export controls
- *
- * Follows Linear's UI pattern with:
- * - Filter, Display, and Export actions grouped on the right
+ * ReleaseTableSubheader - Subheader with right-aligned search, filter, display, and export controls
  */
 export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   releases,
   selectedIds,
-  columnVisibility,
-  onColumnVisibilityChange,
-  availableColumns,
-  onResetToDefaults,
   filters,
   onFiltersChange,
   groupByYear,
@@ -322,7 +247,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   return (
     <div className='flex items-center justify-between border-b border-subtle/80 bg-surface/20 px-4 py-1.5'>
       {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
-      <ActionBar className='hidden items-center md:flex'>
+      <ActionBar className='ml-auto hidden items-center md:flex'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
@@ -348,10 +273,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
         />
         <div className='h-4 w-px bg-subtle/80' aria-hidden='true' />
         <LinearStyleDisplayMenu
-          columnVisibility={columnVisibility}
-          onColumnVisibilityChange={onColumnVisibilityChange}
-          availableColumns={availableColumns}
-          onResetToDefaults={onResetToDefaults}
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}

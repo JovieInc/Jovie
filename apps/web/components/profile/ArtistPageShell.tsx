@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/profile-shell';
+import type { ProfileMode } from '@/components/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
@@ -13,8 +14,7 @@ type ArtistPageShellProps = {
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
-  /** Current profile mode — controls social-bar visibility for conversion optimization */
-  readonly mode?: string;
+  readonly mode?: ProfileMode;
   readonly showTipButton?: boolean;
   readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
