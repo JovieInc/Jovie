@@ -2,6 +2,7 @@ import 'server-only';
 
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { serverFetch } from '@/lib/http/server-fetch';
 
 const MERCURY_BASE_URL =
   env.MERCURY_API_BASE_URL?.trim() || 'https://api.mercury.com/api/v1';
@@ -82,7 +83,7 @@ async function fetchMercury<T>(
     });
   }
 
-  const response = await fetch(url.toString(), {
+  const response = await serverFetch(url.toString(), {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${mercuryEnv.apiToken}`,

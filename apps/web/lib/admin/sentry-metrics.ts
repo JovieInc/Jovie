@@ -2,6 +2,7 @@ import 'server-only';
 
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { serverFetch } from '@/lib/http/server-fetch';
 
 const SENTRY_API_BASE_URL = 'https://sentry.io/api/0';
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -78,7 +79,7 @@ async function fetchSentryIssues(
     limit: '100',
   });
 
-  const response = await fetch(
+  const response = await serverFetch(
     `${SENTRY_API_BASE_URL}/organizations/${orgSlug}/issues/?${params.toString()}`,
     {
       headers: {
