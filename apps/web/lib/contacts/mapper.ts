@@ -34,14 +34,26 @@ export function toPublicContacts(
       }
 
       if (contact.phone) {
+        const encodedPhone = encodeContactPayload({
+          type: 'phone',
+          value: contact.phone,
+          contactId: contact.id,
+        });
+
         channels.push({
           type: 'phone',
+          encoded: encodedPhone,
+          preferred: contact.preferredChannel === 'phone',
+        });
+
+        channels.push({
+          type: 'sms',
           encoded: encodeContactPayload({
-            type: 'phone',
+            type: 'sms',
             value: contact.phone,
             contactId: contact.id,
           }),
-          preferred: contact.preferredChannel === 'phone',
+          preferred: false,
         });
       }
 

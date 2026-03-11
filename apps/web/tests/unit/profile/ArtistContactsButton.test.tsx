@@ -88,6 +88,15 @@ describe('ArtistContactsButton', () => {
             }),
             preferred: false,
           },
+          {
+            type: 'sms',
+            encoded: encodeContactPayload({
+              type: 'sms',
+              value: '+1 (555) 010-1234',
+              contactId: 'contact-1',
+            }),
+            preferred: false,
+          },
         ],
       }),
     ];
@@ -110,6 +119,7 @@ describe('ArtistContactsButton', () => {
       'mailto:agent@example.com?subject=Booking%20-%20Test%20Artist'
     );
     expect(channelActions[1]).toHaveAttribute('href', 'tel:+15550101234');
+    expect(channelActions[2]).toHaveAttribute('href', 'sms:+15550101234');
   });
 
   it('opens drawer when multiple contacts are provided', () => {
