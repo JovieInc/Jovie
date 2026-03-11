@@ -7,6 +7,7 @@ const hoisted = vi.hoisted(() => {
   const selectMock = vi.fn(() => ({ from: fromMock }));
   const doesTableExist = vi.fn();
   const captureError = vi.fn();
+  const captureWarning = vi.fn();
   const getAdminStripeOverviewMetrics = vi.fn();
 
   return {
@@ -15,6 +16,7 @@ const hoisted = vi.hoisted(() => {
     selectMock,
     doesTableExist,
     captureError,
+    captureWarning,
     getAdminStripeOverviewMetrics,
   };
 });
@@ -28,6 +30,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
+  captureWarning: hoisted.captureWarning,
 }));
 
 vi.mock('@/lib/admin/stripe-metrics', () => ({
@@ -64,6 +67,20 @@ describe('getAdminFunnelMetrics outreach query', () => {
     expect(
       whereSql.some(sql => sql.includes("::text IN ('sent', 'dm_sent')"))
     ).toBe(true);
+    expect(hoisted.captureError).not.toHaveBeenCalledWith(
+      'Error fetching outreach sent count',
+      expect.anything()
+    );
+  });
+
+  it('returns zero when outreach_status is missing during a schema rollout', async () => {
+    hoisted.whereMock.mockRejectedValueOnce(
+      new Error('column leads.outreach_status does not exist')
+    );
+
+    const result = await getAdminFunnelMetrics();
+
+    expect(result.outreachSent7d).toBe(0);
     expect(hoisted.captureError).not.toHaveBeenCalledWith(
       'Error fetching outreach sent count',
       expect.anything()

@@ -6,11 +6,18 @@ import { db, doesTableExist } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { emailEngagement } from '@/lib/db/schema/email-engagement';
 import { leads } from '@/lib/db/schema/leads';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const BASELINE_BURN_USD = 5_000;
+
+function isMissingLeadsOutreachStatusColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .toLowerCase()
+    .includes('column leads.outreach_status does not exist');
+}
 
 export interface AdminFunnelMetrics {
   /** Total outreach emails sent in the last 7 days */
@@ -83,6 +90,14 @@ async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
 
     return Number(row?.count ?? 0);
   } catch (error) {
+    if (isMissingLeadsOutreachStatusColumnError(error)) {
+      await captureWarning(
+        '[admin/funnel-metrics] leads.outreach_status column missing; returning 0 outreach count',
+        error
+      );
+      return 0;
+    }
+
     captureError('Error fetching outreach sent count', error);
     return 0;
   }

@@ -3,12 +3,30 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
+import {
+  captureError,
+  captureWarning,
+  getSafeErrorMessage,
+} from '@/lib/error-tracking';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export const runtime = 'nodejs';
+
+function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes('column "spotify_popularity" does not exist') ||
+    normalized.includes('column "spotify_followers" does not exist') ||
+    normalized.includes('column "release_count" does not exist') ||
+    normalized.includes('column "latest_release_date" does not exist') ||
+    normalized.includes('column "priority_score" does not exist') ||
+    normalized.includes('column "is_linktree_verified" does not exist')
+  );
+}
 
 /**
  * GET /api/admin/outreach — List outreach leads by queue.
@@ -59,16 +77,86 @@ export async function GET(request: NextRequest) {
     const orderBy = sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
 
     // Query data and count in parallel
-    const [rows, [totalRow]] = await Promise.all([
-      db
-        .select()
-        .from(leads)
-        .where(whereClause)
-        .orderBy(orderBy)
-        .limit(limit)
-        .offset(offset),
-      db.select({ total: count() }).from(leads).where(whereClause),
-    ]);
+    let rows;
+    let totalRow;
+
+    try {
+      [rows, [totalRow]] = await Promise.all([
+        db
+          .select()
+          .from(leads)
+          .where(whereClause)
+          .orderBy(orderBy)
+          .limit(limit)
+          .offset(offset),
+        db.select({ total: count() }).from(leads).where(whereClause),
+      ]);
+    } catch (error) {
+      if (!isMissingLeadEnrichmentColumnError(error)) {
+        throw error;
+      }
+
+      await captureWarning(
+        '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+        error,
+        { route: '/api/admin/outreach' }
+      );
+
+      [rows, [totalRow]] = await Promise.all([
+        db
+          .select({
+            id: leads.id,
+            linktreeHandle: leads.linktreeHandle,
+            linktreeUrl: leads.linktreeUrl,
+            discoverySource: leads.discoverySource,
+            discoveryQuery: leads.discoveryQuery,
+            displayName: leads.displayName,
+            bio: leads.bio,
+            avatarUrl: leads.avatarUrl,
+            contactEmail: leads.contactEmail,
+            hasPaidTier: leads.hasPaidTier,
+            hasSpotifyLink: leads.hasSpotifyLink,
+            spotifyUrl: leads.spotifyUrl,
+            hasInstagram: leads.hasInstagram,
+            instagramHandle: leads.instagramHandle,
+            musicToolsDetected: leads.musicToolsDetected,
+            allLinks: leads.allLinks,
+            fitScore: leads.fitScore,
+            fitScoreBreakdown: leads.fitScoreBreakdown,
+            status: leads.status,
+            disqualificationReason: leads.disqualificationReason,
+            qualifiedAt: leads.qualifiedAt,
+            disqualifiedAt: leads.disqualifiedAt,
+            approvedAt: leads.approvedAt,
+            ingestedAt: leads.ingestedAt,
+            rejectedAt: leads.rejectedAt,
+            creatorProfileId: leads.creatorProfileId,
+            emailInvalid: leads.emailInvalid,
+            emailSuspicious: leads.emailSuspicious,
+            emailInvalidReason: leads.emailInvalidReason,
+            hasRepresentation: leads.hasRepresentation,
+            representationSignal: leads.representationSignal,
+            outreachRoute: leads.outreachRoute,
+            outreachStatus: leads.outreachStatus,
+            claimToken: leads.claimToken,
+            claimTokenHash: leads.claimTokenHash,
+            claimTokenExpiresAt: leads.claimTokenExpiresAt,
+            instantlyLeadId: leads.instantlyLeadId,
+            outreachQueuedAt: leads.outreachQueuedAt,
+            dmSentAt: leads.dmSentAt,
+            dmCopy: leads.dmCopy,
+            scrapedAt: leads.scrapedAt,
+            createdAt: leads.createdAt,
+            updatedAt: leads.updatedAt,
+          })
+          .from(leads)
+          .where(whereClause)
+          .orderBy(desc(leads.createdAt))
+          .limit(limit)
+          .offset(offset),
+        db.select({ total: count() }).from(leads).where(whereClause),
+      ]);
+    }
 
     return NextResponse.json(
       {
