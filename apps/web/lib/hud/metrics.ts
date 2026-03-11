@@ -5,6 +5,7 @@ import { getAdminReliabilitySummary } from '@/lib/admin/overview';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { checkDbHealth } from '@/lib/db';
 import { env } from '@/lib/env-server';
+import { serverFetch } from '@/lib/http/server-fetch';
 import type {
   HudAccessMode,
   HudDeploymentRun,
@@ -82,7 +83,7 @@ async function getHudDeployments(): Promise<HudDeployments> {
   try {
     const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/workflows/${encodeURIComponent(workflow)}/runs?per_page=6`;
 
-    const response = await fetch(url, {
+    const response = await serverFetch(url, {
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
