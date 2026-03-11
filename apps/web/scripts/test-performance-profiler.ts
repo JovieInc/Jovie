@@ -7,7 +7,7 @@
  */
 
 import { execSync } from 'child_process';
-import { writeFileSync } from 'fs';
+import { readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 interface TestResult {
@@ -67,12 +67,16 @@ class TestPerformanceProfiler {
     this.measureProbeSetupTime();
 
     // Run tests with verbose output and capture timing data
-    const { output: testOutput, durationMs } = this.runTestsWithTiming();
+    const {
+      output: testOutput,
+      durationMs,
+      jsonOutput,
+    } = this.runTestsWithTiming();
 
     // Parse the output to extract performance metrics (excluding setupTime —
     // already captured by the probe above so we don't overwrite it with the
     // misleading aggregate value).
-    this.parseTestOutput(testOutput, { skipSetupTime: true });
+    this.parseTestOutput(testOutput, jsonOutput, { skipSetupTime: true });
     if (!this.results.totalDuration) {
       this.results.totalDuration = durationMs;
     }
@@ -136,19 +140,31 @@ class TestPerformanceProfiler {
     }
   }
 
-  private runTestsWithTiming(): { output: string; durationMs: number } {
+  private runTestsWithTiming(): {
+    output: string;
+    durationMs: number;
+    jsonOutput: string;
+  } {
     console.log('⏱️  Running test suite with timing analysis...');
     const startTime = Date.now();
+    const jsonOutputFile = '.cache/vitest-performance-results.json';
 
     try {
-      const output = execSync('pnpm test:fast --reporter=verbose', {
-        encoding: 'utf8',
-        stdio: 'pipe',
-        maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
-        timeout: 420000, // 7 minutes timeout to align with budget ceilings
-      });
+      const output = execSync(
+        `pnpm test:fast --reporter=default --reporter=json --outputFile=${jsonOutputFile}`,
+        {
+          encoding: 'utf8',
+          stdio: 'pipe',
+          maxBuffer: 20 * 1024 * 1024, // allow verbose output without truncation
+          timeout: 420000, // 7 minutes timeout to align with budget ceilings
+        }
+      );
 
-      return { output, durationMs: Date.now() - startTime };
+      return {
+        output,
+        durationMs: Date.now() - startTime,
+        jsonOutput: this.readVitestJsonOutput(jsonOutputFile),
+      };
     } catch (error: unknown) {
       // Tests might fail but we still want the timing data
       if (error && typeof error === 'object') {
@@ -163,7 +179,11 @@ class TestPerformanceProfiler {
           : '';
 
         if (stdout) {
-          return { output: stdout, durationMs: Date.now() - startTime };
+          return {
+            output: stdout,
+            durationMs: Date.now() - startTime,
+            jsonOutput: this.readVitestJsonOutput(jsonOutputFile),
+          };
         }
 
         if (Array.isArray(errorObj.output)) {
@@ -175,15 +195,34 @@ class TestPerformanceProfiler {
                 : (chunk as string)
             )
             .join('');
-          return { output, durationMs: Date.now() - startTime };
+          return {
+            output,
+            durationMs: Date.now() - startTime,
+            jsonOutput: this.readVitestJsonOutput(jsonOutputFile),
+          };
         }
       }
-      return { output: '', durationMs: Date.now() - startTime };
+      return {
+        output: '',
+        durationMs: Date.now() - startTime,
+        jsonOutput: this.readVitestJsonOutput(jsonOutputFile),
+      };
+    }
+  }
+
+  private readVitestJsonOutput(outputFile: string): string {
+    try {
+      const content = readFileSync(join(process.cwd(), outputFile), 'utf8');
+      unlinkSync(join(process.cwd(), outputFile));
+      return content;
+    } catch {
+      return '';
     }
   }
 
   private parseTestOutput(
     output: string,
+    jsonOutput: string,
     options: { skipSetupTime?: boolean } = {}
   ): void {
     // Extract overall timing information
@@ -226,32 +265,79 @@ class TestPerformanceProfiler {
       this.results.prepareTime = parseFloat(prepareMatch[1]) * 1000;
     }
 
-    // Extract individual test results
-    const testResultRegex = /✓\s+(.+?)\s+\((\d+)\s+tests?\)\s+(\d+)ms/g;
-    let match;
-
-    while ((match = testResultRegex.exec(output)) !== null) {
-      const [, name, testCount, duration] = match;
-      this.results.testResults.push({
-        name: name.trim(),
-        duration: parseInt(duration),
-        tests: parseInt(testCount),
-        status: 'passed',
-      });
+    if (jsonOutput) {
+      this.parseVitestJsonOutput(jsonOutput);
     }
 
-    // Also capture individual test timings within files
-    const individualTestRegex = /✓\s+(.+?)\s+(\d+)ms$/gm;
-    while ((match = individualTestRegex.exec(output)) !== null) {
-      const [, name, duration] = match;
-      if (!name.includes('(') && !name.includes('tests')) {
+    // Extract individual test results from console output only when JSON
+    // parsing failed to produce per-test timings.
+    if (this.results.testResults.length === 0) {
+      const testResultRegex = /✓\s+(.+?)\s+\((\d+)\s+tests?\)\s+(\d+)ms/g;
+      let match;
+
+      while ((match = testResultRegex.exec(output)) !== null) {
+        const [, name, testCount, duration] = match;
         this.results.testResults.push({
           name: name.trim(),
           duration: parseInt(duration),
-          tests: 1,
+          tests: parseInt(testCount),
           status: 'passed',
         });
       }
+
+      // Also capture individual test timings within files
+      const individualTestRegex = /✓\s+(.+?)\s+(\d+)ms$/gm;
+      while ((match = individualTestRegex.exec(output)) !== null) {
+        const [, name, duration] = match;
+        if (!name.includes('(') && !name.includes('tests')) {
+          this.results.testResults.push({
+            name: name.trim(),
+            duration: parseInt(duration),
+            tests: 1,
+            status: 'passed',
+          });
+        }
+      }
+    }
+  }
+
+  private parseVitestJsonOutput(jsonOutput: string): void {
+    try {
+      const parsed = JSON.parse(jsonOutput) as {
+        testResults?: Array<{
+          assertionResults?: Array<{
+            ancestorTitles?: string[];
+            title?: string;
+            duration?: number | null;
+            status?: 'passed' | 'failed' | 'skipped';
+          }>;
+        }>;
+      };
+
+      const assertionResults =
+        parsed.testResults?.flatMap(suite => suite.assertionResults ?? []) ??
+        [];
+
+      this.results.testResults.push(
+        ...assertionResults
+          .filter(result => typeof result.duration === 'number')
+          .map(result => ({
+            name: [
+              ...(result.ancestorTitles ?? []),
+              result.title ?? 'unknown test',
+            ]
+              .filter(Boolean)
+              .join(' > '),
+            duration: result.duration ?? 0,
+            tests: 1,
+            status: (result.status ?? 'passed') as
+              | 'passed'
+              | 'failed'
+              | 'skipped',
+          }))
+      );
+    } catch {
+      // Fallback parsing from console output is still available when JSON parsing fails.
     }
   }
 

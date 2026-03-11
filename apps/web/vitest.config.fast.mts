@@ -58,6 +58,7 @@ export default defineConfig({
       'tests/audit/**',
       'tests/performance/**',
       'tests/integration/**',
+      'tests/**/*.nightly.test.ts',
       'tests/product-screenshots/**',
       'node_modules/**',
       '.next/**',
