@@ -15,6 +15,11 @@ import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import {
+  resolveTestBypassUserId,
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_HEADER,
+} from '@/lib/auth/test-mode';
 import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
 import {
   COOKIE_BANNER_REQUIRED_COOKIE,
@@ -653,6 +658,13 @@ const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
 });
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (process.env.NODE_ENV === 'test') {
+    const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
+    if (testMode === TEST_AUTH_BYPASS_MODE) {
+      return handleRequest(req, resolveTestBypassUserId(req.headers));
+    }
+  }
+
   // Check if Clerk config is missing or mocked
   const clerkConfigMissing = isMockOrMissingClerkConfig();
 
