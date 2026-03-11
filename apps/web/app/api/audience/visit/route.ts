@@ -8,10 +8,10 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
-import { type DbOrTransaction, db } from '@/lib/db';
+import { type DbOrTransaction, db, doesTableExist } from '@/lib/db';
 import { audienceMembers, dailyProfileViews } from '@/lib/db/schema/analytics';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { publicVisitLimiter } from '@/lib/rate-limit';
 import { detectBot } from '@/lib/utils/bot-detection';
@@ -149,6 +149,13 @@ async function incrementDailyProfileViews(
         eq(dailyProfileViews.viewDate, viewDate)
       )
     );
+}
+
+function isMissingDailyProfileViewsTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .toLowerCase()
+    .includes('relation "daily_profile_views" does not exist');
 }
 
 export async function POST(request: NextRequest) {
@@ -291,10 +298,28 @@ export async function POST(request: NextRequest) {
       ? [{ url: resolvedReferrer.trim(), timestamp: now.toISOString() }]
       : [];
 
+    const hasDailyProfileViewsTable = await doesTableExist(
+      'daily_profile_views'
+    );
+
     await withSystemIngestionSession(async tx => {
       const viewDate = now.toISOString().slice(0, 10);
 
-      await incrementDailyProfileViews(tx, profileId, viewDate, now);
+      if (hasDailyProfileViewsTable) {
+        try {
+          await incrementDailyProfileViews(tx, profileId, viewDate, now);
+        } catch (error) {
+          if (!isMissingDailyProfileViewsTableError(error)) {
+            throw error;
+          }
+
+          await captureWarning(
+            '[audience/visit] daily_profile_views table missing; skipping aggregate write',
+            error,
+            { profileId, viewDate }
+          );
+        }
+      }
 
       const [existing] = await tx
         .select({
