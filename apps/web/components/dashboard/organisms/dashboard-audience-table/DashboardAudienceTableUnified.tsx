@@ -5,7 +5,6 @@ import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Bell,
-  BellRing,
   Copy,
   Download,
   Eye,
@@ -45,10 +44,7 @@ import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { downloadVCard } from './utils';
 import {
-  LastSeenCell,
-  MenuCell,
   QuickActionsCell,
-  renderEmailCell,
   renderLastActionCell,
   renderLtvCell,
   renderPlatformsCell,
@@ -67,18 +63,11 @@ const ICON_BELL = <Bell className='h-3.5 w-3.5' />;
 const ICON_DOWNLOAD = <Download className='h-3.5 w-3.5' />;
 const ICON_USER_MINUS = <UserMinus className='h-3.5 w-3.5' />;
 
-function getSrDescription(
-  isEmpty: boolean,
-  mode: 'members' | 'subscribers'
-): string {
+function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
-    return mode === 'members'
-      ? 'Track visitors and grow your fan base'
-      : 'Build a subscriber base for notifications';
+    return 'Track visitors and grow your fan base';
   }
-  return mode === 'members'
-    ? 'Every visitor, anonymous or identified, lives in this table.'
-    : 'Notification signups from your notification modal.';
+  return 'Every visitor, anonymous or identified, lives in this table.';
 }
 
 /**
@@ -137,42 +126,6 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
 ];
 
-/**
- * Stable column definitions for subscribers mode.
- */
-const SUBSCRIBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
-  memberColumnHelper.display({
-    id: 'select',
-    header: () => null,
-    cell: SelectCell,
-    size: 100,
-  }),
-  memberColumnHelper.accessor('displayName', {
-    id: 'user',
-    header: 'User',
-    cell: renderUserCell,
-    size: 300,
-  }),
-  memberColumnHelper.accessor('email', {
-    id: 'email',
-    header: 'Email',
-    cell: renderEmailCell,
-    size: 240,
-  }),
-  memberColumnHelper.accessor('lastSeenAt', {
-    id: 'subscribedAt',
-    header: 'Subscribed',
-    cell: LastSeenCell,
-    size: 180,
-  }),
-  memberColumnHelper.display({
-    id: 'menu',
-    header: '',
-    cell: MenuCell,
-    size: 48,
-  }),
-];
-
 /** Estimated height of each mobile card row in px. */
 const MOBILE_CARD_HEIGHT = 72;
 
@@ -184,7 +137,7 @@ const MobileCardList = memo(function MobileCardList({
   onTap,
 }: {
   rows: AudienceMember[];
-  mode: 'members' | 'subscribers';
+  mode: 'members';
   selectedMemberId: string | null;
   onTap: (member: AudienceMember) => void;
 }) {
@@ -216,7 +169,7 @@ const MobileCardList = memo(function MobileCardList({
             >
               <AudienceMobileCard
                 member={member}
-                mode={mode}
+                mode='members'
                 isSelected={selectedMemberId === member.id}
                 onTap={onTap}
               />
@@ -434,7 +387,7 @@ export const DashboardAudienceTableUnified = memo(
       [setSelectedMember, profileId, handleRemoveMember]
     );
 
-    const columns = mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
+    const columns = MEMBER_COLUMNS;
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
     const stableContextValue = useMemo(
@@ -469,18 +422,10 @@ export const DashboardAudienceTableUnified = memo(
       [selectedIds, openMenuRowId]
     );
 
-    const emptyStateHeading =
-      mode === 'members' ? 'Grow Your Audience' : 'Get Your First Subscriber';
+    const emptyStateHeading = 'Grow Your Audience';
     const emptyStateDescription =
-      mode === 'members'
-        ? 'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.'
-        : 'Encourage fans to tap the bell icon on your profile to get notified when you post new content or updates.';
-    const emptyStateIcon =
-      mode === 'members' ? (
-        <Users className='h-6 w-6' aria-hidden='true' />
-      ) : (
-        <BellRing className='h-6 w-6' aria-hidden='true' />
-      );
+      'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.';
+    const emptyStateIcon = <Users className='h-6 w-6' aria-hidden='true' />;
     const emptyStatePrimaryAction = profileUrl
       ? {
           label: copiedProfileLink ? 'Link copied' : 'Copy profile link',
@@ -493,8 +438,7 @@ export const DashboardAudienceTableUnified = memo(
           href: APP_ROUTES.PROFILE,
         };
     const emptyStateSecondaryAction = {
-      label:
-        mode === 'members' ? 'Learn about audience' : 'Learn about subscribers',
+      label: 'Learn about audience',
       href: '/support',
     };
 
@@ -569,9 +513,7 @@ export const DashboardAudienceTableUnified = memo(
             <h1 className='sr-only'>
               {rows.length === 0 ? 'Audience' : 'Audience CRM'}
             </h1>
-            <p className='sr-only'>
-              {getSrDescription(rows.length === 0, mode)}
-            </p>
+            <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
             {/* Subheader with filter dropdown and export */}
             <AudienceTableSubheader
@@ -602,7 +544,7 @@ export const DashboardAudienceTableUnified = memo(
                     {/* Mobile card list (virtualized) */}
                     <MobileCardList
                       rows={rows}
-                      mode={mode}
+                      mode='members'
                       selectedMemberId={selectedMember?.id ?? null}
                       onTap={setSelectedMember}
                     />
@@ -625,7 +567,7 @@ export const DashboardAudienceTableUnified = memo(
                         getRowId={row => row.id}
                         enableVirtualization={true}
                         enableKeyboardNavigation={true}
-                        hideHeader={mode === 'members'}
+                        hideHeader={true}
                         minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
                         className='text-[13px]'
                         getRowClassName={getRowClassName}

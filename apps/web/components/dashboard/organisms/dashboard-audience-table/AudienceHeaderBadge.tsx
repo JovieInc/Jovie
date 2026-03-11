@@ -1,6 +1,6 @@
 'use client';
 
-import { BellRing, Ghost, Users } from 'lucide-react';
+import { Ghost, UserCheck, Users } from 'lucide-react';
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import type { AudienceView } from './types';
@@ -19,7 +19,7 @@ const VIEW_OPTIONS: {
   Icon: typeof Users;
 }[] = [
   { value: 'all', Icon: Users },
-  { value: 'subscribers', Icon: BellRing },
+  { value: 'identified', Icon: UserCheck },
   { value: 'anonymous', Icon: Ghost },
 ];
 
@@ -35,12 +35,11 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
       : null;
 
   const labels: Record<AudienceView, string> = {
-    all:
-      totalAudienceCount !== null
-        ? `All Audience (${totalAudienceCount})`
-        : 'All Audience',
-    subscribers:
-      subscriberCount !== null ? `Followers (${subscriberCount})` : 'Followers',
+    all: totalAudienceCount !== null ? `All (${totalAudienceCount})` : 'All',
+    identified:
+      subscriberCount !== null
+        ? `Identified (${subscriberCount})`
+        : 'Identified',
     anonymous:
       anonymousCount !== null ? `Anonymous (${anonymousCount})` : 'Anonymous',
   };
