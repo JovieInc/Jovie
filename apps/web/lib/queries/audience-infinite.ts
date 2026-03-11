@@ -23,9 +23,6 @@ interface AudiencePageResponse {
   nextCursor?: string | null;
 }
 
-/** Opaque cursor token for keyset pagination. */
-type PageParam = string;
-
 interface UseAudienceInfiniteQueryParams {
   profileId: string;
   view: AudienceView;
@@ -54,9 +51,9 @@ export function useAudienceInfiniteQuery({
   return useInfiniteQuery<
     AudiencePageResponse,
     Error,
-    InfiniteData<AudiencePageResponse, PageParam>,
+    InfiniteData<AudiencePageResponse, string>,
     unknown[],
-    PageParam
+    string
   >({
     queryKey: [
       ...queryKeys.audience.members(profileId, { ...filterParams, view }),
@@ -95,11 +92,11 @@ export function useAudienceInfiniteQuery({
         ? lastPage.nextCursor
         : undefined;
     },
-    initialPageParam: 'first' as PageParam,
+    initialPageParam: 'first' as string,
     initialData: initialData
       ? {
           pages: [{ rows: initialData.rows, total: initialData.total }],
-          pageParams: ['first' as PageParam],
+          pageParams: ['first' as string],
         }
       : undefined,
     placeholderData: keepPreviousData,
