@@ -70,6 +70,8 @@ export async function GET(request: Request) {
     // Clamp date range to user's plan retention limit.
     // Cache the entitlement lookup (5 min TTL) to avoid repeated billing
     // round-trips on every analytics fetch.
+    const entitlementsTimer = 'db:dashboard-analytics:entitlementsRange';
+    console.time(entitlementsTimer);
     const range = await cacheQuery(
       `analytics-range:${userId}`,
       async () => {
@@ -84,6 +86,7 @@ export async function GET(request: Request) {
       },
       { ttlSeconds: 5 * 60 }
     );
+    console.timeEnd(entitlementsTimer);
 
     const key = `dashboard-analytics:${userId}:${view}:${range}`;
 
@@ -91,6 +94,8 @@ export async function GET(request: Request) {
       await invalidateCache(key);
     }
 
+    const analyticsTimer = 'db:dashboard-analytics:getUserDashboardAnalytics';
+    console.time(analyticsTimer);
     const payload = await cacheQuery(
       key,
       async () => {
@@ -105,6 +110,7 @@ export async function GET(request: Request) {
       },
       { ttlSeconds: 60 }
     );
+    console.timeEnd(analyticsTimer);
 
     return NextResponse.json(payload, {
       status: 200,

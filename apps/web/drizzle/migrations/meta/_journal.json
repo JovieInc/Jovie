@@ -428,6 +428,13 @@
       "when": 1772938561227,
       "tag": "0060_daily_profile_views_rollup",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1773197224777,
+      "tag": "0061_social_links_profile_platform_index",
+      "breakpoints": true
     }
   ]
 }
