@@ -113,23 +113,23 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               onClick={() =>
                 setFormData({
                   ...formData,
-                  hide_branding: !formData.hide_branding,
+                  hideBranding: !formData.hideBranding,
                 })
               }
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base ${
-                formData.hide_branding ? 'bg-surface-3' : 'bg-accent'
+                formData.hideBranding ? 'bg-surface-3' : 'bg-accent'
               }`}
               disabled={loading}
-              aria-pressed={!formData.hide_branding}
+              aria-pressed={!formData.hideBranding}
               aria-label={
-                formData.hide_branding
+                formData.hideBranding
                   ? 'Enable Jovie branding'
                   : 'Disable Jovie branding'
               }
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-surface-1 transition-transform ${
-                  formData.hide_branding ? 'translate-x-1' : 'translate-x-6'
+                  formData.hideBranding ? 'translate-x-1' : 'translate-x-6'
                 }`}
                 aria-hidden='true'
               />

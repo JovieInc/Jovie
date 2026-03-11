@@ -1,3 +1,7 @@
+import type {
+  ProfileIdentityFields,
+  ProfileSaveState,
+} from '@/components/profile/contracts';
 import type { Artist } from '@/types/db';
 
 export interface ProfileFormProps {
@@ -5,12 +9,10 @@ export interface ProfileFormProps {
   readonly onUpdate: (artist: Artist) => void;
 }
 
-export interface ProfileFormData {
-  name: string;
-  tagline: string;
-  image_url: string;
-  hide_branding: boolean;
-}
+export type ProfileFormData = Pick<
+  ProfileIdentityFields,
+  'name' | 'tagline' | 'imageUrl' | 'hideBranding'
+>;
 
 export interface UseProfileFormReturn {
   formRef: React.RefObject<HTMLFormElement | null>;
@@ -26,3 +28,5 @@ export interface UseProfileFormReturn {
   setFormData: React.Dispatch<React.SetStateAction<ProfileFormData>>;
   handleSubmit: (e: React.FormEvent) => Promise<void>;
 }
+
+export type ProfileFormSaveState = ProfileSaveState;
