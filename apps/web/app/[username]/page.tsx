@@ -706,96 +706,67 @@ export default async function ArtistPage({
   );
 }
 
-// Generate metadata for the page with comprehensive SEO
-export async function generateMetadata({
-  params,
-  searchParams,
-}: Props): Promise<Metadata> {
-  const { username } = await params;
-  const resolvedSearchParams = await searchParams;
-  const mode = resolvedSearchParams?.mode ?? 'profile';
+const PROFILE_NOT_FOUND_METADATA: Metadata = {
+  title: 'Profile Not Found',
+  description: 'The requested profile could not be found.',
+};
 
-  if (mode === 'listen') {
-    const lightweightProfile = await getLightweightProfile(username);
+function buildListenModeMetadata(profile: CreatorProfile): Metadata {
+  const artistName = profile.display_name || profile.username;
+  const profileUrl = `${BASE_URL}/${profile.username}?mode=listen`;
 
-    if (!lightweightProfile) {
-      return {
-        title: 'Profile Not Found',
-        description: 'The requested profile could not be found.',
-      };
-    }
-
-    const profile = lightweightProfile.profile;
-    const artistName = profile.display_name || profile.username;
-    const profileUrl = `${BASE_URL}/${profile.username}?mode=listen`;
-
-    return {
+  return {
+    title: `Listen to ${artistName}`,
+    description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
+    metadataBase: new URL(BASE_URL),
+    alternates: {
+      canonical: profileUrl,
+    },
+    openGraph: {
+      type: 'profile',
       title: `Listen to ${artistName}`,
       description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
-      metadataBase: new URL(BASE_URL),
-      alternates: {
-        canonical: profileUrl,
-      },
-      openGraph: {
-        type: 'profile',
-        title: `Listen to ${artistName}`,
-        description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
-        url: profileUrl,
-        siteName: 'Jovie',
-        locale: 'en_US',
-        images: [
-          {
-            url: getProfileOgImageUrl(profile.username),
-            width: 1200,
-            height: 630,
-            alt: `${artistName} listen page`,
-          },
-        ],
-      },
-      twitter: {
-        card: 'summary_large_image',
-        title: `Listen to ${artistName}`,
-        description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
-        creator: '@jovieapp',
-        site: '@jovieapp',
-        images: [
-          {
-            url: getProfileOgImageUrl(profile.username),
-            alt: `${artistName} listen page`,
-          },
-        ],
-      },
-    };
+      url: profileUrl,
+      siteName: 'Jovie',
+      locale: 'en_US',
+      images: [
+        {
+          url: getProfileOgImageUrl(profile.username),
+          width: 1200,
+          height: 630,
+          alt: `${artistName} listen page`,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `Listen to ${artistName}`,
+      description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
+      creator: '@jovieapp',
+      site: '@jovieapp',
+      images: [
+        {
+          url: getProfileOgImageUrl(profile.username),
+          alt: `${artistName} listen page`,
+        },
+      ],
+    },
+  };
+}
+
+function buildGenreContext(genres: string[] | null): string {
+  if (!genres || genres.length === 0) {
+    return '';
   }
 
-  const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status } = profileResult;
+  return ` | ${genres.slice(0, 2).join(', ')} Artist`;
+}
 
-  if (status === 'error') {
-    return {
-      title: 'Profile temporarily unavailable',
-      description: 'We are working to restore this profile. Please try again.',
-    };
-  }
-
-  if (!profile) {
-    return {
-      title: 'Profile Not Found',
-      description: 'The requested profile could not be found.',
-    };
-  }
-
-  const artistName = profile.display_name || profile.username;
-  const profileUrl = `${BASE_URL}/${profile.username}`;
-
-  // Build SEO-optimized title with genre context if available
-  const genreContext =
-    genres && genres.length > 0
-      ? ` | ${genres.slice(0, 2).join(', ')} Artist`
-      : '';
-  const title = `${artistName}${genreContext} - Music & Links`;
-
-  // Build rich description with bio and genre information
+function buildProfileDescription(
+  profile: CreatorProfile,
+  artistName: string,
+  genres: string[] | null
+): string {
   const bioSnippet = profile.bio
     ? profile.bio.slice(0, 155).trim()
     : `Discover ${artistName}'s music`;
@@ -803,9 +774,19 @@ export async function generateMetadata({
     genres && genres.length > 0
       ? `. ${genres.slice(0, 3).join(', ')} artist`
       : '';
-  const description = `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more on Jovie.`;
 
-  // Build dynamic keywords based on artist data
+  return `${bioSnippet}${profile.bio && profile.bio.length > 155 ? '...' : ''}${genreText}. Stream on Spotify, Apple Music & more on Jovie.`;
+}
+
+function buildProfileMetadata(
+  profile: CreatorProfile,
+  genres: string[] | null
+): Metadata {
+  const artistName = profile.display_name || profile.username;
+  const profileUrl = `${BASE_URL}/${profile.username}`;
+  const title = `${artistName}${buildGenreContext(genres)} - Music & Links`;
+  const description = buildProfileDescription(profile, artistName, genres);
+
   const baseKeywords = [
     artistName,
     `${artistName} music`,
@@ -878,4 +859,37 @@ export async function generateMetadata({
       ...(profile.is_verified && { 'profile:verified': 'true' }),
     },
   };
+}
+
+// Generate metadata for the page with comprehensive SEO
+export async function generateMetadata({
+  params,
+  searchParams,
+}: Props): Promise<Metadata> {
+  const { username } = await params;
+  const resolvedSearchParams = await searchParams;
+  const mode = resolvedSearchParams?.mode ?? 'profile';
+
+  if (mode === 'listen') {
+    const lightweightProfile = await getLightweightProfile(username);
+    return lightweightProfile
+      ? buildListenModeMetadata(lightweightProfile.profile)
+      : PROFILE_NOT_FOUND_METADATA;
+  }
+
+  const profileResult = await getProfileAndLinks(username);
+  const { profile, genres, status } = profileResult;
+
+  if (status === 'error') {
+    return {
+      title: 'Profile temporarily unavailable',
+      description: 'We are working to restore this profile. Please try again.',
+    };
+  }
+
+  if (!profile) {
+    return PROFILE_NOT_FOUND_METADATA;
+  }
+
+  return buildProfileMetadata(profile, genres);
 }
