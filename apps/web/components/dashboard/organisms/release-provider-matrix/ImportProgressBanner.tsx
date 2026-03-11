@@ -6,12 +6,14 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 interface ImportProgressBannerProps {
   readonly artistName: string | null;
   readonly importedCount: number;
+  readonly visible?: boolean;
   readonly compact?: boolean;
 }
 
 export const ImportProgressBanner = memo(function ImportProgressBanner({
   artistName,
   importedCount,
+  visible = true,
   compact = false,
 }: ImportProgressBannerProps) {
   if (compact) {
@@ -31,8 +33,16 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
 
   return (
     <div
-      className='mx-4 mt-2 flex items-center gap-3 rounded-lg border border-[#1DB954]/20 bg-[#1DB954]/5 px-4 py-3'
-      aria-live='polite'
+      data-testid='spotify-import-progress-banner'
+      className='mx-4 mt-2 flex items-center gap-3 rounded-lg border border-[#1DB954]/20 bg-[#1DB954]/5 px-4 py-3 transition-opacity duration-200'
+      aria-hidden={!visible}
+      aria-live={visible ? 'polite' : 'off'}
+      inert={!visible}
+      style={{
+        visibility: visible ? 'visible' : 'hidden',
+        opacity: visible ? 1 : 0,
+        pointerEvents: visible ? 'auto' : 'none',
+      }}
     >
       <SocialIcon platform='spotify' className='h-5 w-5 shrink-0' />
       <div className='flex min-w-0 flex-1 flex-col gap-1'>
