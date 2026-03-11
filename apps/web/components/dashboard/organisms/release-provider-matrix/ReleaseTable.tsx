@@ -136,13 +136,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)';
+          'bg-(--linear-bg-surface-1) shadow-[inset_1px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1)';
+          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-150 ease-out';
+          'bg-transparent hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) transition-[background-color,box-shadow] duration-150 ease-out';
       }
 
       const refreshClassName = isRefreshing
@@ -152,7 +152,14 @@ export function ReleaseTable({
         ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
         : '';
 
-      return ['rounded-md', baseClassName, refreshClassName, flashClassName]
+      return [
+        'rounded-[8px]',
+        'focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        'data-[state=selected]:bg-(--linear-bg-surface-1)',
+        baseClassName,
+        refreshClassName,
+        flashClassName,
+      ]
         .filter(Boolean)
         .join(' ');
     },
@@ -210,8 +217,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 280,
-      minSize: 240,
+      size: 248,
+      minSize: 216,
       meta: { className: 'hidden sm:table-cell' },
     });
 

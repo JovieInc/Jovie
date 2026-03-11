@@ -121,7 +121,10 @@ export function SidebarLinkRow({
         type='button'
         onClick={handleOpen}
         disabled={!hasUrl}
-        className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-surface-3')}
+        className={cn(
+          SWIPE_ACTION_BUTTON_CLASS,
+          'bg-(--linear-bg-surface-2) text-(--linear-text-primary)'
+        )}
         aria-label={`Open ${label}`}
       >
         <ExternalLink className='h-4 w-4' aria-hidden='true' />
@@ -152,23 +155,25 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex items-center justify-between lg:rounded-md',
-          'px-4 py-3 lg:px-3 lg:py-1.5',
-          'active:bg-surface-2/50 lg:active:bg-transparent lg:hover:bg-interactive-hover',
-          'transition-colors',
+          'group flex items-center justify-between rounded-[8px]',
+          'px-4 py-3 lg:px-3 lg:py-2',
+          'active:bg-(--linear-bg-surface-1) lg:active:bg-(--linear-bg-surface-1) lg:hover:bg-(--linear-bg-surface-1)',
+          'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
           !isVisible && 'opacity-60',
           className
         )}
         data-testid={testId}
       >
         {/* Left: Icon + Label */}
-        <div className='flex items-center gap-3 lg:gap-2.5 min-w-0 flex-1'>
+        <div className='flex min-w-0 flex-1 items-center gap-3 lg:gap-2.5'>
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
-          <span className='text-[13px] text-secondary-token'>{label}</span>
+          <span className='text-[13px] text-(--linear-text-secondary)'>
+            {label}
+          </span>
           {badge && (
-            <span className='text-[10px] text-tertiary-token shrink-0'>
+            <span className='shrink-0 text-[10px] text-(--linear-text-tertiary)'>
               {badge}
             </span>
           )}
@@ -188,10 +193,10 @@ export function SidebarLinkRow({
               <button
                 type='button'
                 className={cn(
-                  'p-1 rounded text-tertiary-token',
-                  'hover:text-primary-token hover:bg-surface-2',
-                  'transition-colors focus-visible:outline-none',
-                  'focus-visible:ring-2 focus-visible:ring-interactive'
+                  'rounded-[7px] border border-transparent p-1 text-(--linear-text-tertiary)',
+                  'hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)',
+                  'transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
+                  'focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 )}
                 aria-label={`Actions for ${label}`}
               >

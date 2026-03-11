@@ -2,10 +2,10 @@
 
 import { Button, TooltipShortcut } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
-export const ACTION_BAR_BUTTON_CLASS =
-  'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1';
+export const ACTION_BAR_BUTTON_CLASS = APP_CONTROL_BUTTON_CLASS;
 
 interface ActionBarProps {
   readonly children: ReactNode;
@@ -14,7 +14,9 @@ interface ActionBarProps {
 
 export function ActionBar({ children, className }: ActionBarProps) {
   return (
-    <div className={cn('flex items-center gap-2', className)}>{children}</div>
+    <div className={cn('flex items-center gap-[var(--linear-app-toolbar-gap)]', className)}>
+      {children}
+    </div>
   );
 }
 

@@ -90,7 +90,7 @@ export function SidebarInstallBanner() {
 
     return (
       <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-        <div className='relative rounded-md border border-sidebar-border bg-sidebar-accent p-2.5'>
+        <div className='relative rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/35 p-2 shadow-none'>
           <button
             type='button'
             aria-label='Dismiss version update banner'
@@ -101,9 +101,9 @@ export function SidebarInstallBanner() {
           </button>
 
           <div className='flex items-start gap-2 pr-4'>
-            <RefreshCw className='mt-0.5 size-3.5 shrink-0 text-sidebar-item-foreground' />
+            <RefreshCw className='mt-0.5 size-3.5 shrink-0 text-sidebar-item-icon' />
             <div className='min-w-0'>
-              <p className='text-app font-medium text-sidebar-item-foreground'>
+              <p className='text-[12px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
                 {title}
               </p>
               <p className='mt-0.5 text-2xs leading-snug text-sidebar-muted'>
@@ -112,7 +112,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={reload}
-                className='mt-1.5 inline-flex h-6 items-center rounded px-2 text-2xs font-medium text-sidebar-item-foreground bg-surface-3 transition-colors duration-normal hover:bg-interactive-hover'
+                className='mt-1.5 inline-flex h-6 items-center rounded-[7px] border border-sidebar-border/60 px-2 text-2xs font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active'
               >
                 Reload
               </button>
@@ -128,7 +128,7 @@ export function SidebarInstallBanner() {
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-      <div className='relative rounded-md border border-sidebar-border bg-sidebar-accent p-2.5'>
+      <div className='relative rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/35 p-2 shadow-none'>
         <button
           type='button'
           aria-label='Dismiss install banner'
@@ -139,9 +139,9 @@ export function SidebarInstallBanner() {
         </button>
 
         <div className='flex items-start gap-2 pr-4'>
-          <Download className='mt-0.5 size-3.5 shrink-0 text-sidebar-item-foreground' />
+          <Download className='mt-0.5 size-3.5 shrink-0 text-sidebar-item-icon' />
           <div className='min-w-0'>
-            <p className='text-app font-medium text-sidebar-item-foreground'>
+            <p className='text-[12px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
               {TOAST_MESSAGES.PWA_INSTALL}
             </p>
             <p className='mt-0.5 text-2xs leading-snug text-sidebar-muted'>
@@ -153,7 +153,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={install}
-                className='mt-1.5 inline-flex h-6 items-center rounded px-2 text-2xs font-medium text-sidebar-item-foreground bg-surface-3 transition-colors duration-normal hover:bg-interactive-hover'
+                className='mt-1.5 inline-flex h-6 items-center rounded-[7px] border border-sidebar-border/60 px-2 text-2xs font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active'
               >
                 Install
               </button>

@@ -1,7 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 
 interface ImportProgressBannerProps {
   readonly artistName: string | null;
@@ -44,7 +44,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
         pointerEvents: visible ? 'auto' : 'none',
       }}
     >
-      <SocialIcon platform='spotify' className='h-5 w-5 shrink-0' />
+      <ProviderIcon provider='spotify' className='h-5 w-5' />
       <div className='flex min-w-0 flex-1 flex-col gap-1'>
         <div className='flex items-center gap-2 text-[13px] text-primary-token'>
           <span className='truncate'>

@@ -48,10 +48,10 @@ export function ProviderCopyButton({
         void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
       }}
       className={cn(
-        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] transition-colors',
+        'group/btn inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
         isCopied
-          ? 'bg-green-100 text-success dark:bg-green-900/30 dark:text-success'
-          : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+          ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+          : 'text-(--linear-text-secondary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
       )}
     >
       <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
@@ -61,7 +61,7 @@ export function ProviderCopyButton({
             'absolute h-3.5 w-3.5 transition-all duration-150',
             isCopied
               ? 'scale-50 opacity-0'
-              : 'scale-100 opacity-0 group-hover/btn:opacity-100'
+              : 'scale-100 opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
           )}
           aria-hidden='true'
         />

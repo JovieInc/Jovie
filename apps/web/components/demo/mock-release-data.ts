@@ -7,6 +7,10 @@
  * All data is static — no DB, no auth, no server actions.
  */
 
+import type {
+  ReleaseSidebarAnalytics,
+  ReleaseSidebarTrack,
+} from '@/components/organisms/release-sidebar/types';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import type { AudienceMember } from '@/types';
 
@@ -59,6 +63,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-take-me-over',
     title: 'Take Me Over',
+    artistNames: ['Tim White', 'Sora Vale'],
     releaseDate: '2014-10-01',
     artworkUrl:
       'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
@@ -80,6 +85,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-never-say-a-word',
     title: 'Never Say A Word',
+    artistNames: ['Tim White'],
     releaseDate: '2024-01-15',
     artworkUrl:
       'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
@@ -101,6 +107,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-deep-end',
     title: 'The Deep End',
+    artistNames: ['Tim White', 'Aria North', 'Sora Vale'],
     releaseDate: '2017-02-10',
     artworkUrl:
       'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
@@ -122,6 +129,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-01',
     title: 'Night Drive',
+    artistNames: ['Sora Vale'],
     releaseDate: '2026-02-18',
     artworkUrl: undefined,
     slug: 'night-drive',
@@ -144,6 +152,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-02',
     title: 'Neon Nights',
+    artistNames: ['Sora Vale', 'Noah Grey'],
     releaseDate: '2025-10-15',
     artworkUrl: undefined,
     slug: 'neon-nights',
@@ -166,6 +175,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-03',
     title: 'The Sound',
+    artistNames: ['Sora Vale'],
     releaseDate: '2025-03-22',
     artworkUrl: undefined,
     slug: 'the-sound',
@@ -186,6 +196,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-04',
     title: 'Quiet Hours',
+    artistNames: ['Sora Vale'],
     releaseDate: '2024-08-10',
     artworkUrl: undefined,
     slug: 'quiet-hours',
@@ -206,6 +217,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-05',
     title: 'Static Skies',
+    artistNames: ['Sora Vale', 'Ivy Chen'],
     releaseDate: '2026-01-30',
     artworkUrl: undefined,
     slug: 'static-skies',
@@ -226,6 +238,7 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     profileId: 'demo-profile',
     id: 'rel-06',
     title: 'Afterglow (Deluxe)',
+    artistNames: ['Sora Vale'],
     releaseDate: '2026-02-23',
     artworkUrl: undefined,
     slug: 'afterglow-deluxe',
@@ -379,6 +392,61 @@ export const DEMO_RELEASE_VIEW_MODELS: ReleaseViewModel[] = [
     ),
   },
 ];
+
+function makeDemoTracks(
+  release: ReleaseViewModel,
+  count = Math.min(Math.max(release.totalTracks, 1), 6)
+): ReleaseSidebarTrack[] {
+  return Array.from({ length: count }, (_, index) => {
+    const trackNumber = index + 1;
+    return {
+      id: `${release.id}-track-${trackNumber}`,
+      releaseId: release.id,
+      title: count === 1 ? release.title : `${release.title} ${trackNumber}`,
+      slug: `${release.slug}-track-${trackNumber}`,
+      smartLinkPath: `${release.smartLinkPath}/tracks/${trackNumber}`,
+      trackNumber,
+      discNumber: 1,
+      durationMs:
+        release.totalDurationMs && count > 0
+          ? Math.round(release.totalDurationMs / count)
+          : 180_000,
+      isrc: `${release.primaryIsrc ?? 'USRC00000000'}${trackNumber}`,
+      isExplicit: release.isExplicit,
+      previewUrl: release.previewUrl ?? null,
+      audioUrl: null,
+      audioFormat: null,
+      providers: release.providers,
+    };
+  });
+}
+
+function makeDemoAnalytics(
+  release: ReleaseViewModel,
+  index: number
+): ReleaseSidebarAnalytics {
+  const totalClicks = 480 + index * 137;
+  const providerClicks = release.providers.slice(0, 4).map((provider, i) => ({
+    provider: provider.key,
+    clicks: Math.max(24, Math.round(totalClicks / (i + 2.4))),
+  }));
+
+  return {
+    totalClicks,
+    last7DaysClicks: Math.max(32, Math.round(totalClicks * 0.18)),
+    providerClicks,
+  };
+}
+
+export const DEMO_RELEASE_SIDEBAR_FIXTURES = Object.fromEntries(
+  DEMO_RELEASE_VIEW_MODELS.map((release, index) => [
+    release.id,
+    {
+      analytics: makeDemoAnalytics(release, index),
+      tracks: makeDemoTracks(release),
+    },
+  ])
+);
 
 // ── Audience members (50+ entries for rich demo) ────────────────────────────
 

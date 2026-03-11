@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 export interface DashboardHeaderActionButtonProps {
@@ -22,20 +22,19 @@ export function DashboardHeaderActionButton({
   className,
 }: DashboardHeaderActionButtonProps) {
   return (
-    <Button
-      variant='ghost'
-      size='icon'
+    <AppIconButton
       onClick={onClick}
       aria-label={ariaLabel}
       aria-pressed={pressed}
       disabled={disabled}
       className={cn(
-        'h-8 w-8 rounded-md border border-transparent bg-transparent text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover [&_svg]:h-4 [&_svg]:w-4',
-        pressed && 'bg-surface-2 text-primary-token',
+        'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)',
+        pressed &&
+          'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)',
         className
       )}
     >
       {icon}
-    </Button>
+    </AppIconButton>
   );
 }

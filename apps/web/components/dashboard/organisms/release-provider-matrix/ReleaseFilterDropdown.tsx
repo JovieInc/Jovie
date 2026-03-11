@@ -102,7 +102,7 @@ function SearchInput({
   return (
     <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
       <div className='relative'>
-        <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+        <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)' />
         <input
           ref={inputRef}
           type='text'
@@ -111,9 +111,10 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-[13px]',
-            'text-primary-token placeholder:text-tertiary-token',
-            'focus-visible:outline-none focus-visible:ring-0'
+            'w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px]',
+            'text-primary-token placeholder:text-(--linear-text-tertiary)',
+            'transition-[background-color,border-color,box-shadow] duration-150',
+            'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
           )}
           aria-label={placeholder}
         />
@@ -121,7 +122,7 @@ function SearchInput({
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-tertiary-token hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -153,21 +154,21 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-md bg-surface-2/80 text-[11px]'>
+    <div className='flex items-center gap-0.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[11px]'>
       <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
         {icon && (
-          <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
+          <span className='flex h-3.5 w-3.5 items-center justify-center text-(--linear-text-tertiary)'>
             {icon}
           </span>
         )}
-        <span className='text-tertiary-token'>{groupLabel}</span>
-        <span className='text-tertiary-token'>is</span>
+        <span className='text-(--linear-text-tertiary)'>{groupLabel}</span>
+        <span className='text-(--linear-text-tertiary)'>is</span>
         <span className='font-[510] text-primary-token'>{displayValue}</span>
       </div>
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-2) hover:text-primary-token focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -242,19 +243,19 @@ function SubmenuCheckboxItem({
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
           checked
             ? 'border-primary bg-primary text-white'
-            : 'border-subtle bg-surface-2'
+            : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
         )}
       >
         {checked && <Check className='h-3 w-3' />}
       </span>
       {icon && (
-        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
+        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-(--linear-text-tertiary)'>
           {icon}
         </span>
       )}
       <span className='flex-1 truncate text-left'>{label}</span>
       {count !== undefined && (
-        <span className='text-[10px] tabular-nums text-tertiary-token'>
+        <span className='text-[10px] tabular-nums text-(--linear-text-tertiary)'>
           {count}
         </span>
       )}
@@ -297,7 +298,7 @@ function VirtualizedLabelList({
   if (options.length === 0) {
     return (
       <div className='flex-1 overflow-y-auto p-1'>
-        <div className='py-6 text-center text-[13px] text-tertiary-token'>
+        <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
           {emptyMessage}
         </div>
       </div>
@@ -492,7 +493,7 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
+                'h-7 gap-1.5 rounded-md border border-transparent text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token',
                 buttonClassName
               )}
             >
@@ -523,7 +524,7 @@ export function ReleaseFilterDropdown({
           {/* Categories List */}
           <div className='flex-1 overflow-y-auto p-1'>
             {filteredCategories.length === 0 ? (
-              <div className='py-6 text-center text-[13px] text-tertiary-token'>
+              <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
                 No filters found
               </div>
             ) : (
@@ -571,7 +572,7 @@ export function ReleaseFilterDropdown({
                       <div className='flex items-center gap-2'>
                         <Icon
                           name='Building2'
-                          className='h-3.5 w-3.5 text-tertiary-token'
+                          className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
@@ -619,7 +620,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='text-tertiary-token hover:text-primary-token'
+                  className='text-(--linear-text-tertiary) hover:text-primary-token'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

@@ -50,8 +50,11 @@ const ACTION_ICONS: Record<ActivityAction, typeof Plus> = {
 function ActivityIcon({ action }: { readonly action: ActivityAction }) {
   const IconComponent = ACTION_ICONS[action] ?? Plus;
   return (
-    <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/[0.05]'>
-      <IconComponent className='h-3 w-3 text-tertiary-token' aria-hidden />
+    <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)] transition-colors group-hover:border-(--linear-border-default)'>
+      <IconComponent
+        className='h-3 w-3 text-(--linear-text-tertiary)'
+        aria-hidden
+      />
     </div>
   );
 }
@@ -59,13 +62,17 @@ function ActivityIcon({ action }: { readonly action: ActivityAction }) {
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (
-    <div className='group flex items-start gap-3 py-1.5'>
+    <div className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
+      <div
+        aria-hidden='true'
+        className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle) group-last:hidden'
+      />
       <ActivityIcon action={event.action} />
       <div className='min-w-0 flex-1'>
-        <p className='text-[13px] leading-[18px] text-secondary-token'>
+        <p className='text-[13px] leading-[18px] tracking-[-0.01em] text-(--linear-text-secondary)'>
           {event.description}
         </p>
-        <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-quaternary-token'>
+        <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-tertiary)'>
           {isSystem && (
             <>
               <Bot className='h-3 w-3' aria-hidden />
@@ -104,11 +111,7 @@ export function ActivityFeed({
   );
 
   return (
-    <div
-      className='divide-y divide-white/[0.05]'
-      role='feed'
-      aria-label='Activity feed'
-    >
+    <div className='space-y-1' role='feed' aria-label='Activity feed'>
       {sorted.map(event => (
         <ActivityEventRow key={event.id} event={event} />
       ))}

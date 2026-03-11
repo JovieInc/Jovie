@@ -6,11 +6,9 @@
  * Search input with debouncing powered by centralized TanStack Pacer hooks.
  */
 
-import { Input } from '@jovie/ui';
-import { Search } from 'lucide-react';
 import { useEffect } from 'react';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { useDebouncedInput } from '@/lib/pacer/hooks';
-import { cn } from '@/lib/utils';
 
 export interface TableSearchBarProps
   extends Readonly<{
@@ -31,7 +29,7 @@ export function TableSearchBar({
   const {
     value: localValue,
     setValue,
-    onChange: handleInputChange,
+    clear,
   } = useDebouncedInput({
     initialValue: value,
     delay: debounceMs,
@@ -44,15 +42,16 @@ export function TableSearchBar({
   }, [value, setValue]);
 
   return (
-    <div className={cn('relative flex items-center', className)}>
-      <Search className='absolute left-3 h-4 w-4 text-tertiary-token pointer-events-none' />
-      <Input
-        type='search'
-        value={localValue}
-        onChange={handleInputChange}
-        placeholder={placeholder}
-        className='pl-9 h-9 text-sm'
-      />
-    </div>
+    <AppSearchField
+      value={localValue}
+      onChange={setValue}
+      onClear={() => {
+        clear();
+        onChange('');
+      }}
+      placeholder={placeholder}
+      ariaLabel={placeholder}
+      className={className}
+    />
   );
 }

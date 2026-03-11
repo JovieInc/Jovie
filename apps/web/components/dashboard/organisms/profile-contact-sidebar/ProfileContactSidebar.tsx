@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, CommonDropdown, Label, SegmentControl } from '@jovie/ui';
+import { Button, CommonDropdown, Label } from '@jovie/ui';
 import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -12,7 +12,7 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import {
   useAvatarMutation,
@@ -402,11 +402,10 @@ export function ProfileContactSidebar() {
       }
       tabs={
         <div className='flex items-center gap-1.5'>
-          <SegmentControl
+          <DrawerTabs
             value={resolvedCategory}
             onValueChange={setSelectedCategory}
             options={PROFILE_TAB_OPTIONS}
-            size='sm'
             className='flex-1'
             aria-label='Profile sidebar view'
           />

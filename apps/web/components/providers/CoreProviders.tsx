@@ -32,10 +32,10 @@ function ThemeKeyboardShortcut() {
     FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
     false
   );
+  const canPreviewLightMode = env.IS_DEV || isLightModeEnabled;
 
   useEffect(() => {
-    // Only register theme keyboard shortcut when light mode feature flag is on
-    if (!isLightModeEnabled) return;
+    if (!canPreviewLightMode) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
@@ -51,7 +51,7 @@ function ThemeKeyboardShortcut() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resolvedTheme, setTheme, isLightModeEnabled]);
+  }, [resolvedTheme, setTheme, canPreviewLightMode]);
 
   return null;
 }
@@ -89,6 +89,11 @@ function CoreProvidersInner({
   usePacer: boolean;
   initialThemeMode: ThemeMode;
 }) {
+  const isLightModeEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
+    false
+  );
+  const canPreviewLightMode = env.IS_DEV || isLightModeEnabled;
   // Handle chunk load errors gracefully (common with version mismatches)
   useChunkErrorHandler();
 
@@ -150,9 +155,9 @@ function CoreProvidersInner({
   const content = (
     <ThemeProvider
       attribute='class'
-      forcedTheme='dark'
+      forcedTheme={canPreviewLightMode ? undefined : 'dark'}
       defaultTheme='dark'
-      enableSystem={false}
+      enableSystem={canPreviewLightMode}
       disableTransitionOnChange
       storageKey='jovie-theme'
     >

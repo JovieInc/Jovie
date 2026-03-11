@@ -78,16 +78,18 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-md bg-surface-2/80 text-[11px]'>
+    <div className='flex items-center gap-0.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[11px]'>
       <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
-        <span className='text-tertiary-token'>{groupLabel}</span>
-        <span className='text-tertiary-token'>is</span>
-        <span className='font-[510] text-primary-token'>{displayValue}</span>
+        <span className='text-(--linear-text-tertiary)'>{groupLabel}</span>
+        <span className='text-(--linear-text-tertiary)'>is</span>
+        <span className='font-[510] text-(--linear-text-primary)'>
+          {displayValue}
+        </span>
       </div>
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-md px-1.5 py-1 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-0)'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -142,7 +144,7 @@ export function AudienceFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
+                'h-7 gap-1.5 rounded-[7px] border border-transparent text-(--linear-text-secondary) transition-colors duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
                 buttonClassName
               )}
             >

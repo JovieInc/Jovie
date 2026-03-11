@@ -27,7 +27,7 @@ export function TableCell({
     <Component
       className={cn(
         // Base styles with line-clamp instead of truncate
-        'px-4 py-3 border-b border-subtle text-[13px] text-secondary-token',
+        'border-b border-(--linear-border-subtle) px-4 py-3 text-[13px] text-(--linear-text-secondary)',
         'line-clamp-1 overflow-hidden text-ellipsis',
         // Width
         width,

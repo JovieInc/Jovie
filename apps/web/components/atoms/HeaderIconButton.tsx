@@ -1,9 +1,8 @@
 'use client';
 
-import { Button, type ButtonProps } from '@jovie/ui';
 import * as React from 'react';
-
-import { cn } from '@/lib/utils';
+import type { ButtonProps } from '@jovie/ui';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 
 export type HeaderIconButtonSize = 'xs' | 'sm' | 'md';
 
@@ -22,38 +21,26 @@ export const HeaderIconButton = React.forwardRef<
   {
     children,
     ariaLabel,
-    asChild = false,
     size = 'md',
-    variant = 'ghost',
-    className,
     ...props
   },
   ref
 ) {
   const SIZE_CLASS_MAP: Record<HeaderIconButtonSize, string> = {
-    xs: 'p-1',
-    sm: 'p-1.5',
-    md: 'p-2',
+    xs: 'h-6 w-6 rounded-[7px] [&_svg]:h-3 [&_svg]:w-3',
+    sm: 'h-7 w-7 rounded-[8px] [&_svg]:h-3.5 [&_svg]:w-3.5',
+    md: 'h-8 w-8 rounded-[9px] [&_svg]:h-4 [&_svg]:w-4',
   };
-  const sizeClassName = SIZE_CLASS_MAP[size];
 
   return (
-    <Button
+    <AppIconButton
       ref={ref}
-      asChild={asChild}
-      variant={variant}
-      size='icon'
-      className={cn(
-        'rounded-full p-0',
-        sizeClassName,
-        'focus-ring-themed focus-visible:ring-offset-(--color-bg-base)',
-        className
-      )}
+      className={SIZE_CLASS_MAP[size]}
       aria-label={ariaLabel}
       {...props}
     >
       {children}
-    </Button>
+    </AppIconButton>
   );
 });
 

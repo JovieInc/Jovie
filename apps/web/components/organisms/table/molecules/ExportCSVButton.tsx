@@ -14,6 +14,7 @@ import {
 } from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import { type CSVColumn, toCSVBlob } from '@/lib/utils/csv';
@@ -165,7 +166,10 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleOpenConfirmation}
       disabled={disabled || isExporting}
-      className={cn('gap-2 rounded-lg border-subtle hover:bg-base', className)}
+      className={cn(
+        APP_CONTROL_BUTTON_CLASS,
+        className
+      )}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >
@@ -197,7 +201,7 @@ export function ExportCSVButton<T extends object>({
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <dl className='space-y-2 text-[13px] text-secondary-token'>
+          <dl className='space-y-2 text-[13px] text-(--linear-text-secondary)'>
             <div className='flex items-center justify-between gap-4'>
               <dt>Rows</dt>
               <dd className='font-[510] text-primary-token'>

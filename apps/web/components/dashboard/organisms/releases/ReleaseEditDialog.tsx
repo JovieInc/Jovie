@@ -3,6 +3,7 @@
 import { Badge, Button, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   Dialog,
   DialogActions,
@@ -58,12 +59,12 @@ export function ReleaseEditDialog({
       <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
         <Icon
           name='Link'
-          className='h-5 w-5 text-secondary-token'
+          className='h-5 w-5 text-(--linear-text-secondary)'
           aria-hidden='true'
         />
         Edit release links
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-secondary-token'>
+      <DialogDescription className='text-[13px] text-(--linear-text-secondary)'>
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
@@ -71,9 +72,9 @@ export function ReleaseEditDialog({
         {release ? (
           <div className='space-y-4'>
             {/* Release info header */}
-            <div className='flex items-center gap-4 rounded-xl border border-subtle bg-surface-2/60 p-4'>
+            <div className='flex items-center gap-4 rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-4'>
               {/* Artwork */}
-              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
+              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-none'>
                 <ImageWithFallback
                   src={release.artworkUrl}
                   alt={`${release.title} artwork`}
@@ -87,12 +88,12 @@ export function ReleaseEditDialog({
                 <p className='text-base font-[590] text-primary-token'>
                   {release.title}
                 </p>
-                <p className='mt-0.5 text-[11px] text-secondary-token'>
+                <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
                   Smart link: {release.smartLinkPath}
                 </p>
                 <Badge
                   variant='secondary'
-                  className='mt-2 border border-subtle bg-transparent text-[11px] text-secondary-token'
+                  className='mt-2 border border-(--linear-border-subtle) bg-transparent text-[11px] text-(--linear-text-secondary)'
                 >
                   {release.releaseDate
                     ? new Date(release.releaseDate).toLocaleDateString()
@@ -116,14 +117,14 @@ export function ReleaseEditDialog({
                 return (
                   <div
                     key={`${release.id}-${provider.key}`}
-                    className='rounded-lg border border-subtle bg-surface-1 p-3 shadow-card'
+                    className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3 shadow-none'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
-                        <span
-                          className='block h-2.5 w-2.5 rounded-full'
-                          style={{ backgroundColor: provider.accent }}
-                          aria-hidden='true'
+                        <ProviderIcon
+                          provider={provider.key}
+                          className='h-4 w-4'
+                          aria-label={provider.label}
                         />
                         <p className='text-[13px] font-[510] text-primary-token'>
                           {provider.label}
@@ -138,7 +139,7 @@ export function ReleaseEditDialog({
                         </Badge>
                       ) : null}
                     </div>
-                    <p className='mt-1 text-[11px] text-secondary-token'>
+                    <p className='mt-1 text-[11px] text-(--linear-text-secondary)'>
                       {helperText}
                     </p>
                     <div className='mt-2 space-y-2'>

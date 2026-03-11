@@ -5,7 +5,11 @@ import { useEffect, useState } from 'react';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
-export function DrawerToggleButton() {
+export function DrawerToggleButton({
+  className,
+}: {
+  readonly className?: string;
+}) {
   const { tableMeta } = useTableMeta();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -26,6 +30,7 @@ export function DrawerToggleButton() {
       disabled={!tableMeta.toggle}
       onClick={() => tableMeta.toggle?.()}
       icon={<Icon className='h-4 w-4' />}
+      className={className}
     />
   );
 }

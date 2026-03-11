@@ -17,11 +17,8 @@ import {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
-import {
-  PROVIDER_DOMAINS,
-  PROVIDER_TO_DSP,
-} from '@/lib/discography/provider-domains';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 
@@ -204,14 +201,12 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show provider availability details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex h-8 items-center gap-2 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
+          className='inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           {/* Compact provider icons */}
-          <div className='flex -space-x-1.5'>
+          <div className='flex -space-x-1'>
             {compactProviders.map(providerKey => {
               const status = getProviderStatus(providerKey);
-              const dspId = PROVIDER_TO_DSP[providerKey];
-              const config = providerConfig[providerKey];
 
               return (
                 <div
@@ -221,23 +216,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     status === 'missing' && 'opacity-70'
                   )}
                 >
-                  {dspId ? (
-                    <DspProviderIcon
-                      provider={dspId}
-                      size='sm'
-                      className={cn(status === 'missing' && 'opacity-30')}
-                    />
-                  ) : (
-                    <span
-                      className={cn(
-                        'h-2.5 w-2.5 rounded-full',
-                        status === 'missing' && 'opacity-30'
-                      )}
-                      style={{ backgroundColor: config.accent }}
-                    />
-                  )}
+                  <ProviderIcon
+                    provider={providerKey}
+                    className={cn('h-3 w-3', status === 'missing' && 'opacity-30')}
+                    aria-label={providerConfig[providerKey].label}
+                  />
                   {status === 'manual' && (
-                    <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />
+                    <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full border border-(--linear-bg-surface-0) bg-(--color-warning)' />
                   )}
                 </div>
               );
@@ -250,7 +235,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           </span>
           <Icon
             name='ChevronDown'
-            className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
+            className='h-3 w-3 text-(--linear-text-tertiary)'
             aria-hidden='true'
           />
         </button>
@@ -273,7 +258,6 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           {allProviders.map(providerKey => {
             const provider = providerMap.get(providerKey);
             const config = providerConfig[providerKey];
-            const dspId = PROVIDER_TO_DSP[providerKey];
             const status = getProviderStatus(providerKey);
             const testId = `provider-copy-${release.id}-${providerKey}`;
             const isCopied = copiedTestId === testId;
@@ -309,14 +293,11 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                   )}
 
                   {/* Provider icon + name */}
-                  {dspId ? (
-                    <DspProviderIcon provider={dspId} size='sm' />
-                  ) : (
-                    <span
-                      className='h-4 w-4 rounded-full'
-                      style={{ backgroundColor: config.accent }}
-                    />
-                  )}
+                  <ProviderIcon
+                    provider={providerKey}
+                    className='h-4 w-4'
+                    aria-label={config.label}
+                  />
                   <span className='text-[12px] font-[450] text-(--linear-text-primary)'>
                     {config.label}
                   </span>

@@ -33,7 +33,8 @@ const CANVAS_STATUS_CONFIG: Record<
   not_set: {
     label: 'No video',
     displayLabel: 'Has video',
-    className: 'bg-surface-2 text-secondary-token',
+    className:
+      'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
   },
 };
 
@@ -42,7 +43,7 @@ const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[13px] tabular-nums text-secondary-token'>
+    <span className='text-[13px] tabular-nums text-(--linear-text-secondary)'>
       {clamped} / 100
     </span>
   );
@@ -61,7 +62,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-300'
+          className='border-red-500/20 bg-red-500/10 text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -156,7 +157,9 @@ export function ReleaseMetadata({
               className='font-sans'
             />
           ) : (
-            <span className='text-[13px] text-tertiary-token'>Unknown</span>
+            <span className='text-[13px] text-(--linear-text-tertiary)'>
+              Unknown
+            </span>
           )
         }
       />
@@ -169,7 +172,7 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='text-[13px] text-secondary-token truncate'>
+            <span className='truncate text-[13px] text-(--linear-text-secondary)'>
               {formatCopyrightLine(release.copyrightLine, '℗')}
             </span>
           }
@@ -185,7 +188,7 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='text-[13px] text-secondary-token truncate'>
+            <span className='truncate text-[13px] text-(--linear-text-secondary)'>
               {formatCopyrightLine(release.distributor, '©')}
             </span>
           }
@@ -210,12 +213,12 @@ export function ReleaseMetadata({
               <DropdownMenuTrigger asChild>
                 <button
                   type='button'
-                  className='inline-flex items-center gap-1 rounded px-1 -mx-1 py-0.5 text-[13px] text-secondary-token transition-colors duration-100 hover:bg-white/[0.02] focus-visible:outline-none'
+                  className='-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
                     size={12}
-                    className='text-tertiary-token'
+                    className='text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
                 </button>
@@ -233,7 +236,7 @@ export function ReleaseMetadata({
                       <span className='flex items-center gap-2 w-full'>
                         <Badge
                           variant='secondary'
-                          className={`text-[10px] font-medium ${config.className}`}
+                          className={`border text-[10px] font-medium shadow-none ${config.className}`}
                         >
                           {config.label}
                         </Badge>
@@ -253,7 +256,7 @@ export function ReleaseMetadata({
           ) : (
             <Badge
               variant='secondary'
-              className={`text-[10px] font-medium ${canvasStatusConfig.className}`}
+              className={`border text-[10px] font-medium shadow-none ${canvasStatusConfig.className}`}
             >
               {canvasStatusDisplayLabel}
             </Badge>
@@ -281,7 +284,7 @@ export function ReleaseMetadata({
                 <Badge
                   key={genre}
                   variant='secondary'
-                  className='bg-surface-2 text-[10px] font-normal'
+                  className='bg-(--linear-bg-surface-1) text-[10px] font-normal shadow-none'
                 >
                   {genre}
                 </Badge>

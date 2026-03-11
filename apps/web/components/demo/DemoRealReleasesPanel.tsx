@@ -10,8 +10,8 @@ import {
 } from './mock-release-data';
 
 /**
- * Demo panel using the real production ReleaseTable component
- * with static mock ReleaseViewModel data.
+ * Standalone demo release table used by non-dashboard surfaces.
+ * The `/demo` route now renders the shared ReleasesExperience instead.
  */
 export function DemoRealReleasesPanel() {
   const handleCopy = useCallback(

@@ -27,6 +27,7 @@ export interface AuthRouteConfig {
  */
 export function useAuthRouteConfig(): AuthRouteConfig {
   const pathname = usePathname();
+  const isDemoReleasesRoute = pathname === '/demo';
 
   // Detect section based on pathname
   const section = useMemo<'admin' | 'dashboard' | 'settings'>(() => {
@@ -37,6 +38,15 @@ export function useAuthRouteConfig(): AuthRouteConfig {
 
   // Generate breadcrumbs from pathname
   const breadcrumbs = useMemo<DashboardBreadcrumbItem[]>(() => {
+    if (isDemoReleasesRoute) {
+      return [
+        {
+          label: getBreadcrumbLabel('releases'),
+          href: pathname,
+        },
+      ];
+    }
+
     const parts = pathname.split('/').filter(Boolean);
 
     // Get the last meaningful part of the path for the current page.
@@ -58,7 +68,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
         href: pathname,
       },
     ];
-  }, [pathname]);
+  }, [isDemoReleasesRoute, pathname]);
 
   // Show mobile bottom tabs on all authenticated sections so users always
   // have persistent navigation on mobile (dashboard, settings, and admin).
@@ -69,6 +79,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
   // between two non-table (or two table) routes.
   const isTableRoute = useMemo(
     () =>
+      isDemoReleasesRoute ||
       pathname.includes('/creators') ||
       pathname.includes('/audience') ||
       pathname.includes('/users') ||
@@ -76,7 +87,7 @@ export function useAuthRouteConfig(): AuthRouteConfig {
       pathname.includes('/feedback') ||
       pathname.includes('/campaigns') ||
       pathname.includes('/releases'),
-    [pathname]
+    [isDemoReleasesRoute, pathname]
   );
 
   // Artist profile settings page gets the preview panel sidebar

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
-  'min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-tertiary-token transition-colors active:bg-surface-2/50 hover:text-primary-token hover:bg-surface-2 lg:min-h-0 lg:min-w-0 lg:p-1 lg:active:bg-transparent';
+  'min-h-[40px] min-w-[40px] flex items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-(--linear-bg-surface-1) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
 
 export interface DrawerLinkSectionProps {
   /** Section heading text */
@@ -46,11 +46,11 @@ export function DrawerLinkSection({
   return (
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex items-center justify-between min-h-[44px] lg:min-h-0'>
+      <div className='flex min-h-[40px] items-center justify-between lg:min-h-0'>
         <h4
           className={[
             'text-[11px] font-[510] uppercase',
-            'tracking-[0.08em] text-tertiary-token',
+            'tracking-[0.08em] text-(--linear-text-tertiary)',
           ].join(' ')}
         >
           {title}
@@ -72,7 +72,9 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <p className='text-xs text-tertiary-token py-2'>{emptyMessage}</p>
+        <p className='py-2 text-xs text-(--linear-text-tertiary)'>
+          {emptyMessage}
+        </p>
       ) : (
         <div className='-mx-5 lg:mx-0'>{children}</div>
       )}
