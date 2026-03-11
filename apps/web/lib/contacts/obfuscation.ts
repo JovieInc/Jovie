@@ -1,7 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 
 export interface EncodedContactPayload {
-  type: 'email' | 'phone';
+  type: 'email' | 'phone' | 'sms';
   value: string;
   subject?: string;
   contactId?: string;
@@ -47,7 +47,7 @@ export function decodeContactPayload(
     const rotated = base64Decode(encoded);
     const json = rotateCharacters(rotated, -1);
     const parsed = JSON.parse(json) as EncodedContactPayload;
-    if (!parsed || (parsed.type !== 'email' && parsed.type !== 'phone')) {
+    if (!parsed || !['email', 'phone', 'sms'].includes(parsed.type)) {
       return null;
     }
     if (!parsed.value || typeof parsed.value !== 'string') return null;

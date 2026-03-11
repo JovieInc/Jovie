@@ -89,9 +89,26 @@ describe('toPublicContacts', () => {
     ];
     const result = toPublicContacts(contacts, 'Test Artist');
 
-    expect(result[0].channels).toHaveLength(2);
+    expect(result[0].channels).toHaveLength(3);
     expect(result[0].channels[0].type).toBe('email');
     expect(result[0].channels[1].type).toBe('phone');
+    expect(result[0].channels[2].type).toBe('sms');
+  });
+
+  it('adds both phone and sms channels when phone exists', () => {
+    const contacts = [
+      createContact({
+        email: null,
+        phone: '+1-555-0123',
+        preferredChannel: 'phone',
+      }),
+    ];
+    const result = toPublicContacts(contacts, 'Test Artist');
+
+    expect(result[0].channels.map(channel => channel.type)).toEqual([
+      'phone',
+      'sms',
+    ]);
   });
 
   it('marks preferred channel correctly', () => {
@@ -107,7 +124,9 @@ describe('toPublicContacts', () => {
     const emailChannel = result[0].channels.find(c => c.type === 'email');
     const phoneChannel = result[0].channels.find(c => c.type === 'phone');
     expect(emailChannel?.preferred).toBe(true);
+    const smsChannel = result[0].channels.find(c => c.type === 'sms');
     expect(phoneChannel?.preferred).toBe(false);
+    expect(smsChannel?.preferred).toBe(false);
   });
 
   it('auto-marks sole channel as preferred when none specified', () => {
