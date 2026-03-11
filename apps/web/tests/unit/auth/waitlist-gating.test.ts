@@ -370,20 +370,20 @@ describe('resolveProfileState', () => {
     expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
   });
 
-  it('returns NEEDS_ONBOARDING when profile has no avatar', () => {
+  it('returns ACTIVE when profile has no avatar (avatar optional)', () => {
     const result = resolveProfileState({
       ...completeProfile,
       avatarUrl: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(UserState.ACTIVE);
   });
 
-  it('returns NEEDS_ONBOARDING when profile has blank avatar', () => {
+  it('returns ACTIVE when profile has blank avatar (avatar optional)', () => {
     const result = resolveProfileState({
       ...completeProfile,
       avatarUrl: '   ',
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(UserState.ACTIVE);
   });
 
   it('returns NEEDS_ONBOARDING when onboarding not completed', () => {
@@ -425,15 +425,15 @@ describe('resolveProfileState', () => {
       );
     });
 
-    it('returns false when missing avatarUrl', () => {
+    it('returns true when missing avatarUrl (avatar optional)', () => {
       expect(isProfileComplete({ ...completeProfile, avatarUrl: null })).toBe(
-        false
+        true
       );
     });
 
-    it('returns false when avatarUrl is whitespace-only', () => {
+    it('returns true when avatarUrl is whitespace-only (avatar optional)', () => {
       expect(isProfileComplete({ ...completeProfile, avatarUrl: '  ' })).toBe(
-        false
+        true
       );
     });
   });
