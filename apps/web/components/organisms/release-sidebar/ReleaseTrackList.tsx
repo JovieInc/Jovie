@@ -24,9 +24,15 @@ import {
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { DrawerSection } from '@/components/molecules/drawer';
+import {
+  DRAWER_SECTION_HEADING_CLASSNAME,
+  DrawerEmptyState,
+  DrawerSection,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { useReleaseTracksQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release, ReleaseSidebarTrack } from './types';
@@ -81,7 +87,10 @@ export function ReleaseTrackList({
         }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-[8px] px-2 py-0.5 text-[10px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary) transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        className={cn(
+          DRAWER_SECTION_HEADING_CLASSNAME,
+          'flex w-full items-center justify-between rounded-[8px] px-2 py-0.5 tracking-[0.08em] transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        )}
       >
         <span>Tracklist ({release.totalTracks})</span>
         {isExpanded ? (
@@ -98,7 +107,10 @@ export function ReleaseTrackList({
               {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
                 .slice(0, Math.min(release.totalTracks, 6))
                 .map(id => (
-                  <div key={id} className='flex items-start gap-2 px-1.5 py-1'>
+                  <DrawerSurfaceCard
+                    key={id}
+                    className='flex items-start gap-2 px-1.5 py-1'
+                  >
                     <div className='w-6 shrink-0 pt-0.5'>
                       <div className='ml-auto h-3 w-4 rounded skeleton' />
                     </div>
@@ -106,25 +118,24 @@ export function ReleaseTrackList({
                       <div className='h-3.5 w-3/4 rounded skeleton' />
                       <div className='h-2.5 w-1/3 rounded skeleton' />
                     </div>
-                  </div>
+                  </DrawerSurfaceCard>
                 ))}
             </div>
           )}
 
           {!isLoading && hasError && (
-            <div className='flex min-h-[56px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
-              <p className='text-[11.5px] leading-[16px] text-error'>
-                Failed to load tracks. Collapse and expand to retry.
-              </p>
-            </div>
+            <DrawerEmptyState
+              className='min-h-[56px] px-3'
+              message='Failed to load tracks. Collapse and expand to retry.'
+              tone='error'
+            />
           )}
 
           {!isLoading && !hasError && tracks?.length === 0 && (
-            <div className='flex min-h-[56px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
-              <p className='text-[11.5px] leading-[16px] text-(--linear-text-secondary)'>
-                No track data available.
-              </p>
-            </div>
+            <DrawerEmptyState
+              className='min-h-[56px] px-3'
+              message='No track data available.'
+            />
           )}
 
           {!isLoading &&

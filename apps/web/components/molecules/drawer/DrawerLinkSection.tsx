@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
+import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
   'min-h-[40px] min-w-[40px] flex items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-(--linear-bg-surface-1) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
@@ -48,14 +49,9 @@ export function DrawerLinkSection({
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
       <div className='flex min-h-[40px] items-center justify-between lg:min-h-0'>
-        <h4
-          className={[
-            'text-[11px] font-[510] uppercase',
-            'tracking-[0.08em] text-(--linear-text-tertiary)',
-          ].join(' ')}
-        >
+        <DrawerSectionHeading as='h4' className='text-[11px] tracking-[0.08em]'>
           {title}
-        </h4>
+        </DrawerSectionHeading>
         <div className='flex items-center gap-1 lg:gap-0.5'>
           {headerActions}
           {onAdd && (

@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { StatTile } from '@/components/molecules/drawer';
+import {
+  DrawerEmptyState,
+  DrawerStatGrid,
+  StatTile,
+} from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
@@ -85,27 +89,26 @@ export function ReleaseSmartLinkAnalytics({
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
-            <div className='grid grid-cols-2 rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-2'>
-              <div className='space-y-1'>
+            <DrawerStatGrid>
+              <div className='space-y-1 pr-2.5'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-4.5 w-10 rounded skeleton' />
                 <div className='h-[11px] w-10 rounded skeleton' />
               </div>
-              <div className='space-y-1 border-l border-(--linear-border-subtle) pl-2'>
+              <div className='space-y-1 pl-2.5'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-4.5 w-10 rounded skeleton' />
                 <div className='h-[11px] w-10 rounded skeleton' />
               </div>
-            </div>
+            </DrawerStatGrid>
           </div>
         )}
 
         {!showSkeleton && hasError && (
-          <div className='flex min-h-[72px] items-center rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
-            <p className='text-[11.5px] leading-[16px] text-(--linear-text-secondary)'>
-              Analytics unavailable
-            </p>
-          </div>
+          <DrawerEmptyState
+            className='min-h-[76px]'
+            message='Analytics unavailable'
+          />
         )}
 
         {!showSkeleton && !hasError && (
@@ -115,29 +118,28 @@ export function ReleaseSmartLinkAnalytics({
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'>
-              <div>
+            <DrawerStatGrid>
+              <div className='pr-2.5'>
                 <StatTile
                   label='Total clicks'
                   value={numberFormatter.format(totalClicks)}
                   hint='All time'
                 />
               </div>
-              <div className='border-l border-(--linear-border-subtle) pl-2'>
+              <div className='pl-2.5'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
                   hint='Recent'
                 />
               </div>
-            </div>
+            </DrawerStatGrid>
 
             {showEmpty && (
-              <div className='mt-1 flex min-h-[36px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5'>
-                <p className='text-[10px] leading-[13px] text-(--linear-text-tertiary)'>
-                  Share your smart link to start tracking clicks.
-                </p>
-              </div>
+              <DrawerEmptyState
+                className='mt-1 min-h-[40px] px-3'
+                message='Share your smart link to start tracking clicks.'
+              />
             )}
           </div>
         )}

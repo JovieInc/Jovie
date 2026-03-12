@@ -8,7 +8,11 @@ import {
 } from '@jovie/ui';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
-import { StatTile } from '@/components/molecules/drawer';
+import {
+  DrawerEmptyState,
+  DrawerStatGrid,
+  StatTile,
+} from '@/components/molecules/drawer';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -45,12 +49,7 @@ export function ProfileAnalyticsSummary() {
   if (isLoading && !data) {
     return (
       <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-        <div
-          className={cn(
-            'grid grid-cols-2 divide-x divide-(--linear-border-subtle) p-3.5',
-            STAT_MIN_HEIGHT
-          )}
-        >
+        <DrawerStatGrid className={cn('p-3.5', STAT_MIN_HEIGHT)}>
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
             <div className='mt-2 h-6 w-14 rounded skeleton' />
@@ -59,17 +58,13 @@ export function ProfileAnalyticsSummary() {
             <div className='h-[10px] w-16 rounded skeleton' />
             <div className='mt-2 h-6 w-14 rounded skeleton' />
           </div>
-        </div>
+        </DrawerStatGrid>
       </div>
     );
   }
 
   if (isError && !data) {
-    return (
-      <p className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
-        No data yet.
-      </p>
-    );
+    return <DrawerEmptyState message='No data yet.' />;
   }
 
   const profileViews = data?.profile_views ?? 0;
@@ -77,9 +72,9 @@ export function ProfileAnalyticsSummary() {
 
   return (
     <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-      <div
+      <DrawerStatGrid
         className={cn(
-          'grid grid-cols-2 divide-x divide-(--linear-border-subtle) p-3.5 transition-opacity duration-150',
+          'p-3.5 transition-opacity duration-150',
           STAT_MIN_HEIGHT,
           isFetching && 'opacity-50'
         )}
@@ -96,7 +91,7 @@ export function ProfileAnalyticsSummary() {
             value={numberFormatter.format(totalClicks)}
           />
         </div>
-      </div>
+      </DrawerStatGrid>
 
       {/* Time range selector */}
       <div className='flex justify-end border-t border-(--linear-border-subtle) px-3 py-1.5'>

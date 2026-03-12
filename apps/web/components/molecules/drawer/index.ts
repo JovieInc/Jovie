@@ -34,9 +34,20 @@ export {
 } from './DrawerPropertyRow';
 export { DrawerSection, type DrawerSectionProps } from './DrawerSection';
 export {
+  DRAWER_SECTION_HEADING_CLASSNAME,
+  DrawerSectionHeading,
+  type DrawerSectionHeadingProps,
+} from './DrawerSectionHeading';
+export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export { DrawerStatGrid, type DrawerStatGridProps } from './DrawerStatGrid';
+export {
+  DRAWER_SURFACE_CARD_CLASSNAME,
+  DrawerSurfaceCard,
+  type DrawerSurfaceCardProps,
+} from './DrawerSurfaceCard';
 export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,

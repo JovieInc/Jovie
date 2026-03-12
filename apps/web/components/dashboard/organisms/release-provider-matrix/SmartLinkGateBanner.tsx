@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
@@ -32,11 +33,9 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
   const { className, mode } = props;
 
   return (
-    <aside
-      className={cn(
-        'flex items-start gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3',
-        className
-      )}
+    <DrawerSurfaceCard
+      as='aside'
+      className={cn('flex items-start gap-3 rounded-[10px] p-3', className)}
       aria-label={
         mode === 'soft-cap'
           ? 'Smart link limit notice'
@@ -84,6 +83,6 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
           </>
         )}
       </div>
-    </aside>
+    </DrawerSurfaceCard>
   );
 }

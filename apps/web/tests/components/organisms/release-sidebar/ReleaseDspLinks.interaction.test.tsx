@@ -69,6 +69,7 @@ vi.mock('@/components/atoms/ProviderIcon', () => ({
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
+  DRAWER_SECTION_HEADING_CLASSNAME: 'drawer-heading',
   DrawerLinkSection: ({
     title,
     children,
@@ -109,6 +110,13 @@ vi.mock('@/components/molecules/drawer', () => ({
       ) : null}
     </div>
   ),
+  DrawerSurfaceCard: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
 }));
 
 const { ReleaseDspLinks } = await import(

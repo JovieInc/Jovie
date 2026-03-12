@@ -109,6 +109,7 @@ vi.mock('@jovie/ui', async () => {
 
 // Mock drawer molecules — EntitySidebarShell renders children with empty state support.
 vi.mock('@/components/molecules/drawer', () => ({
+  DRAWER_SECTION_HEADING_CLASSNAME: 'drawer-heading',
   EntitySidebarShell: ({
     children,
     isEmpty,
@@ -180,6 +181,13 @@ vi.mock('@/components/molecules/drawer', () => ({
     <div data-testid='async-toggle'>{label}</div>
   ),
   DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerSurfaceCard: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
   DrawerTabs: ({
     value,
     onValueChange,

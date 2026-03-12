@@ -1,5 +1,6 @@
 'use client';
 
+import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { Dialog, DialogBody } from '@/components/organisms/Dialog';
 
 export interface DialogLoadingSkeletonProps {
@@ -39,9 +40,9 @@ export function DialogLoadingSkeleton({
         <div className='rounded-xl border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'>
           <div className='space-y-1.5'>
             {rowIds.map(rowId => (
-              <div
+              <DrawerSurfaceCard
                 key={rowId}
-                className='flex min-h-[64px] items-center gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'
+                className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
               >
                 <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
                 <div className='min-w-0 flex-1 space-y-1.5'>
@@ -49,7 +50,7 @@ export function DialogLoadingSkeleton({
                   <div className='h-2.5 w-20 rounded skeleton' />
                 </div>
                 <div className='h-4 w-4 shrink-0 rounded-full skeleton' />
-              </div>
+              </DrawerSurfaceCard>
             ))}
           </div>
         </div>

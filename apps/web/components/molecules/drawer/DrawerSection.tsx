@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export interface DrawerSectionProps {
   readonly title?: string;
@@ -16,11 +17,7 @@ export function DrawerSection({
 }: DrawerSectionProps) {
   return (
     <div className={cn('space-y-1.5', className)}>
-      {title && (
-        <div className='text-[10px] font-[510] uppercase tracking-[0.06em] text-(--linear-text-tertiary)'>
-          {title}
-        </div>
-      )}
+      {title ? <DrawerSectionHeading>{title}</DrawerSectionHeading> : null}
       {children}
     </div>
   );

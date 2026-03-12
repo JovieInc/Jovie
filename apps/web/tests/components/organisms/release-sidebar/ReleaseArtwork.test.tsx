@@ -11,6 +11,13 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({ image }: { image: ReactNode }) => (
     <div data-testid='entity-header-card'>{image}</div>
   ),
+  DrawerMediaThumb: ({
+    children,
+    fallback,
+  }: {
+    children?: ReactNode;
+    fallback?: ReactNode;
+  }) => <div data-testid='drawer-media-thumb'>{children ?? fallback}</div>,
 }));
 
 vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({

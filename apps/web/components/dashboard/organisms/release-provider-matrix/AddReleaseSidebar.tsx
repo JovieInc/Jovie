@@ -15,7 +15,11 @@ import { toast } from 'sonner';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerMediaThumb,
+  EntityHeaderCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 
 const RELEASE_TYPE_OPTIONS = [
   { value: 'single', label: 'Single' },
@@ -140,24 +144,27 @@ export function AddReleaseSidebar({
       title='Add Release'
       onClose={handleClose}
       entityHeader={
-        <div className='flex items-center gap-2'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
-            <Icon
-              name='Disc3'
-              className='h-5 w-5 text-(--linear-text-tertiary)'
-              aria-hidden='true'
+        <EntityHeaderCard
+          image={
+            <DrawerMediaThumb
+              alt='New release artwork'
+              sizeClassName='h-10 w-10'
+              fallback={
+                <Icon
+                  name='Disc3'
+                  className='h-5 w-5 text-(--linear-text-tertiary)'
+                  aria-hidden='true'
+                />
+              }
             />
-          </div>
-          <div>
-            <p className='text-sm font-[590] text-(--linear-text-primary)'>
-              {title || 'New Release'}
-            </p>
-            <p className='text-xs text-(--linear-text-secondary)'>
-              {RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
-                'Single'}
-            </p>
-          </div>
-        </div>
+          }
+          title={title || 'New Release'}
+          subtitle={
+            RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
+            'Single'
+          }
+          className='gap-2'
+        />
       }
       footer={
         <Button

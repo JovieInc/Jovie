@@ -1,5 +1,6 @@
 'use client';
 
+import { DRAWER_SURFACE_CARD_CLASSNAME } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
@@ -54,7 +55,12 @@ export function DrawerLoadingSkeleton({
 
             <div className='h-[24px] w-full rounded-[7px] skeleton' />
 
-            <div className='grid grid-cols-2 rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'>
+            <div
+              className={cn(
+                DRAWER_SURFACE_CARD_CLASSNAME,
+                'grid grid-cols-2 p-2'
+              )}
+            >
               <div className='space-y-1'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-4.5 w-10 rounded skeleton' />

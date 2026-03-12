@@ -23,10 +23,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
+  DRAWER_SECTION_HEADING_CLASSNAME,
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
@@ -232,7 +234,12 @@ export function ReleaseDspLinks({
           ].join(' ')}
         >
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            <Label
+              className={cn(
+                DRAWER_SECTION_HEADING_CLASSNAME,
+                'text-[11px] tracking-[0.08em]'
+              )}
+            >
               Provider
             </Label>
             <Select
@@ -261,7 +268,12 @@ export function ReleaseDspLinks({
             </Select>
           </div>
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            <Label
+              className={cn(
+                DRAWER_SECTION_HEADING_CLASSNAME,
+                'text-[11px] tracking-[0.08em]'
+              )}
+            >
               URL
             </Label>
             <Input

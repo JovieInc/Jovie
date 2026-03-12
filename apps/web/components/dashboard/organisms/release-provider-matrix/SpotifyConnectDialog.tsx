@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import {
   Dialog,
   DialogBody,
@@ -36,7 +37,7 @@ function SearchDropdownState({
 }) {
   return (
     <div className='p-3'>
-      <div className='flex min-h-[64px] items-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+      <DrawerSurfaceCard className='flex min-h-[64px] items-center rounded-[10px] px-3'>
         <p
           className={cn(
             'text-[12px] leading-[17px]',
@@ -45,7 +46,7 @@ function SearchDropdownState({
         >
           {message}
         </p>
-      </div>
+      </DrawerSurfaceCard>
     </div>
   );
 }
@@ -54,9 +55,9 @@ function SearchResultsLoadingSkeleton() {
   return (
     <div className='p-3 space-y-1.5' aria-busy='true'>
       {LOADING_SKELETON_KEYS.map(key => (
-        <div
+        <DrawerSurfaceCard
           key={key}
-          className='flex min-h-[64px] items-center gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'
+          className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -65,7 +66,7 @@ function SearchResultsLoadingSkeleton() {
             <div className='h-2.5 w-20 rounded skeleton' />
           </div>
           <div className='h-4 w-4 shrink-0 rounded-full skeleton' />
-        </div>
+        </DrawerSurfaceCard>
       ))}
     </div>
   );

@@ -1,24 +1,21 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
+const toggleTrack = vi.fn().mockResolvedValue(undefined);
+
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState: { activeTrackId: null, isPlaying: false },
-    toggleTrack: vi.fn().mockResolvedValue(undefined),
+    toggleTrack,
   }),
 }));
 
 vi.mock('@/components/atoms/TruncatedText', () => ({
   TruncatedText: ({ children }: { children: ReactNode }) => (
     <span>{children}</span>
-  ),
-}));
-
-vi.mock('@/components/atoms/SocialIcon', () => ({
-  SocialIcon: ({ platform }: { platform: string }) => (
-    <span data-testid='provider-icon'>{platform}</span>
   ),
 }));
 
@@ -82,29 +79,39 @@ const baseRelease: ReleaseViewModel = {
 };
 
 describe('ReleaseCell', () => {
-  it('right-aligns and tightly clusters provider icons', () => {
-    const { container } = render(
-      <ReleaseCell release={baseRelease} artistName='Jovie Artist' />
-    );
-
-    const iconCluster =
-      screen.getAllByTestId('provider-icon')[0]?.parentElement;
-    expect(iconCluster).toHaveClass('-space-x-0.5');
-
-    const rightAlignedContainers = container.querySelectorAll('.justify-end');
-    expect(rightAlignedContainers.length).toBeGreaterThan(0);
-  });
-
-  it('shows only three provider icons with overflow count', () => {
+  it('renders release title, type badge, and artist line', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 
-    const icons = screen.getAllByTestId('provider-icon');
-    expect(icons).toHaveLength(3);
-    expect(screen.getByText('+1')).toBeInTheDocument();
-    expect(icons.map(icon => icon.textContent)).toEqual([
-      'spotify',
-      'apple_music',
-      'youtube',
-    ]);
+    expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
+    expect(screen.getByText('Single')).toBeInTheDocument();
+    expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
+  });
+
+  it('toggles preview playback when a preview url is available', async () => {
+    const user = userEvent.setup();
+    render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
+
+    expect(
+      screen.queryByRole('button', { name: 'Play Skyline Dreams' })
+    ).not.toBeInTheDocument();
+
+    const releaseWithPreview = {
+      ...baseRelease,
+      previewUrl: 'https://cdn.example.com/preview.mp3',
+    };
+
+    render(
+      <ReleaseCell release={releaseWithPreview} artistName='Jovie Artist' />
+    );
+
+    await user.click(
+      screen.getByRole('button', { name: 'Play Skyline Dreams' })
+    );
+
+    expect(toggleTrack).toHaveBeenCalledWith({
+      id: 'release-1',
+      title: 'Skyline Dreams',
+      audioUrl: 'https://cdn.example.com/preview.mp3',
+    });
   });
 });

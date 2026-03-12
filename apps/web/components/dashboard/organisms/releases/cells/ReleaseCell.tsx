@@ -64,13 +64,13 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [artistName, release.artistNames]);
 
   return (
-    <div className='grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-x-2'>
-      <div className='flex w-[18px] items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-start gap-x-2.5'>
+      <div className='flex w-[20px] items-center justify-center pt-0.5'>
         {hasPreview ? (
           <button
             type='button'
             onClick={handleTogglePlayback}
-            className='flex h-4.5 w-4.5 items-center justify-center rounded-[5px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='flex h-5 w-5 items-center justify-center rounded-[6px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -82,7 +82,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             )}
           </button>
         ) : (
-          <span className='h-4.5 w-4.5' />
+          <span className='h-5 w-5' />
         )}
       </div>
 
@@ -90,7 +90,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         <div className='flex min-w-0 items-center gap-1 leading-none'>
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[510] leading-[1.15] tracking-[-0.012em] text-(--linear-text-primary)'
+            className='text-[13px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
             tooltipSide='top'
             tooltipAlign='start'
           >
@@ -116,7 +116,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[11.5px] font-[450] leading-[1.15] tracking-[-0.01em] text-(--linear-text-secondary)'
+            className='text-[12px] font-[450] leading-[1.2] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
             {artistLine}
           </TruncatedText>

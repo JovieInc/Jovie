@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export interface DrawerHeaderProps {
   /** Title displayed on the left side of the header */
@@ -19,9 +20,9 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
         className
       )}
     >
-      <p className='truncate text-[10px] font-[510] uppercase tracking-[0.06em] text-(--linear-text-tertiary)'>
+      <DrawerSectionHeading as='p' className='truncate'>
         {title}
-      </p>
+      </DrawerSectionHeading>
       {actions && <div className='flex items-center gap-0.5'>{actions}</div>}
     </div>
   );
