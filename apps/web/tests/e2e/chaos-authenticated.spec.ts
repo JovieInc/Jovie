@@ -60,6 +60,8 @@ const CHAOS_WARMUP_TIMEOUT = 120_000;
 const CHAOS_PAGE_RETRIES = 1;
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const CHAOS_MAX_ELEMENTS_PER_PAGE = IS_FAST_ITERATION ? 4 : 20;
+const CHAOS_STABILIZE_TIMEOUT = IS_FAST_ITERATION ? 3_000 : 10_000;
+const CHAOS_POST_CLICK_TIMEOUT = IS_FAST_ITERATION ? 1_500 : 5_000;
 
 function isReactError(text: string): boolean {
   const lower = text.toLowerCase();
@@ -185,14 +187,20 @@ async function chaosTestPage(
       // Wait for page to stabilize - don't require full 'load' state which can timeout
       await Promise.race([
         waitForHydration(page),
-        page.waitForLoadState('domcontentloaded', { timeout: 10000 }),
+        page.waitForLoadState('domcontentloaded', {
+          timeout: CHAOS_STABILIZE_TIMEOUT,
+        }),
       ]).catch(() => {});
 
-      // Additional stabilization wait
-      await Promise.race([
-        page.waitForLoadState('networkidle'),
-        page.waitForLoadState('domcontentloaded', { timeout: 5000 }),
-      ]).catch(() => {});
+      if (!IS_FAST_ITERATION) {
+        // Extra stabilization is only worth it in the slower exhaustive lane.
+        await Promise.race([
+          page.waitForLoadState('networkidle'),
+          page.waitForLoadState('domcontentloaded', {
+            timeout: CHAOS_POST_CLICK_TIMEOUT,
+          }),
+        ]).catch(() => {});
+      }
 
       const elements = (await findClickableElements(page)).slice(
         0,
@@ -212,7 +220,11 @@ async function chaosTestPage(
           await locator.scrollIntoViewIfNeeded().catch(() => {});
 
           await locator.click({ timeout: 2000, force: false });
-          await page.waitForLoadState('domcontentloaded');
+          await page
+            .waitForLoadState('domcontentloaded', {
+              timeout: CHAOS_POST_CLICK_TIMEOUT,
+            })
+            .catch(() => {});
           elementsClicked++;
 
           // Check for new React errors
@@ -240,7 +252,9 @@ async function chaosTestPage(
             await navigateChaosRoute(page, url);
             await Promise.race([
               waitForHydration(page),
-              page.waitForLoadState('domcontentloaded', { timeout: 5000 }),
+              page.waitForLoadState('domcontentloaded', {
+                timeout: CHAOS_POST_CLICK_TIMEOUT,
+              }),
             ]).catch(() => {});
           }
 
