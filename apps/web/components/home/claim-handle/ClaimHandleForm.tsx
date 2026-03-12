@@ -56,7 +56,7 @@ function getContainerStyles(
 function getDomainPrefixStyles(isHero: boolean): React.CSSProperties {
   return isHero
     ? {
-        fontSize: '19px',
+        fontSize: 'clamp(16px, 4.8vw, 19px)',
         fontWeight: 510,
         letterSpacing: '-0.03em',
         color: 'var(--linear-text-quaternary)',
@@ -77,7 +77,12 @@ function getInputStyles(
 ): React.CSSProperties {
   const color = isAvailable ? 'rgb(74,222,128)' : 'var(--linear-text-primary)';
   return isHero
-    ? { fontSize: '19px', fontWeight: 510, letterSpacing: '-0.03em', color }
+    ? {
+        fontSize: 'clamp(16px, 4.8vw, 19px)',
+        fontWeight: 510,
+        letterSpacing: '-0.03em',
+        color,
+      }
     : { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
 }
 
@@ -86,7 +91,7 @@ function getButtonStyles(
   isDisabled: boolean
 ): React.CSSProperties {
   return {
-    height: isHero ? 50 : 36,
+    height: isHero ? 'clamp(44px, 12vw, 50px)' : 36,
     fontSize: isHero ? '14px' : '13px',
     fontWeight: 510,
     letterSpacing: '-0.01em',
@@ -214,7 +219,7 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
-          isHero ? 'rounded-2xl p-1.5 sm:p-2' : 'rounded-[14px] p-1.5',
+          isHero ? 'rounded-2xl p-1 sm:gap-2 sm:p-2' : 'rounded-[14px] p-1.5',
           isAvailable && 'claim-input-row--available'
         )}
         style={getContainerStyles(isHero, isAvailable)}
@@ -240,7 +245,7 @@ export function ClaimHandleForm({
           </>
         )}
 
-        <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
+        <div className='flex min-w-0 flex-1 items-center gap-0 pl-2.5 pr-0.5 sm:pl-3.5 sm:pr-1'>
           {/* Domain prefix — etched, permanent feel */}
           <span
             className='shrink-0 select-none'
@@ -280,7 +285,9 @@ export function ClaimHandleForm({
           disabled={isDisabled}
           className={cn(
             'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
-            isHero ? 'rounded-[14px] px-6' : 'rounded-[10px] px-4 sm:px-5',
+            isHero
+              ? 'rounded-[14px] px-3.5 sm:px-6'
+              : 'rounded-[10px] px-4 sm:px-5',
             isDisabled
               ? 'cursor-not-allowed opacity-40'
               : 'hover:brightness-110 active:scale-[0.98]'
