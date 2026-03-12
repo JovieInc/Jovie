@@ -49,7 +49,12 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
         )}
         aria-hidden='true'
       />
-      <span className='line-clamp-1 text-(--linear-text-tertiary)'>
+      <span
+        className={cn(
+          'line-clamp-1',
+          isCopied ? 'text-inherit' : 'text-(--linear-text-tertiary)'
+        )}
+      >
         {isCopied ? 'Copied!' : '—'}
       </span>
     </button>

@@ -38,9 +38,8 @@ interface ChatPageClientProps {
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='flex items-center gap-1.5 text-[13px] text-tertiary-token'>
-      <span aria-hidden='true'>/</span>
-      <span className='max-w-[200px] truncate'>{title}</span>
+    <span className='block max-w-[240px] truncate font-[510] text-primary-token'>
+      {title}
     </span>
   );
 }

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerHeader } from './DrawerHeader';
 
@@ -39,6 +40,18 @@ export interface EntitySidebarShellProps {
 
   /** Footer slot — pinned to bottom of drawer */
   readonly footer?: ReactNode;
+  /** Optional classes for the outer drawer */
+  readonly drawerClassName?: string;
+  /** Optional classes for the header row */
+  readonly headerClassName?: string;
+  /** Optional classes for the entity header wrapper */
+  readonly entityHeaderClassName?: string;
+  /** Optional classes for the tabs wrapper */
+  readonly tabsClassName?: string;
+  /** Optional classes for the scrollable content area */
+  readonly contentClassName?: string;
+  /** Optional classes for the footer wrapper */
+  readonly footerClassName?: string;
 
   /** When true, shows empty state instead of entityHeader + tabs + children */
   readonly isEmpty?: boolean;
@@ -83,6 +96,12 @@ export function EntitySidebarShell({
   tabs,
   children,
   footer,
+  drawerClassName,
+  headerClassName,
+  entityHeaderClassName,
+  tabsClassName,
+  contentClassName,
+  footerClassName,
   isEmpty = false,
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
@@ -94,11 +113,13 @@ export function EntitySidebarShell({
       onKeyDown={onKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid={testId}
+      className={drawerClassName}
     >
       <div className='flex h-full flex-col'>
         {/* Header bar — close is in the overflow dropdown */}
         <DrawerHeader
           title={title}
+          className={headerClassName}
           actions={
             headerActions ??
             (onClose ? (
@@ -120,26 +141,46 @@ export function EntitySidebarShell({
           <>
             {/* Entity header — image + name area */}
             {entityHeader && (
-              <div className='shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-4 pb-3'>
+              <div
+                className={cn(
+                  'shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-4 pb-3',
+                  entityHeaderClassName
+                )}
+              >
                 {entityHeader}
               </div>
             )}
 
             {/* Tabs */}
             {tabs && (
-              <div className='shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2 [&>*]:w-full'>
+              <div
+                className={cn(
+                  'shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2 [&>*]:w-full',
+                  tabsClassName
+                )}
+              >
                 {tabs}
               </div>
             )}
 
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-3.5'>
+            <div
+              className={cn(
+                'flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-3.5',
+                contentClassName
+              )}
+            >
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] py-3'>
+              <div
+                className={cn(
+                  'shrink-0 border-t border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] py-3',
+                  footerClassName
+                )}
+              >
                 {footer}
               </div>
             )}

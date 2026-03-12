@@ -1,9 +1,19 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
-import { CheckCircle, RefreshCw, Star, Trash2, XCircle } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import {
+  CheckCircle,
+  RefreshCw,
+  Search,
+  Star,
+  Trash2,
+  X,
+  XCircle,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { ExportCSVButton } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
@@ -139,27 +149,36 @@ export function AdminCreatorsToolbar({
               <form
                 action={basePath}
                 method='get'
-                className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
+                className='relative isolate flex w-full items-center gap-2 sm:w-auto'
               >
                 <input type='hidden' name='sort' value={sort} />
                 <input type='hidden' name='pageSize' value={pageSize} />
-                <Input
-                  name='q'
-                  placeholder='Search by handle'
+                <input type='hidden' name='q' value={searchTerm} />
+                <AppSearchField
                   value={searchTerm}
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    setSearchTerm(event.target.value)
-                  }
-                  className='w-full sm:w-[240px]'
+                  onChange={setSearchTerm}
+                  placeholder='Search by handle'
+                  ariaLabel='Search creators by handle'
+                  className='min-w-0 flex-1 sm:w-[240px] sm:flex-none'
                 />
                 <input type='hidden' name='page' value='1' />
-                <Button type='submit' size='sm' variant='secondary'>
-                  Search
-                </Button>
+                <AppIconButton
+                  type='submit'
+                  ariaLabel='Search creators'
+                  tooltipLabel='Search creators'
+                >
+                  <Search />
+                </AppIconButton>
                 {search && search.length > 0 && (
-                  <Button asChild size='sm' variant='ghost'>
-                    <Link href={clearHref}>Clear</Link>
-                  </Button>
+                  <AppIconButton
+                    asChild
+                    ariaLabel='Clear creator search'
+                    tooltipLabel='Clear search'
+                  >
+                    <Link href={clearHref}>
+                      <X />
+                    </Link>
+                  </AppIconButton>
                 )}
               </form>
               <ExportCSVButton<AdminCreatorProfileRow>

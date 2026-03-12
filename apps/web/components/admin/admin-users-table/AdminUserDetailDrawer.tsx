@@ -1,10 +1,15 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import { Copy, ExternalLink, X } from 'lucide-react';
+import { Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
+import {
+  DrawerPropertyRow,
+  DrawerSection,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
 
@@ -38,50 +43,10 @@ function computeProfileCompleteness(user: AdminUserRow): {
     { label: 'Active account', filled: !user.deletedAt },
   ];
 
-  const filled = fields.filter(f => f.filled).length;
+  const filled = fields.filter(field => field.filled).length;
   const score = Math.round((filled / fields.length) * 100);
 
   return { score, fields };
-}
-
-function ProfileCompletenessBar({
-  score,
-  fields,
-}: {
-  score: number;
-  fields: ProfileField[];
-}) {
-  return (
-    <div className='space-y-3'>
-      <div className='flex items-center justify-between'>
-        <span className='text-xs font-medium text-secondary-token uppercase tracking-wide'>
-          Profile completeness
-        </span>
-        <span className='text-sm font-semibold text-primary-token'>
-          {score}%
-        </span>
-      </div>
-      <div className='h-2 w-full rounded-full bg-surface-3 overflow-hidden'>
-        <div
-          className='h-full rounded-full bg-brand-primary transition-all duration-300'
-          style={{ width: `${score}%` }}
-        />
-      </div>
-      <ul className='space-y-1.5'>
-        {fields.map(field => (
-          <li
-            key={field.label}
-            className='flex items-center gap-2 text-xs text-secondary-token'
-          >
-            <span
-              className={`inline-block h-1.5 w-1.5 rounded-full ${field.filled ? 'bg-success' : 'bg-error'}`}
-            />
-            {field.label}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
 }
 
 function CopyButton({ value, label }: { value: string; label: string }) {
@@ -95,181 +60,182 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   }, [value, label]);
 
   return (
-    <button
+    <AppIconButton
       type='button'
+      variant='ghost'
+      ariaLabel={`Copy ${label}`}
+      tooltipLabel={`Copy ${label}`}
+      className='h-6 w-6 border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
       onClick={handleCopy}
-      className='inline-flex items-center text-secondary-token hover:text-primary-token transition-colors'
-      aria-label={`Copy ${label}`}
     >
-      <Copy className='h-3 w-3' />
-    </button>
+      <Copy />
+    </AppIconButton>
   );
 }
 
-function UserDrawerContent({
-  user,
-  onClose,
+function ProfileCompletenessBar({
+  score,
+  fields,
 }: {
-  readonly user: AdminUserRow;
-  readonly onClose: () => void;
+  readonly score: number;
+  readonly fields: ProfileField[];
 }) {
-  const { score, fields } = computeProfileCompleteness(user);
   return (
-    <div className='flex flex-col h-full'>
-      <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
-        <h3 className='text-sm font-semibold text-primary-token truncate'>
-          User details
-        </h3>
-        <button
-          type='button'
-          onClick={onClose}
-          className='rounded-md p-1 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
-          aria-label='Close drawer'
-        >
-          <X className='h-4 w-4' />
-        </button>
+    <div className='space-y-3 rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3'>
+      <div className='flex items-center justify-between'>
+        <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          Profile completeness
+        </span>
+        <span className='text-[13px] font-[590] tracking-[-0.01em] text-(--linear-text-primary)'>
+          {score}%
+        </span>
       </div>
-
-      <div className='flex-1 overflow-y-auto p-4 space-y-5'>
-        {/* Name and email */}
-        <div className='space-y-1'>
-          <p className='text-base font-semibold text-primary-token'>
-            {user.name ?? 'Unnamed user'}
-          </p>
-          {user.email ? (
-            <div className='flex items-center gap-1.5'>
-              <p className='text-sm text-secondary-token truncate'>
-                {user.email}
-              </p>
-              <CopyButton value={user.email} label='Email' />
-            </div>
-          ) : (
-            <p className='text-sm text-secondary-token'>No email</p>
-          )}
-        </div>
-
-        {/* Status badges */}
-        <div className='flex flex-wrap gap-2'>
-          <Badge
-            size='sm'
-            variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+      <div className='h-1.5 w-full overflow-hidden rounded-full bg-(--linear-bg-surface-2)'>
+        <div
+          className='h-full rounded-full bg-brand-primary transition-all duration-300'
+          style={{ width: `${score}%` }}
+        />
+      </div>
+      <ul className='grid grid-cols-1 gap-1.5 sm:grid-cols-2'>
+        {fields.map(field => (
+          <li
+            key={field.label}
+            className='flex items-center gap-2 text-[12px] leading-[16px] text-(--linear-text-secondary)'
           >
-            {user.plan}
-          </Badge>
-          {user.deletedAt ? (
-            <Badge size='sm' variant='warning'>
-              Deleted
-            </Badge>
-          ) : (
-            <Badge size='sm' variant='success'>
-              Active
-            </Badge>
-          )}
-        </div>
-
-        {/* Profile completeness */}
-        <ProfileCompletenessBar score={score} fields={fields} />
-
-        {user.socialLinks && user.socialLinks.length > 0 ? (
-          <div className='space-y-3'>
-            <p className='text-xs font-medium text-secondary-token uppercase tracking-wide'>
-              Social & music links
-            </p>
-            <div className='space-y-2'>
-              {user.socialLinks.slice(0, 8).map(link => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  className='flex items-center justify-between rounded-lg border border-subtle px-3 py-2 text-sm hover:bg-surface-2 transition-colors'
-                >
-                  <span className='text-primary-token capitalize'>
-                    {link.displayText ?? link.platform.replaceAll('_', ' ')}
-                  </span>
-                  <ExternalLink className='h-3.5 w-3.5 text-secondary-token' />
-                </a>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Details section */}
-        <div className='space-y-3'>
-          <p className='text-xs font-medium text-secondary-token uppercase tracking-wide'>
-            Details
-          </p>
-
-          <dl className='space-y-2 text-sm'>
-            <div className='flex justify-between'>
-              <dt className='text-secondary-token'>User ID</dt>
-              <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-                <span className='truncate max-w-[140px]'>{user.id}</span>
-                <CopyButton value={user.id} label='User ID' />
-              </dd>
-            </div>
-
-            <div className='flex justify-between'>
-              <dt className='text-secondary-token'>Clerk ID</dt>
-              <dd className='flex items-center gap-1.5 text-primary-token font-mono text-xs'>
-                <span className='truncate max-w-[140px]'>{user.clerkId}</span>
-                <CopyButton value={user.clerkId} label='Clerk ID' />
-              </dd>
-            </div>
-
-            <div className='flex justify-between'>
-              <dt className='text-secondary-token'>Signed up</dt>
-              <dd className='text-primary-token'>
-                {dateFormatter.format(user.createdAt)}
-              </dd>
-            </div>
-
-            {user.deletedAt ? (
-              <div className='flex justify-between'>
-                <dt className='text-secondary-token'>Deleted</dt>
-                <dd className='text-primary-token'>
-                  {dateFormatter.format(user.deletedAt)}
-                </dd>
-              </div>
-            ) : null}
-
-            <div className='flex justify-between'>
-              <dt className='text-secondary-token'>Stripe customer</dt>
-              <dd className='text-primary-token'>
-                {user.stripeCustomerId ? (
-                  <span className='font-mono text-xs truncate max-w-[140px] inline-block'>
-                    {user.stripeCustomerId}
-                  </span>
-                ) : (
-                  <span className='text-tertiary-token'>None</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        {/* Actions */}
-        {user.clerkId.length > 0 ? (
-          <div>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={() => {
-                globalThis.open(
-                  `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(user.clerkId)}`,
-                  '_blank',
-                  'noopener,noreferrer'
-                );
-              }}
-            >
-              <ExternalLink className='mr-1.5 h-3.5 w-3.5' />
-              Open in Clerk
-            </Button>
-          </div>
-        ) : null}
-      </div>
+            <span
+              className={[
+                'inline-block h-1.5 w-1.5 rounded-full',
+                field.filled ? 'bg-success' : 'bg-error',
+              ].join(' ')}
+            />
+            {field.label}
+          </li>
+        ))}
+      </ul>
     </div>
+  );
+}
+
+function buildStatusBadges(user: AdminUserRow) {
+  return (
+    <div className='flex flex-wrap gap-2'>
+      <Badge size='sm' variant={user.plan === 'pro' ? 'primary' : 'secondary'}>
+        {user.plan}
+      </Badge>
+      {user.deletedAt ? (
+        <Badge size='sm' variant='warning'>
+          Deleted
+        </Badge>
+      ) : (
+        <Badge size='sm' variant='success'>
+          Active
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function UserHeader({ user }: { readonly user: AdminUserRow }) {
+  return (
+    <div className='space-y-3'>
+      <div className='space-y-1'>
+        <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-(--linear-text-primary)'>
+          {user.name ?? 'Unnamed user'}
+        </p>
+        <p className='truncate text-[12px] leading-[16px] text-(--linear-text-secondary)'>
+          {user.email ?? 'No email'}
+        </p>
+      </div>
+      {buildStatusBadges(user)}
+    </div>
+  );
+}
+
+function IdValue({ value, label }: { readonly value: string; readonly label: string }) {
+  return (
+    <div className='flex min-w-0 items-center justify-end gap-1'>
+      <span className='truncate font-mono text-[11px] text-(--linear-text-primary)'>
+        {value}
+      </span>
+      <CopyButton value={value} label={label} />
+    </div>
+  );
+}
+
+function SocialLinksSection({ user }: { readonly user: AdminUserRow }) {
+  if (!user.socialLinks || user.socialLinks.length === 0) return null;
+
+  return (
+    <DrawerSection title='Social & music links'>
+      <div className='space-y-1'>
+        {user.socialLinks.slice(0, 8).map(link => (
+          <a
+            key={link.id}
+            href={link.url}
+            target='_blank'
+            rel='noopener noreferrer'
+            className='flex min-h-[34px] items-center justify-between rounded-[8px] px-2.5 py-2 text-[13px] text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          >
+            <span className='min-w-0 truncate capitalize'>
+              {link.displayText ?? link.platform.replaceAll('_', ' ')}
+            </span>
+            <ExternalLink className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)' />
+          </a>
+        ))}
+      </div>
+    </DrawerSection>
+  );
+}
+
+function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
+  const { score, fields } = computeProfileCompleteness(user);
+
+  return (
+    <>
+      <ProfileCompletenessBar score={score} fields={fields} />
+
+      <DrawerSection title='Details'>
+        <div className='space-y-1'>
+          <DrawerPropertyRow
+            label='User ID'
+            labelWidth={96}
+            value={<IdValue value={user.id} label='User ID' />}
+          />
+          <DrawerPropertyRow
+            label='Clerk ID'
+            labelWidth={96}
+            value={<IdValue value={user.clerkId} label='Clerk ID' />}
+          />
+          <DrawerPropertyRow
+            label='Signed up'
+            labelWidth={96}
+            value={dateFormatter.format(user.createdAt)}
+          />
+          {user.deletedAt ? (
+            <DrawerPropertyRow
+              label='Deleted'
+              labelWidth={96}
+              value={dateFormatter.format(user.deletedAt)}
+            />
+          ) : null}
+          <DrawerPropertyRow
+            label='Stripe'
+            labelWidth={96}
+            value={
+              user.stripeCustomerId ? (
+                <span className='truncate font-mono text-[11px] text-(--linear-text-primary)'>
+                  {user.stripeCustomerId}
+                </span>
+              ) : (
+                <span className='text-(--linear-text-tertiary)'>None</span>
+              )
+            }
+          />
+        </div>
+      </DrawerSection>
+
+      <SocialLinksSection user={user} />
+    </>
   );
 }
 
@@ -278,8 +244,37 @@ export function AdminUserDetailDrawer({
   onClose,
 }: AdminUserDetailDrawerProps) {
   return (
-    <RightDrawer isOpen={user !== null} width={400} ariaLabel='User details'>
-      {user && <UserDrawerContent user={user} onClose={onClose} />}
-    </RightDrawer>
+    <EntitySidebarShell
+      isOpen={user !== null}
+      width={400}
+      ariaLabel='User details'
+      title='User details'
+      onClose={onClose}
+      isEmpty={!user}
+      emptyMessage='Select a user to view details.'
+      entityHeader={user ? <UserHeader user={user} /> : undefined}
+      footer={
+        user?.clerkId ? (
+          <Button
+            type='button'
+            variant='secondary'
+            size='sm'
+            className='w-full'
+            onClick={() => {
+              globalThis.open(
+                `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(user.clerkId)}`,
+                '_blank',
+                'noopener,noreferrer'
+              );
+            }}
+          >
+            <ExternalLink className='mr-1.5 h-3.5 w-3.5' />
+            Open in Clerk
+          </Button>
+        ) : undefined
+      }
+    >
+      {user ? <UserDrawerContent user={user} /> : null}
+    </EntitySidebarShell>
   );
 }

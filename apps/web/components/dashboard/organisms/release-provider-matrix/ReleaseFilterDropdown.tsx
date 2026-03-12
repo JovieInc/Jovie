@@ -493,12 +493,12 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token',
+                'h-7 gap-1.5 rounded-md border border-transparent px-2 text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token md:px-3',
                 buttonClassName
               )}
             >
               <Icon name='Filter' className='h-3.5 w-3.5' />
-              Filter
+              <span className='sr-only md:not-sr-only'>Filter</span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>

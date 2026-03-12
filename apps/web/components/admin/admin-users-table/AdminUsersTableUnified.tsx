@@ -1,8 +1,8 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Copy, ExternalLink, Users } from 'lucide-react';
+import { Copy, ExternalLink, Search, Users, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -11,6 +11,8 @@ import {
   AdminTableSubheader,
 } from '@/components/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
@@ -122,6 +124,7 @@ function AdminUserMobileCard({
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const { users: initialUsers, pageSize, total, search, sort } = props;
+  const [searchTerm, setSearchTerm] = useState(search);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminUsersInfiniteQuery({
@@ -448,22 +451,34 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                       <form
                         action={APP_ROUTES.ADMIN_USERS}
                         method='get'
-                        className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
+                        className='relative isolate flex w-full items-center gap-2 sm:w-auto'
                       >
                         <input type='hidden' name='sort' value={sort} />
-                        <Input
-                          name='q'
-                          defaultValue={search}
+                        <input type='hidden' name='q' value={searchTerm} />
+                        <AppSearchField
+                          value={searchTerm}
+                          onChange={setSearchTerm}
                           placeholder='Search by email, name, or handle'
-                          className='w-full sm:w-[280px]'
+                          ariaLabel='Search users by email, name, or handle'
+                          className='min-w-0 flex-1 sm:w-[280px] sm:flex-none'
                         />
-                        <Button type='submit' size='sm' variant='secondary'>
-                          Search
-                        </Button>
+                        <AppIconButton
+                          type='submit'
+                          ariaLabel='Search users'
+                          tooltipLabel='Search users'
+                        >
+                          <Search />
+                        </AppIconButton>
                         {search ? (
-                          <Button asChild size='sm' variant='ghost'>
-                            <Link href='?'>Clear</Link>
-                          </Button>
+                          <AppIconButton
+                            asChild
+                            ariaLabel='Clear user search'
+                            tooltipLabel='Clear search'
+                          >
+                            <Link href='?'>
+                              <X />
+                            </Link>
+                          </AppIconButton>
                         ) : null}
                       </form>
                       <ExportCSVButton<AdminUserRow>

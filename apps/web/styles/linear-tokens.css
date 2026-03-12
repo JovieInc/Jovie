@@ -215,6 +215,8 @@
   --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
+  --linear-row-hover: var(--linear-bg-surface-1);
+  --linear-row-selected: oklch(96.5% 0.003 260);
   --linear-app-sidebar-width: 232px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
@@ -340,6 +342,8 @@
   --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.04), -12px 0 32px rgba(0, 0, 0, 0.24);
+  --linear-row-hover: rgba(255, 255, 255, 0.025);
+  --linear-row-selected: rgba(255, 255, 255, 0.04);
   --linear-app-sidebar-background-rgb: 15 16 17;
   --linear-app-sidebar-foreground-rgb: 227 228 229;
   --linear-app-sidebar-border-rgb: 255 255 255 / 0.06;

@@ -45,6 +45,7 @@ export function AddProviderUrlPopover({
       <PopoverTrigger asChild>
         <button
           type='button'
+          aria-label={`Add ${providerLabel} link`}
           className='group/add inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
         >
           <Icon

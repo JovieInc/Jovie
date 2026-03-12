@@ -36,8 +36,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 bg-(--linear-bg-header) supports-[backdrop-filter]:backdrop-blur-md',
-        showDivider && 'border-b border-(--linear-border-subtle)',
+        'z-20 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) supports-[backdrop-filter]:backdrop-blur-md',
         className
       )}
     >
@@ -70,17 +69,20 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex flex-1 items-center text-[13px] tracking-[-0.01em]'>
-          {!breadcrumbSuffix && (
-            <>
-              <span className='text-(--linear-text-tertiary)'>{rootLabel}</span>
-              <ChevronRight className='mx-0.5 size-3.5 text-(--linear-text-quaternary)' />
-              <span className='font-[510] text-primary-token'>
-                {currentLabel}
-              </span>
-            </>
+        <div className='flex flex-1 min-w-0 items-center gap-1 text-[13px] tracking-[-0.01em]'>
+          <span className='shrink-0 text-(--linear-text-tertiary)'>
+            {rootLabel}
+          </span>
+          <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
+          {breadcrumbSuffix ? (
+            <div className='min-w-0 truncate text-(--linear-text-secondary)'>
+              {breadcrumbSuffix}
+            </div>
+          ) : (
+            <span className='truncate font-[510] text-primary-token'>
+              {currentLabel}
+            </span>
           )}
-          {breadcrumbSuffix}
         </div>
         {action ? (
           <div className='ml-auto flex items-center gap-[var(--linear-app-toolbar-gap)]'>

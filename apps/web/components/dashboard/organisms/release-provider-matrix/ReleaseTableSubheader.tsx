@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import {
   APP_CONTROL_BUTTON_CLASS,
   AppIconButton,
@@ -72,6 +72,8 @@ interface ReleaseTableSubheaderProps {
   readonly isSearchOpen?: boolean;
   /** Callback to toggle search open/close */
   readonly onSearchToggle?: () => void;
+  /** Primary action rendered with the toolbar controls */
+  readonly primaryAction?: ReactNode;
 }
 
 /** Options for release view segmented control */
@@ -104,6 +106,35 @@ function InlineReleaseViewTabs({
       className='hidden md:inline-flex'
       surface='ghost'
       triggerClassName='flex-none'
+      aria-label='Choose releases view'
+    />
+  );
+}
+
+function CompactReleaseViewTabs({
+  value,
+  onChange,
+}: {
+  readonly value: ReleaseView;
+  readonly onChange: (value: ReleaseView) => void;
+}) {
+  return (
+    <AppSegmentControl
+      value={value}
+      onValueChange={onChange}
+      options={RELEASE_VIEW_OPTIONS.map(option => ({
+        value: option.value,
+        label: (
+          <span className='inline-flex items-center gap-1.5'>
+            <Icon name={option.icon} className='h-3.5 w-3.5' />
+            {option.label}
+          </span>
+        ),
+      }))}
+      size='sm'
+      className='inline-flex w-full md:hidden'
+      surface='ghost'
+      triggerClassName='flex-1'
       aria-label='Choose releases view'
     />
   );
@@ -187,12 +218,14 @@ function LinearStyleDisplayMenu({
   releaseView,
   onReleaseViewChange,
   triggerClassName,
+  compact = false,
 }: {
   groupByYear?: boolean;
   onGroupByYearChange?: (group: boolean) => void;
   releaseView?: ReleaseView;
   onReleaseViewChange?: (view: ReleaseView) => void;
   triggerClassName?: string;
+  compact?: boolean;
 }) {
   return (
     <Popover>
@@ -205,13 +238,12 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className={cn(
-              APP_CONTROL_BUTTON_CLASS,
-              triggerClassName
-            )}
+            className={cn(APP_CONTROL_BUTTON_CLASS, 'px-2 md:px-3', triggerClassName)}
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
-            Display
+            <span className={cn(compact && 'sr-only md:not-sr-only')}>
+              Display
+            </span>
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
@@ -274,23 +306,30 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onReleaseViewChange,
   isSearchOpen,
   onSearchToggle,
+  primaryAction,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-[var(--linear-app-header-padding-x)] py-2'>
-      <div className='flex items-center gap-3'>
+    <div className='flex flex-col gap-2 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-1.5 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)]'>
+      <div className='flex min-w-0 flex-1 items-center gap-2 md:w-auto md:flex-none'>
         {onReleaseViewChange ? (
-          <InlineReleaseViewTabs
-            value={releaseView}
-            onChange={onReleaseViewChange}
-          />
+          <>
+            <CompactReleaseViewTabs
+              value={releaseView}
+              onChange={onReleaseViewChange}
+            />
+            <InlineReleaseViewTabs
+              value={releaseView}
+              onChange={onReleaseViewChange}
+            />
+          </>
         ) : null}
       </div>
 
       {/* Right: Search + Filter + Display + Export */}
-      <ActionBar className='ml-auto hidden items-center md:flex'>
+      <ActionBar className='ml-auto flex w-full items-center justify-end gap-1.5 md:w-auto'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
@@ -299,12 +338,13 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               onClick={onSearchToggle}
               className={cn(
                 ACTION_BAR_BUTTON_CLASS,
+                'px-2 md:px-3',
                 isSearchOpen && 'bg-interactive-active text-primary-token'
               )}
               aria-pressed={isSearchOpen}
             >
               <Icon name='Search' className='h-3.5 w-3.5' />
-              Search
+              <span className='sr-only md:not-sr-only'>Search</span>
             </Button>
           </TooltipShortcut>
         )}
@@ -314,16 +354,13 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           counts={counts}
           buttonClassName={ACTION_BAR_BUTTON_CLASS}
         />
-        <div
-          className='h-4 w-px bg-(--linear-border-subtle)'
-          aria-hidden='true'
-        />
         <LinearStyleDisplayMenu
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}
           onReleaseViewChange={onReleaseViewChange}
           triggerClassName={ACTION_BAR_BUTTON_CLASS}
+          compact
         />
         <ExportCSVButton
           getData={() => getReleasesForExport(releases, selectedIds)}
@@ -332,9 +369,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label='Export'
           variant='ghost'
           size='sm'
-          className={ACTION_BAR_BUTTON_CLASS}
+          className={cn(ACTION_BAR_BUTTON_CLASS, 'hidden md:inline-flex')}
           tooltipLabel='Export'
         />
+        {primaryAction}
       </ActionBar>
     </div>
   );

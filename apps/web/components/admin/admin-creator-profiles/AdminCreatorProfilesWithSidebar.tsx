@@ -15,11 +15,9 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -432,34 +430,25 @@ export function AdminCreatorProfilesWithSidebar({
           </AdminTableShell>
         </QueryErrorBoundary>
       </div>
-      <RightDrawer
-        isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={SIDEBAR_WIDTH}
-        ariaLabel='Contact details'
-        className='bg-surface-2 border-subtle'
+      <Suspense
+        fallback={
+          <div className='w-[320px] shrink-0 space-y-4 border-l border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) p-4'>
+            <div className='h-10 w-32 animate-pulse rounded-md bg-(--linear-bg-surface-1)' />
+            <div className='h-20 w-full animate-pulse rounded-md bg-(--linear-bg-surface-1)' />
+            <div className='h-40 w-full animate-pulse rounded-md bg-(--linear-bg-surface-1)' />
+          </div>
+        }
       >
-        <div className='flex-1 min-h-0 overflow-auto'>
-          <Suspense
-            fallback={
-              <div className='space-y-4 p-4'>
-                <div className='h-10 w-32 animate-pulse rounded-md bg-surface-1' />
-                <div className='h-20 w-full animate-pulse rounded-md bg-surface-1' />
-                <div className='h-40 w-full animate-pulse rounded-md bg-surface-1' />
-              </div>
-            }
-          >
-            <ContactSidebar
-              contact={effectiveContact}
-              mode={mode}
-              isOpen={sidebarOpen && Boolean(effectiveContact)}
-              onClose={handleSidebarClose}
-              onRefresh={handleSidebarRefresh}
-              onContactChange={handleContactChange}
-              onAvatarUpload={handleAvatarUpload}
-            />
-          </Suspense>
-        </div>
-      </RightDrawer>
+        <ContactSidebar
+          contact={effectiveContact}
+          mode={mode}
+          isOpen={sidebarOpen && Boolean(effectiveContact)}
+          onClose={handleSidebarClose}
+          onRefresh={handleSidebarRefresh}
+          onContactChange={handleContactChange}
+          onAvatarUpload={handleAvatarUpload}
+        />
+      </Suspense>
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}

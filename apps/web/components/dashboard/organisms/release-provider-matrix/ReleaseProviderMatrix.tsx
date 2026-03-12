@@ -508,48 +508,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const headerActions = useMemo(
     () => (
       <div className='flex items-center gap-[var(--linear-app-toolbar-gap)]'>
-        {showImportProgress && (
-          <ImportProgressBanner
-            artistName={artistName}
-            importedCount={importedCount}
-            compact
-          />
-        )}
-        {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
-          <AppleMusicSyncBanner
-            profileId={rows[0].profileId}
-            spotifyConnected={isConnected}
-            releases={rows}
-            compact
-            onMatchStatusChange={handleMatchStatusChange}
-          />
-        )}
-        {canCreateManualReleases && (
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={handleNewRelease}
-            className={APP_CONTROL_BUTTON_CLASS}
-          >
-            <Icon name='Plus' className='h-3.5 w-3.5' />
-            <span className='hidden sm:inline'>New Release</span>
-          </Button>
-        )}
         <DrawerToggleButton className='h-[var(--linear-app-control-height-sm)] w-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)' />
       </div>
     ),
-    [
-      showImportProgress,
-      artistName,
-      importedCount,
-      showReleasesTable,
-      rows,
-      isAmConnected,
-      isConnected,
-      handleMatchStatusChange,
-      canCreateManualReleases,
-      handleNewRelease,
-    ]
+    []
   );
 
   // Header search input — shown when search is open
@@ -741,16 +703,40 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onReleaseViewChange={setReleaseView}
               isSearchOpen={isSearchOpen}
               onSearchToggle={() => setIsSearchOpen(open => !open)}
+              primaryAction={
+                canCreateManualReleases ? (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={handleNewRelease}
+                    className={APP_CONTROL_BUTTON_CLASS}
+                  >
+                    <Icon name='Plus' className='h-3.5 w-3.5' />
+                    <span className='hidden sm:inline'>New Release</span>
+                  </Button>
+                ) : undefined
+              }
             />
           )}
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            <ImportProgressBanner
-              artistName={artistName}
-              importedCount={importedCount}
-              visible={showImportProgress}
-            />
+            {showImportProgress && (
+              <ImportProgressBanner
+                artistName={artistName}
+                importedCount={importedCount}
+                visible={showImportProgress}
+              />
+            )}
+            {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
+              <AppleMusicSyncBanner
+                profileId={rows[0].profileId}
+                spotifyConnected={isConnected}
+                releases={rows}
+                onMatchStatusChange={handleMatchStatusChange}
+                className='mx-4 mt-2'
+              />
+            )}
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnectSpotify={() => setSpotifySearchOpen(true)}

@@ -11,7 +11,11 @@ import {
 } from '@/components/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
+import {
+  DrawerPropertyRow,
+  DrawerSection,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { UnifiedTable } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
@@ -172,8 +176,8 @@ export function AdminFeedbackTable({
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'bg-white/[0.04] cursor-pointer'
-        : 'hover:bg-white/[0.02] cursor-pointer group',
+        ? 'cursor-pointer bg-(--linear-row-selected)'
+        : 'group cursor-pointer hover:bg-(--linear-row-hover)',
     [selectedId]
   );
 
@@ -229,77 +233,58 @@ export function AdminFeedbackTable({
         </AdminTableShell>
       </div>
 
-      <RightDrawer
+      <EntitySidebarShell
         isOpen={Boolean(selected)}
         width={560}
         ariaLabel='Feedback details'
-      >
-        {selected ? (
-          <div className='p-6 space-y-6 overflow-x-hidden'>
-            <div>
-              <h3 className='text-lg font-semibold text-primary-token'>
-                Feedback details
-              </h3>
-              <p className='text-sm text-secondary-token'>
+        title='Feedback details'
+        onClose={() => setSelectedId(null)}
+        isEmpty={!selected}
+        emptyMessage='Select a feedback row to view details.'
+        entityHeader={
+          selected ? (
+            <div className='space-y-2'>
+              <p className='text-[12px] leading-[16px] text-(--linear-text-secondary)'>
                 Source: {selected.source} ·{' '}
                 {new Date(selected.createdAtIso).toLocaleString()}
               </p>
+              <div className='space-y-0.5'>
+                <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-(--linear-text-primary)'>
+                  {selected.user.name ?? 'Unknown user'}
+                </p>
+                <p className='truncate text-[12px] leading-[16px] text-(--linear-text-secondary)'>
+                  {selected.user.email ?? 'No email available'}
+                </p>
+              </div>
             </div>
-
-            <div className='space-y-2'>
-              <p className='text-xs uppercase tracking-wide text-secondary-token'>
-                User
-              </p>
-              <p className='text-sm text-primary-token'>
-                {selected.user.name ?? 'Unknown user'}
-              </p>
-              <p className='text-sm text-secondary-token'>
-                {selected.user.email ?? 'No email available'}
-              </p>
-              <p className='text-xs text-secondary-token'>
-                Clerk ID: {selected.user.clerkId ?? 'N/A'}
-              </p>
-            </div>
-
-            <div className='space-y-2'>
-              <p className='text-xs uppercase tracking-wide text-secondary-token'>
-                Feedback
-              </p>
-              <p className='text-sm leading-relaxed text-primary-token whitespace-pre-wrap'>
-                {selected.message}
-              </p>
-            </div>
-
-            <div className='space-y-2'>
-              <p className='text-xs uppercase tracking-wide text-secondary-token'>
-                Context
-              </p>
-              <pre className='text-xs bg-surface-2 border border-subtle rounded-lg p-3 overflow-auto text-secondary-token'>
-                {JSON.stringify(selected.context, null, 2)}
-              </pre>
-            </div>
-
-            <div className='flex items-center gap-3'>
-              <Button
-                type='button'
-                onClick={dismissSelected}
-                disabled={selected.status === 'dismissed'}
-                loading={dismissingId === selected.id}
-              >
-                Dismiss
-              </Button>
-              <Button
-                type='button'
-                variant='secondary'
-                onClick={copySelectedAsMarkdown}
-              >
-                <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
-                Copy as Markdown
-              </Button>
-              <span className='text-xs text-secondary-token'>
+          ) : undefined
+        }
+        footer={
+          selected ? (
+            <div className='space-y-3'>
+              <div className='flex items-center gap-2'>
+                <Button
+                  type='button'
+                  onClick={dismissSelected}
+                  disabled={selected.status === 'dismissed'}
+                  loading={dismissingId === selected.id}
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  type='button'
+                  variant='secondary'
+                  onClick={copySelectedAsMarkdown}
+                >
+                  <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
+                  Copy as Markdown
+                </Button>
+              </div>
+              <span className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
                 {(() => {
-                  if (selected.status !== 'dismissed')
+                  if (selected.status !== 'dismissed') {
                     return 'Marked as pending';
+                  }
                   const date = selected.dismissedAtIso
                     ? new Date(selected.dismissedAtIso).toLocaleString()
                     : '';
@@ -307,9 +292,45 @@ export function AdminFeedbackTable({
                 })()}
               </span>
             </div>
-          </div>
+          ) : undefined
+        }
+      >
+        {selected ? (
+          <>
+            <DrawerSection title='User'>
+              <div className='space-y-1'>
+                <DrawerPropertyRow
+                  label='User'
+                  labelWidth={84}
+                  value={selected.user.name ?? 'Unknown user'}
+                />
+                <DrawerPropertyRow
+                  label='Email'
+                  labelWidth={84}
+                  value={selected.user.email ?? 'No email available'}
+                />
+                <DrawerPropertyRow
+                  label='Clerk ID'
+                  labelWidth={84}
+                  value={selected.user.clerkId ?? 'N/A'}
+                />
+              </div>
+            </DrawerSection>
+
+            <DrawerSection title='Feedback'>
+              <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-(--linear-text-primary)'>
+                {selected.message}
+              </div>
+            </DrawerSection>
+
+            <DrawerSection title='Context'>
+              <pre className='overflow-auto rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3 text-[11px] leading-[16px] text-(--linear-text-secondary)'>
+                {JSON.stringify(selected.context, null, 2)}
+              </pre>
+            </DrawerSection>
+          </>
         ) : null}
-      </RightDrawer>
+      </EntitySidebarShell>
     </div>
   );
 }

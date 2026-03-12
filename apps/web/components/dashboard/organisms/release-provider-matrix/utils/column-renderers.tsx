@@ -264,7 +264,7 @@ export function createRightMetaCellRenderer(
     const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
     return (
-      <div className='grid min-w-[220px] grid-cols-[minmax(0,1fr)_20px_44px] items-center justify-end gap-x-3 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
+      <div className='grid min-w-[188px] grid-cols-[minmax(0,1fr)_16px_40px] items-center justify-end gap-x-2 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
         <div className='min-w-0'>
           <SmartLinkCell
             release={release}
@@ -277,7 +277,7 @@ export function createRightMetaCellRenderer(
           <PopularityIcon popularity={release.spotifyPopularity} />
         </div>
 
-        <span className='hidden w-12 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
+        <span className='hidden w-10 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
           {year ?? 'Unknown'}
         </span>
       </div>

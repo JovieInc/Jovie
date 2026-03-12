@@ -1,16 +1,12 @@
 (function () {
   try {
     var root = document.documentElement;
-    var isLocalDev =
-      globalThis.location &&
-      (globalThis.location.hostname === 'localhost' ||
-        globalThis.location.hostname === '127.0.0.1');
     var storedTheme =
       typeof localStorage !== 'undefined' && localStorage
         ? localStorage.getItem('jovie-theme')
         : null;
     var nextTheme =
-      isLocalDev && (storedTheme === 'light' || storedTheme === 'dark')
+      storedTheme === 'light' || storedTheme === 'dark'
         ? storedTheme
         : 'dark';
 

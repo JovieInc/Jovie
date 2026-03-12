@@ -44,10 +44,10 @@ export function ProfileAnalyticsSummary() {
   // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <div className='rounded-lg border border-subtle/60 bg-surface-2/40'>
+      <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
         <div
           className={cn(
-            'grid grid-cols-2 divide-x divide-subtle/80 p-3.5',
+            'grid grid-cols-2 divide-x divide-(--linear-border-subtle) p-3.5',
             STAT_MIN_HEIGHT
           )}
         >
@@ -65,17 +65,21 @@ export function ProfileAnalyticsSummary() {
   }
 
   if (isError && !data) {
-    return <p className='text-xs text-tertiary-token'>No data yet.</p>;
+    return (
+      <p className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
+        No data yet.
+      </p>
+    );
   }
 
   const profileViews = data?.profile_views ?? 0;
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <div className='rounded-lg border border-subtle/60 bg-surface-2/40'>
+    <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
       <div
         className={cn(
-          'grid grid-cols-2 divide-x divide-subtle/80 p-3.5 transition-opacity duration-150',
+          'grid grid-cols-2 divide-x divide-(--linear-border-subtle) p-3.5 transition-opacity duration-150',
           STAT_MIN_HEIGHT,
           isFetching && 'opacity-50'
         )}
@@ -95,17 +99,17 @@ export function ProfileAnalyticsSummary() {
       </div>
 
       {/* Time range selector */}
-      <div className='flex justify-end border-t border-subtle/60 px-3 py-1.5'>
+      <div className='flex justify-end border-t border-(--linear-border-subtle) px-3 py-1.5'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type='button'
-              className='inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-secondary-token transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
+              className='inline-flex items-center gap-1 rounded-[7px] px-1.5 py-0.5 text-[11px] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)'
             >
               <span>Last {currentOption.label}</span>
               <ChevronDown
                 size={10}
-                className='text-tertiary-token'
+                className='text-(--linear-text-tertiary)'
                 aria-hidden='true'
               />
             </button>
@@ -127,14 +131,14 @@ export function ProfileAnalyticsSummary() {
                     {option.requiresPro && (
                       <Lock
                         size={12}
-                        className='text-tertiary-token'
+                        className='text-(--linear-text-tertiary)'
                         aria-hidden='true'
                       />
                     )}
                     {isActive && !option.requiresPro && (
                       <Check
                         size={14}
-                        className='ml-auto text-primary-token'
+                        className='ml-auto text-(--linear-text-primary)'
                         aria-hidden='true'
                       />
                     )}

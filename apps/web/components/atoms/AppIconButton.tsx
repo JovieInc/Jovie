@@ -15,7 +15,8 @@ export const APP_ICON_BUTTON_CLASS = cn(
 export interface AppIconButtonProps
   extends Omit<ButtonProps, 'children' | 'size'> {
   readonly children: React.ReactNode;
-  readonly ariaLabel: string;
+  readonly ariaLabel?: string;
+  readonly 'aria-label'?: string;
   readonly tooltipLabel?: string;
   readonly tooltipShortcut?: string;
 }
@@ -27,6 +28,7 @@ export const AppIconButton = React.forwardRef<
   {
     children,
     ariaLabel,
+    'aria-label': ariaLabelProp,
     tooltipLabel,
     tooltipShortcut,
     variant = 'ghost',
@@ -35,13 +37,15 @@ export const AppIconButton = React.forwardRef<
   },
   ref
 ) {
+  const resolvedAriaLabel = ariaLabel ?? ariaLabelProp;
+
   const button = (
     <Button
       ref={ref}
       variant={variant}
       size='icon'
       className={cn(APP_ICON_BUTTON_CLASS, className)}
-      aria-label={ariaLabel}
+      aria-label={resolvedAriaLabel}
       {...props}
     >
       {children}

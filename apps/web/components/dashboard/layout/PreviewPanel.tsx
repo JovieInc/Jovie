@@ -9,11 +9,10 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
-import { DrawerHeader } from '@/components/molecules/drawer';
+import { EntitySidebarShell } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
 
 export const PREVIEW_PANEL_WIDTH = 360;
@@ -157,62 +156,54 @@ export function PreviewPanel() {
   const { username, displayName, avatarUrl, links } = previewData;
 
   return (
-    <RightDrawer
+    <EntitySidebarShell
       isOpen={isOpen}
       width={PREVIEW_PANEL_WIDTH}
       ariaLabel='Live Preview'
       contextMenuItems={contextMenuItems}
-    >
-      <div className='flex h-full flex-col'>
-        {/* Header with action buttons */}
-        <DrawerHeader
-          title='Live Preview'
+      title='Live Preview'
+      onClose={close}
+      headerActions={
+        <DrawerHeaderActions
+          primaryActions={primaryActions}
+          overflowActions={overflowActions}
           onClose={close}
-          actions={
-            <DrawerHeaderActions
-              primaryActions={primaryActions}
-              overflowActions={overflowActions}
-              onClose={close}
-            />
-          }
         />
-
-        {/* Preview Content */}
-        <div className='flex-1 min-h-0 overflow-y-auto p-4'>
-          <div className='flex flex-col items-center gap-4 pb-8'>
-            <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/3 dark:ring-white/5 shadow-sm shadow-black/10 dark:shadow-black/40'>
-              <ProfilePreview
-                username={username}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-                links={links}
-                className='h-full w-full'
-              />
-            </div>
-
-            {/* Hero CTA - View Jovie Profile */}
-            <Button asChild variant='primary' className='w-full max-w-[360px]'>
-              <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
-                <ExternalLink className='h-4 w-4 mr-2' aria-hidden='true' />
-                View Jovie Profile
-              </a>
-            </Button>
-          </div>
-        </div>
-
-        {/* Footer - URL Preview */}
-        <div className='shrink-0 border-t border-subtle p-4'>
-          <h3 className='text-[13px] font-medium text-primary-token mb-2'>
-            Your Profile URL
+      }
+      contentClassName='space-y-0 px-4 py-4'
+      footerClassName='px-4 py-4'
+      footer={
+        <div className='space-y-2'>
+          <h3 className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            Your profile URL
           </h3>
-          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
-            {profileUrl || 'Loading...'}
+          <div className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-[12px] font-medium tracking-[-0.01em] text-(--linear-text-primary)'>
+            <div className='truncate'>{profileUrl || 'Loading...'}</div>
           </div>
-          <p className='mt-2 text-xs text-secondary-token'>
-            Share this link with your audience
+          <p className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
+            Share this link with your audience.
           </p>
         </div>
+      }
+    >
+      <div className='flex flex-col items-center gap-4 pb-6'>
+        <div className='aspect-[9/19.5] max-h-[740px] w-full max-w-[360px] overflow-hidden rounded-[24px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) shadow-[0_20px_60px_rgba(0,0,0,0.24)] dark:shadow-[0_24px_72px_rgba(0,0,0,0.48)]'>
+          <ProfilePreview
+            username={username}
+            displayName={displayName}
+            avatarUrl={avatarUrl}
+            links={links}
+            className='h-full w-full'
+          />
+        </div>
+
+        <Button asChild variant='primary' className='w-full max-w-[360px]'>
+          <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
+            <ExternalLink className='mr-2 h-4 w-4' aria-hidden='true' />
+            View Jovie Profile
+          </a>
+        </Button>
       </div>
-    </RightDrawer>
+    </EntitySidebarShell>
   );
 }

@@ -124,7 +124,7 @@ export function ReleaseEditDialog({
                         <ProviderIcon
                           provider={provider.key}
                           className='h-4 w-4'
-                          aria-label={provider.label}
+                          aria-hidden='true'
                         />
                         <p className='text-[13px] font-[510] text-primary-token'>
                           {provider.label}

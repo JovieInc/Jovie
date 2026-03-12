@@ -156,7 +156,7 @@ function CoreProvidersInner({
     <ThemeProvider
       attribute='class'
       forcedTheme={canPreviewLightMode ? undefined : 'dark'}
-      defaultTheme='dark'
+      defaultTheme={canPreviewLightMode ? initialThemeMode : 'dark'}
       enableSystem={canPreviewLightMode}
       disableTransitionOnChange
       storageKey='jovie-theme'

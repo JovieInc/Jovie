@@ -22,13 +22,17 @@ export function AdminTableHeader({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-start justify-between gap-3 border-b border-subtle px-3 py-3 sm:px-4',
+        'flex flex-wrap items-start justify-between gap-3 border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-3',
         className
       )}
     >
       <div className='space-y-1'>
-        <h2 className='text-sm font-semibold text-primary-token'>{title}</h2>
-        <p className='text-xs text-secondary-token'>{subtitle}</p>
+        <h2 className='text-[14px] font-[590] tracking-[-0.01em] text-(--linear-text-primary)'>
+          {title}
+        </h2>
+        <p className='text-[12px] leading-[16px] text-(--linear-text-secondary)'>
+          {subtitle}
+        </p>
       </div>
       {actions ? <div className='w-full sm:w-auto'>{actions}</div> : null}
     </div>
@@ -40,7 +44,12 @@ export function AdminTableSubheader({
   className,
 }: Readonly<AdminTableSubheaderProps>) {
   return (
-    <div className={cn('border-b border-subtle px-3 py-2 sm:px-4', className)}>
+    <div
+      className={cn(
+        'border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-2',
+        className
+      )}
+    >
       {children}
     </div>
   );

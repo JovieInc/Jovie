@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 type SmartLinkGateBannerProps = {
@@ -73,7 +74,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
             </p>
             <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
               <Link
-                href='/launch/pricing'
+                href={APP_ROUTES.LAUNCH_PRICING}
                 className='font-[510] text-primary-token underline-offset-2 hover:underline'
               >
                 Upgrade to Pro

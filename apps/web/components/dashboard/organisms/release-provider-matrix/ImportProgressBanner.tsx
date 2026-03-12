@@ -22,7 +22,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
         className='inline-flex h-8 items-center gap-2 rounded-full border border-[#1DB954]/25 bg-[#1DB954]/10 px-3 text-[12px] text-primary-token'
         aria-live='polite'
       >
-        <SocialIcon platform='spotify' className='h-3.5 w-3.5 shrink-0' />
+        <ProviderIcon provider='spotify' className='h-3.5 w-3.5 shrink-0' />
         <span className='max-w-[180px] truncate text-secondary-token'>
           {artistName ? `Importing ${artistName}` : 'Importing from Spotify'}
         </span>

@@ -501,7 +501,7 @@ export function ReleaseSidebar({
         release && !selectedTrack ? (
           <DrawerTabs
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
             aria-label='Release sidebar view'
           />

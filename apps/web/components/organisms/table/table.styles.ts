@@ -19,17 +19,19 @@ export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
   rowHeight: '40px', // Fixed height for consistent alignment (Linear compact standard)
-  cellPadding: 'px-4 py-2.5', // Consistent padding for cells
-  headerPadding: 'px-4 py-2', // Compact padding for headers
+  cellPadding: 'px-4 py-2', // Consistent padding for cells
+  headerPadding: 'px-4 py-1.5', // Compact padding for headers
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
 // Row Selection Colors — aligned with Linear design tokens
 export const selection = {
-  unchecked: 'hover:bg-white/[0.02] transition-colors duration-150',
-  checked: 'bg-white/[0.04] hover:bg-white/[0.06]',
-  selected: 'bg-white/[0.04]',
-  hover: 'hover:bg-white/[0.02]',
+  unchecked:
+    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-colors duration-150',
+  checked:
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)',
+  selected: 'bg-(--linear-row-selected)',
+  hover: 'hover:bg-(--linear-row-hover)',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
@@ -76,10 +78,10 @@ export const layoutStability = {
 
 // Border Styles
 export const borders = {
-  cell: 'border-b border-subtle/50',
-  header: 'border-b border-subtle',
-  groupHeader: 'border-b-2 border-subtle/60',
-  subtle: 'border-subtle/50',
+  cell: 'border-b border-(--linear-border-subtle)',
+  header: 'border-b border-(--linear-border-subtle)',
+  groupHeader: 'border-b-2 border-(--linear-border-subtle)',
+  subtle: 'border-(--linear-border-subtle)',
 } as const;
 
 // Loading Skeleton Styles
@@ -119,13 +121,13 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-surface-1',
+    'bg-(--linear-app-content-surface)',
     borders.header
   ),
   stickyGroupHeader: cn(
     'sticky top-0',
     zIndex.groupHeader,
-    'bg-base dark:bg-surface-2',
+    'bg-(--linear-app-content-surface)',
     borders.groupHeader
   ),
   tableRow: cn(

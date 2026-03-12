@@ -136,13 +136,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) shadow-[inset_1px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
+          'bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150 ease-out';
       }
 
       const refreshClassName = isRefreshing
@@ -153,9 +153,9 @@ export function ReleaseTable({
         : '';
 
       return [
-        'rounded-[8px]',
+        'rounded-none',
         'focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
-        'data-[state=selected]:bg-(--linear-bg-surface-1)',
+        'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
         flashClassName,
@@ -217,8 +217,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 248,
-      minSize: 216,
+      size: 216,
+      minSize: 188,
       meta: { className: 'hidden sm:table-cell' },
     });
 

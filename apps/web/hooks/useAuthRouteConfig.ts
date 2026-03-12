@@ -27,7 +27,7 @@ export interface AuthRouteConfig {
  */
 export function useAuthRouteConfig(): AuthRouteConfig {
   const pathname = usePathname();
-  const isDemoReleasesRoute = pathname === '/demo';
+  const isDemoReleasesRoute = pathname === APP_ROUTES.DEMO;
 
   // Detect section based on pathname
   const section = useMemo<'admin' | 'dashboard' | 'settings'>(() => {
