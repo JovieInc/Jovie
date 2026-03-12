@@ -23,6 +23,53 @@ const authStateMaxAgeMs = Number(
 );
 const forwardedArgs =
   process.argv[2] === '--' ? process.argv.slice(3) : process.argv.slice(2);
+const curatedFastSpecs = [
+  'tests/e2e/chaos-authenticated.spec.ts',
+  'tests/e2e/content-gate.spec.ts',
+  'tests/e2e/sentry.spec.ts',
+];
+const optionArgsWithValues = new Set([
+  '--config',
+  '--grep',
+  '--grep-invert',
+  '--max-failures',
+  '--output',
+  '--project',
+  '--repeat-each',
+  '--reporter',
+  '--shard',
+  '--timeout',
+  '--trace',
+  '--workers',
+  '-c',
+  '-g',
+  '-j',
+  '-p',
+  '-x',
+]);
+
+function hasExplicitTestTarget(args) {
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--') {
+      continue;
+    }
+    if (optionArgsWithValues.has(arg)) {
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('-')) {
+      continue;
+    }
+    return true;
+  }
+
+  return false;
+}
+
+const shouldUseCuratedFastSpecs =
+  process.env.E2E_FAST_USE_ALL_SPECS !== '1' &&
+  !hasExplicitTestTarget(forwardedArgs);
 const hasExplicitWorkers = forwardedArgs.some(
   (arg, index) =>
     arg === '--workers' ||
@@ -38,6 +85,10 @@ const hasExplicitProject = forwardedArgs.some(
 const fastWorkerCount = process.env.E2E_FAST_WORKERS ?? '4';
 
 const defaultArgs = ['test', '--no-deps'];
+
+if (shouldUseCuratedFastSpecs) {
+  defaultArgs.push(...curatedFastSpecs);
+}
 
 if (!hasExplicitProject) {
   defaultArgs.push('--project', 'chromium');
