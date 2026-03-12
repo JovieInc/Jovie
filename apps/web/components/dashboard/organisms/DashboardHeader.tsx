@@ -31,6 +31,7 @@ export function DashboardHeader({
   const currentLabel = breadcrumbs.at(-1)?.label ?? '';
   const rootLabel =
     breadcrumbs.length > 1 ? (breadcrumbs[0]?.label ?? 'Jovie') : 'Jovie';
+  const usesSectionTitleLayout = breadcrumbs.length === 1 && !breadcrumbSuffix;
 
   return (
     <header
@@ -69,19 +70,27 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex min-w-0 flex-1 items-center gap-1.5 text-[12px] tracking-[-0.01em]'>
-          <span className='shrink-0 text-(--linear-text-tertiary)'>
-            {rootLabel}
-          </span>
-          <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
-          {breadcrumbSuffix ? (
-            <div className='min-w-0 truncate text-(--linear-text-secondary)'>
-              {breadcrumbSuffix}
-            </div>
-          ) : (
-            <span className='truncate font-[510] text-primary-token'>
+        <div className='flex min-w-0 flex-1 items-center gap-1.5 tracking-[-0.01em]'>
+          {usesSectionTitleLayout ? (
+            <span className='truncate text-[15px] font-[510] text-primary-token'>
               {currentLabel}
             </span>
+          ) : (
+            <>
+              <span className='shrink-0 text-[12px] text-(--linear-text-tertiary)'>
+                {rootLabel}
+              </span>
+              <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
+              {breadcrumbSuffix ? (
+                <div className='min-w-0 truncate text-[12.5px] text-(--linear-text-secondary)'>
+                  {breadcrumbSuffix}
+                </div>
+              ) : (
+                <span className='truncate text-[12.5px] font-[510] text-primary-token'>
+                  {currentLabel}
+                </span>
+              )}
+            </>
           )}
         </div>
         {action ? (
