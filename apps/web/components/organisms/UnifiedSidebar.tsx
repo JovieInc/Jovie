@@ -163,7 +163,7 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-2 rounded-md px-2 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
@@ -181,12 +181,12 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 w-full items-center gap-2 rounded-md px-2 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
-                size={14}
+                size={15}
                 tone='auto'
                 className='rounded-[4px] shrink-0'
               />
@@ -206,7 +206,7 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-8 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-3.5' />
         </Link>
@@ -251,7 +251,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-10 justify-center gap-0 pl-2 pr-2.5 pt-0 pb-0 lg:mt-1.5'>
+      <SidebarHeader className='relative h-11 justify-center gap-0 pl-2.5 pr-2.5 pt-0 pb-0 lg:mt-1.5'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
