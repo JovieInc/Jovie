@@ -157,7 +157,7 @@ export function BatchIngestForm({
 https://open.spotify.com/artist/...
 https://www.instagram.com/artistname, https://artist-website.com'
           />
-          <div className='flex items-center justify-between text-2xs text-tertiary-token'>
+          <div className='flex flex-col gap-2 text-2xs text-tertiary-token sm:flex-row sm:items-center sm:justify-between'>
             <span>
               {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
             </span>
@@ -166,6 +166,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
               size='sm'
               onClick={handleSubmit}
               disabled={isSubmitting}
+              className='w-full sm:w-auto'
             >
               {isSubmitting ? 'Ingesting\u2026' : 'Run batch import'}
             </Button>
@@ -174,7 +175,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
           {result && (
             <div className='space-y-2 rounded-md border border-subtle p-3 text-xs'>
               {/* Summary badges */}
-              <div className='flex items-center gap-3'>
+              <div className='flex flex-wrap items-center gap-3'>
                 {result.summary.success > 0 && (
                   <span className='inline-flex items-center gap-1 text-success'>
                     <CheckCircle2 className='size-3' />

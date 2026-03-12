@@ -73,7 +73,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
           {/* Single profile ingest */}
           <Card>
             <CardHeader className='pb-2'>
-              <div className='flex items-center justify-between'>
+              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
                 <div>
                   <h2 className='text-sm font-medium text-primary-token'>
                     Single profile ingest
@@ -115,7 +115,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                     return (
                       <li
                         key={row.id}
-                        className='flex items-center gap-3 py-2 text-xs'
+                        className='grid grid-cols-[auto,minmax(0,1fr),auto] items-start gap-2 py-2 text-xs sm:flex sm:items-center sm:gap-3'
                       >
                         <EventIcon type={row.type} />
                         <span
@@ -126,20 +126,20 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                         >
                           {config.label}
                         </span>
-                        <span className='min-w-0 flex-1 truncate text-primary-token'>
+                        <span className='col-span-2 min-w-0 truncate text-primary-token sm:col-auto sm:flex-1'>
                           {row.handle
                             ? `@${row.handle}`
                             : (row.spotifyId ?? '--')}
                         </span>
                         {row.failureReason && (
                           <span
-                            className='max-w-[200px] truncate text-error'
+                            className='col-span-3 text-wrap break-words text-error sm:col-auto sm:max-w-[200px] sm:truncate'
                             title={row.failureReason}
                           >
                             {row.failureReason}
                           </span>
                         )}
-                        <span className='ml-auto shrink-0 text-tertiary-token'>
+                        <span className='col-start-3 row-start-1 shrink-0 text-right text-tertiary-token sm:ml-auto'>
                           {formatTimeAgo(row.createdAt)}
                         </span>
                       </li>
