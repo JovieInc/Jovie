@@ -18,6 +18,7 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
+const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 
@@ -129,7 +130,7 @@ export default defineConfig({
   ],
 
   // Only start web server if not in CI (when BASE_URL is not set)
-  ...(isCI && process.env.BASE_URL
+  ...(shouldSkipManagedWebServer || (isCI && process.env.BASE_URL)
     ? {}
     : {
         webServer: {

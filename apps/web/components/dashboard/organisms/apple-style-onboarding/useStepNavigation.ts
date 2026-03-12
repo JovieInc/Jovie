@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
+import { env } from '@/lib/env-client';
 import { ONBOARDING_STEPS } from './types';
 
 interface UseStepNavigationReturn {
@@ -24,6 +25,10 @@ export function useStepNavigation(): UseStepNavigationReturn {
   const goToNextStep = useCallback(() => {
     if (isTransitioning) return;
     if (currentStepIndex >= ONBOARDING_STEPS.length - 1) return;
+    if (env.IS_E2E) {
+      setCurrentStepIndex(prev => prev + 1);
+      return;
+    }
     setIsTransitioning(true);
     setTimeout(() => {
       setCurrentStepIndex(prev => prev + 1);
@@ -34,6 +39,10 @@ export function useStepNavigation(): UseStepNavigationReturn {
   const goToPreviousStep = useCallback(() => {
     if (isTransitioning) return;
     if (currentStepIndex === 0) return;
+    if (env.IS_E2E) {
+      setCurrentStepIndex(prev => prev - 1);
+      return;
+    }
     setIsTransitioning(true);
     setTimeout(() => {
       setCurrentStepIndex(prev => prev - 1);

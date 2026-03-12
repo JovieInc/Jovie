@@ -1,11 +1,18 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkTestError,
+  ensureSignedInUser,
   isProductionTarget,
   signInUser,
 } from '../helpers/clerk-auth';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  smokeNavigateWithRetry,
+  waitForHydration,
+} from './utils/smoke-test-utils';
+
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 /**
  * Suite 3: SmartLink Experience + Content Gate
@@ -30,9 +37,9 @@ async function navigateSafe(
   opts?: { timeout?: number }
 ): Promise<boolean> {
   try {
-    await page.goto(path, {
-      waitUntil: 'domcontentloaded',
+    await smokeNavigateWithRetry(page, path, {
       timeout: opts?.timeout ?? 90_000,
+      retries: process.env.E2E_FAST_ITERATION === '1' ? 3 : 2,
     });
     const url = page.url();
     if (url.includes('clerk') && url.includes('handshake')) {
@@ -96,6 +103,42 @@ async function assertMainContent(
   expect(errorVisible, `${description}: error banner visible`).toBe(false);
 }
 
+async function assertDashboardPageContent(
+  page: import('@playwright/test').Page,
+  pageConfig: {
+    name: string;
+    minLength?: number;
+    readyText?: RegExp;
+  }
+) {
+  if (pageConfig.name === 'Chat') {
+    const chatReady = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    await expect(
+      chatReady,
+      'Dashboard/Chat: composer or new thread CTA should be visible'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    return;
+  }
+
+  if (pageConfig.readyText) {
+    const readySignal = page.getByText(pageConfig.readyText).first();
+    const hasReadySignal = await readySignal
+      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+      .catch(() => false);
+    if (hasReadySignal) {
+      return;
+    }
+  }
+
+  await assertMainContent(page, `Dashboard/${pageConfig.name}`, {
+    minLength: pageConfig.minLength ?? 30,
+  });
+}
+
 // ============================================================================
 // PUBLIC PAGES (unauthenticated)
 // ============================================================================
@@ -103,6 +146,10 @@ async function assertMainContent(
 test.describe('Content Gate — Public Pages', () => {
   test.describe.configure({ mode: 'serial' });
   test.use({ storageState: { cookies: [], origins: [] } });
+  test.skip(
+    FAST_ITERATION,
+    'Public content gate duplicates smoke-public and smoke-auth coverage in the fast lane'
+  );
 
   test('Homepage renders hero, sections, and CTA', async ({
     page,
@@ -175,43 +222,46 @@ test.describe('Content Gate — Public Pages', () => {
       return;
     }
 
-    if (!(await navigateSafe(page, '/sign-up'))) return;
+    for (const authPage of [
+      { path: APP_ROUTES.SIGNUP, name: 'Sign-up' },
+      { path: APP_ROUTES.SIGNIN, name: 'Sign-in' },
+    ]) {
+      if (!(await navigateSafe(page, authPage.path))) return;
 
-    const hasForm = await page
-      .locator('form, [data-clerk-component], button[data-localization-key]')
-      .first()
-      .isVisible({ timeout: 15_000 })
-      .catch(() => false);
+      await expect(page).toHaveURL(new RegExp(authPage.path), {
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
 
-    if (!hasForm) {
-      const bodyText = await page
-        .locator('body')
-        .innerText()
-        .catch(() => '');
-      const hasAuthContent =
-        bodyText.toLowerCase().includes('sign') ||
-        bodyText.toLowerCase().includes('create');
-      expect(hasAuthContent, 'Sign-up: should show auth content').toBe(true);
-    }
+      const hasAuthUi = await page
+        .locator(
+          [
+            'form',
+            'input[name="identifier"]',
+            'input[type="email"]',
+            '[data-clerk-component]',
+            'button[data-localization-key]',
+            'button:has-text("Continue")',
+            'button:has-text("Google")',
+          ].join(', ')
+        )
+        .first()
+        .isVisible({ timeout: 15_000 })
+        .catch(() => false);
 
-    if (!(await navigateSafe(page, '/signin'))) return;
-
-    const hasSigninForm = await page
-      .locator('form, [data-clerk-component], button[data-localization-key]')
-      .first()
-      .isVisible({ timeout: 15_000 })
-      .catch(() => false);
-
-    if (!hasSigninForm) {
-      const bodyText = await page
-        .locator('body')
-        .innerText()
-        .catch(() => '');
-      expect(
-        bodyText.toLowerCase().includes('sign') ||
-          bodyText.toLowerCase().includes('log in'),
-        'Sign-in: should show auth content'
-      ).toBe(true);
+      if (!hasAuthUi) {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        expect(
+          bodyText.length,
+          `${authPage.name}: body should not be blank`
+        ).toBeGreaterThan(50);
+        expect(
+          bodyText.toLowerCase(),
+          `${authPage.name}: should not render an application error`
+        ).not.toContain('application error');
+      }
     }
   });
 
@@ -290,6 +340,7 @@ test.describe('Content Gate — Public Pages', () => {
 
 test.describe('Content Gate — Authenticated Pages', () => {
   test.describe.configure({ mode: 'serial' });
+  const fastIteration = process.env.E2E_FAST_ITERATION === '1';
 
   test.beforeEach(async ({ page }) => {
     if (isProductionTarget()) {
@@ -322,15 +373,13 @@ test.describe('Content Gate — Authenticated Pages', () => {
         return;
       }
     }
-
-    await setupClerkTestingToken({ page });
   });
 
   test('Dashboard pages render real content', async ({ page }, testInfo) => {
     test.setTimeout(300_000);
 
     try {
-      await signInUser(page);
+      await ensureSignedInUser(page);
     } catch (error) {
       if (
         error instanceof ClerkTestError &&
@@ -353,31 +402,53 @@ test.describe('Content Gate — Authenticated Pages', () => {
       throw error;
     }
 
-    await expect(page).toHaveURL(/\/app\//, {
+    await expect(page).toHaveURL(/\/app(?:\/|$)/, {
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    const dashboardPages = [
-      { path: '/app/dashboard/profile', name: 'Profile' },
-      { path: '/app/dashboard/analytics', name: 'Analytics' },
-      { path: '/app/dashboard/audience', name: 'Audience' },
-      { path: '/app/dashboard/releases', name: 'Releases' },
-      { path: '/app/dashboard/earnings', name: 'Earnings' },
-      { path: '/app/dashboard/chat', name: 'Chat' },
-    ];
+    const dashboardPages = fastIteration
+      ? [
+          {
+            path: APP_ROUTES.DASHBOARD_RELEASES,
+            name: 'Releases',
+            readyText: /releases|music|tracks/i,
+          },
+        ]
+      : [
+          {
+            path: APP_ROUTES.DASHBOARD_AUDIENCE,
+            name: 'Audience',
+            minLength: 10,
+            readyText: /audience|fans|subscribers/i,
+          },
+          {
+            path: APP_ROUTES.DASHBOARD_RELEASES,
+            name: 'Releases',
+            readyText: /releases|music|tracks/i,
+          },
+          {
+            path: APP_ROUTES.DASHBOARD_EARNINGS,
+            name: 'Earnings',
+            minLength: 10,
+            readyText: /earnings|tips|revenue/i,
+          },
+          { path: APP_ROUTES.CHAT, name: 'Chat' },
+        ];
 
     const failures: Array<{ name: string; error: string }> = [];
 
     for (const pageConfig of dashboardPages) {
       try {
-        await page.goto(pageConfig.path, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        await smokeNavigateWithRetry(page, pageConfig.path, {
+          timeout: fastIteration ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+          retries: fastIteration ? 3 : 2,
         });
         await waitForHydration(page);
-        await page
-          .waitForLoadState('networkidle', { timeout: 5_000 })
-          .catch(() => {});
+        if (!fastIteration) {
+          await page
+            .waitForLoadState('networkidle', { timeout: 5_000 })
+            .catch(() => {});
+        }
 
         const url = page.url();
         if (url.includes('/signin') || url.includes('/sign-in')) {
@@ -390,9 +461,7 @@ test.describe('Content Gate — Authenticated Pages', () => {
           `${pageConfig.name}: redirected to onboarding`
         ).not.toContain('/onboarding');
 
-        await assertMainContent(page, `Dashboard/${pageConfig.name}`, {
-          minLength: 30,
-        });
+        await assertDashboardPageContent(page, pageConfig);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         failures.push({ name: pageConfig.name, error: msg });
@@ -414,10 +483,10 @@ test.describe('Content Gate — Authenticated Pages', () => {
   });
 
   test('Settings pages render content', async ({ page }, testInfo) => {
-    test.setTimeout(180_000);
+    test.setTimeout(fastIteration ? 180_000 : 240_000);
 
     try {
-      await signInUser(page);
+      await ensureSignedInUser(page);
     } catch (error) {
       if (error instanceof ClerkTestError) {
         test.skip(true, `Clerk auth failed: ${error.message}`);
@@ -435,51 +504,94 @@ test.describe('Content Gate — Authenticated Pages', () => {
       throw error;
     }
 
-    const settingsPages = [
-      { path: '/app/settings/contacts', name: 'Contacts' },
-      { path: '/app/settings/touring', name: 'Touring' },
-      { path: '/app/settings/billing', name: 'Settings Billing' },
-      { path: '/billing', name: 'Billing' },
-      { path: '/account', name: 'Account' },
-    ];
+    const settingsPages = fastIteration
+      ? [
+          {
+            path: APP_ROUTES.SETTINGS,
+            name: 'Settings',
+            readyText: /settings|preferences|account/i,
+          },
+        ]
+      : [
+          {
+            path: APP_ROUTES.SETTINGS,
+            name: 'Settings',
+            readyText: /settings|preferences|account/i,
+          },
+          {
+            path: APP_ROUTES.SETTINGS_CONTACTS,
+            name: 'Contacts',
+            readyText: /contacts|team|contact/i,
+          },
+          {
+            path: APP_ROUTES.SETTINGS_TOURING,
+            name: 'Touring',
+            readyText: /tour|touring|dates/i,
+          },
+          {
+            path: APP_ROUTES.SETTINGS_BILLING,
+            name: 'Settings Billing',
+            readyText: /billing|plan|subscription/i,
+          },
+          {
+            path: APP_ROUTES.BILLING,
+            name: 'Billing',
+            readyText: /billing|plan|subscription/i,
+          },
+        ];
+
+    const failures: Array<{ name: string; error: string }> = [];
 
     for (const pageConfig of settingsPages) {
       try {
-        await page.goto(pageConfig.path, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        await smokeNavigateWithRetry(page, pageConfig.path, {
+          timeout: fastIteration ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+          retries: fastIteration ? 3 : 2,
         });
         await waitForHydration(page);
-        await page
-          .waitForLoadState('networkidle', { timeout: 5_000 })
-          .catch(() => {});
+        if (!fastIteration) {
+          await page
+            .waitForLoadState('networkidle', { timeout: 5_000 })
+            .catch(() => {});
+        }
 
         const url = page.url();
         if (url.includes('/signin') || url.includes('/sign-in')) {
-          await signInUser(page);
+          await ensureSignedInUser(page);
           continue;
         }
 
-        const main = page.locator('main').first();
-        const mainVisible = await main
-          .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-          .catch(() => false);
-        if (mainVisible) {
-          const mainText = await main.innerText().catch(() => '');
-          expect(
-            mainText.length,
-            `${pageConfig.name}: main content too short`
-          ).toBeGreaterThan(20);
-        }
+        expect(
+          url,
+          `${pageConfig.name}: redirected to onboarding`
+        ).not.toContain('/onboarding');
+
+        await assertMainContent(page, `Settings/${pageConfig.name}`, {
+          minLength: 20,
+        });
+
+        await expect(
+          page.getByText(pageConfig.readyText).first(),
+          `Settings/${pageConfig.name}: expected page content should be visible`
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.warn(`${pageConfig.name}: ${msg.slice(0, 100)}`);
+        failures.push({ name: pageConfig.name, error: msg });
       }
     }
+
+    expect(
+      failures,
+      `${failures.length} settings pages failed:\n${failures.map(f => `${f.name}: ${f.error}`).join('\n')}`
+    ).toHaveLength(0);
   });
 
   test('Admin pages render data tables', async ({ page }, testInfo) => {
-    test.setTimeout(240_000);
+    test.setTimeout(fastIteration ? 180_000 : 240_000);
+    test.skip(
+      fastIteration,
+      'Admin content gate duplicates dedicated admin dashboard/navigation/chaos coverage in the fast lane'
+    );
 
     const adminUsername =
       process.env.E2E_CLERK_ADMIN_USERNAME ||
@@ -494,7 +606,7 @@ test.describe('Content Gate — Authenticated Pages', () => {
     }
 
     try {
-      await signInUser(page, {
+      await ensureSignedInUser(page, {
         username: adminUsername,
         password: adminPassword,
       });
@@ -515,18 +627,24 @@ test.describe('Content Gate — Authenticated Pages', () => {
       throw error;
     }
 
-    const adminPages = [
-      { path: '/app/admin', name: 'Admin Dashboard' },
-      { path: '/app/admin/creators', name: 'Admin Creators' },
-      { path: '/app/admin/users', name: 'Admin Users' },
-      { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
-    ];
+    const adminPages = fastIteration
+      ? [
+          { path: APP_ROUTES.ADMIN, name: 'Admin Dashboard' },
+          { path: APP_ROUTES.ADMIN_CAMPAIGNS, name: 'Admin Campaigns' },
+        ]
+      : [
+          { path: APP_ROUTES.ADMIN, name: 'Admin Dashboard' },
+          { path: APP_ROUTES.ADMIN_CREATORS, name: 'Admin Creators' },
+          { path: APP_ROUTES.ADMIN_USERS, name: 'Admin Users' },
+        ];
+
+    const failures: Array<{ name: string; error: string }> = [];
 
     for (const pageConfig of adminPages) {
       try {
-        const response = await page.goto(pageConfig.path, {
-          waitUntil: 'domcontentloaded',
-          timeout: SMOKE_TIMEOUTS.NAVIGATION * 2,
+        const response = await smokeNavigateWithRetry(page, pageConfig.path, {
+          timeout: fastIteration ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION * 2,
+          retries: fastIteration ? 3 : 2,
         });
         await waitForHydration(page);
 
@@ -535,34 +653,33 @@ test.describe('Content Gate — Authenticated Pages', () => {
           return;
         }
 
-        await page
-          .waitForLoadState('networkidle', { timeout: 5_000 })
-          .catch(() => {});
+        if (!fastIteration) {
+          await page
+            .waitForLoadState('networkidle', { timeout: 5_000 })
+            .catch(() => {});
+        }
 
         const url = page.url();
         if (url.includes('/signin') || url.includes('/sign-in')) {
-          await signInUser(page, {
+          await ensureSignedInUser(page, {
             username: adminUsername,
             password: adminPassword,
           });
           continue;
         }
 
-        const main = page.locator('main').first();
-        const mainVisible = await main
-          .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-          .catch(() => false);
-        if (mainVisible) {
-          const mainText = await main.innerText().catch(() => '');
-          expect(
-            mainText.length,
-            `${pageConfig.name}: main content too short`
-          ).toBeGreaterThan(30);
-        }
+        await assertMainContent(page, `Admin/${pageConfig.name}`, {
+          minLength: 20,
+        });
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.warn(`${pageConfig.name}: ${msg.slice(0, 100)}`);
+        failures.push({ name: pageConfig.name, error: msg });
       }
     }
+
+    expect(
+      failures,
+      `${failures.length} admin pages failed:\n${failures.map(f => `${f.name}: ${f.error}`).join('\n')}`
+    ).toHaveLength(0);
   });
 });

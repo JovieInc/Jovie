@@ -9,8 +9,14 @@ import { expect, test } from '@playwright/test';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
 
 test.describe('Sentry Red Lane @sentry @red', () => {
+  test.skip(
+    isFastIteration,
+    'Red lane runs separately from the green fast sweep'
+  );
+
   test('frontend example button triggers a page error and fails intentionally', async ({
     page,
   }) => {

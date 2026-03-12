@@ -40,16 +40,15 @@ test.describe('Pricing Page', () => {
   });
 
   test('has working call-to-action buttons', async ({ page }) => {
-    // All tiers use "Get started" CTA buttons linking to /waitlist
-    const getStartedButtons = page.getByRole('link', { name: /Get started/i });
-    const count = await getStartedButtons.count();
-    expect(count).toBeGreaterThan(0);
+    const freeTierCta = page.getByRole('link', { name: 'Launch for Free' });
+    await expect(freeTierCta).toBeVisible();
+    await expect(freeTierCta).toHaveAttribute('href', /\/signup/);
 
-    // At least one should link to waitlist
-    const firstButton = getStartedButtons.first();
-    await expect(firstButton).toBeVisible();
-    const href = await firstButton.getAttribute('href');
-    expect(href).toContain('/signup');
+    const foundingMemberCta = page.getByRole('link', {
+      name: 'Choose Founding Member',
+    });
+    await expect(foundingMemberCta).toBeVisible();
+    await expect(foundingMemberCta).toHaveAttribute('href', /\/signup/);
   });
 
   test('shows pricing tier details', async ({ page }) => {

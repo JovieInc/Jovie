@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 
 /**
  * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
@@ -33,9 +34,7 @@ function isClerkRedirect(url: string): boolean {
   );
 }
 
-test('homepage: hero heading, CTA, multiple sections, footer', async ({
-  page,
-}) => {
+test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
   test.setTimeout(120_000);
   await blockAnalytics(page);
 
@@ -55,13 +54,16 @@ test('homepage: hero heading, CTA, multiple sections, footer', async ({
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  const sectionCount = await page.locator('section').count();
-  expect(
-    sectionCount,
-    'Homepage missing sections — page may be blank'
-  ).toBeGreaterThanOrEqual(2);
-
-  await expect(page.locator('footer').first()).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const finalCtaHeadline = page.getByTestId('final-cta-headline');
+  await expect(
+    finalCtaHeadline,
+    'Homepage did not render the final claim CTA section'
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(
+    page.getByTestId('final-cta-dock'),
+    'Homepage did not render the final claim handle form'
+  ).toBeVisible({ timeout: 20_000 });
 
   const bodyText =
     (await page
@@ -72,7 +74,7 @@ test('homepage: hero heading, CTA, multiple sections, footer', async ({
   expect(bodyText.toLowerCase()).not.toContain('internal server error');
 });
 
-test.describe('Public Profile — dualipa', () => {
+test.describe('Public Profile - dualipa', () => {
   const TEST_PROFILE = 'dualipa';
 
   test.beforeEach(async ({ page }) => {
@@ -100,7 +102,7 @@ test.describe('Public Profile — dualipa', () => {
     ) {
       test.fail(
         true,
-        'Profile dualipa not seeded — global-setup.ts must seed this profile'
+        'Profile dualipa not seeded - global-setup.ts must seed this profile'
       );
       return;
     }
@@ -165,7 +167,7 @@ test.describe('Public Profile — dualipa', () => {
           ),
         {
           message:
-            'No visible DSP links in listen mode — Spotify seeding failed or DSP rendering is broken',
+            'No visible DSP links in listen mode - Spotify seeding failed or DSP rendering is broken',
           timeout: 60_000,
         }
       )
@@ -199,7 +201,7 @@ test.describe('Public Profile — dualipa', () => {
       .or(page.getByRole('button', { name: /continue with venmo/i }));
     await expect(
       tipUI.first(),
-      'No tipping UI rendered — tipping flow is broken for this profile'
+      'No tipping UI rendered - tipping flow is broken for this profile'
     ).toBeVisible({ timeout: 60_000 });
   });
 
@@ -243,11 +245,11 @@ test('signin and signup pages load', async ({ page }) => {
 
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   if (!pk || pk.includes('mock') || pk.includes('dummy')) {
-    test.skip(true, 'No real Clerk config — skipping auth page tests');
+    test.skip(true, 'No real Clerk config - skipping auth page tests');
     return;
   }
 
-  for (const route of ['/signin', '/sign-up']) {
+  for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
     const response = await page.goto(route, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
@@ -277,7 +279,7 @@ test('unknown routes return <500, not server crash', async ({ page }) => {
     const status = response?.status() ?? 0;
     expect(
       status,
-      `${route} returned ${status} — server crashed on unknown route`
+      `${route} returned ${status} - server crashed on unknown route`
     ).toBeLessThan(500);
 
     const bodyText = (await page.locator('body').textContent()) ?? '';

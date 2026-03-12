@@ -1,12 +1,16 @@
-import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { APP_ROUTES } from '@/constants/routes';
+import { ensureSignedInUser } from '../helpers/clerk-auth';
 import {
   checkForClientError,
   getAdminCredentials,
   hasAdminCredentials,
 } from './utils/admin-test-utils';
-import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
+import {
+  SMOKE_TIMEOUTS,
+  smokeNavigateWithRetry,
+  waitForHydration,
+} from './utils/smoke-test-utils';
 
 /**
  * Admin Navigation Persistence Tests
@@ -26,29 +30,37 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 /**
  * Admin pages to test for navigation persistence
  */
-const ADMIN_PAGES = [
-  { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/leads', name: 'Admin Leads' },
-  { path: '/app/admin/outreach', name: 'Admin Outreach' },
-  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
-  { path: '/app/admin/ingest', name: 'Admin Ingest' },
-  { path: '/app/admin/waitlist', name: 'Admin Waitlist' },
-  { path: '/app/admin/creators', name: 'Admin Creators' },
-  { path: '/app/admin/users', name: 'Admin Users' },
-  { path: '/app/admin/feedback', name: 'Admin Feedback' },
-  { path: '/app/admin/activity', name: 'Admin Activity' },
-  { path: '/app/admin/screenshots', name: 'Admin Screenshots' },
-] as const;
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
+const ADMIN_PAGES = FAST_ITERATION
+  ? [{ path: APP_ROUTES.ADMIN, name: 'Admin Dashboard' }]
+  : [
+      { path: APP_ROUTES.ADMIN, name: 'Admin Dashboard' },
+      { path: APP_ROUTES.ADMIN_LEADS, name: 'Admin Leads' },
+      { path: APP_ROUTES.ADMIN_OUTREACH, name: 'Admin Outreach' },
+      { path: APP_ROUTES.ADMIN_CAMPAIGNS, name: 'Admin Campaigns' },
+      { path: APP_ROUTES.ADMIN_CREATORS, name: 'Admin Creators' },
+      { path: APP_ROUTES.ADMIN_USERS, name: 'Admin Users' },
+      { path: APP_ROUTES.ADMIN_FEEDBACK, name: 'Admin Feedback' },
+      { path: APP_ROUTES.ADMIN_ACTIVITY, name: 'Admin Activity' },
+    ];
 
 /**
  * Dashboard pages to test navigation from
  */
-const DASHBOARD_PAGES = [
-  { path: '/app/dashboard/profile', name: 'Profile' },
-  { path: '/app/dashboard/audience', name: 'Audience' },
-] as const;
+const DASHBOARD_PAGES = FAST_ITERATION
+  ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
+  : [
+      { path: APP_ROUTES.CHAT, name: 'Chat' },
+      { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
+    ];
 
 test.describe('Admin Navigation Persistence @smoke', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Admin nav persistence runs in the slower authenticated coverage lane'
+  );
+
   // signInUser needs 180s+ for Clerk + Turbopack compilation, plus test body navigation
   test.setTimeout(300_000);
 
@@ -79,13 +91,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
       console.log(`[Page Error] ${error.message}`);
     });
 
-    // Set up Clerk testing token and sign in with admin credentials
-    await setupClerkTestingToken({ page });
-
     const { username, password } = getAdminCredentials();
 
     try {
-      await signInUser(page, { username, password });
+      await ensureSignedInUser(page, { username, password });
     } catch (error) {
       console.error('Failed to sign in admin user:', error);
       test.skip();
@@ -150,9 +159,9 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // 2. Navigate to each dashboard page and verify admin nav persists
     for (const dashPage of DASHBOARD_PAGES) {
-      await page.goto(dashPage.path, {
-        waitUntil: 'domcontentloaded',
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      await smokeNavigateWithRetry(page, dashPage.path, {
+        timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+        retries: FAST_ITERATION ? 3 : 2,
       });
       await waitForHydration(page);
       await page.waitForLoadState('domcontentloaded');
@@ -183,9 +192,9 @@ test.describe('Admin Navigation Persistence @smoke', () => {
 
     // 3. Navigate to each admin page and verify admin nav persists
     for (const adminPage of ADMIN_PAGES) {
-      const response = await page.goto(adminPage.path, {
-        waitUntil: 'domcontentloaded',
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      const response = await smokeNavigateWithRetry(page, adminPage.path, {
+        timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+        retries: FAST_ITERATION ? 3 : 2,
       });
 
       // Check for 404 (shouldn't happen if we got this far, but be safe)
@@ -228,9 +237,9 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     }
 
     // 4. Navigate back to dashboard and verify admin nav still visible
-    await page.goto(DASHBOARD_PAGES[0].path, {
-      waitUntil: 'domcontentloaded',
-      timeout: SMOKE_TIMEOUTS.NAVIGATION,
+    await smokeNavigateWithRetry(page, DASHBOARD_PAGES[0].path, {
+      timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+      retries: FAST_ITERATION ? 3 : 2,
     });
     await waitForHydration(page);
     await page.waitForLoadState('domcontentloaded');
@@ -270,6 +279,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   test('admin navigation persists during rapid navigation', async ({
     page,
   }, testInfo) => {
+    test.skip(
+      FAST_ITERATION,
+      'Rapid navigation stress test is excluded from the fast smoke gate'
+    );
     test.setTimeout(120_000); // 2 minutes
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
@@ -301,21 +314,21 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     // Rapid navigation: quickly move between pages
     // Use actual page routes that exist in the app
     const allPages = [
-      '/app/dashboard/profile',
-      '/app/admin',
-      '/app/dashboard/releases',
-      '/app/admin/users',
-      '/app/dashboard/profile',
-      '/app/admin/activity',
+      APP_ROUTES.CHAT,
+      APP_ROUTES.ADMIN,
+      APP_ROUTES.DASHBOARD_RELEASES,
+      APP_ROUTES.ADMIN_USERS,
+      APP_ROUTES.CHAT,
+      APP_ROUTES.ADMIN_ACTIVITY,
     ];
 
     let failures = 0;
 
     for (const path of allPages) {
       // Navigate without waiting for full load
-      await page.goto(path, {
-        waitUntil: 'domcontentloaded',
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      await smokeNavigateWithRetry(page, path, {
+        timeout: FAST_ITERATION ? 90_000 : SMOKE_TIMEOUTS.NAVIGATION,
+        retries: FAST_ITERATION ? 3 : 2,
       });
 
       // Brief wait for React to render
@@ -373,6 +386,10 @@ test.describe('Admin Navigation Persistence @smoke', () => {
   test('admin navigation persists with client-side navigation', async ({
     page,
   }, testInfo) => {
+    test.skip(
+      FAST_ITERATION,
+      'Client-side nav variant is excluded from the fast smoke gate'
+    );
     test.setTimeout(120_000); // 2 minutes
 
     const adminNavSection = page.locator('[data-testid="admin-nav-section"]');
@@ -416,10 +433,16 @@ test.describe('Admin Navigation Persistence @smoke', () => {
     // Use client-side navigation by clicking links
     // Sidebar uses APP_ROUTES: /app/profile, /app/admin, /app/admin/users, /app/audience
     const navLinks = [
-      { selector: 'a[href="/app/admin"]', name: 'Admin Dashboard' },
-      { selector: 'a[href="/app/profile"]', name: 'Profile' },
-      { selector: 'a[href="/app/admin/users"]', name: 'Admin Users' },
-      { selector: 'a[href="/app/audience"]', name: 'Audience' },
+      { selector: `a[href="${APP_ROUTES.ADMIN}"]`, name: 'Admin Dashboard' },
+      { selector: `a[href="${APP_ROUTES.CHAT}"]`, name: 'Chat' },
+      {
+        selector: `a[href="${APP_ROUTES.ADMIN_USERS}"]`,
+        name: 'Admin Users',
+      },
+      {
+        selector: `a[href="${APP_ROUTES.DASHBOARD_AUDIENCE}"]`,
+        name: 'Audience',
+      },
     ];
 
     for (const link of navLinks) {

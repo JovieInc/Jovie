@@ -11,6 +11,7 @@ const webServerCommand = process.env.DATABASE_URL
   : `doppler run -- ${stableLocalServerCommand}`;
 
 process.env.PUBLIC_NOAUTH_SMOKE = '1';
+const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -43,7 +44,7 @@ export default defineConfig({
     },
   ],
   // Only start web server if not in CI
-  ...(process.env.CI && process.env.BASE_URL
+  ...(shouldSkipManagedWebServer || (process.env.CI && process.env.BASE_URL)
     ? {}
     : {
         webServer: {

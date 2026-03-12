@@ -299,6 +299,16 @@ const nextConfig = {
         destination: '/legal/terms',
         permanent: true,
       },
+      {
+        source: '/app/analytics',
+        destination: '/app/dashboard/audience',
+        permanent: false,
+      },
+      {
+        source: '/app/dashboard/analytics',
+        destination: '/app/dashboard/audience',
+        permanent: false,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
@@ -333,10 +343,6 @@ const nextConfig = {
       {
         source: '/app/chat',
         destination: '/app/dashboard/chat',
-      },
-      {
-        source: '/app/analytics',
-        destination: '/app/dashboard/analytics',
       },
       {
         source: '/app/insights',

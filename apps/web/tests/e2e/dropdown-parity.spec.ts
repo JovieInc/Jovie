@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import SPEC_FIXTURE from './fixtures/linear-dropdown-spec.json';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Dropdown Parity — Linear.app match
  *
@@ -80,6 +82,10 @@ function relativeLuminance(r: number, g: number, b: number): number {
 }
 
 test.describe('Dropdown Parity — Linear.app match', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Visual parity checks run outside the fast deploy gate'
+  );
   test.beforeEach(async ({ page }) => {
     await page.goto('/demo/dropdowns');
     await page.waitForLoadState('networkidle');

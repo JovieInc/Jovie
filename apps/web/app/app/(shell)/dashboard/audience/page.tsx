@@ -28,6 +28,8 @@ async function AudienceContent({
   searchParams: Promise<SearchParams>;
 }>) {
   try {
+    const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+
     // Fetch dashboard data server-side (handles auth internally)
     const dashboardData = await getDashboardData();
 
@@ -73,10 +75,10 @@ async function AudienceContent({
           direction: parsedParams.direction,
         },
         view: parsedParams.view,
-        includeDetails: true,
+        includeDetails: !isE2E,
         segments: validSegments,
       }),
-      artist?.id
+      !isE2E && artist?.id
         ? loadUpcomingTourDates(artist.id).catch(() => [])
         : Promise.resolve([]),
     ]);

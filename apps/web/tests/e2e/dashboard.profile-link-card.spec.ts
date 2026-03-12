@@ -4,6 +4,8 @@ import { expect, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 // Helper function to locate and wait for ProfileLinkCard
 // Returns null if the component is not rendered on the current page
 async function getProfileLinkCard(page: Page): Promise<Locator | null> {
@@ -38,6 +40,11 @@ function hasClerkCredentials(): boolean {
 
 test.describe('ProfileLinkCard E2E Tests', () => {
   test.beforeEach(async ({ page, context }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Profile link card coverage runs in the slower authenticated dashboard lane'
+    );
+
     // Skip if no Clerk credentials configured
     if (!hasClerkCredentials()) {
       console.log('⚠ Skipping ProfileLinkCard tests - no Clerk credentials');

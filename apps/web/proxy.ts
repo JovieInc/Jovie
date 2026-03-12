@@ -94,7 +94,6 @@ const DASHBOARD_ROUTES = [
   '/app/earnings',
   '/app/links',
   '/app/chat',
-  '/app/analytics',
 ] as const;
 
 const SETTINGS_ROUTES = [

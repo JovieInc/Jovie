@@ -646,6 +646,8 @@ export async function upsertTrack(input: {
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
   const now = new Date();
+  const discNumber = input.discNumber ?? 1;
+  const fallbackSlug = `${input.slug}-${discNumber}-${input.trackNumber}`;
   const baseSet = {
     title: input.title,
     slug: input.slug,
@@ -666,7 +668,7 @@ export async function upsertTrack(input: {
     title: input.title,
     slug: input.slug,
     trackNumber: input.trackNumber,
-    discNumber: input.discNumber ?? 1,
+    discNumber,
     durationMs: input.durationMs ?? null,
     isExplicit: input.isExplicit ?? false,
     isrc: input.isrc ?? null,
@@ -695,6 +697,31 @@ export async function upsertTrack(input: {
 
     return result;
   } catch (error) {
+    if (
+      isUniqueConstraintViolation(error, 'discog_tracks_release_slug_unique')
+    ) {
+      const [result] = await db
+        .insert(discogTracks)
+        .values({
+          ...insertData,
+          slug: fallbackSlug,
+        })
+        .onConflictDoUpdate({
+          target: [
+            discogTracks.releaseId,
+            discogTracks.discNumber,
+            discogTracks.trackNumber,
+          ],
+          set: {
+            ...baseSet,
+            slug: fallbackSlug,
+          },
+        })
+        .returning();
+
+      return result;
+    }
+
     if (!isUniqueConstraintViolation(error, 'discog_tracks_isrc_unique')) {
       throw error;
     }

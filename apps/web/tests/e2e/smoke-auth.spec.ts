@@ -1,13 +1,23 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
-import { ClerkTestError, signInUser } from '../helpers/clerk-auth';
-import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  ClerkTestError,
+  ensureSignedInUser,
+  signInUser,
+} from '../helpers/clerk-auth';
+import {
+  SMOKE_TIMEOUTS,
+  smokeNavigateWithRetry,
+} from './utils/smoke-test-utils';
+
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 /**
  * Suite 2: Dashboard Navigation (Authenticated)
  *
- * Tests as a LOGGED-IN USER navigating the dashboard.
- * Verifies every main section loads real content without error boundaries.
+ * Tests as a logged-in user navigating the dashboard.
+ * Verifies main sections load meaningful route-specific content.
  *
  * @smoke
  */
@@ -25,7 +35,78 @@ function hasRealClerkConfig(): boolean {
   );
 }
 
-// Fresh context — no inherited auth
+async function assertDashboardRouteLoaded(
+  page: import('@playwright/test').Page,
+  path: string,
+  name: string
+) {
+  const main = page.locator('main').first();
+  await expect(main, `${name}: main shell did not render`).toBeVisible({
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+
+  const bodyText = (
+    (await page.locator('body').textContent()) ?? ''
+  ).toLowerCase();
+  expect(bodyText, `${name}: body shows application error`).not.toContain(
+    'application error'
+  );
+  expect(bodyText, `${name}: body shows internal server error`).not.toContain(
+    'internal server error'
+  );
+  expect(bodyText, `${name}: body shows generic error boundary`).not.toContain(
+    'something went wrong'
+  );
+
+  const errorBanner = page.locator(
+    '[data-testid="error-page"], [data-testid="error-boundary"], [data-testid="dashboard-error"]'
+  );
+  await expect(errorBanner, `${name}: error boundary is visible`).toHaveCount(
+    0
+  );
+
+  const sidebar = page.locator('nav').first();
+  await expect(sidebar, `${name}: dashboard nav did not render`).toBeVisible({
+    timeout: SMOKE_TIMEOUTS.VISIBILITY,
+  });
+
+  if (path === APP_ROUTES.CHAT) {
+    await expect(
+      page.getByPlaceholder(/ask jovie anything/i),
+      'Chat: input did not render'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    return;
+  }
+
+  if (path === APP_ROUTES.DASHBOARD_AUDIENCE) {
+    await expect(
+      page.getByTestId('dashboard-audience-client'),
+      'Audience: audience client did not render'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    return;
+  }
+
+  if (path === APP_ROUTES.DASHBOARD_RELEASES) {
+    await expect(
+      page.getByTestId('releases-matrix'),
+      'Releases: releases matrix did not render'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    return;
+  }
+
+  if (path === APP_ROUTES.DASHBOARD_EARNINGS) {
+    await expect(
+      page
+        .getByRole('button', { name: /connect venmo/i })
+        .or(page.getByText(/connect venmo to unlock earnings/i))
+        .or(page.getByText(/share this link anywhere to receive tips/i))
+        .first(),
+      'Earnings: tipping UI did not render'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+  }
+}
+
+// Fresh context: no inherited auth
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Dashboard Navigation @smoke', () => {
@@ -47,7 +128,6 @@ test.describe('Dashboard Navigation @smoke', () => {
       return;
     }
 
-    // Block analytics
     await page.route('**/api/profile/view', r =>
       r.fulfill({ status: 200, body: '{}' })
     );
@@ -59,17 +139,13 @@ test.describe('Dashboard Navigation @smoke', () => {
     );
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // AUTH PAGES (unauthenticated checks)
-  // ─────────────────────────────────────────────────────────────────────────
-
   test('auth pages (signin/signup) load without server errors', async ({
     page,
   }) => {
-    for (const route of ['/signin', '/sign-up']) {
-      const response = await page.goto(route, {
-        waitUntil: 'domcontentloaded',
+    for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
+      const response = await smokeNavigateWithRetry(page, route, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        retries: process.env.E2E_FAST_ITERATION === '1' ? 3 : 2,
       });
       expect(
         response?.status() ?? 0,
@@ -81,19 +157,17 @@ test.describe('Dashboard Navigation @smoke', () => {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // PROTECTED ROUTE REDIRECTS
-  // ─────────────────────────────────────────────────────────────────────────
-
   test('protected routes redirect unauthenticated users to signin', async ({
     browser,
   }) => {
-    // Use a fresh context WITHOUT Clerk testing token
     const context = await browser.newContext();
     const page = await context.newPage();
 
     try {
-      for (const route of ['/app/dashboard', '/onboarding']) {
+      for (const route of [
+        APP_ROUTES.DASHBOARD_OVERVIEW,
+        APP_ROUTES.ONBOARDING,
+      ]) {
         try {
           await page.goto(route, {
             waitUntil: 'domcontentloaded',
@@ -118,11 +192,11 @@ test.describe('Dashboard Navigation @smoke', () => {
         const isAuthPage =
           url.includes('/signin') ||
           url.includes('/sign-in') ||
+          url.includes('/signup') ||
           url.includes('/sign-up');
         const isClerkHandshake =
           url.includes('clerk') && url.includes('handshake');
 
-        // Should redirect to auth, stay on route (if auth via cookies), or Clerk handshake
         expect(
           isAuthPage || isClerkHandshake || url.includes(route),
           `${route}: unexpected destination ${url}`
@@ -133,19 +207,15 @@ test.describe('Dashboard Navigation @smoke', () => {
     }
   });
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // DASHBOARD PAGES HEALTH
-  // ─────────────────────────────────────────────────────────────────────────
-
   test('dashboard sections load real content after sign-in', async ({
     page,
   }) => {
-    test.setTimeout(300_000); // 5min — sign-in + 6 page loads in dev mode
+    test.setTimeout(300_000);
 
     await setupClerkTestingToken({ page });
 
     try {
-      await signInUser(page);
+      await ensureSignedInUser(page);
     } catch (error) {
       if (error instanceof ClerkTestError) {
         test.skip(true, `Clerk auth failed: ${error.message}`);
@@ -163,93 +233,41 @@ test.describe('Dashboard Navigation @smoke', () => {
       throw error;
     }
 
-    // Verify we're in /app/
-    await expect(page).toHaveURL(/\/app\//, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/app(?:\/|$)/, { timeout: 20_000 });
 
-    const dashboardPages = [
-      { path: '/app/dashboard/profile', name: 'Profile' },
-      { path: '/app/dashboard/audience', name: 'Audience' },
-      { path: '/app/dashboard/releases', name: 'Releases' },
-      { path: '/app/dashboard/analytics', name: 'Analytics' },
-      { path: '/app/dashboard/earnings', name: 'Earnings' },
-      { path: '/app/dashboard/chat', name: 'Chat' },
-    ];
+    const dashboardPages = FAST_ITERATION
+      ? [{ path: APP_ROUTES.CHAT, name: 'Chat' }]
+      : [
+          { path: APP_ROUTES.CHAT, name: 'Chat' },
+          { path: APP_ROUTES.DASHBOARD_AUDIENCE, name: 'Audience' },
+          { path: APP_ROUTES.DASHBOARD_RELEASES, name: 'Releases' },
+          { path: APP_ROUTES.DASHBOARD_EARNINGS, name: 'Earnings' },
+        ];
 
     const failures: string[] = [];
 
     for (const { path, name } of dashboardPages) {
       try {
-        await page.goto(path, {
-          waitUntil: 'domcontentloaded',
+        await smokeNavigateWithRetry(page, path, {
           timeout: SMOKE_TIMEOUTS.NAVIGATION,
+          retries: FAST_ITERATION ? 3 : 2,
         });
 
-        // Wait for hydration
         await page
           .waitForLoadState('load', { timeout: 60_000 })
           .catch(() => {});
 
         const url = page.url();
-
-        // Re-authenticate if session expired
         if (url.includes('/signin') || url.includes('/sign-in')) {
           await signInUser(page);
           continue;
         }
 
-        // Should not redirect to onboarding
         expect(url, `${name}: redirected to onboarding`).not.toContain(
           '/onboarding'
         );
 
-        // Main content area should be visible with real content
-        const main = page.locator('main').first();
-        const mainVisible = await main
-          .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
-          .catch(() => false);
-
-        if (mainVisible) {
-          const mainText = await main.innerText().catch(() => '');
-          if (mainText.length < 30) {
-            failures.push(
-              `${name}: main content too short (${mainText.length} chars)`
-            );
-            continue;
-          }
-
-          // Not an error page
-          const lower = mainText.toLowerCase();
-          if (
-            lower.includes('application error') ||
-            lower.includes('internal server error') ||
-            lower.includes('something went wrong')
-          ) {
-            failures.push(`${name}: shows error page`);
-            continue;
-          }
-        }
-
-        // No error boundary visible
-        const errorBanner = page.locator(
-          '[data-testid="error-page"], [data-testid="error-boundary"], [data-testid="dashboard-error"]'
-        );
-        const hasErrorBanner = await errorBanner
-          .first()
-          .isVisible()
-          .catch(() => false);
-        if (hasErrorBanner) {
-          failures.push(`${name}: error boundary visible`);
-          continue;
-        }
-
-        // Sidebar nav should be visible (proves shell is intact)
-        const sidebar = page.locator('nav').first();
-        const hasSidebar = await sidebar.isVisible().catch(() => false);
-        if (!hasSidebar) {
-          console.warn(
-            `${name}: sidebar nav not visible — possible shell issue`
-          );
-        }
+        await assertDashboardRouteLoaded(page, path, name);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         failures.push(`${name}: ${msg.slice(0, 120)}`);
@@ -261,10 +279,6 @@ test.describe('Dashboard Navigation @smoke', () => {
       `Dashboard pages failed:\n${failures.join('\n')}`
     ).toHaveLength(0);
   });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // REDIRECT LOOP DETECTION
-  // ─────────────────────────────────────────────────────────────────────────
 
   test('dashboard does not redirect-loop when data fails to load', async ({
     browser,
@@ -287,18 +301,16 @@ test.describe('Dashboard Navigation @smoke', () => {
         }
       });
 
-      await page.goto('/app', {
+      await page.goto(APP_ROUTES.DASHBOARD, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,
         waitUntil: 'domcontentloaded',
       });
 
-      // Wait briefly for redirects to settle
       await page.waitForTimeout(3_000);
 
-      // Redirect loop: /app and /onboarding both appear 2+ times
       const appCount = redirectUrls.filter(u => u.startsWith('/app')).length;
       const onboardingCount = redirectUrls.filter(
-        u => u === '/onboarding'
+        u => u === APP_ROUTES.ONBOARDING
       ).length;
       const isLooping =
         (appCount >= 2 && onboardingCount >= 2) || redirectUrls.length > 10;
