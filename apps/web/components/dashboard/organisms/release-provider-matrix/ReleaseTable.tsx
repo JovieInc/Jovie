@@ -137,7 +137,7 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)';
+          'bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
@@ -155,7 +155,7 @@ export function ReleaseTable({
 
       return [
         'rounded-none',
-        'focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        'focus-within:shadow-[inset_1px_0_0_0_var(--linear-border-focus)]',
         'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,

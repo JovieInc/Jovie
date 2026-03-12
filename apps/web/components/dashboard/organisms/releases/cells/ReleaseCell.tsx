@@ -65,8 +65,8 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [artistName, release.artistNames]);
 
   return (
-    <div className='grid min-w-0 grid-cols-[22px_minmax(0,1fr)] items-start gap-x-3'>
-      <div className='flex w-[20px] items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-start gap-x-3.5'>
+      <div className='flex w-[22px] items-center justify-center pt-0.5'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
@@ -86,11 +86,11 @@ export const ReleaseCell = memo(function ReleaseCell({
         )}
       </div>
 
-      <div className='min-w-0 space-y-px'>
+      <div className='min-w-0 space-y-0.5'>
         <div className='flex min-w-0 items-center gap-1 leading-none'>
           <TruncatedText
             lines={1}
-            className='text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
+            className='text-[15px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
             tooltipSide='top'
             tooltipAlign='start'
           >
@@ -99,7 +99,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {showType && typeStyle && (
             <Badge
               size='sm'
-              className={`h-4 shrink-0 rounded-[5px] border px-1.5 text-[9px] font-[510] tracking-[-0.01em] shadow-none ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+              className={`h-[18px] shrink-0 rounded-[5px] border px-1.5 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
             >
               {typeStyle.label}
             </Badge>
@@ -107,7 +107,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
-              className='h-4 shrink-0 rounded-[5px] border border-amber-500/15 bg-amber-500/10 px-1.5 text-[9px] font-[510] tracking-[-0.01em] text-amber-700 shadow-none dark:text-amber-300'
+              className='h-[18px] shrink-0 rounded-[5px] border border-amber-500/15 bg-amber-500/10 px-1.5 text-[9.5px] font-[510] tracking-[-0.01em] text-amber-700 shadow-none dark:text-amber-300'
             >
               {manualOverrideCount} edited
             </Badge>
@@ -116,7 +116,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[450] leading-[1.25] tracking-[-0.01em] text-(--linear-text-secondary)'
+            className='text-[13px] font-[450] leading-[1.3] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
             {artistLine}
           </TruncatedText>

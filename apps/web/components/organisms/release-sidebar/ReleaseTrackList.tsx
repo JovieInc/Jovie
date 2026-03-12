@@ -110,7 +110,7 @@ export function ReleaseTrackList({
                 .map(id => (
                   <DrawerSurfaceCard
                     key={id}
-                    className='flex items-start gap-2.5 px-2 py-1.5'
+                    className='flex items-start gap-3 px-2.5 py-2'
                   >
                     <div className='w-7 shrink-0 pt-0.5'>
                       <div className='ml-auto h-3.5 w-4 rounded skeleton' />
@@ -231,8 +231,8 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2.5 rounded-[8px] border border-transparent px-2 py-1.5 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
-      <span className='w-6 shrink-0 pt-0.5 text-right text-[10px] tabular-nums text-(--linear-text-tertiary)'>
+    <div className='group flex items-start gap-3 rounded-[8px] border border-transparent px-2.5 py-2 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>
 
@@ -245,7 +245,7 @@ function TrackItem({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[12.5px] font-[510] text-(--linear-text-primary)'
+              className='text-[13.5px] font-[510] text-(--linear-text-primary)'
               tooltipSide='top'
             >
               {track.title}
@@ -260,7 +260,7 @@ function TrackItem({
             )}
           </div>
 
-          <div className='mt-0.5 flex items-center gap-1.5 text-[10px] text-(--linear-text-tertiary)'>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-tertiary)'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -271,7 +271,7 @@ function TrackItem({
                 {track.durationMs != null && (
                   <span className='text-(--linear-text-quaternary)'>|</span>
                 )}
-                <span className='font-mono text-[10.5px]'>{track.isrc}</span>
+                <span className='font-mono text-[11px]'>{track.isrc}</span>
               </>
             )}
           </div>
