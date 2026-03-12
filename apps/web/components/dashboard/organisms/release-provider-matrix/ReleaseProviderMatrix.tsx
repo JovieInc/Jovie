@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
   lazy,
@@ -19,6 +18,8 @@ import {
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
@@ -511,20 +512,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-[var(--linear-app-toolbar-gap)]'>
+      <DashboardHeaderActionGroup>
         {canCreateManualReleases ? (
-          <Button
-            variant='ghost'
-            size='sm'
+          <DashboardHeaderActionButton
+            ariaLabel='Create a new release'
             onClick={handleNewRelease}
-            className='h-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
-          >
-            <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
-            <span className='hidden sm:inline'>New Release</span>
-          </Button>
+            icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
+            label='New Release'
+            hideLabelOnMobile
+          />
         ) : null}
-        <DrawerToggleButton className='h-[var(--linear-app-control-height-sm)] w-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)' />
-      </div>
+        <DrawerToggleButton />
+      </DashboardHeaderActionGroup>
     ),
     [canCreateManualReleases, handleNewRelease]
   );

@@ -16,6 +16,8 @@ import { useIngestProfile } from './useIngestProfile';
 
 export function IngestProfileDropdown({
   onIngestPending,
+  buttonClassName,
+  hideLabelOnMobile = false,
 }: Readonly<IngestProfileDropdownProps>) {
   const {
     open,
@@ -48,9 +50,16 @@ export function IngestProfileDropdown({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type='button' size='sm' variant='ghost'>
+        <Button
+          type='button'
+          size='sm'
+          variant='ghost'
+          className={buttonClassName}
+        >
           <Icon name='Plus' className='h-3.5 w-3.5' />
-          Ingest Profile
+          <span className={hideLabelOnMobile ? 'hidden sm:inline' : undefined}>
+            Ingest Profile
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

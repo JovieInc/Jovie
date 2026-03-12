@@ -1,8 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { Plus, UserPlus } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
@@ -87,18 +88,16 @@ export const ContactsTable = memo(function ContactsTable({
   // Memoize header actions to avoid creating new JSX on every render
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-1'>
-        <Button
-          variant='ghost'
-          size='sm'
+      <DashboardHeaderActionGroup>
+        <DashboardHeaderActionButton
+          ariaLabel='Add contact'
           onClick={() => onAddContactRef.current()}
-          className='gap-1.5 text-secondary-token hover:text-primary-token'
-        >
-          <Plus className='h-3.5 w-3.5' />
-          <span className='hidden sm:inline'>Add contact</span>
-        </Button>
+          icon={<Plus className='h-3.5 w-3.5' />}
+          label='Add Contact'
+          hideLabelOnMobile
+        />
         <DrawerToggleButton />
-      </div>
+      </DashboardHeaderActionGroup>
     ),
     []
   );

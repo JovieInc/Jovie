@@ -11,6 +11,7 @@ import {
 } from 'nuqs';
 import * as React from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
@@ -98,7 +99,7 @@ function AudienceHeaderActions({
   readonly onToggle: (panel: AudiencePanelMode) => void;
 }) {
   return (
-    <div className='flex items-center gap-1'>
+    <DashboardHeaderActionGroup>
       <DashboardHeaderActionButton
         ariaLabel={
           mode === 'contact' ? 'Close contact sidebar' : 'Open contact sidebar'
@@ -117,7 +118,7 @@ function AudienceHeaderActions({
         onClick={() => onToggle('analytics')}
         icon={<BarChart3 className='h-4 w-4' />}
       />
-    </div>
+    </DashboardHeaderActionGroup>
   );
 }
 

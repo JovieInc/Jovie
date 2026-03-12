@@ -5,23 +5,12 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { BatchIngestModal } from '@/components/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
-
-function BatchIngestButton({ onClick }: { readonly onClick: () => void }) {
-  return (
-    <button
-      type='button'
-      onClick={onClick}
-      className='inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-secondary-token hover:bg-accent/10 hover:text-primary-token'
-    >
-      <ListPlus className='h-3.5 w-3.5' />
-      Batch Ingest
-    </button>
-  );
-}
 
 export function AdminCreatorsPageWrapper(
   props: Readonly<AdminCreatorProfilesWithSidebarProps>
@@ -41,16 +30,21 @@ export function AdminCreatorsPageWrapper(
   // Register custom header actions on mount
   useEffect(() => {
     setHeaderActions(
-      <div className='flex items-center gap-1'>
-        <BatchIngestButton onClick={handleOpenBatchModal} />
-        <IngestProfileDropdown onIngestPending={handleIngestPending} />
-
-        {/* Vertical divider */}
-        <div className='h-6 w-px bg-border' aria-hidden='true' />
-
-        {/* Drawer toggle button */}
+      <DashboardHeaderActionGroup>
+        <DashboardHeaderActionButton
+          ariaLabel='Batch ingest creators'
+          onClick={handleOpenBatchModal}
+          icon={<ListPlus className='h-3.5 w-3.5' />}
+          label='Batch Ingest'
+          hideLabelOnMobile
+        />
+        <IngestProfileDropdown
+          onIngestPending={handleIngestPending}
+          buttonClassName='h-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          hideLabelOnMobile
+        />
         <DrawerToggleButton />
-      </div>
+      </DashboardHeaderActionGroup>
     );
 
     return () => {
