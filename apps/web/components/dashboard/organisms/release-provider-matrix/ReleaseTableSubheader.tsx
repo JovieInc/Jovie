@@ -105,7 +105,7 @@ function InlineReleaseViewTabs({
       size='sm'
       className='hidden md:inline-flex'
       surface='ghost'
-      triggerClassName='flex-none'
+      triggerClassName='flex-none h-[30px] px-3 text-[12.5px]'
       aria-label='Choose releases view'
     />
   );
@@ -134,7 +134,7 @@ function CompactReleaseViewTabs({
       size='sm'
       className='inline-flex w-full md:hidden'
       surface='ghost'
-      triggerClassName='flex-1'
+      triggerClassName='flex-1 h-[30px] px-3 text-[12.5px]'
       aria-label='Choose releases view'
     />
   );
@@ -318,7 +318,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex flex-col gap-1.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-1 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)]'>
+    <div className='flex flex-col gap-2 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-1.5 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)]'>
       <div className='flex min-w-0 flex-1 items-center gap-1.5 md:w-auto md:flex-none'>
         {onReleaseViewChange ? (
           <>
@@ -344,7 +344,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               onClick={onSearchToggle}
               className={cn(
                 ACTION_BAR_BUTTON_CLASS,
-                'px-2 md:px-2.5',
+                'h-8 px-3 text-[12.5px]',
                 isSearchOpen &&
                   'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
               )}
@@ -359,14 +359,20 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           filters={filters}
           onFiltersChange={onFiltersChange}
           counts={counts}
-          buttonClassName={ACTION_BAR_BUTTON_CLASS}
+          buttonClassName={cn(
+            ACTION_BAR_BUTTON_CLASS,
+            'h-8 px-3 text-[12.5px]'
+          )}
         />
         <LinearStyleDisplayMenu
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}
           onReleaseViewChange={onReleaseViewChange}
-          triggerClassName={ACTION_BAR_BUTTON_CLASS}
+          triggerClassName={cn(
+            ACTION_BAR_BUTTON_CLASS,
+            'h-8 px-3 text-[12.5px]'
+          )}
           compact
         />
         <ExportCSVButton
@@ -376,7 +382,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label='Export'
           variant='ghost'
           size='sm'
-          className={cn(ACTION_BAR_BUTTON_CLASS, 'hidden md:inline-flex')}
+          className={cn(
+            ACTION_BAR_BUTTON_CLASS,
+            'hidden h-8 px-3 text-[12.5px] md:inline-flex'
+          )}
           tooltipLabel='Export'
         />
         {primaryAction ? (
