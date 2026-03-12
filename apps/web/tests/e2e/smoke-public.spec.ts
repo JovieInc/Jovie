@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
  *
@@ -35,6 +37,10 @@ function isClerkRedirect(url: string): boolean {
 }
 
 test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
+  test.skip(
+    FAST_ITERATION,
+    'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+  );
   test.setTimeout(120_000);
   await blockAnalytics(page);
 
@@ -84,6 +90,10 @@ test.describe('Public Profile - dualipa', () => {
   test('default view: artist name in h1, profile identity link, claim banner', async ({
     page,
   }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}`, {
@@ -120,6 +130,10 @@ test.describe('Public Profile - dualipa', () => {
   });
 
   test('listen mode: DSP streaming links render', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}?mode=listen`, {
@@ -175,6 +189,10 @@ test.describe('Public Profile - dualipa', () => {
   });
 
   test('tip mode: tipping UI renders', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
     const tipProfile = 'testartist';
 
@@ -206,6 +224,10 @@ test.describe('Public Profile - dualipa', () => {
   });
 
   test('subscribe mode: notification capture UI renders', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}?mode=subscribe`, {
@@ -241,6 +263,10 @@ test.describe('Public Profile - dualipa', () => {
 });
 
 test('signin and signup pages load', async ({ page }) => {
+  test.skip(
+    FAST_ITERATION,
+    'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+  );
   await blockAnalytics(page);
 
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
@@ -265,6 +291,10 @@ test('signin and signup pages load', async ({ page }) => {
 });
 
 test('unknown routes return <500, not server crash', async ({ page }) => {
+  test.skip(
+    FAST_ITERATION,
+    'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+  );
   await blockAnalytics(page);
 
   for (const route of [

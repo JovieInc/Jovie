@@ -310,6 +310,10 @@ test.describe('Auth expiry resilience', () => {
   test('clearing session cookies redirects to signin, not blank or crash', async ({
     page,
   }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Injected auth-expiry resilience runs in the slower resilience lane'
+    );
     test.setTimeout(120_000);
 
     test.skip(!hasClerkCredentials(), 'Clerk credentials not configured');

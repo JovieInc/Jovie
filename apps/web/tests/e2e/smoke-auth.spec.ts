@@ -215,6 +215,10 @@ test.describe('Dashboard Navigation @smoke', () => {
   test('dashboard sections load real content after sign-in', async ({
     page,
   }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Post-login dashboard content runs in content-gate and chaos fast lanes'
+    );
     test.setTimeout(300_000);
 
     await setupClerkTestingToken({ page });
