@@ -10,15 +10,13 @@
  * @see https://tanstack.com/pacer
  */
 
-import { useAsyncDebouncer } from '@tanstack/react-pacer';
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
-import { PACER_TIMING } from '@/lib/pacer/hooks';
-import { SEARCH_CACHE } from './cache-strategies';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
+import {
+  type ArtistSearchState,
+  useUnifiedArtistSearchQuery,
+} from './useUnifiedArtistSearchQuery';
 
-// Response shape from /api/spotify/search
 export interface SpotifyArtistResult {
   id: string;
   name: string;
@@ -29,19 +27,12 @@ export interface SpotifyArtistResult {
   verified?: boolean;
 }
 
-export type ArtistSearchState =
-  | 'idle'
-  | 'loading'
-  | 'error'
-  | 'empty'
-  | 'success';
-
 export interface UseArtistSearchQueryOptions {
   /** Debounce delay in ms (default 300) */
   debounceMs?: number;
   /** Max results to fetch (default 5) */
   limit?: number;
-  /** Min query length to trigger search (default 2) */
+  /** Min query length to trigger search (default 1) */
   minQueryLength?: number;
 }
 
@@ -61,7 +52,6 @@ export interface UseArtistSearchQueryReturn {
   isPending: boolean;
 }
 
-const DEFAULT_LIMIT = 5;
 const DEFAULT_MIN_QUERY_LENGTH = 1;
 
 async function fetchArtistSearch(
@@ -77,188 +67,33 @@ async function fetchArtistSearch(
   } catch (error) {
     if (error instanceof FetchError) {
       if (error.status === 429) {
-        // Non-retryable: preserve rate limit budget
         const rateLimitError = new Error(
           'Too many requests. Please wait a moment.'
         );
         rateLimitError.name = 'RateLimitError';
         throw rateLimitError;
       }
-      // Parse API error body for user-friendly messages
       if (error.response) {
         const data = await error.response.json().catch(() => ({}));
         error.message = data?.error || error.message || 'Search failed';
-        throw error; // Preserve FetchError so retry policy can call isRetryable()
+        throw error;
       }
     }
     throw error;
   }
 }
 
-/**
- * TanStack Query hook for artist search with debouncing.
- *
- * Benefits over the previous manual implementation:
- * - Automatic caching: Previously searched terms are instant
- * - Request deduplication: No redundant API calls
- * - Background refetching: Stale data is updated automatically
- * - Simpler code: ~100 lines less than manual implementation
- *
- * @example
- * ```tsx
- * const { results, state, search, clear } = useArtistSearchQuery();
- *
- * return (
- *   <input onChange={(e) => search(e.target.value)} />
- *   {state === 'loading' && <Spinner />}
- *   {results.map(artist => <ArtistCard key={artist.id} artist={artist} />)}
- * );
- * ```
- */
 export function useArtistSearchQuery(
   options: UseArtistSearchQueryOptions = {}
 ): UseArtistSearchQueryReturn {
-  const {
-    debounceMs = PACER_TIMING.SEARCH_DEBOUNCE_MS,
-    limit = DEFAULT_LIMIT,
-    minQueryLength = DEFAULT_MIN_QUERY_LENGTH,
-  } = options;
+  const { minQueryLength = DEFAULT_MIN_QUERY_LENGTH, ...rest } = options;
 
-  // Track current input and debounced query separately
-  const [inputQuery, setInputQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-
-  // Track debounce pending state
-  const [isPending, setIsPending] = useState(false);
-
-  // TanStack Pacer debouncer for updating the query key
-  const asyncDebouncer = useAsyncDebouncer(
-    async (searchQuery: string) => {
-      setIsPending(false);
-      const trimmed = searchQuery.trim();
-      if (trimmed.length >= minQueryLength) {
-        setDebouncedQuery(trimmed);
-      } else {
-        setDebouncedQuery('');
-      }
-    },
-    { wait: debounceMs }
-  );
-
-  // TanStack Query for fetching and caching results
-  const {
-    data,
-    isLoading,
-    isFetching,
-    error: queryError,
-  } = useQuery<SpotifyArtistResult[]>({
-    queryKey: queryKeys.spotify.artistSearch(debouncedQuery, limit),
-    queryFn: ({ signal }) => fetchArtistSearch(debouncedQuery, limit, signal),
-    enabled: debouncedQuery.length >= minQueryLength,
-    ...SEARCH_CACHE,
-    // Don't retry rate limit or client errors - only retry server/network errors
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.name === 'RateLimitError')
-        return false;
-      if (error instanceof FetchError && !error.isRetryable()) return false;
-      return failureCount < 2;
-    },
-  });
-
-  // Derive state from query status
-  const state = useMemo<ArtistSearchState>(() => {
-    if (!debouncedQuery || debouncedQuery.length < minQueryLength) {
-      return 'idle';
-    }
-    if (isLoading || isFetching || isPending) {
-      return 'loading';
-    }
-    if (queryError) {
-      return 'error';
-    }
-    if (data?.length === 0) {
-      return 'empty';
-    }
-    if (data && data.length > 0) {
-      return 'success';
-    }
-    return 'idle';
-  }, [
-    debouncedQuery,
+  return useUnifiedArtistSearchQuery<SpotifyArtistResult>({
+    ...rest,
     minQueryLength,
-    isLoading,
-    isFetching,
-    queryError,
-    data,
-    isPending,
-  ]);
-
-  const search = useCallback(
-    (searchQuery: string) => {
-      setInputQuery(searchQuery);
-      const trimmed = searchQuery.trim();
-
-      if (trimmed.length < minQueryLength) {
-        asyncDebouncer.cancel();
-        setDebouncedQuery('');
-        setIsPending(false);
-        return;
-      }
-
-      // Single letter: bypass debounce for instant alphabet pre-cache results
-      if (trimmed.length === 1 && /^[a-zA-Z]$/.test(trimmed)) {
-        asyncDebouncer.cancel();
-        setDebouncedQuery(trimmed);
-        setIsPending(false);
-        return;
-      }
-
-      setIsPending(true);
-      // Fire-and-forget: debouncer handles async execution internally
-      asyncDebouncer.maybeExecute(searchQuery);
-    },
-    [asyncDebouncer, minQueryLength]
-  );
-
-  const searchImmediate = useCallback(
-    (searchQuery: string) => {
-      asyncDebouncer.cancel();
-      setInputQuery(searchQuery);
-      const trimmed = searchQuery.trim();
-
-      if (trimmed.length < minQueryLength) {
-        setDebouncedQuery('');
-        return;
-      }
-
-      setDebouncedQuery(trimmed);
-    },
-    [asyncDebouncer, minQueryLength]
-  );
-
-  const clear = useCallback(() => {
-    asyncDebouncer.cancel();
-    setInputQuery('');
-    setDebouncedQuery('');
-    setIsPending(false);
-  }, [asyncDebouncer]);
-
-  // Extract error message from query error
-  let errorMessage: string | null = null;
-  if (queryError instanceof Error) {
-    errorMessage = queryError.message;
-  } else if (queryError) {
-    errorMessage = String(queryError);
-  }
-
-  return {
-    results: data ?? [],
-    state,
-    error: errorMessage,
-    search,
-    searchImmediate,
-    clear,
-    query: inputQuery,
-    isPending,
-  };
+    queryKey: queryKeys.spotify.artistSearch,
+    searchFn: fetchArtistSearch,
+    shouldBypassDebounce: query =>
+      query.length === 1 && /^[a-zA-Z]$/.test(query),
+  });
 }
