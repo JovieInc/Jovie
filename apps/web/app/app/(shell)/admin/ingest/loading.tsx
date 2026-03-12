@@ -1,3 +1,4 @@
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 const SKELETON_ROW_KEYS = Array.from(
@@ -10,14 +11,17 @@ export default function AdminIngestLoading() {
     <PageShell>
       <PageContent>
         <div className='space-y-6' aria-busy='true'>
-          <div className='rounded-xl border border-subtle px-6 py-5'>
-            <div className='h-5 w-44 rounded skeleton' />
-            <div className='mt-2 h-3 w-64 rounded skeleton' />
+          <div className='overflow-hidden rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface)'>
+            <ContentSectionHeaderSkeleton
+              titleWidth='w-44'
+              descriptionWidth='w-64'
+              className='border-b-0 px-6'
+            />
           </div>
-          <div className='rounded-xl border border-subtle px-6 py-5'>
+          <div className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-6 py-5'>
             <div className='h-5 w-36 rounded skeleton' />
           </div>
-          <div className='rounded-xl border border-subtle px-6 py-5'>
+          <div className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-6 py-5'>
             <div className='h-5 w-40 rounded skeleton' />
             <div className='mt-4 space-y-3'>
               {SKELETON_ROW_KEYS.map(key => (
