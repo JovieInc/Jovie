@@ -1,10 +1,12 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
+  DrawerButton,
+  DrawerFormField,
   DrawerSurfaceCard,
   EntityHeaderCard,
 } from '@/components/molecules/drawer';
@@ -142,10 +144,11 @@ export function ReleaseEditDialog({
                         </Badge>
                       ) : null}
                     </div>
-                    <p className='mt-1 text-[11px] text-(--linear-text-secondary)'>
-                      {helperText}
-                    </p>
-                    <div className='mt-2 space-y-2'>
+                    <DrawerFormField
+                      label='URL'
+                      helperText={helperText}
+                      className='mt-2 space-y-2'
+                    >
                       <Input
                         value={value}
                         onChange={event =>
@@ -155,26 +158,24 @@ export function ReleaseEditDialog({
                         data-testid={`provider-input-${release.id}-${provider.key}`}
                       />
                       <div className='flex items-center justify-between gap-2'>
-                        <Button
-                          variant='primary'
-                          size='sm'
+                        <DrawerButton
+                          tone='primary'
                           disabled={isSaving || !value.trim()}
                           data-testid={`save-provider-${release.id}-${provider.key}`}
                           onClick={() => onSave(provider.key)}
                         >
                           Save
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
+                        </DrawerButton>
+                        <DrawerButton
+                          tone='ghost'
                           disabled={isSaving}
                           data-testid={`reset-provider-${release.id}-${provider.key}`}
                           onClick={() => onReset(provider.key)}
                         >
                           Reset
-                        </Button>
+                        </DrawerButton>
                       </div>
-                    </div>
+                    </DrawerFormField>
                   </DrawerSurfaceCard>
                 );
               })}
@@ -183,9 +184,7 @@ export function ReleaseEditDialog({
         ) : null}
       </DialogBody>
       <DialogActions className='justify-end'>
-        <Button variant='secondary' size='sm' onClick={onClose}>
-          Done
-        </Button>
+        <DrawerButton onClick={onClose}>Done</DrawerButton>
       </DialogActions>
     </Dialog>
   );

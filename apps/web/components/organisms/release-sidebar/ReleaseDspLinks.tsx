@@ -9,7 +9,6 @@
 import {
   Button,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -23,14 +22,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
-  DRAWER_SECTION_HEADING_CLASSNAME,
   DrawerButton,
+  DrawerFormGridRow,
   DrawerLinkSection,
   DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
-import { cn } from '@/lib/utils';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
@@ -61,9 +59,6 @@ interface ReleaseDspLinksProps {
   readonly onRescanIsrc?: () => void;
   readonly isRescanningIsrc?: boolean;
 }
-
-const FORM_ROW_CLASS =
-  'grid grid-cols-[88px,minmax(0,1fr)] items-center gap-2.5';
 
 /**
  * Format remaining cooldown time for display.
@@ -229,15 +224,7 @@ export function ReleaseDspLinks({
       {/* Add link form */}
       {isEditable && isAddingLink && (
         <DrawerSurfaceCard className='mt-2 space-y-2.5 rounded-[10px] p-3'>
-          <div className={FORM_ROW_CLASS}>
-            <Label
-              className={cn(
-                DRAWER_SECTION_HEADING_CLASSNAME,
-                'text-[11px] tracking-[0.08em]'
-              )}
-            >
-              Provider
-            </Label>
+          <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
               onValueChange={(value: string) => {
@@ -262,16 +249,8 @@ export function ReleaseDspLinks({
                 })}
               </SelectContent>
             </Select>
-          </div>
-          <div className={FORM_ROW_CLASS}>
-            <Label
-              className={cn(
-                DRAWER_SECTION_HEADING_CLASSNAME,
-                'text-[11px] tracking-[0.08em]'
-              )}
-            >
-              URL
-            </Label>
+          </DrawerFormGridRow>
+          <DrawerFormGridRow label='URL'>
             <Input
               type='url'
               value={newLinkUrl}
@@ -286,7 +265,7 @@ export function ReleaseDspLinks({
               autoFocus
               className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'
             />
-          </div>
+          </DrawerFormGridRow>
           <div className='flex justify-end gap-2 pt-1'>
             <DrawerButton
               type='button'

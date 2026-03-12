@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import {
   Dialog,
   DialogBody,
@@ -117,22 +117,21 @@ function SearchInputTrailing({
 }) {
   if (showClaimButton) {
     return (
-      <button
+      <DrawerButton
         type='button'
+        tone='primary'
         disabled={claimButtonDisabled}
         onClick={onClaimArtist}
         className={cn(
-          'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border px-3 text-[13px] font-[510] transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
-          claimButtonDisabled
-            ? 'cursor-not-allowed border-(--linear-border-subtle) bg-(--linear-accent)/50 text-white/60'
-            : 'border-(--linear-accent) bg-(--linear-accent) text-white hover:border-(--linear-accent) hover:bg-(--linear-accent-hover) focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+          'h-8 shrink-0 px-3 text-[13px]',
+          claimButtonDisabled && 'text-white/60'
         )}
       >
         {(isLoading || isPending) && (
           <LoadingSpinner size='sm' tone='inverse' label='Connecting' />
         )}
         Connect Spotify
-      </button>
+      </DrawerButton>
     );
   }
 

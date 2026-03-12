@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 export interface NotFoundCopyButtonProps {
@@ -27,13 +28,15 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
   onCopy,
 }: Readonly<NotFoundCopyButtonProps>) {
   return (
-    <button
+    <DrawerButton
       type='button'
+      tone={isCopied ? 'secondary' : 'ghost'}
+      size='sm'
       className={cn(
-        'group/btn inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] transition-[background-color,border-color,color] duration-150',
+        'group/btn h-7 gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[450]',
         isCopied
           ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-          : 'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          : 'text-(--linear-text-tertiary)'
       )}
       onClick={() =>
         void onCopy(smartLinkPath, `${releaseTitle} smart link`, testId)
@@ -57,6 +60,6 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       >
         {isCopied ? 'Copied!' : '—'}
       </span>
-    </button>
+    </DrawerButton>
   );
 });

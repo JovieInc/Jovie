@@ -110,14 +110,14 @@ export function ReleaseTrackList({
                 .map(id => (
                   <DrawerSurfaceCard
                     key={id}
-                    className='flex items-start gap-2 px-1.5 py-1'
+                    className='flex items-start gap-2.5 px-2 py-1.5'
                   >
-                    <div className='w-6 shrink-0 pt-0.5'>
-                      <div className='ml-auto h-3 w-4 rounded skeleton' />
+                    <div className='w-7 shrink-0 pt-0.5'>
+                      <div className='ml-auto h-3.5 w-4 rounded skeleton' />
                     </div>
                     <div className='min-w-0 flex-1 space-y-1'>
-                      <div className='h-3.5 w-3/4 rounded skeleton' />
-                      <div className='h-2.5 w-1/3 rounded skeleton' />
+                      <div className='h-4 w-3/4 rounded skeleton' />
+                      <div className='h-3 w-1/3 rounded skeleton' />
                     </div>
                   </DrawerSurfaceCard>
                 ))}
@@ -231,8 +231,8 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2 rounded-[8px] border border-transparent px-1.5 py-1 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
-      <span className='w-5 shrink-0 pt-0.5 text-right text-[9px] tabular-nums text-(--linear-text-tertiary)'>
+    <div className='group flex items-start gap-2.5 rounded-[8px] border border-transparent px-2 py-1.5 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[10px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>
 
@@ -245,7 +245,7 @@ function TrackItem({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[11.5px] font-[510] text-(--linear-text-primary)'
+              className='text-[12.5px] font-[510] text-(--linear-text-primary)'
               tooltipSide='top'
             >
               {track.title}
@@ -260,7 +260,7 @@ function TrackItem({
             )}
           </div>
 
-          <div className='mt-0.5 flex items-center gap-1.5 text-[9px] text-(--linear-text-tertiary)'>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[10px] text-(--linear-text-tertiary)'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -271,22 +271,22 @@ function TrackItem({
                 {track.durationMs != null && (
                   <span className='text-(--linear-text-quaternary)'>|</span>
                 )}
-                <span className='font-mono text-[10px]'>{track.isrc}</span>
+                <span className='font-mono text-[10.5px]'>{track.isrc}</span>
               </>
             )}
           </div>
         </button>
 
         {playableUrl && (
-          <div className='mt-1 space-y-0.5'>
-            <div className='flex items-center gap-1.5'>
+          <div className='mt-1.5 space-y-1'>
+            <div className='flex items-center gap-2'>
               <button
                 type='button'
                 onClick={event => {
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-4.5 w-4.5 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
@@ -302,7 +302,7 @@ function TrackItem({
                 />
               </div>
             </div>
-            <p className='text-[10px] text-(--linear-text-tertiary)'>
+            <p className='text-[10.5px] text-(--linear-text-tertiary)'>
               {track.audioFormat
                 ? `Audio preview · ${track.audioFormat.toUpperCase()}`
                 : 'Audio preview'}

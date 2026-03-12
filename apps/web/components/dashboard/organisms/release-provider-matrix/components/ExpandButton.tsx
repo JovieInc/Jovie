@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { cn } from '@/lib/utils';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 
 interface ExpandButtonProps {
   /** Whether the row is currently expanded */
@@ -35,17 +35,10 @@ export const ExpandButton = memo(function ExpandButton({
   }
 
   return (
-    <button
-      type='button'
+    <DrawerInlineIconButton
       onClick={onClick}
       disabled={isLoading}
-      className={cn(
-        'flex h-5 w-5 items-center justify-center rounded-[6px] border border-transparent',
-        'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary)',
-        'transition-[background-color,border-color,color,box-shadow] duration-150',
-        'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-        'disabled:cursor-not-allowed disabled:opacity-50'
-      )}
+      className='h-5 w-5 rounded-[6px] p-0 text-(--linear-text-tertiary) disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >
@@ -62,6 +55,6 @@ export const ExpandButton = memo(function ExpandButton({
           aria-hidden='true'
         />
       )}
-    </button>
+    </DrawerInlineIconButton>
   );
 });

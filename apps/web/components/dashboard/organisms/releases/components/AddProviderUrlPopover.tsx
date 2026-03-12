@@ -1,14 +1,13 @@
 'use client';
 
-import {
-  Button,
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@jovie/ui';
+import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import {
+  DrawerButton,
+  DrawerFormField,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey } from '@/lib/discography/types';
 
@@ -80,10 +79,11 @@ export function AddProviderUrlPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type='button'
+        <DrawerButton
           aria-label={`Add ${providerLabel} link`}
-          className='group/add inline-flex h-7 min-w-[76px] items-center justify-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          tone='ghost'
+          size='sm'
+          className='group/add h-7 min-w-[76px] gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary)'
         >
           <Icon
             name='Plus'
@@ -96,70 +96,76 @@ export function AddProviderUrlPopover({
           <span className='line-clamp-1 hidden group-hover/add:inline group-focus-visible/add:inline'>
             Add link
           </span>
-        </button>
+        </DrawerButton>
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[288px] rounded-[10px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'
+        className='w-[288px] border-0 bg-transparent p-0 shadow-none'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
         }}
       >
-        <form onSubmit={handleSubmit} className='space-y-3'>
-          <div className='flex items-center gap-2'>
-            <span
-              className='h-2 w-2 shrink-0 rounded-full'
-              style={{ backgroundColor: accent }}
-              aria-hidden='true'
-            />
-            <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
-              Add {providerLabel} link
-            </span>
-          </div>
-          <Input
-            ref={inputRef}
-            type='url'
-            inputSize='sm'
-            placeholder='Paste URL here...'
-            value={url}
-            onChange={e => {
-              setUrl(e.target.value);
-              setValidationError('');
-            }}
-            disabled={isSaving}
-            autoComplete='off'
-            className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
-          />
-          {validationError ? (
-            <p className='text-[12px] text-(--linear-error)'>
-              {validationError}
-            </p>
-          ) : null}
-          <div className='flex justify-end gap-2'>
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={() => {
-                setUrl('');
-                setOpen(false);
-              }}
-              className='h-8 rounded-[8px] px-2.5 text-[12px]'
+        <DrawerSurfaceCard className='p-3'>
+          <form onSubmit={handleSubmit} className='space-y-3'>
+            <div className='flex items-center gap-2'>
+              <span
+                className='h-2 w-2 shrink-0 rounded-full'
+                style={{ backgroundColor: accent }}
+                aria-hidden='true'
+              />
+              <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                Add {providerLabel} link
+              </span>
+            </div>
+            <DrawerFormField
+              label='URL'
+              helperText={
+                validationError ? (
+                  <span className='text-(--linear-error)'>
+                    {validationError}
+                  </span>
+                ) : undefined
+              }
+              className='space-y-2'
             >
-              Cancel
-            </Button>
-            <Button
-              type='submit'
-              variant='primary'
-              size='sm'
-              disabled={!url.trim() || isSaving}
-              className='h-8 min-w-[68px] rounded-[8px] px-2.5 text-[12px]'
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </Button>
-          </div>
-        </form>
+              <Input
+                ref={inputRef}
+                type='url'
+                inputSize='sm'
+                placeholder='Paste URL here...'
+                value={url}
+                onChange={e => {
+                  setUrl(e.target.value);
+                  setValidationError('');
+                }}
+                disabled={isSaving}
+                autoComplete='off'
+                className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
+              />
+            </DrawerFormField>
+            <div className='flex justify-end gap-2'>
+              <DrawerButton
+                type='button'
+                tone='ghost'
+                onClick={() => {
+                  setUrl('');
+                  setOpen(false);
+                }}
+              >
+                Cancel
+              </DrawerButton>
+              <DrawerButton
+                type='submit'
+                tone='primary'
+                disabled={!url.trim() || isSaving}
+                className='min-w-[68px]'
+              >
+                {isSaving ? 'Saving...' : 'Save'}
+              </DrawerButton>
+            </div>
+          </form>
+        </DrawerSurfaceCard>
       </PopoverContent>
     </Popover>
   );

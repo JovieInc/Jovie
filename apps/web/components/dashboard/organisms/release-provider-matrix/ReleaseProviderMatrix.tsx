@@ -22,7 +22,10 @@ import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
+import {
+  DrawerButton,
+  DrawerLoadingSkeleton,
+} from '@/components/molecules/drawer';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
@@ -815,9 +818,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                     : 'Sync your releases from Spotify to start generating smart links.'}
                 </p>
                 <div className='mt-4 flex items-center gap-3'>
-                  <Button
-                    variant='primary'
-                    size='sm'
+                  <DrawerButton
+                    tone='primary'
                     disabled={isSyncing}
                     onClick={
                       experienceAdapter?.onSync
@@ -836,11 +838,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                       aria-hidden='true'
                     />
                     {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                  </Button>
+                  </DrawerButton>
                   {canCreateManualReleases && (
-                    <Button
-                      variant='secondary'
-                      size='sm'
+                    <DrawerButton
                       onClick={handleNewRelease}
                       className='inline-flex items-center gap-2'
                       data-testid='create-release-empty-state'
@@ -851,7 +851,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                         aria-hidden='true'
                       />
                       Create Release
-                    </Button>
+                    </DrawerButton>
                   )}
                 </div>
               </div>

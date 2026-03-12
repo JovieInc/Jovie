@@ -9,6 +9,7 @@ import {
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 /**
@@ -72,13 +73,12 @@ function SearchInput({
           className='w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         />
         {value && (
-          <button
-            type='button'
+          <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
+            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-(--linear-text-tertiary)'
           >
             <Icon name='X' className='h-3 w-3' />
-          </button>
+          </DrawerInlineIconButton>
         )}
       </div>
     </div>

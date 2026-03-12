@@ -12,12 +12,15 @@
  * flashing a loading banner on every page visit.
  */
 
-import { Button } from '@jovie/ui';
 import { useEffect, useMemo } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import {
+  DrawerButton,
+  DrawerInlineIconButton,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   useConfirmDspMatchMutation,
@@ -151,54 +154,54 @@ export function AppleMusicSyncBanner({
         <span className='max-w-[160px] truncate text-(--linear-text-secondary)'>
           Match: {match.externalArtistName}
         </span>
-        <Button
-          variant='ghost'
-          size='sm'
+        <DrawerButton
+          tone='ghost'
           onClick={() =>
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='h-6 rounded-[7px] px-2 text-[11px]'
+          className='h-6 px-2 text-[11px]'
         >
           Dismiss
-        </Button>
-        <Button
-          variant='primary'
-          size='sm'
+        </DrawerButton>
+        <DrawerButton
+          tone='primary'
           onClick={() =>
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='h-6 rounded-[7px] bg-[#FA243C] px-2 text-[11px] hover:bg-[#FA243C]/90'
+          className='h-6 border-[#FA243C] bg-[#FA243C] px-2 text-[11px] hover:border-[#FA243C] hover:bg-[#FA243C]/90'
         >
           Confirm
-        </Button>
+        </DrawerButton>
       </div>
     );
   }
 
   if (syncState === 'no_match') {
     return (
-      <DashboardCard
-        variant='default'
-        padding='none'
-        className={cn('flex items-center gap-3 px-4 py-3', className)}
+      <DrawerSurfaceCard
+        className={cn(
+          'flex items-center gap-3 px-4 py-3 text-(--linear-text-secondary)',
+          className
+        )}
       >
         <DspProviderIcon provider='apple_music' size='md' />
         <p className='text-[13px] text-(--linear-text-secondary)'>
           No matching Apple Music artist found
         </p>
-      </DashboardCard>
+      </DrawerSurfaceCard>
     );
   }
 
   // Suggested match — the only actionable banner state
   const match = appleMusicMatch!;
+  const externalArtistUrl = match.externalArtistUrl ?? undefined;
 
   return (
-    <div
+    <DrawerSurfaceCard
       className={cn(
-        'flex items-center gap-3 rounded-lg border border-[#FA243C]/20 bg-[#FA243C]/5 px-4 py-3',
+        'flex items-center gap-3 border-[#FA243C]/20 bg-[#FA243C]/5 px-4 py-3',
         className
       )}
     >
@@ -211,16 +214,21 @@ export function AppleMusicSyncBanner({
           <span className='min-w-0 truncate text-[13px] font-[510] text-(--linear-text-primary)'>
             {match.externalArtistName}
           </span>
-          {match.externalArtistUrl && (
-            <a
-              href={match.externalArtistUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-              className='shrink-0 text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-secondary)'
-              title='View on Apple Music'
+          {externalArtistUrl && (
+            <DrawerInlineIconButton
+              type='button'
+              aria-label='View on Apple Music'
+              onClick={() =>
+                globalThis.open(
+                  externalArtistUrl,
+                  '_blank',
+                  'noopener,noreferrer'
+                )
+              }
+              className='p-0.5 text-(--linear-text-tertiary)'
             >
               <Icon name='ExternalLink' className='h-3 w-3' />
-            </a>
+            </DrawerInlineIconButton>
           )}
         </div>
         <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
@@ -229,28 +237,26 @@ export function AppleMusicSyncBanner({
       </div>
 
       <div className='flex items-center gap-2 shrink-0'>
-        <Button
-          variant='ghost'
-          size='sm'
+        <DrawerButton
+          tone='ghost'
           onClick={() =>
             rejectMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={rejectMutation.isPending || confirmMutation.isPending}
-          className='h-8 rounded-[8px] px-2.5 text-[12px]'
+          className='h-8 px-2.5 text-[12px]'
         >
           {rejectMutation.isPending &&
           rejectMutation.variables?.matchId === match.id
             ? 'Dismissing...'
             : 'Dismiss'}
-        </Button>
-        <Button
-          variant='primary'
-          size='sm'
+        </DrawerButton>
+        <DrawerButton
+          tone='primary'
           onClick={() =>
             confirmMutation.mutate({ matchId: match.id, profileId })
           }
           disabled={confirmMutation.isPending || rejectMutation.isPending}
-          className='h-8 rounded-[8px] bg-[#FA243C] px-2.5 text-[12px] hover:bg-[#FA243C]/90'
+          className='h-8 border-[#FA243C] bg-[#FA243C] px-2.5 text-[12px] hover:border-[#FA243C] hover:bg-[#FA243C]/90'
         >
           {confirmMutation.isPending &&
           confirmMutation.variables?.matchId === match.id ? (
@@ -265,8 +271,8 @@ export function AppleMusicSyncBanner({
           ) : (
             'Confirm'
           )}
-        </Button>
+        </DrawerButton>
       </div>
-    </div>
+    </DrawerSurfaceCard>
   );
 }

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@jovie/ui';
+import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import {
   type FormEvent,
   memo,
@@ -18,6 +12,10 @@ import {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import {
+  DrawerButton,
+  DrawerInlineIconButton,
+} from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -47,7 +45,7 @@ interface AvailabilityCellProps {
 function AvailabilityEmptyAction() {
   return (
     <div className='flex min-w-[150px] justify-end'>
-      <div className='h-7 w-[76px] rounded-[7px] border border-dashed border-(--linear-border-subtle) bg-(--linear-bg-surface-1)' />
+      <div className='h-8 w-[84px] rounded-[8px] border border-dashed border-(--linear-border-subtle) bg-(--linear-bg-surface-1)' />
     </div>
   );
 }
@@ -319,8 +317,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                   if (provider?.url) {
                     return (
                       <div className='flex min-w-[150px] items-center justify-end gap-1'>
-                        <button
-                          type='button'
+                        <DrawerInlineIconButton
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
                             globalThis.open(
@@ -329,16 +326,15 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               'noopener,noreferrer'
                             )
                           }
-                          className='rounded-[7px] border border-transparent p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                          className='p-1 text-(--linear-text-tertiary)'
                         >
                           <Icon
                             name='ExternalLink'
                             className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
-                        </button>
-                        <button
-                          type='button'
+                        </DrawerInlineIconButton>
+                        <DrawerInlineIconButton
                           aria-label={
                             isCopied
                               ? `Copied ${config.label} link`
@@ -355,7 +351,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
-                        </button>
+                        </DrawerInlineIconButton>
                       </div>
                     );
                   }
@@ -377,54 +373,55 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-7 w-[150px] rounded-[7px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
+                          className='h-8 w-[150px] rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
                           autoFocus
                         />
-                        <Button
+                        <DrawerButton
                           type='submit'
-                          variant='ghost'
-                          size='sm'
+                          tone='ghost'
+                          size='icon'
                           aria-label='Confirm URL'
                           disabled={!urlInput.trim() || isAddingUrl}
-                          className='h-7 w-7 rounded-[7px] border border-transparent px-0 text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+                          className='h-8 w-8 rounded-[8px] text-(--linear-text-tertiary)'
                         >
                           <Icon
                             name='Check'
                             className='h-4 w-4'
                             aria-hidden='true'
                           />
-                        </Button>
-                        <Button
+                        </DrawerButton>
+                        <DrawerButton
                           type='button'
-                          variant='ghost'
-                          size='sm'
+                          tone='ghost'
+                          size='icon'
                           aria-label='Cancel adding URL'
                           onClick={() => {
                             setAddingProvider(null);
                             setUrlInput('');
                             setValidationError('');
                           }}
-                          className='h-7 w-7 rounded-[7px] border border-transparent px-0 text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+                          className='h-8 w-8 rounded-[8px] text-(--linear-text-tertiary)'
                         >
                           <Icon
                             name='X'
                             className='h-4 w-4'
                             aria-hidden='true'
                           />
-                        </Button>
+                        </DrawerButton>
                       </form>
                     );
                   }
 
                   if (onAddUrl) {
                     return (
-                      <button
-                        type='button'
+                      <DrawerButton
                         onClick={() => setAddingProvider(providerKey)}
-                        className='inline-flex h-7 min-w-[76px] items-center justify-center rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 text-[11px] font-[450] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-2) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                        tone='secondary'
+                        size='sm'
+                        className='min-w-[84px] rounded-[8px] text-[11px] font-[510]'
                       >
                         + Add link
-                      </button>
+                      </DrawerButton>
                     );
                   }
 

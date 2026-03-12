@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 
 interface ReleasesEmptyStateProps {
   readonly onConnectSpotify: () => void;
@@ -18,14 +17,9 @@ export function ReleasesEmptyState({
       <p className='mt-1 max-w-sm text-[12px] leading-[17px] text-(--linear-text-secondary)'>
         Search your artist profile to import releases.
       </p>
-      <Button
-        variant='primary'
-        size='sm'
-        onClick={onConnectSpotify}
-        className='mt-4'
-      >
+      <DrawerButton tone='primary' onClick={onConnectSpotify} className='mt-4'>
         Connect Spotify
-      </Button>
+      </DrawerButton>
     </DrawerSurfaceCard>
   );
 }

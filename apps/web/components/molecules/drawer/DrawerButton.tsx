@@ -4,10 +4,12 @@ import { Button, type ButtonProps } from '@jovie/ui';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-type DrawerButtonTone = 'secondary' | 'ghost';
+type DrawerButtonTone = 'primary' | 'secondary' | 'ghost';
 type DrawerButtonSize = 'sm' | 'icon';
 
 const TONE_CLASSNAMES: Record<DrawerButtonTone, string> = {
+  primary:
+    'border-(--linear-accent) bg-(--linear-accent) text-white hover:border-(--linear-accent) hover:bg-(--linear-accent-hover,rgba(91,111,255,0.92)) hover:text-white active:border-(--linear-accent) active:bg-(--linear-accent-hover,rgba(91,111,255,0.88))',
   secondary:
     'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) active:border-(--linear-border-default) active:bg-(--linear-bg-surface-2)',
   ghost:
@@ -38,7 +40,13 @@ export const DrawerButton = React.forwardRef<
   return (
     <Button
       ref={ref}
-      variant={tone === 'ghost' ? 'ghost' : 'secondary'}
+      variant={
+        tone === 'primary'
+          ? 'primary'
+          : tone === 'ghost'
+            ? 'ghost'
+            : 'secondary'
+      }
       size={size === 'icon' ? 'icon' : 'sm'}
       className={cn(
         DRAWER_BUTTON_CLASSNAME,

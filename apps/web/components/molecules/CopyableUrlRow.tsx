@@ -2,6 +2,7 @@
 
 import { Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 interface CopyableUrlRowProps {
@@ -58,18 +59,18 @@ export function CopyableUrlRow({
 
   const sizeClasses = {
     sm: {
-      container: 'h-[22px] gap-1 rounded-[7px] px-1.5',
+      container: 'h-[24px] gap-1 rounded-[7px] px-1.5',
       icon: 'h-3 w-3',
-      value: 'text-[10px]',
-      button: 'h-4 w-4 rounded-[5px]',
+      value: 'text-[10.5px]',
+      button: 'h-4.5 w-4.5 rounded-[5px]',
       glyph: 'h-[11px] w-[11px]',
     },
     md: {
-      container: 'h-[24px] gap-1 rounded-[7px] px-1.5',
+      container: 'h-[26px] gap-1.5 rounded-[8px] px-2',
       icon: 'h-3 w-3',
-      value: 'text-[9.5px]',
-      button: 'h-4 w-4 rounded-[5px]',
-      glyph: 'h-[11px] w-[11px]',
+      value: 'text-[10.5px]',
+      button: 'h-4.5 w-4.5 rounded-[6px]',
+      glyph: 'h-3 w-3',
     },
     lg: {
       container: 'h-7 gap-1.5 rounded-[8px] px-2',
@@ -105,31 +106,26 @@ export function CopyableUrlRow({
       >
         {displayValue ?? url.replace(/^https?:\/\//, '')}
       </span>
-      <button
-        type='button'
+      <DrawerInlineIconButton
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : copyButtonTitle}
         className={cn(
-          'flex shrink-0 items-center justify-center text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'shrink-0 text-(--linear-text-tertiary)',
           styles.button,
           isCopied && 'text-success'
         )}
       >
         <Copy className={styles.glyph} />
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-      </button>
-      <button
-        type='button'
+      </DrawerInlineIconButton>
+      <DrawerInlineIconButton
         onClick={handleOpen}
         title={openButtonTitle}
-        className={cn(
-          'flex shrink-0 items-center justify-center text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-          styles.button
-        )}
+        className={cn('shrink-0 text-(--linear-text-tertiary)', styles.button)}
       >
         <ExternalLink className={styles.glyph} />
         <span className='sr-only'>Open</span>
-      </button>
+      </DrawerInlineIconButton>
     </div>
   );
 }

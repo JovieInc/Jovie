@@ -4,6 +4,7 @@ import { Badge } from '@jovie/ui';
 import { Pause, Play } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -64,13 +65,12 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [artistName, release.artistNames]);
 
   return (
-    <div className='grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-start gap-x-2.5'>
+    <div className='grid min-w-0 grid-cols-[22px_minmax(0,1fr)] items-start gap-x-3'>
       <div className='flex w-[20px] items-center justify-center pt-0.5'>
         {hasPreview ? (
-          <button
-            type='button'
+          <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='flex h-5 w-5 items-center justify-center rounded-[6px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='h-5 w-5 rounded-[6px] p-0 text-(--linear-text-tertiary)'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -80,7 +80,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             ) : (
               <Play className='h-[11px] w-[11px]' />
             )}
-          </button>
+          </DrawerInlineIconButton>
         ) : (
           <span className='h-5 w-5' />
         )}
@@ -90,7 +90,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         <div className='flex min-w-0 items-center gap-1 leading-none'>
           <TruncatedText
             lines={1}
-            className='text-[13px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
+            className='text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
             tooltipSide='top'
             tooltipAlign='start'
           >
@@ -116,7 +116,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[12px] font-[450] leading-[1.2] tracking-[-0.01em] text-(--linear-text-secondary)'
+            className='text-[12.5px] font-[450] leading-[1.25] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
             {artistLine}
           </TruncatedText>

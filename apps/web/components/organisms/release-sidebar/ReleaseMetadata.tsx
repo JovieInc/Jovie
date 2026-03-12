@@ -11,7 +11,7 @@ import {
 import { Check, ChevronDown, Info } from 'lucide-react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 
-import { DrawerPropertyRow } from '@/components/molecules/drawer';
+import { DrawerButton, DrawerPropertyRow } from '@/components/molecules/drawer';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
@@ -47,8 +47,6 @@ const METADATA_TEXT_CLASSNAME =
   'text-[11px] leading-[14px] text-(--linear-text-secondary)';
 const METADATA_MUTED_TEXT_CLASSNAME =
   'text-[10.5px] leading-[14px] text-(--linear-text-tertiary)';
-const METADATA_TRIGGER_CLASSNAME =
-  '-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[11px] leading-[14px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)';
 const METADATA_BADGE_CLASSNAME = 'border text-[9.5px] font-[510] shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
@@ -238,14 +236,18 @@ export function ReleaseMetadata({
           onCanvasStatusChange ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button type='button' className={METADATA_TRIGGER_CLASSNAME}>
+                <DrawerButton
+                  tone='ghost'
+                  size='sm'
+                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[450] leading-[14px] text-(--linear-text-secondary)'
+                >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
                     size={12}
                     className='text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
-                </button>
+                </DrawerButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='start' className='w-44'>
                 {CANVAS_STATUS_OPTIONS.map(status => {

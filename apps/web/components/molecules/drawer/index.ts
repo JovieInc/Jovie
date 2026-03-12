@@ -19,6 +19,18 @@ export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';
+export {
+  DRAWER_FIELD_HELPER_CLASSNAME,
+  DRAWER_FIELD_LABEL_CLASSNAME,
+  DrawerFormField,
+  type DrawerFormFieldProps,
+} from './DrawerFormField';
+export {
+  DRAWER_FORM_GRID_LABEL_CLASSNAME,
+  DRAWER_FORM_GRID_ROW_CLASSNAME,
+  DrawerFormGridRow,
+  type DrawerFormGridRowProps,
+} from './DrawerFormGridRow';
 export { DrawerHeader, type DrawerHeaderProps } from './DrawerHeader';
 export {
   DrawerInlineIconButton,

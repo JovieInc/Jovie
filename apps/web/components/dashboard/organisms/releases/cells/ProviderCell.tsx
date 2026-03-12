@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -33,33 +34,25 @@ function ProviderActionButtons({
   onCopyClick,
 }: ProviderActionButtonsProps) {
   return (
-    <div className='inline-flex items-center overflow-hidden rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
-      {/* Open button (left) */}
-      <button
-        type='button'
+    <div className='inline-flex items-center gap-1 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-1'>
+      <DrawerInlineIconButton
         title='Open'
         onClick={event => {
           event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
-        className='inline-flex cursor-pointer items-center justify-center p-1.5 text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
+        className='p-1 text-(--linear-text-secondary)'
       >
         <Icon name='ExternalLink' className='h-3.5 w-3.5' aria-hidden='true' />
         <span className='sr-only'>Open</span>
-      </button>
-
-      {/* Divider */}
-      <div className='h-4 w-px bg-(--linear-border-subtle)' />
-
-      {/* Copy button (right) */}
-      <button
-        type='button'
+      </DrawerInlineIconButton>
+      <DrawerInlineIconButton
         title={isCopied ? 'Copied' : 'Copy'}
         data-testid={testId}
         data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
         onClick={onCopyClick}
         className={cn(
-          'inline-flex cursor-pointer items-center justify-center p-1.5 text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)',
+          'p-1 text-(--linear-text-secondary)',
           isCopied && 'text-success hover:text-success'
         )}
       >
@@ -80,7 +73,7 @@ function ProviderActionButtons({
           />
         </span>
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-      </button>
+      </DrawerInlineIconButton>
     </div>
   );
 }

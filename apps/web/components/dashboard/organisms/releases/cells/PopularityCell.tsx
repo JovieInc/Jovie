@@ -2,6 +2,7 @@
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { memo } from 'react';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 
 interface PopularityCellProps {
   readonly popularity: number | null | undefined;
@@ -29,9 +30,8 @@ export const PopularityCell = memo(function PopularityCell({
     <Tooltip>
       <TooltipTrigger asChild>
         {isValidPopularity ? (
-          <button
-            type='button'
-            className='inline-flex items-center gap-1.5 rounded-[6px] border border-transparent px-1 py-0.5 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          <DrawerInlineIconButton
+            className='gap-1.5 rounded-[6px] px-1 py-0.5 text-(--linear-text-tertiary)'
             aria-label={`Spotify popularity ${displayPopularity} out of 100`}
           >
             <div className='h-2 w-12 overflow-hidden rounded-full bg-(--linear-border-subtle)'>
@@ -40,7 +40,7 @@ export const PopularityCell = memo(function PopularityCell({
                 style={{ width: `${clampedPopularity}%` }}
               />
             </div>
-          </button>
+          </DrawerInlineIconButton>
         ) : (
           <span className='text-[11px] text-(--linear-text-tertiary)'>—</span>
         )}

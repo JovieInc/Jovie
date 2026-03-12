@@ -1,9 +1,7 @@
 'use client';
 
 import {
-  Button,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -16,6 +14,8 @@ import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
+  DrawerButton,
+  DrawerFormField,
   DrawerMediaThumb,
   EntityHeaderCard,
   EntitySidebarShell,
@@ -167,8 +167,8 @@ export function AddReleaseSidebar({
         />
       }
       footer={
-        <Button
-          variant='primary'
+        <DrawerButton
+          tone='primary'
           className='w-full'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
@@ -181,18 +181,11 @@ export function AddReleaseSidebar({
           ) : (
             'Create Release'
           )}
-        </Button>
+        </DrawerButton>
       }
     >
       <div className='space-y-5'>
-        {/* Title */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='release-title'
-            className='text-xs font-medium text-(--linear-text-secondary)'
-          >
-            Title
-          </Label>
+        <DrawerFormField label='Title' htmlFor='release-title'>
           <Input
             id='release-title'
             value={title}
@@ -200,16 +193,9 @@ export function AddReleaseSidebar({
             placeholder='My New Release'
             autoFocus
           />
-        </div>
+        </DrawerFormField>
 
-        {/* Release Type */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='release-type'
-            className='text-xs font-medium text-(--linear-text-secondary)'
-          >
-            Release Type
-          </Label>
+        <DrawerFormField label='Release Type' htmlFor='release-type'>
           <Select
             value={releaseType}
             onValueChange={v => setReleaseType(v as ReleaseType)}
@@ -225,32 +211,18 @@ export function AddReleaseSidebar({
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </DrawerFormField>
 
-        {/* Release Date */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='release-date'
-            className='text-xs font-medium text-(--linear-text-secondary)'
-          >
-            Release Date
-          </Label>
+        <DrawerFormField label='Release Date' htmlFor='release-date'>
           <Input
             id='release-date'
             type='date'
             value={releaseDate}
             onChange={e => setReleaseDate(e.target.value)}
           />
-        </div>
+        </DrawerFormField>
 
-        {/* Artwork URL */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='artwork-url'
-            className='text-xs font-medium text-(--linear-text-secondary)'
-          >
-            Artwork URL (optional)
-          </Label>
+        <DrawerFormField label='Artwork URL (optional)' htmlFor='artwork-url'>
           <Input
             id='artwork-url'
             type='url'
@@ -258,21 +230,19 @@ export function AddReleaseSidebar({
             onChange={e => setArtworkUrl(e.target.value)}
             placeholder='https://example.com/artwork.jpg'
           />
-        </div>
+        </DrawerFormField>
 
-        {/* Provider URLs */}
         <div className='space-y-3'>
-          <p className='text-xs font-medium text-(--linear-text-secondary)'>
+          <p className='text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
             Platform Links (optional)
           </p>
           {PROVIDER_FIELDS.map(provider => (
-            <div key={provider.key} className='space-y-1'>
-              <Label
-                htmlFor={`provider-${provider.key}`}
-                className='text-2xs text-(--linear-text-tertiary)'
-              >
-                {provider.label}
-              </Label>
+            <DrawerFormField
+              key={provider.key}
+              label={provider.label}
+              htmlFor={`provider-${provider.key}`}
+              className='space-y-1'
+            >
               <Input
                 id={`provider-${provider.key}`}
                 type='url'
@@ -282,7 +252,7 @@ export function AddReleaseSidebar({
                 }
                 placeholder={provider.placeholder}
               />
-            </div>
+            </DrawerFormField>
           ))}
         </div>
       </div>

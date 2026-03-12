@@ -122,6 +122,18 @@ vi.mock('@/components/molecules/drawer', () => ({
     children: React.ReactNode;
     className?: string;
   }) => <div className={className}>{children}</div>,
+  DrawerFormGridRow: ({
+    children,
+    label,
+  }: {
+    children: React.ReactNode;
+    label: React.ReactNode;
+  }) => (
+    <div>
+      <span>{label}</span>
+      {children}
+    </div>
+  ),
 }));
 
 const { ReleaseDspLinks } = await import(

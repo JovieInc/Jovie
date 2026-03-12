@@ -18,6 +18,7 @@ import { Check, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';
@@ -120,14 +121,13 @@ function SearchInput({
           aria-label={placeholder}
         />
         {value && (
-          <button
-            type='button'
+          <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
+            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-(--linear-text-tertiary)'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
-          </button>
+          </DrawerInlineIconButton>
         )}
       </div>
     </div>
@@ -168,14 +168,13 @@ function ActiveFilterPill({
           {displayValue}
         </span>
       </div>
-      <button
-        type='button'
+      <DrawerInlineIconButton
         onClick={onClear}
-        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
+        className='h-full rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary)'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
-      </button>
+      </DrawerInlineIconButton>
     </div>
   );
 }

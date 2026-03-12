@@ -147,7 +147,7 @@ function ReleaseEntityHeader({
               <DrawerMediaThumb
                 src={release.artworkUrl}
                 alt={artworkAlt}
-                sizeClassName='h-[72px] w-[72px]'
+                sizeClassName='h-[84px] w-[84px]'
                 fallback={
                   <Icon
                     name='Disc3'
@@ -197,8 +197,8 @@ function ReleaseEntityHeader({
               platformCount={release.providers.length}
             />
           }
-          className='min-w-0 flex-1 gap-0'
-          bodyClassName='pt-0.5'
+          className='min-w-0 flex-1 gap-0.5'
+          bodyClassName='pt-1'
         />
       </div>
 
