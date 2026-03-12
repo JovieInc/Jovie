@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
 import path from 'path';
@@ -25,6 +25,11 @@ const shouldSkipWarmup =
   isAuthRefreshOnly || process.env.E2E_SKIP_WARMUP === '1';
 const authStatePath = path.join(webRoot, 'tests', '.auth', 'user.json');
 const hasStoredAuthState = existsSync(authStatePath);
+const warmupCacheDir = path.join(webRoot, 'tests', '.cache');
+const warmupStampPath = path.join(warmupCacheDir, 'fast-warmup.json');
+const warmupStampMaxAgeMs = Number(
+  process.env.E2E_WARMUP_MAX_AGE_MS ?? 15 * 60 * 1000
+);
 const WRAP_LINK_WARMUP_IP = '198.51.100.250';
 const CHALLENGE_TOKEN_PATTERNS = [
   /"challengeToken":"([^"]+)"/,
@@ -54,6 +59,31 @@ function isRealKey(key: string | undefined): key is string {
   if (!key) return false;
   const lowerKey = key.toLowerCase();
   return !SENSITIVE_PATTERNS.some(pattern => lowerKey.includes(pattern));
+}
+
+function hasFreshWarmupStamp(baseURL: string): boolean {
+  if (!existsSync(warmupStampPath)) return false;
+
+  try {
+    const raw = readFileSync(warmupStampPath, 'utf8');
+    const parsed = JSON.parse(raw) as {
+      baseURL?: string;
+      warmedAt?: number;
+    };
+    if (parsed.baseURL !== baseURL) return false;
+    if (typeof parsed.warmedAt !== 'number') return false;
+    return Date.now() - parsed.warmedAt < warmupStampMaxAgeMs;
+  } catch {
+    return false;
+  }
+}
+
+function writeWarmupStamp(baseURL: string) {
+  mkdirSync(warmupCacheDir, { recursive: true });
+  writeFileSync(
+    warmupStampPath,
+    JSON.stringify({ baseURL, warmedAt: Date.now() }, null, 2)
+  );
 }
 
 async function globalSetup() {
@@ -158,6 +188,16 @@ async function globalSetup() {
     console.log('Skipping route warmup for fast local iteration');
   } else {
     const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+    const canReuseWarmup =
+      isFastIteration && !isPublicNoAuthOnly && hasFreshWarmupStamp(baseURL);
+
+    if (canReuseWarmup) {
+      console.log('Skipping route warmup because hot-server warmup is fresh');
+      const elapsed = Date.now() - startTime;
+      console.log(`E2E global setup complete in ${elapsed}ms`);
+      return;
+    }
+
     console.log('Warming up Turbopack routes...');
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
     const warmupRoutes = isPublicNoAuthOnly
@@ -315,6 +355,10 @@ async function globalSetup() {
           '  /api/wrap-link warmup failed (will compile on first anti-cloaking request)'
         );
       }
+    }
+
+    if (isFastIteration && !isPublicNoAuthOnly) {
+      writeWarmupStamp(baseURL);
     }
   }
 
