@@ -84,7 +84,7 @@ export function ReleaseTable({
   onCopy,
   onEdit,
   columnVisibility,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
