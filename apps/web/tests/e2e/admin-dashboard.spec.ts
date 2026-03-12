@@ -193,6 +193,10 @@ test.describe('Admin Dashboard', () => {
   test('all admin pages return sub-500 status and no error text', async ({
     page,
   }) => {
+    test.skip(
+      fastIteration,
+      'Admin status sweep duplicates admin chaos and navigation coverage in the fast lane'
+    );
     test.setTimeout(360_000); // 6 min for 8 pages
 
     const adminPages = fastIteration
