@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import type { AppleMusicArtistResult } from '@/lib/contracts/api';
 import { cacheQuery } from '@/lib/db/cache';
 import { CircuitOpenError } from '@/lib/dsp-enrichment/circuit-breakers';
 import {
@@ -25,14 +26,6 @@ const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const APPLE_MUSIC_SEARCH_CACHE_TTL_SECONDS = 60 * 60; // 1 hour
-
-interface AppleMusicArtistResult {
-  id: string;
-  name: string;
-  url: string;
-  imageUrl?: string;
-  genres?: string[];
-}
 
 function parseLimit(
   limitParam: string | null,
