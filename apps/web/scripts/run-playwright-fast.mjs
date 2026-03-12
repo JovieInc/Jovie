@@ -18,7 +18,9 @@ const authStatePath = path.resolve(
   '.auth',
   'user.json'
 );
-const authStateMaxAgeMs = 15 * 60 * 1000;
+const authStateMaxAgeMs = Number(
+  process.env.E2E_AUTH_MAX_AGE_MS ?? 60 * 60 * 1000
+);
 const forwardedArgs =
   process.argv[2] === '--' ? process.argv.slice(3) : process.argv.slice(2);
 
@@ -31,10 +33,13 @@ const sharedEnv = {
   E2E_USE_STORED_AUTH: '1',
 };
 
-function runPlaywright(args) {
+function runPlaywright(args, extraEnv = {}) {
   return spawnSync(process.execPath, [playwrightCli, ...args], {
     stdio: 'inherit',
-    env: sharedEnv,
+    env: {
+      ...sharedEnv,
+      ...extraEnv,
+    },
   });
 }
 
@@ -63,11 +68,12 @@ function shouldRefreshAuthState() {
 
 if (shouldRefreshAuthState()) {
   console.log('Refreshing stored auth state...');
-  const authSetupResult = runPlaywright([
-    'test',
-    'tests/e2e/auth.setup.ts',
-    '--project=auth-setup',
-  ]);
+  const authSetupResult = runPlaywright(
+    ['test', 'tests/e2e/auth.setup.ts', '--project=auth-setup'],
+    {
+      E2E_SKIP_WARMUP: '1',
+    }
+  );
 
   if (
     typeof authSetupResult.status === 'number' &&
