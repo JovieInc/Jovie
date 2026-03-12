@@ -21,56 +21,20 @@ import {
   Pause,
   Play,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
-import type { TrackViewModel } from '@/lib/discography/types';
+import { type ReleaseTrack, useReleaseTracksQuery } from '@/lib/queries';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release } from './types';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
-/** Track shape returned by the API route for sidebar tracklist + actions. */
-type SidebarTrack = Pick<
-  TrackViewModel,
-  | 'id'
-  | 'releaseId'
-  | 'title'
-  | 'slug'
-  | 'smartLinkPath'
-  | 'trackNumber'
-  | 'discNumber'
-  | 'durationMs'
-  | 'isrc'
-  | 'isExplicit'
-  | 'previewUrl'
-  | 'audioUrl'
-  | 'audioFormat'
-  | 'providers'
->;
-
-/**
- * Fetch tracks via the route handler instead of a server action.
- * Server action calls trigger RSC tree reconciliation which can
- * cause the parent drawer to unmount.
- */
-async function fetchTracks(
-  releaseId: string,
-  signal?: AbortSignal
-): Promise<SidebarTrack[]> {
-  const res = await fetch(
-    `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`,
-    { signal }
-  );
-  if (!res.ok) throw new Error('Failed to load tracks');
-  return res.json() as Promise<SidebarTrack[]>;
-}
-
 interface ReleaseTrackListProps {
   readonly release: Release;
-  readonly onTrackClick?: (track: SidebarTrack) => void;
+  readonly onTrackClick?: (track: ReleaseTrack) => void;
 }
 
 export function ReleaseTrackList({
@@ -79,29 +43,13 @@ export function ReleaseTrackList({
 }: ReleaseTrackListProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
-  const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // Auto-fetch tracks on mount since tracklist starts expanded
-  useEffect(() => {
-    if (release.totalTracks === 0) return;
-    const controller = new AbortController();
-    setIsLoading(true);
-    fetchTracks(release.id, controller.signal)
-      .then(data => {
-        if (!controller.signal.aborted) setTracks(data);
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setTracks(null);
-        setHasError(true);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-    return () => controller.abort();
-  }, [release.id, release.totalTracks]);
+  const {
+    data: tracks,
+    isLoading,
+    isFetching,
+    isError: hasError,
+    refetch,
+  } = useReleaseTracksQuery(release.id, isExpanded && release.totalTracks > 0);
 
   const handleToggle = useCallback(async () => {
     if (isExpanded) {
@@ -111,22 +59,10 @@ export function ReleaseTrackList({
 
     setIsExpanded(true);
 
-    // Only fetch if not already cached (null = not fetched, [] = empty)
-    if (tracks !== null && !hasError) return;
-
-    setIsLoading(true);
-    setHasError(false);
-    try {
-      const result = await fetchTracks(release.id);
-      setTracks(result);
-    } catch (error) {
-      console.error('Failed to load tracks:', error);
-      setTracks(null);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
+    if (hasError) {
+      await refetch();
     }
-  }, [isExpanded, tracks, hasError, release.id]);
+  }, [hasError, isExpanded, refetch]);
 
   if (release.totalTracks === 0) return null;
 
@@ -151,7 +87,7 @@ export function ReleaseTrackList({
 
       {isExpanded && (
         <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
-          {isLoading && (
+          {(isLoading || (isFetching && !tracks)) && (
             <div className='space-y-0.5'>
               {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
                 .slice(0, Math.min(release.totalTracks, 6))
@@ -175,7 +111,7 @@ export function ReleaseTrackList({
             </p>
           )}
 
-          {!isLoading && !hasError && tracks?.length === 0 && (
+          {!isLoading && !hasError && tracks && tracks.length === 0 && (
             <p className='py-2 text-[13px] text-tertiary-token'>
               No track data available.
             </p>
@@ -206,8 +142,8 @@ function TrackItem({
   playbackState,
   onToggleTrack,
 }: {
-  readonly track: SidebarTrack;
-  readonly onClick?: (track: SidebarTrack) => void;
+  readonly track: ReleaseTrack;
+  readonly onClick?: (track: ReleaseTrack) => void;
   readonly playbackState: {
     activeTrackId: string | null;
     isPlaying: boolean;
@@ -375,8 +311,8 @@ function TrackActionsMenu({
   onCopyIsrc,
   onCopySmartLink,
 }: {
-  readonly track: SidebarTrack;
-  readonly streamingProviders: SidebarTrack['providers'];
+  readonly track: ReleaseTrack;
+  readonly streamingProviders: ReleaseTrack['providers'];
   readonly onCopyIsrc: () => void;
   readonly onCopySmartLink: () => void;
 }) {
