@@ -82,69 +82,52 @@ const RELEASE_VIEW_OPTIONS = [
   { value: 'releases', label: 'Releases', icon: 'Disc3' },
 ] as const;
 
-const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
-  ACTION_BAR_BUTTON_CLASS,
-  'gap-1.5 px-3 text-[12.5px] [&_svg]:h-3.5 [&_svg]:w-3.5'
+const RELEASE_VIEW_TAB_CLASS = cn(
+  APP_CONTROL_BUTTON_CLASS,
+  'h-9 rounded-[9px] border-(--linear-border-subtle) bg-transparent px-4 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:[stroke-width:2.2]'
 );
 
 const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
   'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
-function InlineReleaseViewTabs({
-  value,
-  onChange,
-}: {
-  readonly value: ReleaseView;
-  readonly onChange: (value: ReleaseView) => void;
-}) {
-  return (
-    <AppSegmentControl
-      value={value}
-      onValueChange={onChange}
-      options={RELEASE_VIEW_OPTIONS.map(option => ({
-        value: option.value,
-        label: (
-          <span className='inline-flex items-center gap-1.5'>
-            <Icon name={option.icon} className='h-3.5 w-3.5' />
-            {option.label}
-          </span>
-        ),
-      }))}
-      size='sm'
-      className='hidden md:inline-flex'
-      surface='ghost'
-      triggerClassName='flex-none h-[30px] px-3 text-[12.5px]'
-      aria-label='Choose releases view'
-    />
-  );
-}
+const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
+  ACTION_BAR_BUTTON_CLASS,
+  'h-9 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-4 [&_svg]:w-4 [&_svg]:[stroke-width:2.2]'
+);
 
-function CompactReleaseViewTabs({
+function ReleaseViewButtons({
   value,
   onChange,
+  className,
 }: {
   readonly value: ReleaseView;
   readonly onChange: (value: ReleaseView) => void;
+  readonly className?: string;
 }) {
   return (
-    <AppSegmentControl
-      value={value}
-      onValueChange={onChange}
-      options={RELEASE_VIEW_OPTIONS.map(option => ({
-        value: option.value,
-        label: (
-          <span className='inline-flex items-center gap-1.5'>
+    <div className={cn('flex items-center gap-1', className)}>
+      {RELEASE_VIEW_OPTIONS.map(option => {
+        const isActive = value === option.value;
+
+        return (
+          <Button
+            key={option.value}
+            type='button'
+            variant='ghost'
+            size='sm'
+            onClick={() => onChange(option.value)}
+            className={cn(
+              RELEASE_VIEW_TAB_CLASS,
+              isActive && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS
+            )}
+            aria-pressed={isActive}
+          >
             <Icon name={option.icon} className='h-3.5 w-3.5' />
-            {option.label}
-          </span>
-        ),
-      }))}
-      size='sm'
-      className='inline-flex w-full md:hidden'
-      surface='ghost'
-      triggerClassName='flex-1 h-[30px] px-3 text-[12.5px]'
-      aria-label='Choose releases view'
-    />
+            <span>{option.label}</span>
+          </Button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -251,8 +234,7 @@ function LinearStyleDisplayMenu({
             variant='ghost'
             size='sm'
             className={cn(
-              APP_CONTROL_BUTTON_CLASS,
-              'px-3 text-[12.5px] [&_svg]:h-3.5 [&_svg]:w-3.5',
+              RELEASE_TOOLBAR_BUTTON_CLASS,
               isOpen && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS,
               triggerClassName
             )}
@@ -329,24 +311,20 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex flex-col gap-2 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-1.5 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)]'>
-      <div className='flex min-w-0 flex-1 items-center gap-1.5 md:w-auto md:flex-none'>
+    <div className='flex flex-col gap-2 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-2 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-2.5'>
+      <div className='flex min-w-0 flex-1 items-center gap-1 md:w-auto md:flex-none'>
         {onReleaseViewChange ? (
-          <>
-            <CompactReleaseViewTabs
-              value={releaseView}
-              onChange={onReleaseViewChange}
-            />
-            <InlineReleaseViewTabs
-              value={releaseView}
-              onChange={onReleaseViewChange}
-            />
-          </>
+          <ReleaseViewButtons
+            value={releaseView}
+            onChange={onReleaseViewChange}
+            className='w-full overflow-x-auto pb-px md:w-auto'
+          />
         ) : null}
+        {primaryAction ? <div className='shrink-0'>{primaryAction}</div> : null}
       </div>
 
       {/* Right: Search + Filter + Display + Export */}
-      <ActionBar className='ml-auto flex w-full items-center justify-end gap-1 md:w-auto'>
+      <ActionBar className='ml-auto flex w-full items-center justify-end gap-0.5 md:w-auto'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
@@ -388,9 +366,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           className={cn(RELEASE_TOOLBAR_BUTTON_CLASS, 'hidden md:inline-flex')}
           tooltipLabel='Export'
         />
-        {primaryAction ? (
-          <div className='ml-0.5 shrink-0'>{primaryAction}</div>
-        ) : null}
       </ActionBar>
     </div>
   );
