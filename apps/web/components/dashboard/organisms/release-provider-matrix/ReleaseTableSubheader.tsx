@@ -82,6 +82,11 @@ const RELEASE_VIEW_OPTIONS = [
   { value: 'releases', label: 'Releases', icon: 'Disc3' },
 ] as const;
 
+const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
+  ACTION_BAR_BUTTON_CLASS,
+  'px-2.5 md:px-3'
+);
+
 function InlineReleaseViewTabs({
   value,
   onChange,
@@ -343,8 +348,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               size='sm'
               onClick={onSearchToggle}
               className={cn(
-                ACTION_BAR_BUTTON_CLASS,
-                'h-8 px-3 text-[12.5px]',
+                RELEASE_TOOLBAR_BUTTON_CLASS,
                 isSearchOpen &&
                   'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
               )}
@@ -359,20 +363,14 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           filters={filters}
           onFiltersChange={onFiltersChange}
           counts={counts}
-          buttonClassName={cn(
-            ACTION_BAR_BUTTON_CLASS,
-            'h-8 px-3 text-[12.5px]'
-          )}
+          buttonClassName={RELEASE_TOOLBAR_BUTTON_CLASS}
         />
         <LinearStyleDisplayMenu
           groupByYear={groupByYear}
           onGroupByYearChange={onGroupByYearChange}
           releaseView={releaseView}
           onReleaseViewChange={onReleaseViewChange}
-          triggerClassName={cn(
-            ACTION_BAR_BUTTON_CLASS,
-            'h-8 px-3 text-[12.5px]'
-          )}
+          triggerClassName={RELEASE_TOOLBAR_BUTTON_CLASS}
           compact
         />
         <ExportCSVButton
@@ -382,10 +380,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           label='Export'
           variant='ghost'
           size='sm'
-          className={cn(
-            ACTION_BAR_BUTTON_CLASS,
-            'hidden h-8 px-3 text-[12.5px] md:inline-flex'
-          )}
+          className={cn(RELEASE_TOOLBAR_BUTTON_CLASS, 'hidden md:inline-flex')}
           tooltipLabel='Export'
         />
         {primaryAction ? (
