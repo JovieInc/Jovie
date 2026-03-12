@@ -28,7 +28,7 @@ const hasStoredAuthState = existsSync(authStatePath);
 const warmupCacheDir = path.join(webRoot, 'tests', '.cache');
 const warmupStampPath = path.join(warmupCacheDir, 'fast-warmup.json');
 const warmupStampMaxAgeMs = Number(
-  process.env.E2E_WARMUP_MAX_AGE_MS ?? 15 * 60 * 1000
+  process.env.E2E_WARMUP_MAX_AGE_MS ?? 60 * 60 * 1000
 );
 const WRAP_LINK_WARMUP_IP = '198.51.100.250';
 const CHALLENGE_TOKEN_PATTERNS = [
