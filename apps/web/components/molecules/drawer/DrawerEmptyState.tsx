@@ -12,8 +12,15 @@ export function DrawerEmptyState({
   className,
 }: DrawerEmptyStateProps) {
   return (
-    <p className={cn('text-[13px] text-secondary-token', className)}>
-      {message}
-    </p>
+    <div
+      className={cn(
+        'flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
+        className
+      )}
+    >
+      <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+        {message}
+      </p>
+    </div>
   );
 }

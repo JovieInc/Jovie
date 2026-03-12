@@ -251,7 +251,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-11 justify-center gap-0 pl-2 pr-3 pt-0 pb-0 lg:mt-2'>
+      <SidebarHeader className='relative h-10 justify-center gap-0 pl-2 pr-2.5 pt-0 pb-0 lg:mt-1.5'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -260,8 +260,8 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-2.5'>
+        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
               <DashboardNav />
@@ -275,7 +275,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       <SidebarUpgradeBanner />
       <SidebarInstallBanner />
 
-      <div className='pl-2 pr-3 pb-3 pt-1 group-data-[collapsible=icon]:hidden'>
+      <div className='pl-2 pr-2.5 pb-2.5 pt-0.5 group-data-[collapsible=icon]:hidden'>
         <span className='text-2xs text-sidebar-muted select-none'>
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
           {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA

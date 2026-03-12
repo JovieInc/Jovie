@@ -58,7 +58,8 @@ interface ReleaseDspLinksProps {
   readonly isRescanningIsrc?: boolean;
 }
 
-const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
+const FORM_ROW_CLASS =
+  'grid grid-cols-[88px,minmax(0,1fr)] items-center gap-2.5';
 
 /**
  * Format remaining cooldown time for display.
@@ -225,13 +226,15 @@ export function ReleaseDspLinks({
       {isEditable && isAddingLink && (
         <div
           className={[
-            'mt-2 space-y-2 rounded-lg',
-            'border border-dashed border-subtle',
-            'bg-surface-1 p-3',
+            'mt-2 space-y-2.5 rounded-[10px]',
+            'border border-(--linear-border-subtle)',
+            'bg-(--linear-bg-surface-1) p-3',
           ].join(' ')}
         >
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-[11px] text-tertiary-token'>Provider</Label>
+            <Label className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+              Provider
+            </Label>
             <Select
               value={selectedProvider ?? ''}
               onValueChange={(value: string) => {
@@ -240,7 +243,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger className='h-8 w-full rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -258,7 +261,9 @@ export function ReleaseDspLinks({
             </Select>
           </div>
           <div className={FORM_ROW_CLASS}>
-            <Label className='text-[11px] text-tertiary-token'>URL</Label>
+            <Label className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+              URL
+            </Label>
             <Input
               type='url'
               value={newLinkUrl}
@@ -271,6 +276,7 @@ export function ReleaseDspLinks({
               autoCapitalize='none'
               autoCorrect='off'
               autoFocus
+              className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'
             />
           </div>
           <div className='flex justify-end gap-2 pt-1'>
@@ -283,6 +289,7 @@ export function ReleaseDspLinks({
                 onSetNewLinkUrl('');
                 onSetSelectedProvider(null);
               }}
+              className='h-8 rounded-[8px] px-2.5 text-[12px]'
             >
               Cancel
             </Button>
@@ -294,6 +301,7 @@ export function ReleaseDspLinks({
               disabled={
                 !isValidUrl(newLinkUrl) || !selectedProvider || isAddingDspLink
               }
+              className='h-8 min-w-[68px] rounded-[8px] px-2.5 text-[12px]'
             >
               {isAddingDspLink ? 'Adding...' : 'Add'}
             </Button>

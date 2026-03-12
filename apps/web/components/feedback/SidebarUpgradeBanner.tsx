@@ -61,22 +61,22 @@ export function SidebarUpgradeBanner() {
   }
 
   return (
-    <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-      <div className='rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/35 p-2 shadow-none'>
-        <div className='flex items-start gap-2'>
-          <BadgeCheck className='mt-0.5 size-3.5 shrink-0 text-sidebar-item-icon' />
+    <div className='group-data-[collapsible=icon]:hidden px-2 pb-0.5'>
+      <div className='rounded-[9px] border border-sidebar-border/50 bg-sidebar-accent/20 p-2 shadow-none'>
+        <div className='flex items-start gap-1.5'>
+          <BadgeCheck className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon' />
           <div className='min-w-0'>
-            <p className='text-[12px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
+            <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
               Get Verified — {priceLabel}
             </p>
-            <p className='mt-0.5 text-2xs leading-snug text-sidebar-muted'>
+            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted'>
               Stand out with trusted verification.
             </p>
             <button
               type='button'
               onClick={() => handleUpgrade()}
               disabled={!selectedPrice?.priceId || checkoutMutation.isPending}
-              className='mt-1.5 inline-flex h-6 items-center rounded-[7px] border border-sidebar-border/60 px-2 text-2xs font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active disabled:cursor-not-allowed disabled:opacity-60'
+              className='mt-1 inline-flex h-5 items-center rounded-[6px] border border-sidebar-border/50 px-1.5 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active disabled:cursor-not-allowed disabled:opacity-60'
             >
               {checkoutMutation.isPending ? 'Opening…' : 'Upgrade'}
             </button>

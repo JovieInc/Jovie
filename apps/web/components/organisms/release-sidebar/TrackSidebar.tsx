@@ -17,8 +17,9 @@ import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
-  DrawerTabs,
+  DrawerEmptyState,
   DrawerSection,
+  DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -283,7 +284,7 @@ export function TrackSidebar({
                   <button
                     type='button'
                     onClick={handleCopyIsrc}
-                    className='flex w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                    className='flex min-h-8 w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[12px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                   >
                     <Hash className='h-3.5 w-3.5 shrink-0' />
                     <span>Copy ISRC</span>
@@ -298,9 +299,10 @@ export function TrackSidebar({
 
           {activeTab === 'platforms' && streamingProviders.length === 0 && (
             <DrawerSection>
-              <p className='py-2 text-[13px] text-(--linear-text-tertiary)'>
-                No platform links available.
-              </p>
+              <DrawerEmptyState
+                message='No platform links available for this track.'
+                className='min-h-[96px]'
+              />
             </DrawerSection>
           )}
 
@@ -316,12 +318,14 @@ export function TrackSidebar({
                     href={provider.url}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                    className='flex min-h-8 items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[12px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                   >
                     <ProviderIcon
                       provider={provider.key as ProviderKey}
                       className='h-4 w-4'
-                      aria-label={PROVIDER_LABELS[provider.key] ?? provider.label}
+                      aria-label={
+                        PROVIDER_LABELS[provider.key] ?? provider.label
+                      }
                     />
                     <span>
                       {PROVIDER_LABELS[provider.key] ?? provider.label}

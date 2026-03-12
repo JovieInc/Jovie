@@ -15,7 +15,7 @@ export interface DrawerPropertyRowProps {
 export function DrawerPropertyRow({
   label,
   value,
-  labelWidth = 88,
+  labelWidth = 76,
   interactive = false,
   onClick,
   className,
@@ -32,17 +32,17 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid w-full min-h-[30px] items-center gap-2 rounded-[8px] px-1.5 py-1 text-left transition-[background-color,box-shadow,border-color] duration-150',
+        'grid w-full min-h-[24px] items-center gap-2 rounded-[7px] px-1.5 py-0.5 text-left transition-[background-color,box-shadow,border-color] duration-150',
         interactive &&
           'cursor-pointer hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
       style={gridStyle}
     >
-      <span className='text-[11px] font-[510] leading-[14px] tracking-[-0.01em] text-(--linear-text-tertiary)'>
+      <span className='text-[9.5px] font-[510] uppercase leading-[12px] tracking-[0.05em] text-(--linear-text-tertiary)'>
         {label}
       </span>
-      <span className='min-w-0 text-[13px] leading-[17px] text-(--linear-text-secondary)'>
+      <span className='min-w-0 text-[11.5px] leading-[15px] text-(--linear-text-secondary)'>
         {value}
       </span>
     </Wrapper>

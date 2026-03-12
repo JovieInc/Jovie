@@ -58,17 +58,17 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex h-7 items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 transition-colors hover:bg-(--linear-bg-surface-0)',
+        'flex h-[24px] items-center gap-1 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 transition-[background-color,border-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
         className
       )}
     >
       <Link2
-        className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
+        className='h-3 w-3 shrink-0 text-(--linear-text-tertiary)'
         aria-hidden='true'
       />
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono text-[11px] tracking-[-0.01em] text-(--linear-text-secondary)',
+          'min-w-0 flex-1 truncate font-mono text-[9.5px] tracking-[-0.01em] text-(--linear-text-secondary)',
           valueClassName
         )}
         title={url}
@@ -80,20 +80,20 @@ export function CopyableUrlRow({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : copyButtonTitle}
         className={cn(
-          'flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           isCopied && 'text-success'
         )}
       >
-        <Copy className='h-3 w-3' />
+        <Copy className='h-[11px] w-[11px]' />
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
       </button>
       <button
         type='button'
         onClick={handleOpen}
         title={openButtonTitle}
-        className='flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        className='flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
       >
-        <ExternalLink className='h-3 w-3' />
+        <ExternalLink className='h-[11px] w-[11px]' />
         <span className='sr-only'>Open</span>
       </button>
     </div>

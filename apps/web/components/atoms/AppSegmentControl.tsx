@@ -37,12 +37,12 @@ export function AppSegmentControl<T extends string>({
       variant={surface === 'ghost' ? 'ghost' : 'default'}
       className={cn(
         surface === 'muted'
-          ? 'rounded-[8px] bg-(--linear-bg-surface-1) p-0.5'
-          : 'rounded-[8px] border-(--linear-border-subtle) bg-transparent p-0.5',
+          ? 'rounded-[var(--linear-app-control-radius)] bg-(--linear-bg-surface-1) p-0.5'
+          : 'rounded-[var(--linear-app-control-radius)] border-(--linear-border-subtle) bg-transparent p-0.5',
         className
       )}
       triggerClassName={cn(
-        'rounded-[6px] px-2 py-1 text-[12px] font-[510] tracking-[-0.01em] data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:shadow-none',
+        'rounded-[calc(var(--linear-app-control-radius)-1px)] px-2 py-0.5 text-[12px] font-[510] tracking-[-0.01em] data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:shadow-none',
         triggerClassName
       )}
       {...props}

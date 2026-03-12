@@ -44,6 +44,14 @@ interface AvailabilityCellProps {
   readonly isAddingUrl?: boolean;
 }
 
+function AvailabilityEmptyAction() {
+  return (
+    <div className='flex min-w-[150px] justify-end'>
+      <div className='h-7 w-[76px] rounded-[7px] border border-dashed border-(--linear-border-subtle) bg-(--linear-bg-surface-1)' />
+    </div>
+  );
+}
+
 /**
  * AvailabilityCell - Consolidated provider availability display
  *
@@ -218,7 +226,10 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 >
                   <ProviderIcon
                     provider={providerKey}
-                    className={cn('h-3 w-3', status === 'missing' && 'opacity-30')}
+                    className={cn(
+                      'h-3 w-3',
+                      status === 'missing' && 'opacity-30'
+                    )}
                     aria-label={providerConfig[providerKey].label}
                   />
                   {status === 'manual' && (
@@ -266,9 +277,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             return (
               <div
                 key={providerKey}
-                className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2.5 last:border-b-0'
+                className='flex min-h-11 items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2 last:border-b-0'
               >
-                <div className='flex items-center gap-2'>
+                <div className='flex min-w-0 items-center gap-2.5'>
                   {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
                     <span
@@ -298,7 +309,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     className='h-4 w-4'
                     aria-label={config.label}
                   />
-                  <span className='text-[12px] font-[450] text-(--linear-text-primary)'>
+                  <span className='truncate text-[12px] font-[450] text-(--linear-text-primary)'>
                     {config.label}
                   </span>
                 </div>
@@ -307,7 +318,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 {(() => {
                   if (provider?.url) {
                     return (
-                      <div className='flex items-center gap-1'>
+                      <div className='flex min-w-[150px] items-center justify-end gap-1'>
                         <button
                           type='button'
                           aria-label={`Open ${config.label} in new tab`}
@@ -318,7 +329,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               'noopener,noreferrer'
                             )
                           }
-                          className='rounded-md p-1.5 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+                          className='rounded-[7px] border border-transparent p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                         >
                           <Icon
                             name='ExternalLink'
@@ -335,7 +346,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           }
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
-                            'rounded-md p-1.5 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)',
+                            'rounded-[7px] border border-transparent p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                             isCopied && 'text-emerald-600 dark:text-emerald-400'
                           )}
                         >
@@ -353,7 +364,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     return (
                       <form
                         onSubmit={handleAddUrl}
-                        className='flex items-center gap-1'
+                        className='flex min-w-[150px] items-center justify-end gap-1'
                       >
                         <Input
                           ref={inputRef}
@@ -366,7 +377,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-6 w-32 text-[13px]'
+                          className='h-7 w-[150px] rounded-[7px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
                           autoFocus
                         />
                         <Button
@@ -375,7 +386,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           size='sm'
                           aria-label='Confirm URL'
                           disabled={!urlInput.trim() || isAddingUrl}
-                          className='h-6 px-1.5'
+                          className='h-7 w-7 rounded-[7px] border border-transparent px-0 text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
                         >
                           <Icon
                             name='Check'
@@ -393,7 +404,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setUrlInput('');
                             setValidationError('');
                           }}
-                          className='h-6 px-1.5'
+                          className='h-7 w-7 rounded-[7px] border border-transparent px-0 text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
                         >
                           <Icon
                             name='X'
@@ -410,18 +421,14 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                       <button
                         type='button'
                         onClick={() => setAddingProvider(providerKey)}
-                        className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 py-1 text-[11px] font-[450] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
+                        className='inline-flex h-7 min-w-[76px] items-center justify-center rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 text-[11px] font-[450] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-2) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                       >
                         + Add link
                       </button>
                     );
                   }
 
-                  return (
-                    <span className='text-[11px] text-(--linear-text-tertiary)'>
-                      —
-                    </span>
-                  );
+                  return <AvailabilityEmptyAction />;
                 })()}
               </div>
             );
@@ -429,7 +436,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </div>
 
         {validationError && (
-          <div className='border-t border-(--linear-border-subtle) px-3 py-2'>
+          <div className='min-h-[36px] border-t border-(--linear-border-subtle) px-3 py-2'>
             <p className='text-[11px] text-(--linear-error)'>
               {validationError}
             </p>

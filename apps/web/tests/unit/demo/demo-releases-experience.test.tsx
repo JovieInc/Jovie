@@ -32,10 +32,7 @@ vi.mock('@clerk/nextjs', () => ({
 
 // Mock nuqs sort params hook (avoids deep next/navigation dependency via nuqs → useRouter)
 vi.mock('@/lib/nuqs/hooks', () => ({
-  useReleaseSortParams: () => [
-    { sort: 'releaseDate', direction: 'desc' },
-    vi.fn(),
-  ],
+  useReleaseSortParams: () => [{ sort: 'release', direction: 'desc' }, vi.fn()],
   useAudienceSortParams: () => [
     { sort: 'createdAt', direction: 'desc' },
     vi.fn(),
@@ -51,7 +48,12 @@ vi.mock('@/components/demo/demo-actions', () => ({
 // Mock next/image for test environment
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
-    const { priority: _priority, fetchPriority: _fp, ...rest } = props;
+    const {
+      priority: _priority,
+      fetchPriority: _fp,
+      unoptimized: _unoptimized,
+      ...rest
+    } = props;
     return <img alt='' {...rest} />;
   },
 }));

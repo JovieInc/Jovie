@@ -34,8 +34,8 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     return (
       <div
         className={cn(
-          'flex h-7 items-center gap-1.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5',
-          'text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-tertiary) select-none transition-[background-color,border-color,color] duration-150'
+          'flex h-[24px] items-center gap-1 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2',
+          'text-[11px] font-[450] tracking-[-0.01em] text-(--linear-text-tertiary) select-none transition-[background-color,border-color,color] duration-150'
         )}
         title={
           isScheduled
@@ -60,7 +60,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     <CopyableUrlRow
       url={smartLinkUrl}
       displayValue={release.smartLinkPath}
-      className='h-[26px] min-w-[136px] rounded-[7px] px-1.5'
+      className='h-[22px] min-w-[116px] rounded-[7px] px-1.5'
       valueClassName='text-[10px]'
       onCopySuccess={handleCopySuccess}
       copyButtonTitle='Copy smart link'

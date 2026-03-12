@@ -46,7 +46,7 @@ export function AddProviderUrlPopover({
         <button
           type='button'
           aria-label={`Add ${providerLabel} link`}
-          className='group/add inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
+          className='group/add inline-flex h-7 min-w-[76px] items-center justify-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           <Icon
             name='Plus'
@@ -63,7 +63,7 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-72 rounded-[10px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'
+        className='w-[288px] rounded-[10px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
@@ -89,7 +89,7 @@ export function AddProviderUrlPopover({
             onChange={e => setUrl(e.target.value)}
             disabled={isSaving}
             autoComplete='off'
-            className='text-[13px]'
+            className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
           />
           <div className='flex justify-end gap-2'>
             <Button
@@ -100,7 +100,7 @@ export function AddProviderUrlPopover({
                 setUrl('');
                 setOpen(false);
               }}
-              className='text-[13px]'
+              className='h-8 rounded-[8px] px-2.5 text-[12px]'
             >
               Cancel
             </Button>
@@ -109,7 +109,7 @@ export function AddProviderUrlPopover({
               variant='primary'
               size='sm'
               disabled={!url.trim() || isSaving}
-              className='text-[13px]'
+              className='h-8 min-w-[68px] rounded-[8px] px-2.5 text-[12px]'
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>

@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const segmentControlVariants = cva(
-  'inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5 shadow-none',
+  'inline-flex items-center rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5 shadow-none',
   {
     variants: {
       variant: {
@@ -29,20 +29,20 @@ const segmentControlVariants = cva(
 
 const segmentTriggerVariants = cva(
   [
-    'relative rounded-[6px] font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
+    'relative rounded-[calc(var(--linear-app-control-radius)-1px)] font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
     'border border-transparent',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-bg-surface-1)',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state
     'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-secondary)',
     // Active state
-    'data-[state=active]:border-(--linear-border-subtle) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary) data-[state=active]:shadow-none',
+    'data-[state=active]:border-(--linear-border-default) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary) data-[state=active]:shadow-[0_1px_0_rgba(255,255,255,0.02)]',
   ],
   {
     variants: {
       size: {
-        sm: 'h-7 px-2.5 text-[12px]',
-        md: 'h-8 px-3 text-[13px]',
+        sm: 'h-[26px] px-2 text-[12px]',
+        md: 'h-[30px] px-2.5 text-[13px]',
         lg: 'h-9 px-4 text-sm',
       },
     },

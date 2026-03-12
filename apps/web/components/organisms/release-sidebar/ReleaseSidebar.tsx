@@ -119,8 +119,8 @@ function ReleaseEntityHeader({
   const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
 
   return (
-    <div className='space-y-3'>
-      <div className='flex items-start gap-3'>
+    <div className='space-y-2.5'>
+      <div className='flex items-start gap-2.5'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -143,14 +143,14 @@ function ReleaseEntityHeader({
                 showHoverOverlay
               />
             ) : (
-              <div className='relative h-[84px] w-[84px] overflow-hidden rounded-[10px] bg-(--linear-bg-surface-1) shadow-none'>
+              <div className='relative h-[72px] w-[72px] overflow-hidden rounded-[10px] bg-(--linear-bg-surface-1) shadow-none'>
                 {release.artworkUrl ? (
                   <Image
                     src={release.artworkUrl}
                     alt={artworkAlt}
                     fill
                     className='object-cover'
-                    sizes='96px'
+                    sizes='72px'
                   />
                 ) : (
                   <div className='flex h-full w-full items-center justify-center'>
@@ -189,13 +189,13 @@ function ReleaseEntityHeader({
         </div>
 
         {/* Compact property stack */}
-        <div className='min-w-0 flex-1 space-y-1 pt-0.5'>
+        <div className='min-w-0 flex-1 space-y-0.5 pt-0.5'>
           <div>
-            <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
+            <p className='truncate text-[14px] font-[590] leading-[17px] tracking-[-0.015em] text-primary-token'>
               {release.title}
             </p>
             {artistLine && (
-              <p className='line-clamp-2 text-[12px] leading-[16px] text-(--linear-text-secondary)'>
+              <p className='line-clamp-2 text-[12px] leading-[15px] text-(--linear-text-secondary)'>
                 {artistLine}
               </p>
             )}

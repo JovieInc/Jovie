@@ -143,7 +143,7 @@ export function EntitySidebarShell({
             {entityHeader && (
               <div
                 className={cn(
-                  'shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-4 pb-3',
+                  'shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-2.5 pb-2',
                   entityHeaderClassName
                 )}
               >
@@ -155,7 +155,7 @@ export function EntitySidebarShell({
             {tabs && (
               <div
                 className={cn(
-                  'shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2 [&>*]:w-full',
+                  'shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-1 [&>*]:w-full',
                   tabsClassName
                 )}
               >
@@ -166,7 +166,7 @@ export function EntitySidebarShell({
             {/* Scrollable content */}
             <div
               className={cn(
-                'flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-3.5',
+                'flex-1 min-h-0 space-y-2.5 overflow-y-auto overflow-x-hidden overscroll-contain bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2.5',
                 contentClassName
               )}
             >
@@ -177,7 +177,7 @@ export function EntitySidebarShell({
             {footer && (
               <div
                 className={cn(
-                  'shrink-0 border-t border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] py-3',
+                  'shrink-0 border-t border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] py-2',
                   footerClassName
                 )}
               >

@@ -48,7 +48,7 @@ export function ProviderCopyButton({
         void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
       }}
       className={cn(
-        'group/btn inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
+        'group/btn inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] transition-[background-color,border-color,color] duration-150',
         isCopied
           ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
           : 'text-(--linear-text-secondary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
@@ -58,7 +58,7 @@ export function ProviderCopyButton({
         <Icon
           name='Copy'
           className={cn(
-            'absolute h-3.5 w-3.5 transition-all duration-150',
+            'absolute h-3 w-3 transition-all duration-150',
             isCopied
               ? 'scale-50 opacity-0'
               : 'scale-100 opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
@@ -68,7 +68,7 @@ export function ProviderCopyButton({
         <Icon
           name='Check'
           className={cn(
-            'absolute h-3.5 w-3.5 transition-all duration-150',
+            'absolute h-3 w-3 transition-all duration-150',
             isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
           )}
           aria-hidden='true'

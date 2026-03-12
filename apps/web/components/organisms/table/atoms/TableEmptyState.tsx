@@ -53,7 +53,7 @@ export function TableEmptyState({
   const content = (
     <div
       className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-4 py-12 px-4 text-center',
+        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-4 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-4 py-12 text-center',
         className
       )}
     >

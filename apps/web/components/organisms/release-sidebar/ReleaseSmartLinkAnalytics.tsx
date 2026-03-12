@@ -81,19 +81,19 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[164px]'>
+    <div className='min-h-[116px]'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
-            <div className='grid grid-cols-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3'>
+            <div className='grid grid-cols-2 rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-2'>
               <div className='space-y-1'>
                 <div className='h-[10px] w-14 rounded skeleton' />
-                <div className='h-5 w-10 rounded skeleton' />
+                <div className='h-4.5 w-10 rounded skeleton' />
                 <div className='h-[11px] w-10 rounded skeleton' />
               </div>
-              <div className='space-y-1 border-l border-(--linear-border-subtle) pl-3'>
+              <div className='space-y-1 border-l border-(--linear-border-subtle) pl-2'>
                 <div className='h-[10px] w-14 rounded skeleton' />
-                <div className='h-5 w-10 rounded skeleton' />
+                <div className='h-4.5 w-10 rounded skeleton' />
                 <div className='h-[11px] w-10 rounded skeleton' />
               </div>
             </div>
@@ -101,9 +101,11 @@ export function ReleaseSmartLinkAnalytics({
         )}
 
         {!showSkeleton && hasError && (
-          <p className='text-[13px] text-(--linear-text-tertiary)'>
-            Analytics unavailable
-          </p>
+          <div className='flex min-h-[72px] items-center rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+            <p className='text-[11.5px] leading-[16px] text-(--linear-text-secondary)'>
+              Analytics unavailable
+            </p>
+          </div>
         )}
 
         {!showSkeleton && !hasError && (
@@ -113,7 +115,7 @@ export function ReleaseSmartLinkAnalytics({
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'>
+            <div className='grid grid-cols-2 rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]'>
               <div>
                 <StatTile
                   label='Total clicks'
@@ -121,7 +123,7 @@ export function ReleaseSmartLinkAnalytics({
                   hint='All time'
                 />
               </div>
-              <div className='border-l border-(--linear-border-subtle) pl-3'>
+              <div className='border-l border-(--linear-border-subtle) pl-2'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
@@ -131,9 +133,11 @@ export function ReleaseSmartLinkAnalytics({
             </div>
 
             {showEmpty && (
-              <p className='mt-1.5 text-[11px] leading-[14px] text-(--linear-text-tertiary)'>
-                Share your smart link to start tracking clicks.
-              </p>
+              <div className='mt-1 flex min-h-[36px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5'>
+                <p className='text-[10px] leading-[13px] text-(--linear-text-tertiary)'>
+                  Share your smart link to start tracking clicks.
+                </p>
+              </div>
             )}
           </div>
         )}

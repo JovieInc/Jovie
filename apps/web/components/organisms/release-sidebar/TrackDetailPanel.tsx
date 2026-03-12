@@ -6,7 +6,7 @@ import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
-import { DrawerSection } from '@/components/molecules/drawer';
+import { DrawerEmptyState, DrawerSection } from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { ProviderKey } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -102,7 +102,7 @@ export function TrackDetailPanel({
             <button
               type='button'
               onClick={handleCopyIsrc}
-              className='flex w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+              className='flex min-h-8 w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[12px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
               <Copy className='h-3.5 w-3.5 shrink-0' />
               <span>Copy ISRC</span>
@@ -138,7 +138,7 @@ export function TrackDetailPanel({
                 href={provider.url}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='flex items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex min-h-8 items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[12px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
               >
                 <ProviderIcon
                   provider={provider.key as ProviderKey}
@@ -150,6 +150,18 @@ export function TrackDetailPanel({
               </a>
             ))}
           </div>
+        </DrawerSection>
+      )}
+
+      {streamingProviders.length === 0 && (
+        <DrawerSection>
+          <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            Available on
+          </p>
+          <DrawerEmptyState
+            message='No platform links available for this track.'
+            className='min-h-[96px]'
+          />
         </DrawerSection>
       )}
     </div>

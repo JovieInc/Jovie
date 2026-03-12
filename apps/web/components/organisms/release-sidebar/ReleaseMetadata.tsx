@@ -43,7 +43,7 @@ const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[13px] tabular-nums text-(--linear-text-secondary)'>
+    <span className='text-[11.5px] tabular-nums text-(--linear-text-secondary)'>
       {clamped} / 100
     </span>
   );
@@ -118,7 +118,7 @@ export function ReleaseMetadata({
     canvasStatusConfig.displayLabel ?? canvasStatusConfig.label;
 
   return (
-    <div className='space-y-0.5'>
+    <div className='space-y-px'>
       <DrawerPropertyRow
         label='Type'
         value={<ReleaseTypeBadges release={release} />}
@@ -157,7 +157,7 @@ export function ReleaseMetadata({
               className='font-sans'
             />
           ) : (
-            <span className='text-[13px] text-(--linear-text-tertiary)'>
+            <span className='text-[11px] text-(--linear-text-tertiary)'>
               Unknown
             </span>
           )
@@ -172,7 +172,7 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='truncate text-[13px] text-(--linear-text-secondary)'>
+            <span className='truncate text-[11.5px] text-(--linear-text-secondary)'>
               {formatCopyrightLine(release.copyrightLine, '℗')}
             </span>
           }
@@ -188,7 +188,7 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='truncate text-[13px] text-(--linear-text-secondary)'>
+            <span className='truncate text-[11.5px] text-(--linear-text-secondary)'>
               {formatCopyrightLine(release.distributor, '©')}
             </span>
           }
@@ -198,7 +198,7 @@ export function ReleaseMetadata({
       <DrawerPropertyRow
         label='Tracks'
         value={
-          <span className='text-[13px] tabular-nums'>
+          <span className='text-[11.5px] tabular-nums text-(--linear-text-secondary)'>
             {release.totalTracks}{' '}
             {release.totalTracks === 1 ? 'track' : 'tracks'}
           </span>
@@ -213,7 +213,7 @@ export function ReleaseMetadata({
               <DropdownMenuTrigger asChild>
                 <button
                   type='button'
-                  className='-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                  className='-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[11.5px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
@@ -268,7 +268,7 @@ export function ReleaseMetadata({
         <DrawerPropertyRow
           label='Duration'
           value={
-            <span className='text-[13px] tabular-nums'>
+            <span className='text-[12px] tabular-nums text-(--linear-text-secondary)'>
               {formatDuration(release.totalDurationMs)}
             </span>
           }
@@ -280,11 +280,11 @@ export function ReleaseMetadata({
           label='Genres'
           value={
             <div className='flex flex-wrap gap-1'>
-              {release.genres.map(genre => (
+              {release.genres.slice(0, 3).map(genre => (
                 <Badge
                   key={genre}
                   variant='secondary'
-                  className='bg-(--linear-bg-surface-1) text-[10px] font-normal shadow-none'
+                  className='rounded-[5px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 text-[10px] font-[510] text-(--linear-text-secondary) shadow-none'
                 >
                   {genre}
                 </Badge>

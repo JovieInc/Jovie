@@ -59,6 +59,32 @@ function ActivityIcon({ action }: { readonly action: ActivityAction }) {
   );
 }
 
+const ACTIVITY_SKELETON_KEYS = Array.from(
+  { length: 4 },
+  (_, index) => `activity-skeleton-${index + 1}`
+);
+
+export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
+  return (
+    <div className='space-y-1' aria-busy='true'>
+      {ACTIVITY_SKELETON_KEYS.slice(0, rows).map(key => (
+        <div
+          key={key}
+          className='relative flex items-start gap-3 rounded-[8px] px-2 py-2'
+          aria-hidden='true'
+        >
+          <div className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle)' />
+          <div className='relative z-10 h-6 w-6 shrink-0 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)] skeleton' />
+          <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
+            <div className='h-3 w-[72%] rounded skeleton' />
+            <div className='h-2.5 w-[24%] rounded skeleton' />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (
@@ -92,17 +118,25 @@ function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
 export interface ActivityFeedProps {
   readonly events: ActivityEvent[];
   readonly emptyMessage?: string;
+  readonly isLoading?: boolean;
 }
 
 export function ActivityFeed({
   events,
   emptyMessage = 'No activity yet.',
+  isLoading = false,
 }: ActivityFeedProps) {
+  if (isLoading) {
+    return <ActivityFeedSkeleton rows={4} />;
+  }
+
   if (events.length === 0) {
     return (
-      <p className='py-4 text-center text-[13px] text-quaternary-token'>
-        {emptyMessage}
-      </p>
+      <div className='flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+          {emptyMessage}
+        </p>
+      </div>
     );
   }
 

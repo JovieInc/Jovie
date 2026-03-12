@@ -185,13 +185,15 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover'
+      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-1 py-1.5 transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)'
     >
-      <span className='text-[13px] text-secondary-token'>{label}</span>
+      <span className='text-[13px] text-(--linear-text-secondary)'>
+        {label}
+      </span>
       <span
         className={cn(
           'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
-          checked ? 'bg-primary' : 'bg-surface-3'
+          checked ? 'bg-(--linear-accent)' : 'bg-(--linear-border-subtle)'
         )}
       >
         <span
@@ -238,7 +240,11 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className={cn(APP_CONTROL_BUTTON_CLASS, 'px-2 md:px-3', triggerClassName)}
+            className={cn(
+              APP_CONTROL_BUTTON_CLASS,
+              'px-2 md:px-3',
+              triggerClassName
+            )}
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
             <span className={cn(compact && 'sr-only md:not-sr-only')}>
@@ -249,8 +255,8 @@ function LinearStyleDisplayMenu({
       </TooltipShortcut>
       <PopoverContent align='end' className='w-[260px]'>
         {/* Header */}
-        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-          <span className='text-[13px] font-[510] text-primary-token'>
+        <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
+          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
             Display
           </span>
           <PopoverPrimitive.Close asChild>
@@ -266,7 +272,7 @@ function LinearStyleDisplayMenu({
 
         {/* Release view toggle */}
         {onReleaseViewChange && (
-          <div className='border-b border-subtle px-3 py-2'>
+          <div className='border-b border-(--linear-border-subtle) px-3 py-2'>
             <ReleaseViewSegmentedControl
               value={releaseView ?? 'releases'}
               onChange={onReleaseViewChange}
@@ -276,8 +282,8 @@ function LinearStyleDisplayMenu({
 
         {/* List options */}
         {onGroupByYearChange && (
-          <div className='border-b border-subtle px-3 py-1.5'>
-            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <div className='border-b border-(--linear-border-subtle) px-3 py-1.5'>
+            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
               List options
             </p>
             <ToggleSwitch
@@ -312,8 +318,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex flex-col gap-2 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-1.5 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)]'>
-      <div className='flex min-w-0 flex-1 items-center gap-2 md:w-auto md:flex-none'>
+    <div className='flex flex-col gap-1.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-1 md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)]'>
+      <div className='flex min-w-0 flex-1 items-center gap-1.5 md:w-auto md:flex-none'>
         {onReleaseViewChange ? (
           <>
             <CompactReleaseViewTabs
@@ -329,7 +335,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       </div>
 
       {/* Right: Search + Filter + Display + Export */}
-      <ActionBar className='ml-auto flex w-full items-center justify-end gap-1.5 md:w-auto'>
+      <ActionBar className='ml-auto flex w-full items-center justify-end gap-1 md:w-auto'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
@@ -338,8 +344,9 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               onClick={onSearchToggle}
               className={cn(
                 ACTION_BAR_BUTTON_CLASS,
-                'px-2 md:px-3',
-                isSearchOpen && 'bg-interactive-active text-primary-token'
+                'px-2 md:px-2.5',
+                isSearchOpen &&
+                  'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
               )}
               aria-pressed={isSearchOpen}
             >
@@ -372,7 +379,9 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           className={cn(ACTION_BAR_BUTTON_CLASS, 'hidden md:inline-flex')}
           tooltipLabel='Export'
         />
-        {primaryAction}
+        {primaryAction ? (
+          <div className='ml-0.5 shrink-0'>{primaryAction}</div>
+        ) : null}
       </ActionBar>
     </div>
   );

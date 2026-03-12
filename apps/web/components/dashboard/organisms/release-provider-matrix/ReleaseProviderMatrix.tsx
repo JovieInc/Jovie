@@ -18,12 +18,14 @@ import {
   connectAppleMusicArtist,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
-import { Icon } from '@/components/atoms/Icon';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
+import { Icon } from '@/components/atoms/Icon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
+import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
+import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -560,9 +562,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return (
         <Suspense
           fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
+            <DrawerLoadingSkeleton
+              ariaLabel='Loading track details'
+              width={SIDEBAR_WIDTH}
+              showTabs={false}
+              contentRows={5}
             />
           }
         >
@@ -579,9 +583,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return (
         <Suspense
           fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
+            <DrawerLoadingSkeleton
+              ariaLabel='Loading release details'
+              width={SIDEBAR_WIDTH}
+              showTabs
+              contentRows={6}
             />
           }
         >
@@ -677,6 +683,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isSaving,
     allowArtworkDownloads,
     canEditSmartLinks,
+    experienceMode,
     handleCanvasStatusUpdate,
   ]);
 
@@ -861,7 +868,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onArtistSelect={handleAppleMusicConnect}
       />
 
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          spotifySearchOpen ? (
+            <DialogLoadingSkeleton
+              open={spotifySearchOpen}
+              onClose={() => setSpotifySearchOpen(false)}
+              size='lg'
+              rows={3}
+            />
+          ) : null
+        }
+      >
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}
@@ -871,7 +889,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       </Suspense>
 
       {experienceMode === 'live' && canCreateManualReleases && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            addReleaseOpen ? (
+              <DrawerLoadingSkeleton
+                ariaLabel='Loading add release form'
+                width={SIDEBAR_WIDTH}
+                showTabs={false}
+                contentRows={6}
+              />
+            ) : null
+          }
+        >
           <AddReleaseSidebar
             isOpen={addReleaseOpen}
             onClose={() => setAddReleaseOpen(false)}

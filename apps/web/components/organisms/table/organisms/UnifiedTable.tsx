@@ -154,6 +154,20 @@ export interface UnifiedTableProps<TData> {
   readonly skeletonRows?: number;
 
   /**
+   * Optional per-column skeleton config to preserve final layout geometry.
+   */
+  readonly skeletonColumnConfig?: Array<{
+    readonly width?: string;
+    readonly variant?:
+      | 'text'
+      | 'avatar'
+      | 'badge'
+      | 'button'
+      | 'release'
+      | 'meta';
+  }>;
+
+  /**
    * Optional grouping configuration
    * When provided, table will render with grouped rows and sticky group headers
    */
@@ -323,6 +337,7 @@ export function UnifiedTable<TData>({
   containerClassName,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   skeletonRows = 20,
+  skeletonColumnConfig,
   groupingConfig,
   enableKeyboardNavigation,
   focusedRowIndex: controlledFocusedIndex,
@@ -513,6 +528,7 @@ export function UnifiedTable<TData>({
           <LoadingTableBody
             rows={skeletonRows}
             columns={columnCount}
+            columnConfig={skeletonColumnConfig}
             rowHeight={`${rowHeight}px`}
           />
         </table>

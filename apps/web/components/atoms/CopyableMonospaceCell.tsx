@@ -37,7 +37,11 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   }, [value]);
 
   if (!value) {
-    return <span className='text-tertiary-token'>—</span>;
+    return (
+      <span className='text-[11px] font-[450] text-(--linear-text-tertiary)'>
+        —
+      </span>
+    );
   }
 
   return (
@@ -45,7 +49,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       type='button'
       onClick={handleCopy}
       className={cn(
-        'group/copy inline-flex items-center gap-1 font-mono text-xs text-secondary-token hover:text-primary-token',
+        'group/copy -mx-1 inline-flex h-6 items-center gap-1 rounded-[7px] border border-transparent px-1 py-0.5 font-mono text-[11px] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
       title={`Copy ${label}`}
@@ -64,7 +68,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
           'h-3 w-3 transition-opacity',
           copied
             ? 'text-success opacity-100'
-            : 'opacity-0 group-hover/copy:opacity-60'
+            : 'opacity-0 group-hover/copy:opacity-70 group-focus-visible/copy:opacity-70'
         )}
       />
       <span className='sr-only' aria-live='polite'>

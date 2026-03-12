@@ -46,8 +46,8 @@ const ProviderStatusDot = memo(function ProviderStatusDot({
 }: ProviderStatusDotProps) {
   if (status === 'missing') {
     return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
-        <span className='h-1 w-1 rounded-full bg-tertiary-token' />
+      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
+        <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
       </span>
     );
   }
@@ -147,24 +147,24 @@ function AddProviderUrlPopover({
       <PopoverTrigger asChild>
         <button
           type='button'
-          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+          className='group/add inline-flex h-7 min-w-[76px] items-center justify-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           <Icon
             name='Plus'
-            className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
+            className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100 group-focus-visible/add:opacity-100'
             aria-hidden='true'
           />
-          <span className='line-clamp-1 text-tertiary-token/50 group-hover/add:hidden'>
+          <span className='line-clamp-1 text-(--linear-text-tertiary) group-hover/add:hidden group-focus-visible/add:hidden'>
             —
           </span>
-          <span className='line-clamp-1 hidden group-hover/add:inline'>
+          <span className='line-clamp-1 hidden group-hover/add:inline group-focus-visible/add:inline'>
             Add link
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-72 p-3'
+        className='w-[288px] rounded-[10px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
@@ -177,7 +177,7 @@ function AddProviderUrlPopover({
               style={{ backgroundColor: accent }}
               aria-hidden='true'
             />
-            <span className='text-[13px] font-[510] text-primary-token'>
+            <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
               Add {providerLabel} link
             </span>
           </div>
@@ -194,10 +194,10 @@ function AddProviderUrlPopover({
               }}
               disabled={isSaving}
               autoComplete='off'
-              className='text-[13px]'
+              className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
             />
             {validationError && (
-              <p className='text-[13px] text-(--color-error)'>
+              <p className='min-h-[18px] text-[12px] text-(--linear-error)'>
                 {validationError}
               </p>
             )}
@@ -211,7 +211,7 @@ function AddProviderUrlPopover({
                 setUrl('');
                 setOpen(false);
               }}
-              className='text-[13px]'
+              className='h-8 rounded-[8px] px-2.5 text-[12px]'
             >
               Cancel
             </Button>
@@ -220,7 +220,7 @@ function AddProviderUrlPopover({
               variant='primary'
               size='sm'
               disabled={!url.trim() || isSaving}
-              className='text-[13px]'
+              className='h-8 min-w-[68px] rounded-[8px] px-2.5 text-[12px]'
             >
               {isSaving ? 'Saving...' : 'Save'}
             </Button>
@@ -245,7 +245,7 @@ function ProviderActionButtons({
   onCopyClick,
 }: ProviderActionButtonsProps) {
   return (
-    <div className='inline-flex items-center overflow-hidden rounded-md border border-subtle'>
+    <div className='inline-flex items-center overflow-hidden rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
       {/* Open button (left) */}
       <button
         type='button'
@@ -254,14 +254,14 @@ function ProviderActionButtons({
           event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
-        className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+        className='inline-flex cursor-pointer items-center justify-center p-1.5 text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
       >
         <Icon name='ExternalLink' className='h-3.5 w-3.5' aria-hidden='true' />
         <span className='sr-only'>Open</span>
       </button>
 
       {/* Divider */}
-      <div className='h-4 w-px bg-subtle' />
+      <div className='h-4 w-px bg-(--linear-border-subtle)' />
 
       {/* Copy button (right) */}
       <button
@@ -271,7 +271,7 @@ function ProviderActionButtons({
         data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
         onClick={onCopyClick}
         className={cn(
-          'inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
+          'inline-flex cursor-pointer items-center justify-center p-1.5 text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)',
           isCopied && 'text-success hover:text-success'
         )}
       >
@@ -417,7 +417,7 @@ export const ProviderCell = memo(function ProviderCell({
     }
 
     return (
-      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-tertiary-token/50'>
+      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-(--linear-text-tertiary)'>
         —
       </span>
     );

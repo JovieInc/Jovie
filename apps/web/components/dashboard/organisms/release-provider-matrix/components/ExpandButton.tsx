@@ -31,7 +31,7 @@ export const ExpandButton = memo(function ExpandButton({
 }: ExpandButtonProps) {
   // Don't show expand button for singles (1 track)
   if (totalTracks <= 1) {
-    return <div className='w-5 h-5' aria-hidden='true' />;
+    return <div className='h-5 w-5' aria-hidden='true' />;
   }
 
   return (
@@ -40,11 +40,11 @@ export const ExpandButton = memo(function ExpandButton({
       onClick={onClick}
       disabled={isLoading}
       className={cn(
-        'flex items-center justify-center w-5 h-5 rounded',
-        'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)',
-        'hover:bg-(--linear-bg-surface-1) transition-[background-color,color,box-shadow] duration-150',
-        'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-        'disabled:opacity-50 disabled:cursor-not-allowed'
+        'flex h-5 w-5 items-center justify-center rounded-[6px] border border-transparent',
+        'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary)',
+        'transition-[background-color,border-color,color,box-shadow] duration-150',
+        'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'disabled:cursor-not-allowed disabled:opacity-50'
       )}
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}

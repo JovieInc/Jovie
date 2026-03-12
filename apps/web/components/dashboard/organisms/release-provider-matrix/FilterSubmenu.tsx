@@ -8,6 +8,7 @@ import {
 } from '@jovie/ui';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
 import { cn } from '@/lib/utils';
 
 /**
@@ -59,7 +60,7 @@ function SearchInput({
       <div className='relative'>
         <Icon
           name='Search'
-          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
+          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)'
         />
         <input
           ref={inputRef}
@@ -68,15 +69,15 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-7 text-[13px] text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
+          className='w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         />
         {value && (
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 hover:bg-interactive-hover'
+            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
           >
-            <Icon name='X' className='h-3 w-3 text-tertiary-token' />
+            <Icon name='X' className='h-3 w-3' />
           </button>
         )}
       </div>
@@ -122,18 +123,22 @@ function SubmenuCheckboxItem({
       className={cn(
         MENU_ITEM_BASE,
         'w-full justify-between',
-        checked && 'bg-primary/5 dark:bg-primary/10'
+        checked && 'bg-(--linear-accent-subtle) text-(--linear-text-primary)'
       )}
     >
       <div className='flex items-center gap-2'>
-        {icon && <span className='text-tertiary-token'>{icon}</span>}
+        {icon && <span className='text-(--linear-text-tertiary)'>{icon}</span>}
         <span className='text-[13px]'>{label}</span>
       </div>
       <div className='flex items-center gap-2'>
         {count > 0 && (
-          <span className='text-[10px] text-tertiary-token'>{count}</span>
+          <span className='text-[10px] text-(--linear-text-tertiary)'>
+            {count}
+          </span>
         )}
-        {checked && <Icon name='Check' className='h-3.5 w-3.5 text-primary' />}
+        {checked && (
+          <Icon name='Check' className='h-3.5 w-3.5 text-(--linear-accent)' />
+        )}
       </div>
     </button>
   );
@@ -231,11 +236,11 @@ export function FilterSubmenu<T extends string = string>({
         <div className='flex items-center gap-2'>
           <Icon
             name={iconName as 'Disc3'}
-            className='h-3.5 w-3.5 text-tertiary-token'
+            className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
           />
           <span>{label}</span>
           {selectedCount > 0 && (
-            <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-[510] text-primary'>
+            <span className='rounded-full bg-(--linear-accent-subtle) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
               {selectedCount}
             </span>
           )}
@@ -261,9 +266,7 @@ export function FilterSubmenu<T extends string = string>({
 
         <div className='flex-1 overflow-y-auto p-1'>
           {filteredOptions.length === 0 ? (
-            <div className='py-6 text-center text-[13px] text-tertiary-token'>
-              No options found
-            </div>
+            <DropdownEmptyState message='No options found' />
           ) : (
             filteredOptions.map(opt => (
               <SubmenuCheckboxItem

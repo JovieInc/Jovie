@@ -7,12 +7,15 @@ export {
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';
 export { DrawerHeader, type DrawerHeaderProps } from './DrawerHeader';
-export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
   type DrawerLinkSectionProps,
 } from './DrawerLinkSection';
+export {
+  DrawerLoadingSkeleton,
+  type DrawerLoadingSkeletonProps,
+} from './DrawerLoadingSkeleton';
 export {
   DrawerPropertyRow,
   type DrawerPropertyRowProps,
@@ -22,6 +25,7 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,
   type EntityHeaderCardProps,

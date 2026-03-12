@@ -5,6 +5,7 @@ import { useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { UnifiedTable } from '@/components/organisms/table';
+import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -217,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 216,
-      minSize: 188,
+      size: 194,
+      minSize: 166,
       meta: { className: 'hidden sm:table-cell' },
     });
 
@@ -313,15 +314,12 @@ export function ReleaseTable({
   if (isMobile) {
     if (releases.length === 0) {
       return (
-        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
-          <Icon name='Disc3' className='h-6 w-6' />
-          <div>
-            <div className='font-[510]'>No releases</div>
-            <div className='text-[11px]'>
-              Your releases will appear here once synced.
-            </div>
-          </div>
-        </div>
+        <TableEmptyState
+          icon={<Icon name='Disc3' className='h-6 w-6' />}
+          title='No releases'
+          description='Your releases will appear here once synced.'
+          className='mx-4 my-4 min-h-[200px]'
+        />
       );
     }
 
@@ -357,20 +355,22 @@ export function ReleaseTable({
       containerClassName='h-full'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
+      skeletonRows={14}
+      skeletonColumnConfig={[
+        { variant: 'release', width: '100%' },
+        { variant: 'meta', width: '154px' },
+      ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedRowIds}
       renderExpandedContent={showTracks ? renderExpandedContent : undefined}
       getExpandableRowId={getExpandableRowId}
       emptyState={
-        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
-          <Icon name='Disc3' className='h-6 w-6' />
-          <div>
-            <div className='font-[510]'>No releases</div>
-            <div className='text-[11px]'>
-              Your releases will appear here once synced.
-            </div>
-          </div>
-        </div>
+        <TableEmptyState
+          icon={<Icon name='Disc3' className='h-6 w-6' />}
+          title='No releases'
+          description='Your releases will appear here once synced.'
+          className='m-4 min-h-[200px]'
+        />
       }
     />
   );

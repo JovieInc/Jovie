@@ -161,13 +161,15 @@ export function useReleaseHeaderParts({
 
   const title = (
     <span className='group/isrc flex min-w-0 items-center gap-1'>
-      <span className='truncate font-mono'>{titleText}</span>
+      <span className='truncate font-mono text-[11px] tracking-[0.04em] text-(--linear-text-tertiary)'>
+        {titleText}
+      </span>
       {isrcValue && (
         <button
           type='button'
           onClick={handleCopyIsrc}
           title={isIdCopied ? 'Copied!' : 'Copy ISRC'}
-          className='shrink-0 rounded p-0.5 text-tertiary-token opacity-0 transition-opacity group-hover/isrc:opacity-100 hover:text-primary-token'
+          className='shrink-0 rounded-[6px] border border-transparent p-0.5 text-(--linear-text-quaternary) opacity-0 transition-[opacity,background-color,border-color,color] duration-150 group-hover/isrc:opacity-100 group-focus-within/isrc:opacity-100 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:opacity-100 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           {isIdCopied ? (
             <Check className='h-3 w-3' />

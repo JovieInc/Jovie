@@ -67,7 +67,7 @@ export function DrawerHeaderActions({
     : baseMenuItems;
 
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex items-center gap-px'>
       {/* Primary actions - always visible */}
       {displayActions.map(action => {
         const Icon =
@@ -80,7 +80,7 @@ export function DrawerHeaderActions({
             <AppIconButton
               key={action.id}
               asChild
-              className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+              className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:bg-white/[0.04]'
               aria-label={action.label}
             >
               <Link href={action.href}>
@@ -98,7 +98,7 @@ export function DrawerHeaderActions({
             key={action.id}
             onClick={action.onClick}
             className={cn(
-              'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)',
+              'border-transparent bg-transparent hover:bg-white/[0.04]',
               action.isActive
                 ? 'text-success hover:text-success'
                 : 'text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
@@ -133,7 +133,7 @@ export function DrawerHeaderActions({
       {menuItems.length > 0 && (
         <TableActionMenu items={menuItems} trigger='custom' align='end'>
           <AppIconButton
-            className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+            className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:bg-white/[0.04]'
             aria-label='More actions'
           >
             <MoreVertical className='h-3.5 w-3.5' />

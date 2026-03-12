@@ -27,6 +27,50 @@ const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
 const DEFAULT_PLACEHOLDER = 'Search your artist name or paste a Spotify link';
 const PASTE_PLACEHOLDER = 'Paste your Spotify artist URL here';
 
+function SearchDropdownState({
+  message,
+  tone = 'default',
+}: {
+  readonly message: string;
+  readonly tone?: 'default' | 'error';
+}) {
+  return (
+    <div className='p-3'>
+      <div className='flex min-h-[64px] items-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+        <p
+          className={cn(
+            'text-[12px] leading-[17px]',
+            tone === 'error' ? 'text-error' : 'text-(--linear-text-secondary)'
+          )}
+        >
+          {message}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function SearchResultsLoadingSkeleton() {
+  return (
+    <div className='p-3 space-y-1.5' aria-busy='true'>
+      {LOADING_SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className='flex min-h-[64px] items-center gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'
+          aria-hidden='true'
+        >
+          <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
+          <div className='min-w-0 flex-1 space-y-1.5'>
+            <div className='h-3.5 w-32 rounded skeleton' />
+            <div className='h-2.5 w-20 rounded skeleton' />
+          </div>
+          <div className='h-4 w-4 shrink-0 rounded-full skeleton' />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function handleEnterInResults(
   activeIndex: number,
   results: SpotifyArtist[],
@@ -485,36 +529,18 @@ export function SpotifyConnectDialog({
               </select>
 
               {searchState === 'loading' && results.length === 0 && (
-                <div className='p-3 space-y-2'>
-                  {LOADING_SKELETON_KEYS.map(key => (
-                    <div
-                      key={key}
-                      className='flex items-center gap-3 animate-pulse'
-                    >
-                      <div className='w-10 h-10 rounded-full bg-surface-1' />
-                      <div className='flex-1 space-y-1'>
-                        <div className='h-4 w-32 rounded bg-surface-1' />
-                        <div className='h-3 w-20 rounded bg-surface-1' />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <SearchResultsLoadingSkeleton />
               )}
 
               {searchState === 'empty' && (
-                <div className='p-4 text-center'>
-                  <p className='text-[13px] text-secondary-token'>
-                    No artists found
-                  </p>
-                </div>
+                <SearchDropdownState message='No artists found' />
               )}
 
               {searchState === 'error' && (
-                <div className='p-4 text-center'>
-                  <p className='text-[13px] text-error'>
-                    {searchError || 'Search failed. Try again.'}
-                  </p>
-                </div>
+                <SearchDropdownState
+                  message={searchError || 'Search failed. Try again.'}
+                  tone='error'
+                />
               )}
 
               {results.length > 0 && (
@@ -557,7 +583,10 @@ export function SpotifyConnectDialog({
                           />
                         ) : (
                           <div className='w-full h-full flex items-center justify-center'>
-                            <ProviderIcon provider='spotify' className='h-5 w-5' />
+                            <ProviderIcon
+                              provider='spotify'
+                              className='h-5 w-5'
+                            />
                           </div>
                         )}
                       </div>

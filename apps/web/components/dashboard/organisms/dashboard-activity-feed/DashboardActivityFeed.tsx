@@ -2,30 +2,10 @@
 
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
+import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Activity, DashboardActivityFeedProps } from './types';
-
-const DASHBOARD_ACTIVITY_LOADING_KEYS = Array.from(
-  { length: 4 },
-  (_, i) => `dashboard-activity-loading-${i + 1}`
-);
-
-function ActivityLoadingSkeleton() {
-  return (
-    <div className='space-y-2' aria-busy='true'>
-      {DASHBOARD_ACTIVITY_LOADING_KEYS.map(key => (
-        <div key={key} className='flex items-start gap-3' aria-hidden='true'>
-          <div className='h-6 w-6 rounded-full skeleton' />
-          <div className='flex-1 space-y-1.5 pt-0.5'>
-            <div className='h-3 w-3/4 rounded skeleton' />
-            <div className='h-2.5 w-1/3 rounded skeleton' />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function ActivityEmptyState({
   isRefreshing,
@@ -34,9 +14,11 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <p className='text-[13px] text-tertiary-token'>
-        No recent activity. Share your profile to see engagement here.
-      </p>
+      <div className='flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+          No recent activity. Share your profile to see engagement here.
+        </p>
+      </div>
     </div>
   );
 }
@@ -161,7 +143,7 @@ export function DashboardActivityFeed({
           }
 
           if (isLoading) {
-            return <ActivityLoadingSkeleton />;
+            return <ActivityFeedSkeleton rows={4} />;
           }
 
           if (activities.length === 0) {

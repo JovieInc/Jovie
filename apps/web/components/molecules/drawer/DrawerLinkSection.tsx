@@ -3,6 +3,7 @@
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { DrawerEmptyState } from './DrawerEmptyState';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
   'min-h-[40px] min-w-[40px] flex items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-(--linear-bg-surface-1) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
@@ -72,9 +73,7 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <p className='py-2 text-xs text-(--linear-text-tertiary)'>
-          {emptyMessage}
-        </p>
+        <DrawerEmptyState message={emptyMessage} className='min-h-[96px]' />
       ) : (
         <div className='-mx-5 lg:mx-0'>{children}</div>
       )}

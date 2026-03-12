@@ -123,8 +123,9 @@ function VirtualizedTableRowComponent<TData>({
         presets.tableRow,
         onRowClick && 'cursor-pointer',
         shouldEnableKeyboardNav &&
-          'focus-visible:outline-none focus-visible:bg-(--linear-row-selected)',
-        focusedIndex === rowIndex && 'bg-(--linear-row-selected)',
+          'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        focusedIndex === rowIndex &&
+          'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]',
         getRowClassName?.(rowData, rowIndex)
       )}
       onClick={handleClick}

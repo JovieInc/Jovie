@@ -264,7 +264,7 @@ export function createRightMetaCellRenderer(
     const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
     return (
-      <div className='grid min-w-[188px] grid-cols-[minmax(0,1fr)_16px_40px] items-center justify-end gap-x-2 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
+      <div className='grid min-w-[154px] grid-cols-[minmax(0,1fr)_12px_28px] items-center justify-end gap-x-1 text-[11px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
         <div className='min-w-0'>
           <SmartLinkCell
             release={release}
@@ -273,11 +273,11 @@ export function createRightMetaCellRenderer(
           />
         </div>
 
-        <div className='flex w-4 items-center justify-center'>
+        <div className='flex w-3 items-center justify-center'>
           <PopularityIcon popularity={release.spotifyPopularity} />
         </div>
 
-        <span className='hidden w-10 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
+        <span className='hidden w-7 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
           {year ?? 'Unknown'}
         </span>
       </div>
@@ -491,7 +491,7 @@ export function renderStatsCell({
   const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
   return (
-    <div className='flex items-center gap-2 text-[13px] text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-2 text-[13px] tabular-nums text-(--linear-text-secondary)'>
       {/* Popularity icon first */}
       <div className='w-4 flex justify-center'>
         <PopularityIcon popularity={release.spotifyPopularity} />

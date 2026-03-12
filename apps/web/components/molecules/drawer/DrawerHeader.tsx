@@ -15,14 +15,14 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
   return (
     <div
       className={cn(
-        'sticky top-0 z-10 flex min-h-[var(--linear-app-drawer-header-height)] shrink-0 items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2',
+        'sticky top-0 z-10 flex min-h-[var(--linear-app-drawer-header-height)] shrink-0 items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-1',
         className
       )}
     >
-      <p className='truncate text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
+      <p className='truncate text-[10px] font-[510] uppercase tracking-[0.06em] text-(--linear-text-tertiary)'>
         {title}
       </p>
-      {actions && <div className='flex items-center gap-1'>{actions}</div>}
+      {actions && <div className='flex items-center gap-0.5'>{actions}</div>}
     </div>
   );
 }

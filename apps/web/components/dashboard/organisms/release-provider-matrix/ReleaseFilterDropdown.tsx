@@ -17,6 +17,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';
@@ -297,10 +298,8 @@ function VirtualizedLabelList({
 
   if (options.length === 0) {
     return (
-      <div className='flex-1 overflow-y-auto p-1'>
-        <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
-          {emptyMessage}
-        </div>
+      <div className='flex-1 overflow-y-auto'>
+        <DropdownEmptyState message={emptyMessage} />
       </div>
     );
   }
@@ -524,9 +523,7 @@ export function ReleaseFilterDropdown({
           {/* Categories List */}
           <div className='flex-1 overflow-y-auto p-1'>
             {filteredCategories.length === 0 ? (
-              <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
-                No filters found
-              </div>
+              <DropdownEmptyState message='No filters found' />
             ) : (
               <>
                 {/* Release Type Submenu */}
