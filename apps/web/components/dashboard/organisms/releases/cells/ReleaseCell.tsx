@@ -65,24 +65,24 @@ export const ReleaseCell = memo(function ReleaseCell({
   }, [artistName, release.artistNames]);
 
   return (
-    <div className='grid min-w-0 grid-cols-[24px_minmax(0,1fr)] items-start gap-x-3.5'>
-      <div className='flex w-[22px] items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[20px_minmax(0,1fr)] items-start gap-x-2.5'>
+      <div className='flex w-[18px] items-center justify-center pt-0.5'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-5 w-5 rounded-[6px] p-0 text-(--linear-text-tertiary)'
+            className='h-[18px] w-[18px] rounded-[5px] p-0 text-(--linear-text-tertiary)'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
           >
             {isPlaying ? (
-              <Pause className='h-[11px] w-[11px]' />
+              <Pause className='h-[10px] w-[10px]' />
             ) : (
-              <Play className='h-[11px] w-[11px]' />
+              <Play className='h-[10px] w-[10px]' />
             )}
           </DrawerInlineIconButton>
         ) : (
-          <span className='h-5 w-5' />
+          <span className='h-[18px] w-[18px]' />
         )}
       </div>
 

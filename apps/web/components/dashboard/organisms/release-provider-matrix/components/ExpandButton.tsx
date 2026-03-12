@@ -31,27 +31,27 @@ export const ExpandButton = memo(function ExpandButton({
 }: ExpandButtonProps) {
   // Don't show expand button for singles (1 track)
   if (totalTracks <= 1) {
-    return <div className='h-5 w-5' aria-hidden='true' />;
+    return <div className='h-[18px] w-[18px]' aria-hidden='true' />;
   }
 
   return (
     <DrawerInlineIconButton
       onClick={onClick}
       disabled={isLoading}
-      className='h-5 w-5 rounded-[6px] p-0 text-(--linear-text-tertiary) disabled:cursor-not-allowed disabled:opacity-50'
+      className='h-[18px] w-[18px] rounded-[5px] p-0 text-(--linear-text-tertiary) disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >
       {isLoading ? (
         <Icon
           name='Loader2'
-          className='h-4 w-4 animate-spin'
+          className='h-3.5 w-3.5 animate-spin'
           aria-hidden='true'
         />
       ) : (
         <Icon
           name={isExpanded ? 'ChevronDown' : 'ChevronRight'}
-          className='h-4 w-4'
+          className='h-3.5 w-3.5'
           aria-hidden='true'
         />
       )}

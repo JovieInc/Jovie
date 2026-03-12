@@ -140,9 +140,9 @@ export const TrackRow = memo(function TrackRow({
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
         <td className='py-2 pr-4'>
-          <div className='flex items-center gap-3 pl-8'>
+          <div className='flex items-center gap-2.5 pl-6'>
             {/* Track number */}
-            <span className='w-8 shrink-0 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
+            <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
               {trackLabel}.
             </span>
 
