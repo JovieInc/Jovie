@@ -6,11 +6,11 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
+import { isAllowedVenmoUrl } from '@/components/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { cn } from '@/lib/utils';
 
-const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 const CARD_CLASSES =
   'rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm';
 
@@ -43,17 +43,6 @@ function VenmoLogo({ className }: { readonly className?: string }) {
       <path d='M592.68 18.64c17.32 0 34.72 12.16 34.72 37.92 0 37.84-29.76 73.72-68.6 73.72-12.72 0-28.64-5.32-36.2-15.96 0 0 3.56 19.32-34.16 19.32-22.16 0-34.88-13.68-34.88-36.76 0-33.04 20.04-74.52 63.92-74.52 10.52 0 19.48 3.68 24.84 10.2l3.36-10.44h43.4l-14.64 69.32c-.88 4.4-1.48 8.32-1.48 11.12 0 5.28 2.36 7.6 6.36 7.6 9.6 0 21.4-17.88 21.4-41.04 0-31.4-19.4-51.28-52.84-51.28-36.2 0-63.6 28.48-63.6 63.72 0 30.16 18.44 52.24 52.72 52.24 14.52 0 26.44-3.12 40.56-11.52l5.72 5.24c-14.52 12.72-34.56 20.4-55.6 20.4-42.44 0-68.6-26.64-68.6-62.44 0-48.72 36.88-83.44 83.68-83.44 10.56 0 21.24 2.16 29.68 6.36Zm-92.2 32.48c-13.04 0-21.72 19.92-21.72 35.36 0 10.48 4.96 17.56 13.36 17.56 6.08 0 11.88-3.08 15.44-7.12l7.16-33.2c-3.12-8-7.88-12.6-14.24-12.6Z' />
     </svg>
   );
-}
-
-function isAllowedVenmoUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === 'https:' && ALLOWED_VENMO_HOSTS.has(parsed.hostname)
-    );
-  } catch {
-    return false;
-  }
 }
 
 function BackButton({ onClick }: { readonly onClick: () => void }) {

@@ -3,32 +3,12 @@
  * Provides enhanced security validation beyond basic protocol checks
  */
 
-// Private IP ranges (IANA reserved)
-const PRIVATE_IP_PATTERNS = [
-  // IPv4 private ranges
-  /^127\./, // Loopback
-  /^10\./, // Class A private
-  /^172\.(1[6-9]|2\d|3[0-1])\./, // Class B private
-  /^192\.168\./, // Class C private
-  /^169\.254\./, // Link-local
-  /^0\./, // Current network
-  // IPv6 patterns (simplified matching)
-  /^::1$/, // Loopback
-  /^fc[\da-f]{2}:/i, // Unique local
-  /^fd[\da-f]{2}:/i, // Unique local
-  /^fe80:/i, // Link-local
-  /^::ffff:(127\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.|192\.168\.)/i, // IPv4-mapped
-];
-
-// Blocked hostnames
-const BLOCKED_HOSTNAMES = new Set([
-  'localhost',
-  'localhost.localdomain',
-  'local',
-  'broadcasthost',
-  'ip6-localhost',
-  'ip6-loopback',
-]);
+import {
+  BLOCKED_HOSTNAMES,
+  INTERNAL_DOMAIN_SUFFIXES,
+  isPrivateIpAddress,
+  METADATA_HOSTNAMES,
+} from '@/lib/constants/url-safety';
 
 // Dangerous protocols that should never be allowed
 const DANGEROUS_PROTOCOLS = new Set([
@@ -95,20 +75,20 @@ function isPrivateHostname(hostname: string): boolean {
 
   // Check for IPv6 bracket notation (e.g., [::1])
   const bracketedIpv6 = extractBracketedIpv6(lower);
-  if (bracketedIpv6 && isPrivateIp(bracketedIpv6)) {
+  if (bracketedIpv6 && isPrivateIpAddress(bracketedIpv6)) {
     return true;
   }
 
   // Check if hostname is a decimal IP representation (e.g., 2130706433 = 127.0.0.1)
   if (/^\d+$/.test(lower)) {
     const dottedQuad = decimalToIp(lower);
-    if (dottedQuad && isPrivateIp(dottedQuad)) {
+    if (dottedQuad && isPrivateIpAddress(dottedQuad)) {
       return true;
     }
   }
 
   // Check if hostname looks like an IP address
-  if (isPrivateIp(lower)) {
+  if (isPrivateIpAddress(lower)) {
     return true;
   }
 
@@ -118,9 +98,6 @@ function isPrivateHostname(hostname: string): boolean {
 /**
  * Check if a string is a private IP address
  */
-function isPrivateIp(ip: string): boolean {
-  return PRIVATE_IP_PATTERNS.some(pattern => pattern.test(ip));
-}
 
 /**
  * Create validation error result.
@@ -133,13 +110,6 @@ function createValidationError(error: string): UrlValidationResult {
 /**
  * Internal domain suffixes that are not allowed.
  */
-const INTERNAL_DOMAIN_SUFFIXES = [
-  '.internal',
-  '.local',
-  '.localhost',
-  '.localdomain',
-];
-
 /**
  * Cloud metadata endpoints to block (SSRF protection).
  *
@@ -149,11 +119,6 @@ const INTERNAL_DOMAIN_SUFFIXES = [
  *   cloud credentials or instance metadata.
  * - metadata.google.internal is the GCP-specific metadata endpoint.
  */
-const METADATA_PATTERNS = new Set([
-  '169.254.169.254',
-  'metadata.google.internal',
-]);
-
 /**
  * Validation rule with check function and error message.
  */
@@ -187,7 +152,7 @@ const URL_VALIDATION_RULES: ValidationRule[] = [
     error: 'URLs pointing to internal domains are not allowed',
   },
   {
-    check: hostname => METADATA_PATTERNS.has(hostname),
+    check: hostname => METADATA_HOSTNAMES.has(hostname),
     error: 'URLs pointing to cloud metadata endpoints are not allowed',
   },
 ];
