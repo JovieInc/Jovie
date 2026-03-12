@@ -18,7 +18,6 @@ import {
   connectAppleMusicArtist,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
@@ -30,6 +29,7 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
+import { PAGE_TOOLBAR_TAB_BUTTON_CLASS } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -719,10 +719,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                     variant='ghost'
                     size='sm'
                     onClick={handleNewRelease}
-                    className={cn(
-                      APP_CONTROL_BUTTON_CLASS,
-                      'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
-                    )}
+                    className={cn(PAGE_TOOLBAR_TAB_BUTTON_CLASS, 'px-3')}
                   >
                     <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
                     <span className='hidden sm:inline'>New Release</span>

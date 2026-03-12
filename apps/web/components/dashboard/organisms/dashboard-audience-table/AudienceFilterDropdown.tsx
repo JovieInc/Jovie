@@ -9,17 +9,14 @@ import {
   DropdownMenuTrigger,
   TooltipShortcut,
 } from '@jovie/ui';
-import {
-  Check,
-  Clock,
-  Filter,
-  MapPin,
-  RefreshCw,
-  Repeat,
-  X,
-  Zap,
-} from 'lucide-react';
 import { type ReactNode, useCallback, useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
+import {
+  PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+} from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import type { AudienceFilters } from './types';
 
@@ -32,27 +29,57 @@ const SEGMENT_OPTIONS: readonly {
   {
     id: 'highIntent',
     label: 'High Intent',
-    icon: <Zap className='h-3.5 w-3.5' />,
+    icon: (
+      <Icon
+        name='Bolt'
+        className={PAGE_TOOLBAR_ICON_CLASS}
+        strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+      />
+    ),
   },
   {
     id: 'returning',
     label: 'Returning',
-    icon: <RefreshCw className='h-3.5 w-3.5' />,
+    icon: (
+      <Icon
+        name='RefreshCw'
+        className={PAGE_TOOLBAR_ICON_CLASS}
+        strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+      />
+    ),
   },
   {
     id: 'frequent',
     label: '3+ Visits',
-    icon: <Repeat className='h-3.5 w-3.5' />,
+    icon: (
+      <Icon
+        name='RefreshCw'
+        className={PAGE_TOOLBAR_ICON_CLASS}
+        strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+      />
+    ),
   },
   {
     id: 'recent24h',
     label: 'Last 24h',
-    icon: <Clock className='h-3.5 w-3.5' />,
+    icon: (
+      <Icon
+        name='AlarmClock'
+        className={PAGE_TOOLBAR_ICON_CLASS}
+        strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+      />
+    ),
   },
   {
     id: 'touringCity',
     label: 'Touring City',
-    icon: <MapPin className='h-3.5 w-3.5' />,
+    icon: (
+      <Icon
+        name='MapPin'
+        className={PAGE_TOOLBAR_ICON_CLASS}
+        strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+      />
+    ),
   },
 ];
 
@@ -92,7 +119,7 @@ function ActiveFilterPill({
         className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-0)'
         aria-label={`Clear ${groupLabel} filter`}
       >
-        <X className='h-3 w-3' />
+        <Icon name='X' className='h-3 w-3' strokeWidth={2} />
       </button>
     </div>
   );
@@ -144,12 +171,18 @@ export function AudienceFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-[7px] border border-transparent text-(--linear-text-secondary) transition-colors duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
+                PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                (isOpen || hasAnyFilter) && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
                 buttonClassName
               )}
+              aria-pressed={isOpen || hasAnyFilter}
             >
-              <Filter className='h-3.5 w-3.5' />
-              <span className='hidden sm:inline'>Filter</span>
+              <Icon
+                name='Filter'
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+              <span className='sr-only md:not-sr-only'>Filter</span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>
@@ -178,7 +211,13 @@ export function AudienceFilterDropdown({
                   <span className='text-tertiary-token'>{opt.icon}</span>
                   <span>{opt.label}</span>
                 </div>
-                {checked && <Check className='h-3.5 w-3.5 text-primary' />}
+                {checked && (
+                  <Icon
+                    name='Check'
+                    className='h-3.5 w-3.5 text-primary'
+                    strokeWidth={2}
+                  />
+                )}
               </DropdownMenuItem>
             );
           })}
@@ -192,7 +231,7 @@ export function AudienceFilterDropdown({
                   onFiltersChange({ segments: [] });
                 }}
               >
-                <X className='h-3.5 w-3.5' />
+                <Icon name='X' className='h-3.5 w-3.5' strokeWidth={2} />
                 <span>Clear all filters</span>
               </DropdownMenuItem>
             </>

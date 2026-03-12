@@ -1,8 +1,13 @@
 'use client';
 
-import { Ghost, UserCheck, Users } from 'lucide-react';
 import { memo } from 'react';
-import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
+import { Icon } from '@/components/atoms/Icon';
+import {
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+  PageToolbarTabButton,
+} from '@/components/organisms/table';
+import { cn } from '@/lib/utils';
 import type { AudienceView } from './types';
 
 interface AudienceHeaderBadgeProps {
@@ -16,11 +21,11 @@ interface AudienceHeaderBadgeProps {
 
 const VIEW_OPTIONS: {
   value: AudienceView;
-  Icon: typeof Users;
+  icon: string;
 }[] = [
-  { value: 'all', Icon: Users },
-  { value: 'identified', Icon: UserCheck },
-  { value: 'anonymous', Icon: Ghost },
+  { value: 'all', icon: 'Users' },
+  { value: 'identified', icon: 'User' },
+  { value: 'anonymous', icon: 'EyeOff' },
 ];
 
 export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
@@ -45,24 +50,23 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   };
 
   return (
-    <div className='scrollbar-hide flex min-w-0 items-center overflow-x-auto'>
-      <AppSegmentControl
-        value={view}
-        onValueChange={onViewChange}
-        aria-label='Audience view filter'
-        surface='ghost'
-        className='backdrop-blur-sm'
-        triggerClassName='whitespace-nowrap transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1)'
-        options={VIEW_OPTIONS.map(({ value, Icon }) => ({
-          value,
-          label: (
-            <span className='inline-flex items-center gap-1.5'>
-              <Icon className='h-3 w-3' />
-              <span>{labels[value]}</span>
-            </span>
-          ),
-        }))}
-      />
+    <div className='scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto pb-px'>
+      {VIEW_OPTIONS.map(({ value, icon }) => (
+        <PageToolbarTabButton
+          key={value}
+          active={view === value}
+          onClick={() => onViewChange(value)}
+          className={cn('whitespace-nowrap')}
+          icon={
+            <Icon
+              name={icon}
+              className={PAGE_TOOLBAR_ICON_CLASS}
+              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+            />
+          }
+          label={labels[value]}
+        />
+      ))}
     </div>
   );
 });

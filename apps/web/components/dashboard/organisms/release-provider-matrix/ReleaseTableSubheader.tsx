@@ -10,16 +10,18 @@ import {
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
 import { memo, type ReactNode, useState } from 'react';
-import {
-  APP_CONTROL_BUTTON_CLASS,
-  AppIconButton,
-} from '@/components/atoms/AppIconButton';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import {
-  ACTION_BAR_BUTTON_CLASS,
-  ActionBar,
   ExportCSVButton,
+  PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+  PageToolbar,
+  PageToolbarActionButton,
+  PageToolbarTabButton,
 } from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
@@ -82,22 +84,6 @@ const RELEASE_VIEW_OPTIONS = [
   { value: 'releases', label: 'Releases', icon: 'Disc3' },
 ] as const;
 
-const RELEASE_VIEW_TAB_CLASS = cn(
-  APP_CONTROL_BUTTON_CLASS,
-  'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
-);
-
-const RELEASE_VIEW_TAB_ACTIVE_CLASS =
-  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
-
-const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
-  'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
-
-const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
-  ACTION_BAR_BUTTON_CLASS,
-  'h-8 rounded-[6px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
-);
-
 function ReleaseViewButtons({
   value,
   onChange,
@@ -113,21 +99,19 @@ function ReleaseViewButtons({
         const isActive = value === option.value;
 
         return (
-          <Button
+          <PageToolbarTabButton
             key={option.value}
-            type='button'
-            variant='ghost'
-            size='sm'
             onClick={() => onChange(option.value)}
-            className={cn(
-              RELEASE_VIEW_TAB_CLASS,
-              isActive && RELEASE_VIEW_TAB_ACTIVE_CLASS
-            )}
-            aria-pressed={isActive}
-          >
-            <Icon name={option.icon} className='h-3.5 w-3.5' strokeWidth={2} />
-            <span>{option.label}</span>
-          </Button>
+            active={isActive}
+            icon={
+              <Icon
+                name={option.icon}
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            label={option.label}
+          />
         );
       })}
     </div>
@@ -237,15 +221,15 @@ function LinearStyleDisplayMenu({
             variant='ghost'
             size='sm'
             className={cn(
-              RELEASE_TOOLBAR_BUTTON_CLASS,
-              isOpen && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS,
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
               triggerClassName
             )}
           >
             <Icon
               name='SlidersHorizontal'
-              className='h-3.5 w-3.5'
-              strokeWidth={2}
+              className={PAGE_TOOLBAR_ICON_CLASS}
+              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
             />
             <span className={cn(compact && 'sr-only md:not-sr-only')}>
               Display
@@ -318,62 +302,66 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex flex-col gap-0.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-1.5 md:min-h-[42px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-1'>
-      <div className='flex min-w-0 flex-1 items-center gap-1 md:w-auto md:flex-none'>
-        {onReleaseViewChange ? (
-          <ReleaseViewButtons
-            value={releaseView}
-            onChange={onReleaseViewChange}
-            className='w-full overflow-x-auto pb-px md:w-auto'
-          />
-        ) : null}
-        {primaryAction ? <div className='shrink-0'>{primaryAction}</div> : null}
-      </div>
-
-      {/* Right: Search + Filter + Display + Export */}
-      <ActionBar className='ml-auto flex w-full items-center justify-end gap-0.5 md:w-auto'>
-        {onSearchToggle && (
-          <TooltipShortcut label='Search' side='bottom'>
-            <Button
-              variant='ghost'
-              size='sm'
+    <PageToolbar
+      start={
+        <>
+          {onReleaseViewChange ? (
+            <ReleaseViewButtons
+              value={releaseView}
+              onChange={onReleaseViewChange}
+              className='w-full overflow-x-auto pb-px md:w-auto'
+            />
+          ) : null}
+          {primaryAction ? (
+            <div className='shrink-0'>{primaryAction}</div>
+          ) : null}
+        </>
+      }
+      end={
+        <>
+          {onSearchToggle ? (
+            <PageToolbarActionButton
+              label={<span className='sr-only md:not-sr-only'>Search</span>}
+              icon={
+                <Icon
+                  name='Search'
+                  className={PAGE_TOOLBAR_ICON_CLASS}
+                  strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+                />
+              }
               onClick={onSearchToggle}
-              className={cn(
-                RELEASE_TOOLBAR_BUTTON_CLASS,
-                isSearchOpen && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS
-              )}
-              aria-pressed={isSearchOpen}
-            >
-              <Icon name='Search' className='h-3.5 w-3.5' strokeWidth={2} />
-              <span className='sr-only md:not-sr-only'>Search</span>
-            </Button>
-          </TooltipShortcut>
-        )}
-        <ReleaseFilterDropdown
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          counts={counts}
-          buttonClassName={RELEASE_TOOLBAR_BUTTON_CLASS}
-        />
-        <LinearStyleDisplayMenu
-          groupByYear={groupByYear}
-          onGroupByYearChange={onGroupByYearChange}
-          releaseView={releaseView}
-          onReleaseViewChange={onReleaseViewChange}
-          triggerClassName={RELEASE_TOOLBAR_BUTTON_CLASS}
-          compact
-        />
-        <ExportCSVButton
-          getData={() => getReleasesForExport(releases, selectedIds)}
-          columns={RELEASES_CSV_COLUMNS}
-          filename='releases'
-          label='Export'
-          variant='ghost'
-          size='sm'
-          className={cn(RELEASE_TOOLBAR_BUTTON_CLASS, 'hidden md:inline-flex')}
-          tooltipLabel='Export'
-        />
-      </ActionBar>
-    </div>
+              active={isSearchOpen}
+              ariaPressed={isSearchOpen}
+              tooltipLabel='Search'
+            />
+          ) : null}
+          <ReleaseFilterDropdown
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            counts={counts}
+            buttonClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+          />
+          <LinearStyleDisplayMenu
+            groupByYear={groupByYear}
+            onGroupByYearChange={onGroupByYearChange}
+            releaseView={releaseView}
+            onReleaseViewChange={onReleaseViewChange}
+            triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+            compact
+          />
+          <ExportCSVButton
+            getData={() => getReleasesForExport(releases, selectedIds)}
+            columns={RELEASES_CSV_COLUMNS}
+            filename='releases'
+            label='Export'
+            variant='ghost'
+            size='sm'
+            chrome='page-toolbar'
+            className='hidden md:inline-flex'
+            tooltipLabel='Export'
+          />
+        </>
+      }
+    />
   );
 });

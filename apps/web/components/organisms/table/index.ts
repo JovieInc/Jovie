@@ -85,6 +85,20 @@ export type {
 } from './molecules/HeaderBulkActions';
 export { HeaderBulkActions } from './molecules/HeaderBulkActions';
 export { LoadingTableBody } from './molecules/LoadingTableBody';
+export {
+  PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_CONTAINER_CLASS,
+  PAGE_TOOLBAR_END_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+  PAGE_TOOLBAR_START_CLASS,
+  PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
+  PAGE_TOOLBAR_TAB_BUTTON_CLASS,
+  PageToolbar,
+  PageToolbarActionButton,
+  PageToolbarTabButton,
+} from './molecules/PageToolbar';
 export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
 export { SocialLinksCell } from './molecules/SocialLinksCell';
 export type { BulkAction } from './molecules/TableBulkActionsToolbar';
