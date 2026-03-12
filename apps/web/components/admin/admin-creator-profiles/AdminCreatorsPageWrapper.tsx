@@ -40,7 +40,6 @@ export function AdminCreatorsPageWrapper(
         />
         <IngestProfileDropdown
           onIngestPending={handleIngestPending}
-          buttonClassName='h-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
           hideLabelOnMobile
         />
         <DrawerToggleButton />

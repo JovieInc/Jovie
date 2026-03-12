@@ -10,6 +10,11 @@ import {
 } from '@jovie/ui';
 import { useMemo, useRef } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import {
+  DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS,
+  DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
+} from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { cn } from '@/lib/utils';
 import { INGEST_NETWORKS } from './ingest-network-options';
 import type { IngestProfileDropdownProps } from './types';
 import { useIngestProfile } from './useIngestProfile';
@@ -54,7 +59,11 @@ export function IngestProfileDropdown({
           type='button'
           size='sm'
           variant='ghost'
-          className={buttonClassName}
+          className={cn(
+            DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
+            open && DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS,
+            buttonClassName
+          )}
         >
           <Icon name='Plus' className='h-3.5 w-3.5' />
           <span className={hideLabelOnMobile ? 'hidden sm:inline' : undefined}>

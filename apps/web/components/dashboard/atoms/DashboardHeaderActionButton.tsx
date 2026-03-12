@@ -8,6 +8,20 @@ import {
 } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
+export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
+  APP_CONTROL_BUTTON_CLASS,
+  'px-3 text-[13px] [&_svg]:h-3.5 [&_svg]:w-3.5'
+);
+
+export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
+  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+
+export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS =
+  'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)';
+
+export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS =
+  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+
 export interface DashboardHeaderActionButtonProps {
   readonly ariaLabel: string;
   readonly pressed?: boolean;
@@ -40,10 +54,8 @@ export function DashboardHeaderActionButton({
         aria-pressed={pressed}
         disabled={disabled}
         className={cn(
-          APP_CONTROL_BUTTON_CLASS,
-          'px-3 text-[13px] [&_svg]:h-3.5 [&_svg]:w-3.5',
-          pressed &&
-            'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)',
+          DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
+          pressed && DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS,
           className
         )}
       >
@@ -62,9 +74,8 @@ export function DashboardHeaderActionButton({
       aria-pressed={pressed}
       disabled={disabled}
       className={cn(
-        'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)',
-        pressed &&
-          'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)',
+        DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
+        pressed && DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS,
         className
       )}
     >
