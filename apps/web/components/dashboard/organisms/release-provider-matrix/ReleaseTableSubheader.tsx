@@ -84,7 +84,7 @@ const RELEASE_VIEW_OPTIONS = [
 
 const RELEASE_VIEW_TAB_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-10 rounded-[10px] border-(--linear-border-subtle) bg-transparent px-4.5 text-[13.5px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-4 [&_svg]:w-4'
+  'h-9 rounded-[9px] border-(--linear-border-subtle) bg-transparent px-4 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
@@ -92,7 +92,7 @@ const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
 
 const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-10 rounded-[8px] border border-transparent bg-transparent px-3 text-[13.5px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-4 [&_svg]:w-4'
+  'h-9 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 function ReleaseViewButtons({
@@ -105,7 +105,7 @@ function ReleaseViewButtons({
   readonly className?: string;
 }) {
   return (
-    <div className={cn('flex items-center gap-1.5', className)}>
+    <div className={cn('flex items-center gap-1', className)}>
       {RELEASE_VIEW_OPTIONS.map(option => {
         const isActive = value === option.value;
 
@@ -122,7 +122,11 @@ function ReleaseViewButtons({
             )}
             aria-pressed={isActive}
           >
-            <Icon name={option.icon} className='h-4 w-4' strokeWidth={2.35} />
+            <Icon
+              name={option.icon}
+              className='h-3.5 w-3.5'
+              strokeWidth={2.15}
+            />
             <span>{option.label}</span>
           </Button>
         );
@@ -154,7 +158,7 @@ function ReleaseViewSegmentedControl({
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='h-auto min-h-16 px-2 py-3 text-[13px]'
+      triggerClassName='h-auto min-h-14 px-2 py-2.5 text-[12.5px]'
       aria-label='Choose releases view'
     />
   );
@@ -241,8 +245,8 @@ function LinearStyleDisplayMenu({
           >
             <Icon
               name='SlidersHorizontal'
-              className='h-4 w-4'
-              strokeWidth={2.35}
+              className='h-3.5 w-3.5'
+              strokeWidth={2.15}
             />
             <span className={cn(compact && 'sr-only md:not-sr-only')}>
               Display
@@ -315,8 +319,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex flex-col gap-2 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-2.5 md:min-h-[56px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-2.5'>
-      <div className='flex min-w-0 flex-1 items-center gap-1.5 md:w-auto md:flex-none'>
+    <div className='flex flex-col gap-1.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-2 md:min-h-[50px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-2'>
+      <div className='flex min-w-0 flex-1 items-center gap-1 md:w-auto md:flex-none'>
         {onReleaseViewChange ? (
           <ReleaseViewButtons
             value={releaseView}
@@ -328,7 +332,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       </div>
 
       {/* Right: Search + Filter + Display + Export */}
-      <ActionBar className='ml-auto flex w-full items-center justify-end gap-0 md:w-auto'>
+      <ActionBar className='ml-auto flex w-full items-center justify-end gap-0.5 md:w-auto'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
             <Button
@@ -341,7 +345,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               )}
               aria-pressed={isSearchOpen}
             >
-              <Icon name='Search' className='h-4 w-4' strokeWidth={2.35} />
+              <Icon name='Search' className='h-3.5 w-3.5' strokeWidth={2.15} />
               <span className='sr-only md:not-sr-only'>Search</span>
             </Button>
           </TooltipShortcut>

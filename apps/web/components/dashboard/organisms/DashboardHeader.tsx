@@ -72,7 +72,7 @@ export function DashboardHeader({
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex min-w-0 flex-1 items-center gap-1.5 tracking-[-0.01em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[16px] font-[520] tracking-[-0.015em] text-primary-token'>
+            <span className='truncate text-[15px] font-[510] tracking-[-0.012em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
