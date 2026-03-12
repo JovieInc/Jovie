@@ -1,6 +1,6 @@
-import { Card, CardContent } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 export interface KpiItemProps {
   readonly title: string;
@@ -18,8 +18,8 @@ export function KpiItem({
   iconClassName,
 }: Readonly<KpiItemProps>) {
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardContent className='space-y-2 p-4'>
+    <ContentSurfaceCard className='p-4'>
+      <div className='space-y-2'>
         <div className='flex items-center gap-1.5'>
           <Icon
             className={`h-4 w-4 ${iconClassName || 'text-tertiary-token'}`}
@@ -30,7 +30,7 @@ export function KpiItem({
           {value}
         </p>
         <div className='text-app text-secondary-token'>{metadata}</div>
-      </CardContent>
-    </Card>
+      </div>
+    </ContentSurfaceCard>
   );
 }

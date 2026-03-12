@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { OutreachKpis } from '@/components/admin/outreach/OutreachKpis';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface QueueResponse {
   items: unknown[];
@@ -65,18 +66,18 @@ export default function AdminOutreachPage() {
 
   if (loading) {
     return (
-      <div className='flex items-center justify-center py-16'>
+      <ContentSurfaceCard className='flex items-center justify-center py-16'>
         <LoadingSpinner size='md' tone='muted' />
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
+    <div className='flex flex-col gap-6'>
       {loadError && (
-        <p className='rounded-md border border-subtle bg-surface-2 px-3 py-2 text-sm text-secondary-token'>
-          {loadError}
-        </p>
+        <ContentSurfaceCard className='rounded-[10px] bg-(--linear-bg-surface-0) px-3 py-2 text-sm text-secondary-token'>
+          <p>{loadError}</p>
+        </ContentSurfaceCard>
       )}
       <OutreachKpis counts={counts} />
     </div>

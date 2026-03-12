@@ -5,6 +5,8 @@ import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface ReviewLead {
   id: string;
@@ -118,18 +120,17 @@ export default function AdminOutreachReviewPage() {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
-      <section className='rounded-lg border border-subtle p-4 sm:p-6'>
-        <div className='mb-4'>
-          <h2 className='text-sm font-semibold text-primary-token'>
-            Manual Review ({total})
-          </h2>
-        </div>
+    <div className='flex flex-col gap-6'>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeader
+          title={`Manual Review (${total})`}
+          className='min-h-0 px-4 py-3 sm:px-6'
+        />
 
-        <div className='overflow-x-auto'>
+        <div className='overflow-x-auto px-4 py-4 sm:px-6'>
           <table className='w-full text-xs'>
             <thead>
-              <tr className='border-b border-subtle text-left text-secondary-token'>
+              <tr className='border-b border-(--linear-border-subtle) text-left text-secondary-token'>
                 <th className='pb-2 pr-3 font-medium'>Name</th>
                 <th className='pb-2 pr-3 font-medium'>Priority</th>
                 <th className='pb-2 pr-3 font-medium'>Fit Score</th>
@@ -143,7 +144,7 @@ export default function AdminOutreachReviewPage() {
               {renderReviewRows(loading, leads, lead => (
                 <tr
                   key={lead.id}
-                  className='border-b border-subtle hover:bg-white/[0.03]'
+                  className='border-b border-(--linear-border-subtle) transition-colors hover:bg-(--linear-bg-surface-0)'
                 >
                   <td className='py-2.5 pr-3'>
                     <span className='font-medium text-primary-token'>
@@ -216,7 +217,7 @@ export default function AdminOutreachReviewPage() {
         </div>
 
         {totalPages > 1 && (
-          <div className='mt-3 flex items-center justify-between'>
+          <div className='flex items-center justify-between border-t border-(--linear-border-subtle) px-4 py-3 sm:px-6'>
             <span className='text-xs text-secondary-token'>
               Page {page} of {totalPages}
             </span>
@@ -226,6 +227,7 @@ export default function AdminOutreachReviewPage() {
                 size='sm'
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1 || loading}
+                className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
               >
                 <ChevronLeft className='size-4' />
               </Button>
@@ -234,13 +236,14 @@ export default function AdminOutreachReviewPage() {
                 size='sm'
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages || loading}
+                className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
               >
                 <ChevronRight className='size-4' />
               </Button>
             </div>
           </div>
         )}
-      </section>
+      </ContentSurfaceCard>
     </div>
   );
 }
