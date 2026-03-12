@@ -43,8 +43,8 @@ export function DrawerLoadingSkeleton({
 
         <div className='shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-2.5 pb-2'>
           <div className='space-y-2'>
-            <div className='flex items-start gap-2.5'>
-              <div className='h-[72px] w-[72px] shrink-0 rounded-[10px] skeleton' />
+            <div className='flex items-start gap-3'>
+              <div className='h-[84px] w-[84px] shrink-0 rounded-[10px] skeleton' />
               <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
                 <div className='h-4 w-2/3 rounded skeleton' />
                 <div className='h-3 w-1/2 rounded skeleton' />
