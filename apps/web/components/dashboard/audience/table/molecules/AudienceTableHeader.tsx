@@ -8,8 +8,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import type { HeaderCheckboxState } from '@/components/organisms/table';
+import { SortableHeaderButton } from '@/components/organisms/table/SortableHeaderButton';
 import { cn } from '@/lib/utils';
 import type { AudienceMode } from '../types';
 
