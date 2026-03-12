@@ -380,7 +380,7 @@ interface ReleaseFilterDropdownProps {
 }
 
 const FILTER_TRIGGER_ACTIVE_CLASS =
-  'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
 export function ReleaseFilterDropdown({
   filters,
@@ -505,7 +505,7 @@ export function ReleaseFilterDropdown({
               )}
               aria-pressed={isOpen || hasAnyFilter}
             >
-              <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2.15} />
+              <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2} />
               <span className='sr-only md:not-sr-only'>Filter</span>
             </Button>
           </DropdownMenuTrigger>

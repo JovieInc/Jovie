@@ -88,7 +88,7 @@ const RELEASE_VIEW_TAB_CLASS = cn(
 );
 
 const RELEASE_VIEW_TAB_ACTIVE_CLASS =
-  'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
 const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
   'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
@@ -125,11 +125,7 @@ function ReleaseViewButtons({
             )}
             aria-pressed={isActive}
           >
-            <Icon
-              name={option.icon}
-              className='h-3.5 w-3.5'
-              strokeWidth={2.15}
-            />
+            <Icon name={option.icon} className='h-3.5 w-3.5' strokeWidth={2} />
             <span>{option.label}</span>
           </Button>
         );
@@ -249,7 +245,7 @@ function LinearStyleDisplayMenu({
             <Icon
               name='SlidersHorizontal'
               className='h-3.5 w-3.5'
-              strokeWidth={2.15}
+              strokeWidth={2}
             />
             <span className={cn(compact && 'sr-only md:not-sr-only')}>
               Display
@@ -348,7 +344,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               )}
               aria-pressed={isSearchOpen}
             >
-              <Icon name='Search' className='h-3.5 w-3.5' strokeWidth={2.15} />
+              <Icon name='Search' className='h-3.5 w-3.5' strokeWidth={2} />
               <span className='sr-only md:not-sr-only'>Search</span>
             </Button>
           </TooltipShortcut>

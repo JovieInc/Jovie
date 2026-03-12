@@ -724,11 +724,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                       'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
                     )}
                   >
-                    <Icon
-                      name='Plus'
-                      className='h-3.5 w-3.5'
-                      strokeWidth={2.15}
-                    />
+                    <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
                     <span className='hidden sm:inline'>New Release</span>
                   </Button>
                 ) : undefined
