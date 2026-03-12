@@ -16,7 +16,10 @@ import {
   DrawerSection,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { UnifiedTable } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
 interface FeedbackRow {
@@ -195,23 +198,26 @@ export function AdminFeedbackTable({
           title='Feedback'
           subtitle='Triage product feedback and close the loop with clear status.'
         />
-        <AdminTableSubheader>
-          <div className='flex items-center justify-between'>
+        <AdminTableSubheader
+          start={
             <span className='text-xs text-secondary-token'>
               {rows.length} item{rows.length === 1 ? '' : 's'}
             </span>
+          }
+          end={
             <Button
               type='button'
               variant='ghost'
               size='sm'
               onClick={copyAllAsMarkdown}
               disabled={rows.length === 0}
+              className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
             >
-              <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
-              Copy All as Markdown
+              <ClipboardCopy className='h-3.5 w-3.5' />
+              <span>Copy All as Markdown</span>
             </Button>
-          </div>
-        </AdminTableSubheader>
+          }
+        />
         <AdminTableShell testId='admin-feedback-table'>
           {() => (
             <UnifiedTable

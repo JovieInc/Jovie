@@ -130,9 +130,9 @@ export function ActivityTableUnified({
         title='Activity'
         subtitle='Monitor operational actions and recent system outcomes.'
       />
-      <AdminTableSubheader>
-        <p className='text-xs text-secondary-token'>Last 7 days.</p>
-      </AdminTableSubheader>
+      <AdminTableSubheader
+        start={<p className='text-xs text-secondary-token'>Last 7 days.</p>}
+      />
       <div className='overflow-x-auto'>
         <UnifiedTable
           data={items}

@@ -38,6 +38,12 @@ vi.mock('@/components/admin/table/AdminTableShell', () => ({
 vi.mock('@/components/organisms/table', () => ({
   convertContextMenuItems: () => [],
   ExportCSVButton: () => <button type='button'>Export</button>,
+  PageToolbar: ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
+    <div>
+      {start}
+      {end}
+    </div>
+  ),
   TableBulkActionsToolbar: () => null,
   UnifiedTable: () => <div data-testid='desktop-table'>Desktop table</div>,
   useRowSelection: (rowIds: string[]) => mockUseRowSelection(rowIds),

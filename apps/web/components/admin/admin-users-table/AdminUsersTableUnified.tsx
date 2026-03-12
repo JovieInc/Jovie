@@ -439,15 +439,15 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   title='Users'
                   subtitle='Review lifecycle state, profile completion, and suppression health.'
                 />
-                <AdminTableSubheader>
-                  <div className='flex flex-wrap items-center justify-between gap-2 sm:gap-3'>
+                <AdminTableSubheader
+                  start={
                     <div className='text-xs text-secondary-token tabular-nums'>
-                      <span className='hidden sm:inline'>Showing </span>
-                      {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                      {total.toLocaleString()}
-                      <span className='hidden sm:inline'> users</span>
+                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                      {total.toLocaleString()} users
                     </div>
-                    <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
+                  }
+                  end={
+                    <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'>
                       <form
                         action={APP_ROUTES.ADMIN_USERS}
                         method='get'
@@ -487,10 +487,12 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         filename={USERS_CSV_FILENAME_PREFIX}
                         disabled={users.length === 0}
                         ariaLabel='Export users to CSV file'
+                        chrome='page-toolbar'
+                        className='whitespace-nowrap'
                       />
                     </div>
-                  </div>
-                </AdminTableSubheader>
+                  }
+                />
               </>
             }
           >

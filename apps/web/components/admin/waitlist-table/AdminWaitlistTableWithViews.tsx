@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Settings2 } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -12,14 +12,14 @@ import {
   KanbanBoard,
   type KanbanColumn,
 } from '@/components/admin/table/organisms/KanbanBoard';
+import { Icon } from '@/components/atoms/Icon';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import {
-  ACTION_BAR_BUTTON_CLASS,
-  ActionBar,
-  ActionBarButton,
-  ActionBarItem,
   DisplayMenuDropdown,
   ExportCSVButton,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+  PageToolbarActionButton,
   TableBulkActionsToolbar,
   useRowSelection,
   type ViewMode,
@@ -231,51 +231,51 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               title='Waitlist'
               subtitle='Track pipeline state and move prospects from new to claimed.'
             />
-            <AdminTableSubheader>
-              <div className='flex items-center justify-between gap-3'>
+            <AdminTableSubheader
+              start={
                 <div className='text-xs text-secondary-token tabular-nums'>
-                  <span className='hidden sm:inline'>Showing </span>
-                  {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                  {total.toLocaleString()}
-                  <span className='hidden sm:inline'> entries</span>
+                  Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                  {total.toLocaleString()} entries
                 </div>
-                <ActionBar>
-                  <ActionBarItem tooltipLabel='Export'>
-                    <ExportCSVButton<WaitlistEntryRow>
-                      getData={() => entries}
-                      columns={waitlistCSVColumns}
-                      filename={WAITLIST_CSV_FILENAME_PREFIX}
-                      disabled={entries.length === 0}
-                      ariaLabel='Export waitlist to CSV file'
-                      variant='ghost'
-                      className={ACTION_BAR_BUTTON_CLASS}
-                      label='Export'
-                    />
-                  </ActionBarItem>
-                  <ActionBarItem
-                    tooltipLabel='Display'
-                    shortcut={`${GLYPH_SHIFT}V`}
-                  >
-                    <DisplayMenuDropdown
-                      trigger={
-                        <ActionBarButton
-                          label='Display'
-                          icon={<Settings2 className='h-3.5 w-3.5' />}
-                          mobileIconOnly={true}
-                          className={ACTION_BAR_BUTTON_CLASS}
-                        />
-                      }
-                      viewMode={viewMode}
-                      availableViewModes={['list', 'board']}
-                      onViewModeChange={setViewMode}
-                      groupingEnabled={groupingEnabled}
-                      onGroupingToggle={setGroupingEnabled}
-                      groupingLabel='Group by status'
-                    />
-                  </ActionBarItem>
-                </ActionBar>
-              </div>
-            </AdminTableSubheader>
+              }
+              end={
+                <>
+                  <ExportCSVButton<WaitlistEntryRow>
+                    getData={() => entries}
+                    columns={waitlistCSVColumns}
+                    filename={WAITLIST_CSV_FILENAME_PREFIX}
+                    disabled={entries.length === 0}
+                    ariaLabel='Export waitlist to CSV file'
+                    chrome='page-toolbar'
+                    className='whitespace-nowrap'
+                    label='Export'
+                  />
+                  <DisplayMenuDropdown
+                    trigger={
+                      <PageToolbarActionButton
+                        label='Display'
+                        icon={
+                          <Icon
+                            name='SlidersHorizontal'
+                            className={PAGE_TOOLBAR_ICON_CLASS}
+                            strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+                          />
+                        }
+                        active={viewMode !== 'list' || groupingEnabled}
+                        tooltipLabel='Display'
+                        tooltipShortcut={`${GLYPH_SHIFT}V`}
+                      />
+                    }
+                    viewMode={viewMode}
+                    availableViewModes={['list', 'board']}
+                    onViewModeChange={setViewMode}
+                    groupingEnabled={groupingEnabled}
+                    onGroupingToggle={setGroupingEnabled}
+                    groupingLabel='Group by status'
+                  />
+                </>
+              }
+            />
           </>
         }
       >

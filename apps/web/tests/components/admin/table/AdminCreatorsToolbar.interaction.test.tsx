@@ -1,6 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
@@ -23,6 +24,12 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  PageToolbar: ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
+    <div>
+      {start}
+      {end}
+    </div>
+  ),
   ExportCSVButton: ({ disabled }: { disabled: boolean }) => (
     <button type='button' disabled={disabled}>
       Export

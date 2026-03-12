@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { PageToolbar } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 interface AdminTableHeaderProps {
@@ -9,7 +10,9 @@ interface AdminTableHeaderProps {
 }
 
 interface AdminTableSubheaderProps {
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
+  readonly start?: ReactNode;
+  readonly end?: ReactNode;
   readonly className?: string;
 }
 
@@ -41,16 +44,27 @@ export function AdminTableHeader({
 
 export function AdminTableSubheader({
   children,
+  start,
+  end,
   className,
 }: Readonly<AdminTableSubheaderProps>) {
+  const hasToolbar = start !== undefined || end !== undefined;
+  const toolbarContent = hasToolbar ? (
+    <PageToolbar start={start ?? null} end={end} />
+  ) : (
+    children
+  );
+
   return (
     <div
       className={cn(
-        'border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-2',
+        hasToolbar
+          ? 'bg-(--linear-bg-surface-0)'
+          : 'border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-2',
         className
       )}
     >
-      {children}
+      {toolbarContent}
     </div>
   );
 }
