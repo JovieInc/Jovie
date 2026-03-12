@@ -484,6 +484,10 @@ test.describe('Content Gate — Authenticated Pages', () => {
 
   test('Settings pages render content', async ({ page }, testInfo) => {
     test.setTimeout(fastIteration ? 180_000 : 240_000);
+    test.skip(
+      fastIteration,
+      'Settings content gate duplicates dedicated settings chaos coverage in the fast lane'
+    );
 
     try {
       await ensureSignedInUser(page);
