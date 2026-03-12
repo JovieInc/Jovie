@@ -1,12 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getCurrentUserProfile } from '@/lib/auth/session';
-import {
-  getReleaseById,
-  getTracksForReleaseWithProviders,
-} from '@/lib/discography/queries';
-import { buildSmartLinkPath } from '@/lib/discography/utils';
-import { mapProviderLinksToViewModel } from '@/lib/discography/view-models';
+import { loadReleaseTracksForProfile } from '@/lib/discography/release-track-loader';
 
 export const runtime = 'nodejs';
 
@@ -38,47 +33,25 @@ export async function GET(
 
     const { releaseId } = await params;
 
-    // Verify the release belongs to the user's profile
-    const release = await getReleaseById(releaseId);
-    if (release?.creatorProfileId !== profile.id) {
-      return NextResponse.json(
-        { error: 'Release not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    const { tracks } = await getTracksForReleaseWithProviders(releaseId);
-
     const handle = profile.usernameNormalized ?? profile.username ?? '';
+    const tracks = await loadReleaseTracksForProfile({
+      releaseId,
+      profileId: profile.id,
+      profileHandle: handle,
+    });
 
-    // Map to shape needed by the sidebar tracklist + actions menu
-    const mapped = tracks.map(track => ({
-      id: track.id,
-      releaseId: track.releaseId,
-      title: track.title,
-      slug: track.slug,
-      smartLinkPath: buildSmartLinkPath(handle, track.slug),
-      trackNumber: track.trackNumber,
-      discNumber: track.discNumber,
-      durationMs: track.durationMs,
-      isrc: track.isrc,
-      isExplicit: track.isExplicit,
-      previewUrl: track.previewUrl,
-      audioUrl: track.audioUrl,
-      audioFormat: track.audioFormat,
-      providers: mapProviderLinksToViewModel({
-        providerLinks: track.providerLinks,
-        profileHandle: handle,
-        slug: track.slug,
-      }),
-    }));
-
-    return NextResponse.json(mapped, { headers: NO_STORE_HEADERS });
+    return NextResponse.json(tracks, { headers: NO_STORE_HEADERS });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (error instanceof TypeError && error.message === 'Release not found') {
+      return NextResponse.json(
+        { error: 'Release not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
     Sentry.captureException(error);
