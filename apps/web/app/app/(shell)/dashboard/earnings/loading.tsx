@@ -19,7 +19,7 @@ export default function EarningsLoading() {
         {STAT_KEYS.map(key => (
           <div
             key={key}
-            className='space-y-2 rounded-xl border border-subtle bg-surface-1 p-4'
+            className='space-y-2 rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-4'
           >
             <div className='flex items-center gap-2'>
               <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
@@ -37,12 +37,12 @@ export default function EarningsLoading() {
       {/* Sharing tools — stacked mobile, 2 cols sm+ */}
       <div className='grid gap-4 sm:grid-cols-2'>
         {/* Tip link card */}
-        <div className='space-y-3 rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+        <div className='space-y-3 rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-4 sm:p-5'>
           <div className='flex items-center gap-2'>
             <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
             <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
           </div>
-          <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
+          <div className='flex items-center gap-2 rounded-lg border border-(--linear-border-subtle) bg-(--linear-app-surface-elevated) px-3 py-2.5'>
             <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
             <LoadingSkeleton height='h-7' width='w-14' rounded='md' />
           </div>
@@ -50,13 +50,13 @@ export default function EarningsLoading() {
         </div>
 
         {/* QR code card */}
-        <div className='space-y-4 rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+        <div className='space-y-4 rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-4 sm:p-5'>
           <div className='flex items-center gap-2'>
             <LoadingSkeleton height='h-7' width='w-7' rounded='lg' />
             <LoadingSkeleton height='h-4' width='w-16' rounded='sm' />
           </div>
           <div className='flex flex-col items-center gap-4'>
-            <div className='w-full rounded-xl bg-surface-0 p-4 sm:p-6'>
+            <div className='w-full rounded-xl bg-(--linear-app-surface-elevated) p-4 sm:p-6'>
               <LoadingSkeleton
                 height='h-40'
                 width='w-40'
