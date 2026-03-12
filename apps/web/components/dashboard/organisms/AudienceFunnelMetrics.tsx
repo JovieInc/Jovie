@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 
@@ -79,7 +80,7 @@ export function AudienceFunnelMetrics() {
       : undefined;
 
   return (
-    <div className='flex items-center gap-1 rounded-lg border border-subtle bg-surface-1 px-4 py-3'>
+    <ContentSurfaceCard className='flex items-center gap-1 px-4 py-3'>
       <FunnelStep
         label='Views'
         value={fmt.format(profileViews)}
@@ -99,6 +100,6 @@ export function AudienceFunnelMetrics() {
         rate={subscriberRate}
         loading={isLoading}
       />
-    </div>
+    </ContentSurfaceCard>
   );
 }

@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import {
   ArrowRight,
   DollarSign,
@@ -7,6 +6,8 @@ import {
   TrendingUp,
   UserCheck,
 } from 'lucide-react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 interface OutreachPipelineCardProps {
@@ -65,7 +66,7 @@ function PipelineStep({
   iconClassName,
 }: PipelineStepProps) {
   return (
-    <div className='flex-1 rounded-lg bg-surface-2 p-3'>
+    <div className='flex-1 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3'>
       <div className='flex items-center gap-1.5'>
         <Icon className={`size-3.5 ${iconClassName}`} />
         <span className='text-2xs text-tertiary-token'>{label}</span>
@@ -84,25 +85,21 @@ export function OutreachPipelineCard({
   const hasOutreachData = metrics.outreachSent7d > 0;
 
   return (
-    <Card className='h-full border-subtle bg-surface-1/80'>
-      <CardHeader className='space-y-1 p-5 pb-3'>
-        <div className='flex items-start justify-between gap-2'>
-          <div>
-            <CardTitle className='text-lg tracking-tight'>
-              Outreach Pipeline
-            </CardTitle>
-            <p className='text-2xs text-tertiary-token'>
-              Last 7 days &middot; Email &amp; DM campaigns
-            </p>
-          </div>
-          {hasOutreachData && (
+    <ContentSurfaceCard className='h-full overflow-hidden'>
+      <ContentSectionHeader
+        title='Outreach Pipeline'
+        subtitle='Last 7 days · Email & DM campaigns'
+        actions={
+          hasOutreachData ? (
             <span className='text-app font-medium tabular-nums text-primary-token'>
               {formatPercent(metrics.claimRate)} conv.
             </span>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className='space-y-4 p-5 pt-0'>
+          ) : null
+        }
+        className='min-h-0 px-5 py-4'
+        actionsClassName='shrink-0'
+      />
+      <div className='space-y-4 px-5 py-4'>
         <div className='flex items-center gap-2'>
           <PipelineStep
             label='Sent'
@@ -133,7 +130,7 @@ export function OutreachPipelineCard({
           </p>
         )}
 
-        <div className='space-y-2 rounded-lg bg-surface-2 p-3'>
+        <div className='space-y-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3'>
           <p className='text-2xs font-medium text-tertiary-token'>
             Conversion rates
           </p>
@@ -156,7 +153,7 @@ export function OutreachPipelineCard({
             iconClassName='text-accent'
           />
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </ContentSurfaceCard>
   );
 }

@@ -1,12 +1,13 @@
 'use client';
 
-import { Card, CardContent, CardHeader } from '@jovie/ui';
 import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { BatchIngestForm } from '@/components/admin/BatchIngestForm';
 import type { IngestHistoryRow } from '@/components/admin/ingest-history.types';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { cn } from '@/lib/utils';
 
@@ -71,42 +72,35 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
       <PageContent>
         <div className='space-y-6'>
           {/* Single profile ingest */}
-          <Card>
-            <CardHeader className='pb-2'>
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-                <div>
-                  <h2 className='text-sm font-medium text-primary-token'>
-                    Single profile ingest
-                  </h2>
-                  <p className='text-xs text-tertiary-token'>
-                    Ingest a creator by URL or Spotify artist name search.
-                  </p>
-                </div>
+          <ContentSurfaceCard>
+            <ContentSectionHeader
+              title='Single profile ingest'
+              subtitle='Ingest a creator by URL or Spotify artist name search.'
+              actions={
                 <IngestProfileDropdown onIngestPending={handleIngestComplete} />
-              </div>
-            </CardHeader>
-          </Card>
+              }
+              className='min-h-0 px-4 py-3'
+              actionsClassName='shrink-0'
+            />
+          </ContentSurfaceCard>
 
           {/* Batch ingest */}
           <BatchIngestForm onComplete={handleIngestComplete} />
 
           {/* Ingest history */}
-          <Card>
-            <CardHeader className='pb-2'>
-              <h2 className='text-sm font-medium text-primary-token'>
-                Recent ingest history
-              </h2>
-              <p className='text-xs text-tertiary-token'>
-                Last {history.length} ingest events from the audit log.
-              </p>
-            </CardHeader>
-            <CardContent>
+          <ContentSurfaceCard className='overflow-hidden'>
+            <ContentSectionHeader
+              title='Recent ingest history'
+              subtitle={`Last ${history.length} ingest events from the audit log.`}
+              className='min-h-0 px-4 py-3'
+            />
+            <div className='px-4 py-3'>
               {history.length === 0 ? (
                 <p className='py-6 text-center text-sm text-secondary-token'>
                   No ingest events recorded yet.
                 </p>
               ) : (
-                <ul className='max-h-[480px] divide-y divide-subtle overflow-y-auto'>
+                <ul className='max-h-[480px] divide-y divide-(--linear-border-subtle) overflow-y-auto'>
                   {history.map(row => {
                     const config = EVENT_LABELS[row.type] ?? {
                       label: row.type,
@@ -147,8 +141,8 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                   })}
                 </ul>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ContentSurfaceCard>
         </div>
       </PageContent>
     </PageShell>

@@ -2,6 +2,7 @@
 
 import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { useInsightsSummaryQuery } from '@/lib/queries/useInsightsQuery';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
@@ -11,7 +12,7 @@ export function InsightsSummaryWidget() {
 
   if (isLoading) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+      <ContentSurfaceCard className='p-4'>
         <div className='flex items-center gap-2'>
           <div className='h-4 w-4 rounded skeleton' />
           <div className='h-3 w-24 rounded skeleton' />
@@ -20,7 +21,7 @@ export function InsightsSummaryWidget() {
           <div className='h-3 w-full rounded skeleton' />
           <div className='h-3 w-3/4 rounded skeleton' />
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
@@ -32,24 +33,27 @@ export function InsightsSummaryWidget() {
   }
 
   return (
-    <section
-      className='rounded-xl border border-subtle bg-surface-1 p-4'
+    <ContentSurfaceCard
+      as='section'
+      className='p-4'
       aria-label='AI Insights summary'
     >
       {/* Header */}
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-2'>
-          <Sparkles className='h-4 w-4 text-purple-600 dark:text-purple-400' />
+          <div className='flex h-7 w-7 items-center justify-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+            <Sparkles className='h-3.5 w-3.5 text-(--linear-text-secondary)' />
+          </div>
           <span className='text-[13px] font-[510] text-primary-token'>
             AI Insights
           </span>
-          <span className='rounded-full bg-purple-500/10 px-1.5 py-0.5 text-[10px] font-[510] text-purple-600 dark:bg-purple-500/15 dark:text-purple-400'>
+          <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-text-secondary)'>
             {totalActive}
           </span>
         </div>
         <Link
           href={APP_ROUTES.INSIGHTS}
-          className='text-[11px] font-[510] text-accent-token hover:underline'
+          className='text-[11px] font-[510] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
         >
           View all &rarr;
         </Link>
@@ -71,6 +75,6 @@ export function InsightsSummaryWidget() {
           </li>
         ))}
       </ul>
-    </section>
+    </ContentSurfaceCard>
   );
 }

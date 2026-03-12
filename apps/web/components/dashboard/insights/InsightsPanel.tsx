@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
 import { useInsightsQuery } from '@/lib/queries/useInsightsQuery';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
@@ -61,22 +62,31 @@ function InsightsPanelContent({
 }: InsightsPanelContentProps) {
   if (isLoading) {
     return (
-      <div className='flex items-center justify-center py-12'>
-        <Icon
-          name='Loader2'
-          className='h-5 w-5 animate-spin text-tertiary-token'
-        />
+      <div className='space-y-3' aria-hidden='true'>
+        {['high', 'medium', 'low'].map(key => (
+          <ContentSurfaceCard
+            key={key}
+            className='flex items-start gap-3 p-4 sm:p-5'
+          >
+            <div className='h-8 w-8 rounded-lg skeleton motion-reduce:animate-none' />
+            <div className='min-w-0 flex-1 space-y-2'>
+              <div className='h-4 w-40 rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='h-3 w-4/5 rounded-sm skeleton motion-reduce:animate-none' />
+            </div>
+          </ContentSurfaceCard>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-6 text-center'>
+      <ContentSurfaceCard className='p-6 text-center'>
         <p className='text-[13px] text-secondary-token'>
           Failed to load insights. Please try again.
         </p>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
@@ -135,7 +145,7 @@ export function InsightsPanel() {
   const { mutate: generate, isPending: isGenerating } =
     useGenerateInsightsMutation();
 
-  const insights = data?.insights ?? [];
+  const insights = useMemo(() => data?.insights ?? [], [data?.insights]);
   const total = data?.total ?? 0;
 
   // Group insights by priority
@@ -175,16 +185,21 @@ export function InsightsPanel() {
       </div>
 
       {/* Category filter pills */}
-      <div className='flex flex-wrap gap-1.5'>
+      <div
+        className='flex flex-wrap gap-1.5'
+        role='toolbar'
+        aria-label='Filter insights by category'
+      >
         {CATEGORY_FILTERS.map(filter => (
           <button
             key={filter.value}
             type='button'
             onClick={() => setSelectedCategory(filter.value)}
-            className={`rounded-full px-3 py-1 text-[13px] font-[510] transition-colors ${
+            aria-pressed={selectedCategory === filter.value}
+            className={`rounded-[8px] border px-3 py-1 text-[12.5px] font-[510] tracking-[-0.01em] transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 ${
               selectedCategory === filter.value
-                ? 'bg-accent-token text-white'
-                : 'bg-surface-2 text-secondary-token hover:text-primary-token'
+                ? 'border-(--linear-border-default) bg-(--linear-bg-surface-0) text-(--linear-text-primary)'
+                : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
             }`}
           >
             {filter.label}

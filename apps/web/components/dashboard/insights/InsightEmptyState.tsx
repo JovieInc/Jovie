@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Sparkles } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
 
 interface InsightEmptyStateProps {
@@ -15,9 +16,9 @@ export function InsightEmptyState({
   const { mutate, isPending } = useGenerateInsightsMutation();
 
   return (
-    <div className='flex flex-col items-center justify-center rounded-xl border border-subtle bg-surface-1 p-8 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-500/10 dark:bg-purple-500/15'>
-        <Sparkles className='h-6 w-6 text-purple-600 dark:text-purple-400' />
+    <ContentSurfaceCard className='flex flex-col items-center justify-center p-8 text-center'>
+      <div className='flex h-12 w-12 items-center justify-center rounded-[14px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <Sparkles className='h-5 w-5 text-(--linear-text-secondary)' />
       </div>
 
       <h3 className='mt-4 text-[13px] font-[590] text-primary-token'>
@@ -36,7 +37,7 @@ export function InsightEmptyState({
           size='sm'
           disabled={isPending}
           onClick={() => mutate()}
-          className='mt-4 gap-2'
+          className='mt-4 h-8 gap-2 px-3'
         >
           <Icon
             name={isPending ? 'Loader2' : 'Sparkles'}
@@ -45,6 +46,6 @@ export function InsightEmptyState({
           {isPending ? 'Generating...' : 'Generate Insights'}
         </Button>
       ) : null}
-    </div>
+    </ContentSurfaceCard>
   );
 }

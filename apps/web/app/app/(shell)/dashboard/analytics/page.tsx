@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardAnalytics } from '@/components/dashboard/dashboard-analytics';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { logger } from '@/lib/utils/logger';
@@ -79,9 +80,9 @@ function AnalyticsStatsSkeleton() {
   return (
     <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
       {SKELETON_STAT_KEYS.map(key => (
-        <div
+        <ContentSurfaceCard
           key={key}
-          className='h-24 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
+          className='h-24 skeleton motion-reduce:animate-none'
         />
       ))}
     </div>
@@ -92,9 +93,9 @@ function AnalyticsListsSkeleton() {
   return (
     <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
       {SKELETON_LIST_KEYS.map(key => (
-        <div
+        <ContentSurfaceCard
           key={key}
-          className='h-56 skeleton motion-reduce:animate-none rounded-xl border border-subtle'
+          className='h-56 skeleton motion-reduce:animate-none'
         />
       ))}
     </div>

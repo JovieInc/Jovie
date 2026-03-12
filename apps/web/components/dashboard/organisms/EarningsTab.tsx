@@ -16,6 +16,7 @@ import {
 import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -66,7 +67,7 @@ const StatCard = memo(function StatCard({
   iconColor,
 }: StatCardProps) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4'>
+    <ContentSurfaceCard className='p-4'>
       <div className='flex items-center gap-2'>
         <div
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconBg}`}
@@ -79,7 +80,7 @@ const StatCard = memo(function StatCard({
       <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
         {value}
       </dd>
-    </div>
+    </ContentSurfaceCard>
   );
 });
 
@@ -221,9 +222,9 @@ export function EarningsTab() {
   // ── Empty state ──────────────────────────────────
   if (!handle) {
     return (
-      <div className='flex flex-col items-center justify-center gap-3 rounded-xl border border-subtle bg-surface-1 px-6 py-16 text-center'>
+      <ContentSurfaceCard className='flex flex-col items-center justify-center gap-3 px-6 py-16 text-center'>
         <div
-          className='flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2'
+          className='flex h-12 w-12 items-center justify-center rounded-2xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
           aria-hidden='true'
         >
           <QrCode className='h-6 w-6 text-tertiary-token' />
@@ -235,7 +236,7 @@ export function EarningsTab() {
           Set up your artist handle in profile settings to generate a QR code
           for your tip page.
         </p>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
@@ -252,16 +253,13 @@ export function EarningsTab() {
       {isEarningsLoading ? (
         <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
           {[1, 2, 3].map(i => (
-            <div
-              key={i}
-              className='space-y-2 rounded-xl border border-subtle bg-surface-1 p-4'
-            >
+            <ContentSurfaceCard key={i} className='space-y-2 p-4'>
               <div className='flex items-center gap-2'>
                 <div className='h-7 w-7 rounded-lg skeleton' />
                 <div className='h-3 w-16 rounded-sm skeleton' />
               </div>
               <div className='h-7 w-20 rounded-md skeleton' />
-            </div>
+            </ContentSurfaceCard>
           ))}
         </div>
       ) : (
@@ -295,7 +293,7 @@ export function EarningsTab() {
         Recent tippers
       </p>
 
-      <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
+      <ContentSurfaceCard className='overflow-hidden'>
         {isEarningsLoading && (
           <div className='space-y-3 p-4'>
             {[1, 2, 3].map(i => (
@@ -313,7 +311,7 @@ export function EarningsTab() {
         {!isEarningsLoading && tippers.length === 0 && (
           <div className='flex flex-col items-center gap-3 px-6 py-12 text-center'>
             <div
-              className='flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2'
+              className='flex h-10 w-10 items-center justify-center rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
               aria-hidden='true'
             >
               <Users className='h-5 w-5 text-tertiary-token' />
@@ -327,7 +325,7 @@ export function EarningsTab() {
           <div className='overflow-x-auto'>
             <table className='w-full text-left text-[13px]'>
               <thead>
-                <tr className='border-b border-subtle'>
+                <tr className='border-b border-(--linear-border-subtle)'>
                   <th className='px-4 py-3 text-[13px] font-[510] text-tertiary-token'>
                     Name
                   </th>
@@ -346,7 +344,7 @@ export function EarningsTab() {
                 {tippers.map(tipper => (
                   <tr
                     key={tipper.id}
-                    className='border-b border-subtle last:border-b-0 transition-colors hover:bg-white/[0.02]'
+                    className='border-b border-(--linear-border-subtle) last:border-b-0 transition-colors hover:bg-(--linear-bg-surface-0)'
                   >
                     <td className='px-4 py-3 text-primary-token'>
                       {tipper.tipperName ?? 'Anonymous'}
@@ -366,14 +364,14 @@ export function EarningsTab() {
             </table>
           </div>
         )}
-      </div>
+      </ContentSurfaceCard>
 
       {/* ── QR Code Card ───────────────────────────── */}
       <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
         QR Code
       </p>
 
-      <div className='rounded-xl border border-subtle bg-surface-1 p-5 sm:p-6'>
+      <ContentSurfaceCard className='p-5 sm:p-6'>
         <div className='flex items-center gap-2 mb-5'>
           <div
             className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-subtle'
@@ -388,7 +386,7 @@ export function EarningsTab() {
 
         <div className='flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:gap-8'>
           {/* Preview */}
-          <div className='shrink-0 rounded-xl bg-white p-3 shadow-card'>
+          <div className='shrink-0 rounded-[14px] border border-(--linear-border-subtle) bg-white p-3 shadow-[0_1px_0_rgba(0,0,0,0.04)]'>
             <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
           </div>
 
@@ -405,7 +403,7 @@ export function EarningsTab() {
             </div>
 
             {/* Tip URL display */}
-            <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
+            <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
               <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
                 {tipUrl}
@@ -452,7 +450,7 @@ export function EarningsTab() {
             </div>
           </div>
         </div>
-      </div>
+      </ContentSurfaceCard>
     </div>
   );
 }

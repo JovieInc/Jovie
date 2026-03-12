@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface DmQueueLead {
   id: string;
@@ -54,14 +55,14 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
   }
 
   return (
-    <div
-      className={`rounded-lg border border-subtle p-4 space-y-3 ${
+    <ContentSurfaceCard
+      className={`space-y-3 rounded-[10px] p-4 ${
         markedDone ? 'opacity-50' : ''
       }`}
     >
       <div className='flex items-start justify-between'>
         <div className='flex items-center gap-3'>
-          <div className='flex size-10 items-center justify-center rounded-full bg-surface-2'>
+          <div className='flex size-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
             <User className='size-5 text-tertiary-token' />
           </div>
           <div>
@@ -82,7 +83,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           </div>
         </div>
         {lead.priorityScore != null && (
-          <span className='rounded-md bg-surface-2 px-2 py-1 text-xs font-medium tabular-nums text-secondary-token'>
+          <span className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-1 text-xs font-medium tabular-nums text-secondary-token'>
             Score: {lead.priorityScore}
           </span>
         )}
@@ -93,7 +94,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           readOnly
           value={lead.dmCopy}
           rows={4}
-          className='w-full resize-none rounded-md border border-subtle bg-background px-3 py-2 text-xs text-secondary-token'
+          className='w-full resize-none rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-xs text-secondary-token'
         />
       )}
 
@@ -103,6 +104,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           size='sm'
           onClick={() => void handleCopy()}
           disabled={!lead.dmCopy || markedDone}
+          className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[12px] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
         >
           {copied ? (
             <Check className='mr-1.5 size-3.5' />
@@ -116,6 +118,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           size='sm'
           onClick={() => void handleMarkSent()}
           disabled={marking || markedDone}
+          className='h-8 rounded-[8px] px-3 text-[12px]'
         >
           {marking ? (
             <Loader2 className='mr-1.5 size-3.5 animate-spin' />
@@ -125,6 +128,6 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           {markedDone ? 'Sent' : "Mark as DM'd"}
         </Button>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }

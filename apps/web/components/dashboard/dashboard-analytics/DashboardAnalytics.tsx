@@ -3,9 +3,9 @@
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DashboardRefreshButton } from '@/components/dashboard/molecules/DashboardRefreshButton';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { captureException } from '@/lib/sentry/client-lite';
@@ -45,7 +45,7 @@ function StatCard({
 }) {
   if (loading) {
     return (
-      <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
+      <ContentSurfaceCard className='p-4 lg:p-5'>
         <LoadingSkeleton
           height='h-3'
           width='w-20'
@@ -53,12 +53,12 @@ function StatCard({
           className='mb-3'
         />
         <LoadingSkeleton height='h-7' width='w-16' rounded='sm' />
-      </DashboardCard>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
+    <ContentSurfaceCard className='p-4 lg:p-5'>
       <p className='text-[13px] text-secondary-token'>{label}</p>
       <p className='mt-1 text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
         {value}
@@ -68,7 +68,7 @@ function StatCard({
           {meta}
         </p>
       )}
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }
 
@@ -96,7 +96,7 @@ function ListSection({
   readonly emptyMessage: string;
 }) {
   return (
-    <DashboardCard variant='analytics' padding='none' className='p-4 lg:p-5'>
+    <ContentSurfaceCard className='p-4 lg:p-5'>
       <div className='mb-3 flex items-center gap-2'>
         <Icon className='h-4 w-4 text-tertiary-token' />
         <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
@@ -139,7 +139,7 @@ function ListSection({
           {emptyMessage}
         </p>
       )}
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }
 
@@ -263,7 +263,9 @@ export function DashboardAnalytics() {
           )}
 
         {error && (
-          <p className='text-[13px] text-center text-destructive'>{error}</p>
+          <ContentSurfaceCard className='px-4 py-3 text-center'>
+            <p className='text-[13px] text-destructive'>{error}</p>
+          </ContentSurfaceCard>
         )}
 
         {/* Lists */}

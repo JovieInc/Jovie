@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { useCreateInviteMutation } from '@/lib/queries/useInviteMutation';
@@ -95,7 +96,7 @@ export function SendInviteDialog({
       <DialogBody>
         <form onSubmit={handleSubmit} className='space-y-4'>
           {/* Profile info */}
-          <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-2/50 p-3'>
+          <ContentSurfaceCard className='flex items-center gap-3 rounded-[10px] bg-(--linear-bg-surface-0) p-3'>
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}
@@ -107,7 +108,7 @@ export function SendInviteDialog({
                 unoptimized={profile.avatarUrl.includes('i.scdn.co')}
               />
             ) : (
-              <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-3'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
                 <Icon name='User' className='h-5 w-5 text-tertiary-token' />
               </div>
             )}
@@ -119,7 +120,7 @@ export function SendInviteDialog({
                 @{profile.username}
               </p>
             </div>
-          </div>
+          </ContentSurfaceCard>
 
           {/* Email input */}
           <div className='space-y-2'>
@@ -148,7 +149,7 @@ export function SendInviteDialog({
 
           {/* Error message */}
           {error && (
-            <div className='flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2'>
+            <div className='flex items-center gap-2 rounded-[10px] border border-destructive/20 bg-destructive/8 px-3 py-2'>
               <Icon
                 name='XCircle'
                 className='h-3.5 w-3.5 text-destructive shrink-0'
@@ -159,7 +160,7 @@ export function SendInviteDialog({
 
           {/* Success message */}
           {success && (
-            <div className='flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2'>
+            <div className='flex items-center gap-2 rounded-[10px] border border-success/20 bg-success/8 px-3 py-2'>
               <Icon
                 name='CheckCircle'
                 className='h-3.5 w-3.5 text-success shrink-0'
