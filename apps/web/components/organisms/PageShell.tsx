@@ -43,15 +43,11 @@ export interface PageShellProps {
  * }
  * ```
  */
-export function PageShell({
-  children,
-  className,
-  noPadding = false,
-}: PageShellProps) {
+export function PageShell({ children, className }: PageShellProps) {
   return (
     <div
       className={cn(
-        'bg-surface-1 shadow-sm h-full overflow-hidden overflow-x-hidden flex flex-col',
+        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-transparent text-(--linear-text-primary)',
         className
       )}
     >
@@ -107,20 +103,19 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'min-h-[56px] shrink-0 border-b border-subtle px-4 sm:px-6',
-        'flex items-center justify-between gap-3 sm:gap-4',
+        'flex min-h-[var(--linear-app-header-height)] shrink-0 items-center justify-between gap-3 border-b border-(--linear-border-subtle) bg-transparent px-[var(--linear-app-header-padding-x)] py-1.5',
         className
       )}
     >
-      <div className='flex items-center gap-2 sm:gap-3 min-w-0'>
+      <div className='flex min-w-0 items-center gap-2 sm:gap-3'>
         {mobileSidebarTrigger}
         {breadcrumbs}
         <div className='min-w-0 flex-1'>
-          <h1 className='text-[15px] sm:text-sm font-semibold text-primary-token truncate'>
+          <h1 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
             {title}
           </h1>
           {description && (
-            <p className='text-xs text-secondary-token truncate hidden sm:block'>
+            <p className='hidden truncate text-[12px] leading-[18px] text-(--linear-text-secondary) sm:block'>
               {description}
             </p>
           )}
@@ -170,7 +165,8 @@ export function PageContent({
     <div
       className={cn(
         'flex-1 min-h-0 min-w-0 overflow-auto overflow-x-hidden',
-        !noPadding && 'p-4 sm:p-6',
+        !noPadding &&
+          'px-[var(--linear-app-content-padding-x)] py-[var(--linear-app-content-padding-y)]',
         className
       )}
     >
