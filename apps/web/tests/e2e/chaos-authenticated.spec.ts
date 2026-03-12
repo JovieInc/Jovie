@@ -56,9 +56,9 @@ interface ChaosResult {
   duration: number;
 }
 
-const CHAOS_WARMUP_TIMEOUT = 120_000;
-const CHAOS_PAGE_RETRIES = 1;
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const CHAOS_WARMUP_TIMEOUT = IS_FAST_ITERATION ? 45_000 : 120_000;
+const CHAOS_PAGE_RETRIES = 1;
 const CHAOS_MAX_ELEMENTS_PER_PAGE = IS_FAST_ITERATION ? 3 : 20;
 const CHAOS_STABILIZE_TIMEOUT = IS_FAST_ITERATION ? 3_000 : 10_000;
 const CHAOS_POST_CLICK_TIMEOUT = IS_FAST_ITERATION ? 1_500 : 5_000;
@@ -486,6 +486,10 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
   });
 
   test('Settings pages chaos test', async ({ page }, testInfo) => {
+    test.skip(
+      IS_FAST_ITERATION,
+      'Settings interaction chaos runs in the slower authenticated chaos lane'
+    );
     const activePages = IS_FAST_ITERATION
       ? FAST_SETTINGS_PAGES
       : SETTINGS_PAGES;
@@ -515,6 +519,10 @@ test.describe('Admin Chaos Testing @chaos', () => {
   });
 
   test('Admin pages chaos test', async ({ page }, testInfo) => {
+    test.skip(
+      IS_FAST_ITERATION,
+      'Admin interaction chaos runs in the slower authenticated chaos lane'
+    );
     const activePages = IS_FAST_ITERATION ? FAST_ADMIN_PAGES : ADMIN_PAGES;
     // First check if user has admin access
     const response = await navigateChaosRoute(page, activePages[0]);
