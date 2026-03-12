@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { addBreadcrumb } from '@/lib/sentry/client-lite';
+import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
 export interface BuildInfo {
@@ -32,10 +33,14 @@ export async function fetchBuildInfo({
   signal?: AbortSignal;
 }): Promise<BuildInfo | null> {
   try {
-    const response = await fetch('/api/health/build-info', { signal });
-    if (!response.ok) return null;
-    return (await response.json()) as BuildInfo;
+    return await fetchWithTimeout<BuildInfo>('/api/health/build-info', {
+      signal,
+    });
   } catch (error) {
+    if (error instanceof FetchError && error.status === 408) {
+      return null;
+    }
+
     if (error instanceof Error && error.name === 'AbortError') {
       throw error; // Let TanStack Query handle cancellation
     }

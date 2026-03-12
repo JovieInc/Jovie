@@ -24,6 +24,31 @@ export async function fetchWithTimeout<T>(
   url: string,
   options: FetchOptions = {}
 ): Promise<T> {
+  const response = await fetchWithTimeoutResponse(url, options);
+
+  // Parse JSON with error handling for malformed responses
+  let data: T;
+  try {
+    data = (await response.json()) as T;
+  } catch (parseError) {
+    if (parseError instanceof SyntaxError) {
+      throw new FetchError('Invalid JSON response', 502, response);
+    }
+    throw parseError;
+  }
+  return data;
+}
+
+/**
+ * Edge-compatible fetch with timeout that returns the raw Response.
+ *
+ * Useful for call sites that need non-JSON response handling (e.g. blobs)
+ * while preserving timeout/cancellation behavior and status normalization.
+ */
+export async function fetchWithTimeoutResponse(
+  url: string,
+  options: FetchOptions = {}
+): Promise<Response> {
   const { timeout = 10000, signal: externalSignal, ...fetchOptions } = options;
 
   const controller = new AbortController();
@@ -53,17 +78,7 @@ export async function fetchWithTimeout<T>(
       );
     }
 
-    // Parse JSON with error handling for malformed responses
-    let data: T;
-    try {
-      data = (await response.json()) as T;
-    } catch (parseError) {
-      if (parseError instanceof SyntaxError) {
-        throw new FetchError('Invalid JSON response', 502, response);
-      }
-      throw parseError;
-    }
-    return data;
+    return response;
   } catch (error) {
     if (error instanceof FetchError) {
       throw error;
