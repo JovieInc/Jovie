@@ -142,6 +142,11 @@ test.describe('Dashboard Navigation @smoke', () => {
   test('auth pages (signin/signup) load without server errors', async ({
     page,
   }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Auth page render coverage runs in golden-path and the slower auth lanes'
+    );
+
     for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
       const response = await smokeNavigateWithRetry(page, route, {
         timeout: SMOKE_TIMEOUTS.NAVIGATION,

@@ -29,11 +29,23 @@ const hasExplicitWorkers = forwardedArgs.some(
     arg.startsWith('--workers=') ||
     (arg === '-j' && forwardedArgs[index + 1] != null)
 );
+const hasExplicitProject = forwardedArgs.some(
+  (arg, index) =>
+    arg === '--project' ||
+    arg.startsWith('--project=') ||
+    (arg === '-p' && forwardedArgs[index + 1] != null)
+);
 const fastWorkerCount = process.env.E2E_FAST_WORKERS ?? '4';
 
-const defaultArgs = hasExplicitWorkers
-  ? ['test', '--no-deps']
-  : ['test', '--no-deps', '--workers', fastWorkerCount];
+const defaultArgs = ['test', '--no-deps'];
+
+if (!hasExplicitProject) {
+  defaultArgs.push('--project', 'chromium');
+}
+
+if (!hasExplicitWorkers) {
+  defaultArgs.push('--workers', fastWorkerCount);
+}
 const sharedEnv = {
   ...process.env,
   BASE_URL: process.env.BASE_URL || 'http://localhost:3100',

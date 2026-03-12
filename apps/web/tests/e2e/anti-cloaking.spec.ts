@@ -19,6 +19,10 @@ const hasDatabase = !!(
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy')
 );
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+test.skip(
+  isFastIteration,
+  'Anti-cloaking coverage runs in the slower dedicated lane'
+);
 const WRAP_LINK_TEST_IP = `198.51.100.${(process.pid % 200) + 1}`;
 const MAX_NORMAL_REDIRECT_MS = isFastIteration ? 30_000 : 10_000;
 

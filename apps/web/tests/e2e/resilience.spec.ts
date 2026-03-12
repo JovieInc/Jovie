@@ -145,6 +145,10 @@ test.describe('API failure resilience', () => {
   test('audience page shows error UI (not blank) when audience API returns 500', async ({
     page,
   }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Injected API-failure resilience runs in the slower resilience lane'
+    );
     test.setTimeout(120_000);
 
     await page.route('**/api/audience/**', route => {
