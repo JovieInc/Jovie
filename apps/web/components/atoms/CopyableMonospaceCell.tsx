@@ -9,6 +9,8 @@ interface CopyableMonospaceCellProps {
   readonly value: string | null | undefined;
   /** Label for the copy tooltip (e.g., "ISRC", "UPC") */
   readonly label: string;
+  /** Shared compact/drawer sizing */
+  readonly size?: 'sm' | 'md';
   /** Maximum width for truncation (default: 100px) */
   readonly maxWidth?: number;
   /** Additional class name */
@@ -24,6 +26,7 @@ interface CopyableMonospaceCellProps {
 export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
   value,
   label,
+  size = 'md',
   maxWidth = 100,
   className,
 }: CopyableMonospaceCellProps) {
@@ -44,12 +47,26 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
     );
   }
 
+  const sizeClasses = {
+    sm: {
+      button: 'h-5 gap-1 rounded-[6px] px-1 text-[10px]',
+      icon: 'h-3 w-3',
+    },
+    md: {
+      button: 'h-6 gap-1 rounded-[7px] px-1 py-0.5 text-[11px]',
+      icon: 'h-3 w-3',
+    },
+  } as const;
+
+  const styles = sizeClasses[size];
+
   return (
     <button
       type='button'
       onClick={handleCopy}
       className={cn(
-        'group/copy -mx-1 inline-flex h-6 items-center gap-1 rounded-[7px] border border-transparent px-1 py-0.5 font-mono text-[11px] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'group/copy -mx-1 inline-flex items-center border border-transparent font-mono text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        styles.button,
         className
       )}
       title={`Copy ${label}`}
@@ -65,7 +82,8 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       <Icon
         name={copied ? 'Check' : 'Copy'}
         className={cn(
-          'h-3 w-3 transition-opacity',
+          styles.icon,
+          'transition-opacity',
           copied
             ? 'text-success opacity-100'
             : 'opacity-0 group-hover/copy:opacity-70 group-focus-visible/copy:opacity-70'

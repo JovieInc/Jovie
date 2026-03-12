@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -18,7 +17,7 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { DrawerSection } from '@/components/molecules/drawer';
+import { DrawerButton, DrawerSection } from '@/components/molecules/drawer';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
 
 /** Auto-save debounce delay in milliseconds */
@@ -207,10 +206,8 @@ export function ReleaseLyricsSection({
 
       <div className='mt-3 flex items-center gap-2'>
         {/* Copy button */}
-        <Button
+        <DrawerButton
           type='button'
-          size='sm'
-          variant='secondary'
           disabled={isActionsDisabled || isCopying}
           onClick={handleCopy}
         >
@@ -220,16 +217,14 @@ export function ReleaseLyricsSection({
             <Copy className='h-3.5 w-3.5' />
           )}
           {isCopying ? 'Copied!' : 'Copy'}
-        </Button>
+        </DrawerButton>
 
         {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
           <div className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-none'>
             {/* Primary format action — uses the most recently selected format */}
-            <Button
+            <DrawerButton
               type='button'
-              size='sm'
-              variant='secondary'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
               className='rounded-r-none border-r border-r-(--linear-border-subtle)'
@@ -242,21 +237,20 @@ export function ReleaseLyricsSection({
               {isFormatting
                 ? 'Formatting…'
                 : `Format: ${LYRICS_FORMAT_LABELS[selectedFormat]}`}
-            </Button>
+            </DrawerButton>
 
             {/* Dropdown chevron — shows all format options */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
+                <DrawerButton
                   type='button'
-                  size='sm'
-                  variant='secondary'
+                  size='icon'
                   disabled={isActionsDisabled || isFormatting}
                   className='rounded-l-none px-1.5'
                   aria-label='Choose format'
                 >
                   <ChevronDown className='h-3.5 w-3.5' />
-                </Button>
+                </DrawerButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent align='end'>
                 {FORMAT_OPTIONS.map(format => (

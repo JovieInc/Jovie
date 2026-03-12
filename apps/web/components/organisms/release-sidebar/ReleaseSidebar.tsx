@@ -24,6 +24,7 @@ import {
   DrawerAsyncToggle,
   DrawerMediaThumb,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -181,25 +182,24 @@ function ReleaseEntityHeader({
           </button>
         </div>
 
-        {/* Compact property stack */}
-        <div className='min-w-0 flex-1 space-y-1 pt-0.5'>
-          <div>
-            <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.017em] text-(--linear-text-primary)'>
-              {release.title}
-            </p>
-            {artistLine && (
-              <p className='line-clamp-2 text-[12.5px] leading-[16px] text-(--linear-text-secondary)'>
-                {artistLine}
-              </p>
-            )}
-          </div>
-          <ReleaseFields
-            releaseDate={release.releaseDate}
-            releaseType={release.releaseType}
-            totalTracks={release.totalTracks}
-            platformCount={release.providers.length}
-          />
-        </div>
+        <EntityHeaderCard
+          title={release.title}
+          subtitle={
+            artistLine ? (
+              <span className='line-clamp-2 block'>{artistLine}</span>
+            ) : null
+          }
+          meta={
+            <ReleaseFields
+              releaseDate={release.releaseDate}
+              releaseType={release.releaseType}
+              totalTracks={release.totalTracks}
+              platformCount={release.providers.length}
+            />
+          }
+          className='min-w-0 flex-1 gap-0'
+          bodyClassName='pt-0.5'
+        />
       </div>
 
       {/* Smart link — full width */}

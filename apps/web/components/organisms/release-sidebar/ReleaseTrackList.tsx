@@ -27,6 +27,7 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   DRAWER_SECTION_HEADING_CLASSNAME,
   DrawerEmptyState,
+  DrawerInlineIconButton,
   DrawerSection,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
@@ -334,13 +335,12 @@ function TrackActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          className='shrink-0 self-center rounded-[7px] border border-transparent p-0.5 opacity-60 transition-[opacity,background-color,border-color,color] duration-150 group-hover:opacity-100 focus-visible:opacity-100 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        <DrawerInlineIconButton
           aria-label={`Actions for ${track.title}`}
+          className='self-center group-hover:opacity-100'
         >
           <MoreHorizontal className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
-        </button>
+        </DrawerInlineIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-48'>
         {track.isrc && (

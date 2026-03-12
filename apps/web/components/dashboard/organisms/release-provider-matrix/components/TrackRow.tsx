@@ -233,7 +233,7 @@ export const TrackRow = memo(function TrackRow({
       {/* 9. ISRC */}
       {isVisible('primaryIsrc') && (
         <td className='py-2'>
-          <CopyableMonospaceCell value={track.isrc} label='ISRC' />
+          <CopyableMonospaceCell value={track.isrc} label='ISRC' size='sm' />
         </td>
       )}
 

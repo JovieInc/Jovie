@@ -76,6 +76,7 @@ export function TrackDetailPanel({
           )}
           <CopyableUrlRow
             url={smartLinkUrl}
+            size='lg'
             copyButtonTitle='Copy smart link'
             openButtonTitle='Open smart link'
             onCopySuccess={() => {

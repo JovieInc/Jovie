@@ -29,16 +29,16 @@ const VARIANT_STYLES: Record<
   }
 > = {
   compact: {
-    container: 'space-y-1',
-    number: 'text-[11px]',
-    title: 'text-[13px]',
-    meta: 'text-[11px]',
+    container: 'space-y-0.5',
+    number: 'text-[10.5px]',
+    title: 'text-[12.5px]',
+    meta: 'text-[10.5px]',
   },
   drawer: {
-    container: 'space-y-1.5',
-    number: 'text-[13px]',
-    title: 'text-[15px]',
-    meta: 'text-[11px]',
+    container: 'space-y-1',
+    number: 'text-[11px]',
+    title: 'text-[14px]',
+    meta: 'text-[10.5px]',
   },
 };
 
@@ -60,7 +60,7 @@ export function TrackMetaSummary({
   return (
     <div
       className={cn(
-        artwork ? 'flex items-start gap-4' : styles.container,
+        artwork ? 'flex items-start gap-3.5' : styles.container,
         className
       )}
     >
@@ -85,7 +85,7 @@ export function TrackMetaSummary({
           {isExplicit ? (
             <Badge
               variant='secondary'
-              className='shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-0 text-[9px] text-(--linear-text-tertiary)'
+              className='shrink-0 rounded-[6px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0 text-[9px] font-[510] text-(--linear-text-tertiary) shadow-none'
             >
               E
             </Badge>
@@ -102,7 +102,7 @@ export function TrackMetaSummary({
             <span className='tabular-nums'>{formatDuration(durationMs)}</span>
           ) : null}
           {isrc ? (
-            <span className='font-mono text-[10px] text-(--linear-text-tertiary)'>
+            <span className='font-mono text-[9.5px] tracking-[0.02em] text-(--linear-text-tertiary)'>
               {isrc}
             </span>
           ) : null}

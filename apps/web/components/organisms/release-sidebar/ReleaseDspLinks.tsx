@@ -24,7 +24,9 @@ import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DRAWER_SECTION_HEADING_CLASSNAME,
+  DrawerButton,
   DrawerLinkSection,
+  DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -226,13 +228,7 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <div
-          className={[
-            'mt-2 space-y-2.5 rounded-[10px]',
-            'border border-(--linear-border-subtle)',
-            'bg-(--linear-bg-surface-1) p-3',
-          ].join(' ')}
-        >
+        <DrawerSurfaceCard className='mt-2 space-y-2.5 rounded-[10px] p-3'>
           <div className={FORM_ROW_CLASS}>
             <Label
               className={cn(
@@ -292,33 +288,29 @@ export function ReleaseDspLinks({
             />
           </div>
           <div className='flex justify-end gap-2 pt-1'>
-            <Button
+            <DrawerButton
               type='button'
-              size='sm'
-              variant='ghost'
               onClick={() => {
                 onSetIsAddingLink(false);
                 onSetNewLinkUrl('');
                 onSetSelectedProvider(null);
               }}
-              className='h-8 rounded-[8px] px-2.5 text-[12px]'
+              tone='ghost'
             >
               Cancel
-            </Button>
-            <Button
+            </DrawerButton>
+            <DrawerButton
               type='button'
-              size='sm'
-              variant='primary'
               onClick={() => void onAddLink()}
               disabled={
                 !isValidUrl(newLinkUrl) || !selectedProvider || isAddingDspLink
               }
-              className='h-8 min-w-[68px] rounded-[8px] px-2.5 text-[12px]'
+              className='min-w-[68px]'
             >
               {isAddingDspLink ? 'Adding...' : 'Add'}
-            </Button>
+            </DrawerButton>
           </div>
-        </div>
+        </DrawerSurfaceCard>
       )}
     </DrawerLinkSection>
   );

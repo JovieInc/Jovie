@@ -70,6 +70,11 @@ vi.mock('@/components/atoms/ProviderIcon', () => ({
 
 vi.mock('@/components/molecules/drawer', () => ({
   DRAWER_SECTION_HEADING_CLASSNAME: 'drawer-heading',
+  DrawerButton: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
   DrawerLinkSection: ({
     title,
     children,

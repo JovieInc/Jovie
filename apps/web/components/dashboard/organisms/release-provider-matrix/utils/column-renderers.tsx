@@ -346,14 +346,14 @@ export function renderReleaseTypeCell({
 export function renderIsrcCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
-  return <CopyableMonospaceCell value={getValue()} label='ISRC' />;
+  return <CopyableMonospaceCell value={getValue()} label='ISRC' size='sm' />;
 }
 
 /** Renders the UPC cell */
 export function renderUpcCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
-  return <CopyableMonospaceCell value={getValue()} label='UPC' />;
+  return <CopyableMonospaceCell value={getValue()} label='UPC' size='sm' />;
 }
 
 /** Renders the label cell with truncation and tooltip */

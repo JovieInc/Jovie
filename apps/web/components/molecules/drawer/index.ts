@@ -11,10 +11,19 @@ export {
   type DrawerBackButtonProps,
 } from './DrawerBackButton';
 export {
+  DRAWER_BUTTON_CLASSNAME,
+  DrawerButton,
+  type DrawerButtonProps,
+} from './DrawerButton';
+export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';
 export { DrawerHeader, type DrawerHeaderProps } from './DrawerHeader';
+export {
+  DrawerInlineIconButton,
+  type DrawerInlineIconButtonProps,
+} from './DrawerInlineIconButton';
 export {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,

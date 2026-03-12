@@ -60,8 +60,8 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     <CopyableUrlRow
       url={smartLinkUrl}
       displayValue={release.smartLinkPath}
-      className='h-[22px] min-w-[116px] rounded-[7px] px-1.5'
-      valueClassName='text-[10px]'
+      size='sm'
+      className='min-w-[116px]'
       onCopySuccess={handleCopySuccess}
       copyButtonTitle='Copy smart link'
       openButtonTitle='Open smart link'

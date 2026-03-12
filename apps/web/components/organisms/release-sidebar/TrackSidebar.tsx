@@ -215,6 +215,7 @@ export function TrackSidebar({
             <DrawerSection title='Smart link'>
               <CopyableUrlRow
                 url={smartLinkUrl}
+                size='lg'
                 copyButtonTitle='Copy smart link'
                 openButtonTitle='Open smart link'
                 onCopySuccess={() => {

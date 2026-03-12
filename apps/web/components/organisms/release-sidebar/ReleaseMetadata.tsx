@@ -39,11 +39,22 @@ const CANVAS_STATUS_CONFIG: Record<
 };
 
 const CANVAS_STATUS_OPTIONS: CanvasStatus[] = ['uploaded', 'not_set'];
+const METADATA_ROW_PROPS = {
+  labelWidth: 72,
+  size: 'sm' as const,
+};
+const METADATA_TEXT_CLASSNAME =
+  'text-[11px] leading-[14px] text-(--linear-text-secondary)';
+const METADATA_MUTED_TEXT_CLASSNAME =
+  'text-[10.5px] leading-[14px] text-(--linear-text-tertiary)';
+const METADATA_TRIGGER_CLASSNAME =
+  '-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[11px] leading-[14px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)';
+const METADATA_BADGE_CLASSNAME = 'border text-[9.5px] font-[510] shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[11.5px] tabular-nums text-(--linear-text-secondary)'>
+    <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
       {clamped} / 100
     </span>
   );
@@ -52,17 +63,17 @@ function PopularityScore({ value }: { readonly value: number }) {
 function ReleaseTypeBadges({ release }: { readonly release: Release }) {
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   return (
-    <div className='flex items-center gap-1.5'>
+    <div className='flex flex-wrap items-center gap-1.5'>
       <Badge
         size='sm'
-        className={`${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+        className={`h-5 rounded-[6px] px-1.5 text-[9.5px] font-[510] shadow-none ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
       >
         {typeStyle.label}
       </Badge>
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='border-red-500/20 bg-red-500/10 text-red-600 shadow-none dark:text-red-300'
+          className='h-5 rounded-[6px] border-red-500/20 bg-red-500/10 px-1.5 text-[9.5px] font-[510] text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -105,6 +116,10 @@ function CopyrightLabel({
   );
 }
 
+function MetadataFallbackValue({ children }: { readonly children: string }) {
+  return <span className={METADATA_MUTED_TEXT_CLASSNAME}>{children}</span>;
+}
+
 export function ReleaseMetadata({
   release,
   onCanvasStatusChange,
@@ -120,51 +135,58 @@ export function ReleaseMetadata({
   return (
     <div className='space-y-px'>
       <DrawerPropertyRow
+        {...METADATA_ROW_PROPS}
         label='Type'
         value={<ReleaseTypeBadges release={release} />}
+        align='start'
       />
 
       <DrawerPropertyRow
+        {...METADATA_ROW_PROPS}
         label='ISRC'
         value={
           <CopyableMonospaceCell
             value={release.primaryIsrc}
             label='ISRC'
+            size='sm'
             maxWidth={140}
           />
         }
       />
 
       <DrawerPropertyRow
+        {...METADATA_ROW_PROPS}
         label='UPC'
         value={
           <CopyableMonospaceCell
             value={release.upc}
             label='UPC'
+            size='sm'
             maxWidth={140}
           />
         }
       />
 
       <DrawerPropertyRow
+        {...METADATA_ROW_PROPS}
         label='Label'
         value={
           release.label ? (
             <CopyableMonospaceCell
               value={release.label}
               label='Label'
+              size='sm'
               maxWidth={140}
               className='font-sans'
             />
           ) : (
-            <span className='text-[11px] text-(--linear-text-tertiary)'>
-              Unknown
-            </span>
+            <MetadataFallbackValue>Unknown</MetadataFallbackValue>
           )
         }
       />
       {release.copyrightLine && (
         <DrawerPropertyRow
+          {...METADATA_ROW_PROPS}
           label={
             <CopyrightLabel
               symbol='℗'
@@ -172,15 +194,17 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='truncate text-[11.5px] text-(--linear-text-secondary)'>
+            <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
               {formatCopyrightLine(release.copyrightLine, '℗')}
             </span>
           }
+          align='start'
         />
       )}
 
       {release.distributor && (
         <DrawerPropertyRow
+          {...METADATA_ROW_PROPS}
           label={
             <CopyrightLabel
               symbol='©'
@@ -188,17 +212,19 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='truncate text-[11.5px] text-(--linear-text-secondary)'>
+            <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
               {formatCopyrightLine(release.distributor, '©')}
             </span>
           }
+          align='start'
         />
       )}
 
       <DrawerPropertyRow
+        {...METADATA_ROW_PROPS}
         label='Tracks'
         value={
-          <span className='text-[11.5px] tabular-nums text-(--linear-text-secondary)'>
+          <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
             {release.totalTracks}{' '}
             {release.totalTracks === 1 ? 'track' : 'tracks'}
           </span>
@@ -206,15 +232,13 @@ export function ReleaseMetadata({
       />
 
       <DrawerPropertyRow
+        {...METADATA_ROW_PROPS}
         label='Canvas'
         value={
           onCanvasStatusChange ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
-                  type='button'
-                  className='-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[11.5px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-                >
+                <button type='button' className={METADATA_TRIGGER_CLASSNAME}>
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
                     size={12}
@@ -236,7 +260,7 @@ export function ReleaseMetadata({
                       <span className='flex items-center gap-2 w-full'>
                         <Badge
                           variant='secondary'
-                          className={`border text-[10px] font-medium shadow-none ${config.className}`}
+                          className={`${METADATA_BADGE_CLASSNAME} ${config.className}`}
                         >
                           {config.label}
                         </Badge>
@@ -256,7 +280,7 @@ export function ReleaseMetadata({
           ) : (
             <Badge
               variant='secondary'
-              className={`border text-[10px] font-medium shadow-none ${canvasStatusConfig.className}`}
+              className={`${METADATA_BADGE_CLASSNAME} ${canvasStatusConfig.className}`}
             >
               {canvasStatusDisplayLabel}
             </Badge>
@@ -266,9 +290,10 @@ export function ReleaseMetadata({
 
       {release.totalDurationMs != null && release.totalDurationMs > 0 && (
         <DrawerPropertyRow
+          {...METADATA_ROW_PROPS}
           label='Duration'
           value={
-            <span className='text-[12px] tabular-nums text-(--linear-text-secondary)'>
+            <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
               {formatDuration(release.totalDurationMs)}
             </span>
           }
@@ -277,6 +302,7 @@ export function ReleaseMetadata({
 
       {release.genres && release.genres.length > 0 && (
         <DrawerPropertyRow
+          {...METADATA_ROW_PROPS}
           label='Genres'
           value={
             <div className='flex flex-wrap gap-1'>
@@ -284,18 +310,20 @@ export function ReleaseMetadata({
                 <Badge
                   key={genre}
                   variant='secondary'
-                  className='rounded-[5px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 text-[10px] font-[510] text-(--linear-text-secondary) shadow-none'
+                  className='rounded-[6px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0 text-[9.5px] font-[510] text-(--linear-text-secondary) shadow-none'
                 >
                   {genre}
                 </Badge>
               ))}
             </div>
           }
+          align='start'
         />
       )}
 
       {release.spotifyPopularity != null && (
         <DrawerPropertyRow
+          {...METADATA_ROW_PROPS}
           label='Popularity'
           value={<PopularityScore value={release.spotifyPopularity} />}
         />

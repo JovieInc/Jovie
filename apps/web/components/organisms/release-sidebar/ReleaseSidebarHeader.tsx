@@ -10,6 +10,7 @@
 import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -165,18 +166,18 @@ export function useReleaseHeaderParts({
         {titleText}
       </span>
       {isrcValue && (
-        <button
-          type='button'
+        <DrawerInlineIconButton
           onClick={handleCopyIsrc}
           title={isIdCopied ? 'Copied!' : 'Copy ISRC'}
-          className='shrink-0 rounded-[6px] border border-transparent p-0.5 text-(--linear-text-quaternary) opacity-0 transition-[opacity,background-color,border-color,color] duration-150 group-hover/isrc:opacity-100 group-focus-within/isrc:opacity-100 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:opacity-100 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          fadeOnParentHover
+          className='group-hover/isrc:opacity-100 group-focus-within/isrc:opacity-100'
         >
           {isIdCopied ? (
             <Check className='h-3 w-3' />
           ) : (
             <Copy className='h-3 w-3' />
           )}
-        </button>
+        </DrawerInlineIconButton>
       )}
     </span>
   );

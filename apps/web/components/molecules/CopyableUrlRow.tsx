@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 interface CopyableUrlRowProps {
   readonly url: string;
   readonly displayValue?: string;
+  readonly size?: 'sm' | 'md' | 'lg';
   readonly className?: string;
   readonly valueClassName?: string;
   readonly onCopySuccess?: () => void;
@@ -19,6 +20,7 @@ interface CopyableUrlRowProps {
 export function CopyableUrlRow({
   url,
   displayValue,
+  size = 'md',
   className,
   valueClassName,
   onCopySuccess,
@@ -54,21 +56,49 @@ export function CopyableUrlRow({
     globalThis.open(url, '_blank', 'noopener,noreferrer');
   }, [url]);
 
+  const sizeClasses = {
+    sm: {
+      container: 'h-[22px] gap-1 rounded-[7px] px-1.5',
+      icon: 'h-3 w-3',
+      value: 'text-[10px]',
+      button: 'h-4 w-4 rounded-[5px]',
+      glyph: 'h-[11px] w-[11px]',
+    },
+    md: {
+      container: 'h-[24px] gap-1 rounded-[7px] px-1.5',
+      icon: 'h-3 w-3',
+      value: 'text-[9.5px]',
+      button: 'h-4 w-4 rounded-[5px]',
+      glyph: 'h-[11px] w-[11px]',
+    },
+    lg: {
+      container: 'h-7 gap-1.5 rounded-[8px] px-2',
+      icon: 'h-3.5 w-3.5',
+      value: 'text-[10.5px]',
+      button: 'h-4.5 w-4.5 rounded-[6px]',
+      glyph: 'h-3 w-3',
+    },
+  } as const;
+
+  const styles = sizeClasses[size];
+
   return (
     <div
       data-testid={testId}
       className={cn(
-        'flex h-[24px] items-center gap-1 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 transition-[background-color,border-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
+        'flex items-center border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) transition-[background-color,border-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
+        styles.container,
         className
       )}
     >
       <Link2
-        className='h-3 w-3 shrink-0 text-(--linear-text-tertiary)'
+        className={cn(styles.icon, 'shrink-0 text-(--linear-text-tertiary)')}
         aria-hidden='true'
       />
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono text-[9.5px] tracking-[-0.01em] text-(--linear-text-secondary)',
+          'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-(--linear-text-secondary)',
+          styles.value,
           valueClassName
         )}
         title={url}
@@ -80,20 +110,24 @@ export function CopyableUrlRow({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : copyButtonTitle}
         className={cn(
-          'flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'flex shrink-0 items-center justify-center text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          styles.button,
           isCopied && 'text-success'
         )}
       >
-        <Copy className='h-[11px] w-[11px]' />
+        <Copy className={styles.glyph} />
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
       </button>
       <button
         type='button'
         onClick={handleOpen}
         title={openButtonTitle}
-        className='flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        className={cn(
+          'flex shrink-0 items-center justify-center text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          styles.button
+        )}
       >
-        <ExternalLink className='h-[11px] w-[11px]' />
+        <ExternalLink className={styles.glyph} />
         <span className='sr-only'>Open</span>
       </button>
     </div>

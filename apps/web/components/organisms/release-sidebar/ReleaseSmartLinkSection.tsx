@@ -16,7 +16,7 @@ export function ReleaseSmartLinkSection({
     <CopyableUrlRow
       url={smartLinkUrl}
       displayValue={smartLinkPath}
-      className='h-7 lg:gap-1.5 lg:px-2'
+      size='lg'
       copyButtonTitle='Copy link'
       openButtonTitle='Open smart link'
     />
