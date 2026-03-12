@@ -505,7 +505,7 @@ export function ReleaseFilterDropdown({
               )}
               aria-pressed={isOpen || hasAnyFilter}
             >
-              <Icon name='Filter' className='h-3.5 w-3.5' />
+              <Icon name='Filter' className='h-4 w-4' strokeWidth={2.35} />
               <span className='sr-only md:not-sr-only'>Filter</span>
             </Button>
           </DropdownMenuTrigger>

@@ -721,10 +721,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                     onClick={handleNewRelease}
                     className={cn(
                       APP_CONTROL_BUTTON_CLASS,
-                      'h-9 rounded-[9px] border-(--linear-border-subtle) bg-transparent px-3.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:[stroke-width:2.2]'
+                      'h-10 rounded-[10px] border-(--linear-border-subtle) bg-transparent px-4 text-[13.5px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-4 [&_svg]:w-4'
                     )}
                   >
-                    <Icon name='Plus' className='h-3.5 w-3.5' />
+                    <Icon name='Plus' className='h-4 w-4' strokeWidth={2.35} />
                     <span className='hidden sm:inline'>New Release</span>
                   </Button>
                 ) : undefined
