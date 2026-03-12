@@ -207,10 +207,10 @@
   --linear-app-content-padding-y: 12px;
   --linear-app-drawer-header-height: 40px;
   --linear-app-drawer-padding-x: 14px;
-  --linear-app-control-height-sm: 24px;
-  --linear-app-control-padding-x: 7px;
+  --linear-app-control-height-sm: 26px;
+  --linear-app-control-padding-x: 8px;
   --linear-app-control-radius: 7px;
-  --linear-app-toolbar-gap: 3px;
+  --linear-app-toolbar-gap: 4px;
   --linear-app-content-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:

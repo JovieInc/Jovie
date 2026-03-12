@@ -156,7 +156,7 @@ function ActiveFilterPill({
 
   return (
     <div className='flex items-center gap-0.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[11px]'>
-      <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
+      <div className='flex items-center gap-1.5 py-1 pl-2.5 pr-1'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-(--linear-text-tertiary)'>
             {icon}
@@ -493,14 +493,7 @@ export function ReleaseFilterDropdown({
       <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
         <TooltipShortcut label='Filter' shortcut='F' side='bottom'>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant='ghost'
-              size='sm'
-              className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent px-2 text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) md:px-3',
-                buttonClassName
-              )}
-            >
+            <Button variant='ghost' size='sm' className={cn(buttonClassName)}>
               <Icon name='Filter' className='h-3.5 w-3.5' />
               <span className='sr-only md:not-sr-only'>Filter</span>
             </Button>
