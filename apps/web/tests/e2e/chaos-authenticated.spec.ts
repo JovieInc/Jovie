@@ -59,7 +59,7 @@ interface ChaosResult {
 const CHAOS_WARMUP_TIMEOUT = 120_000;
 const CHAOS_PAGE_RETRIES = 1;
 const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
-const CHAOS_MAX_ELEMENTS_PER_PAGE = IS_FAST_ITERATION ? 8 : 20;
+const CHAOS_MAX_ELEMENTS_PER_PAGE = IS_FAST_ITERATION ? 4 : 20;
 
 function isReactError(text: string): boolean {
   const lower = text.toLowerCase();
@@ -432,6 +432,7 @@ const SETTINGS_PAGES = [
   '/app/settings/branding',
   '/app/settings/ad-pixels',
 ];
+const FAST_SETTINGS_PAGES = ['/app/settings', '/app/settings/ad-pixels'];
 
 const ADMIN_PAGES = [
   '/app/admin',
@@ -457,7 +458,9 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
     const activePages = IS_FAST_ITERATION
       ? FAST_DASHBOARD_PAGES
       : DASHBOARD_PAGES;
-    await warmupChaosRoutes(page, activePages);
+    if (!IS_FAST_ITERATION) {
+      await warmupChaosRoutes(page, activePages);
+    }
 
     const { errors } = await runChaosTestGroup(
       page,
@@ -473,11 +476,16 @@ test.describe('Authenticated Chaos Testing @chaos', () => {
   });
 
   test('Settings pages chaos test', async ({ page }, testInfo) => {
-    await warmupChaosRoutes(page, SETTINGS_PAGES);
+    const activePages = IS_FAST_ITERATION
+      ? FAST_SETTINGS_PAGES
+      : SETTINGS_PAGES;
+    if (!IS_FAST_ITERATION) {
+      await warmupChaosRoutes(page, activePages);
+    }
 
     const { errors } = await runChaosTestGroup(
       page,
-      SETTINGS_PAGES,
+      activePages,
       'Settings Pages',
       testInfo
     );
@@ -507,7 +515,9 @@ test.describe('Admin Chaos Testing @chaos', () => {
       return;
     }
 
-    await warmupChaosRoutes(page, activePages);
+    if (!IS_FAST_ITERATION) {
+      await warmupChaosRoutes(page, activePages);
+    }
 
     const { errors } = await runChaosTestGroup(
       page,
