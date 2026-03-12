@@ -6,6 +6,7 @@ import {
   getTracksForReleaseWithProviders,
 } from '@/lib/discography/queries';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { mapProviderLinksToViewModel } from '@/lib/discography/view-models';
 
 export const runtime = 'nodejs';
 
@@ -65,11 +66,11 @@ export async function GET(
       previewUrl: track.previewUrl,
       audioUrl: track.audioUrl,
       audioFormat: track.audioFormat,
-      providers: track.providerLinks.map(link => ({
-        key: link.providerId,
-        label: link.providerId,
-        url: link.url ?? '',
-      })),
+      providers: mapProviderLinksToViewModel({
+        providerLinks: track.providerLinks,
+        profileHandle: handle,
+        slug: track.slug,
+      }),
     }));
 
     return NextResponse.json(mapped, { headers: NO_STORE_HEADERS });
