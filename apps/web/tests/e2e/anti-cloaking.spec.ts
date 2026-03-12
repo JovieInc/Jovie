@@ -412,6 +412,11 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
   });
 
   test.describe('Security Headers and Compliance', () => {
+    test.skip(
+      isFastIteration,
+      'Compliance-oriented anti-cloaking checks run in the slower lane'
+    );
+
     test('should include proper security headers on all responses', async ({
       page,
     }) => {
@@ -469,6 +474,11 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
     test('should have consistent response structure for different user agents', async ({
       page,
     }) => {
+      test.skip(
+        isFastIteration,
+        'User-agent response parity runs in the slower anti-cloaking lane'
+      );
+
       // This test needs database to create wrapped links
       test.skip(!hasDatabase, 'Requires database for wrapped links');
 
@@ -556,6 +566,11 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
   });
 
   test.describe('Error Handling', () => {
+    test.skip(
+      isFastIteration,
+      'Error-path anti-cloaking checks run in the slower lane'
+    );
+
     test('should handle invalid URLs gracefully', async ({ page }) => {
       const response = await createWrappedLink(page, {
         url: TEST_URLS.invalid,

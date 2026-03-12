@@ -23,8 +23,17 @@ const authStateMaxAgeMs = Number(
 );
 const forwardedArgs =
   process.argv[2] === '--' ? process.argv.slice(3) : process.argv.slice(2);
+const hasExplicitWorkers = forwardedArgs.some(
+  (arg, index) =>
+    arg === '--workers' ||
+    arg.startsWith('--workers=') ||
+    (arg === '-j' && forwardedArgs[index + 1] != null)
+);
+const fastWorkerCount = process.env.E2E_FAST_WORKERS ?? '4';
 
-const defaultArgs = ['test', '--no-deps'];
+const defaultArgs = hasExplicitWorkers
+  ? ['test', '--no-deps']
+  : ['test', '--no-deps', '--workers', fastWorkerCount];
 const sharedEnv = {
   ...process.env,
   BASE_URL: process.env.BASE_URL || 'http://localhost:3100',
