@@ -166,10 +166,7 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleOpenConfirmation}
       disabled={disabled || isExporting}
-      className={cn(
-        APP_CONTROL_BUTTON_CLASS,
-        className
-      )}
+      className={cn(APP_CONTROL_BUTTON_CLASS, className)}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >

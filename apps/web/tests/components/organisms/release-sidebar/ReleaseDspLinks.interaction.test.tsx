@@ -62,8 +62,8 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
-vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
-  DspProviderIcon: ({ provider }: { provider: string }) => (
+vi.mock('@/components/atoms/ProviderIcon', () => ({
+  ProviderIcon: ({ provider }: { provider: string }) => (
     <span data-testid={`provider-icon-${provider}`} />
   ),
 }));

@@ -8,9 +8,6 @@
  */
 export function VerticalDivider() {
   return (
-    <div
-      className='h-5 w-px bg-(--linear-border-subtle)'
-      aria-hidden='true'
-    />
+    <div className='h-5 w-px bg-(--linear-border-subtle)' aria-hidden='true' />
   );
 }

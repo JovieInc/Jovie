@@ -43,7 +43,9 @@ const SIZE_CLASSES = {
   lg: 'h-6 w-6',
 };
 
-const DSP_PROVIDER_MAP: Partial<Record<DspProviderId, Exclude<DspProviderId, 'musicbrainz'>>> = {
+const DSP_PROVIDER_MAP: Partial<
+  Record<DspProviderId, Exclude<DspProviderId, 'musicbrainz'>>
+> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
   deezer: 'deezer',

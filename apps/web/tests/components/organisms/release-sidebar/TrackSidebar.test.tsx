@@ -72,7 +72,7 @@ describe('TrackSidebar', () => {
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
 
     expect(
-      screen.getByText('No platform links available.')
+      screen.getByText('No platform links available for this track.')
     ).toBeInTheDocument();
   });
 });

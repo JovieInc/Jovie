@@ -12,9 +12,9 @@ import {
 } from '@/components/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,

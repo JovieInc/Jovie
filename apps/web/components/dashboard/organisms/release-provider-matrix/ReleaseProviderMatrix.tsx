@@ -728,7 +728,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            {showImportProgress && (
+            {showReleasesTable && (
               <ImportProgressBanner
                 artistName={artistName}
                 importedCount={importedCount}

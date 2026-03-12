@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -82,14 +83,16 @@ describe('AdminUsersTableUnified', () => {
     });
 
     render(
-      <AdminUsersTableUnified
-        users={[userRow]}
-        page={1}
-        pageSize={20}
-        total={1}
-        search=''
-        sort='created_desc'
-      />
+      <TooltipProvider>
+        <AdminUsersTableUnified
+          users={[userRow]}
+          page={1}
+          pageSize={20}
+          total={1}
+          search=''
+          sort='created_desc'
+        />
+      </TooltipProvider>
     );
 
     expect(screen.getByText('Ari Lane')).toBeInTheDocument();
@@ -115,14 +118,16 @@ describe('AdminUsersTableUnified', () => {
     });
 
     render(
-      <AdminUsersTableUnified
-        users={[userRow]}
-        page={1}
-        pageSize={20}
-        total={1}
-        search=''
-        sort='created_desc'
-      />
+      <TooltipProvider>
+        <AdminUsersTableUnified
+          users={[userRow]}
+          page={1}
+          pageSize={20}
+          total={1}
+          search=''
+          sort='created_desc'
+        />
+      </TooltipProvider>
     );
 
     expect(screen.getByTestId('desktop-table')).toBeInTheDocument();

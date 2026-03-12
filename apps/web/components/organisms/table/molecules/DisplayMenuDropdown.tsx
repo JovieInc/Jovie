@@ -35,7 +35,9 @@ function ToggleSwitch({
       onClick={onToggle}
       className='flex w-full items-center justify-between gap-2 rounded-[8px] px-1.5 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
-      <span className='text-[13px] text-(--linear-text-secondary)'>{label}</span>
+      <span className='text-[13px] text-(--linear-text-secondary)'>
+        {label}
+      </span>
       <span
         className={cn(
           'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',

@@ -1,7 +1,7 @@
 'use client';
 
-import * as React from 'react';
 import type { ButtonProps } from '@jovie/ui';
+import * as React from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 
 export type HeaderIconButtonSize = 'xs' | 'sm' | 'md';
@@ -18,12 +18,7 @@ export const HeaderIconButton = React.forwardRef<
   HTMLButtonElement,
   HeaderIconButtonProps
 >(function HeaderIconButton(
-  {
-    children,
-    ariaLabel,
-    size = 'md',
-    ...props
-  },
+  { children, ariaLabel, size = 'md', ...props },
   ref
 ) {
   const SIZE_CLASS_MAP: Record<HeaderIconButtonSize, string> = {

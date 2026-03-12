@@ -11,8 +11,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey } from '@/lib/discography/types';
-import { getContrastSafeIconColor } from '@/lib/utils/color';
 import { cn } from '@/lib/utils';
+import { getContrastSafeIconColor } from '@/lib/utils/color';
 
 interface ProviderIconProps {
   readonly provider: ProviderKey;
@@ -62,7 +62,10 @@ export function ProviderIcon({
 
   return (
     <span
-      className={cn('inline-flex shrink-0 items-center justify-center', className)}
+      className={cn(
+        'inline-flex shrink-0 items-center justify-center',
+        className
+      )}
       style={{ color }}
     >
       <SocialIcon

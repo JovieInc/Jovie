@@ -1,3 +1,4 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,19 +67,21 @@ function renderToolbar(
   };
 
   render(
-    <AdminCreatorsToolbar
-      basePath='/admin/creators'
-      search=''
-      sort='newest'
-      pageSize={20}
-      from={1}
-      to={2}
-      total={2}
-      clearHref='/admin/creators'
-      profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
-      {...handlers}
-      {...props}
-    />
+    <TooltipProvider>
+      <AdminCreatorsToolbar
+        basePath='/admin/creators'
+        search=''
+        sort='newest'
+        pageSize={20}
+        from={1}
+        to={2}
+        total={2}
+        clearHref='/admin/creators'
+        profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
+        {...handlers}
+        {...props}
+      />
+    </TooltipProvider>
   );
 
   return handlers;
@@ -140,7 +143,9 @@ describe('AdminCreatorsToolbar interactions', () => {
   it('renders normal toolbar mode without bulk actions when no rows are selected', () => {
     renderToolbar({ selectedIds: new Set() });
 
-    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Search creators' })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Delete' })
     ).not.toBeInTheDocument();

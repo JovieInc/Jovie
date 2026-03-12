@@ -179,6 +179,30 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
   ),
+  DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerTabs: ({
+    value,
+    onValueChange,
+    options,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: Array<{ value: string; label: string }>;
+  }) => (
+    <div>
+      {options.map(option => (
+        <button
+          key={option.value}
+          type='button'
+          aria-selected={value === option.value}
+          role='tab'
+          onClick={() => onValueChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  ),
 }));
 
 vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({

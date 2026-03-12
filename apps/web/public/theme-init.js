@@ -6,9 +6,7 @@
         ? localStorage.getItem('jovie-theme')
         : null;
     var nextTheme =
-      storedTheme === 'light' || storedTheme === 'dark'
-        ? storedTheme
-        : 'dark';
+      storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'dark';
 
     root.classList.remove('light', 'dark');
     root.classList.add(nextTheme);

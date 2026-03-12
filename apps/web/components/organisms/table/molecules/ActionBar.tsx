@@ -14,7 +14,12 @@ interface ActionBarProps {
 
 export function ActionBar({ children, className }: ActionBarProps) {
   return (
-    <div className={cn('flex items-center gap-[var(--linear-app-toolbar-gap)]', className)}>
+    <div
+      className={cn(
+        'flex items-center gap-[var(--linear-app-toolbar-gap)]',
+        className
+      )}
+    >
       {children}
     </div>
   );

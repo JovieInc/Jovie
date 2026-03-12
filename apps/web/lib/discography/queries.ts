@@ -327,23 +327,23 @@ export async function getReleasesForProfile(
   // Fetch track summaries (duration, ISRC) in parallel with provider links
   const [trackSummaries, artistNamesByRelease, providerLinksResult] =
     await Promise.all([
-    getTrackSummariesForReleases(releaseIds),
-    getArtistNamesForReleases(releaseIds),
-    hasProviderLinksTable().then(async hasTable => {
-      if (!hasTable) return [];
-      if (releaseIds.length === 0) return [];
-      // Use SQL filtering instead of JavaScript for better performance
-      return db
-        .select()
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'release'),
-            inArray(providerLinks.releaseId, releaseIds)
-          )
-        );
-    }),
-  ]);
+      getTrackSummariesForReleases(releaseIds),
+      getArtistNamesForReleases(releaseIds),
+      hasProviderLinksTable().then(async hasTable => {
+        if (!hasTable) return [];
+        if (releaseIds.length === 0) return [];
+        // Use SQL filtering instead of JavaScript for better performance
+        return db
+          .select()
+          .from(providerLinks)
+          .where(
+            and(
+              eq(providerLinks.ownerType, 'release'),
+              inArray(providerLinks.releaseId, releaseIds)
+            )
+          );
+      }),
+    ]);
 
   // Group links by release ID
   const linksByRelease = new Map<string, ProviderLink[]>();

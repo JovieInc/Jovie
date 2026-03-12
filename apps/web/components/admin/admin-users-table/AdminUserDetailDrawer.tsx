@@ -151,7 +151,13 @@ function UserHeader({ user }: { readonly user: AdminUserRow }) {
   );
 }
 
-function IdValue({ value, label }: { readonly value: string; readonly label: string }) {
+function IdValue({
+  value,
+  label,
+}: {
+  readonly value: string;
+  readonly label: string;
+}) {
   return (
     <div className='flex min-w-0 items-center justify-end gap-1'>
       <span className='truncate font-mono text-[11px] text-(--linear-text-primary)'>
