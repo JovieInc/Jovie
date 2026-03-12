@@ -1,6 +1,8 @@
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
+const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Homepage E2E Tests (consolidated from homepage + featured-artists)
  *
@@ -9,6 +11,10 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.skip(
+  isFastIteration,
+  'Homepage coverage runs in the lighter smoke-public and content-gate fast lanes'
+);
 
 /**
  * Force all DeferredSections to render by patching IntersectionObserver

@@ -225,6 +225,11 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
     });
 
     test('should handle invalid short IDs gracefully', async ({ page }) => {
+      test.skip(
+        isFastIteration,
+        'Invalid ID 404 coverage runs in the slower anti-cloaking lane'
+      );
+
       const response = await getRequestWithRetry(page, '/go/invalid-id');
       expect(response.status()).toBe(404);
     });
@@ -258,6 +263,11 @@ test.describe('Anti-Cloaking Link Wrapping', () => {
     });
 
     test('should complete human verification flow', async ({ page }) => {
+      test.skip(
+        isFastIteration,
+        'Human verification flow runs in the slower anti-cloaking lane'
+      );
+
       const response = await createWrappedLink(page, {
         url: TEST_URLS.sensitive,
         platform: 'external',
