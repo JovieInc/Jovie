@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
-import { memo, type ReactNode } from 'react';
+import { memo, type ReactNode, useState } from 'react';
 import {
   APP_CONTROL_BUTTON_CLASS,
   AppIconButton,
@@ -84,8 +84,11 @@ const RELEASE_VIEW_OPTIONS = [
 
 const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'px-2.5 md:px-3'
+  'gap-1.5 px-3 text-[12.5px] [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
+
+const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
+  'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
 function InlineReleaseViewTabs({
   value,
@@ -234,8 +237,10 @@ function LinearStyleDisplayMenu({
   triggerClassName?: string;
   compact?: boolean;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <TooltipShortcut
         label='Display'
         shortcut={`${GLYPH_SHIFT}V`}
@@ -247,7 +252,8 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               APP_CONTROL_BUTTON_CLASS,
-              'px-2 md:px-3',
+              'px-3 text-[12.5px] [&_svg]:h-3.5 [&_svg]:w-3.5',
+              isOpen && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS,
               triggerClassName
             )}
           >
@@ -349,8 +355,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               onClick={onSearchToggle}
               className={cn(
                 RELEASE_TOOLBAR_BUTTON_CLASS,
-                isSearchOpen &&
-                  'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
+                isSearchOpen && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS
               )}
               aria-pressed={isSearchOpen}
             >

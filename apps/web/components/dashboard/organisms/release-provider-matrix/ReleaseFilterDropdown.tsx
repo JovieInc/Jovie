@@ -379,6 +379,9 @@ interface ReleaseFilterDropdownProps {
   readonly buttonClassName?: string;
 }
 
+const FILTER_TRIGGER_ACTIVE_CLASS =
+  'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+
 export function ReleaseFilterDropdown({
   filters,
   onFiltersChange,
@@ -493,7 +496,15 @@ export function ReleaseFilterDropdown({
       <DropdownMenu open={isOpen} onOpenChange={handleOpenChange}>
         <TooltipShortcut label='Filter' shortcut='F' side='bottom'>
           <DropdownMenuTrigger asChild>
-            <Button variant='ghost' size='sm' className={cn(buttonClassName)}>
+            <Button
+              variant='ghost'
+              size='sm'
+              className={cn(
+                buttonClassName,
+                (isOpen || hasAnyFilter) && FILTER_TRIGGER_ACTIVE_CLASS
+              )}
+              aria-pressed={isOpen || hasAnyFilter}
+            >
               <Icon name='Filter' className='h-3.5 w-3.5' />
               <span className='sr-only md:not-sr-only'>Filter</span>
             </Button>
