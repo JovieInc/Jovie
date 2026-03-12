@@ -721,7 +721,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                     onClick={handleNewRelease}
                     className={cn(
                       APP_CONTROL_BUTTON_CLASS,
-                      'h-[34px] rounded-[8px] border-(--linear-border-subtle) bg-transparent px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
+                      'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
                     )}
                   >
                     <Icon
