@@ -30,7 +30,7 @@ import {
   checkSpotifyPublicSearchRateLimit,
   checkSpotifySearchRateLimit,
 } from '@/lib/rate-limit';
-import { type SearchArtistResult, spotifyClient } from '@/lib/spotify/client';
+import { type SearchArtistResult, spotifyClient } from '@/lib/spotify';
 import { type SanitizedArtist } from '@/lib/spotify/sanitize';
 import {
   artistSearchSchema,

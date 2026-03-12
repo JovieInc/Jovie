@@ -263,6 +263,18 @@ class SpotifyClientManager {
   }
 
   /**
+   * Public passthrough for Spotify API requests using the managed stack.
+   * Intended for modules that need raw Spotify payloads while still sharing
+   * token refresh, timeout, retry, and circuit-breaker behavior.
+   */
+  async requestJson<T>(
+    endpoint: string,
+    options: RequestInit = {}
+  ): Promise<T> {
+    return this.request<T>(endpoint, options);
+  }
+
+  /**
    * Execute a single HTTP request with timeout handling.
    * Extracted to reduce nesting depth in the request method.
    */

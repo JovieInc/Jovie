@@ -156,7 +156,7 @@ async function probeSpotify(): Promise<ConnectivityResult> {
   const start = Date.now();
   try {
     // Dynamic import to avoid pulling server-only module at module level
-    const { spotifyClient } = await import('@/lib/spotify/client');
+    const { spotifyClient } = await import('@/lib/spotify');
     const token = await spotifyClient.getAccessToken();
     const latencyMs = Date.now() - start;
 

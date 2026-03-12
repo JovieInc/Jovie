@@ -1,14 +1,14 @@
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  getSpotifyArtist as getSpotifyArtistFromClient,
+  getSpotifyArtistsBatch as getSpotifyArtistsBatchFromClient,
+  spotifyClient,
+} from '@/lib/spotify/client';
 
-// Spotify API configuration
-const SPOTIFY_CLIENT_ID = env.SPOTIFY_CLIENT_ID;
-const SPOTIFY_CLIENT_SECRET = env.SPOTIFY_CLIENT_SECRET;
-
-interface SpotifyTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
+interface SpotifySearchResponse {
+  artists: {
+    items: SpotifyArtist[];
+  };
 }
 
 interface SpotifyArtist {
@@ -17,12 +17,6 @@ interface SpotifyArtist {
   images?: Array<{ url: string; height: number; width: number }>;
   popularity: number;
   followers?: { total: number };
-}
-
-interface SpotifySearchResponse {
-  artists: {
-    items: SpotifyArtist[];
-  };
 }
 
 // Spotify Album types
@@ -104,79 +98,16 @@ interface SpotifyAlbumsResponse {
   next: string | null;
 }
 
-// Cached Spotify access token to avoid redundant token requests.
-// Each token lasts ~3600s; we refresh 60s before expiry.
-let cachedSpotifyToken: { token: string; expiresAt: number } | null = null;
-
-// Get Spotify access token (cached until near-expiry)
-async function getSpotifyToken(): Promise<string | null> {
-  if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-    return null;
-  }
-
-  // Return cached token if still valid (with 60s buffer)
-  if (
-    cachedSpotifyToken &&
-    Date.now() < cachedSpotifyToken.expiresAt - 60_000
-  ) {
-    return cachedSpotifyToken.token;
-  }
-
-  try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Authorization: `Basic ${Buffer.from(
-          `${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`
-        ).toString('base64')}`,
-      },
-      body: 'grant_type=client_credentials',
-      signal: AbortSignal.timeout(10_000),
-    });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data: SpotifyTokenResponse = await response.json();
-    cachedSpotifyToken = {
-      token: data.access_token,
-      expiresAt: Date.now() + data.expires_in * 1000,
-    };
-    return data.access_token;
-  } catch {
-    return null;
-  }
-}
-
 // Search for artists on Spotify
 export async function searchSpotifyArtists(
   query: string,
   limit: number = 5
 ): Promise<SpotifyArtist[]> {
-  const token = await getSpotifyToken();
-  if (!token) {
-    return [];
-  }
-
   try {
-    const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(
-        query
-      )}&type=artist&limit=${limit}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+    const data = await spotifyClient.requestJson<SpotifySearchResponse>(
+      `/search?q=${encodeURIComponent(query)}&type=artist&limit=${limit}`
     );
 
-    if (!response.ok) {
-      return [];
-    }
-
-    const data: SpotifySearchResponse = await response.json();
     return data.artists.items;
   } catch {
     return [];
@@ -187,29 +118,7 @@ export async function searchSpotifyArtists(
 export async function getSpotifyArtist(
   artistId: string
 ): Promise<SpotifyArtist | null> {
-  const token = await getSpotifyToken();
-  if (!token) {
-    return null;
-  }
-
-  try {
-    const response = await fetch(
-      `https://api.spotify.com/v1/artists/${artistId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    return await response.json();
-  } catch {
-    return null;
-  }
+  return (await getSpotifyArtistFromClient(artistId)) as SpotifyArtist | null;
 }
 
 /**
@@ -219,55 +128,7 @@ export async function getSpotifyArtist(
 export async function getSpotifyArtistsBatch(
   artistIds: string[]
 ): Promise<SpotifyArtist[]> {
-  const token = await getSpotifyToken();
-  if (!token || artistIds.length === 0) {
-    return [];
-  }
-
-  // Spotify API allows max 50 artists per request
-  const chunks: string[][] = [];
-  for (let i = 0; i < artistIds.length; i += 50) {
-    chunks.push(artistIds.slice(i, i + 50));
-  }
-
-  const artists: SpotifyArtist[] = [];
-
-  try {
-    for (const chunk of chunks) {
-      const response = await fetch(
-        `https://api.spotify.com/v1/artists?ids=${chunk.join(',')}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        await captureError(
-          'Spotify artists batch API error',
-          new Error(`Status ${response.status}`),
-          {
-            artistIds: chunk,
-            status: response.status,
-            operation: 'getSpotifyArtistsBatch',
-          }
-        );
-        continue;
-      }
-
-      const data: { artists: SpotifyArtist[] } = await response.json();
-      artists.push(...data.artists.filter(Boolean));
-    }
-
-    return artists;
-  } catch (error) {
-    await captureError('Failed to fetch Spotify artists batch', error, {
-      artistIdsCount: artistIds.length,
-      operation: 'getSpotifyArtistsBatch',
-    });
-    return [];
-  }
+  return (await getSpotifyArtistsBatchFromClient(artistIds)) as SpotifyArtist[];
 }
 
 // Build Spotify artist URL from artist ID
@@ -297,11 +158,6 @@ export async function getSpotifyArtistAlbums(
     market?: string;
   } = {}
 ): Promise<SpotifyAlbum[]> {
-  const token = await getSpotifyToken();
-  if (!token) {
-    return [];
-  }
-
   const includeGroups = options.includeGroups ?? [
     'album',
     'single',
@@ -323,40 +179,17 @@ export async function getSpotifyArtistAlbums(
         market,
       });
 
-      const response = await fetch(
-        `https://api.spotify.com/v1/artists/${artistId}/albums?${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      const data = await spotifyClient.requestJson<SpotifyAlbumsResponse>(
+        `/artists/${artistId}/albums?${params}`
       );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        await captureError(
-          'Spotify artist albums API error',
-          new Error(`Status ${response.status}: ${errorText}`),
-          {
-            artistId,
-            status: response.status,
-            operation: 'getSpotifyArtistAlbums',
-          }
-        );
-        break;
-      }
-
-      const data: SpotifyAlbumsResponse = await response.json();
       albums.push(...data.items);
 
-      // Check if there are more albums to fetch
       if (data.next && albums.length < data.total) {
         offset += limit;
       } else {
         hasMore = false;
       }
 
-      // Safety limit to prevent infinite loops
       if (albums.length >= 500) {
         hasMore = false;
       }
@@ -379,35 +212,10 @@ export async function getSpotifyAlbum(
   albumId: string,
   market: string = 'US'
 ): Promise<SpotifyAlbumFull | null> {
-  const token = await getSpotifyToken();
-  if (!token) {
-    return null;
-  }
-
   try {
-    const response = await fetch(
-      `https://api.spotify.com/v1/albums/${albumId}?market=${market}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+    return await spotifyClient.requestJson<SpotifyAlbumFull>(
+      `/albums/${albumId}?market=${market}`
     );
-
-    if (!response.ok) {
-      await captureError(
-        'Spotify album API error',
-        new Error(`Status ${response.status}`),
-        {
-          albumId,
-          status: response.status,
-          operation: 'getSpotifyAlbum',
-        }
-      );
-      return null;
-    }
-
-    return await response.json();
   } catch (error) {
     await captureError('Failed to fetch Spotify album', error, {
       albumId,
@@ -424,12 +232,10 @@ export async function getSpotifyAlbums(
   albumIds: string[],
   market: string = 'US'
 ): Promise<SpotifyAlbumFull[]> {
-  const token = await getSpotifyToken();
-  if (!token || albumIds.length === 0) {
+  if (albumIds.length === 0) {
     return [];
   }
 
-  // Spotify API allows max 20 albums per request
   const chunks: string[][] = [];
   for (let i = 0; i < albumIds.length; i += 20) {
     chunks.push(albumIds.slice(i, i + 20));
@@ -439,29 +245,9 @@ export async function getSpotifyAlbums(
 
   try {
     for (const chunk of chunks) {
-      const response = await fetch(
-        `https://api.spotify.com/v1/albums?ids=${chunk.join(',')}&market=${market}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        await captureError(
-          'Spotify albums batch API error',
-          new Error(`Status ${response.status}`),
-          {
-            albumIds: chunk,
-            status: response.status,
-            operation: 'getSpotifyAlbums',
-          }
-        );
-        continue;
-      }
-
-      const data: { albums: SpotifyAlbumFull[] } = await response.json();
+      const data = await spotifyClient.requestJson<{
+        albums: SpotifyAlbumFull[];
+      }>(`/albums?ids=${chunk.join(',')}&market=${market}`);
       albums.push(...data.albums.filter(Boolean));
     }
 
@@ -482,12 +268,10 @@ export async function getSpotifyTracks(
   trackIds: string[],
   market: string = 'US'
 ): Promise<SpotifyTrackFull[]> {
-  const token = await getSpotifyToken();
-  if (!token || trackIds.length === 0) {
+  if (trackIds.length === 0) {
     return [];
   }
 
-  // Spotify API allows max 50 tracks per request
   const chunks: string[][] = [];
   for (let i = 0; i < trackIds.length; i += 50) {
     chunks.push(trackIds.slice(i, i + 50));
@@ -501,29 +285,9 @@ export async function getSpotifyTracks(
 
   try {
     for (const chunk of chunks) {
-      const response = await fetch(
-        `https://api.spotify.com/v1/tracks?ids=${chunk.join(',')}&market=${market}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        await captureError(
-          'Spotify tracks batch API error',
-          new Error(`Status ${response.status}`),
-          {
-            trackIds: chunk,
-            status: response.status,
-            operation: 'getSpotifyTracks',
-          }
-        );
-        continue;
-      }
-
-      const data: { tracks: SpotifyTrackFull[] } = await response.json();
+      const data = await spotifyClient.requestJson<{
+        tracks: SpotifyTrackFull[];
+      }>(`/tracks?ids=${chunk.join(',')}&market=${market}`);
       tracks.push(...data.tracks.filter(Boolean));
     }
 
@@ -581,7 +345,6 @@ export function getBestSpotifyImage(images: SpotifyImage[]): string | null {
     return null;
   }
 
-  // Sort by height descending and return the largest
   const sorted = [...images].sort((a, b) => (b.height || 0) - (a.height || 0));
   return sorted[0]?.url ?? null;
 }
@@ -590,7 +353,6 @@ export function getBestSpotifyImage(images: SpotifyImage[]): string | null {
  * Generate a URL-safe slug from a release title
  */
 export function generateReleaseSlug(title: string, spotifyId: string): string {
-  // Guard against undefined to prevent runtime errors
   if (!title || !spotifyId) return '';
 
   const slugified = title
@@ -600,7 +362,12 @@ export function generateReleaseSlug(title: string, spotifyId: string): string {
     .replaceAll(/-+/g, '-')
     .slice(0, 50);
 
-  // Append short ID for uniqueness
   const shortId = spotifyId.slice(-6);
   return `${slugified}-${shortId}`;
 }
+
+export {
+  isSpotifyAvailable,
+  type SearchArtistResult,
+  spotifyClient,
+} from '@/lib/spotify/client';
