@@ -16,6 +16,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { executeWithRetry } from '@/lib/resilience/primitives';
 import {
   getCachedArtistProfile,
   getCachedIsrcTrack,
@@ -144,15 +145,6 @@ function isNonRetryableError(error: unknown): boolean {
 }
 
 /**
- * Calculate exponential backoff delay with jitter.
- */
-function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
-  const jitter =
-    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 0.3 + 0.85; // 0.85-1.15x
-  return baseDelayMs * Math.pow(2, attempt) * jitter;
-}
-
-/**
  * Retry wrapper with exponential backoff for transient failures.
  * Does not retry on auth errors (401) or not found (404).
  */
@@ -161,24 +153,12 @@ async function withRetry<T>(
   maxRetries = DEFAULT_MAX_RETRIES,
   baseDelayMs = DEFAULT_BASE_DELAY_MS
 ): Promise<T> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (isNonRetryableError(error)) throw error;
-      if (attempt >= maxRetries) throw lastError;
-
-      const delayMs = calculateBackoffDelay(attempt, baseDelayMs);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
-  // This should never be reached, but TypeScript needs it
-  throw lastError ?? new Error('Unknown retry failure');
+  return executeWithRetry(fn, {
+    maxRetries,
+    baseDelayMs,
+    jitterRatio: 0.15,
+    isRetryable: error => !isNonRetryableError(error),
+  });
 }
 
 // ============================================================================

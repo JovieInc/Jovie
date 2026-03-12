@@ -4,6 +4,7 @@
  * Retry logic for transient database failures with exponential backoff.
  */
 
+import { executeWithRetry } from '@/lib/resilience/primitives';
 import { PERFORMANCE_THRESHOLDS } from '../config';
 import { dbCircuitBreaker } from './circuit-breaker';
 import { logDbError, logDbInfo } from './logging';
@@ -93,62 +94,59 @@ export async function withRetry<T>(
 
   return dbCircuitBreaker.execute(
     async () => {
-      let lastError: unknown;
+      let attempts = 0;
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          const result = await operation();
-          if (attempt > 1) {
-            logDbInfo(
-              'retry_success',
-              `Operation succeeded on attempt ${attempt}`,
-              { context }
-            );
-          }
-          return result;
-        } catch (error) {
-          lastError = error;
+      return executeWithRetry(operation, {
+        maxRetries: Math.max(0, maxRetries - 1),
+        baseDelayMs: DB_CONFIG.retryDelay,
+        backoffMultiplier: DB_CONFIG.retryBackoffMultiplier,
+        isRetryable: isRetryableError,
+        onRetry: ({ attempt, maxRetries: retryCount, error }) => {
+          attempts = attempt;
 
-          // Check if error is retryable
-          const isRetryable = isRetryableError(error);
-
-          const willRetry = attempt < maxRetries && isRetryable;
+          const totalAttempts = retryCount + 1;
+          const willRetry = attempt <= retryCount;
           logDbError(
             'retry_attempt',
             error,
             {
               context,
               attempt,
-              maxRetries,
-              isRetryable,
+              maxRetries: totalAttempts,
+              isRetryable: true,
               willRetry,
             },
-            // Log intermediate retryable failures as breadcrumbs only — they
-            // are expected transient events that will be retried. Capturing
-            // them as Sentry exceptions floods the error dashboard with noise
-            // for errors that the retry loop ultimately recovers from.
-            // Only the final unrecoverable throw (after all retries or a
-            // non-retryable error) reaches the caller and Sentry via normal
-            // exception propagation.
             { asBreadcrumb: willRetry }
           );
-
-          // Don't retry if not retryable or on last attempt
-          if (!isRetryable || attempt >= maxRetries) {
-            break;
+        },
+      })
+        .then(result => {
+          if (attempts > 0) {
+            logDbInfo(
+              'retry_success',
+              `Operation succeeded on attempt ${attempts + 1}`,
+              { context }
+            );
           }
-
-          // Exponential backoff delay
-          const delay =
-            DB_CONFIG.retryDelay *
-            Math.pow(DB_CONFIG.retryBackoffMultiplier, attempt - 1);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-
-      throw lastError instanceof Error
-        ? lastError
-        : new Error(String(lastError));
+          return result;
+        })
+        .catch(error => {
+          const isRetryable = isRetryableError(error);
+          const totalAttempts = maxRetries;
+          logDbError(
+            'retry_attempt',
+            error,
+            {
+              context,
+              attempt: Math.min(attempts + 1, totalAttempts),
+              maxRetries: totalAttempts,
+              isRetryable,
+              willRetry: false,
+            },
+            { asBreadcrumb: false }
+          );
+          throw error;
+        });
     },
     {
       shouldCountFailure: isRetryableError,

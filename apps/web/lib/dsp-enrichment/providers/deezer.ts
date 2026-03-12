@@ -16,6 +16,7 @@
 
 import 'server-only';
 
+import { executeWithRetry } from '@/lib/resilience/primitives';
 import { deezerCircuitBreaker } from '../circuit-breakers';
 import type { DeezerArtist, DeezerTrack, DspImageUrls } from '../types';
 
@@ -91,34 +92,17 @@ function isNonRetryableError(error: unknown): boolean {
   return false;
 }
 
-function calculateBackoffDelay(attempt: number, baseDelayMs: number): number {
-  const jitter =
-    (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 0.3 + 0.85;
-  return baseDelayMs * Math.pow(2, attempt) * jitter;
-}
-
 async function withRetry<T>(
   fn: () => Promise<T>,
   maxRetries = DEFAULT_MAX_RETRIES,
   baseDelayMs = DEFAULT_BASE_DELAY_MS
 ): Promise<T> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (isNonRetryableError(error)) throw error;
-      if (attempt >= maxRetries) throw lastError;
-
-      const delayMs = calculateBackoffDelay(attempt, baseDelayMs);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
-  throw lastError ?? new Error('Unknown retry failure');
+  return executeWithRetry(fn, {
+    maxRetries,
+    baseDelayMs,
+    jitterRatio: 0.15,
+    isRetryable: error => !isNonRetryableError(error),
+  });
 }
 
 // ============================================================================
