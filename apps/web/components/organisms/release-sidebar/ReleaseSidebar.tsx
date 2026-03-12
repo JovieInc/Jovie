@@ -31,6 +31,7 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
+import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -361,9 +362,9 @@ export function ReleaseSidebar({
   }, [release?.id]);
 
   const handleTrackClick = useCallback(
-    (track: TrackForDetail & Record<string, unknown>) => {
+    (track: ReleaseSidebarTrack) => {
       if (externalTrackClick) {
-        externalTrackClick(track as Parameters<typeof externalTrackClick>[0]);
+        externalTrackClick(track);
         return;
       }
       setSelectedTrack(track);
