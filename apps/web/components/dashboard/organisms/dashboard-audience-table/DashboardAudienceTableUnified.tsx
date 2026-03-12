@@ -42,7 +42,7 @@ import {
 import { AudienceTableSubheader } from './AudienceTableSubheader';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
-import { downloadVCard } from './utils';
+import { copyTextToClipboard, downloadVCard } from './utils';
 import {
   QuickActionsCell,
   renderLastActionCell,
@@ -290,13 +290,19 @@ export const DashboardAudienceTableUnified = memo(
     // Quick action: send notification (copies contact info for now)
     const handleSendNotification = React.useCallback(
       (member: AudienceMember) => {
-        if (member.email) {
-          void navigator.clipboard.writeText(member.email);
-          toast.success('Email copied - ready to send notification');
-        } else if (member.phone) {
-          void navigator.clipboard.writeText(member.phone);
-          toast.success('Phone copied - ready to send notification');
+        const contact = member.email ?? member.phone;
+        if (!contact) {
+          return;
         }
+
+        void copyTextToClipboard(contact).then(success => {
+          if (!success) {
+            toast.error('Unable to copy contact details');
+            return;
+          }
+
+          toast.success('Contact copied and ready for notification');
+        });
       },
       []
     );
@@ -328,8 +334,14 @@ export const DashboardAudienceTableUnified = memo(
             icon: ICON_COPY,
             onClick: () => {
               if (member.email) {
-                void navigator.clipboard.writeText(member.email);
-                toast.success('Email copied to clipboard');
+                void copyTextToClipboard(member.email).then(success => {
+                  if (success) {
+                    toast.success('Email copied to clipboard');
+                    return;
+                  }
+
+                  toast.error('Unable to copy email');
+                });
               }
             },
             disabled: !member.email,
@@ -340,8 +352,14 @@ export const DashboardAudienceTableUnified = memo(
             icon: ICON_PHONE,
             onClick: () => {
               if (member.phone) {
-                void navigator.clipboard.writeText(member.phone);
-                toast.success('Phone number copied to clipboard');
+                void copyTextToClipboard(member.phone).then(success => {
+                  if (success) {
+                    toast.success('Phone number copied to clipboard');
+                    return;
+                  }
+
+                  toast.error('Unable to copy phone number');
+                });
               }
             },
             disabled: !member.phone,
@@ -351,13 +369,7 @@ export const DashboardAudienceTableUnified = memo(
             label: 'Send notification',
             icon: ICON_BELL,
             onClick: () => {
-              if (member.email) {
-                void navigator.clipboard.writeText(member.email);
-                toast.success('Email copied - ready to send notification');
-              } else if (member.phone) {
-                void navigator.clipboard.writeText(member.phone);
-                toast.success('Phone copied - ready to send notification');
-              }
+              handleSendNotification(member);
             },
             disabled: !member.email && !member.phone,
           },
@@ -384,7 +396,7 @@ export const DashboardAudienceTableUnified = memo(
           },
         ];
       },
-      [setSelectedMember, profileId, handleRemoveMember]
+      [setSelectedMember, profileId, handleRemoveMember, handleSendNotification]
     );
 
     const columns = MEMBER_COLUMNS;

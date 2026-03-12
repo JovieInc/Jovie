@@ -11,6 +11,7 @@ import {
 import { Copy, MoreHorizontal } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AudienceMember } from '@/types';
 
@@ -18,19 +19,6 @@ interface AudienceRowActionsMenuProps {
   readonly row: AudienceMember;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
-}
-
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function AudienceRowActionsMenu({
@@ -43,7 +31,7 @@ export function AudienceRowActionsMenu({
 
   const handleCopyEmail = useCallback(async () => {
     if (!row.email) return;
-    const success = await copyTextToClipboard(row.email);
+    const success = await copyToClipboard(row.email);
     if (success) {
       setCopySuccess(true);
       notifications.success('Copied email');
@@ -55,7 +43,7 @@ export function AudienceRowActionsMenu({
 
   const handleCopyPhone = useCallback(async () => {
     if (!row.phone) return;
-    const success = await copyTextToClipboard(row.phone);
+    const success = await copyToClipboard(row.phone);
     if (success) {
       setCopySuccess(true);
       notifications.success('Copied phone number');
