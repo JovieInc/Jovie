@@ -44,6 +44,9 @@ vi.mock('@/components/organisms/table', () => ({
       {end}
     </div>
   ),
+  PageToolbarSearchForm: ({ submitAriaLabel }: { submitAriaLabel: string }) => (
+    <button type='submit'>{submitAriaLabel}</button>
+  ),
   TableBulkActionsToolbar: () => null,
   UnifiedTable: () => <div data-testid='desktop-table'>Desktop table</div>,
   useRowSelection: (rowIds: string[]) => mockUseRowSelection(rowIds),

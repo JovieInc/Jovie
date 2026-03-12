@@ -3,7 +3,6 @@
 import { Badge, Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Search, Users, X } from 'lucide-react';
-import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -11,14 +10,13 @@ import {
   AdminTableSubheader,
 } from '@/components/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   ExportCSVButton,
+  PageToolbarSearchForm,
   TableBulkActionsToolbar,
   UnifiedTable,
   useRowSelection,
@@ -448,39 +446,20 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   }
                   end={
                     <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'>
-                      <form
+                      <PageToolbarSearchForm
                         action={APP_ROUTES.ADMIN_USERS}
-                        method='get'
-                        className='relative isolate flex w-full items-center gap-2 sm:w-auto'
-                      >
-                        <input type='hidden' name='sort' value={sort} />
-                        <input type='hidden' name='q' value={searchTerm} />
-                        <AppSearchField
-                          value={searchTerm}
-                          onChange={setSearchTerm}
-                          placeholder='Search by email, name, or handle'
-                          ariaLabel='Search users by email, name, or handle'
-                          className='min-w-0 flex-1 sm:w-[280px] sm:flex-none'
-                        />
-                        <AppIconButton
-                          type='submit'
-                          ariaLabel='Search users'
-                          tooltipLabel='Search users'
-                        >
-                          <Search />
-                        </AppIconButton>
-                        {search ? (
-                          <AppIconButton
-                            asChild
-                            ariaLabel='Clear user search'
-                            tooltipLabel='Clear search'
-                          >
-                            <Link href='?'>
-                              <X />
-                            </Link>
-                          </AppIconButton>
-                        ) : null}
-                      </form>
+                        searchValue={searchTerm}
+                        onSearchValueChange={setSearchTerm}
+                        placeholder='Search by email, name, or handle'
+                        ariaLabel='Search users by email, name, or handle'
+                        submitAriaLabel='Search users'
+                        clearHref='?'
+                        clearAriaLabel='Clear user search'
+                        hiddenInputs={[{ name: 'sort', value: sort }]}
+                        fieldClassName='sm:w-[280px]'
+                        submitIcon={<Search />}
+                        clearIcon={<X />}
+                      />
                       <ExportCSVButton<AdminUserRow>
                         getData={() => users}
                         columns={usersCSVColumns}

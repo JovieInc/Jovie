@@ -30,6 +30,9 @@ vi.mock('@/components/organisms/table', () => ({
       {end}
     </div>
   ),
+  PageToolbarSearchForm: ({ submitAriaLabel }: { submitAriaLabel: string }) => (
+    <button type='submit'>{submitAriaLabel}</button>
+  ),
   ExportCSVButton: ({ disabled }: { disabled: boolean }) => (
     <button type='button' disabled={disabled}>
       Export

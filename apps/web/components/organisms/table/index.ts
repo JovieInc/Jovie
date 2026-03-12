@@ -99,6 +99,8 @@ export {
   PageToolbarActionButton,
   PageToolbarTabButton,
 } from './molecules/PageToolbar';
+export type { PageToolbarSearchFormProps } from './molecules/PageToolbarSearchForm';
+export { PageToolbarSearchForm } from './molecules/PageToolbarSearchForm';
 export { ResponsiveActionsCell } from './molecules/ResponsiveActionsCell';
 export { SocialLinksCell } from './molecules/SocialLinksCell';
 export type { BulkAction } from './molecules/TableBulkActionsToolbar';

@@ -10,11 +10,11 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useState } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { ExportCSVButton } from '@/components/organisms/table';
+import {
+  ExportCSVButton,
+  PageToolbarSearchForm,
+} from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
@@ -80,41 +80,24 @@ export function AdminCreatorsToolbar({
       end={
         hasSelection ? undefined : (
           <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'>
-            <form
+            <PageToolbarSearchForm
               action={basePath}
-              method='get'
-              className='relative isolate flex w-full items-center gap-2 sm:w-auto'
-            >
-              <input type='hidden' name='sort' value={sort} />
-              <input type='hidden' name='pageSize' value={pageSize} />
-              <input type='hidden' name='q' value={searchTerm} />
-              <AppSearchField
-                value={searchTerm}
-                onChange={setSearchTerm}
-                placeholder='Search by handle'
-                ariaLabel='Search creators by handle'
-                className='min-w-0 flex-1 sm:w-[240px] sm:flex-none'
-              />
-              <input type='hidden' name='page' value='1' />
-              <AppIconButton
-                type='submit'
-                ariaLabel='Search creators'
-                tooltipLabel='Search creators'
-              >
-                <Search />
-              </AppIconButton>
-              {search && search.length > 0 && (
-                <AppIconButton
-                  asChild
-                  ariaLabel='Clear creator search'
-                  tooltipLabel='Clear search'
-                >
-                  <Link href={clearHref}>
-                    <X />
-                  </Link>
-                </AppIconButton>
-              )}
-            </form>
+              searchValue={searchTerm}
+              onSearchValueChange={setSearchTerm}
+              placeholder='Search by handle'
+              ariaLabel='Search creators by handle'
+              submitAriaLabel='Search creators'
+              clearHref={clearHref}
+              clearAriaLabel='Clear creator search'
+              hiddenInputs={[
+                { name: 'sort', value: sort },
+                { name: 'pageSize', value: pageSize },
+                { name: 'page', value: 1 },
+              ]}
+              fieldClassName='sm:w-[240px]'
+              submitIcon={<Search />}
+              clearIcon={<X />}
+            />
             <ExportCSVButton<AdminCreatorProfileRow>
               getData={() => profiles}
               columns={creatorsCSVColumns}
