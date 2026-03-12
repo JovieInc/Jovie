@@ -162,7 +162,7 @@ export function useReleaseHeaderParts({
 
   const title = (
     <span className='group/isrc flex min-w-0 items-center gap-1'>
-      <span className='truncate font-mono text-[11px] tracking-[0.04em] text-(--linear-text-tertiary)'>
+      <span className='truncate font-mono text-[11.5px] tracking-[0.04em] text-(--linear-text-tertiary)'>
         {titleText}
       </span>
       {isrcValue && (

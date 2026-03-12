@@ -85,20 +85,20 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[116px]'>
+    <div className='min-h-[124px]'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
             <DrawerStatGrid>
-              <div className='space-y-1 pr-2.5'>
+              <div className='space-y-1.5 pr-3'>
                 <div className='h-[10px] w-14 rounded skeleton' />
-                <div className='h-4.5 w-10 rounded skeleton' />
-                <div className='h-[11px] w-10 rounded skeleton' />
+                <div className='h-5 w-10 rounded skeleton' />
+                <div className='h-3 w-10 rounded skeleton' />
               </div>
-              <div className='space-y-1 pl-2.5'>
+              <div className='space-y-1.5 pl-3'>
                 <div className='h-[10px] w-14 rounded skeleton' />
-                <div className='h-4.5 w-10 rounded skeleton' />
-                <div className='h-[11px] w-10 rounded skeleton' />
+                <div className='h-5 w-10 rounded skeleton' />
+                <div className='h-3 w-10 rounded skeleton' />
               </div>
             </DrawerStatGrid>
           </div>
