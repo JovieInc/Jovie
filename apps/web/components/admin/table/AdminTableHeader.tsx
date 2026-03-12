@@ -25,15 +25,15 @@ export function AdminTableHeader({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-start justify-between gap-3 border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-3',
+        'flex flex-wrap items-start justify-between gap-3 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-[var(--linear-app-header-padding-x)] py-2.5',
         className
       )}
     >
-      <div className='space-y-1'>
-        <h2 className='text-[14px] font-[590] tracking-[-0.01em] text-(--linear-text-primary)'>
+      <div className='space-y-0.5'>
+        <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
           {title}
         </h2>
-        <p className='text-[12px] leading-[16px] text-(--linear-text-secondary)'>
+        <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
           {subtitle}
         </p>
       </div>
@@ -59,8 +59,8 @@ export function AdminTableSubheader({
     <div
       className={cn(
         hasToolbar
-          ? 'bg-(--linear-bg-surface-0)'
-          : 'border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-2',
+          ? 'bg-(--linear-app-content-surface)'
+          : 'border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-[var(--linear-app-header-padding-x)] py-2',
         className
       )}
     >

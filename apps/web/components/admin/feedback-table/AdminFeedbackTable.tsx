@@ -193,7 +193,7 @@ export function AdminFeedbackTable({
         </div>
       )}
 
-      <div className='w-full lg:w-[58%] border-r border-subtle h-full'>
+      <div className='h-full w-full border-r border-(--linear-border-subtle) bg-(--linear-app-content-surface) lg:w-[58%]'>
         <AdminTableHeader
           title='Feedback'
           subtitle='Triage product feedback and close the loop with clear status.'
