@@ -17,9 +17,12 @@ const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isPublicNoAuthOnly = process.env.PUBLIC_NOAUTH_SMOKE === '1';
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
-const shouldSkipSeeding = isFastIteration || process.env.E2E_SKIP_SEED === '1';
-const shouldSkipWarmup = process.env.E2E_SKIP_WARMUP === '1';
+const shouldSkipSeeding =
+  isAuthRefreshOnly || isFastIteration || process.env.E2E_SKIP_SEED === '1';
+const shouldSkipWarmup =
+  isAuthRefreshOnly || process.env.E2E_SKIP_WARMUP === '1';
 const authStatePath = path.join(webRoot, 'tests', '.auth', 'user.json');
 const hasStoredAuthState = existsSync(authStatePath);
 const WRAP_LINK_WARMUP_IP = '198.51.100.250';
@@ -56,6 +59,9 @@ function isRealKey(key: string | undefined): key is string {
 async function globalSetup() {
   const startTime = Date.now();
   console.log('Starting E2E global setup...');
+  if (isAuthRefreshOnly) {
+    console.log('  Running auth-refresh-only setup');
+  }
 
   console.log('  Env files loaded:');
   console.log(

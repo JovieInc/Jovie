@@ -71,6 +71,7 @@ if (shouldRefreshAuthState()) {
   const authSetupResult = runPlaywright(
     ['test', 'tests/e2e/auth.setup.ts', '--project=auth-setup'],
     {
+      E2E_AUTH_REFRESH_ONLY: '1',
       E2E_SKIP_WARMUP: '1',
     }
   );
