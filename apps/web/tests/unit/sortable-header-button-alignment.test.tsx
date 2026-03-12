@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SortableHeaderButton as AdminSortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
-import { SortableHeaderButton as TableSortableHeaderButton } from '@/components/organisms/table/SortableHeaderButton';
+import {
+  SortableHeaderButton as AdminSortableHeaderButton,
+  SortableHeaderButton as TableSortableHeaderButton,
+} from '@/components/organisms/table/SortableHeaderButton';
 
 describe('SortableHeaderButton alignment', () => {
   it('uses a consistent icon+label gap in admin tables', () => {

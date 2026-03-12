@@ -14,7 +14,7 @@ import {
   SORTABLE_COLUMNS,
   SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
-import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
+import { SortableHeaderButton } from '@/components/organisms/table/SortableHeaderButton';
 import type { AdminCreatorProfilesSort } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 
