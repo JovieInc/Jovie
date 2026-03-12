@@ -29,7 +29,6 @@ import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
-import { PAGE_TOOLBAR_TAB_BUTTON_CLASS } from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -513,10 +512,21 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const headerActions = useMemo(
     () => (
       <div className='flex items-center gap-[var(--linear-app-toolbar-gap)]'>
+        {canCreateManualReleases ? (
+          <Button
+            variant='ghost'
+            size='sm'
+            onClick={handleNewRelease}
+            className='h-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          >
+            <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
+            <span className='hidden sm:inline'>New Release</span>
+          </Button>
+        ) : null}
         <DrawerToggleButton className='h-[var(--linear-app-control-height-sm)] w-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)' />
       </div>
     ),
-    []
+    [canCreateManualReleases, handleNewRelease]
   );
 
   // Header search input — shown when search is open
@@ -713,19 +723,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onReleaseViewChange={setReleaseView}
               isSearchOpen={isSearchOpen}
               onSearchToggle={() => setIsSearchOpen(open => !open)}
-              primaryAction={
-                canCreateManualReleases ? (
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    onClick={handleNewRelease}
-                    className={cn(PAGE_TOOLBAR_TAB_BUTTON_CLASS, 'px-3')}
-                  >
-                    <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
-                    <span className='hidden sm:inline'>New Release</span>
-                  </Button>
-                ) : undefined
-              }
             />
           )}
 

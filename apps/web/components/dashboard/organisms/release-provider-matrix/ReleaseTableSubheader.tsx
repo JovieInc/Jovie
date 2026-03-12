@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
-import { memo, type ReactNode, useState } from 'react';
+import { memo, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
@@ -74,8 +74,6 @@ interface ReleaseTableSubheaderProps {
   readonly isSearchOpen?: boolean;
   /** Callback to toggle search open/close */
   readonly onSearchToggle?: () => void;
-  /** Primary action rendered with the toolbar controls */
-  readonly primaryAction?: ReactNode;
 }
 
 /** Options for release view segmented control */
@@ -296,7 +294,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onReleaseViewChange,
   isSearchOpen,
   onSearchToggle,
-  primaryAction,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
@@ -304,18 +301,13 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   return (
     <PageToolbar
       start={
-        <>
-          {onReleaseViewChange ? (
-            <ReleaseViewButtons
-              value={releaseView}
-              onChange={onReleaseViewChange}
-              className='w-full overflow-x-auto pb-px md:w-auto'
-            />
-          ) : null}
-          {primaryAction ? (
-            <div className='shrink-0'>{primaryAction}</div>
-          ) : null}
-        </>
+        onReleaseViewChange ? (
+          <ReleaseViewButtons
+            value={releaseView}
+            onChange={onReleaseViewChange}
+            className='w-full overflow-x-auto pb-px md:w-auto'
+          />
+        ) : null
       }
       end={
         <>
