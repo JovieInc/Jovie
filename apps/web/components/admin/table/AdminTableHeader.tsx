@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { PageToolbar } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
@@ -23,22 +24,12 @@ export function AdminTableHeader({
   className,
 }: Readonly<AdminTableHeaderProps>) {
   return (
-    <div
-      className={cn(
-        'flex flex-wrap items-start justify-between gap-3 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-[var(--linear-app-header-padding-x)] py-2.5',
-        className
-      )}
-    >
-      <div className='space-y-0.5'>
-        <h2 className='text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
-          {title}
-        </h2>
-        <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
-          {subtitle}
-        </p>
-      </div>
-      {actions ? <div className='w-full sm:w-auto'>{actions}</div> : null}
-    </div>
+    <ContentSectionHeader
+      title={title}
+      subtitle={subtitle}
+      actions={actions}
+      className={cn('bg-(--linear-app-content-surface)', className)}
+    />
   );
 }
 

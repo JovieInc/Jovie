@@ -1,3 +1,4 @@
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 const AUDIENCE_TABLE_HEADER_KEYS = Array.from(
@@ -20,30 +21,15 @@ const AUDIENCE_MOBILE_ROW_KEYS = Array.from(
 export default function Loading() {
   return (
     <div className='flex h-full min-h-0 flex-col' aria-busy='true'>
-      {/* Header */}
-      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
-        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
-          <div className='space-y-2'>
-            <LoadingSkeleton height='h-6' width='w-40' rounded='md' />
-            <LoadingSkeleton
-              height='h-4'
-              width='w-80'
-              rounded='md'
-              className='hidden sm:block'
-            />
-            <LoadingSkeleton
-              height='h-4'
-              width='w-48'
-              rounded='md'
-              className='sm:hidden'
-            />
-          </div>
-          <LoadingSkeleton height='h-6' width='w-20' rounded='full' />
-        </div>
-      </div>
+      <ContentSectionHeaderSkeleton
+        titleWidth='w-40'
+        descriptionWidth='w-80'
+        actionWidths={['w-20']}
+        className='bg-(--linear-app-content-surface)'
+      />
 
       <div className='flex-1 min-h-0 overflow-hidden'>
-        <div className='flex h-full min-h-0 flex-col bg-surface-1'>
+        <div className='flex h-full min-h-0 flex-col bg-(--linear-app-content-surface)'>
           {/* Mobile: compact list (visible below sm) */}
           <div className='flex-1 min-h-0 overflow-auto sm:hidden'>
             <div className='divide-y divide-subtle'>
@@ -76,8 +62,8 @@ export default function Loading() {
           {/* Desktop: table layout (hidden below sm) */}
           <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
             <div className='px-4 py-4 sm:px-6'>
-              <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
-                <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
+              <div className='overflow-hidden rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)]'>
+                <div className='grid grid-cols-7 gap-4 border-b border-(--linear-border-subtle) px-4 py-3'>
                   {AUDIENCE_TABLE_HEADER_KEYS.map(key => (
                     <LoadingSkeleton
                       key={key}
@@ -91,7 +77,7 @@ export default function Loading() {
                   {AUDIENCE_TABLE_ROW_KEYS.map(rowKey => (
                     <li
                       key={rowKey}
-                      className='grid grid-cols-7 items-center gap-4 border-b border-subtle px-4 last:border-b-0'
+                      className='grid grid-cols-7 items-center gap-4 border-b border-(--linear-border-subtle) px-4 last:border-b-0'
                       style={{ height: '44px' }}
                       aria-hidden='true'
                     >
@@ -111,7 +97,7 @@ export default function Loading() {
           </div>
 
           {/* Footer */}
-          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-(--linear-border-subtle) bg-(--linear-app-content-surface)/95 px-4 py-2 text-xs text-(--linear-text-secondary) backdrop-blur-md sm:px-6 supports-[backdrop-filter]:bg-(--linear-app-content-surface)/85'>
             <LoadingSkeleton
               height='h-4'
               width='w-48'

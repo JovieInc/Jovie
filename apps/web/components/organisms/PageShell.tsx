@@ -1,3 +1,4 @@
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { cn } from '@/lib/utils';
 
 export interface PageShellProps {
@@ -101,29 +102,25 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header
-      className={cn(
-        'flex min-h-[var(--linear-app-header-height)] shrink-0 items-center justify-between gap-3 border-b border-(--linear-border-subtle) bg-transparent px-[var(--linear-app-header-padding-x)] py-1.5',
-        className
-      )}
-    >
-      <div className='flex min-w-0 items-center gap-2 sm:gap-3'>
-        {mobileSidebarTrigger}
-        {breadcrumbs}
-        <div className='min-w-0 flex-1'>
-          <h1 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
-            {title}
-          </h1>
-          {description && (
-            <p className='hidden truncate text-[12px] leading-[18px] text-(--linear-text-secondary) sm:block'>
-              {description}
-            </p>
-          )}
-        </div>
-        {sidebarTrigger}
-      </div>
-      {action && <div className='shrink-0'>{action}</div>}
-    </header>
+    <ContentSectionHeader
+      title={
+        <span className='flex min-w-0 items-center gap-2 sm:gap-3'>
+          {mobileSidebarTrigger}
+          {breadcrumbs}
+          <span className='min-w-0 flex-1 truncate'>{title}</span>
+          {sidebarTrigger}
+        </span>
+      }
+      subtitle={
+        description ? (
+          <span className='hidden truncate sm:block'>{description}</span>
+        ) : undefined
+      }
+      actions={action}
+      actionsClassName='shrink-0'
+      className={className}
+      bodyClassName='min-w-0'
+    />
   );
 }
 
