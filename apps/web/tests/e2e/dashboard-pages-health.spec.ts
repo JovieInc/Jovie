@@ -229,6 +229,11 @@ const HEALTH_NAVIGATION_TIMEOUT = FAST_ITERATION
   ? 90_000
   : SMOKE_TIMEOUTS.NAVIGATION;
 
+test.skip(
+  FAST_ITERATION,
+  'Dashboard route-health sweeps run in the slower dashboard regression lane'
+);
+
 test.describe('Dashboard Pages Health Check @smoke', () => {
   // signInUser navigates to /signin, waits 60s for Clerk, signs in, then navigates to
   // /app/dashboard/profile (120s Turbopack). Combined with test body, need generous timeout.

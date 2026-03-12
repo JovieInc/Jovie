@@ -23,6 +23,10 @@ import {
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.skip(
+  process.env.E2E_FAST_ITERATION === '1',
+  'Public profile matrix coverage runs in the slower public-profile lane'
+);
 
 const hasDatabase = !!(
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy')

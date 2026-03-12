@@ -11,6 +11,10 @@ import { expect, test } from '@playwright/test';
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+test.skip(
+  FAST_ITERATION,
+  'Onboarding behavior is covered by the dedicated golden path in the fast lane'
+);
 
 test.describe('Onboarding Flow', () => {
   test.beforeEach(async ({ page }) => {

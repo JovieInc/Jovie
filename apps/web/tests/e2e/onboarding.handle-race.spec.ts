@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Onboarding Handle Race Conditions Tests
  *
@@ -9,6 +11,10 @@ import { expect, test } from '@playwright/test';
 
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
+test.skip(
+  FAST_ITERATION,
+  'Onboarding handle race coverage runs outside the hot fast-iteration lane'
+);
 
 test.describe('Onboarding Handle Race Conditions', () => {
   test.beforeEach(async ({ page }) => {

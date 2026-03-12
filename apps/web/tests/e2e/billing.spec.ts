@@ -20,6 +20,11 @@ const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
  * They add ~30-60s to smoke tests without catching critical regressions.
  */
 test.describe('Billing Routes', () => {
+  test.skip(
+    IS_FAST_ITERATION,
+    'Billing route health is covered by the faster dashboard and golden-path lanes'
+  );
+
   test('/billing redirects or loads without errors', async ({
     page,
   }, testInfo) => {

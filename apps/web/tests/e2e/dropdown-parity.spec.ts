@@ -26,6 +26,10 @@ const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 // No auth needed — test page is public
 test.use({ storageState: { cookies: [], origins: [] } });
+test.skip(
+  FAST_ITERATION,
+  'Dropdown visual parity runs in the slower UI regression lane'
+);
 
 // Locked parity fixture values (source of truth)
 const FIXTURE = SPEC_FIXTURE;

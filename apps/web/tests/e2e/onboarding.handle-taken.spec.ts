@@ -1,6 +1,8 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * E2E Test: Handle Taken Prevents Submission
  *
@@ -18,6 +20,11 @@ import { expect, test } from '@playwright/test';
  */
 
 test.describe('Onboarding Handle Taken Prevention', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Onboarding handle-taken coverage runs outside the hot fast-iteration lane'
+  );
+
   // Only run when environment is properly configured
   // If E2E_ONBOARDING_HANDLE_TAKEN is not set, we'll still run the test
   // but with mocked API responses
