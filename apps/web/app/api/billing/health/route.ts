@@ -20,6 +20,7 @@ import { billingAuditLog, stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { captureWarning } from '@/lib/error-tracking';
 import { RETRY_AFTER_HEALTH } from '@/lib/http/headers';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { stripe } from '@/lib/stripe/client';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
 import { logger } from '@/lib/utils/logger';
@@ -249,21 +250,6 @@ async function getStripeActiveSubscriptionCount(): Promise<number> {
 }
 
 /**
- * Wrap a promise with a timeout
- */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(
-        () => reject(new Error(`Operation timed out after ${ms}ms`)),
-        ms
-      )
-    ),
-  ]);
-}
-
-/**
  * Count subscriptions with a specific status, handling pagination
  * Includes pagination limit and timeout for health check efficiency
  */
@@ -284,7 +270,10 @@ async function countSubscriptionsWithStatus(
         limit: 100,
         starting_after: startingAfter,
       }),
-      STRIPE_TIMEOUT_MS
+      {
+        timeoutMs: STRIPE_TIMEOUT_MS,
+        context: `Stripe ${status} subscription list`,
+      }
     );
 
     count += result.data.length;

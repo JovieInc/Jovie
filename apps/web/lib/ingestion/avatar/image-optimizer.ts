@@ -4,6 +4,7 @@
  * Utilities for optimizing images to avatar format.
  */
 
+import { withTimeout as withSharedTimeout } from '@/lib/resilience/primitives';
 import type { OptimizedAvatar, SharpConstructor, SharpModule } from './types';
 
 function isSharpConstructor(value: unknown): value is SharpConstructor {
@@ -42,16 +43,11 @@ export async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number
 ): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+  return withSharedTimeout(promise, {
+    timeoutMs,
+    context: 'avatar image processing',
+    timeoutMessage: 'timeout',
   });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
 }
 
 /**
