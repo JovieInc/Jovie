@@ -226,6 +226,18 @@ export const queryKeys = {
   admin: {
     all: ['admin'] as const,
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
+    leads: {
+      all: () => [...queryKeys.admin.all, 'leads'] as const,
+      list: (filters: {
+        page: number;
+        limit: number;
+        sortBy: 'createdAt' | 'fitScore';
+        status?: string;
+        search?: string;
+      }) => [...queryKeys.admin.leads.all(), 'list', filters] as const,
+      settings: () => [...queryKeys.admin.leads.all(), 'settings'] as const,
+      keywords: () => [...queryKeys.admin.leads.all(), 'keywords'] as const,
+    },
   },
 
   // Campaign invite queries (admin)

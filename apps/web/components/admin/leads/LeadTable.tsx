@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
@@ -9,30 +10,14 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-interface Lead {
-  id: string;
-  linktreeHandle: string;
-  linktreeUrl: string;
-  displayName: string | null;
-  status: string;
-  fitScore: number | null;
-  hasPaidTier: boolean | null;
-  hasSpotifyLink: boolean;
-  hasInstagram: boolean;
-  musicToolsDetected: string[];
-  contactEmail: string | null;
-  createdAt: string;
-}
-
-interface LeadListResponse {
-  items: Lead[];
-  total: number;
-  page: number;
-  limit: number;
-}
+import {
+  type AdminLead,
+  useLeadsListQuery,
+  useUpdateLeadStatusMutation,
+} from '@/lib/queries';
+import { queryKeys } from '@/lib/queries/keys';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -63,8 +48,8 @@ interface LeadTableProps {
 function renderLeadRows(
   loading: boolean,
   loadError: string | null,
-  leads: Lead[],
-  renderRow: (lead: Lead) => ReactNode
+  leads: AdminLead[],
+  renderRow: (lead: AdminLead) => ReactNode
 ): ReactNode {
   if (loading) {
     return (
@@ -97,66 +82,39 @@ function renderLeadRows(
 }
 
 export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'createdAt' | 'fitScore'>('createdAt');
   const [actioningId, setActioningId] = useState<string | null>(null);
   const limit = 25;
 
-  const fetchLeads = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-        sortBy,
-        sortOrder: 'desc',
-      });
-      if (statusFilter) params.set('status', statusFilter);
-      if (search) params.set('search', search);
-
-      const res = await fetch(`/api/admin/leads?${params}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error('Failed to load leads');
-      const data = (await res.json()) as LeadListResponse;
-      setLeads(data.items);
-      setTotal(data.total);
-    } catch {
-      setLeads([]);
-      setTotal(0);
-      setLoadError('Unable to load leads right now. Try again in a moment.');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, statusFilter, search, sortBy]);
+  const leadsQuery = useLeadsListQuery({
+    page,
+    limit,
+    sortBy,
+    status: statusFilter || undefined,
+    search: search || undefined,
+  });
+  const updateLeadStatusMutation = useUpdateLeadStatusMutation();
 
   useEffect(() => {
-    fetchLeads();
-  }, [fetchLeads, refreshKey]);
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.admin.leads.all(),
+    });
+  }, [queryClient, refreshKey]);
+
+  const loadError = leadsQuery.isError
+    ? 'Unable to load leads right now. Try again in a moment.'
+    : null;
+  const leads = leadsQuery.data?.items ?? [];
+  const total = leadsQuery.data?.total ?? 0;
 
   async function updateLeadStatus(id: string, status: 'approved' | 'rejected') {
     setActioningId(id);
     try {
-      const res = await fetch(`/api/admin/leads/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error(`Failed to ${status} lead`);
-      const data = (await res.json()) as Lead & {
-        ingestion?: {
-          success: boolean;
-          profileUsername?: string;
-          error?: string;
-        } | null;
-      };
+      const data = await updateLeadStatusMutation.mutateAsync({ id, status });
 
       if (status === 'approved' && data.ingestion) {
         if (data.ingestion.success) {
@@ -172,7 +130,9 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         toast.success(`Lead ${status}`);
       }
 
-      await fetchLeads();
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.all(),
+      });
     } catch {
       toast.error(`Failed to ${status} lead`);
     } finally {
@@ -190,7 +150,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         </h2>
       </div>
 
-      {/* Filters */}
       <div className='mb-4 flex flex-wrap items-center gap-2'>
         {STATUS_OPTIONS.map(opt => (
           <button
@@ -231,7 +190,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         </select>
       </div>
 
-      {/* Table */}
       <div className='overflow-x-auto'>
         <table className='w-full text-xs'>
           <thead>
@@ -245,7 +203,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
             </tr>
           </thead>
           <tbody>
-            {renderLeadRows(loading, loadError, leads, lead => (
+            {renderLeadRows(leadsQuery.isLoading, loadError, leads, lead => (
               <tr
                 key={lead.id}
                 className='border-b border-subtle/50 hover:bg-white/[0.02]'
@@ -346,7 +304,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className='mt-3 flex items-center justify-between'>
           <span className='text-xs text-secondary-token'>
@@ -357,7 +314,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
               variant='outline'
               size='sm'
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
+              disabled={page === 1 || leadsQuery.isLoading}
             >
               <ChevronLeft className='h-4 w-4' />
             </Button>
@@ -365,7 +322,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
               variant='outline'
               size='sm'
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
+              disabled={page === totalPages || leadsQuery.isLoading}
             >
               <ChevronRight className='h-4 w-4' />
             </Button>
