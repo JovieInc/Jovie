@@ -103,6 +103,7 @@ const sharedEnv = {
   E2E_FAST_ITERATION: '1',
   E2E_SKIP_WEB_SERVER: '1',
   E2E_USE_STORED_AUTH: '1',
+  E2E_FAST_CURATED: shouldUseCuratedFastSpecs ? '1' : '0',
 };
 
 function runPlaywright(args, extraEnv = {}) {

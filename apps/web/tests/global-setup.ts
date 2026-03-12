@@ -17,6 +17,7 @@ const isCI = !!process.env.CI;
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isPublicNoAuthOnly = process.env.PUBLIC_NOAUTH_SMOKE === '1';
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+const isCuratedFastLane = process.env.E2E_FAST_CURATED === '1';
 const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
 const shouldSkipSeeding =
@@ -249,7 +250,7 @@ async function globalSetup() {
       }
     }
 
-    if (isFastIteration) {
+    if (isFastIteration && !isCuratedFastLane) {
       try {
         const wrapLinkResponse = await fetch(`${baseURL}/api/wrap-link`, {
           method: 'POST',
