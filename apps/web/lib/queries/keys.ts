@@ -177,6 +177,8 @@ export const queryKeys = {
     all: ['releases'] as const,
     matrix: (profileId: string) =>
       [...queryKeys.releases.all, 'matrix', profileId] as const,
+    tracks: (releaseId: string) =>
+      [...queryKeys.releases.all, 'tracks', releaseId] as const,
     dspStatus: (releaseId: string) =>
       [...queryKeys.releases.all, 'dsp-status', releaseId] as const,
   },

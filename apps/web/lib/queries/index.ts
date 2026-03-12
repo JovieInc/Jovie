@@ -282,6 +282,11 @@ export {
 } from './useReleaseMutations';
 // Release queries and mutations
 export { useReleasesQuery } from './useReleasesQuery';
+
+export {
+  type ReleaseTrack,
+  useReleaseTracksQuery,
+} from './useReleaseTracksQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,
