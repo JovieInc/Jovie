@@ -84,15 +84,18 @@ const RELEASE_VIEW_OPTIONS = [
 
 const RELEASE_VIEW_TAB_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-9 rounded-[9px] border-(--linear-border-subtle) bg-transparent px-4 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-[34px] rounded-[8px] border-(--linear-border-subtle) bg-transparent px-3.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
-const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
+const RELEASE_VIEW_TAB_ACTIVE_CLASS =
   'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+
+const RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS =
+  'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
 const RELEASE_TOOLBAR_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-9 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-[34px] rounded-[7px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 function ReleaseViewButtons({
@@ -118,7 +121,7 @@ function ReleaseViewButtons({
             onClick={() => onChange(option.value)}
             className={cn(
               RELEASE_VIEW_TAB_CLASS,
-              isActive && RELEASE_TOOLBAR_BUTTON_ACTIVE_CLASS
+              isActive && RELEASE_VIEW_TAB_ACTIVE_CLASS
             )}
             aria-pressed={isActive}
           >
@@ -158,7 +161,7 @@ function ReleaseViewSegmentedControl({
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='h-auto min-h-14 px-2 py-2.5 text-[12.5px]'
+      triggerClassName='h-auto min-h-[52px] px-2 py-2 text-[12.5px]'
       aria-label='Choose releases view'
     />
   );
@@ -319,7 +322,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex flex-col gap-1.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-2 md:min-h-[50px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-2'>
+    <div className='flex flex-col gap-1 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-1.5 md:min-h-[46px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-1.5'>
       <div className='flex min-w-0 flex-1 items-center gap-1 md:w-auto md:flex-none'>
         {onReleaseViewChange ? (
           <ReleaseViewButtons
