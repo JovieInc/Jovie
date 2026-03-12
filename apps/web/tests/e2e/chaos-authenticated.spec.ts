@@ -446,7 +446,7 @@ const SETTINGS_PAGES = [
   '/app/settings/branding',
   '/app/settings/ad-pixels',
 ];
-const FAST_SETTINGS_PAGES = ['/app/settings', '/app/settings/ad-pixels'];
+const FAST_SETTINGS_PAGES = ['/app/settings'];
 
 const ADMIN_PAGES = [
   '/app/admin',
@@ -455,7 +455,7 @@ const ADMIN_PAGES = [
   '/app/admin/creators',
   '/app/admin/users',
 ];
-const FAST_ADMIN_PAGES = ['/app/admin', '/app/admin/activity'];
+const FAST_ADMIN_PAGES = ['/app/admin'];
 
 // ============================================================================
 // Tests
