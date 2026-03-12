@@ -11,7 +11,11 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { createMutationFn, FetchError } from './fetch';
+import {
+  createMutationFn,
+  FetchError,
+  fetchWithTimeoutResponse,
+} from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
 
@@ -85,7 +89,7 @@ async function uploadAvatarApi(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch('/api/images/upload', {
+  const response = await fetchWithTimeoutResponse('/api/images/upload', {
     method: 'POST',
     body: formData,
   });

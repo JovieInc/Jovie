@@ -2,7 +2,11 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { APP_ROUTES } from '@/constants/routes';
-import { FetchError, fetchWithTimeout } from './fetch';
+import {
+  FetchError,
+  fetchWithTimeout,
+  fetchWithTimeoutResponse,
+} from './fetch';
 import { queryKeys } from './keys';
 
 // Types
@@ -212,7 +216,7 @@ export function useUpdateWaitlistStatusMutation() {
 async function submitWaitlistEntry(
   input: WaitlistSubmitInput
 ): Promise<WaitlistSubmitResponse> {
-  const response = await fetch('/api/waitlist', {
+  const response = await fetchWithTimeoutResponse('/api/waitlist', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

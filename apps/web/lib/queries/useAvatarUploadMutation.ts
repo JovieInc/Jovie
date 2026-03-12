@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchWithTimeoutResponse } from './fetch';
 import { queryKeys } from './keys';
 
 export interface AvatarUploadInput {
@@ -26,7 +27,7 @@ async function uploadAvatar(
   const formData = new FormData();
   formData.append('file', file);
 
-  const uploadResponse = await fetch('/api/images/upload', {
+  const uploadResponse = await fetchWithTimeoutResponse('/api/images/upload', {
     method: 'POST',
     body: formData,
   });
@@ -43,16 +44,19 @@ async function uploadAvatar(
   const blobUrl = uploadJson.blobUrl;
 
   // Step 2: Update creator profile with new avatar URL
-  const adminResponse = await fetch('/api/admin/creator-avatar', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      profileId,
-      avatarUrl: blobUrl,
-    }),
-  });
+  const adminResponse = await fetchWithTimeoutResponse(
+    '/api/admin/creator-avatar',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        profileId,
+        avatarUrl: blobUrl,
+      }),
+    }
+  );
 
   if (!adminResponse.ok) {
     const adminJson = (await adminResponse.json().catch(() => ({}))) as {

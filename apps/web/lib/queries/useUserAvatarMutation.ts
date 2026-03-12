@@ -2,7 +2,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { useMutation } from '@tanstack/react-query';
-import { FetchError } from './fetch';
+import { FetchError, fetchWithTimeoutResponse } from './fetch';
 
 interface AvatarUploadResponse {
   blobUrl: string;
@@ -15,7 +15,7 @@ async function uploadAvatar(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch('/api/images/upload', {
+  const response = await fetchWithTimeoutResponse('/api/images/upload', {
     method: 'POST',
     body: formData,
   });
