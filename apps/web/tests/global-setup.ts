@@ -216,23 +216,8 @@ async function globalSetup() {
           ]
       : isFastIteration
         ? useStoredAuth && hasStoredAuthState
-          ? [
-              APP_ROUTES.CHAT,
-              APP_ROUTES.ADMIN,
-              APP_ROUTES.ADMIN_CREATORS,
-              APP_ROUTES.ADMIN_USERS,
-              '/billing',
-              '/account',
-            ]
-          : [
-              '/signin',
-              APP_ROUTES.CHAT,
-              APP_ROUTES.ADMIN,
-              APP_ROUTES.ADMIN_CREATORS,
-              APP_ROUTES.ADMIN_USERS,
-              '/billing',
-              '/account',
-            ]
+          ? [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
+          : ['/signin', APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
         : [
             '/',
             '/api/stripe/pricing-options',
