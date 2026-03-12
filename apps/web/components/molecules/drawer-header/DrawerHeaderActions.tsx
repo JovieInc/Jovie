@@ -9,7 +9,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
 const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'border-transparent bg-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)';
+  'h-[26px] w-[26px] border-transparent bg-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)';
 
 export interface DrawerHeaderAction {
   readonly id: string;
@@ -70,7 +70,7 @@ export function DrawerHeaderActions({
     : baseMenuItems;
 
   return (
-    <div className='flex items-center gap-px'>
+    <div className='flex items-center gap-0.5'>
       {/* Primary actions - always visible */}
       {displayActions.map(action => {
         const Icon =

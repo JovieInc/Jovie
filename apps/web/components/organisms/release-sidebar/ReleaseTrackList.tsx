@@ -90,7 +90,7 @@ export function ReleaseTrackList({
         aria-controls={`release-tracklist-${release.id}`}
         className={cn(
           DRAWER_SECTION_HEADING_CLASSNAME,
-          'flex w-full items-center justify-between rounded-[8px] px-2 py-0.5 tracking-[0.08em] transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          'flex w-full items-center justify-between rounded-[8px] px-2.5 py-1 tracking-[0.08em] transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         )}
       >
         <span>Tracklist ({release.totalTracks})</span>
@@ -102,7 +102,7 @@ export function ReleaseTrackList({
       </button>
 
       {isExpanded && (
-        <div id={`release-tracklist-${release.id}`} className='space-y-px'>
+        <div id={`release-tracklist-${release.id}`} className='space-y-1'>
           {(isLoading || (isFetching && !tracks)) && (
             <div className='space-y-0.5'>
               {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
@@ -231,7 +231,7 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-3 rounded-[8px] border border-transparent px-2.5 py-2 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
+    <div className='group flex items-start gap-3 rounded-[8px] border border-transparent px-3 py-2 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
       <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>
@@ -286,13 +286,13 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
-                  <Pause className='h-[11px] w-[11px]' />
+                  <Pause className='h-3 w-3' />
                 ) : (
-                  <Play className='h-[11px] w-[11px]' />
+                  <Play className='h-3 w-3' />
                 )}
               </button>
               <div className='h-0.5 flex-1 rounded-full bg-(--linear-bg-surface-1)'>
@@ -337,7 +337,7 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <DrawerInlineIconButton
           aria-label={`Actions for ${track.title}`}
-          className='self-center group-hover:opacity-100'
+          className='h-[22px] w-[22px] self-center group-hover:opacity-100'
         >
           <MoreHorizontal className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
         </DrawerInlineIconButton>
