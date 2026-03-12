@@ -9,10 +9,13 @@ import {
 } from '@jovie/ui';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
+import type { ProviderKey } from '@/lib/discography/types';
 
 export interface AddProviderUrlPopoverProps {
   readonly providerLabel: string;
   readonly accent: string;
+  readonly providerKey?: ProviderKey;
   readonly onSave: (url: string) => Promise<void>;
   readonly isSaving?: boolean;
 }
@@ -20,23 +23,57 @@ export interface AddProviderUrlPopoverProps {
 export function AddProviderUrlPopover({
   providerLabel,
   accent,
+  providerKey,
   onSave,
   isSaving,
 }: Readonly<AddProviderUrlPopoverProps>) {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState('');
+  const [validationError, setValidationError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const isSavingRef = useRef(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
+
+    if (providerKey) {
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(trimmed);
+      } catch {
+        setValidationError('Please enter a valid URL');
+        return;
+      }
+
+      const allowedDomains = PROVIDER_DOMAINS[providerKey];
+      const hostname = parsedUrl.hostname.toLowerCase();
+      const isValidDomain = allowedDomains.some(
+        domain => hostname === domain || hostname.endsWith(`.${domain}`)
+      );
+
+      if (!isValidDomain) {
+        const domainMsg =
+          allowedDomains.length === 1
+            ? allowedDomains[0]
+            : `one of: ${allowedDomains.join(', ')}`;
+        setValidationError(`URL must be from ${domainMsg}`);
+        return;
+      }
+    }
+
+    setValidationError('');
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     try {
       await onSave(trimmed);
       setUrl('');
       setOpen(false);
     } catch {
       // Error toast is shown by the hook; keep popover open so user can retry
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
@@ -46,7 +83,7 @@ export function AddProviderUrlPopover({
         <button
           type='button'
           aria-label={`Add ${providerLabel} link`}
-          className='group/add inline-flex h-7 min-w-[76px] items-center justify-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='group/add inline-flex h-7 min-w-[76px] items-center justify-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           <Icon
             name='Plus'
@@ -76,7 +113,7 @@ export function AddProviderUrlPopover({
               style={{ backgroundColor: accent }}
               aria-hidden='true'
             />
-            <span className='text-[13px] font-[510] text-primary-token'>
+            <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
               Add {providerLabel} link
             </span>
           </div>
@@ -86,11 +123,19 @@ export function AddProviderUrlPopover({
             inputSize='sm'
             placeholder='Paste URL here...'
             value={url}
-            onChange={e => setUrl(e.target.value)}
+            onChange={e => {
+              setUrl(e.target.value);
+              setValidationError('');
+            }}
             disabled={isSaving}
             autoComplete='off'
             className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
           />
+          {validationError ? (
+            <p className='text-[12px] text-(--linear-error)'>
+              {validationError}
+            </p>
+          ) : null}
           <div className='flex justify-end gap-2'>
             <Button
               type='button'

@@ -56,7 +56,7 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
+      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-(--linear-text-primary)'>
         <Icon
           name='Link'
           className='h-5 w-5 text-(--linear-text-secondary)'
@@ -85,7 +85,7 @@ export function ReleaseEditDialog({
                 />
               </div>
               <div className='min-w-0 flex-1'>
-                <p className='text-base font-[590] text-primary-token'>
+                <p className='text-base font-[590] text-(--linear-text-primary)'>
                   {release.title}
                 </p>
                 <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
@@ -126,7 +126,7 @@ export function ReleaseEditDialog({
                           className='h-4 w-4'
                           aria-hidden='true'
                         />
-                        <p className='text-[13px] font-[510] text-primary-token'>
+                        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                           {provider.label}
                         </p>
                       </div>

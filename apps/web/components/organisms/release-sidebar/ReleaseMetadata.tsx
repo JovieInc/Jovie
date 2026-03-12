@@ -243,7 +243,7 @@ export function ReleaseMetadata({
                         {isActive && (
                           <Check
                             size={14}
-                            className='ml-auto text-primary-token'
+                            className='ml-auto text-(--linear-text-primary)'
                             aria-hidden='true'
                           />
                         )}

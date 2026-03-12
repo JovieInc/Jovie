@@ -16,13 +16,13 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerAsyncToggle,
+  DrawerMediaThumb,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -143,25 +143,18 @@ function ReleaseEntityHeader({
                 showHoverOverlay
               />
             ) : (
-              <div className='relative h-[72px] w-[72px] overflow-hidden rounded-[10px] bg-(--linear-bg-surface-1) shadow-none'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt={artworkAlt}
-                    fill
-                    className='object-cover'
-                    sizes='72px'
+              <DrawerMediaThumb
+                src={release.artworkUrl}
+                alt={artworkAlt}
+                sizeClassName='h-[72px] w-[72px]'
+                fallback={
+                  <Icon
+                    name='Disc3'
+                    className='h-12 w-12 text-(--linear-text-tertiary)'
+                    aria-hidden='true'
                   />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    <Icon
-                      name='Disc3'
-                      className='h-12 w-12 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  </div>
-                )}
-              </div>
+                }
+              />
             )}
           </AlbumArtworkContextMenu>
 
@@ -191,7 +184,7 @@ function ReleaseEntityHeader({
         {/* Compact property stack */}
         <div className='min-w-0 flex-1 space-y-0.5 pt-0.5'>
           <div>
-            <p className='truncate text-[14px] font-[590] leading-[17px] tracking-[-0.015em] text-primary-token'>
+            <p className='truncate text-[14px] font-[590] leading-[17px] tracking-[-0.015em] text-(--linear-text-primary)'>
               {release.title}
             </p>
             {artistLine && (

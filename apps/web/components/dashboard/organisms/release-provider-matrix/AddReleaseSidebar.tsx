@@ -141,18 +141,18 @@ export function AddReleaseSidebar({
       onClose={handleClose}
       entityHeader={
         <div className='flex items-center gap-2'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2'>
+          <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
             <Icon
               name='Disc3'
-              className='h-5 w-5 text-tertiary-token'
+              className='h-5 w-5 text-(--linear-text-tertiary)'
               aria-hidden='true'
             />
           </div>
           <div>
-            <p className='text-sm font-medium text-primary-token'>
+            <p className='text-sm font-[590] text-(--linear-text-primary)'>
               {title || 'New Release'}
             </p>
-            <p className='text-xs text-secondary-token'>
+            <p className='text-xs text-(--linear-text-secondary)'>
               {RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
                 'Single'}
             </p>
@@ -182,7 +182,7 @@ export function AddReleaseSidebar({
         <div className='space-y-1.5'>
           <Label
             htmlFor='release-title'
-            className='text-xs font-medium text-secondary-token'
+            className='text-xs font-medium text-(--linear-text-secondary)'
           >
             Title
           </Label>
@@ -199,7 +199,7 @@ export function AddReleaseSidebar({
         <div className='space-y-1.5'>
           <Label
             htmlFor='release-type'
-            className='text-xs font-medium text-secondary-token'
+            className='text-xs font-medium text-(--linear-text-secondary)'
           >
             Release Type
           </Label>
@@ -224,7 +224,7 @@ export function AddReleaseSidebar({
         <div className='space-y-1.5'>
           <Label
             htmlFor='release-date'
-            className='text-xs font-medium text-secondary-token'
+            className='text-xs font-medium text-(--linear-text-secondary)'
           >
             Release Date
           </Label>
@@ -240,7 +240,7 @@ export function AddReleaseSidebar({
         <div className='space-y-1.5'>
           <Label
             htmlFor='artwork-url'
-            className='text-xs font-medium text-secondary-token'
+            className='text-xs font-medium text-(--linear-text-secondary)'
           >
             Artwork URL (optional)
           </Label>
@@ -255,14 +255,14 @@ export function AddReleaseSidebar({
 
         {/* Provider URLs */}
         <div className='space-y-3'>
-          <p className='text-xs font-medium text-secondary-token'>
+          <p className='text-xs font-medium text-(--linear-text-secondary)'>
             Platform Links (optional)
           </p>
           {PROVIDER_FIELDS.map(provider => (
             <div key={provider.key} className='space-y-1'>
               <Label
                 htmlFor={`provider-${provider.key}`}
-                className='text-2xs text-tertiary-token'
+                className='text-2xs text-(--linear-text-tertiary)'
               >
                 {provider.label}
               </Label>

@@ -113,7 +113,7 @@ function SearchInput({
           onKeyDown={handleKeyDown}
           className={cn(
             'w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px]',
-            'text-primary-token placeholder:text-(--linear-text-tertiary)',
+            'text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary)',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
           )}
@@ -123,7 +123,7 @@ function SearchInput({
           <button
             type='button'
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
+            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -164,12 +164,14 @@ function ActiveFilterPill({
         )}
         <span className='text-(--linear-text-tertiary)'>{groupLabel}</span>
         <span className='text-(--linear-text-tertiary)'>is</span>
-        <span className='font-[510] text-primary-token'>{displayValue}</span>
+        <span className='font-[510] text-(--linear-accent)'>
+          {displayValue}
+        </span>
       </div>
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-2) hover:text-primary-token focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
+        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -237,13 +239,17 @@ function SubmenuCheckboxItem({
         onCheckedChange();
       }}
       onKeyDown={handleKeyDown}
-      className={cn(MENU_ITEM_BASE, 'w-full', checked && 'text-primary-token')}
+      className={cn(
+        MENU_ITEM_BASE,
+        'w-full',
+        checked && 'text-(--linear-text-primary)'
+      )}
     >
       <span
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
           checked
-            ? 'border-primary bg-primary text-white'
+            ? 'border-(--linear-accent) bg-(--linear-accent) text-white'
             : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
         )}
       >
@@ -492,7 +498,7 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent px-2 text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token md:px-3',
+                'h-7 gap-1.5 rounded-md border border-transparent px-2 text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) md:px-3',
                 buttonClassName
               )}
             >
@@ -573,7 +579,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-[510] text-primary'>
+                          <span className='rounded-full bg-(--linear-accent-subtle) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
                             {labelFilterCount}
                           </span>
                         )}
@@ -617,7 +623,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='text-(--linear-text-tertiary) hover:text-primary-token'
+                  className='text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

@@ -799,17 +799,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
               <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-xl bg-surface-2'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
                   <Icon
                     name='Disc3'
-                    className='h-8 w-8 text-tertiary-token'
+                    className='h-8 w-8 text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
                 </div>
-                <h3 className='mt-4 text-lg font-[590] text-primary-token'>
+                <h3 className='mt-4 text-lg font-[590] text-(--linear-text-primary)'>
                   No releases yet
                 </h3>
-                <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
+                <p className='mt-1 max-w-sm text-[13px] text-(--linear-text-secondary)'>
                   {canCreateManualReleases
                     ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
                     : 'Sync your releases from Spotify to start generating smart links.'}

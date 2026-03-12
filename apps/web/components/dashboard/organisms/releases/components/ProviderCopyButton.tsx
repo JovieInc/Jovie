@@ -51,7 +51,7 @@ export function ProviderCopyButton({
         'group/btn inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-transparent px-2.5 text-[11px] font-[450] transition-[background-color,border-color,color] duration-150',
         isCopied
           ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-          : 'text-(--linear-text-secondary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
+          : 'text-(--linear-text-secondary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
       )}
     >
       <span className='relative flex h-3.5 w-3.5 items-center justify-center'>

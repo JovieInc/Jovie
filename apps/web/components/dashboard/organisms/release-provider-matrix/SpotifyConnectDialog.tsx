@@ -121,10 +121,10 @@ function SearchInputTrailing({
         disabled={claimButtonDisabled}
         onClick={onClaimArtist}
         className={cn(
-          'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-[13px] font-[510] transition-colors focus-ring-themed',
+          'inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border px-3 text-[13px] font-[510] transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
           claimButtonDisabled
-            ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
-            : 'bg-btn-primary text-btn-primary-foreground'
+            ? 'cursor-not-allowed border-(--linear-border-subtle) bg-(--linear-accent)/50 text-white/60'
+            : 'border-(--linear-accent) bg-(--linear-accent) text-white hover:border-(--linear-accent) hover:bg-(--linear-accent-hover) focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         )}
       >
         {(isLoading || isPending) && (
@@ -139,7 +139,12 @@ function SearchInputTrailing({
     return <LoadingSpinner size='sm' tone='muted' label='Loading' />;
   }
 
-  return <Search className='w-4 h-4 shrink-0 text-tertiary-token' />;
+  return (
+    <Search
+      className='h-4 w-4 shrink-0 text-(--linear-text-tertiary)'
+      aria-hidden='true'
+    />
+  );
 }
 
 interface SpotifyConnectDialogProps {
@@ -397,16 +402,16 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-lg font-[590] text-primary-token'>
+      <DialogTitle className='text-lg font-[590] text-(--linear-text-primary)'>
         Connect Spotify
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-secondary-token'>
+      <DialogDescription className='text-[13px] text-(--linear-text-secondary)'>
         Search for your artist profile to import releases.
       </DialogDescription>
 
       <DialogBody className='space-y-4'>
         <div className='space-y-1'>
-          <p className='text-[13px] text-secondary-token'>
+          <p className='text-[13px] text-(--linear-text-secondary)'>
             Search by artist name or paste your Spotify artist URL to connect
             instantly.
           </p>
@@ -418,11 +423,11 @@ export function SpotifyConnectDialog({
           </label>
           <div
             className={cn(
-              'w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
+              'flex min-h-12 w-full items-center gap-3 rounded-xl border border-(--linear-border-default) bg-(--linear-bg-surface-0) px-4 py-3',
               'transition-all duration-200',
               shouldShowDropdown
-                ? 'border-focus ring-2 ring-focus/20'
-                : 'border-strong hover:border-focus',
+                ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/20'
+                : 'hover:border-(--linear-border-focus)',
               isPending && 'opacity-60'
             )}
           >
@@ -455,7 +460,7 @@ export function SpotifyConnectDialog({
               autoCorrect='off'
               autoComplete='off'
               disabled={isPending}
-              className='min-w-0 flex-1 bg-transparent text-[13px] text-primary-token focus-visible:outline-none'
+              className='min-w-0 flex-1 bg-transparent text-[13px] text-(--linear-text-primary) focus-visible:outline-none'
               role='combobox'
               aria-expanded={shouldShowDropdown}
               aria-controls='spotify-connect-results'
@@ -481,7 +486,7 @@ export function SpotifyConnectDialog({
           )}
 
           {shouldShowDropdown && (
-            <div className='absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-card-elevated'>
+            <div className='absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-(--linear-border-default) bg-(--linear-bg-surface-0) shadow-[var(--linear-shadow-card-elevated)]'>
               <select
                 id='spotify-connect-results'
                 className='sr-only'
@@ -555,8 +560,9 @@ export function SpotifyConnectDialog({
                       type='button'
                       tabIndex={0}
                       className={cn(
-                        'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
-                        index === formState.activeResultIndex && 'bg-surface-1'
+                        'flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
+                        index === formState.activeResultIndex &&
+                          'bg-(--linear-bg-surface-1)'
                       )}
                       onClick={() => handleArtistSelect(artist)}
                       onKeyDown={event =>
@@ -571,7 +577,7 @@ export function SpotifyConnectDialog({
                         })
                       }
                     >
-                      <div className='w-10 h-10 rounded-full overflow-hidden shrink-0 relative bg-surface-1'>
+                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-(--linear-bg-surface-1)'>
                         {artist.imageUrl ? (
                           <Image
                             src={artist.imageUrl}
@@ -591,11 +597,11 @@ export function SpotifyConnectDialog({
                         )}
                       </div>
                       <div className='flex-1 min-w-0'>
-                        <div className='font-[510] truncate text-[13px] text-primary-token'>
+                        <div className='truncate text-[13px] font-[510] text-(--linear-text-primary)'>
                           {artist.name}
                         </div>
                         {artist.followers && (
-                          <div className='text-[11px] text-tertiary-token'>
+                          <div className='text-[11px] text-(--linear-text-tertiary)'>
                             {formatFollowers(artist.followers)}
                           </div>
                         )}
@@ -617,9 +623,9 @@ export function SpotifyConnectDialog({
                 type='button'
                 tabIndex={0}
                 className={cn(
-                  'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left border-t border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
+                  'flex w-full cursor-pointer items-center gap-3 border-t border-(--linear-border-subtle) bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
                   formState.activeResultIndex === pasteUrlIndex &&
-                    'bg-surface-1'
+                    'bg-(--linear-bg-surface-1)'
                 )}
                 onClick={handlePasteUrlClick}
                 onKeyDown={event =>
@@ -632,17 +638,17 @@ export function SpotifyConnectDialog({
                   })
                 }
               >
-                <div className='w-10 h-10 rounded-full flex items-center justify-center bg-surface-1'>
+                <div className='flex h-10 w-10 items-center justify-center rounded-full bg-(--linear-bg-surface-1)'>
                   <Link2
-                    className='h-5 w-5 text-tertiary-token'
+                    className='h-5 w-5 text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
                 </div>
                 <div className='flex-1'>
-                  <div className='font-[510] text-[13px] text-primary-token'>
+                  <div className='text-[13px] font-[510] text-(--linear-text-primary)'>
                     Paste a Spotify URL instead
                   </div>
-                  <div className='text-[11px] text-tertiary-token'>
+                  <div className='text-[11px] text-(--linear-text-tertiary)'>
                     open.spotify.com/artist/...
                   </div>
                 </div>

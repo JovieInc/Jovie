@@ -188,7 +188,7 @@ export function ReleaseLyricsSection({
         />
         {/* Auto-save status indicator */}
         {saveStatus !== 'idle' && (
-          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
+          <div className='flex items-center gap-1 text-2xs text-(--linear-text-tertiary)'>
             {saveStatus === 'saving' && (
               <>
                 <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
@@ -224,7 +224,7 @@ export function ReleaseLyricsSection({
 
         {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[var(--radius-default)] shadow-card'>
+          <div className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-none'>
             {/* Primary format action — uses the most recently selected format */}
             <Button
               type='button'
@@ -232,7 +232,7 @@ export function ReleaseLyricsSection({
               variant='secondary'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
-              className='rounded-r-none border-r border-r-border-default'
+              className='rounded-r-none border-r border-r-(--linear-border-subtle)'
             >
               {isFormatting ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
@@ -273,7 +273,7 @@ export function ReleaseLyricsSection({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <div className='px-2 py-1.5 text-2xs text-tertiary-token'>
+                <div className='px-2 py-1.5 text-2xs text-(--linear-text-tertiary)'>
                   Formats lyrics for the selected platform
                 </div>
               </DropdownMenuContent>

@@ -1,7 +1,15 @@
 export {
+  DrawerActionRow,
+  type DrawerActionRowProps,
+} from './DrawerActionRow';
+export {
   DrawerAsyncToggle,
   type DrawerAsyncToggleProps,
 } from './DrawerAsyncToggle';
+export {
+  DrawerBackButton,
+  type DrawerBackButtonProps,
+} from './DrawerBackButton';
 export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
@@ -16,6 +24,10 @@ export {
   DrawerLoadingSkeleton,
   type DrawerLoadingSkeletonProps,
 } from './DrawerLoadingSkeleton';
+export {
+  DrawerMediaThumb,
+  type DrawerMediaThumbProps,
+} from './DrawerMediaThumb';
 export {
   DrawerPropertyRow,
   type DrawerPropertyRowProps,
