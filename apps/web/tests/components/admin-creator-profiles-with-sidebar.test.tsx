@@ -6,6 +6,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorProfilesWithSidebar } from '@/components/admin/admin-creator-profiles';
+import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import type {
   AdminCreatorProfileRow,
@@ -97,7 +98,9 @@ const renderWithProviders = (ui: ReactNode) => {
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <TooltipProvider>{ui}</TooltipProvider>
+        <TooltipProvider>
+          <TableMetaProvider>{ui}</TableMetaProvider>
+        </TooltipProvider>
       </ToastProvider>
     </QueryClientProvider>
   );

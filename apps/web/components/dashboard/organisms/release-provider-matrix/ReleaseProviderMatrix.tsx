@@ -20,7 +20,6 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
@@ -214,11 +213,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const searchInputRef = useCallback((node: HTMLInputElement | null) => {
-    if (node) node.focus();
-  }, []);
 
   // Apply filters and search to rows
   const filteredRows = useMemo(() => {
@@ -505,7 +500,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   ]);
 
   // Set header badge (DSP pills on left) and actions (drawer toggle on right)
-  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+  const { setHeaderActions } = useSetHeaderActions();
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
@@ -525,41 +520,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     [canCreateManualReleases, handleNewRelease]
   );
 
-  // Header search input — shown when search is open
-  const handleSearchClose = useCallback(() => {
-    setIsSearchOpen(false);
-    setSearchQuery('');
-  }, []);
-
-  const headerBadgeContent = useMemo(() => {
-    if (!isSearchOpen) return null; // Show default breadcrumb label
-
-    return (
-      <AppSearchField
-        inputRef={searchInputRef}
-        value={searchQuery}
-        onChange={setSearchQuery}
-        onEscape={handleSearchClose}
-        placeholder='Search releases…'
-        ariaLabel='Search releases'
-        className='flex-1'
-      />
-    );
-  }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
-
   useEffect(() => {
-    // Search input or null (for default breadcrumb) on left side of header
-    setHeaderBadge(headerBadgeContent);
-
-    // New Release button + drawer toggle on right side (use memoized element to prevent infinite loops)
+    // New Release button on the right side (use memoized element to prevent infinite loops)
     setHeaderActions(headerActions);
 
     return () => {
-      setHeaderBadge(null);
       setHeaderActions(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [headerBadgeContent, headerActions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
+  }, [headerActions]);
 
   // Register right panel with AuthShell - supports both release and track drawers
   const sidebarPanel = useMemo(() => {
@@ -717,8 +686,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
-              isSearchOpen={isSearchOpen}
-              onSearchToggle={() => setIsSearchOpen(open => !open)}
+              searchQuery={searchQuery}
+              onSearchQueryChange={setSearchQuery}
             />
           )}
 

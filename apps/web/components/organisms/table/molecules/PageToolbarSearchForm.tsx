@@ -18,7 +18,7 @@ interface HiddenInput {
 }
 
 export interface PageToolbarSearchFormProps {
-  readonly action: string;
+  readonly action?: string;
   readonly searchValue: string;
   readonly onSearchValueChange: (value: string) => void;
   readonly placeholder: string;
@@ -26,6 +26,9 @@ export interface PageToolbarSearchFormProps {
   readonly submitAriaLabel: string;
   readonly clearHref?: string;
   readonly clearAriaLabel?: string;
+  readonly onClearAction?: () => void;
+  readonly onApply?: () => void;
+  readonly applyLabel?: string;
   readonly hiddenInputs?: readonly HiddenInput[];
   readonly searchParamName?: string;
   readonly className?: string;
@@ -45,6 +48,9 @@ export function PageToolbarSearchForm({
   submitAriaLabel,
   clearHref,
   clearAriaLabel = 'Clear search',
+  onClearAction,
+  onApply,
+  applyLabel = 'Apply',
   hiddenInputs = [],
   searchParamName = 'q',
   className,
@@ -55,10 +61,18 @@ export function PageToolbarSearchForm({
   tooltipLabel,
 }: Readonly<PageToolbarSearchFormProps>) {
   const [isOpen, setIsOpen] = useState(false);
+  const isRouteSearch = Boolean(action);
 
   if (compact) {
     const triggerLabel = tooltipLabel ?? 'Search';
-    const showClearAction = Boolean(clearHref && searchValue);
+    const showClearAction = isRouteSearch
+      ? Boolean(clearHref && searchValue)
+      : searchValue.length > 0;
+
+    const handleLocalClear = () => {
+      onSearchValueChange('');
+      onClearAction?.();
+    };
 
     return (
       <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -96,21 +110,31 @@ export function PageToolbarSearchForm({
           </div>
           <form
             action={action}
-            method='get'
+            method={isRouteSearch ? 'get' : undefined}
             className='flex flex-col gap-3 p-3'
-            onSubmit={() => setIsOpen(false)}
+            onSubmit={event => {
+              if (!isRouteSearch) {
+                event.preventDefault();
+                onApply?.();
+              }
+              setIsOpen(false);
+            }}
           >
-            {hiddenInputs.map(input =>
-              input.value === undefined || input.value === null ? null : (
-                <input
-                  key={input.name}
-                  type='hidden'
-                  name={input.name}
-                  value={String(input.value)}
-                />
-              )
-            )}
-            <input type='hidden' name={searchParamName} value={searchValue} />
+            {isRouteSearch
+              ? hiddenInputs.map(input =>
+                  input.value === undefined || input.value === null ? null : (
+                    <input
+                      key={input.name}
+                      type='hidden'
+                      name={input.name}
+                      value={String(input.value)}
+                    />
+                  )
+                )
+              : null}
+            {isRouteSearch ? (
+              <input type='hidden' name={searchParamName} value={searchValue} />
+            ) : null}
             <AppSearchField
               value={searchValue}
               onChange={onSearchValueChange}
@@ -123,14 +147,26 @@ export function PageToolbarSearchForm({
             />
             <div className='flex items-center justify-end gap-2'>
               {showClearAction ? (
-                <Button variant='ghost' size='sm' asChild>
-                  <Link href={clearHref!} onClick={() => setIsOpen(false)}>
+                isRouteSearch ? (
+                  <Button variant='ghost' size='sm' asChild>
+                    <Link href={clearHref!} onClick={() => setIsOpen(false)}>
+                      Clear
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='sm'
+                    aria-label={clearAriaLabel}
+                    onClick={handleLocalClear}
+                  >
                     Clear
-                  </Link>
-                </Button>
+                  </Button>
+                )
               ) : null}
               <Button type='submit' variant='secondary' size='sm'>
-                Apply
+                {applyLabel}
               </Button>
             </div>
           </form>

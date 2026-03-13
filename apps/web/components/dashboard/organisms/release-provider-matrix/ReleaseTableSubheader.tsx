@@ -22,7 +22,7 @@ import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
-  PageToolbarActionButton,
+  PageToolbarSearchForm,
   PageToolbarTabButton,
 } from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
@@ -73,9 +73,9 @@ interface ReleaseTableSubheaderProps {
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
   /** Whether search is currently active */
-  readonly isSearchOpen?: boolean;
-  /** Callback to toggle search open/close */
-  readonly onSearchToggle?: () => void;
+  readonly searchQuery: string;
+  /** Callback to update search query */
+  readonly onSearchQueryChange: (value: string) => void;
 }
 
 /** Options for release view segmented control */
@@ -293,8 +293,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
-  isSearchOpen,
-  onSearchToggle,
+  searchQuery,
+  onSearchQueryChange,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
@@ -312,24 +312,32 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       }
       end={
         <>
-          {onSearchToggle ? (
-            <PageToolbarActionButton
-              label='Search'
-              ariaLabel='Search releases'
-              icon={
-                <Icon
-                  name='Search'
-                  className={PAGE_TOOLBAR_ICON_CLASS}
-                  strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-                />
-              }
-              onClick={onSearchToggle}
-              active={isSearchOpen}
-              ariaPressed={isSearchOpen}
-              iconOnly
-              tooltipLabel='Search'
-            />
-          ) : null}
+          <PageToolbarSearchForm
+            searchValue={searchQuery}
+            onSearchValueChange={onSearchQueryChange}
+            onClearAction={() => onSearchQueryChange('')}
+            onApply={() => undefined}
+            applyLabel='Done'
+            placeholder='Search releases'
+            ariaLabel='Search releases'
+            submitAriaLabel='Search releases'
+            submitIcon={
+              <Icon
+                name='Search'
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            clearIcon={
+              <Icon
+                name='X'
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            compact
+            tooltipLabel='Search'
+          />
           <ReleaseFilterDropdown
             filters={filters}
             onFiltersChange={onFiltersChange}
@@ -345,6 +353,12 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
             compact
           />
+          <DrawerToggleButton
+            chrome='page-toolbar'
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
+          />
           <ExportCSVButton
             getData={() => getReleasesForExport(releases, selectedIds)}
             columns={RELEASES_CSV_COLUMNS}
@@ -355,12 +369,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-          />
-          <DrawerToggleButton
-            chrome='page-toolbar'
-            ariaLabel='Toggle release preview'
-            label='Preview'
-            tooltipLabel='Preview'
           />
         </>
       }

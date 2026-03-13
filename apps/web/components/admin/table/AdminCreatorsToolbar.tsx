@@ -11,6 +11,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import {
   ExportCSVButton,
   PageToolbarSearchForm,
@@ -108,6 +109,12 @@ export function AdminCreatorsToolbar({
               chrome='page-toolbar'
               iconOnly
               tooltipLabel='Export'
+            />
+            <DrawerToggleButton
+              chrome='page-toolbar'
+              ariaLabel='Toggle creator details'
+              label='Details'
+              tooltipLabel='Details'
             />
           </div>
         )

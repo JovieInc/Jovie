@@ -9,12 +9,13 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { cn } from '@/lib/utils';
 import { AdminProfileSidebar } from './AdminProfileSidebar';
@@ -227,6 +228,37 @@ export function AdminCreatorProfilesUnified({
   const handleSidebarClose = useCallback(() => {
     setSidebarOpen(false);
   }, []);
+
+  const { setTableMeta } = useTableMeta();
+  const filteredProfilesRef = useRef(filteredProfiles);
+  filteredProfilesRef.current = filteredProfiles;
+
+  React.useEffect(() => {
+    const toggle = () => {
+      if (sidebarOpen) {
+        setSidebarOpen(false);
+        return;
+      }
+
+      const nextProfile =
+        filteredProfilesRef.current.find(
+          profile => profile.id === selectedId
+        ) ?? filteredProfilesRef.current[0];
+
+      if (!nextProfile) return;
+
+      setSelectedId(nextProfile.id);
+      setSidebarOpen(true);
+      setDraftContact(null);
+    };
+
+    setTableMeta({
+      rowCount: filteredProfiles.length,
+      toggle: filteredProfiles.length > 0 ? toggle : null,
+      rightPanelWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [filteredProfiles.length, selectedId, setDraftContact, sidebarOpen]);
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {

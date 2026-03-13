@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
+import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 vi.mock('next/link', () => ({
@@ -29,6 +30,17 @@ vi.mock('@/components/organisms/table', () => ({
       {start}
       {end}
     </div>
+  ),
+  PageToolbarActionButton: ({
+    label,
+    ariaLabel,
+  }: {
+    label: ReactNode;
+    ariaLabel: string;
+  }) => (
+    <button type='button' aria-label={ariaLabel}>
+      {label}
+    </button>
   ),
   PageToolbarSearchForm: ({ submitAriaLabel }: { submitAriaLabel: string }) => (
     <button type='submit'>{submitAriaLabel}</button>
@@ -78,19 +90,21 @@ function renderToolbar(
 
   render(
     <TooltipProvider>
-      <AdminCreatorsToolbar
-        basePath='/admin/creators'
-        search=''
-        sort='newest'
-        pageSize={20}
-        from={1}
-        to={2}
-        total={2}
-        clearHref='/admin/creators'
-        profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
-        {...handlers}
-        {...props}
-      />
+      <TableMetaProvider>
+        <AdminCreatorsToolbar
+          basePath='/admin/creators'
+          search=''
+          sort='newest'
+          pageSize={20}
+          from={1}
+          to={2}
+          total={2}
+          clearHref='/admin/creators'
+          profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
+          {...handlers}
+          {...props}
+        />
+      </TableMetaProvider>
     </TooltipProvider>
   );
 

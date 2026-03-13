@@ -7,7 +7,6 @@ import { BatchIngestModal } from '@/components/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
-import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -42,7 +41,6 @@ export function AdminCreatorsPageWrapper(
           onIngestPending={handleIngestPending}
           hideLabelOnMobile
         />
-        <DrawerToggleButton ariaLabel='Toggle creator details' />
       </DashboardHeaderActionGroup>
     );
 

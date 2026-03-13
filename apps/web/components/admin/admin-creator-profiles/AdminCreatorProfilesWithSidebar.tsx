@@ -15,9 +15,11 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -258,6 +260,37 @@ export function AdminCreatorProfilesWithSidebar({
   const handleSidebarClose = useCallback(() => {
     setSidebarOpen(false);
   }, []);
+
+  const { setTableMeta } = useTableMeta();
+  const filteredProfilesRef = React.useRef(filteredProfiles);
+  filteredProfilesRef.current = filteredProfiles;
+
+  React.useEffect(() => {
+    const toggle = () => {
+      if (sidebarOpen) {
+        setSidebarOpen(false);
+        return;
+      }
+
+      const nextProfile =
+        filteredProfilesRef.current.find(
+          profile => profile.id === selectedId
+        ) ?? filteredProfilesRef.current[0];
+
+      if (!nextProfile) return;
+
+      setSelectedId(nextProfile.id);
+      setSidebarOpen(true);
+      setDraftContact(null);
+    };
+
+    setTableMeta({
+      rowCount: filteredProfiles.length,
+      toggle: filteredProfiles.length > 0 ? toggle : null,
+      rightPanelWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [filteredProfiles.length, selectedId, setDraftContact, sidebarOpen]);
 
   const getProfileId = useCallback(
     (profile: (typeof filteredProfiles)[number]) => profile.id,
