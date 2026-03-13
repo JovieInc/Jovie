@@ -1,8 +1,8 @@
 'use client';
 
 import { type QueryClient, useQuery } from '@tanstack/react-query';
-import { fetchWithTimeout } from './fetch';
 import type { EnvHealthResponse } from '@/lib/contracts/api';
+import { fetchWithTimeout } from './fetch';
 
 export type { EnvHealthResponse } from '@/lib/contracts/api';
 
