@@ -6,7 +6,7 @@ import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { formatReleaseArtistLine } from '@/lib/discography/formatting';
+import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
@@ -48,7 +48,10 @@ export const ReleaseCell = memo(function ReleaseCell({
     ? getReleaseTypeStyle(release.releaseType)
     : null;
 
-  const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
+  const artistLine = formatCompactReleaseArtistLine(
+    release.artistNames,
+    artistName
+  );
 
   return (
     <div className='grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-x-2'>
@@ -94,7 +97,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
-              className='h-[17px] shrink-0 rounded-[5px] border border-amber-500/15 bg-amber-500/10 px-1.5 text-[9px] font-[510] tracking-[-0.01em] text-amber-700 shadow-none dark:text-amber-300'
+              className='hidden h-[17px] shrink-0 rounded-[5px] border border-amber-500/15 bg-amber-500/10 px-1.5 text-[9px] font-[510] tracking-[-0.01em] text-amber-700 shadow-none xl:inline-flex dark:text-amber-300'
             >
               {manualOverrideCount} edited
             </Badge>

@@ -43,6 +43,29 @@ export function formatReleaseArtistLine(
   return fallback ? fallback : null;
 }
 
+export function formatCompactReleaseArtistLine(
+  artistNames: string[] | undefined,
+  fallbackArtistName: string | null | undefined,
+  maxVisibleArtists = 2
+): string | null {
+  const normalizedNames = (artistNames ?? [])
+    .map(name => name.trim())
+    .filter(Boolean);
+
+  if (normalizedNames.length === 0) {
+    const fallback = fallbackArtistName?.trim();
+    return fallback ? fallback : null;
+  }
+
+  if (normalizedNames.length <= maxVisibleArtists) {
+    return releaseArtistListFormatter.format(normalizedNames);
+  }
+
+  const visibleNames = normalizedNames.slice(0, maxVisibleArtists);
+  const remainingCount = normalizedNames.length - maxVisibleArtists;
+  return `${visibleNames.join(', ')} +${remainingCount}`;
+}
+
 export function formatReleaseDate(date: string | undefined): string {
   if (!date) return 'Release date TBD';
   const parsed = parseReleaseDate(date);
