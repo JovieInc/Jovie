@@ -58,14 +58,16 @@ export function TableEmptyState({
       )}
     >
       {icon && (
-        <div className='flex h-10 w-10 items-center justify-center text-tertiary-token'>
+        <div className='flex h-10 w-10 items-center justify-center text-(--linear-text-tertiary)'>
           {icon}
         </div>
       )}
       <div className='space-y-1'>
-        <p className='text-[13px] font-[510] text-secondary-token'>{title}</p>
+        <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
+          {title}
+        </p>
         {description && (
-          <p className='text-[13px] text-tertiary-token max-w-md'>
+          <p className='max-w-md text-[13px] text-(--linear-text-tertiary)'>
             {description}
           </p>
         )}

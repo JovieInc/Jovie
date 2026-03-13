@@ -21,6 +21,7 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,
   type EntityHeaderCardProps,

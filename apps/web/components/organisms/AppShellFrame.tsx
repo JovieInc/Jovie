@@ -35,7 +35,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   return (
     <div
       className={cn(
-        'flex h-svh w-full overflow-hidden bg-base',
+        'flex h-svh w-full overflow-hidden bg-(--linear-bg-page) text-(--linear-text-primary)',
         /* PWA safe area: pad top for notch/Dynamic Island in standalone mode */
         'pt-[env(safe-area-inset-top)]',
         containerClassName
@@ -45,7 +45,7 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='bg-surface-0 lg:border lg:border-strong lg:rounded-sm lg:m-2 lg:ml-0 flex flex-1 min-h-0 overflow-hidden'
+        className='flex flex-1 min-h-0 overflow-hidden border-l border-(--linear-border-subtle) bg-(--linear-bg-page) lg:m-[var(--linear-app-shell-gap)] lg:ml-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:bg-(--linear-app-content-surface)'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
@@ -55,7 +55,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                 'flex-1 min-h-0 min-w-0',
                 isTableRoute
                   ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                  : 'overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6',
+                  : 'overflow-y-auto overflow-x-hidden overscroll-contain px-[var(--linear-app-content-padding-x)] py-[var(--linear-app-content-padding-y)]',
                 contentClassName
               )}
             >

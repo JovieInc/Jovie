@@ -4,7 +4,7 @@ import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   Dialog,
   DialogBody,
@@ -383,10 +383,7 @@ export function SpotifyConnectDialog({
             )}
           >
             <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
-              <SocialIcon
-                platform='spotify'
-                className='w-3.5 h-3.5 text-brand-spotify'
-              />
+              <ProviderIcon provider='spotify' className='h-3.5 w-3.5' />
             </div>
             <input
               ref={inputRef}
@@ -560,9 +557,9 @@ export function SpotifyConnectDialog({
                           />
                         ) : (
                           <div className='w-full h-full flex items-center justify-center'>
-                            <SocialIcon
-                              platform='spotify'
-                              className='w-5 h-5 text-tertiary-token'
+                            <ProviderIcon
+                              provider='spotify'
+                              className='h-5 w-5'
                             />
                           </div>
                         )}

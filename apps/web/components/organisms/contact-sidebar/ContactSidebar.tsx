@@ -1,12 +1,11 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { SegmentControl } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
@@ -141,12 +140,11 @@ export const ContactSidebar = memo(function ContactSidebar({
       }
       tabs={
         contact ? (
-          <SegmentControl
+          <DrawerTabs
             value={activeTab}
-            onValueChange={setActiveTab}
+            onValueChange={value => setActiveTab(value)}
             options={SIDEBAR_TAB_OPTIONS}
-            size='sm'
-            aria-label='Contact sidebar view'
+            ariaLabel='Contact sidebar view'
           />
         ) : undefined
       }

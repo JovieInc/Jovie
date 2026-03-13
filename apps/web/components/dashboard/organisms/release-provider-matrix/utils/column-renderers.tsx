@@ -364,7 +364,10 @@ export function renderLabelCell({
   if (!label) return <EmptyCell />;
 
   return (
-    <TruncatedText lines={1} className='text-[11px] text-secondary-token'>
+    <TruncatedText
+      lines={1}
+      className='text-[11px] text-(--linear-text-secondary)'
+    >
       {label}
     </TruncatedText>
   );
@@ -375,7 +378,7 @@ export function renderTotalTracksCell({
   getValue,
 }: CellContext<ReleaseViewModel, number>) {
   return (
-    <span className='text-[13px] text-secondary-token tabular-nums'>
+    <span className='text-[13px] tabular-nums text-(--linear-text-secondary)'>
       {getValue()}
     </span>
   );
@@ -389,7 +392,7 @@ export function renderDurationCell({
   if (!durationMs) return <EmptyCell />;
 
   return (
-    <span className='text-[13px] text-secondary-token tabular-nums'>
+    <span className='text-[13px] tabular-nums text-(--linear-text-secondary)'>
       {formatDuration(durationMs)}
     </span>
   );
@@ -409,12 +412,15 @@ export function renderGenresCell({
 
   return (
     <div className='flex items-center gap-1'>
-      <TruncatedText lines={1} className='text-[13px] text-secondary-token'>
+      <TruncatedText
+        lines={1}
+        className='text-[13px] text-(--linear-text-secondary)'
+      >
         {firstGenre}
       </TruncatedText>
       {remainingCount > 0 && (
         <span
-          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full bg-surface-2 px-1.5 py-0.5 text-[11px] text-tertiary-token'
+          className='inline-flex min-w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0.5 text-[11px] text-(--linear-text-tertiary)'
           title={genres.slice(1).join(', ')}
         >
           +{remainingCount}
@@ -441,7 +447,7 @@ export function renderMetricsCell({
     : null;
 
   return (
-    <div className='flex items-center gap-3 text-[13px] text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-3 text-[13px] tabular-nums text-(--linear-text-secondary)'>
       {/* Tracks count - fixed width */}
       <span className='w-8 text-right' title='Tracks'>
         {release.totalTracks}
@@ -456,7 +462,7 @@ export function renderMetricsCell({
       {release.label && (
         <TruncatedText
           lines={1}
-          className='max-w-48 text-tertiary-token'
+          className='max-w-48 text-(--linear-text-tertiary)'
           tooltipSide='top'
         >
           {release.label}

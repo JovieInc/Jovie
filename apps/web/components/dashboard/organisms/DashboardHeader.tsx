@@ -29,11 +29,17 @@ export function DashboardHeader({
   className,
 }: DashboardHeaderProps) {
   const currentLabel = breadcrumbs.at(-1)?.label ?? '';
+  const rootLabel =
+    breadcrumbs.length > 1 ? (breadcrumbs[0]?.label ?? 'Jovie') : 'Jovie';
 
   return (
     <header
       data-testid='dashboard-header'
-      className={cn('z-20', showDivider && 'border-b border-subtle', className)}
+      className={cn(
+        'z-20 bg-(--linear-bg-header) supports-[backdrop-filter]:backdrop-blur-md',
+        showDivider && 'border-b border-(--linear-border-subtle)',
+        className
+      )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
@@ -42,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1.5 [&>button]:h-9 [&>button]:w-9 [&>button]:rounded-lg [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
+            <div className='flex items-center gap-1.5 [&>button]:h-8 [&>button]:w-8 [&>button]:rounded-[8px] [&>button]:border [&>button]:border-(--linear-border-subtle) [&>button]:bg-(--linear-bg-surface-0) [&>button>svg]:h-4 [&>button>svg]:w-4'>
               {action}
             </div>
           ) : (
@@ -51,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-12 w-full items-center gap-2 px-5 md:px-6 sm:flex'>
+      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-2 px-[var(--linear-app-header-padding-x)] sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -64,11 +70,11 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex-1 items-center flex text-[13px]'>
+        <div className='flex flex-1 items-center text-[13px] tracking-[-0.01em]'>
           {!breadcrumbSuffix && (
             <>
-              <span className='text-tertiary-token'>Jovie</span>
-              <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
+              <span className='text-(--linear-text-tertiary)'>{rootLabel}</span>
+              <ChevronRight className='mx-0.5 size-3.5 text-(--linear-text-quaternary)' />
               <span className='font-[510] text-primary-token'>
                 {currentLabel}
               </span>
@@ -77,7 +83,9 @@ export function DashboardHeader({
           {breadcrumbSuffix}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-2'>{action}</div>
+          <div className='ml-auto flex items-center gap-[var(--linear-app-toolbar-gap)]'>
+            {action}
+          </div>
         ) : null}
       </div>
     </header>

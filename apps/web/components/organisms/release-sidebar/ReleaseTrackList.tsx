@@ -26,30 +26,10 @@ import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerSection } from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
-import type { TrackViewModel } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import type { Release } from './types';
+import type { Release, ReleaseSidebarTrack } from './types';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
-
-/** Track shape returned by the API route for sidebar tracklist + actions. */
-type SidebarTrack = Pick<
-  TrackViewModel,
-  | 'id'
-  | 'releaseId'
-  | 'title'
-  | 'slug'
-  | 'smartLinkPath'
-  | 'trackNumber'
-  | 'discNumber'
-  | 'durationMs'
-  | 'isrc'
-  | 'isExplicit'
-  | 'previewUrl'
-  | 'audioUrl'
-  | 'audioFormat'
-  | 'providers'
->;
 
 /**
  * Fetch tracks via the route handler instead of a server action.
@@ -59,33 +39,41 @@ type SidebarTrack = Pick<
 async function fetchTracks(
   releaseId: string,
   signal?: AbortSignal
-): Promise<SidebarTrack[]> {
+): Promise<ReleaseSidebarTrack[]> {
   const res = await fetch(
     `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`,
     { signal }
   );
   if (!res.ok) throw new Error('Failed to load tracks');
-  return res.json() as Promise<SidebarTrack[]>;
+  return res.json() as Promise<ReleaseSidebarTrack[]>;
 }
 
 interface ReleaseTrackListProps {
   readonly release: Release;
-  readonly onTrackClick?: (track: SidebarTrack) => void;
+  readonly onTrackClick?: (track: ReleaseSidebarTrack) => void;
+  readonly tracksOverride?: ReleaseSidebarTrack[];
 }
 
 export function ReleaseTrackList({
   release,
   onTrackClick,
+  tracksOverride,
 }: ReleaseTrackListProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
-  const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
+  const [tracks, setTracks] = useState<ReleaseSidebarTrack[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   // Auto-fetch tracks on mount since tracklist starts expanded
   useEffect(() => {
     if (release.totalTracks === 0) return;
+    if (tracksOverride) {
+      setTracks(tracksOverride);
+      setHasError(false);
+      setIsLoading(false);
+      return;
+    }
     const controller = new AbortController();
     setIsLoading(true);
     fetchTracks(release.id, controller.signal)
@@ -101,7 +89,7 @@ export function ReleaseTrackList({
         if (!controller.signal.aborted) setIsLoading(false);
       });
     return () => controller.abort();
-  }, [release.id, release.totalTracks]);
+  }, [release.id, release.totalTracks, tracksOverride]);
 
   const handleToggle = useCallback(async () => {
     if (isExpanded) {
@@ -110,6 +98,8 @@ export function ReleaseTrackList({
     }
 
     setIsExpanded(true);
+
+    if (tracksOverride) return;
 
     // Only fetch if not already cached (null = not fetched, [] = empty)
     if (tracks !== null && !hasError) return;
@@ -126,7 +116,7 @@ export function ReleaseTrackList({
     } finally {
       setIsLoading(false);
     }
-  }, [isExpanded, tracks, hasError, release.id]);
+  }, [isExpanded, tracks, hasError, release.id, tracksOverride]);
 
   if (release.totalTracks === 0) return null;
 
@@ -139,7 +129,7 @@ export function ReleaseTrackList({
         }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token hover:text-secondary-token transition-colors'
+        className='flex w-full items-center justify-between rounded-[8px] px-2 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary) transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
       >
         <span>Tracklist ({release.totalTracks})</span>
         {isExpanded ? (
@@ -176,7 +166,7 @@ export function ReleaseTrackList({
           )}
 
           {!isLoading && !hasError && tracks?.length === 0 && (
-            <p className='py-2 text-[13px] text-tertiary-token'>
+            <p className='py-2 text-[13px] text-(--linear-text-tertiary)'>
               No track data available.
             </p>
           )}
@@ -206,8 +196,8 @@ function TrackItem({
   playbackState,
   onToggleTrack,
 }: {
-  readonly track: SidebarTrack;
-  readonly onClick?: (track: SidebarTrack) => void;
+  readonly track: ReleaseSidebarTrack;
+  readonly onClick?: (track: ReleaseSidebarTrack) => void;
   readonly playbackState: {
     activeTrackId: string | null;
     isPlaying: boolean;
@@ -273,9 +263,9 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-surface-2/50'>
+    <div className='group flex items-start gap-2 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow,border-color] duration-150 hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
       {/* Track number */}
-      <span className='w-6 shrink-0 pt-0.5 text-right text-[11px] tabular-nums text-tertiary-token'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>
 
@@ -284,7 +274,7 @@ function TrackItem({
         <button
           type='button'
           onClick={handleClick}
-          className='w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
+          className='w-full rounded-[6px] text-left focus-visible:outline-none'
         >
           <div className='flex items-center gap-1.5'>
             <TruncatedText
@@ -297,7 +287,7 @@ function TrackItem({
             {track.isExplicit && (
               <Badge
                 variant='secondary'
-                className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+                className='shrink-0 bg-(--linear-bg-surface-1) px-1 py-0 text-[9px] text-(--linear-text-tertiary)'
               >
                 E
               </Badge>
@@ -305,7 +295,7 @@ function TrackItem({
           </div>
 
           {/* Duration + ISRC row */}
-          <div className='mt-0.5 flex items-center gap-2 text-[11px] text-tertiary-token'>
+          <div className='mt-0.5 flex items-center gap-2 text-[11px] text-(--linear-text-tertiary)'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -331,7 +321,7 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle text-secondary-token hover:border-primary hover:text-primary-token transition-colors'
+                className='flex h-6 w-6 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
@@ -340,14 +330,14 @@ function TrackItem({
                   <Play className='h-3.5 w-3.5' />
                 )}
               </button>
-              <div className='h-1 flex-1 rounded-full bg-surface-2'>
+              <div className='h-1 flex-1 rounded-full bg-(--linear-bg-surface-1)'>
                 <div
                   className='h-full rounded-full bg-primary transition-[width]'
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
-            <p className='text-[10px] text-tertiary-token'>
+            <p className='text-[10px] text-(--linear-text-tertiary)'>
               {track.audioFormat
                 ? `Audio preview · ${track.audioFormat.toUpperCase()}`
                 : 'Audio preview'}
@@ -375,8 +365,8 @@ function TrackActionsMenu({
   onCopyIsrc,
   onCopySmartLink,
 }: {
-  readonly track: SidebarTrack;
-  readonly streamingProviders: SidebarTrack['providers'];
+  readonly track: ReleaseSidebarTrack;
+  readonly streamingProviders: ReleaseSidebarTrack['providers'];
   readonly onCopyIsrc: () => void;
   readonly onCopySmartLink: () => void;
 }) {
@@ -385,10 +375,10 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          className='shrink-0 self-center rounded p-1 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          className='shrink-0 self-center rounded-[7px] border border-transparent p-1 opacity-60 transition-[opacity,background-color,border-color,color] duration-150 group-hover:opacity-100 focus-visible:opacity-100 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           aria-label={`Actions for ${track.title}`}
         >
-          <MoreHorizontal className='h-4 w-4 text-tertiary-token' />
+          <MoreHorizontal className='h-4 w-4 text-(--linear-text-tertiary)' />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-48'>
@@ -411,20 +401,22 @@ function TrackActionsMenu({
                 Open on platform
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                {streamingProviders.map(provider => (
-                  <DropdownMenuItem
-                    key={provider.key}
-                    onClick={() =>
-                      globalThis.open(
-                        provider.url,
-                        '_blank',
-                        'noopener,noreferrer'
-                      )
-                    }
-                  >
-                    {PROVIDER_LABELS[provider.key] ?? provider.label}
-                  </DropdownMenuItem>
-                ))}
+                {streamingProviders.map(
+                  (provider: ReleaseSidebarTrack['providers'][number]) => (
+                    <DropdownMenuItem
+                      key={provider.key}
+                      onClick={() =>
+                        globalThis.open(
+                          provider.url,
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
+                    >
+                      {PROVIDER_LABELS[provider.key] ?? provider.label}
+                    </DropdownMenuItem>
+                  )
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           </>

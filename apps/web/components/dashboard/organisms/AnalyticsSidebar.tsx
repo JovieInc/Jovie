@@ -1,9 +1,8 @@
 'use client';
 
-import { SegmentControl } from '@jovie/ui';
 import { ArrowDown, Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useCallback, useState } from 'react';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
@@ -354,13 +353,12 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         </div>
 
         <div className='flex items-center gap-2'>
-          <SegmentControl
+          <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}
             options={ANALYTICS_TAB_OPTIONS}
-            size='sm'
             className='flex-1'
-            aria-label='Analytics data tabs'
+            ariaLabel='Analytics data tabs'
           />
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>

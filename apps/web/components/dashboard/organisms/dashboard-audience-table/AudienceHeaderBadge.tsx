@@ -2,7 +2,7 @@
 
 import { Ghost, UserCheck, Users } from 'lucide-react';
 import { memo } from 'react';
-import { cn } from '@/lib/utils';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import type { AudienceView } from './types';
 
 interface AudienceHeaderBadgeProps {
@@ -45,27 +45,24 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
   };
 
   return (
-    <div className='flex items-center min-w-0 overflow-x-auto scrollbar-hide'>
-      <fieldset className='inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0/80 p-[3px] backdrop-blur-sm'>
-        <legend className='sr-only'>Audience view filter</legend>
-        {VIEW_OPTIONS.map(({ value, Icon }) => (
-          <button
-            key={value}
-            type='button'
-            onClick={() => onViewChange(value)}
-            aria-pressed={view === value}
-            className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-[510] tracking-[-0.01em] transition-all duration-150 whitespace-nowrap',
-              view === value
-                ? 'border-default bg-surface-2 text-primary-token shadow-card'
-                : 'border-transparent text-tertiary-token hover:text-secondary-token hover:bg-surface-1'
-            )}
-          >
-            <Icon className='h-3 w-3' />
-            {labels[value]}
-          </button>
-        ))}
-      </fieldset>
+    <div className='scrollbar-hide flex min-w-0 items-center overflow-x-auto'>
+      <AppSegmentControl
+        value={view}
+        onValueChange={onViewChange}
+        aria-label='Audience view filter'
+        surface='ghost'
+        className='backdrop-blur-sm'
+        triggerClassName='whitespace-nowrap transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1)'
+        options={VIEW_OPTIONS.map(({ value, Icon }) => ({
+          value,
+          label: (
+            <span className='inline-flex items-center gap-1.5'>
+              <Icon className='h-3 w-3' />
+              <span>{labels[value]}</span>
+            </span>
+          ),
+        }))}
+      />
     </div>
   );
 });

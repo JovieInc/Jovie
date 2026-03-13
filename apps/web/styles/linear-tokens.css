@@ -199,6 +199,31 @@
   /* App UI tokens (distinct from marketing page tokens) */
   --linear-app-radius-item: 4px;
   --linear-app-radius-menu: 8px;
+  --linear-app-shell-gap: 12px;
+  --linear-app-shell-radius: 14px;
+  --linear-app-header-height: 48px;
+  --linear-app-header-padding-x: 20px;
+  --linear-app-content-padding-x: 20px;
+  --linear-app-content-padding-y: 18px;
+  --linear-app-drawer-header-height: 44px;
+  --linear-app-drawer-padding-x: 16px;
+  --linear-app-control-height-sm: 28px;
+  --linear-app-control-padding-x: 10px;
+  --linear-app-control-radius: 8px;
+  --linear-app-toolbar-gap: 6px;
+  --linear-app-content-surface: var(--linear-bg-surface-0);
+  --linear-app-drawer-surface: var(--linear-bg-surface-0);
+  --linear-app-drawer-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
+  --linear-app-sidebar-width: 232px;
+  --linear-app-sidebar-background-rgb: 247 248 248;
+  --linear-app-sidebar-foreground-rgb: 18 18 20;
+  --linear-app-sidebar-border-rgb: 0 0 0 / 0.06;
+  --linear-app-sidebar-accent-rgb: 242 243 245;
+  --linear-app-sidebar-accent-active-rgb: 236 238 241;
+  --linear-app-sidebar-item-foreground-rgb: 88 90 96;
+  --linear-app-sidebar-item-icon-rgb: 122 125 132;
+  --linear-app-sidebar-muted-rgb: 112 116 124;
   /* ============================================
      SPACING — mode-independent
      ============================================ */
@@ -311,6 +336,18 @@
   --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
+  --linear-app-content-surface: var(--linear-bg-surface-1);
+  --linear-app-drawer-surface: var(--linear-bg-surface-0);
+  --linear-app-drawer-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04), -12px 0 32px rgba(0, 0, 0, 0.24);
+  --linear-app-sidebar-background-rgb: 15 16 17;
+  --linear-app-sidebar-foreground-rgb: 227 228 229;
+  --linear-app-sidebar-border-rgb: 255 255 255 / 0.06;
+  --linear-app-sidebar-accent-rgb: 255 255 255 / 0.03;
+  --linear-app-sidebar-accent-active-rgb: 255 255 255 / 0.05;
+  --linear-app-sidebar-item-foreground-rgb: 214 218 226;
+  --linear-app-sidebar-item-icon-rgb: 116 120 128;
+  --linear-app-sidebar-muted-rgb: 107 111 118;
 }
 
 /* ============================================

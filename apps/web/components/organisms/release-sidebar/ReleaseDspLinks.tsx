@@ -20,15 +20,13 @@ import {
 import { Loader2, RefreshCw } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
-import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
@@ -59,37 +57,6 @@ interface ReleaseDspLinksProps {
   readonly onRescanIsrc?: () => void;
   readonly isRescanningIsrc?: boolean;
 }
-
-// Maps ProviderKey to DspProviderId for icons
-const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
-  spotify: 'spotify',
-  apple_music: 'apple_music',
-  youtube: null,
-  youtube_music: 'youtube_music',
-  soundcloud: 'soundcloud',
-  deezer: 'deezer',
-  tidal: 'tidal',
-  amazon_music: 'amazon_music',
-  bandcamp: null,
-  beatport: null,
-  pandora: null,
-  napster: null,
-  audiomack: null,
-  qobuz: null,
-  anghami: null,
-  boomplay: null,
-  iheartradio: null,
-  tiktok: null,
-};
-
-// Maps ProviderKey to SocialIcon platform name for providers without a DspProviderId
-const PROVIDER_TO_SOCIAL_ICON: Partial<Record<ProviderKey, string>> = {
-  youtube: 'youtube',
-  youtube_music: 'youtube',
-  bandcamp: 'bandcamp',
-  beatport: 'beatport',
-  tiktok: 'tiktok',
-};
 
 const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
 
@@ -229,34 +196,18 @@ export function ReleaseDspLinks({
         <div className='space-y-0.5'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
-            const dspId = PROVIDER_TO_DSP[provider.key];
             const isManual = provider.source === 'manual';
-
-            const socialIconPlatform = PROVIDER_TO_SOCIAL_ICON[provider.key];
-            let icon: React.ReactNode;
-            if (dspId) {
-              icon = <DspProviderIcon provider={dspId} size='sm' />;
-            } else if (socialIconPlatform) {
-              icon = (
-                <SocialIcon
-                  platform={socialIconPlatform}
-                  className='h-4 w-4'
-                  aria-label={config?.label || provider.key}
-                />
-              );
-            } else {
-              icon = (
-                <span
-                  className='h-4 w-4 rounded-full shrink-0'
-                  style={{ backgroundColor: config?.accent }}
-                />
-              );
-            }
 
             return (
               <SidebarLinkRow
                 key={provider.key}
-                icon={icon}
+                icon={
+                  <ProviderIcon
+                    provider={provider.key}
+                    className='h-4 w-4'
+                    aria-label={config?.label || provider.key}
+                  />
+                }
                 label={config?.label || provider.key}
                 url={provider.url}
                 deepLinkPlatform={provider.key}
@@ -294,34 +245,10 @@ export function ReleaseDspLinks({
               </SelectTrigger>
               <SelectContent>
                 {availableProviders.map(([key, config]) => {
-                  const dspId = PROVIDER_TO_DSP[key];
-                  const socialIcon = PROVIDER_TO_SOCIAL_ICON[key];
-                  let optionIcon: React.ReactNode;
-
-                  if (dspId) {
-                    optionIcon = <DspProviderIcon provider={dspId} size='sm' />;
-                  } else if (socialIcon) {
-                    optionIcon = (
-                      <SocialIcon
-                        platform={socialIcon}
-                        className='h-4 w-4'
-                        aria-hidden
-                      />
-                    );
-                  } else {
-                    optionIcon = (
-                      <span
-                        className='h-2 w-2 rounded-full'
-                        style={{ backgroundColor: config.accent }}
-                        aria-hidden='true'
-                      />
-                    );
-                  }
-
                   return (
                     <SelectItem key={key} value={key}>
                       <div className='flex items-center gap-2'>
-                        {optionIcon}
+                        <ProviderIcon provider={key} className='h-4 w-4' />
                         {config.label}
                       </div>
                     </SelectItem>

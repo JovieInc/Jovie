@@ -44,7 +44,7 @@ export function TableHeaderCell({
         onClick={onSort}
       />
     ) : (
-      <span className='text-[11px] font-[510] text-tertiary-token'>
+      <span className='text-[11px] font-[510] text-(--linear-text-tertiary)'>
         {children}
       </span>
     );
@@ -53,9 +53,9 @@ export function TableHeaderCell({
     <th
       className={cn(
         // Base styles
-        'px-4 py-3 border-b border-subtle text-[13px] text-tertiary-token',
+        'border-b border-(--linear-border-subtle) px-4 py-3 text-[13px] text-(--linear-text-tertiary)',
         // Sticky positioning
-        sticky && 'sticky z-20 bg-surface-1',
+        sticky && 'sticky z-20 bg-(--linear-bg-surface-1)',
         // Alignment
         alignmentClasses[align],
         // Width

@@ -32,17 +32,17 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid items-center gap-1 w-full min-h-[28px] text-left',
+        'grid w-full min-h-[30px] items-center gap-2 rounded-[8px] px-1.5 py-1 text-left transition-[background-color,box-shadow,border-color] duration-150',
         interactive &&
-          'rounded -mx-1.5 px-1.5 hover:bg-white/[0.02] transition-colors duration-100 cursor-pointer',
+          'cursor-pointer hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
       style={gridStyle}
     >
-      <span className='text-[13px] font-[450] leading-tight text-tertiary-token'>
+      <span className='text-[11px] font-[510] leading-[14px] tracking-[-0.01em] text-(--linear-text-tertiary)'>
         {label}
       </span>
-      <span className='min-w-0 text-[13px] leading-tight text-secondary-token'>
+      <span className='min-w-0 text-[13px] leading-[17px] text-(--linear-text-secondary)'>
         {value}
       </span>
     </Wrapper>

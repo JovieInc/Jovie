@@ -17,11 +17,11 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-4 py-2 min-h-12 shrink-0',
+        'flex min-h-[var(--linear-app-drawer-header-height)] shrink-0 items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-[var(--linear-app-drawer-padding-x)] py-2',
         className
       )}
     >
-      <p className='text-[13px] font-[510] text-secondary-token truncate'>
+      <p className='truncate text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
         {title}
       </p>
       {actions && <div className='flex items-center gap-1'>{actions}</div>}

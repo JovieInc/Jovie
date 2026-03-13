@@ -3,30 +3,17 @@
 import { Badge } from '@jovie/ui';
 import { Pause, Play } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
-import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-
-/** Maps ProviderKey to SocialIcon platform name (only those with SVG icons) */
-const PROVIDER_ICON_MAP: Partial<Record<ProviderKey, string>> = {
-  spotify: 'spotify',
-  apple_music: 'apple_music',
-  youtube: 'youtube',
-  soundcloud: 'soundcloud',
-  tidal: 'tidal',
-  bandcamp: 'bandcamp',
-  beatport: 'beatport',
-  tiktok: 'tiktok',
-};
+import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const MAX_VISIBLE_ICONS = 3;
-
-interface IconProviderInfo {
-  readonly key: ProviderKey;
-  readonly icon: string;
-}
+const artistListFormatter = new Intl.ListFormat('en', {
+  style: 'long',
+  type: 'conjunction',
+});
 
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
@@ -70,26 +57,31 @@ export const ReleaseCell = memo(function ReleaseCell({
     const providers = release.providers;
     if (providers.length === 0) return null;
 
-    const withIcons = providers
-      .map(p => ({
-        key: p.key,
-        icon: PROVIDER_ICON_MAP[p.key],
-      }))
-      .filter((p): p is IconProviderInfo => Boolean(p.icon));
-
-    const visible = withIcons.slice(0, MAX_VISIBLE_ICONS);
-    const remaining = withIcons.length - visible.length;
+    const visible = providers.slice(0, MAX_VISIBLE_ICONS);
+    const remaining = providers.length - visible.length;
     return { visible, remaining };
   }, [release.providers]);
 
+  const artistLine = useMemo(() => {
+    const artistNames = (release.artistNames ?? [])
+      .map(name => name.trim())
+      .filter(Boolean);
+
+    if (artistNames.length > 0) {
+      return artistListFormatter.format(artistNames);
+    }
+
+    return artistName?.trim() || null;
+  }, [artistName, release.artistNames]);
+
   return (
-    <div className='grid min-w-0 items-center gap-x-2 grid-cols-[24px_minmax(0,1fr)_minmax(88px,120px)_auto]'>
-      <div className='flex w-6 items-center justify-center'>
+    <div className='grid min-w-0 grid-cols-[20px_minmax(0,1fr)_minmax(72px,96px)_auto] items-center gap-x-2.5'>
+      <div className='flex w-5 items-center justify-center'>
         {hasPreview ? (
           <button
             type='button'
             onClick={handleTogglePlayback}
-            className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-white/[0.06]'
+            className='flex h-5 w-5 items-center justify-center rounded-[6px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -101,7 +93,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             )}
           </button>
         ) : (
-          <span className='h-6 w-6' />
+          <span className='h-5 w-5' />
         )}
       </div>
 
@@ -117,7 +109,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {showType && typeStyle && (
           <Badge
             size='sm'
-            className={`shrink-0 ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+            className={`h-5 shrink-0 rounded-[5px] border px-1.5 text-[10px] font-[510] tracking-[-0.01em] shadow-none ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
           >
             {typeStyle.label}
           </Badge>
@@ -125,7 +117,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {manualOverrideCount > 0 && (
           <Badge
             variant='secondary'
-            className='shrink-0 border-amber-500/15 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-300'
+            className='h-5 shrink-0 rounded-[5px] border border-amber-500/15 bg-amber-500/10 px-1.5 text-[10px] font-[510] tracking-[-0.01em] text-amber-700 shadow-none dark:text-amber-300'
           >
             {manualOverrideCount} edited
           </Badge>
@@ -133,26 +125,25 @@ export const ReleaseCell = memo(function ReleaseCell({
       </div>
 
       <div className='min-w-0'>
-        {artistName ? (
+        {artistLine ? (
           <TruncatedText
             lines={1}
             className='text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
-            {artistName}
+            {artistLine}
           </TruncatedText>
         ) : null}
       </div>
 
       <div className='flex min-w-0 items-center justify-end'>
         {platformInfo ? (
-          <div className='inline-flex h-6 shrink-0 items-center justify-end gap-1 text-[11px] text-(--linear-text-tertiary)'>
+          <div className='inline-flex h-5 shrink-0 items-center justify-end gap-1 text-[11px] text-(--linear-text-tertiary)'>
             <span className='flex items-center -space-x-0.5'>
               {platformInfo.visible.map(p => (
-                <SocialIcon
+                <ProviderIcon
                   key={p.key}
-                  platform={p.icon}
-                  className='h-3.5 w-3.5 text-(--linear-text-secondary)'
-                  aria-hidden
+                  provider={p.key}
+                  className='h-3.5 w-3.5'
                 />
               ))}
             </span>

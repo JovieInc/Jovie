@@ -8,21 +8,23 @@
  * or when clicking a track row in "tracks" view mode.
  */
 
-import { Badge, SegmentControl } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import { ArrowLeft, Check, Copy, ExternalLink, Hash } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerSection,
+  DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
+import type { ProviderKey } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -174,7 +176,7 @@ export function TrackSidebar({
           <div className='flex items-start gap-4'>
             <div className='min-w-0 flex-1 space-y-1.5'>
               <div className='flex items-center gap-2'>
-                <span className='text-[13px] text-tertiary-token tabular-nums'>
+                <span className='text-[13px] tabular-nums text-(--linear-text-tertiary)'>
                   {trackLabel}.
                 </span>
                 <h3 className='text-[15px] font-[590] text-primary-token'>
@@ -183,27 +185,27 @@ export function TrackSidebar({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+                    className='shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-0 text-[9px] text-(--linear-text-tertiary)'
                   >
                     E
                   </Badge>
                 )}
               </div>
-              <div className='flex items-center gap-3 text-[11px] text-secondary-token'>
+              <div className='flex items-center gap-3 text-[11px] text-(--linear-text-secondary)'>
                 {track.durationMs != null && (
                   <span className='tabular-nums'>
                     {formatDuration(track.durationMs)}
                   </span>
                 )}
                 {track.isrc && (
-                  <span className='font-mono text-[10px] text-tertiary-token'>
+                  <span className='font-mono text-[10px] text-(--linear-text-tertiary)'>
                     {track.isrc}
                   </span>
                 )}
               </div>
             </div>
             {track.releaseArtworkUrl ? (
-              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
+              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-none'>
                 <Image
                   src={track.releaseArtworkUrl}
                   alt={`${track.releaseTitle} artwork`}
@@ -213,11 +215,11 @@ export function TrackSidebar({
                 />
               </div>
             ) : (
-              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
+              <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-none'>
                 <div className='flex h-full w-full items-center justify-center'>
                   <Icon
                     name='Music'
-                    className='h-7 w-7 text-tertiary-token'
+                    className='h-7 w-7 text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
                 </div>
@@ -228,12 +230,11 @@ export function TrackSidebar({
       }
       tabs={
         track ? (
-          <SegmentControl
+          <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as TrackSidebarTab)}
             options={TRACK_SIDEBAR_TAB_OPTIONS}
-            size='sm'
-            aria-label='Track sidebar tabs'
+            ariaLabel='Track sidebar tabs'
           />
         ) : undefined
       }
@@ -244,7 +245,7 @@ export function TrackSidebar({
             <button
               type='button'
               onClick={handleBackToRelease}
-              className='flex items-center gap-1.5 rounded text-[13px] text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+              className='flex items-center gap-1.5 rounded-[7px] border border-transparent px-1.5 py-1 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
               <ArrowLeft className='h-3.5 w-3.5' />
               <span className='max-w-[200px] truncate'>
@@ -255,7 +256,7 @@ export function TrackSidebar({
 
           {activeTab === 'details' && (
             <DrawerSection>
-              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
                 Smart link
               </p>
               <CopyableUrlRow
@@ -274,7 +275,7 @@ export function TrackSidebar({
 
           {activeTab === 'details' && (
             <DrawerSection>
-              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
                 Actions
               </p>
               <div className='space-y-1'>
@@ -282,11 +283,11 @@ export function TrackSidebar({
                   <button
                     type='button'
                     onClick={handleCopyIsrc}
-                    className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token'
+                    className='flex w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                   >
                     <Hash className='h-3.5 w-3.5 shrink-0' />
                     <span>Copy ISRC</span>
-                    <span className='ml-auto font-mono text-[10px] text-tertiary-token'>
+                    <span className='ml-auto font-mono text-[10px] text-(--linear-text-tertiary)'>
                       {track.isrc}
                     </span>
                   </button>
@@ -297,7 +298,7 @@ export function TrackSidebar({
 
           {activeTab === 'platforms' && streamingProviders.length === 0 && (
             <DrawerSection>
-              <p className='py-2 text-[13px] text-tertiary-token'>
+              <p className='py-2 text-[13px] text-(--linear-text-tertiary)'>
                 No platform links available.
               </p>
             </DrawerSection>
@@ -305,7 +306,7 @@ export function TrackSidebar({
 
           {activeTab === 'platforms' && streamingProviders.length > 0 && (
             <DrawerSection>
-              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <p className='py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
                 Available on
               </p>
               <div className='space-y-1'>
@@ -315,16 +316,19 @@ export function TrackSidebar({
                     href={provider.url}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='flex items-center gap-2 rounded-md px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token'
+                    className='flex items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                   >
-                    <SocialIcon
-                      platform={provider.key}
-                      className='h-4 w-4 shrink-0'
+                    <ProviderIcon
+                      provider={provider.key as ProviderKey}
+                      className='h-4 w-4'
+                      aria-label={
+                        PROVIDER_LABELS[provider.key] ?? provider.label
+                      }
                     />
                     <span>
                       {PROVIDER_LABELS[provider.key] ?? provider.label}
                     </span>
-                    <ExternalLink className='ml-auto h-3 w-3 text-tertiary-token' />
+                    <ExternalLink className='ml-auto h-3 w-3 text-(--linear-text-tertiary)' />
                   </a>
                 ))}
               </div>

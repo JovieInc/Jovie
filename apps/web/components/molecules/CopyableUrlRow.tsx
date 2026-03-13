@@ -58,17 +58,17 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center gap-2 rounded-sm border border-subtle bg-surface-1 px-2.5 py-1.5',
+        'flex h-7 items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 transition-colors hover:bg-(--linear-bg-surface-0)',
         className
       )}
     >
       <Link2
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+        className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
         aria-hidden='true'
       />
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono text-[11px] text-secondary-token',
+          'min-w-0 flex-1 truncate font-mono text-[11px] tracking-[-0.01em] text-(--linear-text-secondary)',
           valueClassName
         )}
         title={url}
@@ -80,7 +80,7 @@ export function CopyableUrlRow({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : copyButtonTitle}
         className={cn(
-          'flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
+          'flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
           isCopied && 'text-success'
         )}
       >
@@ -91,7 +91,7 @@ export function CopyableUrlRow({
         type='button'
         onClick={handleOpen}
         title={openButtonTitle}
-        className='flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+        className='flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
       >
         <ExternalLink className='h-3 w-3' />
         <span className='sr-only'>Open</span>

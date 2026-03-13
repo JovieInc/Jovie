@@ -35,14 +35,14 @@ export function DemoReleaseDetail({
   return (
     <div className='flex h-full flex-col'>
       {/* Header */}
-      <div className='flex items-center justify-between border-b border-subtle px-4 py-2 min-h-12'>
-        <div className='min-w-0 flex-1 text-[13px] text-tertiary-token font-medium'>
+      <div className='flex min-h-11 items-center justify-between border-b border-(--linear-border-subtle) px-4 py-2'>
+        <div className='min-w-0 flex-1 text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
         <button
           type='button'
           onClick={onClose}
-          className='shrink-0 rounded flex items-center justify-center size-6 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+          className='flex size-7 shrink-0 items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
           aria-label='Close detail panel'
         >
           <X className='size-4' />
@@ -155,28 +155,38 @@ export function DemoReleaseDetail({
         )}
 
         {/* Activity */}
-        <div className='mt-4 space-y-2'>
-          <h3 className='text-2xs uppercase tracking-wider text-tertiary-token mb-3 [font-weight:var(--font-weight-medium)]'>
+        <div className='mt-4'>
+          <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
             Activity
           </h3>
-          <div className='space-y-3'>
+          <div className='space-y-0.5'>
             {DEMO_ACTIVITY_TEMPLATE.map(activity => (
-              <div key={activity.id} className='flex gap-2.5 text-[13px]'>
-                <div className='mt-1 size-2 shrink-0 rounded-full bg-tertiary-token' />
-                <div className='text-secondary-token leading-snug'>
-                  <span className='font-medium text-primary-token'>
-                    {activity.action}
-                  </span>
-                  {activity.detail && (
-                    <span className='text-tertiary-token'>
-                      {' '}
-                      &mdash; {activity.detail}
+              <div
+                key={activity.id}
+                className='relative flex items-start gap-3 py-2'
+              >
+                <div
+                  aria-hidden='true'
+                  className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle) last:hidden'
+                />
+                <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
+                  <div className='size-1.5 rounded-full bg-(--linear-text-tertiary)' />
+                </div>
+                <div className='min-w-0 flex-1 leading-snug text-(--linear-text-secondary)'>
+                  <div className='text-[13px] tracking-[-0.01em]'>
+                    <span className='font-[510] text-(--linear-text-primary)'>
+                      {activity.action}
                     </span>
-                  )}
-                  <span className='text-tertiary-token'>
-                    {' '}
-                    · {activity.time}
-                  </span>
+                    {activity.detail ? (
+                      <span className='text-(--linear-text-tertiary)'>
+                        {' '}
+                        - {activity.detail}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className='mt-0.5 text-[11px] text-(--linear-text-tertiary)'>
+                    {activity.time}
+                  </div>
                 </div>
               </div>
             ))}

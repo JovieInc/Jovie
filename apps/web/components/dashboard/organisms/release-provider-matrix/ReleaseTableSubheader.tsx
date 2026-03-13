@@ -10,6 +10,11 @@ import {
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
 import { memo } from 'react';
+import {
+  APP_CONTROL_BUTTON_CLASS,
+  AppIconButton,
+} from '@/components/atoms/AppIconButton';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import {
   ACTION_BAR_BUTTON_CLASS,
@@ -86,6 +91,35 @@ const RELEASE_VIEW_OPTIONS = [
   { value: 'releases', label: 'Releases', icon: 'Disc3' },
 ] as const;
 
+function InlineReleaseViewTabs({
+  value,
+  onChange,
+}: {
+  readonly value: ReleaseView;
+  readonly onChange: (value: ReleaseView) => void;
+}) {
+  return (
+    <AppSegmentControl
+      value={value}
+      onValueChange={onChange}
+      options={RELEASE_VIEW_OPTIONS.map(option => ({
+        value: option.value,
+        label: (
+          <span className='inline-flex items-center gap-1.5'>
+            <Icon name={option.icon} className='h-3.5 w-3.5' />
+            {option.label}
+          </span>
+        ),
+      }))}
+      size='sm'
+      className='hidden md:inline-flex'
+      surface='ghost'
+      triggerClassName='flex-none'
+      aria-label='Choose releases view'
+    />
+  );
+}
+
 /** Linear-style full-width segmented control with icons */
 function ReleaseViewSegmentedControl({
   value,
@@ -95,26 +129,23 @@ function ReleaseViewSegmentedControl({
   onChange: (value: ReleaseView) => void;
 }) {
   return (
-    <fieldset className='grid grid-cols-2 gap-1.5 rounded-lg'>
-      <legend className='sr-only'>Release type filter</legend>
-      {RELEASE_VIEW_OPTIONS.map(option => (
-        <button
-          key={option.value}
-          type='button'
-          onClick={() => onChange(option.value)}
-          aria-pressed={value === option.value}
-          className={cn(
-            'flex flex-col items-center gap-1 rounded-lg py-3 text-[13px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
-            value === option.value
-              ? 'bg-surface-2 text-primary-token border border-subtle'
-              : 'text-tertiary-token hover:text-secondary-token border border-transparent'
-          )}
-        >
-          <Icon name={option.icon} className='h-4 w-4' />
-          {option.label}
-        </button>
-      ))}
-    </fieldset>
+    <AppSegmentControl
+      value={value}
+      onValueChange={onChange}
+      options={RELEASE_VIEW_OPTIONS.map(option => ({
+        value: option.value,
+        label: (
+          <span className='flex flex-col items-center gap-1'>
+            <Icon name={option.icon} className='h-4 w-4' />
+            <span>{option.label}</span>
+          </span>
+        ),
+      }))}
+      size='md'
+      className='grid w-full grid-cols-2'
+      triggerClassName='h-auto min-h-16 px-2 py-3 text-[13px]'
+      aria-label='Choose releases view'
+    />
   );
 }
 
@@ -193,10 +224,7 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className={cn(
-              'h-7 gap-1.5 rounded-md border border-transparent text-secondary-token transition-colors duration-150 hover:bg-interactive-hover hover:text-primary-token',
-              triggerClassName
-            )}
+            className={cn(APP_CONTROL_BUTTON_CLASS, triggerClassName)}
           >
             <Icon name='SlidersHorizontal' className='h-3.5 w-3.5' />
             Display
@@ -209,11 +237,14 @@ function LinearStyleDisplayMenu({
           <span className='text-[13px] font-[510] text-primary-token'>
             Display
           </span>
-          <PopoverPrimitive.Close
-            aria-label='Close'
-            className='rounded-md p-0.5 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
-          >
-            <X className='h-3.5 w-3.5' />
+          <PopoverPrimitive.Close asChild>
+            <AppIconButton
+              type='button'
+              ariaLabel='Close display menu'
+              className='border-transparent bg-transparent'
+            >
+              <X className='h-3.5 w-3.5' />
+            </AppIconButton>
           </PopoverPrimitive.Close>
         </div>
 
@@ -320,8 +351,17 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex items-center justify-between border-b border-subtle/80 bg-surface/20 px-4 py-1.5'>
-      {/* Right: Search + Filter + Display + Export (hidden on mobile where list view is used) */}
+    <div className='flex items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-[var(--linear-app-header-padding-x)] py-2'>
+      <div className='flex items-center gap-3'>
+        {onReleaseViewChange ? (
+          <InlineReleaseViewTabs
+            value={releaseView}
+            onChange={onReleaseViewChange}
+          />
+        ) : null}
+      </div>
+
+      {/* Right: Search + Filter + Display + Export */}
       <ActionBar className='ml-auto hidden items-center md:flex'>
         {onSearchToggle && (
           <TooltipShortcut label='Search' side='bottom'>
@@ -346,7 +386,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
           counts={counts}
           buttonClassName={ACTION_BAR_BUTTON_CLASS}
         />
-        <div className='h-4 w-px bg-subtle/80' aria-hidden='true' />
+        <div
+          className='h-4 w-px bg-(--linear-border-subtle)'
+          aria-hidden='true'
+        />
         <LinearStyleDisplayMenu
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={onColumnVisibilityChange}

@@ -111,8 +111,8 @@ export function useSpeechRecognition({
       // indices are already-final results whose text must also be included
       // so the caller always receives the complete in-session transcript.
       let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+      for (const result of Array.from(event.results)) {
+        transcript += result[0].transcript;
       }
       onTranscriptRef.current(transcript);
     };

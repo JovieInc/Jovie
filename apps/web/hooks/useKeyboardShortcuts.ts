@@ -1,5 +1,6 @@
 'use client';
 
+import type * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { isFormElement } from '@/lib/utils/keyboard';
 
@@ -8,6 +9,12 @@ export interface ShortcutConfig {
   handler: () => void;
   description: string;
   enabled?: boolean;
+  preventDefault?: boolean;
+}
+
+export interface KeyboardShortcutOptions {
+  readonly allowInInputs?: boolean;
+  readonly scopeRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -39,8 +46,12 @@ export interface ShortcutConfig {
  * ]);
  * ```
  */
-export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
+export function useKeyboardShortcuts(
+  shortcuts: ShortcutConfig[],
+  options: KeyboardShortcutOptions = {}
+) {
   const shortcutsRef = useRef(shortcuts);
+  const optionsRef = useRef(options);
 
   // Update ref in effect to avoid writing during render (React 19 guidance)
   useEffect(() => {
@@ -48,7 +59,20 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
   });
 
   useEffect(() => {
+    optionsRef.current = options;
+  });
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const { allowInInputs = false, scopeRef } = optionsRef.current;
+
+      if (scopeRef?.current) {
+        const target = e.target;
+        if (!(target instanceof Node) || !scopeRef.current.contains(target)) {
+          return;
+        }
+      }
+
       // Build key string (e.g., "Meta+B", "Ctrl+Shift+A")
       const parts: string[] = [];
       const hasModifier = e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
@@ -62,7 +86,7 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
       const key = parts.join('+');
 
       // Suppress single-key shortcuts when typing in form fields
-      if (!hasModifier && isFormElement(e.target)) return;
+      if (!allowInInputs && !hasModifier && isFormElement(e.target)) return;
 
       // Find matching shortcut that is enabled
       const match = shortcutsRef.current.find(
@@ -70,7 +94,9 @@ export function useKeyboardShortcuts(shortcuts: ShortcutConfig[]) {
       );
 
       if (match) {
-        e.preventDefault();
+        if (match.preventDefault !== false) {
+          e.preventDefault();
+        }
         match.handler();
       }
     };

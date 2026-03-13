@@ -18,8 +18,10 @@ import {
   connectAppleMusicArtist,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
@@ -85,8 +87,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   appleMusicArtistName = null,
   allowArtworkDownloads = false,
   initialImporting = false,
+  experienceAdapter,
 }: ReleaseProviderMatrixProps) {
   const router = useRouter();
+  const experienceMode = experienceAdapter?.mode ?? 'live';
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(initialImporting);
@@ -121,6 +125,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleFormatLyrics,
     isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
+  const copyHandler = experienceAdapter?.onCopy ?? handleCopy;
 
   const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
     null
@@ -236,13 +241,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [rows, filters, deferredSearchQuery, releaseView]);
 
   // Smart link gating
+  const planGate = usePlanGate();
   const {
     smartLinksLimit,
     isPro,
     canCreateManualReleases,
     canEditSmartLinks,
     canAccessFutureReleases,
-  } = usePlanGate();
+  } = {
+    ...planGate,
+    ...experienceAdapter?.entitlements,
+  };
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -400,8 +409,12 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const _isAmSyncing = false;
 
   const handleNewRelease = useCallback(() => {
+    if (experienceAdapter?.onCreateRelease) {
+      experienceAdapter.onCreateRelease();
+      return;
+    }
     setAddReleaseOpen(true);
-  }, []);
+  }, [experienceAdapter]);
 
   const handleAddReleaseCreated = useCallback(() => {
     router.refresh();
@@ -501,19 +514,19 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-1'>
+      <div className='flex items-center gap-[var(--linear-app-toolbar-gap)]'>
         {canCreateManualReleases && (
           <Button
             variant='ghost'
             size='sm'
             onClick={handleNewRelease}
-            className='h-8 gap-1.5 border-none text-secondary-token hover:text-primary-token'
+            className={APP_CONTROL_BUTTON_CLASS}
           >
-            <Icon name='Plus' className='h-4 w-4' />
+            <Icon name='Plus' className='h-3.5 w-3.5' />
             <span className='hidden sm:inline'>New Release</span>
           </Button>
         )}
-        <DrawerToggleButton />
+        <DrawerToggleButton className='h-[var(--linear-app-control-height-sm)] w-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)' />
       </div>
     ),
     [handleNewRelease, canCreateManualReleases]
@@ -529,34 +542,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     if (!isSearchOpen) return null; // Show default breadcrumb label
 
     return (
-      <div className='flex flex-1 items-center gap-2'>
-        <Icon
-          name='Search'
-          className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-        />
-        <input
-          ref={searchInputRef}
-          type='text'
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Escape') handleSearchClose();
-          }}
-          placeholder='Search releases…'
-          className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
-          aria-label='Search releases'
-        />
-        {searchQuery && (
-          <button
-            type='button'
-            onClick={() => setSearchQuery('')}
-            className='rounded p-0.5 text-tertiary-token hover:text-secondary-token transition-colors'
-            aria-label='Clear search'
-          >
-            <Icon name='X' className='h-3.5 w-3.5' />
-          </button>
-        )}
-      </div>
+      <AppSearchField
+        inputRef={searchInputRef}
+        value={searchQuery}
+        onChange={setSearchQuery}
+        onEscape={handleSearchClose}
+        placeholder='Search releases…'
+        ariaLabel='Search releases'
+        className='flex-1'
+      />
     );
   }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
 
@@ -576,6 +570,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Register right panel with AuthShell - supports both release and track drawers
   const sidebarPanel = useMemo(() => {
+    const selectedSidebarData = editingRelease
+      ? experienceAdapter?.sidebarDataByReleaseId?.[editingRelease.id]
+      : undefined;
+
     if (isTrackSidebarOpen) {
       return (
         <Suspense
@@ -614,27 +612,57 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             onClose={closeEditor}
             onRefresh={
               editingRelease
-                ? () => handleRefreshRelease(editingRelease.id)
+                ? () =>
+                    experienceAdapter?.onRefreshRelease
+                      ? experienceAdapter.onRefreshRelease(editingRelease.id)
+                      : handleRefreshRelease(editingRelease.id)
                 : undefined
             }
             isRefreshing={refreshingReleaseId === editingRelease?.id}
-            onAddDspLink={handleAddUrl}
+            onAddDspLink={experienceAdapter?.onAddDspLink ?? handleAddUrl}
             onRescanIsrc={
               editingRelease
-                ? () => handleRescanIsrc(editingRelease.id)
+                ? () =>
+                    experienceAdapter?.onRescanIsrc
+                      ? experienceAdapter.onRescanIsrc(editingRelease.id)
+                      : handleRescanIsrc(editingRelease.id)
                 : undefined
             }
             isRescanningIsrc={isRescanningIsrc}
-            onArtworkUpload={handleArtworkUpload}
-            onArtworkRevert={handleArtworkRevert}
+            onArtworkUpload={
+              experienceAdapter?.onArtworkUpload ?? handleArtworkUpload
+            }
+            onArtworkRevert={
+              experienceAdapter?.onArtworkRevert
+                ? releaseId =>
+                    experienceAdapter.onArtworkRevert?.(
+                      releaseId,
+                      editingRelease ?? null
+                    ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
+                : handleArtworkRevert
+            }
             onReleaseChange={handleReleaseChange}
-            onSaveLyrics={handleSaveLyrics}
-            onFormatLyrics={handleFormatLyrics}
+            onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
+            onFormatLyrics={
+              experienceAdapter?.onFormatLyrics
+                ? (releaseId, lyrics) =>
+                    experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
+                    Promise.resolve([])
+                : handleFormatLyrics
+            }
             isLyricsSaving={isLyricsSaving}
             isSaving={isSaving}
             allowDownloads={allowArtworkDownloads}
-            readOnly={!canEditSmartLinks}
-            onCanvasStatusUpdate={handleCanvasStatusUpdate}
+            onToggleArtworkDownloads={
+              experienceAdapter?.onToggleArtworkDownloads
+            }
+            readOnly={experienceMode === 'demo' ? false : !canEditSmartLinks}
+            analyticsOverride={selectedSidebarData?.analytics ?? null}
+            tracksOverride={selectedSidebarData?.tracks}
+            onCanvasStatusUpdate={
+              experienceAdapter?.onCanvasStatusUpdate ??
+              handleCanvasStatusUpdate
+            }
             onTrackClick={handleTrackClickFromRelease}
           />
         </Suspense>
@@ -651,6 +679,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     closeEditor,
     closeTrackDrawer,
     handleRefreshRelease,
+    experienceAdapter,
     handleBackToReleaseFromTrack,
     handleTrackClickFromRelease,
     refreshingReleaseId,
@@ -666,6 +695,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isSaving,
     allowArtworkDownloads,
     canEditSmartLinks,
+    experienceMode,
     handleCanvasStatusUpdate,
   ]);
 
@@ -755,7 +785,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   releases={filteredRows}
                   providerConfig={providerConfig}
                   artistName={artistName}
-                  onCopy={handleCopy}
+                  onCopy={copyHandler}
                   onEdit={openEditor}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
@@ -794,7 +824,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                     variant='primary'
                     size='sm'
                     disabled={isSyncing}
-                    onClick={handleSync}
+                    onClick={
+                      experienceAdapter?.onSync
+                        ? experienceAdapter.onSync
+                        : handleSync
+                    }
                     className='inline-flex items-center gap-2'
                     data-testid='sync-spotify-empty-state'
                   >
@@ -848,7 +882,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         />
       </Suspense>
 
-      {canCreateManualReleases && (
+      {experienceMode === 'live' && canCreateManualReleases && (
         <Suspense fallback={null}>
           <AddReleaseSidebar
             isOpen={addReleaseOpen}

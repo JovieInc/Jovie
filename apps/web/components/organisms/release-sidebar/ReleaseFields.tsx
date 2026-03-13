@@ -40,10 +40,10 @@ export function ReleaseFields({
 
   return (
     <div className='space-y-0.5'>
-      <p className='text-xs text-secondary-token'>
+      <p className='text-[12px] leading-[16px] text-(--linear-text-secondary)'>
         {releaseDate ? (
           <>
-            <span className='text-tertiary-token'>Released</span>{' '}
+            <span className='text-(--linear-text-tertiary)'>Released</span>{' '}
             {formatReleaseDate(releaseDate)}
           </>
         ) : (
@@ -51,7 +51,9 @@ export function ReleaseFields({
         )}
       </p>
       {parts.length > 0 && (
-        <p className='text-[11px] text-tertiary-token'>{parts.join(' · ')}</p>
+        <p className='text-[11px] leading-[14px] text-(--linear-text-tertiary)'>
+          {parts.join(' · ')}
+        </p>
       )}
     </div>
   );
