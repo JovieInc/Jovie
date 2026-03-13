@@ -70,7 +70,7 @@ const TAB_LABEL: Record<DemoTab, string> = {
 };
 
 const toolbarBtnClass =
-  'flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-normal rounded-sm hover:bg-interactive-hover gap-1.5 text-[13px] [font-weight:var(--font-weight-medium)]';
+  'flex h-7 items-center justify-center gap-1.5 rounded-sm px-2 text-[13px] text-(--linear-text-tertiary) transition-colors duration-normal [font-weight:var(--font-weight-medium)] hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)';
 
 const VIEW_TABS = ['All Releases', 'Active', 'Backlog'] as const;
 
@@ -123,7 +123,7 @@ export function DemoShell({
                       >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='text-[10px] text-secondary-token bg-interactive-hover rounded-[2px] border border-subtle px-1 py-px leading-none [font-weight:var(--font-weight-medium)]'>
+                        <span className='rounded-[2px] border border-(--linear-border-default) bg-(--linear-bg-surface-2) px-1 py-px text-[10px] leading-none text-(--linear-text-secondary) [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -304,7 +304,7 @@ export function DemoShell({
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
                 href={APP_ROUTES.SIGNUP}
-                className='flex h-7 items-center justify-center rounded-sm bg-interactive-hover border border-subtle text-[13px] text-secondary-token hover:text-primary-token hover:bg-interactive-active transition-colors [font-weight:var(--font-weight-medium)]'
+                className='flex h-7 items-center justify-center rounded-sm border border-(--linear-border-default) bg-(--linear-bg-surface-2) text-[13px] text-(--linear-text-secondary) transition-colors [font-weight:var(--font-weight-medium)] hover:bg-(--linear-bg-surface-3) hover:text-(--linear-text-primary)'
               >
                 Sign up for Jovie
               </a>
@@ -312,13 +312,13 @@ export function DemoShell({
           </Sidebar>
         }
         header={
-          <header className='flex h-11 shrink-0 items-center justify-between border-b border-subtle px-5 md:px-6'>
+          <header className='flex h-11 shrink-0 items-center justify-between border-b border-(--linear-border-subtle) px-5 md:px-6'>
             <div className='flex items-center gap-4'>
               {/* Breadcrumb */}
               <div className='flex items-center text-[13px]'>
-                <span className='text-tertiary-token'>Sora Vale</span>
-                <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
-                <span className='font-medium text-primary-token'>
+                <span className='text-(--linear-text-tertiary)'>Sora Vale</span>
+                <ChevronRight className='mx-0.5 size-3.5 text-(--linear-text-quaternary)' />
+                <span className='font-medium text-(--linear-text-primary)'>
                   {TAB_LABEL[activeTab]}
                 </span>
               </div>
@@ -331,10 +331,10 @@ export function DemoShell({
                       key={tab}
                       type='button'
                       className={cn(
-                        'px-2 py-0.5 text-[13px] rounded-sm transition-colors duration-normal',
+                        'rounded-sm px-2 py-0.5 text-[13px] transition-colors duration-normal',
                         i === 0
-                          ? 'text-primary-token bg-interactive-hover [font-weight:var(--font-weight-medium)]'
-                          : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
+                          ? 'bg-(--linear-bg-surface-2) text-(--linear-text-primary) [font-weight:var(--font-weight-medium)]'
+                          : 'text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary)'
                       )}
                     >
                       {tab}
@@ -342,7 +342,7 @@ export function DemoShell({
                   ))}
                   <button
                     type='button'
-                    className='px-1 py-0.5 text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover rounded-sm transition-colors duration-normal'
+                    className='rounded-sm px-1 py-0.5 text-(--linear-text-tertiary) transition-colors duration-normal hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary)'
                     aria-label='Add view'
                   >
                     <Plus className='size-3.5' />

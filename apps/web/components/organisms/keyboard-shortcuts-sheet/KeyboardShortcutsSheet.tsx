@@ -29,7 +29,7 @@ function ShortcutKeys({ keys }: { keys: string }) {
     return (
       <div className='flex items-center gap-1.5'>
         <Kbd variant='default'>{first}</Kbd>
-        <span className='text-xs text-tertiary-token'>then</span>
+        <span className='text-xs text-(--linear-text-tertiary)'>then</span>
         <Kbd variant='default'>{second}</Kbd>
       </div>
     );
@@ -59,12 +59,15 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
   const Icon = shortcut.icon;
 
   return (
-    <div className='flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-2 transition-colors'>
+    <div className='flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-(--linear-bg-surface-2)'>
       <div className='flex items-center gap-3 min-w-0'>
         {Icon && (
-          <Icon className='h-4 w-4 shrink-0 text-tertiary-token' aria-hidden />
+          <Icon
+            className='h-4 w-4 shrink-0 text-(--linear-text-tertiary)'
+            aria-hidden
+          />
         )}
-        <span className='text-sm text-primary-token truncate'>
+        <span className='truncate text-sm text-(--linear-text-primary)'>
           {shortcut.label}
         </span>
       </div>
@@ -87,7 +90,7 @@ function ShortcutCategorySection({
 
   return (
     <div className='space-y-1'>
-      <h3 className='text-xs font-medium text-tertiary-token uppercase tracking-wider px-3 py-2'>
+      <h3 className='px-3 py-2 text-xs font-medium uppercase tracking-wider text-(--linear-text-tertiary)'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
       <div className='space-y-0.5'>
@@ -167,12 +170,12 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='w-full sm:max-w-md p-0 flex flex-col gap-0 top-1 right-1 bottom-1 h-auto rounded-xl border border-subtle'
+        className='top-1 right-1 bottom-1 h-auto w-full rounded-xl border border-(--linear-border-default) p-0 sm:max-w-md'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
         {/* Header with back button and title */}
-        <SheetHeader className='px-4 py-3 border-b border-subtle flex-shrink-0 flex-row items-center gap-3 space-y-0'>
+        <SheetHeader className='flex shrink-0 flex-row items-center gap-3 space-y-0 border-b border-(--linear-border-subtle) px-4 py-3'>
           <Button
             variant='ghost'
             size='icon'
@@ -197,16 +200,16 @@ export function KeyboardShortcutsSheet() {
         </SheetHeader>
 
         {/* Search input */}
-        <div className='px-4 py-3 border-b border-subtle flex-shrink-0'>
+        <div className='shrink-0 border-b border-(--linear-border-subtle) px-4 py-3'>
           <div className='relative'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tertiary-token' />
+            <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--linear-text-tertiary)' />
             <Input
               ref={inputRef}
               type='text'
               placeholder='Search shortcuts'
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='pl-9 bg-surface-2 border-subtle'
+              className='border-(--linear-border-default) bg-(--linear-bg-surface-2) pl-9'
               inputSize='sm'
             />
             {searchQuery && (
@@ -237,8 +240,8 @@ export function KeyboardShortcutsSheet() {
             </div>
           ) : (
             <div className='flex flex-col items-center justify-center py-12 text-center'>
-              <Search className='h-8 w-8 text-tertiary-token mb-3' />
-              <p className='text-sm text-tertiary-token'>
+              <Search className='mb-3 h-8 w-8 text-(--linear-text-tertiary)' />
+              <p className='text-sm text-(--linear-text-tertiary)'>
                 No shortcuts found for &quot;{searchQuery}&quot;
               </p>
             </div>

@@ -111,12 +111,12 @@ export function DemoReleasesPanel({
             <button
               type='button'
               onClick={() => toggleGroup(group.status)}
-              className='sticky top-0 z-10 flex w-full items-center gap-2 bg-surface-1 px-4 h-[28px] text-[13px] text-tertiary-token hover:text-secondary-token [font-weight:var(--font-weight-medium)]'
+              className='sticky top-0 z-10 flex h-[28px] w-full items-center gap-2 bg-(--linear-bg-surface-1) px-4 text-[13px] text-(--linear-text-tertiary) hover:text-(--linear-text-secondary) [font-weight:var(--font-weight-medium)]'
               aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
             >
               <ChevronRight
                 className={cn(
-                  'size-3.5 shrink-0 transition-transform duration-fast text-tertiary-token',
+                  'size-3.5 shrink-0 text-(--linear-text-tertiary) transition-transform duration-fast',
                   !isCollapsed && 'rotate-90'
                 )}
                 aria-hidden='true'
@@ -126,13 +126,13 @@ export function DemoReleasesPanel({
                 <AlertTriangle className='size-3 text-yellow-500/80' />
               )}
               <span>{STATUS_LABEL[group.status]}</span>
-              <span className='text-quaternary-token text-[12px]'>
+              <span className='text-[12px] text-(--linear-text-quaternary)'>
                 {group.releases.length}
               </span>
               <span className='flex-1' />
               <button
                 type='button'
-                className='size-5 flex items-center justify-center rounded text-tertiary-token hover:text-primary-token hover:bg-interactive-hover transition-colors'
+                className='flex size-5 items-center justify-center rounded text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
                 tabIndex={-1}
                 onClick={e => e.stopPropagation()}
                 aria-label={`Add ${STATUS_LABEL[group.status]} release`}
@@ -167,11 +167,13 @@ export function DemoReleasesPanel({
                       }
                     }}
                     className={cn(
-                      'flex h-[34px] cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--color-border-subtle)]',
+                      'flex h-[34px] cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--linear-border-subtle)]',
                       isSelected &&
-                        'bg-accent/10 shadow-[inset_2px_0_0_var(--color-accent),inset_0_-1px_0_var(--color-border-subtle)]',
-                      isFocused && !isSelected && 'bg-interactive-hover',
-                      !isSelected && !isFocused && 'hover:bg-interactive-hover'
+                        'bg-accent/10 shadow-[inset_2px_0_0_var(--color-accent),inset_0_-1px_0_var(--linear-border-subtle)]',
+                      isFocused && !isSelected && 'bg-(--linear-bg-surface-2)',
+                      !isSelected &&
+                        !isFocused &&
+                        'hover:bg-(--linear-bg-surface-2)'
                     )}
                   >
                     {/* Priority */}
@@ -182,7 +184,7 @@ export function DemoReleasesPanel({
                     )}
 
                     {/* Release ID */}
-                    <span className='hidden shrink-0 text-[12px] text-quaternary-token font-mono sm:block w-[54px]'>
+                    <span className='hidden w-[54px] shrink-0 font-mono text-[12px] text-(--linear-text-quaternary) sm:block'>
                       {release.displayId}
                     </span>
 
@@ -191,10 +193,10 @@ export function DemoReleasesPanel({
 
                     {/* Title + artist inline */}
                     <div className='min-w-0 flex-1 flex items-baseline gap-2'>
-                      <span className='truncate text-[13px] font-medium text-primary-token'>
+                      <span className='truncate text-[13px] font-medium text-(--linear-text-primary)'>
                         {release.title}
                       </span>
-                      <span className='truncate text-[12px] text-tertiary-token'>
+                      <span className='truncate text-[12px] text-(--linear-text-tertiary)'>
                         {release.artist}
                       </span>
                     </div>
@@ -204,7 +206,7 @@ export function DemoReleasesPanel({
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
-                          className='flex items-center gap-1.5 rounded-[2px] border border-subtle bg-interactive-hover px-1.5 py-0.5 text-[10px] text-secondary-token [font-weight:var(--font-weight-medium)]'
+                          className='flex items-center gap-1.5 rounded-[2px] border border-(--linear-border-default) bg-(--linear-bg-surface-2) px-1.5 py-0.5 text-[10px] text-(--linear-text-secondary) [font-weight:var(--font-weight-medium)]'
                         >
                           <span
                             className='size-1.5 rounded-full'
@@ -216,7 +218,7 @@ export function DemoReleasesPanel({
                     </div>
 
                     {/* Type badge */}
-                    <span className='hidden shrink-0 text-2xs text-quaternary-token lg:block'>
+                    <span className='hidden shrink-0 text-2xs text-(--linear-text-quaternary) lg:block'>
                       {release.type}
                     </span>
 
@@ -224,7 +226,7 @@ export function DemoReleasesPanel({
                     <DemoAvatar assignee={release.assignee} size={16} />
 
                     {/* Date */}
-                    <span className='hidden shrink-0 text-[12px] text-quaternary-token xl:block w-16 text-right'>
+                    <span className='hidden w-16 shrink-0 text-right text-[12px] text-(--linear-text-quaternary) xl:block'>
                       {release.releaseDate}
                     </span>
                   </div>
