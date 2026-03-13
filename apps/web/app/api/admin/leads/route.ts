@@ -343,6 +343,70 @@ export async function GET(request: NextRequest) {
   }
 }
 
+type LeadProcessResult = {
+  url: string;
+  status: 'created' | 'duplicate' | 'invalid';
+  reason?: string;
+};
+
+async function insertLeadOrFallback(
+  seed: Awaited<ReturnType<typeof seedLeadFromUrl>>
+): Promise<string | null> {
+  if (!seed) return null;
+  try {
+    const [inserted] = await db
+      .insert(leads)
+      .values({
+        linktreeHandle: seed.handle,
+        linktreeUrl: seed.normalizedUrl,
+        discoverySource: 'manual',
+        hasSpotifyLink: seed.hasSpotifyLink,
+        spotifyUrl: seed.spotifyUrl,
+        hasInstagram: seed.hasInstagram,
+        instagramHandle: seed.instagramHandle,
+        musicToolsDetected: seed.kind === 'apple_music' ? ['apple_music'] : [],
+      })
+      .returning({ id: leads.id });
+    return inserted?.id ?? null;
+  } catch (error) {
+    if (!isMissingLeadInsertColumnError(error)) throw error;
+    await captureWarning(
+      '[admin/leads] leads insert columns missing; falling back to legacy insert',
+      error,
+      { route: '/api/admin/leads', handle: seed.handle }
+    );
+    return insertLeadWithLegacyFallback(seed);
+  }
+}
+
+async function processLeadUrl(
+  url: string
+): Promise<{ result: LeadProcessResult; leadId: string | null }> {
+  const seed = seedLeadFromUrl(url);
+  if (!seed) {
+    return {
+      result: { url, status: 'invalid', reason: 'Invalid URL' },
+      leadId: null,
+    };
+  }
+
+  const [existing] = await db
+    .select({ id: leads.id })
+    .from(leads)
+    .where(eq(leads.linktreeHandle, seed.handle))
+    .limit(1);
+
+  if (existing) {
+    return { result: { url, status: 'duplicate' }, leadId: null };
+  }
+
+  const leadId = await insertLeadOrFallback(seed);
+  const result: LeadProcessResult = leadId
+    ? { url, status: 'created' }
+    : { url, status: 'invalid', reason: 'Insert failed' };
+  return { result, leadId };
+}
+
 /**
  * POST /api/admin/leads — Manual URL submission (single or batch).
  * Inserts new leads as 'discovered', then triggers qualification.
@@ -376,73 +440,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const results: Array<{
-      url: string;
-      status: 'created' | 'duplicate' | 'invalid';
-      reason?: string;
-    }> = [];
+    const results: LeadProcessResult[] = [];
     const newLeadIds: string[] = [];
 
     for (const url of validated.data.urls) {
-      const seed = seedLeadFromUrl(url);
-      if (!seed) {
-        results.push({
-          url,
-          status: 'invalid',
-          reason: 'Invalid URL',
-        });
-        continue;
-      }
-
-      // Check for existing lead with same handle
-      const [existing] = await db
-        .select({ id: leads.id })
-        .from(leads)
-        .where(eq(leads.linktreeHandle, seed.handle))
-        .limit(1);
-
-      if (existing) {
-        results.push({ url, status: 'duplicate' });
-        continue;
-      }
-
-      let insertedId: string | null = null;
-
-      try {
-        const [inserted] = await db
-          .insert(leads)
-          .values({
-            linktreeHandle: seed.handle,
-            linktreeUrl: seed.normalizedUrl,
-            discoverySource: 'manual',
-            hasSpotifyLink: seed.hasSpotifyLink,
-            spotifyUrl: seed.spotifyUrl,
-            hasInstagram: seed.hasInstagram,
-            instagramHandle: seed.instagramHandle,
-            musicToolsDetected:
-              seed.kind === 'apple_music' ? ['apple_music'] : [],
-          })
-          .returning({ id: leads.id });
-
-        insertedId = inserted?.id ?? null;
-      } catch (error) {
-        if (!isMissingLeadInsertColumnError(error)) {
-          throw error;
-        }
-
-        await captureWarning(
-          '[admin/leads] leads insert columns missing; falling back to legacy insert',
-          error,
-          { route: '/api/admin/leads', handle: seed.handle }
-        );
-
-        insertedId = await insertLeadWithLegacyFallback(seed);
-      }
-
-      if (insertedId) {
-        newLeadIds.push(insertedId);
-        results.push({ url, status: 'created' });
-      }
+      const { result, leadId } = await processLeadUrl(url);
+      results.push(result);
+      if (leadId) newLeadIds.push(leadId);
     }
 
     // Trigger qualification for newly created leads
