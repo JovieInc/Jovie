@@ -4,6 +4,7 @@ import {
   getSpotifyArtistsBatch as getSpotifyArtistsBatchFromClient,
   spotifyClient,
 } from '@/lib/spotify/client';
+import type { SanitizedArtist } from '@/lib/spotify/sanitize';
 
 interface SpotifySearchResponse {
   artists: {
@@ -17,6 +18,7 @@ interface SpotifyArtist {
   images?: Array<{ url: string; height: number; width: number }>;
   popularity: number;
   followers?: { total: number };
+  genres?: string[];
 }
 
 // Spotify Album types
@@ -118,7 +120,8 @@ export async function searchSpotifyArtists(
 export async function getSpotifyArtist(
   artistId: string
 ): Promise<SpotifyArtist | null> {
-  return (await getSpotifyArtistFromClient(artistId)) as SpotifyArtist | null;
+  const artist = await getSpotifyArtistFromClient(artistId);
+  return artist ? mapSanitizedArtist(artist) : null;
 }
 
 /**
@@ -128,7 +131,21 @@ export async function getSpotifyArtist(
 export async function getSpotifyArtistsBatch(
   artistIds: string[]
 ): Promise<SpotifyArtist[]> {
-  return (await getSpotifyArtistsBatchFromClient(artistIds)) as SpotifyArtist[];
+  const artists = await getSpotifyArtistsBatchFromClient(artistIds);
+  return artists.map(mapSanitizedArtist);
+}
+
+function mapSanitizedArtist(artist: SanitizedArtist): SpotifyArtist {
+  return {
+    id: artist.spotifyId,
+    name: artist.name,
+    images: artist.imageUrl
+      ? [{ url: artist.imageUrl, height: 0, width: 0 }]
+      : [],
+    popularity: artist.popularity,
+    followers: { total: artist.followerCount },
+    genres: artist.genres,
+  };
 }
 
 // Build Spotify artist URL from artist ID
