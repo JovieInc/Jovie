@@ -180,10 +180,10 @@ describe('DotBadge', () => {
 
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
-      expect(badge).toHaveClass('rounded-full');
+      expect(badge).toHaveClass('rounded-[8px]');
       expect(badge).toHaveClass('border');
-      expect(badge).toHaveClass('font-medium');
-      expect(badge).toHaveClass('tracking-wide');
+      expect(badge).toHaveClass('font-[510]');
+      expect(badge).toHaveClass('tracking-[-0.01em]');
     });
 
     it('applies dot base classes', () => {
