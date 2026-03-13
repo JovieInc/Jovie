@@ -75,9 +75,11 @@ const StatCard = memo(function StatCard({
         >
           <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
         </div>
-        <dt className='text-[13px] font-[510] text-secondary-token'>{label}</dt>
+        <dt className='text-[13px] font-[510] text-(--linear-text-secondary)'>
+          {label}
+        </dt>
       </div>
-      <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-primary-token'>
+      <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-(--linear-text-primary)'>
         {value}
       </dd>
     </ContentSurfaceCard>
@@ -227,12 +229,12 @@ export function EarningsTab() {
           className='flex h-12 w-12 items-center justify-center rounded-2xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
           aria-hidden='true'
         >
-          <QrCode className='h-6 w-6 text-tertiary-token' />
+          <QrCode className='h-6 w-6 text-(--linear-text-tertiary)' />
         </div>
-        <h2 className='text-base font-[590] text-primary-token'>
+        <h2 className='text-base font-[590] text-(--linear-text-primary)'>
           No handle set
         </h2>
-        <p className='max-w-sm text-[13px] text-secondary-token'>
+        <p className='max-w-sm text-[13px] text-(--linear-text-secondary)'>
           Set up your artist handle in profile settings to generate a QR code
           for your tip page.
         </p>
@@ -246,7 +248,7 @@ export function EarningsTab() {
   return (
     <div className='flex flex-col gap-6'>
       {/* ── Earnings Stats ─────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         Revenue
       </p>
 
@@ -289,7 +291,7 @@ export function EarningsTab() {
       )}
 
       {/* ── Tippers Table ──────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         Recent tippers
       </p>
 
@@ -314,9 +316,9 @@ export function EarningsTab() {
               className='flex h-10 w-10 items-center justify-center rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
               aria-hidden='true'
             >
-              <Users className='h-5 w-5 text-tertiary-token' />
+              <Users className='h-5 w-5 text-(--linear-text-tertiary)' />
             </div>
-            <p className='text-[13px] text-secondary-token'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
               No tips yet. Share your tip link to get started.
             </p>
           </div>
@@ -326,16 +328,16 @@ export function EarningsTab() {
             <table className='w-full text-left text-[13px]'>
               <thead>
                 <tr className='border-b border-(--linear-border-subtle)'>
-                  <th className='px-4 py-3 text-[13px] font-[510] text-tertiary-token'>
+                  <th className='px-4 py-3 text-[13px] font-[510] text-(--linear-text-tertiary)'>
                     Name
                   </th>
-                  <th className='px-4 py-3 text-[13px] font-[510] text-tertiary-token'>
+                  <th className='px-4 py-3 text-[13px] font-[510] text-(--linear-text-tertiary)'>
                     Email
                   </th>
-                  <th className='px-4 py-3 text-right text-[13px] font-[510] text-tertiary-token'>
+                  <th className='px-4 py-3 text-right text-[13px] font-[510] text-(--linear-text-tertiary)'>
                     Amount
                   </th>
-                  <th className='px-4 py-3 text-right text-[13px] font-[510] text-tertiary-token'>
+                  <th className='px-4 py-3 text-right text-[13px] font-[510] text-(--linear-text-tertiary)'>
                     Date
                   </th>
                 </tr>
@@ -346,16 +348,16 @@ export function EarningsTab() {
                     key={tipper.id}
                     className='border-b border-(--linear-border-subtle) last:border-b-0 transition-colors hover:bg-(--linear-bg-surface-0)'
                   >
-                    <td className='px-4 py-3 text-primary-token'>
+                    <td className='px-4 py-3 text-(--linear-text-primary)'>
                       {tipper.tipperName ?? 'Anonymous'}
                     </td>
-                    <td className='px-4 py-3 text-secondary-token'>
+                    <td className='px-4 py-3 text-(--linear-text-secondary)'>
                       {tipper.contactEmail ?? '--'}
                     </td>
-                    <td className='px-4 py-3 text-right font-[510] tabular-nums text-primary-token'>
+                    <td className='px-4 py-3 text-right font-[510] tabular-nums text-(--linear-text-primary)'>
                       {formatCents(tipper.amountCents)}
                     </td>
-                    <td className='px-4 py-3 text-right text-secondary-token'>
+                    <td className='px-4 py-3 text-right text-(--linear-text-secondary)'>
                       {formatDate(tipper.createdAt)}
                     </td>
                   </tr>
@@ -367,7 +369,7 @@ export function EarningsTab() {
       </ContentSurfaceCard>
 
       {/* ── QR Code Card ───────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         QR Code
       </p>
 
@@ -379,7 +381,7 @@ export function EarningsTab() {
           >
             <QrCode className='h-3.5 w-3.5 text-accent-token' />
           </div>
-          <h2 className='text-[13px] font-[510] text-primary-token'>
+          <h2 className='text-[13px] font-[510] text-(--linear-text-primary)'>
             Tip QR Code
           </h2>
         </div>
@@ -393,10 +395,10 @@ export function EarningsTab() {
           {/* Actions */}
           <div className='flex flex-1 flex-col gap-4'>
             <div>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                 Share your tip page
               </p>
-              <p className='mt-1 text-[13px] leading-5 text-secondary-token'>
+              <p className='mt-1 text-[13px] leading-5 text-(--linear-text-secondary)'>
                 Download this QR code to print on merch, flyers, or display at
                 shows. The high-res version is 1024px for crisp output.
               </p>
@@ -404,8 +406,8 @@ export function EarningsTab() {
 
             {/* Tip URL display */}
             <DrawerSurfaceCard className='flex items-center gap-2 rounded-[10px] bg-(--linear-bg-surface-0) px-3 py-2.5'>
-              <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-              <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
+              <Link2 className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)' />
+              <span className='min-w-0 flex-1 truncate text-[13px] text-(--linear-text-secondary)'>
                 {tipUrl}
               </span>
             </DrawerSurfaceCard>

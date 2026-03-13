@@ -25,6 +25,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/components/dashboard/organisms/EarningsTab';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   Dialog,
   DialogBody,
@@ -74,14 +75,14 @@ const StatCard = memo(function StatCard({
           >
             <Icon className={cn('h-3.5 w-3.5', iconClassName)} />
           </div>
-          <dt className='text-[13px] font-[510] text-secondary-token'>
+          <dt className='text-[13px] font-[510] text-(--linear-text-secondary)'>
             {label}
           </dt>
         </div>
-        <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-primary-token sm:text-3xl'>
+        <dd className='mt-2 text-2xl font-[590] tabular-nums leading-none tracking-[-0.011em] text-(--linear-text-primary) sm:text-3xl'>
           {formatCount(value)}
         </dd>
-        <dd className='mt-1.5 text-[11px] leading-4 text-tertiary-token sm:text-[13px]'>
+        <dd className='mt-1.5 text-[11px] leading-4 text-(--linear-text-tertiary) sm:text-[13px]'>
           {description}
         </dd>
       </dl>
@@ -112,7 +113,7 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
           type='button'
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
-          className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-2 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[14px]'
+          className='inline-flex items-center gap-1.5 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 py-1 text-[13px] font-[510] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-2) sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[14px]'
         >
           <Wallet className='h-3.5 w-3.5 sm:h-4 sm:w-4' />
           <span className='truncate'>@{venmoHandle}</span>
@@ -167,7 +168,7 @@ const VenmoEditForm = memo(function VenmoEditForm({
   return (
     <div className='space-y-3'>
       <div className='flex items-center gap-2'>
-        <span className='text-[13px] text-secondary-token'>@</span>
+        <span className='text-[13px] text-(--linear-text-secondary)'>@</span>
         <Input
           type='text'
           value={venmoHandle}
@@ -230,10 +231,10 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           <Wallet className='h-4.5 w-4.5 text-accent-token' />
         </div>
         <div className='min-w-0 flex-1'>
-          <DialogTitle className='text-[15px] font-[590] tracking-[-0.011em] text-primary-token'>
+          <DialogTitle className='text-[15px] font-[590] tracking-[-0.011em] text-(--linear-text-primary)'>
             Connect Venmo
           </DialogTitle>
-          <DialogDescription className='mt-0.5 text-[13px] leading-5 text-secondary-token'>
+          <DialogDescription className='mt-0.5 text-[13px] leading-5 text-(--linear-text-secondary)'>
             Link your Venmo to start receiving tips from fans.
           </DialogDescription>
         </div>
@@ -244,12 +245,14 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
           <div>
             <label
               htmlFor='venmo-handle'
-              className='mb-1.5 block text-[13px] font-[510] text-secondary-token'
+              className='mb-1.5 block text-[13px] font-[510] text-(--linear-text-secondary)'
             >
               Venmo Username
             </label>
             <div className='flex items-center gap-2'>
-              <span className='text-[13px] text-tertiary-token'>@</span>
+              <span className='text-[13px] text-(--linear-text-tertiary)'>
+                @
+              </span>
               <Input
                 type='text'
                 id='venmo-handle'
@@ -306,7 +309,7 @@ const TipLinkSection = memo(function TipLinkSection({
   tipRelativePathLink,
 }: TipLinkSectionProps) {
   return (
-    <div className='rounded-xl border border-subtle bg-surface-1 p-4 sm:p-5'>
+    <ContentSurfaceCard className='p-4 sm:p-5'>
       <div className='flex items-center gap-2 mb-3'>
         <div
           className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info-subtle'
@@ -314,12 +317,14 @@ const TipLinkSection = memo(function TipLinkSection({
         >
           <Link2 className='h-3.5 w-3.5 text-info' />
         </div>
-        <h3 className='text-[13px] font-[510] text-primary-token'>Tip link</h3>
+        <h3 className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          Tip link
+        </h3>
       </div>
 
-      <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
-        <Copy className='hidden h-3.5 w-3.5 shrink-0 text-tertiary-token sm:block' />
-        <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
+      <div className='flex items-center gap-2 rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
+        <Copy className='hidden h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary) sm:block' />
+        <span className='min-w-0 flex-1 truncate text-[13px] text-(--linear-text-secondary)'>
           {tipUrl}
         </span>
         <CopyToClipboardButton
@@ -330,10 +335,10 @@ const TipLinkSection = memo(function TipLinkSection({
           className='h-7 shrink-0 px-2.5 text-[13px]'
         />
       </div>
-      <p className='mt-2 text-[11px] text-tertiary-token sm:text-[13px]'>
+      <p className='mt-2 text-[11px] text-(--linear-text-tertiary) sm:text-[13px]'>
         Share this link anywhere to receive tips.
       </p>
-    </div>
+    </ContentSurfaceCard>
   );
 });
 
@@ -399,10 +404,10 @@ export function DashboardTipping() {
       <div className='space-y-3'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='min-w-0'>
-            <h1 className='text-xl font-[590] tracking-[-0.022em] text-primary-token sm:text-2xl'>
+            <h1 className='text-xl font-[590] tracking-[-0.022em] text-(--linear-text-primary) sm:text-2xl'>
               Earnings
             </h1>
-            <p className='mt-0.5 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
+            <p className='mt-0.5 text-[13px] leading-5 text-(--linear-text-secondary) sm:text-[14px]'>
               Manage your payout method and track tip activity.
             </p>
           </div>
@@ -454,7 +459,7 @@ export function DashboardTipping() {
       {/* ── Cohesive empty state ───────────────────────── */}
       {!hasVenmoHandle && (
         <>
-          <div className='rounded-xl border border-subtle bg-surface-1 px-6 py-12 sm:px-8 sm:py-14'>
+          <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
             <div className='mx-auto flex max-w-md flex-col items-center text-center'>
               <div
                 className='mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10'
@@ -462,10 +467,10 @@ export function DashboardTipping() {
               >
                 <Wallet className='h-5 w-5 text-accent-token' />
               </div>
-              <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-primary-token sm:text-[18px]'>
+              <h2 className='text-[17px] font-[590] tracking-[-0.011em] text-(--linear-text-primary) sm:text-[18px]'>
                 Connect Venmo to unlock earnings
               </h2>
-              <p className='mt-2 text-[13px] leading-5 text-secondary-token sm:text-[14px]'>
+              <p className='mt-2 text-[13px] leading-5 text-(--linear-text-secondary) sm:text-[14px]'>
                 Link your Venmo once to start receiving tips and reveal your
                 full earnings dashboard.
               </p>
@@ -478,7 +483,7 @@ export function DashboardTipping() {
                 Connect Venmo
               </Button>
             </div>
-          </div>
+          </ContentSurfaceCard>
           <VenmoConnectDialog
             open={isConnectOpen}
             onClose={handleCloseConnect}
@@ -495,7 +500,7 @@ export function DashboardTipping() {
       {hasVenmoHandle && (
         <div className='flex flex-col gap-5'>
           {/* Section label */}
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Activity
           </p>
 
@@ -528,7 +533,7 @@ export function DashboardTipping() {
           </div>
 
           {/* Sharing tools */}
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Share
           </p>
 
