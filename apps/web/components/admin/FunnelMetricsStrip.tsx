@@ -1,4 +1,3 @@
-import { Card, CardContent } from '@jovie/ui';
 import {
   CalendarClock,
   ChartNoAxesCombined,
@@ -9,6 +8,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
@@ -63,20 +63,18 @@ function MetricCard({
   iconClassName,
 }: MetricCardProps) {
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardContent className='space-y-1.5 p-4'>
-        <div className='flex items-center gap-1.5'>
-          <Icon
-            className={`size-3.5 ${iconClassName ?? 'text-tertiary-token'}`}
-          />
-          <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
-        </div>
-        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
-          {value}
-        </p>
-        <p className='text-app text-secondary-token'>{subtitle}</p>
-      </CardContent>
-    </Card>
+    <ContentSurfaceCard className='space-y-1.5 p-4'>
+      <div className='flex items-center gap-1.5'>
+        <Icon
+          className={`size-3.5 ${iconClassName ?? 'text-tertiary-token'}`}
+        />
+        <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
+      </div>
+      <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
+        {value}
+      </p>
+      <p className='text-app text-secondary-token'>{subtitle}</p>
+    </ContentSurfaceCard>
   );
 }
 
@@ -90,23 +88,21 @@ function PlaceholderMetricCard({
   description,
 }: Readonly<PlaceholderMetricCardProps>) {
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardContent className='space-y-2 p-4'>
-        <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
-        <div className='flex items-center justify-between gap-3'>
-          <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
-            —
-          </p>
-          <Link
-            href={APP_ROUTES.SETTINGS_BILLING}
-            className='text-app font-medium text-info transition-colors hover:text-info/80'
-          >
-            Configure
-          </Link>
-        </div>
-        <p className='text-app text-secondary-token'>{description}</p>
-      </CardContent>
-    </Card>
+    <ContentSurfaceCard className='space-y-2 p-4'>
+      <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
+      <div className='flex items-center justify-between gap-3'>
+        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
+          —
+        </p>
+        <Link
+          href={APP_ROUTES.SETTINGS_BILLING}
+          className='text-app font-medium text-(--linear-text-primary) transition-colors hover:text-(--linear-text-secondary)'
+        >
+          Configure
+        </Link>
+      </div>
+      <p className='text-app text-secondary-token'>{description}</p>
+    </ContentSurfaceCard>
   );
 }
 

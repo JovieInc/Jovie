@@ -1,10 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
+
+beforeEach(() => {
+  toggleTrack.mockClear();
+});
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
@@ -89,7 +93,9 @@ describe('ReleaseCell', () => {
 
   it('toggles preview playback when a preview url is available', async () => {
     const user = userEvent.setup();
-    render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
+    const { rerender } = render(
+      <ReleaseCell release={baseRelease} artistName='Jovie Artist' />
+    );
 
     expect(
       screen.queryByRole('button', { name: 'Play Skyline Dreams' })
@@ -100,7 +106,7 @@ describe('ReleaseCell', () => {
       previewUrl: 'https://cdn.example.com/preview.mp3',
     };
 
-    render(
+    rerender(
       <ReleaseCell release={releaseWithPreview} artistName='Jovie Artist' />
     );
 

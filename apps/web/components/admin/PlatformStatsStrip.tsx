@@ -1,13 +1,6 @@
-import {
-  Badge,
-  Card,
-  CardContent,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@jovie/ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2 } from 'lucide-react';
-
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminPlatformStats } from '@/lib/admin/platform-stats';
 
 interface PlatformStatsStripProps {
@@ -51,71 +44,72 @@ export function PlatformStatsStrip({
   stats,
 }: Readonly<PlatformStatsStripProps>) {
   return (
-    <Card
+    <ContentSurfaceCard
       data-testid='platform-stats-strip'
-      className='border-subtle bg-surface'
+      className='space-y-6 p-5'
     >
-      <CardContent className='space-y-6 p-5'>
-        <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7'>
-          <StatItem value={stats.labelsOnPlatform} label='Labels on platform' />
-          <StatItem
-            value={stats.totalUniqueVisitors}
-            label='Total unique visitors'
-          />
-          <StatItem value={stats.dspClicksDriven} label='DSP clicks driven' />
-          <StatItem value={stats.contactsCaptured} label='Contacts captured' />
-          <StatItem
-            value={stats.creatorsOnPlatform}
-            label='Creators on platform'
-          />
-          <StatItem value={stats.releasesTracked} label='Releases tracked' />
-          <StatItem value={stats.tracksTracked} label='Tracks tracked' />
-        </div>
+      <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7'>
+        <StatItem value={stats.labelsOnPlatform} label='Labels on platform' />
+        <StatItem
+          value={stats.totalUniqueVisitors}
+          label='Total unique visitors'
+        />
+        <StatItem value={stats.dspClicksDriven} label='DSP clicks driven' />
+        <StatItem value={stats.contactsCaptured} label='Contacts captured' />
+        <StatItem
+          value={stats.creatorsOnPlatform}
+          label='Creators on platform'
+        />
+        <StatItem value={stats.releasesTracked} label='Releases tracked' />
+        <StatItem value={stats.tracksTracked} label='Tracks tracked' />
+      </div>
 
-        <div className='space-y-3 border-t border-subtle pt-4'>
-          <p className='flex items-center gap-2 text-app font-medium text-secondary-token'>
-            <Building2 className='size-4 text-tertiary-token' />
-            {getUsageCopy(stats)}
-          </p>
+      <div className='space-y-3 border-t border-(--linear-border-subtle) pt-4'>
+        <p className='flex items-center gap-2 text-app font-medium text-secondary-token'>
+          <Building2 className='size-4 text-tertiary-token' />
+          {getUsageCopy(stats)}
+        </p>
 
-          {stats.labelBadges.length > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className='flex cursor-help flex-wrap items-center gap-2'>
-                  {stats.labelBadges.map(label => (
-                    <Badge key={label} size='sm' variant='secondary'>
-                      {label}
-                    </Badge>
-                  ))}
-                  {stats.labelsOnPlatform > stats.labelBadges.length && (
-                    <Badge size='sm' variant='secondary'>
-                      +{stats.labelsOnPlatform - stats.labelBadges.length}
-                    </Badge>
-                  )}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent
-                side='top'
-                className='w-[min(32rem,calc(100vw-2rem))] p-3'
-              >
-                <p className='mb-2 text-xs font-medium text-tertiary-token'>
-                  All labels and distributors
-                </p>
-                <ul className='max-h-60 space-y-1 overflow-y-auto pr-1'>
-                  {stats.allLabelsAndDistributors.map(name => (
-                    <li
-                      key={name}
-                      className='truncate text-xs text-secondary-token'
-                    >
-                      {name}
-                    </li>
-                  ))}
-                </ul>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+        {stats.labelBadges.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className='flex cursor-help flex-wrap items-center gap-2'>
+                {stats.labelBadges.map(label => (
+                  <span
+                    key={label}
+                    className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-2xs font-medium text-secondary-token'
+                  >
+                    {label}
+                  </span>
+                ))}
+                {stats.labelsOnPlatform > stats.labelBadges.length && (
+                  <span className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-2xs font-medium text-secondary-token'>
+                    +{stats.labelsOnPlatform - stats.labelBadges.length}
+                  </span>
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent
+              side='top'
+              className='w-[min(32rem,calc(100vw-2rem))] p-3'
+            >
+              <p className='mb-2 text-xs font-medium text-tertiary-token'>
+                All labels and distributors
+              </p>
+              <ul className='max-h-60 space-y-1 overflow-y-auto pr-1'>
+                {stats.allLabelsAndDistributors.map(name => (
+                  <li
+                    key={name}
+                    className='truncate text-xs text-secondary-token'
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </ContentSurfaceCard>
   );
 }

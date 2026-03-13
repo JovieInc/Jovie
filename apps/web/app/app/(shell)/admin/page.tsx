@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   AdminBraggingRightsSection,
@@ -40,20 +41,20 @@ export default function AdminPage() {
             <AdminKpiSection />
           </Suspense>
 
-          <details className='rounded-xl border border-subtle bg-surface p-4'>
-            <summary className='cursor-pointer list-none text-sm font-semibold text-primary-token'>
+          <ContentSurfaceCard as='details' className='overflow-hidden'>
+            <summary className='cursor-pointer list-none border-b border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-3 text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
               Platform reach metrics
             </summary>
-            <p className='mt-2 text-app text-secondary-token'>
-              Secondary platform stats are intentionally below the fold so core
-              business KPIs stay front and center.
-            </p>
-            <div className='mt-4'>
+            <div className='space-y-4 px-[var(--linear-app-header-padding-x)] py-4'>
+              <p className='text-app text-secondary-token'>
+                Secondary platform stats are intentionally below the fold so
+                core business KPIs stay front and center.
+              </p>
               <Suspense fallback={<AdminPlatformStatsSectionSkeleton />}>
                 <AdminPlatformStatsSection />
               </Suspense>
             </div>
-          </details>
+          </ContentSurfaceCard>
 
           {/* Row 3: Outreach pipeline + Reliability side by side */}
 

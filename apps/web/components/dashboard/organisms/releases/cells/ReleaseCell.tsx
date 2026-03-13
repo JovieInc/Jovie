@@ -2,17 +2,13 @@
 
 import { Badge } from '@jovie/ui';
 import { Pause, Play } from 'lucide-react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-
-const artistListFormatter = new Intl.ListFormat('en', {
-  style: 'long',
-  type: 'conjunction',
-});
 
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
@@ -52,17 +48,7 @@ export const ReleaseCell = memo(function ReleaseCell({
     ? getReleaseTypeStyle(release.releaseType)
     : null;
 
-  const artistLine = useMemo(() => {
-    const artistNames = (release.artistNames ?? [])
-      .map(name => name.trim())
-      .filter(Boolean);
-
-    if (artistNames.length > 0) {
-      return artistListFormatter.format(artistNames);
-    }
-
-    return artistName?.trim() || null;
-  }, [artistName, release.artistNames]);
+  const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
 
   return (
     <div className='grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-x-2'>

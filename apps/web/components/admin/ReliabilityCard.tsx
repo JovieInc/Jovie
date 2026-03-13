@@ -1,5 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
 interface ReliabilityCardProps {
@@ -49,43 +50,38 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
     : '—';
 
   return (
-    <Card className='h-full border-subtle bg-transparent'>
-      <CardHeader className='space-y-1 p-5 pb-3'>
-        <div className='flex items-start justify-between gap-2'>
-          <div>
-            <CardTitle className='text-lg tracking-tight'>
-              Reliability
-            </CardTitle>
-            <p className='text-2xs text-tertiary-token'>
-              System health metrics
-            </p>
-          </div>
+    <ContentSurfaceCard className='h-full overflow-hidden'>
+      <ContentSectionHeader
+        title='Reliability'
+        subtitle='System health metrics'
+        actions={
           <span className={`text-app font-medium ${tone.labelClassName}`}>
             {tone.label}
           </span>
-        </div>
-      </CardHeader>
-      <CardContent className='space-y-3 p-5 pt-0 text-app text-secondary-token'>
-        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
-          <div className='flex items-center gap-2 font-medium text-primary-token'>
+        }
+        className='px-5 py-3'
+      />
+      <div className='space-y-3 p-5 text-app text-secondary-token'>
+        <div className='flex items-center justify-between rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
+          <div className='flex items-center gap-2 font-medium text-(--linear-text-primary)'>
             <CheckCircle2 className={`h-4 w-4 ${tone.iconClassName}`} />
             Error rate
           </div>
-          <span className='text-primary-token tabular-nums'>
+          <span className='tabular-nums text-(--linear-text-primary)'>
             {errorRateLabel}
           </span>
         </div>
-        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
-          <div className='flex items-center gap-2 font-medium text-primary-token'>
+        <div className='flex items-center justify-between rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
+          <div className='flex items-center gap-2 font-medium text-(--linear-text-primary)'>
             <Clock3 className={`h-4 w-4 ${tone.iconClassName}`} />
             p95 latency
           </div>
-          <span className='text-primary-token tabular-nums'>
+          <span className='tabular-nums text-(--linear-text-primary)'>
             {latencyLabel}
           </span>
         </div>
-        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
-          <div className='flex items-center gap-2 font-medium text-primary-token'>
+        <div className='flex items-center justify-between rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
+          <div className='flex items-center gap-2 font-medium text-(--linear-text-primary)'>
             {summary.incidents24h > 0 ? (
               <AlertTriangle className={`h-4 w-4 ${tone.iconClassName}`} />
             ) : (
@@ -106,7 +102,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
             )}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </ContentSurfaceCard>
   );
 }

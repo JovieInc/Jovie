@@ -17,6 +17,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { formatReleaseDateShort } from '@/lib/discography/formatting';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 interface ProviderInfo {
@@ -100,7 +101,7 @@ export function ReleaseEditDialog({
                     className='border border-(--linear-border-subtle) bg-transparent text-[11px] text-(--linear-text-secondary)'
                   >
                     {release.releaseDate
-                      ? new Date(release.releaseDate).toLocaleDateString()
+                      ? formatReleaseDateShort(release.releaseDate)
                       : 'Date TBD'}
                   </Badge>
                 }

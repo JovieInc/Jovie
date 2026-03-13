@@ -33,6 +33,7 @@ import {
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -61,30 +62,9 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'lyrics' as const, label: 'Lyrics' },
 ];
 
-const artistListFormatter = new Intl.ListFormat('en', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
   if (!hasPreview) return 'No preview available';
   return isPlaying ? 'Pause preview' : 'Play preview';
-}
-
-function formatReleaseArtistLine(
-  artistNames: string[] | undefined,
-  fallbackArtistName: string | null | undefined
-): string | null {
-  const normalizedNames = (artistNames ?? [])
-    .map(name => name.trim())
-    .filter(Boolean);
-
-  if (normalizedNames.length > 0) {
-    return artistListFormatter.format(normalizedNames);
-  }
-
-  const fallback = fallbackArtistName?.trim();
-  return fallback ? fallback : null;
 }
 
 interface ReleaseEntityHeaderProps {

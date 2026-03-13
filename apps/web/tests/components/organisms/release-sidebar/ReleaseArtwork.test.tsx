@@ -49,4 +49,16 @@ describe('ReleaseArtwork', () => {
       'md'
     );
   });
+
+  it('renders drawer media thumb fallback when artwork is missing', () => {
+    render(
+      <ReleaseArtwork
+        artworkUrl={null}
+        title='Midnight Echo'
+        canUploadArtwork={false}
+      />
+    );
+
+    expect(screen.getByTestId('drawer-media-thumb')).toBeInTheDocument();
+  });
 });

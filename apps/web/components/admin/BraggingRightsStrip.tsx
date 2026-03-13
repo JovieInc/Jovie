@@ -1,13 +1,8 @@
 'use client';
 
-import {
-  Card,
-  CardContent,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@jovie/ui';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2, Mail, MousePointerClick, Tag, Users } from 'lucide-react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminBraggingRights } from '@/lib/admin/bragging-rights';
 
 interface BraggingRightsStripProps {
@@ -48,7 +43,7 @@ function BadgeRow({
           {visible.map(item => (
             <span
               key={item}
-              className='inline-flex items-center rounded-md bg-surface-2 px-2 py-0.5 text-2xs font-medium text-secondary-token'
+              className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-2xs font-medium text-secondary-token'
             >
               {item}
             </span>
@@ -58,7 +53,7 @@ function BadgeRow({
               <TooltipTrigger asChild>
                 <button
                   type='button'
-                  className='inline-flex cursor-default items-center rounded-md bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token hover:text-secondary-token'
+                  className='inline-flex cursor-default items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-2xs font-medium text-tertiary-token transition-colors hover:border-(--linear-border-default) hover:text-secondary-token'
                   aria-label={`${overflow.length} more ${title.toLowerCase()}`}
                 >
                   +{overflow.length} others
@@ -101,20 +96,18 @@ function StatCard({
   readonly iconClassName?: string;
 }) {
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardContent className='space-y-1.5 p-4'>
-        <div className='flex items-center gap-1.5'>
-          <Icon
-            className={`size-3.5 ${iconClassName ?? 'text-tertiary-token'}`}
-          />
-          <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
-        </div>
-        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
-          {value}
-        </p>
-        <p className='text-app text-secondary-token'>{subtitle}</p>
-      </CardContent>
-    </Card>
+    <ContentSurfaceCard className='space-y-1.5 p-4'>
+      <div className='flex items-center gap-1.5'>
+        <Icon
+          className={`size-3.5 ${iconClassName ?? 'text-tertiary-token'}`}
+        />
+        <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
+      </div>
+      <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
+        {value}
+      </p>
+      <p className='text-app text-secondary-token'>{subtitle}</p>
+    </ContentSurfaceCard>
   );
 }
 
@@ -135,27 +128,23 @@ export function BraggingRightsStrip({
     <div className='space-y-4' data-testid='bragging-rights-strip'>
       {/* Labels + Distributors row */}
       <div className='grid gap-4 sm:grid-cols-2'>
-        <Card className='border-subtle bg-transparent'>
-          <CardContent className='space-y-2 p-4'>
-            <BadgeRow
-              items={data.labels}
-              emptyText='No label data yet'
-              icon={Tag}
-              title='Labels'
-            />
-          </CardContent>
-        </Card>
+        <ContentSurfaceCard className='space-y-2 p-4'>
+          <BadgeRow
+            items={data.labels}
+            emptyText='No label data yet'
+            icon={Tag}
+            title='Labels'
+          />
+        </ContentSurfaceCard>
 
-        <Card className='border-subtle bg-transparent'>
-          <CardContent className='space-y-2 p-4'>
-            <BadgeRow
-              items={data.distributors}
-              emptyText='No distributor data yet'
-              icon={Building2}
-              title='Distributors'
-            />
-          </CardContent>
-        </Card>
+        <ContentSurfaceCard className='space-y-2 p-4'>
+          <BadgeRow
+            items={data.distributors}
+            emptyText='No distributor data yet'
+            icon={Building2}
+            title='Distributors'
+          />
+        </ContentSurfaceCard>
       </div>
 
       {/* Platform stats row */}
