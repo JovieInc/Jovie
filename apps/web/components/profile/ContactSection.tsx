@@ -86,12 +86,11 @@ export function ContactSection({
                     const channelHref = getActionHref(channel);
                     if (!channelHref) return null;
 
-                    const channelLabel =
-                      channel.type === 'email'
-                        ? 'Email'
-                        : channel.type === 'sms'
-                          ? 'Text'
-                          : 'Call';
+                    const channelLabels: Record<string, string> = {
+                      email: 'Email',
+                      sms: 'Text',
+                    };
+                    const channelLabel = channelLabels[channel.type] ?? 'Call';
                     return (
                       <a
                         key={`${contact.id}-${channel.type}`}
