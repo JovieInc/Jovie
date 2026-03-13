@@ -16,15 +16,11 @@ import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 import { AudiencePanelProvider } from './AudiencePanelContext';
+import { AudienceTableLoadingShell } from './dashboard-audience-table/AudienceTableLoadingShell';
 import type {
   AudienceFilters,
   AudienceView,
 } from './dashboard-audience-table/types';
-
-const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
-  { length: 10 },
-  (_, i) => `dashboard-audience-loading-row-${i + 1}`
-);
 
 const DashboardAudienceTable = dynamic(
   () =>
@@ -34,19 +30,7 @@ const DashboardAudienceTable = dynamic(
       })
     ),
   {
-    loading: () => (
-      <div className='h-full w-full space-y-4 p-4'>
-        <div className='flex items-center justify-between'>
-          <div className='h-8 w-48 rounded skeleton' />
-          <div className='h-8 w-32 rounded skeleton' />
-        </div>
-        <div className='space-y-2'>
-          {DASHBOARD_AUDIENCE_LOADING_ROW_KEYS.map(key => (
-            <div key={key} className='h-14 rounded-lg skeleton' />
-          ))}
-        </div>
-      </div>
-    ),
+    loading: () => <AudienceTableLoadingShell />,
     ssr: false,
   }
 );
