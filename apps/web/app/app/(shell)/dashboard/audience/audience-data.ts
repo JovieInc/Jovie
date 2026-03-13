@@ -444,7 +444,7 @@ async function fetchMembersData(
   // Build next-page cursor from the last returned row.
   let nextCursor: string | null = null;
   if (hasMore && rows.length > 0) {
-    const lastRow = rows[rows.length - 1];
+    const lastRow = rows.at(-1)!;
     const rawSortVal = lastRow.lastSeenAt;
     const sortValStr =
       rawSortVal instanceof Date
@@ -581,7 +581,7 @@ async function _fetchSubscribersData(
   // Build next-page cursor from the last returned row.
   let nextCursor: string | null = null;
   if (hasMore && rows.length > 0) {
-    const lastRow = rows[rows.length - 1];
+    const lastRow = rows.at(-1)!;
     const sortValStr = toISOStringOrNull(lastRow.createdAt) ?? '';
     nextCursor = encodeCursor(sortValStr, lastRow.id);
   }

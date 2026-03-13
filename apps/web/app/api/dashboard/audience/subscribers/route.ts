@@ -171,7 +171,7 @@ export async function GET(request: Request) {
       }>;
 
       // Derive nextCursor from the last row in the page
-      const lastRow = rows[rows.length - 1];
+      const lastRow = rows.at(-1);
       let nextCursor: string | null = null;
       if (rows.length === pageSize && lastRow) {
         nextCursor = encodeCursor(

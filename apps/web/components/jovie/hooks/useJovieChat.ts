@@ -385,7 +385,7 @@ export function useJovieChat({
               message: `Message persistence failed after retries: ${err.message}`,
               level: 'warning',
               data: {
-                status: (err as FetchError).status,
+                status: err.status,
                 profileId: profileId ?? null,
                 conversationId: activeConversationId,
               },
@@ -489,7 +489,7 @@ export function useJovieChat({
             message: `Conversation create failed after retries: ${err.message}`,
             level: 'warning',
             data: {
-              status: (err as FetchError).status,
+              status: err.status,
               profileId: profileId ?? null,
             },
           });

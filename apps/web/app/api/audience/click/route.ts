@@ -322,7 +322,7 @@ export async function POST(request: NextRequest) {
       const metadataWithTipValue =
         linkType === 'tip'
           ? {
-              ...(metadata ?? {}),
+              ...metadata,
               tipAmountCents: resolveTipAmountCents(
                 metadata as Record<string, unknown> | null
               ),
