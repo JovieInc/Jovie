@@ -21,12 +21,12 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex min-h-[var(--linear-app-header-height)] shrink-0 flex-wrap items-center justify-between gap-3 border-b border-(--linear-border-subtle) bg-transparent px-[var(--linear-app-header-padding-x)] py-1.5',
+        'flex min-h-[38px] shrink-0 flex-wrap items-center justify-between gap-2.5 border-b border-(--linear-app-frame-seam) bg-transparent px-[var(--linear-app-header-padding-x)] py-1',
         className
       )}
     >
       <div className={cn('min-w-0 flex-1 space-y-0.5', bodyClassName)}>
-        <h2 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+        <h2 className='truncate text-[12.5px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
           {title}
         </h2>
         {subtitle ? (

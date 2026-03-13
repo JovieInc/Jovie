@@ -2,7 +2,7 @@ import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const CONTENT_SURFACE_CARD_CLASSNAME =
-  'rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-[0_1px_0_rgba(0,0,0,0.03)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+  'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
 
 export interface ContentSurfaceCardProps {
   readonly children?: ReactNode;

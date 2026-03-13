@@ -48,7 +48,7 @@ export function PageShell({ children, className }: PageShellProps) {
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-transparent text-(--linear-text-primary)',
+        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-(--linear-text-primary)',
         className
       )}
     >
@@ -117,7 +117,7 @@ export function PageHeader({
         ) : undefined
       }
       actions={action}
-      actionsClassName='shrink-0'
+      actionsClassName='flex shrink-0 items-center gap-[var(--linear-app-toolbar-gap)]'
       className={className}
       bodyClassName='min-w-0'
     />

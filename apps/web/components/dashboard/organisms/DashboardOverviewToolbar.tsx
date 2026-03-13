@@ -41,10 +41,11 @@ export function DashboardOverviewToolbar({
         onClick={onRefresh}
         icon={<Icon name='RefreshCw' className='h-4 w-4' />}
         label='Refresh'
+        iconOnly
       />
 
       {rangeLabel ? (
-        <p className='hidden min-w-26 whitespace-nowrap text-right text-[13px] text-tertiary-token sm:block'>
+        <p className='hidden min-w-26 whitespace-nowrap text-right text-[12.5px] text-(--linear-text-tertiary) sm:block'>
           {rangeLabel}
         </p>
       ) : null}

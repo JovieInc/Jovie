@@ -79,9 +79,7 @@ export function DashboardHeaderActionButton({
       ariaLabel={ariaLabel}
       aria-pressed={pressed}
       disabled={disabled}
-      tooltipLabel={
-        tooltipLabel ?? (typeof label === 'string' ? label : undefined)
-      }
+      tooltipLabel={tooltipLabel}
       tooltipShortcut={tooltipShortcut}
       className={cn(
         DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
