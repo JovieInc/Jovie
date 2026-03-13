@@ -204,7 +204,7 @@ async function toDataUrl(imageUrl: string): Promise<string | null> {
     let binary = '';
 
     for (const byte of bytes) {
-      binary += String.fromCharCode(byte);
+      binary += String.fromCodePoint(byte);
     }
 
     return `data:${contentType};base64,${btoa(binary)}`;

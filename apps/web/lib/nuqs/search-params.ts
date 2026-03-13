@@ -18,7 +18,6 @@ import {
   parseAsString,
   parseAsStringLiteral,
 } from 'nuqs/server';
-import type { ProfileMode } from '@/components/profile/contracts';
 import { profileModes } from '@/components/profile/registry';
 
 export { parseAsString as sortFieldParser } from 'nuqs/server';
@@ -339,5 +338,5 @@ export {
   parseAsStringLiteral,
 } from 'nuqs/server';
 
-export { profileModes };
-export type { ProfileMode };
+export type { ProfileMode } from '@/components/profile/contracts';
+export { profileModes } from '@/components/profile/registry';

@@ -4,6 +4,8 @@ import { publicEnv } from '@/lib/env-public';
 
 export const LINEAR_EASE = [0.16, 1, 0.3, 1] as const;
 
+const FEATURE_DETAIL_REGEX = /^(.+?)\s*\(([^)]+)\)$/;
+
 /**
  * Plan features for the billing comparison UI, derived from ENTITLEMENT_REGISTRY.
  * The `{ label, detail? }` shape is consumed by PlanComparisonSection.
@@ -13,7 +15,7 @@ export const PLAN_FEATURES = {
     name: ENTITLEMENT_REGISTRY.free.marketing.displayName,
     tagline: ENTITLEMENT_REGISTRY.free.marketing.tagline,
     features: ENTITLEMENT_REGISTRY.free.marketing.features.map(f => {
-      const match = f.match(/^(.+?)\s*\(([^)]+)\)$/);
+      const match = FEATURE_DETAIL_REGEX.exec(f);
       return match ? { label: match[1], detail: match[2] } : { label: f };
     }),
   },
@@ -21,7 +23,7 @@ export const PLAN_FEATURES = {
     name: ENTITLEMENT_REGISTRY.pro.marketing.displayName,
     tagline: ENTITLEMENT_REGISTRY.pro.marketing.tagline,
     features: ENTITLEMENT_REGISTRY.pro.marketing.features.map(f => {
-      const match = f.match(/^(.+?)\s*\(([^)]+)\)$/);
+      const match = FEATURE_DETAIL_REGEX.exec(f);
       return match ? { label: match[1], detail: match[2] } : { label: f };
     }),
   },
@@ -29,7 +31,7 @@ export const PLAN_FEATURES = {
     name: ENTITLEMENT_REGISTRY.growth.marketing.displayName,
     tagline: `${ENTITLEMENT_REGISTRY.growth.marketing.tagline} — Early Access`,
     features: ENTITLEMENT_REGISTRY.growth.marketing.features.map(f => {
-      const match = f.match(/^(.+?)\s*\(([^)]+)\)$/);
+      const match = FEATURE_DETAIL_REGEX.exec(f);
       return match ? { label: match[1], detail: match[2] } : { label: f };
     }),
   },
