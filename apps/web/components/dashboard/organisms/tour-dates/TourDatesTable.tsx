@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import {
   type ColumnDef,
   createColumnHelper,
@@ -8,6 +9,8 @@ import {
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { InlineIconButton } from '@/components/atoms/InlineIconButton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   type ContextMenuItemType,
   UnifiedTable,
@@ -40,7 +43,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-md bg-surface-3 px-2 py-0.5 text-[13px] font-[510] text-tertiary-token'>
+      <span className='inline-flex items-center rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-[12px] font-[510] text-(--linear-text-tertiary)'>
         Past
       </span>
     );
@@ -49,19 +52,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-md bg-warning-subtle px-2 py-0.5 text-[13px] font-[510] text-warning'>
+        <span className='inline-flex items-center rounded-[7px] border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[12px] font-[510] text-amber-600 dark:text-amber-300'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-md bg-error-subtle px-2 py-0.5 text-[13px] font-[510] text-error'>
+        <span className='inline-flex items-center rounded-[7px] border border-red-500/20 bg-red-500/8 px-2 py-0.5 text-[12px] font-[510] text-red-600 dark:text-red-400'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-md bg-success-subtle px-2 py-0.5 text-[13px] font-[510] text-success'>
+        <span className='inline-flex items-center rounded-[7px] border border-emerald-500/20 bg-emerald-500/8 px-2 py-0.5 text-[12px] font-[510] text-emerald-600 dark:text-emerald-400'>
           On Sale
         </span>
       );
@@ -179,21 +182,22 @@ const ActionsHeader = memo(function ActionsHeader({
   return (
     <div className='flex items-center justify-end gap-2'>
       {onSync && (
-        <button
-          type='button'
+        <Button
           onClick={event => {
             event.stopPropagation();
             onSync();
           }}
           disabled={isSyncing}
-          className='inline-flex items-center gap-1 rounded px-2 py-1 text-[13px] text-secondary-token hover:bg-surface-2 disabled:opacity-50'
+          variant='ghost'
+          size='sm'
+          className='h-8 gap-1 rounded-[8px] px-2.5 text-[13px] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
         >
           <Icon
             name='RefreshCw'
             className={cn('h-4 w-4', isSyncing && 'animate-spin')}
           />
           Sync
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -208,17 +212,16 @@ const ActionsCell = memo(function ActionsCell({
 }) {
   return (
     <div className='flex items-center justify-end'>
-      <button
-        type='button'
+      <InlineIconButton
         aria-label={`Edit ${tourDate.venueName} tour date`}
         onClick={event => {
           event.stopPropagation();
           onEdit(tourDate);
         }}
-        className='rounded p-1 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+        className='rounded-full p-1 text-(--linear-text-tertiary)'
       >
         <Icon name='MoreHorizontal' className='h-4 w-4' />
-      </button>
+      </InlineIconButton>
     </div>
   );
 });
@@ -389,14 +392,21 @@ export function TourDatesTable({
       rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
       className='text-[13px]'
       emptyState={
-        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
-          <Icon name='Calendar' className='h-6 w-6' />
-          <div>
-            <div className='font-[510]'>No tour dates</div>
-            <div className='text-[13px]'>
-              Add your first tour date to get started.
+        <div className='px-4 py-8'>
+          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-8 text-center text-[13px] text-(--linear-text-secondary)'>
+            <Icon
+              name='Calendar'
+              className='h-6 w-6 text-(--linear-text-tertiary)'
+            />
+            <div>
+              <div className='font-[510] text-(--linear-text-primary)'>
+                No tour dates
+              </div>
+              <div className='text-[13px]'>
+                Add your first tour date to get started.
+              </div>
             </div>
-          </div>
+          </ContentSurfaceCard>
         </div>
       }
     />
