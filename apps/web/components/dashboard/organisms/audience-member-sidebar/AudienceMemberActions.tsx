@@ -7,6 +7,7 @@
  */
 
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
@@ -19,18 +20,22 @@ interface AudienceMemberActionsProps
 
 export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   if (member.latestActions.length === 0) {
-    return <div className='text-sm text-secondary-token'>No actions yet.</div>;
+    return (
+      <DrawerEmptyState className='min-h-[96px]' message='No actions yet.' />
+    );
   }
 
   return (
-    <ul className='space-y-2'>
+    <ul className='space-y-1'>
       {member.latestActions.slice(0, 6).map(action => (
         <li
           key={`${member.id}-${action.label}-${action.timestamp ?? ''}`}
-          className={cn('flex items-start gap-2 text-sm text-primary-token')}
+          className={cn(
+            'flex items-start gap-2.5 rounded-[8px] border border-transparent px-2.5 py-2 text-sm text-(--linear-text-primary) transition-[background-color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1)'
+          )}
         >
           <span
-            className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
+            className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-tertiary)'
             aria-hidden='true'
           >
             <Icon
@@ -42,7 +47,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
             {formatActionLabel(action.label)}
           </span>
           {action.timestamp ? (
-            <span className='ml-2 text-xs text-secondary-token'>
+            <span className='ml-2 text-xs text-(--linear-text-tertiary)'>
               {formatTimeAgo(action.timestamp)}
             </span>
           ) : null}
