@@ -39,6 +39,7 @@ interface UseUnifiedArtistSearchQueryReturn<TResult> {
 }
 
 const DEFAULT_LIMIT = 5;
+const DEFAULT_MIN_QUERY_LENGTH = 1;
 
 export function useUnifiedArtistSearchQuery<TResult>(
   options: UseUnifiedArtistSearchQueryOptions<TResult>
@@ -46,7 +47,7 @@ export function useUnifiedArtistSearchQuery<TResult>(
   const {
     debounceMs = PACER_TIMING.SEARCH_DEBOUNCE_MS,
     limit = DEFAULT_LIMIT,
-    minQueryLength,
+    minQueryLength = DEFAULT_MIN_QUERY_LENGTH,
     queryKey,
     searchFn,
     shouldBypassDebounce,

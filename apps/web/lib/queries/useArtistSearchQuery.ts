@@ -17,6 +17,8 @@ import {
   useUnifiedArtistSearchQuery,
 } from './useUnifiedArtistSearchQuery';
 
+export type { ArtistSearchState } from './useUnifiedArtistSearchQuery';
+
 export interface SpotifyArtistResult {
   id: string;
   name: string;
