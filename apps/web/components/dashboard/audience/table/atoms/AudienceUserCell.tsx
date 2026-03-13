@@ -65,12 +65,12 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 text-[13px] text-primary-token min-w-0',
+        'min-w-0 text-[13px] text-(--linear-text-primary) flex items-center gap-2',
         className
       )}
     >
       <IconComponent
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+        className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
         aria-hidden='true'
       />
       <span className='truncate font-[510]'>{primaryLabel}</span>
