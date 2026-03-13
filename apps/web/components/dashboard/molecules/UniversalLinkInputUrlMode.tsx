@@ -66,7 +66,7 @@ interface UniversalLinkInputUrlModeProps {
   readonly onSendVoiceRecording?: () => void;
 }
 
-function VoiceRecordingWaveform({ levels }: { levels: number[] }) {
+function VoiceRecordingWaveform({ levels }: { readonly levels: number[] }) {
   return (
     <div className='flex h-8 items-end gap-1' aria-hidden='true'>
       {levels.map(level => (
