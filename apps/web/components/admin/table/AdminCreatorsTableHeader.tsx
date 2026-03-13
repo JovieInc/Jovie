@@ -44,7 +44,7 @@ export function AdminCreatorsTableHeader({
   headerActions,
 }: Readonly<AdminCreatorsTableHeaderProps>) {
   const headerCellClass = cn(
-    'sticky z-20 px-4 py-3 text-left border-b border-subtle',
+    'sticky z-20 border-b border-(--linear-border-subtle) px-4 py-3 text-left',
     headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
   );
 
@@ -54,14 +54,14 @@ export function AdminCreatorsTableHeader({
   );
 
   return (
-    <thead className='text-left text-secondary-token'>
-      <tr className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+    <thead className='text-left text-(--linear-text-secondary)'>
+      <tr className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
         <th className={cn(headerCellClass, 'w-14')} style={stickyStyle}>
           <Checkbox
             aria-label='Select all creators'
             checked={headerCheckboxState}
             onCheckedChange={onToggleSelectAll}
-            className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+            className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-accent) data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white'
           />
         </th>
         <th className={headerCellClass} style={stickyStyle}>
@@ -100,7 +100,7 @@ export function AdminCreatorsTableHeader({
           className={cn(headerCellClass, 'hidden lg:table-cell')}
           style={stickyStyle}
         >
-          <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+          <span className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
             Social
           </span>
         </th>
@@ -121,7 +121,7 @@ export function AdminCreatorsTableHeader({
           {headerActions ? (
             <div className='flex items-center justify-end'>{headerActions}</div>
           ) : (
-            <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+            <span className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
               Actions
             </span>
           )}
