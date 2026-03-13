@@ -218,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 186,
-      minSize: 154,
+      size: 232,
+      minSize: 188,
       meta: { className: 'hidden sm:table-cell' },
     });
 
@@ -358,7 +358,7 @@ export function ReleaseTable({
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '194px' },
+        { variant: 'meta', width: '236px' },
       ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedRowIds}

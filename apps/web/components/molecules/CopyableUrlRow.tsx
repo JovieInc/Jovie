@@ -59,11 +59,11 @@ export function CopyableUrlRow({
 
   const sizeClasses = {
     sm: {
-      container: 'h-[24px] gap-1 rounded-[7px] px-1.5',
-      icon: 'h-3 w-3',
-      value: 'text-[10.5px]',
-      button: 'h-4.5 w-4.5 rounded-[5px]',
-      glyph: 'h-[11px] w-[11px]',
+      container: 'h-[24px] gap-[3px] rounded-[7px] px-[5px]',
+      icon: 'h-[11px] w-[11px]',
+      value: 'text-[11px]',
+      button: 'h-4 w-4 rounded-[5px]',
+      glyph: 'h-[10px] w-[10px]',
     },
     md: {
       container: 'h-[26px] gap-1.5 rounded-[8px] px-2',
