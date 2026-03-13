@@ -2,7 +2,7 @@
 
 import { Input } from '@jovie/ui';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -32,16 +32,29 @@ export function SendInviteDialog({
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // TanStack Query mutation for cache invalidation
   const createInviteMutation = useCreateInviteMutation();
 
-  if (!profile) return null;
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const isLoading = createInviteMutation.isPending;
 
+  if (!profile) return null;
+
   const handleClose = () => {
     if (!isLoading) {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
       setEmail('');
       setError(null);
       setSuccess(false);
@@ -84,7 +97,7 @@ export function SendInviteDialog({
       setEmail('');
 
       // Close dialog after showing success briefly
-      setTimeout(() => {
+      successTimeoutRef.current = setTimeout(() => {
         handleClose();
         onSuccess?.();
       }, 1500);
@@ -114,14 +127,17 @@ export function SendInviteDialog({
               />
             ) : (
               <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
-                <Icon name='User' className='h-5 w-5 text-tertiary-token' />
+                <Icon
+                  name='User'
+                  className='h-5 w-5 text-(--linear-text-tertiary)'
+                />
               </div>
             )}
             <div>
-              <p className='text-sm font-medium text-primary-token'>
+              <p className='text-sm font-medium text-(--linear-text-primary)'>
                 {profile.displayName || profile.username}
               </p>
-              <p className='text-xs text-secondary-token'>
+              <p className='text-xs text-(--linear-text-secondary)'>
                 @{profile.username}
               </p>
             </div>

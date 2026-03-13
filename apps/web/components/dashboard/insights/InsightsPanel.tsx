@@ -84,7 +84,7 @@ function InsightsPanelContent({
   if (error) {
     return (
       <ContentSurfaceCard className='p-6 text-center'>
-        <p className='text-[13px] text-secondary-token'>
+        <p className='text-[13px] text-(--linear-text-secondary)'>
           Failed to load insights. Please try again.
         </p>
       </ContentSurfaceCard>
@@ -109,7 +109,7 @@ function InsightsPanelContent({
       />
       <PrioritySection
         label='Informational'
-        colorClass='text-tertiary-token'
+        colorClass='text-(--linear-text-tertiary)'
         insights={grouped.low}
       />
     </div>
@@ -162,8 +162,10 @@ export function InsightsPanel() {
       {/* Header */}
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>
-          <h2 className='text-lg font-[590] text-primary-token'>AI Insights</h2>
-          <p className='text-[13px] text-secondary-token'>
+          <h2 className='text-lg font-[590] text-(--linear-text-primary)'>
+            AI Insights
+          </h2>
+          <p className='text-[13px] text-(--linear-text-secondary)'>
             {getSubtitle(total)}
           </p>
         </div>
