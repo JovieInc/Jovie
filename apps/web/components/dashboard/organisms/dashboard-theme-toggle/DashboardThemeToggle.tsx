@@ -34,8 +34,8 @@ function LoadingStateWithSystem() {
   return (
     <div className='space-y-3'>
       <div className='animate-pulse motion-reduce:animate-none space-y-3'>
-        <div className='h-4 bg-surface-hover-token rounded w-24' />
-        <div className='h-8 bg-surface-hover-token rounded' />
+        <div className='h-4 w-24 rounded bg-(--linear-bg-surface-0)' />
+        <div className='h-8 rounded bg-(--linear-bg-surface-0)' />
       </div>
     </div>
   );
@@ -44,21 +44,21 @@ function LoadingStateWithSystem() {
 function LoadingStateToggle() {
   return (
     <div className='flex items-center space-x-3'>
-      <span className='text-[13px] text-secondary-token'>Light</span>
-      <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-out'>
-        <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out' />
+      <span className='text-[13px] text-(--linear-text-secondary)'>Light</span>
+      <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 transition-colors duration-200 ease-out'>
+        <span className='inline-block h-5 w-5 translate-x-0 transform rounded-full bg-(--linear-bg-surface-1) shadow ring-0 transition duration-200 ease-out' />
       </div>
-      <span className='text-[13px] text-secondary-token'>Dark</span>
+      <span className='text-[13px] text-(--linear-text-secondary)'>Dark</span>
     </div>
   );
 }
 
 function getThemeIcon(value: string) {
   if (value === 'light')
-    return <SunIcon className='h-5 w-5 text-secondary-token' />;
+    return <SunIcon className='h-5 w-5 text-(--linear-text-secondary)' />;
   if (value === 'dark')
-    return <MoonIcon className='h-5 w-5 text-secondary-token' />;
-  return <SystemIcon className='h-5 w-5 text-secondary-token' />;
+    return <MoonIcon className='h-5 w-5 text-(--linear-text-secondary)' />;
+  return <SystemIcon className='h-5 w-5 text-(--linear-text-secondary)' />;
 }
 
 interface ThemeOptionGridProps {
@@ -79,7 +79,7 @@ function ThemeOptionGrid({
 
   return (
     <div className='space-y-3'>
-      <span className='text-[13px] font-[510] text-primary-token'>
+      <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
         Theme Preference
       </span>
       <div className='grid grid-cols-3 gap-2'>
@@ -90,10 +90,10 @@ function ThemeOptionGrid({
             onClick={() => onThemeChange(option.value)}
             disabled={isUpdating}
             className={cn(
-              'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200',
+              'flex flex-col items-center justify-center rounded-lg border px-3 py-3 transition-all duration-200',
               theme === option.value
-                ? 'border-accent bg-accent/10 text-primary-token'
-                : 'border-border hover:bg-surface-hover-token text-secondary-token',
+                ? 'border-(--linear-border-focus) bg-(--linear-bg-surface-0) text-(--linear-text-primary)'
+                : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-0)',
               'disabled:opacity-50 disabled:cursor-not-allowed'
             )}
           >
@@ -102,14 +102,14 @@ function ThemeOptionGrid({
             </span>
             <span className='text-[11px] font-[510]'>{option.label}</span>
             {showResolvedTheme(option.value) && (
-              <span className='text-[11px] text-secondary-token mt-1'>
+              <span className='mt-1 text-[11px] text-(--linear-text-secondary)'>
                 ({resolvedTheme})
               </span>
             )}
           </button>
         ))}
       </div>
-      <p className='text-[11px] text-secondary-token'>
+      <p className='text-[11px] text-(--linear-text-secondary)'>
         Choose how the interface appears. System follows your device settings.
       </p>
     </div>
@@ -145,7 +145,7 @@ function ThemeToggleButton({
               isUpdating && 'opacity-70'
             )}
           >
-            <ThemeIcon className='h-4 w-4 text-secondary-token' />
+            <ThemeIcon className='h-4 w-4 text-(--linear-text-secondary)' />
           </AppIconButton>
         </TooltipTrigger>
         <TooltipContent side='right'>{tooltipText}</TooltipContent>
@@ -166,8 +166,10 @@ function ThemeToggleButton({
           disabled={isUpdating}
           onClick={onToggle}
           className={cn(
-            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed',
-            isDark ? 'bg-accent' : 'bg-surface-hover-token',
+            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-(--linear-border-subtle) transition-colors duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) disabled:cursor-not-allowed disabled:opacity-50',
+            isDark
+              ? 'bg-(--linear-border-focus)'
+              : 'bg-(--linear-bg-surface-0)',
             'p-0.5'
           )}
           role='switch'
@@ -177,12 +179,12 @@ function ThemeToggleButton({
           <span
             aria-hidden='true'
             className={cn(
-              'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-out items-center justify-center',
+              'flex h-5 w-5 transform items-center justify-center rounded-full bg-(--linear-bg-surface-1) shadow ring-0 transition duration-200 ease-out',
               isDark ? 'translate-x-5' : 'translate-x-0',
               isUpdating && 'animate-pulse motion-reduce:animate-none'
             )}
           >
-            <ThemeIcon className='h-3 w-3 text-accent-token' />
+            <ThemeIcon className='h-3 w-3 text-(--linear-text-primary)' />
           </span>
         </button>
       </TooltipTrigger>
