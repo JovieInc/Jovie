@@ -155,7 +155,7 @@ export function DisplayMenuDropdown({
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
-          <span className='text-[13px] font-[590] text-primary-token'>
+          <span className='text-[13px] font-[590] text-(--linear-text-primary)'>
             Display
           </span>
           <PopoverPrimitive.Close
@@ -188,7 +188,7 @@ export function DisplayMenuDropdown({
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'list'
-                    ? 'text-primary-token'
+                    ? 'text-(--linear-text-primary)'
                     : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
                 )}
                 aria-pressed={viewMode === 'list'}
@@ -204,7 +204,7 @@ export function DisplayMenuDropdown({
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'board'
-                    ? 'text-primary-token'
+                    ? 'text-(--linear-text-primary)'
                     : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
                 )}
                 aria-pressed={viewMode === 'board'}
@@ -269,8 +269,8 @@ export function DisplayMenuDropdown({
                   className={cn(
                     'rounded-md px-2 py-1 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
                     density === option.value
-                      ? 'bg-surface-2 text-primary-token border border-subtle'
-                      : 'text-tertiary-token hover:text-secondary-token border border-transparent hover:bg-interactive-hover'
+                      ? 'border border-(--linear-border-subtle) bg-(--linear-bg-surface-2) text-(--linear-text-primary)'
+                      : 'border border-transparent text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary)'
                   )}
                 >
                   {option.label}

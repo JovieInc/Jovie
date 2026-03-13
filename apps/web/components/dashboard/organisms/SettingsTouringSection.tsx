@@ -102,7 +102,7 @@ export function SettingsTouringSection({
         />
         <div className='px-4 py-3'>
           <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-3.5'>
-            <p className='text-[13px] text-secondary-token'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
               Failed to load connection status.
             </p>
             <Button variant='ghost' size='sm' onClick={() => refetch()}>
@@ -169,12 +169,12 @@ export function SettingsTouringSection({
       <div className='px-4 py-3'>
         <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
           <div className='space-y-1'>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
               {isConnected
                 ? 'Bandsintown connected'
                 : 'Bandsintown not connected'}
             </p>
-            <p className='text-[13px] leading-[18px] text-secondary-token'>
+            <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
               Tour dates will appear on your public profile when connected.
             </p>
           </div>
@@ -250,7 +250,7 @@ function BandsintownConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-[13px] font-[510] transition-colors cursor-pointer',
+              'inline-flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-[13px] font-[510] transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             )}
             style={
@@ -263,11 +263,11 @@ function BandsintownConnectionPill({
             aria-label={`Bandsintown connection: ${artistName || 'Connected'}`}
           >
             <Calendar className='h-4 w-4 shrink-0' style={{ color: accent }} />
-            <span className='truncate max-w-[160px] text-secondary-token'>
+            <span className='max-w-[160px] truncate text-(--linear-text-secondary)'>
               {artistName || 'Connected'}
             </span>
             {lastSyncedAt && !hovered && !menuOpen && (
-              <span className='text-[10px] text-tertiary-token ml-0.5'>
+              <span className='ml-0.5 text-[10px] text-(--linear-text-tertiary)'>
                 {new Date(lastSyncedAt).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -309,8 +309,8 @@ function BandsintownConnectionPill({
       type='button'
       onClick={onConnect}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-secondary-token transition-colors',
-        'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
+        'inline-flex items-center gap-1.5 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) py-1 pl-2.5 pr-3 text-[13px] font-[510] text-(--linear-text-secondary) transition-colors',
+        'hover:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
       )}
       style={
         {
@@ -434,7 +434,7 @@ function BandsintownConnectDialog({
           <div className='space-y-1.5'>
             <Label htmlFor='bandsintown-api-key' className='text-[11px]'>
               API key{' '}
-              <span className='text-tertiary-token font-normal'>
+              <span className='font-normal text-(--linear-text-tertiary)'>
                 (optional)
               </span>
             </Label>
