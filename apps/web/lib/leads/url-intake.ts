@@ -88,11 +88,11 @@ function normalizeUrl(rawUrl: string): string | null {
 function deriveHandleFromUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
-    const pathSegment = parsed.pathname.split('/').filter(Boolean).at(-1);
+    const pathSegment = parsed.pathname.split('/').findLast(Boolean);
     const fallback = `${parsed.hostname}-${pathSegment ?? 'profile'}`;
     const normalized = fallback
       .toLowerCase()
-      .replace(HANDLE_SANITIZE_REGEX, '');
+      .replaceAll(HANDLE_SANITIZE_REGEX, '');
     return normalized.length > 0 ? normalized.slice(0, 64) : null;
   } catch {
     return null;

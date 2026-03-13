@@ -15,12 +15,7 @@ interface ContactDrawerProps {
   readonly artistName: string;
   readonly artistHandle: string;
   readonly contacts: PublicContact[];
-  readonly performAction: (
-    channel: PublicContactChannel,
-    contact: PublicContact
-  ) => void;
   readonly primaryChannel: (contact: PublicContact) => PublicContactChannel;
-  readonly buildTerritoryLabel: (contact: PublicContact) => string;
 }
 
 export function ContactDrawer({
