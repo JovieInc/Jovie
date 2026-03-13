@@ -2,6 +2,8 @@
 
 import { AlertTriangle, Mail, MessageCircle, Send } from 'lucide-react';
 import { KpiItem } from '@/components/admin/KpiItem';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface OutreachKpisProps {
   readonly counts: {
@@ -14,11 +16,19 @@ interface OutreachKpisProps {
 
 export function OutreachKpis({ counts }: OutreachKpisProps) {
   return (
-    <section className='space-y-3'>
-      <h2 className='text-sm font-semibold text-primary-token'>
-        Outreach Pipeline
-      </h2>
-      <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='Outreach Pipeline'
+        subtitle='Across email, DM, and manual-review queues'
+        actions={
+          <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
+            {counts.total} total
+          </span>
+        }
+        className='min-h-0 px-4 py-3 sm:px-5'
+        actionsClassName='shrink-0'
+      />
+      <div className='grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4'>
         <KpiItem
           title='TOTAL QUEUED'
           value={String(counts.total)}
@@ -45,6 +55,6 @@ export function OutreachKpis({ counts }: OutreachKpisProps) {
           iconClassName='text-warning'
         />
       </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }
