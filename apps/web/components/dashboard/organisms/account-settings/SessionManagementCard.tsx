@@ -9,7 +9,6 @@
 
 import { Button } from '@jovie/ui';
 import { useEffect, useState } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -83,11 +82,7 @@ export function SessionManagementCard({
 
   if (sessionsLoading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
+      <ContentSurfaceCard className='overflow-hidden'>
         <div className='space-y-3 px-4 py-3'>
           <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
             <LoadingSkeleton height='h-10' />
@@ -96,23 +91,19 @@ export function SessionManagementCard({
             <LoadingSkeleton height='h-10' />
           </ContentSurfaceCard>
         </div>
-      </DashboardCard>
+      </ContentSurfaceCard>
     );
   }
 
   if (sessionsError) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
+      <ContentSurfaceCard className='overflow-hidden'>
         <div className='px-4 py-3'>
           <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
             <p className='text-[13px] text-destructive'>{sessionsError}</p>
           </ContentSurfaceCard>
         </div>
-      </DashboardCard>
+      </ContentSurfaceCard>
     );
   }
 
@@ -121,11 +112,7 @@ export function SessionManagementCard({
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden'>
       <div className='space-y-3 px-4 py-3'>
         {sessions.map(session => {
           const isCurrent = session.id === activeSessionId;
@@ -184,6 +171,6 @@ export function SessionManagementCard({
           if (sessionToEnd) await handleEndSession(sessionToEnd);
         }}
       />
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

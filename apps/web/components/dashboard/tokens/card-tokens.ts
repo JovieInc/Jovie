@@ -118,7 +118,6 @@ export const cardTokens = {
     // Default static card - responsive padding
     default: tw`
       bg-(--linear-bg-surface-1)
-      p-4 sm:p-6
       shadow-[0_1px_0_rgba(0,0,0,0.03)]
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
@@ -126,7 +125,6 @@ export const cardTokens = {
     // Interactive clickable card - full hover effects, responsive padding
     interactive: tw`
       bg-(--linear-bg-surface-1)
-      p-4 sm:p-6
       cursor-pointer
       transition-[background-color,border-color,box-shadow,transform] ${timing.normal} ${timing.easing}
       hover:bg-(--linear-bg-surface-0)
@@ -144,7 +142,6 @@ export const cardTokens = {
     // Settings card - elevated surface, no hover effects (Linear-style)
     settings: tw`
       bg-(--linear-bg-surface-1)
-      px-4 py-3
       shadow-[0_1px_0_rgba(0,0,0,0.03)]
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
@@ -152,7 +149,6 @@ export const cardTokens = {
     // Analytics/metric card - minimal, data-focused
     analytics: tw`
       bg-(--linear-bg-surface-1)
-      p-5
       transition-[background-color,border-color] ${timing.fast} ${timing.easing}
       hover:bg-(--linear-bg-surface-0)
       hover:border-(--linear-border-default)
@@ -161,7 +157,6 @@ export const cardTokens = {
     // Empty state card - centered content, responsive padding
     'empty-state': tw`
       bg-(--linear-bg-surface-1)
-      p-6 sm:p-8
       text-center
     `,
 
@@ -192,7 +187,6 @@ export const cardTokens = {
       relative
       bg-[var(--color-bg-surface-1)]
       rounded-2xl
-      p-4 sm:p-6
       shadow-[var(--shadow-lg)]
       ring-1
       ring-[var(--color-border-subtle)]

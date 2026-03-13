@@ -10,7 +10,6 @@
 import { Button } from '@jovie/ui';
 import { Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -83,11 +82,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden'>
       <div className='space-y-3 px-4 py-3'>
         {accounts.map(account => {
           const label = getProviderLabel(account.provider);
@@ -148,6 +143,6 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           if (accountToDisconnect) await handleDisconnect(accountToDisconnect);
         }}
       />
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

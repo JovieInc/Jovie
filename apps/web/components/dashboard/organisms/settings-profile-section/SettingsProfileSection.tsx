@@ -2,7 +2,6 @@
 
 import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -54,11 +53,7 @@ export function SettingsProfileSection({
   };
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Profile identity'
         subtitle='Control the display name, username, and public profile image fans see.'
@@ -136,6 +131,6 @@ export function SettingsProfileSection({
           </div>
         </ContentSurfaceCard>
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

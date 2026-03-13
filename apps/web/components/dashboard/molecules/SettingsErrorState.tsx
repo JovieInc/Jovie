@@ -2,7 +2,6 @@
 
 import { Button } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface SettingsErrorStateProps {
@@ -17,11 +16,7 @@ export function SettingsErrorState({
   onRetry,
 }: SettingsErrorStateProps) {
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden'>
       <div className='px-4 py-3'>
         <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-8 text-center'>
           <AlertCircle className='h-6 w-6 text-destructive' aria-hidden />
@@ -34,6 +29,6 @@ export function SettingsErrorState({
           ) : null}
         </ContentSurfaceCard>
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

@@ -10,7 +10,6 @@
 import { Button, Input } from '@jovie/ui';
 import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
@@ -52,11 +51,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden'>
       <div className='space-y-3 px-4 py-3'>
         {sortedEmails.map(email => {
           const isPrimary = email.id === primaryEmailId;
@@ -207,6 +202,6 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           if (emailToRemove) await handleRemoveEmail(emailToRemove);
         }}
       />
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

@@ -8,9 +8,9 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
@@ -49,11 +49,7 @@ export function SettingsAppearanceSection() {
     THEME_OPTIONS.find(o => o.value === theme)?.label ?? 'System';
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden divide-y divide-(--linear-border-subtle)'
-    >
+    <ContentSurfaceCard className='overflow-hidden divide-y divide-(--linear-border-subtle)'>
       {isLightModeEnabled && (
         <ContentSectionHeader
           title='Interface theme'
@@ -91,6 +87,6 @@ export function SettingsAppearanceSection() {
           ariaLabel='Toggle high contrast mode'
         />
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }
