@@ -108,7 +108,17 @@ export function SessionManagementCard({
   }
 
   if (sessions.length === 0) {
-    return null;
+    return (
+      <ContentSurfaceCard className='overflow-hidden'>
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
+              No other active sessions.
+            </p>
+          </ContentSurfaceCard>
+        </div>
+      </ContentSurfaceCard>
+    );
   }
 
   return (
@@ -124,17 +134,17 @@ export function SessionManagementCard({
               className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
             >
               <div className='min-w-0'>
-                <p className='flex items-center gap-2 text-[13px] text-primary-token'>
+                <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
                   {isCurrent
                     ? 'This device'
                     : activity?.browserName || 'Unknown device'}
                   {isCurrent ? (
-                    <span className='text-[11px] text-secondary-token'>
+                    <span className='text-[11px] text-(--linear-text-secondary)'>
                       Current session
                     </span>
                   ) : null}
                 </p>
-                <p className='mt-0.5 text-[11px] text-secondary-token'>
+                <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
                   Last active {formatRelativeDate(session.lastActiveAt)}
                   {activity?.city && activity?.country
                     ? ` · ${activity.city}, ${activity.country}`

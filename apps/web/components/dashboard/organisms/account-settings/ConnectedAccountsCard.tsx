@@ -78,7 +78,17 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
   };
 
   if (accounts.length === 0) {
-    return null;
+    return (
+      <ContentSurfaceCard className='overflow-hidden'>
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
+              No connected accounts yet.
+            </p>
+          </ContentSurfaceCard>
+        </div>
+      </ContentSurfaceCard>
+    );
   }
 
   return (
@@ -95,11 +105,14 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
               className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
             >
               <div className='flex min-w-0 items-center gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10'>
-                  <Link2 className='h-4 w-4 text-accent' aria-hidden />
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1)'>
+                  <Link2
+                    className='h-4 w-4 text-(--linear-text-secondary)'
+                    aria-hidden
+                  />
                 </div>
                 <div className='min-w-0'>
-                  <p className='flex items-center gap-2 text-[13px] text-primary-token'>
+                  <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
                     {label}
                     {isVerified ? (
                       <span className='text-[11px] text-emerald-600'>
@@ -107,7 +120,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                       </span>
                     ) : null}
                   </p>
-                  <p className='mt-0.5 truncate text-[11px] text-secondary-token'>
+                  <p className='mt-0.5 truncate text-[11px] text-(--linear-text-secondary)'>
                     {identifier}
                   </p>
                 </div>
