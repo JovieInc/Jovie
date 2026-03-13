@@ -136,13 +136,15 @@ export function BatchIngestForm({
         >
           <ChevronRight
             className={cn(
-              'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-200',
+              'h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary) transition-transform duration-200',
               isOpen && 'rotate-90'
             )}
           />
-          <span className='text-app font-medium'>Batch URL import</span>
+          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            Batch URL import
+          </span>
           {summaryText && !isOpen && (
-            <span className='ml-auto text-2xs text-tertiary-token'>
+            <span className='ml-auto text-[11px] text-(--linear-text-tertiary)'>
               {summaryText}
             </span>
           )}
@@ -158,7 +160,7 @@ export function BatchIngestForm({
 https://open.spotify.com/artist/...
 https://www.instagram.com/artistname, https://artist-website.com'
           />
-          <div className='flex flex-col gap-2 text-2xs text-tertiary-token sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex flex-col gap-2 text-[11px] text-(--linear-text-tertiary) sm:flex-row sm:items-center sm:justify-between'>
             <span>
               {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
             </span>
@@ -174,7 +176,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
           </div>
 
           {result && (
-            <div className='space-y-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3 text-xs'>
+            <div className='space-y-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3 text-[12px] text-(--linear-text-secondary)'>
               {/* Summary badges */}
               <div className='flex flex-wrap items-center gap-3'>
                 {result.summary.success > 0 && (
