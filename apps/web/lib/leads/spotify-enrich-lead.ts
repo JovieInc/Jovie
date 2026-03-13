@@ -19,7 +19,7 @@ interface SpotifyAlbumsResponse {
 }
 
 function extractArtistId(spotifyUrl: string): string | null {
-  const match = spotifyUrl.match(/\/artist\/([a-zA-Z0-9]+)/);
+  const match = /\/artist\/([a-zA-Z0-9]+)/.exec(spotifyUrl);
   return match?.[1] ?? null;
 }
 
