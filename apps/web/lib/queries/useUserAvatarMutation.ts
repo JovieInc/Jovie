@@ -1,43 +1,7 @@
 'use client';
 
 import * as Sentry from '@sentry/nextjs';
-import { useMutation } from '@tanstack/react-query';
-import { FetchError, fetchWithTimeoutResponse } from './fetch';
-
-interface AvatarUploadResponse {
-  blobUrl: string;
-}
-
-/**
- * Upload avatar to blob storage and return the URL.
- */
-async function uploadAvatar(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetchWithTimeoutResponse('/api/images/upload', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    throw new FetchError(
-      errorData.error ?? 'Upload failed',
-      response.status,
-      response
-    );
-  }
-
-  const { blobUrl } = (await response.json()) as AvatarUploadResponse;
-  if (!blobUrl) {
-    throw new FetchError('Upload failed: no URL returned', 500);
-  }
-
-  return blobUrl;
-}
+import { useAvatarUploadMutation } from './useAvatarUploadMutation';
 
 export interface UseUserAvatarMutationOptions {
   onSuccess?: (blobUrl: string) => void;
@@ -64,8 +28,7 @@ export function useUserAvatarMutation(
 ) {
   const { onSuccess, onError } = options;
 
-  return useMutation({
-    mutationFn: uploadAvatar,
+  return useAvatarUploadMutation({
     onSuccess: blobUrl => {
       onSuccess?.(blobUrl);
     },
@@ -86,6 +49,5 @@ export function useUserAvatarMutation(
 
       onError?.(normalizedError);
     },
-    retry: false, // Don't retry uploads
   });
 }

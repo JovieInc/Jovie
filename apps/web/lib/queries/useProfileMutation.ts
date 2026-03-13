@@ -11,13 +11,10 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  createMutationFn,
-  FetchError,
-  fetchWithTimeoutResponse,
-} from './fetch';
+import { createMutationFn, FetchError } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
+import { uploadAvatarToBlob } from './useAvatarUploadMutation';
 
 // ============================================================================
 // Types
@@ -69,13 +66,6 @@ export interface ProfileUpdateResponse {
   warning?: string;
 }
 
-/**
- * Avatar upload response.
- */
-interface AvatarUploadResponse {
-  blobUrl: string;
-}
-
 // ============================================================================
 // Mutation Functions
 // ============================================================================
@@ -84,35 +74,6 @@ const updateProfileApi = createMutationFn<
   ProfileUpdateInput,
   ProfileUpdateResponse
 >('/api/dashboard/profile', 'PUT');
-
-async function uploadAvatarApi(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const response = await fetchWithTimeoutResponse('/api/images/upload', {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as {
-      error?: string;
-    };
-    throw new FetchError(
-      body.error ?? 'Failed to upload image',
-      response.status,
-      response
-    );
-  }
-
-  const body = (await response.json()) as AvatarUploadResponse;
-  if (!body.blobUrl) {
-    throw new FetchError('Upload failed: no URL returned', 500);
-  }
-
-  return body.blobUrl;
-}
-
 // ============================================================================
 // Profile Update Mutation
 // ============================================================================
@@ -254,7 +215,7 @@ export function useAvatarMutation(options: UseAvatarMutationOptions = {}) {
   return useMutation({
     mutationFn: async (file: File): Promise<string> => {
       // Step 1: Upload to blob storage
-      const blobUrl = await uploadAvatarApi(file);
+      const blobUrl = await uploadAvatarToBlob(file);
 
       // Step 2: Update profile with new URL
       await updateProfileApi({ updates: { avatarUrl: blobUrl } });
