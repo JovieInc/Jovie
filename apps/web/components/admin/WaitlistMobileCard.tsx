@@ -12,6 +12,7 @@ import {
   Target,
 } from 'lucide-react';
 import React, { useState } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /** Map platform ID to display name */
@@ -98,7 +99,7 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
   const approveButtonLabel = getApproveButtonLabel();
 
   return (
-    <div className='bg-surface-0 border border-subtle rounded-xl overflow-hidden'>
+    <ContentSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0) p-0'>
       {/* Main card content - always visible */}
       <div className='p-4'>
         {/* Header: Name, Status, Action */}
@@ -109,9 +110,9 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
             </h3>
             <a
               href={`mailto:${entry.email}`}
-              className='text-sm text-secondary-token hover:text-accent flex items-center gap-1.5 mt-0.5'
+              className='mt-0.5 flex items-center gap-1.5 text-sm text-secondary-token hover:text-primary-token'
             >
-              <Mail className='h-3.5 w-3.5 flex-shrink-0' />
+              <Mail className='h-3.5 w-3.5 flex-shrink-0' aria-hidden />
               <span className='truncate'>{entry.email}</span>
             </a>
           </div>
@@ -127,13 +128,13 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           </Badge>
           {primaryGoalLabel && (
             <Badge size='sm' variant='secondary'>
-              <Target className='h-3 w-3 mr-1' />
+              <Target className='mr-1 h-3 w-3' aria-hidden />
               {primaryGoalLabel}
             </Badge>
           )}
           {formattedDate && (
-            <span className='text-xs text-tertiary-token flex items-center gap-1'>
-              <Calendar className='h-3 w-3' />
+            <span className='flex items-center gap-1 text-xs text-tertiary-token'>
+              <Calendar className='h-3 w-3' aria-hidden />
               {formattedDate}
             </span>
           )}
@@ -169,42 +170,45 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className='border-t border-subtle bg-surface-1/50 px-4 py-3 space-y-3'>
+        <div className='space-y-3 border-t border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-3'>
           {/* Primary Social */}
           <div className='flex items-start gap-3'>
-            <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium'>
+            <div className='w-20 flex-shrink-0 text-xs font-medium text-tertiary-token'>
               Social
             </div>
             <a
               href={entry.primarySocialUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-sm text-accent hover:underline flex items-center gap-1.5 min-w-0'
+              className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
             >
               <span className='truncate'>
                 {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
               </span>
-              <ExternalLink className='h-3.5 w-3.5 flex-shrink-0' />
+              <ExternalLink className='h-3.5 w-3.5 flex-shrink-0' aria-hidden />
             </a>
           </div>
 
           {/* Spotify */}
           {entry.spotifyUrlNormalized && (
             <div className='flex items-start gap-3'>
-              <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium flex items-center gap-1'>
-                <Music className='h-3 w-3' />
+              <div className='flex w-20 flex-shrink-0 items-center gap-1 text-xs font-medium text-tertiary-token'>
+                <Music className='h-3 w-3' aria-hidden />
                 Spotify
               </div>
               <a
                 href={entry.spotifyUrlNormalized}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-sm text-accent hover:underline flex items-center gap-1.5 min-w-0'
+                className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
               >
                 <span className='truncate'>
                   {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
                 </span>
-                <ExternalLink className='h-3.5 w-3.5 flex-shrink-0' />
+                <ExternalLink
+                  className='h-3.5 w-3.5 flex-shrink-0'
+                  aria-hidden
+                />
               </a>
             </div>
           )}
@@ -224,8 +228,8 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           {/* Heard About */}
           {entry.heardAbout && (
             <div className='flex items-start gap-3'>
-              <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium flex items-center gap-1'>
-                <MessageSquare className='h-3 w-3' />
+              <div className='flex w-20 flex-shrink-0 items-center gap-1 text-xs font-medium text-tertiary-token'>
+                <MessageSquare className='h-3 w-3' aria-hidden />
                 Source
               </div>
               <span className='text-sm text-secondary-token'>
@@ -235,6 +239,6 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           )}
         </div>
       )}
-    </div>
+    </ContentSurfaceCard>
   );
 });
