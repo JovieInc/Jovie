@@ -284,7 +284,7 @@ export function DemoAnalyticsSidebar({
             onValueChange={value => setActiveTab(value as AnalyticsTab)}
             options={ANALYTICS_TAB_OPTIONS}
             className='flex-1'
-            aria-label='Analytics data tabs'
+            ariaLabel='Analytics data tabs'
           />
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>

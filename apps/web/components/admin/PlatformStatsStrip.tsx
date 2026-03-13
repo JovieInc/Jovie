@@ -1,5 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2 } from 'lucide-react';
+import { ContentMetricStat } from '@/components/molecules/ContentMetricStat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminPlatformStats } from '@/lib/admin/platform-stats';
 
@@ -14,12 +15,12 @@ interface StatItemProps {
 
 function StatItem({ value, label }: Readonly<StatItemProps>) {
   return (
-    <div className='space-y-1'>
-      <p className='text-3xl font-semibold tracking-tight text-primary-token'>
-        {value.toLocaleString('en-US')}
-      </p>
-      <p className='text-app text-secondary-token'>{label}</p>
-    </div>
+    <ContentMetricStat
+      label={label}
+      value={value.toLocaleString('en-US')}
+      valueClassName='text-[32px] font-[620] leading-none tracking-[-0.035em] text-(--linear-text-primary) tabular-nums'
+      labelClassName='text-[12px] leading-[17px] tracking-[-0.01em] text-(--linear-text-secondary)'
+    />
   );
 }
 

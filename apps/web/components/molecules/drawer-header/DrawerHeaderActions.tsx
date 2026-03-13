@@ -87,10 +87,10 @@ export function DrawerHeaderActions({
                 DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
                 'text-(--linear-text-tertiary)'
               )}
-              aria-label={action.label}
+              ariaLabel={action.label}
             >
               <Link href={action.href}>
-                <Icon className='h-3.5 w-3.5' />
+                <Icon className='h-3.5 w-3.5' aria-hidden='true' />
               </Link>
             </AppIconButton>
           );
@@ -109,7 +109,7 @@ export function DrawerHeaderActions({
                 ? 'text-success hover:text-success'
                 : 'text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
             )}
-            aria-label={action.label}
+            ariaLabel={action.label}
           >
             <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
               <DefaultIcon
@@ -119,6 +119,7 @@ export function DrawerHeaderActions({
                     ? 'scale-50 opacity-0'
                     : 'scale-100 opacity-100'
                 )}
+                aria-hidden='true'
               />
               {ActiveIcon && (
                 <ActiveIcon
@@ -128,6 +129,7 @@ export function DrawerHeaderActions({
                       ? 'scale-100 opacity-100'
                       : 'scale-50 opacity-0'
                   )}
+                  aria-hidden='true'
                 />
               )}
             </span>
@@ -143,9 +145,9 @@ export function DrawerHeaderActions({
               DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
               'text-(--linear-text-tertiary)'
             )}
-            aria-label='More actions'
+            ariaLabel='More actions'
           >
-            <MoreVertical className='h-3.5 w-3.5' />
+            <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
           </AppIconButton>
         </TableActionMenu>
       )}

@@ -46,7 +46,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
     <>
       <span
         aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-base shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'
+        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-base shadow-[0_0_0_3px_var(--linear-bg-surface-0)] group-hover:shadow-[0_0_0_3px_var(--linear-bg-surface-1)] group-focus-visible:shadow-[0_0_0_3px_var(--linear-bg-surface-1)]'
       >
         <span className='scale-90 text-(--linear-text-tertiary)'>
           {activity.icon}
@@ -75,7 +75,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         />
         <Link
           href={activity.href}
-          className='relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           {content}
         </Link>
@@ -89,7 +89,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         aria-hidden='true'
         className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle)'
       />
-      <div className='relative flex items-start gap-3 rounded-[8px] px-2 py-2'>
+      <div className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2'>
         {content}
       </div>
     </li>

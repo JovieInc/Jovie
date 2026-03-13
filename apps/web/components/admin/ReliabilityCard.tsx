@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
+import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
@@ -62,37 +63,26 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         className='px-5 py-3'
       />
       <div className='space-y-3 p-5 text-app text-secondary-token'>
-        <div className='flex items-center justify-between rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
-          <div className='flex items-center gap-2 font-medium text-(--linear-text-primary)'>
-            <CheckCircle2 className={`h-4 w-4 ${tone.iconClassName}`} />
-            Error rate
-          </div>
-          <span className='tabular-nums text-(--linear-text-primary)'>
-            {errorRateLabel}
-          </span>
-        </div>
-        <div className='flex items-center justify-between rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
-          <div className='flex items-center gap-2 font-medium text-(--linear-text-primary)'>
-            <Clock3 className={`h-4 w-4 ${tone.iconClassName}`} />
-            p95 latency
-          </div>
-          <span className='tabular-nums text-(--linear-text-primary)'>
-            {latencyLabel}
-          </span>
-        </div>
-        <div className='flex items-center justify-between rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
-          <div className='flex items-center gap-2 font-medium text-(--linear-text-primary)'>
-            {summary.incidents24h > 0 ? (
-              <AlertTriangle className={`h-4 w-4 ${tone.iconClassName}`} />
-            ) : (
-              <CheckCircle2 className='h-4 w-4 text-success' />
-            )}
-            Incidents (24h)
-          </div>
-          <span className='text-primary-token tabular-nums'>
-            {incidentsLabel}
-          </span>
-        </div>
+        <ContentMetricRow
+          label='Error rate'
+          value={errorRateLabel}
+          icon={CheckCircle2}
+          iconClassName={tone.iconClassName}
+        />
+        <ContentMetricRow
+          label='p95 latency'
+          value={latencyLabel}
+          icon={Clock3}
+          iconClassName={tone.iconClassName}
+        />
+        <ContentMetricRow
+          label='Incidents (24h)'
+          value={incidentsLabel}
+          icon={summary.incidents24h > 0 ? AlertTriangle : CheckCircle2}
+          iconClassName={
+            summary.incidents24h > 0 ? tone.iconClassName : 'text-success'
+          }
+        />
 
         {summary.lastIncidentAt && (
           <p className='pt-1 text-2xs text-tertiary-token'>

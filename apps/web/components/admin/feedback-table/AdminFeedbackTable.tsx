@@ -42,8 +42,12 @@ interface AdminFeedbackTableProps {
   readonly items: FeedbackRow[];
 }
 
+function getFeedbackUserLabel(user: FeedbackRow['user']): string {
+  return user.name ?? user.email ?? 'Unknown user';
+}
+
 function formatFeedbackAsMarkdown(item: FeedbackRow): string {
-  const userName = item.user.name ?? item.user.email ?? 'Unknown user';
+  const userName = getFeedbackUserLabel(item.user);
   const date = new Date(item.createdAtIso).toLocaleString();
   const context = (item.context as { pathname?: string })?.pathname;
 
@@ -66,7 +70,7 @@ function renderUserCell({ getValue }: { getValue: () => any }) {
   const user = getValue() as FeedbackRow['user'];
   return (
     <span className='font-medium text-primary-token'>
-      {user.name ?? user.email ?? 'Unknown user'}
+      {getFeedbackUserLabel(user)}
     </span>
   );
 }
@@ -256,7 +260,7 @@ export function AdminFeedbackTable({
               </p>
               <div className='space-y-0.5'>
                 <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-(--linear-text-primary)'>
-                  {selected.user.name ?? 'Unknown user'}
+                  {getFeedbackUserLabel(selected.user)}
                 </p>
                 <p className='truncate text-[12px] leading-[16px] text-(--linear-text-secondary)'>
                   {selected.user.email ?? 'No email available'}
@@ -308,7 +312,7 @@ export function AdminFeedbackTable({
                 <DrawerPropertyRow
                   label='User'
                   labelWidth={84}
-                  value={selected.user.name ?? 'Unknown user'}
+                  value={getFeedbackUserLabel(selected.user)}
                 />
                 <DrawerPropertyRow
                   label='Email'

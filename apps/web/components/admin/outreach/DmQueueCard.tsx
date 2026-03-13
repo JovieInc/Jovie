@@ -4,7 +4,9 @@ import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { cn } from '@/lib/utils';
 
 interface DmQueueLead {
   id: string;
@@ -56,9 +58,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
 
   return (
     <ContentSurfaceCard
-      className={`space-y-3 rounded-[10px] p-4 ${
-        markedDone ? 'opacity-50' : ''
-      }`}
+      className={cn('space-y-3 p-4', markedDone && 'opacity-50')}
     >
       <div className='flex items-start justify-between'>
         <div className='flex items-center gap-3'>
@@ -104,7 +104,10 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           size='sm'
           onClick={() => void handleCopy()}
           disabled={!lead.dmCopy || markedDone}
-          className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[12px] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className={cn(
+            APP_CONTROL_BUTTON_CLASS,
+            'h-8 rounded-[7px] px-3 text-[12px]'
+          )}
         >
           {copied ? (
             <Check className='mr-1.5 size-3.5' />
@@ -118,7 +121,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           size='sm'
           onClick={() => void handleMarkSent()}
           disabled={marking || markedDone}
-          className='h-8 rounded-[8px] px-3 text-[12px]'
+          className='h-8 rounded-[7px] px-3 text-[12px] font-[510]'
         >
           {marking ? (
             <Loader2 className='mr-1.5 size-3.5 animate-spin' />

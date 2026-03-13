@@ -390,7 +390,7 @@ export function ProfileContactSidebar() {
                     type='button'
                     variant='ghost'
                     className='h-8 w-8 shrink-0'
-                    aria-label='Open profile share options'
+                    ariaLabel='Open profile share options'
                   >
                     <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
                   </AppIconButton>
@@ -409,7 +409,7 @@ export function ProfileContactSidebar() {
             }
             options={PROFILE_TAB_OPTIONS}
             className='flex-1'
-            aria-label='Profile sidebar view'
+            ariaLabel='Profile sidebar view'
           />
           <div className='h-6 w-6 shrink-0'>
             {supportsAddAction && (
@@ -417,7 +417,7 @@ export function ProfileContactSidebar() {
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
                 className='h-7 w-7 border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
-                aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+                ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
                 <Plus className='h-4 w-4' />
               </AppIconButton>

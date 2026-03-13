@@ -197,7 +197,7 @@ export function TrackSidebar({
             value={activeTab}
             onValueChange={value => setActiveTab(value as TrackSidebarTab)}
             options={TRACK_SIDEBAR_TAB_OPTIONS}
-            aria-label='Track sidebar tabs'
+            ariaLabel='Track sidebar tabs'
           />
         ) : undefined
       }

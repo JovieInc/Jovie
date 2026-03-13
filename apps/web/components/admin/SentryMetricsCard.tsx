@@ -1,4 +1,5 @@
 import { AlertOctagon, Bug, Flame, Users } from 'lucide-react';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminSentryMetrics } from '@/lib/admin/sentry-metrics';
@@ -21,15 +22,14 @@ function MetricBlock({
   value,
 }: Readonly<MetricBlockProps>) {
   return (
-    <ContentSurfaceCard className='space-y-2 p-3'>
-      <p className='flex items-center gap-2 text-2xs text-secondary-token'>
-        <Icon className={`h-4 w-4 ${iconClassName}`} />
-        {label}
-      </p>
-      <p className='text-2xl font-semibold text-primary-token tabular-nums'>
-        {value}
-      </p>
-    </ContentSurfaceCard>
+    <ContentMetricCard
+      className='p-3'
+      label={label}
+      value={value}
+      icon={Icon}
+      iconClassName={iconClassName}
+      valueClassName='text-[26px] font-[620] leading-none tracking-[-0.028em] text-(--linear-text-primary) tabular-nums'
+    />
   );
 }
 

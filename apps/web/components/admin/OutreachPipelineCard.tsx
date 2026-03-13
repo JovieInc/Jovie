@@ -6,6 +6,8 @@ import {
   TrendingUp,
   UserCheck,
 } from 'lucide-react';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
@@ -38,15 +40,15 @@ function ConversionMetric({
   iconClassName,
 }: ConversionMetricProps) {
   return (
-    <div className='flex items-center justify-between'>
-      <div className='flex items-center gap-1.5'>
-        <Icon className={`size-3 ${iconClassName}`} />
-        <span className='text-2xs text-secondary-token'>{label}</span>
-      </div>
-      <span className='text-2xs font-semibold tabular-nums text-primary-token'>
-        {value}
-      </span>
-    </div>
+    <ContentMetricRow
+      label={label}
+      value={value}
+      icon={Icon}
+      iconClassName={iconClassName}
+      className='rounded-[8px] px-2.5 py-2'
+      labelClassName='text-[12px] font-[500] text-(--linear-text-secondary)'
+      valueClassName='text-[12px] font-[590] text-(--linear-text-primary) tabular-nums'
+    />
   );
 }
 
@@ -66,16 +68,16 @@ function PipelineStep({
   iconClassName,
 }: PipelineStepProps) {
   return (
-    <div className='flex-1 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3'>
-      <div className='flex items-center gap-1.5'>
-        <Icon className={`size-3.5 ${iconClassName}`} />
-        <span className='text-2xs text-tertiary-token'>{label}</span>
-      </div>
-      <p className='mt-1 text-xl font-semibold tabular-nums text-primary-token'>
-        {value}
-      </p>
-      <p className='text-2xs text-secondary-token'>{detail}</p>
-    </div>
+    <ContentMetricCard
+      className='flex-1 p-3'
+      label={label}
+      value={value}
+      subtitle={detail}
+      icon={Icon}
+      iconClassName={iconClassName}
+      valueClassName='text-[24px] font-[620] leading-none tracking-[-0.028em] text-(--linear-text-primary) tabular-nums'
+      subtitleClassName='text-[11px] leading-[16px] text-(--linear-text-secondary)'
+    />
   );
 }
 

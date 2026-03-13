@@ -59,17 +59,14 @@ function ActivityIcon({ action }: { readonly action: ActivityAction }) {
   );
 }
 
-const ACTIVITY_SKELETON_KEYS = Array.from(
-  { length: 4 },
-  (_, index) => `activity-skeleton-${index + 1}`
-);
-
 export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
+  const safeRows = Math.max(0, rows);
+
   return (
     <div className='space-y-1' aria-busy='true'>
-      {ACTIVITY_SKELETON_KEYS.slice(0, rows).map(key => (
+      {Array.from({ length: safeRows }, (_, index) => (
         <div
-          key={key}
+          key={`activity-skeleton-${index + 1}`}
           className='relative flex items-start gap-3 rounded-[8px] px-2 py-2'
           aria-hidden='true'
         >
@@ -127,7 +124,16 @@ export function ActivityFeed({
   isLoading = false,
 }: ActivityFeedProps) {
   if (isLoading) {
-    return <ActivityFeedSkeleton rows={4} />;
+    return (
+      <div
+        className='space-y-1'
+        role='feed'
+        aria-label='Activity feed'
+        aria-busy='true'
+      >
+        <ActivityFeedSkeleton rows={4} />
+      </div>
+    );
   }
 
   if (events.length === 0) {

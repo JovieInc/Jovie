@@ -8,6 +8,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
@@ -63,18 +64,13 @@ function MetricCard({
   iconClassName,
 }: MetricCardProps) {
   return (
-    <ContentSurfaceCard className='space-y-1.5 p-4'>
-      <div className='flex items-center gap-1.5'>
-        <Icon
-          className={`size-3.5 ${iconClassName ?? 'text-tertiary-token'}`}
-        />
-        <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
-      </div>
-      <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
-        {value}
-      </p>
-      <p className='text-app text-secondary-token'>{subtitle}</p>
-    </ContentSurfaceCard>
+    <ContentMetricCard
+      label={title}
+      value={value}
+      subtitle={subtitle}
+      icon={Icon}
+      iconClassName={iconClassName}
+    />
   );
 }
 

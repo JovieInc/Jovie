@@ -70,7 +70,7 @@ export function DashboardHeaderActionButton({
   return (
     <AppIconButton
       onClick={onClick}
-      aria-label={ariaLabel}
+      ariaLabel={ariaLabel}
       aria-pressed={pressed}
       disabled={disabled}
       className={cn(

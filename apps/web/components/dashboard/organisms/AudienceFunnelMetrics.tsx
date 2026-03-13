@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronRight } from 'lucide-react';
+import { ContentMetricStat } from '@/components/molecules/ContentMetricStat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -33,19 +34,15 @@ function FunnelStep({
   }
 
   return (
-    <div className='flex-1 min-w-0'>
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token truncate'>
-        {label}
-      </p>
-      <p className='mt-1 text-lg font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
-        {value}
-      </p>
-      {rate && (
-        <p className='mt-0.5 text-[11px] text-tertiary-token tabular-nums'>
-          {rate}
-        </p>
-      )}
-    </div>
+    <ContentMetricStat
+      className='flex-1 min-w-0'
+      label={label}
+      value={value}
+      subtitle={rate}
+      labelClassName='truncate text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'
+      valueClassName='text-[20px] font-[590] leading-none tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'
+      subtitleClassName='text-[11px] text-(--linear-text-tertiary) tabular-nums'
+    />
   );
 }
 

@@ -8,8 +8,7 @@ export interface DrawerTabsProps<T extends string> {
   readonly value: T;
   readonly onValueChange: (value: T) => void;
   readonly options: readonly SegmentControlOption<T>[];
-  readonly ariaLabel?: string;
-  readonly 'aria-label'?: string;
+  readonly ariaLabel: string;
   readonly className?: string;
   readonly triggerClassName?: string;
 }
@@ -19,7 +18,6 @@ export function DrawerTabs<T extends string>({
   onValueChange,
   options,
   ariaLabel,
-  'aria-label': ariaLabelProp,
   className,
   triggerClassName,
 }: DrawerTabsProps<T>) {
@@ -28,7 +26,7 @@ export function DrawerTabs<T extends string>({
       value={value}
       onValueChange={onValueChange}
       options={options}
-      aria-label={ariaLabel ?? ariaLabelProp}
+      aria-label={ariaLabel}
       className={cn('w-full', className)}
       triggerClassName={cn('h-[34px] px-3.5 text-[12.5px]', triggerClassName)}
     />

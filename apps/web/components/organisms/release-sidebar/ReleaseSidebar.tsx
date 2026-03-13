@@ -476,7 +476,7 @@ export function ReleaseSidebar({
             value={activeTab}
             onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
-            aria-label='Release sidebar view'
+            ariaLabel='Release sidebar view'
           />
         ) : undefined
       }

@@ -18,7 +18,7 @@ export const HeaderIconButton = React.forwardRef<
   HTMLButtonElement,
   HeaderIconButtonProps
 >(function HeaderIconButton(
-  { children, ariaLabel, size = 'md', ...props },
+  { children, ariaLabel, size = 'md', className, ...props },
   ref
 ) {
   const SIZE_CLASS_MAP: Record<HeaderIconButtonSize, string> = {
@@ -30,8 +30,8 @@ export const HeaderIconButton = React.forwardRef<
   return (
     <AppIconButton
       ref={ref}
-      className={SIZE_CLASS_MAP[size]}
-      aria-label={ariaLabel}
+      className={[SIZE_CLASS_MAP[size], className].filter(Boolean).join(' ')}
+      ariaLabel={ariaLabel}
       {...props}
     >
       {children}
