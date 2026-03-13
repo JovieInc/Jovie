@@ -4,6 +4,7 @@ import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
 import {
@@ -52,11 +53,14 @@ export function SettingsProfileSection({
     <DashboardCard
       variant='settings'
       padding='none'
-      className='relative divide-y divide-subtle'
+      className='overflow-hidden divide-y divide-subtle'
     >
-      <SettingsStatusPill
-        status={profileSaveStatus}
-        className='absolute right-5 top-4'
+      <ContentSectionHeader
+        title='Profile identity'
+        subtitle='Control the display name, username, and public profile image fans see.'
+        className='min-h-0 px-4 py-3'
+        actions={<SettingsStatusPill status={profileSaveStatus} />}
+        actionsClassName='w-auto shrink-0'
       />
 
       {/* Profile picture row */}
