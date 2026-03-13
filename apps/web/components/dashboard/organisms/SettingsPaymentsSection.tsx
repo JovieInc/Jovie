@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, CreditCard, Unlink } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface StripeConnectStatus {
   connected: boolean;
@@ -100,9 +101,11 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <p className='text-[13px] text-secondary-token'>
-            Loading payment settings...
-          </p>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
+              Loading payment settings...
+            </p>
+          </ContentSurfaceCard>
         </div>
       </DashboardCard>
     );
@@ -122,7 +125,9 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <p className='text-[13px] text-red-500'>{error}</p>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+            <p className='text-[13px] text-error'>{error}</p>
+          </ContentSurfaceCard>
         </div>
       </DashboardCard>
     );
@@ -142,20 +147,22 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3 space-y-3'>
-          <div className='flex items-start gap-3'>
-            <CreditCard className='h-5 w-5 text-secondary-token mt-0.5 shrink-0' />
-            <div className='flex-1'>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Connect with Stripe
-              </p>
-              <p className='text-[13px] text-secondary-token mt-1'>
-                Set up Stripe Connect to receive payments directly from fans.
-                Stripe handles all payment processing, payouts, and tax
-                reporting.
-              </p>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+            <div className='flex items-start gap-3'>
+              <CreditCard className='mt-0.5 h-5 w-5 shrink-0 text-(--linear-text-secondary)' />
+              <div className='flex-1'>
+                <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                  Connect with Stripe
+                </p>
+                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                  Set up Stripe Connect to receive payments directly from fans.
+                  Stripe handles all payment processing, payouts, and tax
+                  reporting.
+                </p>
+              </div>
             </div>
-          </div>
-          {error && <p className='text-[13px] text-red-500'>{error}</p>}
+            {error && <p className='mt-3 text-[13px] text-error'>{error}</p>}
+          </ContentSurfaceCard>
           <Button
             onClick={handleConnect}
             loading={isActionLoading || undefined}
@@ -184,19 +191,21 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3 space-y-3'>
-          <div className='flex items-start gap-3'>
-            <AlertTriangle className='h-5 w-5 text-amber-500 mt-0.5 shrink-0' />
-            <div className='flex-1'>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Stripe Setup Incomplete
-              </p>
-              <p className='text-[13px] text-secondary-token mt-1'>
-                Your Stripe account is connected but onboarding is not complete.
-                Finish setup to start receiving payments.
-              </p>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+            <div className='flex items-start gap-3'>
+              <AlertTriangle className='mt-0.5 h-5 w-5 shrink-0 text-warning' />
+              <div className='flex-1'>
+                <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                  Stripe setup incomplete
+                </p>
+                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                  Your Stripe account is connected but onboarding is not
+                  complete. Finish setup to start receiving payments.
+                </p>
+              </div>
             </div>
-          </div>
-          {error && <p className='text-[13px] text-red-500'>{error}</p>}
+            {error && <p className='mt-3 text-[13px] text-error'>{error}</p>}
+          </ContentSurfaceCard>
           <div className='flex gap-2'>
             <Button
               onClick={handleConnect}
@@ -234,25 +243,27 @@ export function SettingsPaymentsSection() {
         className='min-h-0 px-4 py-3'
       />
       <div className='px-4 py-3 space-y-3'>
-        <div className='flex items-start gap-3'>
-          <CheckCircle2 className='h-5 w-5 text-green-500 mt-0.5 shrink-0' />
-          <div className='flex-1'>
-            <p className='text-[13px] font-[510] text-primary-token'>
-              Stripe Connected
-            </p>
-            <p className='text-[13px] text-secondary-token mt-1'>
-              {status.payoutsEnabled
-                ? 'Payouts are enabled. You are ready to receive payments.'
-                : 'Account connected. Payouts are being reviewed by Stripe.'}
-            </p>
-            {status.email && (
-              <p className='text-[13px] text-secondary-token mt-1'>
-                Payout email: {status.email}
+        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+          <div className='flex items-start gap-3'>
+            <CheckCircle2 className='mt-0.5 h-5 w-5 shrink-0 text-success' />
+            <div className='flex-1'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                Stripe connected
               </p>
-            )}
+              <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                {status.payoutsEnabled
+                  ? 'Payouts are enabled. You are ready to receive payments.'
+                  : 'Account connected. Payouts are being reviewed by Stripe.'}
+              </p>
+              {status.email && (
+                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                  Payout email: {status.email}
+                </p>
+              )}
+            </div>
           </div>
-        </div>
-        {error && <p className='text-[13px] text-red-500'>{error}</p>}
+          {error && <p className='mt-3 text-[13px] text-error'>{error}</p>}
+        </ContentSurfaceCard>
         <Button
           onClick={handleDisconnect}
           loading={isActionLoading || undefined}
