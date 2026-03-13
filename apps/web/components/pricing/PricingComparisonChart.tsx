@@ -15,8 +15,8 @@ function CellValue({
   value,
   comingSoon,
 }: {
-  value: boolean | string;
-  comingSoon?: boolean;
+  readonly value: boolean | string;
+  readonly comingSoon?: boolean;
 }) {
   if (typeof value === 'string') {
     return (
@@ -76,7 +76,7 @@ function CellValue({
   );
 }
 
-function FeatureRow({ feature }: { feature: ComparisonFeature }) {
+function FeatureRow({ feature }: { readonly feature: ComparisonFeature }) {
   return (
     <tr
       className='border-b'
@@ -137,9 +137,9 @@ export function PricingComparisonChart() {
         <span
           className='text-[13px] font-medium'
           style={{
-            color: !isAnnual
-              ? 'var(--linear-text-primary)'
-              : 'var(--linear-text-tertiary)',
+            color: isAnnual
+              ? 'var(--linear-text-tertiary)'
+              : 'var(--linear-text-primary)',
           }}
         >
           Monthly
