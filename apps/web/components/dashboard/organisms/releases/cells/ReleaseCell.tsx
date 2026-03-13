@@ -60,6 +60,7 @@ export const ReleaseCell = memo(function ReleaseCell({
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
+            aria-pressed={isPlaying}
           >
             {isPlaying ? (
               <Pause className='h-[9px] w-[9px]' />
@@ -76,7 +77,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         <div className='flex min-w-0 items-center gap-1 leading-none'>
           <TruncatedText
             lines={1}
-            className='text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
+            className='min-w-0 flex-1 text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
             tooltipSide='top'
             tooltipAlign='start'
           >

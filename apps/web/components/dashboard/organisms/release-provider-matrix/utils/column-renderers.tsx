@@ -262,6 +262,8 @@ export function createRightMetaCellRenderer(
       ? new Date(release.releaseDate).getFullYear()
       : null;
     const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
+    const yearLabel = year === null ? '—' : String(year);
+    const yearTitle = year === null ? 'Unknown release year' : String(year);
 
     return (
       <div className='grid min-w-[186px] grid-cols-[minmax(0,1fr)_16px_50px] items-center justify-end gap-x-2 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
@@ -277,8 +279,11 @@ export function createRightMetaCellRenderer(
           <PopularityIcon popularity={release.spotifyPopularity} />
         </div>
 
-        <span className='hidden w-[50px] text-right tabular-nums text-[11.5px] text-(--linear-text-tertiary) sm:block'>
-          {year ?? 'Unknown'}
+        <span
+          className='hidden w-[50px] text-right tabular-nums text-[11.5px] text-(--linear-text-tertiary) sm:block'
+          title={yearTitle}
+        >
+          {yearLabel}
         </span>
       </div>
     );

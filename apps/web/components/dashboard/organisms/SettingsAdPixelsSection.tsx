@@ -330,33 +330,47 @@ export function SettingsAdPixelsSection({
 
   if (!isPro) {
     return (
-      <DashboardCard variant='settings' className='overflow-hidden'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
         <ContentSectionHeader
           title='Pixel tracking'
           subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
           className='min-h-0 px-4 py-3'
         />
-        <SettingsToggleRow
-          title='Pixel tracking'
-          description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-          checked={false}
-          onCheckedChange={() => {}}
-          ariaLabel='Pixel tracking'
-          gated
-        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+            <SettingsToggleRow
+              title='Pixel tracking'
+              description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
+              checked={false}
+              onCheckedChange={() => {}}
+              ariaLabel='Pixel tracking'
+              gated
+            />
+          </ContentSurfaceCard>
+        </div>
       </DashboardCard>
     );
   }
 
   if (isLoading) {
     return (
-      <DashboardCard variant='settings' className='overflow-hidden'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
         <ContentSectionHeader
           title='Pixel tracking'
           subtitle='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
           className='min-h-0 px-4 py-3'
         />
-        <PixelsSectionSkeleton />
+        <div className='px-4 py-3'>
+          <PixelsSectionSkeleton />
+        </div>
       </DashboardCard>
     );
   }
@@ -381,7 +395,7 @@ export function SettingsAdPixelsSection({
       <DashboardCard
         variant='settings'
         padding='none'
-        className='overflow-hidden divide-y divide-(--linear-border-subtle)'
+        className='overflow-hidden'
       >
         <ContentSectionHeader
           title='Pixel tracking'
@@ -404,22 +418,22 @@ export function SettingsAdPixelsSection({
           }
         />
 
-        {!hasAnyPixels && (
-          <div className='px-4 py-4 text-center'>
-            <p className='text-[13px] text-secondary-token'>
-              No tracking pixels configured. Add your first pixel to start
-              tracking conversions.
+        <div className='space-y-3 px-4 py-3'>
+          {!hasAnyPixels && (
+            <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-6 py-5 text-center'>
+              <p className='text-[13px] leading-[18px] text-secondary-token'>
+                No tracking pixels configured yet. Add your first destination to
+                start tracking conversions.
+              </p>
+            </ContentSurfaceCard>
+          )}
+
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+            <p className='text-[13px] leading-[18px] text-secondary-token'>
+              Configure each retargeting destination independently.
             </p>
-          </div>
-        )}
+          </ContentSurfaceCard>
 
-        <div className='space-y-2 px-4 pt-3'>
-          <p className='text-[13px] text-secondary-token'>
-            Configure each retargeting destination independently.
-          </p>
-        </div>
-
-        <div className='space-y-4 px-4 pb-3'>
           <PlatformSection
             platform='Facebook Conversions API'
             description='Track profile views and link clicks in Meta Ads Manager.'
@@ -496,13 +510,14 @@ export function SettingsAdPixelsSection({
               handleInputChange('tiktokAccessToken', value)
             }
           />
-        </div>
 
-        <div className='px-4 py-3'>
-          <p className='text-[13px] text-secondary-token'>
-            Events are sent server-side for better accuracy. No third-party
-            JavaScript on your profile. Credentials are encrypted.
-          </p>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+            <p className='text-[13px] leading-[18px] text-secondary-token'>
+              Events are sent server-side for better accuracy. No third-party
+              JavaScript is injected on your profile, and credentials are
+              encrypted.
+            </p>
+          </ContentSurfaceCard>
         </div>
       </DashboardCard>
 
