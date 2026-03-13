@@ -268,6 +268,7 @@ export const DashboardAudienceTableUnified = memo(
     // Quick action: view member profile (opens contact sidebar)
     const {
       mode: panelMode,
+      toggle,
       open: openPanel,
       close: closePanel,
     } = useAudiencePanel();
@@ -538,6 +539,8 @@ export const DashboardAudienceTableUnified = memo(
               subscriberCount={subscriberCount}
               totalAudienceCount={totalAudienceCount}
               total={total}
+              panelMode={panelMode}
+              onTogglePanel={toggle}
             />
 
             <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>

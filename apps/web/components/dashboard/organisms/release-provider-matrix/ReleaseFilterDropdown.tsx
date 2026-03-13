@@ -19,6 +19,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
+import { PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS } from '@/components/organisms/table';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';
@@ -377,6 +378,7 @@ interface ReleaseFilterDropdownProps {
   readonly onFiltersChange: (filters: ReleaseFilters) => void;
   readonly counts: ReleaseFilterCounts;
   readonly buttonClassName?: string;
+  readonly iconOnly?: boolean;
 }
 
 const FILTER_TRIGGER_ACTIVE_CLASS =
@@ -387,6 +389,7 @@ export function ReleaseFilterDropdown({
   onFiltersChange,
   counts,
   buttonClassName,
+  iconOnly = false,
 }: ReleaseFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mainSearch, setMainSearch] = useState('');
@@ -500,13 +503,18 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
+                iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
                 buttonClassName,
                 (isOpen || hasAnyFilter) && FILTER_TRIGGER_ACTIVE_CLASS
               )}
               aria-pressed={isOpen || hasAnyFilter}
             >
               <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2} />
-              <span className='sr-only md:not-sr-only'>Filter</span>
+              <span
+                className={cn(iconOnly ? 'sr-only' : 'sr-only md:not-sr-only')}
+              >
+                Filter
+              </span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>

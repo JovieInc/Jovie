@@ -28,6 +28,9 @@ export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   'h-8 rounded-[6px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
+export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
+  'w-8 justify-center px-0';
+
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
   'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
@@ -103,9 +106,12 @@ interface PageToolbarActionButtonProps {
   readonly label: ReactNode;
   readonly icon?: ReactNode;
   readonly active?: boolean;
+  readonly disabled?: boolean;
   readonly onClick?: () => void;
   readonly className?: string;
   readonly ariaPressed?: boolean;
+  readonly ariaLabel?: string;
+  readonly iconOnly?: boolean;
   readonly tooltipLabel?: string;
   readonly tooltipShortcut?: string;
 }
@@ -114,9 +120,12 @@ export function PageToolbarActionButton({
   label,
   icon,
   active = false,
+  disabled = false,
   onClick,
   className,
   ariaPressed,
+  ariaLabel,
+  iconOnly = false,
   tooltipLabel,
   tooltipShortcut,
 }: PageToolbarActionButtonProps) {
@@ -126,15 +135,22 @@ export function PageToolbarActionButton({
       variant='ghost'
       size='sm'
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+        iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
         active && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
         className
       )}
+      aria-label={
+        ariaLabel ??
+        tooltipLabel ??
+        (typeof label === 'string' ? label : undefined)
+      }
       aria-pressed={ariaPressed ?? active}
     >
       {icon}
-      <span>{label}</span>
+      <span className={cn(iconOnly && 'sr-only')}>{label}</span>
     </Button>
   );
 

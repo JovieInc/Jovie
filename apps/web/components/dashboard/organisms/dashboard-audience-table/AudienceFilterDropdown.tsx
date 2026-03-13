@@ -14,6 +14,7 @@ import { Icon } from '@/components/atoms/Icon';
 import {
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
 } from '@/components/organisms/table';
@@ -129,12 +130,14 @@ interface AudienceFilterDropdownProps {
   readonly filters: AudienceFilters;
   readonly onFiltersChange: (filters: AudienceFilters) => void;
   readonly buttonClassName?: string;
+  readonly iconOnly?: boolean;
 }
 
 export function AudienceFilterDropdown({
   filters,
   onFiltersChange,
   buttonClassName,
+  iconOnly = false,
 }: AudienceFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -172,6 +175,7 @@ export function AudienceFilterDropdown({
               size='sm'
               className={cn(
                 PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
                 (isOpen || hasAnyFilter) && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
                 buttonClassName
               )}
@@ -182,7 +186,11 @@ export function AudienceFilterDropdown({
                 className={PAGE_TOOLBAR_ICON_CLASS}
                 strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
               />
-              <span className='sr-only md:not-sr-only'>Filter</span>
+              <span
+                className={cn(iconOnly ? 'sr-only' : 'sr-only md:not-sr-only')}
+              >
+                Filter
+              </span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>

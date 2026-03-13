@@ -13,10 +13,12 @@ import { memo, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import {
   ExportCSVButton,
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
@@ -220,6 +222,7 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
               triggerClassName
             )}
@@ -229,9 +232,7 @@ function LinearStyleDisplayMenu({
               className={PAGE_TOOLBAR_ICON_CLASS}
               strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
             />
-            <span className={cn(compact && 'sr-only md:not-sr-only')}>
-              Display
-            </span>
+            <span className={cn(compact && 'sr-only')}>Display</span>
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
@@ -313,7 +314,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
         <>
           {onSearchToggle ? (
             <PageToolbarActionButton
-              label={<span className='sr-only md:not-sr-only'>Search</span>}
+              label='Search'
+              ariaLabel='Search releases'
               icon={
                 <Icon
                   name='Search'
@@ -324,6 +326,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
               onClick={onSearchToggle}
               active={isSearchOpen}
               ariaPressed={isSearchOpen}
+              iconOnly
               tooltipLabel='Search'
             />
           ) : null}
@@ -332,6 +335,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             onFiltersChange={onFiltersChange}
             counts={counts}
             buttonClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+            iconOnly
           />
           <LinearStyleDisplayMenu
             groupByYear={groupByYear}
@@ -349,9 +353,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             variant='ghost'
             size='sm'
             chrome='page-toolbar'
-            className='hidden md:inline-flex'
+            iconOnly
             tooltipLabel='Export'
           />
+          <DrawerToggleButton chrome='page-toolbar' />
         </>
       }
     />

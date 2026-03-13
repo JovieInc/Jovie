@@ -20,7 +20,6 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
-import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import {
   DrawerButton,
@@ -511,9 +510,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup>
-        {canCreateManualReleases ? (
+    () =>
+      canCreateManualReleases ? (
+        <DashboardHeaderActionGroup>
           <DashboardHeaderActionButton
             ariaLabel='Create a new release'
             onClick={handleNewRelease}
@@ -521,10 +520,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             label='New Release'
             hideLabelOnMobile
           />
-        ) : null}
-        <DrawerToggleButton />
-      </DashboardHeaderActionGroup>
-    ),
+        </DashboardHeaderActionGroup>
+      ) : null,
     [canCreateManualReleases, handleNewRelease]
   );
 
