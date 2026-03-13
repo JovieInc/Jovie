@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
+import { SettingsGroupHeading } from '@/components/dashboard/molecules/SettingsGroupHeading';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/components/dashboard/organisms/DataPrivacySection';
 import { SettingsAdminSection } from '@/components/dashboard/organisms/SettingsAdminSection';
@@ -17,6 +18,7 @@ import { SettingsPaymentsSection } from '@/components/dashboard/organisms/Settin
 import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { SettingsTouringSection } from '@/components/dashboard/organisms/SettingsTouringSection';
 import { SettingsArtistProfileSection } from '@/components/dashboard/organisms/settings-artist-profile-section';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { publicEnv } from '@/lib/env-public';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
@@ -50,15 +52,22 @@ export function SettingsPolished({
         {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
           <AccountSettingsSection isGrowth={isGrowth} />
         ) : (
-          <DashboardCard variant='settings'>
-            <div className='text-center py-4'>
-              <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
-                Account settings unavailable
-              </h3>
-              <p className='text-[13px] text-secondary'>
-                Clerk is not configured (missing publishable key). Set
-                NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
-              </p>
+          <DashboardCard
+            variant='settings'
+            padding='none'
+            className='overflow-hidden'
+          >
+            <div className='px-4 py-3'>
+              <ContentSurfaceCard className='px-6 py-8 text-center bg-(--linear-bg-surface-0)'>
+                <h3 className='mb-2 text-[14px] font-[510] text-primary-token'>
+                  Account settings unavailable
+                </h3>
+                <p className='text-[13px] text-secondary'>
+                  Clerk is not configured (missing publishable key). Set
+                  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account
+                  management.
+                </p>
+              </ContentSurfaceCard>
             </div>
           </DashboardCard>
         )}
@@ -214,7 +223,7 @@ export function SettingsPolished({
     <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
       {/* General settings */}
       <div className='space-y-6'>
-        <h3 className='text-[13px] font-[510] text-secondary-token'>General</h3>
+        <SettingsGroupHeading>General</SettingsGroupHeading>
         {userSections.map(section => (
           <SettingsSection
             key={section.id}
@@ -230,7 +239,7 @@ export function SettingsPolished({
 
       {/* Artist settings */}
       <div className='space-y-6'>
-        <h3 className='text-[13px] font-[510] text-secondary-token'>Artist</h3>
+        <SettingsGroupHeading>Artist</SettingsGroupHeading>
         {artistSections.map(section => (
           <SettingsSection
             key={section.id}
@@ -247,7 +256,7 @@ export function SettingsPolished({
       {/* Admin settings - only visible to admin users */}
       {adminSections.length > 0 && (
         <div className='space-y-6'>
-          <h3 className='text-[13px] font-[510] text-secondary-token'>Admin</h3>
+          <SettingsGroupHeading>Admin</SettingsGroupHeading>
           {adminSections.map(section => (
             <SettingsSection
               key={section.id}
