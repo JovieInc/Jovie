@@ -414,10 +414,10 @@ function ConnectedDspListContent({
       <div className='space-y-3 px-4 py-3'>
         <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
           <div className='space-y-1'>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
               Primary platforms
             </p>
-            <p className='text-[13px] leading-[18px] text-secondary-token'>
+            <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
               Connect your Spotify and Apple Music artist profiles.
             </p>
           </div>
@@ -433,7 +433,7 @@ function ConnectedDspListContent({
               className='h-8 w-8 text-(--linear-text-tertiary)'
               aria-hidden
             />
-            <p className='text-[13px] text-secondary-token'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
               Click a platform above to connect your streaming profiles.
             </p>
           </ContentSurfaceCard>
@@ -442,10 +442,10 @@ function ConnectedDspListContent({
         {nonPrimaryMatches.length > 0 ? (
           <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
             <div className='space-y-1'>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
                 Other platforms
               </p>
-              <p className='text-[13px] leading-[18px] text-secondary-token'>
+              <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
                 Secondary DSP matches connected to this profile.
               </p>
             </div>
