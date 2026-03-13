@@ -12,6 +12,9 @@ export interface ContentSurfaceCardProps {
   readonly role?: string;
   readonly 'data-testid'?: string;
   readonly 'aria-hidden'?: ComponentPropsWithoutRef<'div'>['aria-hidden'];
+  readonly 'aria-live'?: ComponentPropsWithoutRef<'div'>['aria-live'];
+  readonly inert?: ComponentPropsWithoutRef<'div'>['inert'];
+  readonly style?: ComponentPropsWithoutRef<'div'>['style'];
 }
 
 export function ContentSurfaceCard({
