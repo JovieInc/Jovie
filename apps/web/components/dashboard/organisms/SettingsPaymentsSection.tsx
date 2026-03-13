@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, CreditCard, Unlink } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 
 interface StripeConnectStatus {
   connected: boolean;
@@ -88,7 +89,16 @@ export function SettingsPaymentsSection() {
 
   if (isLoading) {
     return (
-      <DashboardCard variant='settings' padding='none'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Stripe payouts'
+          subtitle='Connect Stripe to receive fan payments directly through Jovie.'
+          className='min-h-0 px-4 py-3'
+        />
         <div className='px-4 py-3'>
           <p className='text-[13px] text-secondary-token'>
             Loading payment settings...
@@ -101,7 +111,16 @@ export function SettingsPaymentsSection() {
   // Error state
   if (error && !status) {
     return (
-      <DashboardCard variant='settings' padding='none'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Stripe payouts'
+          subtitle='Connect Stripe to receive fan payments directly through Jovie.'
+          className='min-h-0 px-4 py-3'
+        />
         <div className='px-4 py-3'>
           <p className='text-[13px] text-red-500'>{error}</p>
         </div>
@@ -112,7 +131,16 @@ export function SettingsPaymentsSection() {
   // Not connected
   if (!status?.connected) {
     return (
-      <DashboardCard variant='settings' padding='none'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Stripe payouts'
+          subtitle='Connect Stripe to receive fan payments directly through Jovie.'
+          className='min-h-0 px-4 py-3'
+        />
         <div className='px-4 py-3 space-y-3'>
           <div className='flex items-start gap-3'>
             <CreditCard className='h-5 w-5 text-secondary-token mt-0.5 shrink-0' />
@@ -130,7 +158,7 @@ export function SettingsPaymentsSection() {
           {error && <p className='text-[13px] text-red-500'>{error}</p>}
           <Button
             onClick={handleConnect}
-            loading={isActionLoading}
+            loading={isActionLoading || undefined}
             variant='primary'
             size='sm'
             className='w-full sm:w-auto'
@@ -145,7 +173,16 @@ export function SettingsPaymentsSection() {
   // Connected but onboarding incomplete
   if (!status.onboardingComplete) {
     return (
-      <DashboardCard variant='settings' padding='none'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Stripe payouts'
+          subtitle='Finish Stripe onboarding to enable payouts and collect payments.'
+          className='min-h-0 px-4 py-3'
+        />
         <div className='px-4 py-3 space-y-3'>
           <div className='flex items-start gap-3'>
             <AlertTriangle className='h-5 w-5 text-amber-500 mt-0.5 shrink-0' />
@@ -163,7 +200,7 @@ export function SettingsPaymentsSection() {
           <div className='flex gap-2'>
             <Button
               onClick={handleConnect}
-              loading={isActionLoading}
+              loading={isActionLoading || undefined}
               variant='primary'
               size='sm'
             >
@@ -171,7 +208,7 @@ export function SettingsPaymentsSection() {
             </Button>
             <Button
               onClick={handleDisconnect}
-              loading={isActionLoading}
+              loading={isActionLoading || undefined}
               variant='ghost'
               size='sm'
             >
@@ -186,7 +223,16 @@ export function SettingsPaymentsSection() {
 
   // Connected and active
   return (
-    <DashboardCard variant='settings' padding='none'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='overflow-hidden'
+    >
+      <ContentSectionHeader
+        title='Stripe payouts'
+        subtitle='Stripe is connected and ready to handle fan payments.'
+        className='min-h-0 px-4 py-3'
+      />
       <div className='px-4 py-3 space-y-3'>
         <div className='flex items-start gap-3'>
           <CheckCircle2 className='h-5 w-5 text-green-500 mt-0.5 shrink-0' />
@@ -209,7 +255,7 @@ export function SettingsPaymentsSection() {
         {error && <p className='text-[13px] text-red-500'>{error}</p>}
         <Button
           onClick={handleDisconnect}
-          loading={isActionLoading}
+          loading={isActionLoading || undefined}
           variant='ghost'
           size='sm'
         >
