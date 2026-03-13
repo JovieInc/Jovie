@@ -29,8 +29,9 @@ import {
   syncFromBandsintown,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import {
   Dialog,
@@ -70,18 +71,46 @@ export function SettingsTouringSection({
 
   if (isLoading) {
     return (
-      <DashboardCard variant='settings'>
-        <TouringSectionSkeleton />
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Bandsintown'
+          subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <TouringSectionSkeleton />
+        </div>
       </DashboardCard>
     );
   }
 
   if (isError) {
     return (
-      <SettingsErrorState
-        message='Failed to load connection status.'
-        onRetry={() => refetch()}
-      />
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Bandsintown'
+          subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-3.5'>
+            <p className='text-[13px] text-secondary-token'>
+              Failed to load connection status.
+            </p>
+            <Button variant='ghost' size='sm' onClick={() => refetch()}>
+              Try again
+            </Button>
+          </ContentSurfaceCard>
+        </div>
+      </DashboardCard>
     );
   }
 
@@ -127,23 +156,41 @@ export function SettingsTouringSection({
   };
 
   return (
-    <DashboardCard variant='settings'>
-      <div className='space-y-4'>
-        <p className='text-[13px] text-secondary-token'>
-          Tour dates will appear on your public profile when connected.
-        </p>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='overflow-hidden'
+    >
+      <ContentSectionHeader
+        title='Bandsintown'
+        subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
+        className='min-h-0 px-4 py-3'
+      />
+      <div className='px-4 py-3'>
+        <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
+          <div className='space-y-1'>
+            <p className='text-[13px] font-[510] text-primary-token'>
+              {isConnected
+                ? 'Bandsintown connected'
+                : 'Bandsintown not connected'}
+            </p>
+            <p className='text-[13px] leading-[18px] text-secondary-token'>
+              Tour dates will appear on your public profile when connected.
+            </p>
+          </div>
 
-        <div className='flex flex-wrap items-center gap-2'>
-          <BandsintownConnectionPill
-            connected={isConnected}
-            artistName={connectedArtist}
-            lastSyncedAt={lastSyncedAt}
-            isSyncing={isSyncing}
-            onConnect={() => setConnectDialogOpen(true)}
-            onSyncNow={handleSyncNow}
-            onDisconnect={() => setDisconnectDialogOpen(true)}
-          />
-        </div>
+          <div className='flex flex-wrap items-center gap-2'>
+            <BandsintownConnectionPill
+              connected={isConnected}
+              artistName={connectedArtist}
+              lastSyncedAt={lastSyncedAt}
+              isSyncing={isSyncing}
+              onConnect={() => setConnectDialogOpen(true)}
+              onSyncNow={handleSyncNow}
+              onDisconnect={() => setDisconnectDialogOpen(true)}
+            />
+          </div>
+        </ContentSurfaceCard>
       </div>
 
       <BandsintownConnectDialog
