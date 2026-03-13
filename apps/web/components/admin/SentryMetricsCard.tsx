@@ -23,12 +23,13 @@ function MetricBlock({
 }: Readonly<MetricBlockProps>) {
   return (
     <ContentMetricCard
-      className='p-3'
+      className='p-3.5'
       label={label}
       value={value}
       icon={Icon}
       iconClassName={iconClassName}
-      valueClassName='text-[26px] font-[620] leading-none tracking-[-0.028em] text-(--linear-text-primary) tabular-nums'
+      bodyClassName='space-y-1'
+      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.032em] text-(--linear-text-primary) tabular-nums'
     />
   );
 }
@@ -69,7 +70,7 @@ export function SentryMetricsCard({
         className='px-5 py-3'
       />
       <div className='space-y-4 p-5 pt-4'>
-        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
           <MetricBlock
             icon={Bug}
             iconClassName='text-info'
@@ -96,12 +97,17 @@ export function SentryMetricsCard({
           />
         </div>
 
-        <p
-          className='truncate text-2xs text-tertiary-token'
-          title={topIssueLabel}
-        >
-          {topIssueLabel}
-        </p>
+        <ContentSurfaceCard className='p-3.5'>
+          <p className='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'>
+            Top unresolved issue
+          </p>
+          <p
+            className='mt-1 truncate text-[12px] leading-[18px] text-(--linear-text-secondary)'
+            title={topIssueLabel}
+          >
+            {topIssueLabel}
+          </p>
+        </ContentSurfaceCard>
       </div>
     </ContentSurfaceCard>
   );

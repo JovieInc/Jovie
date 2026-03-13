@@ -4,6 +4,7 @@ import { Button, Textarea } from '@jovie/ui';
 import { Loader2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface UnifiedUrlIntakeProps {
@@ -55,18 +56,13 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
   }
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      className='rounded-none border-0 border-b border-(--linear-border-subtle) p-4 sm:p-6'
-    >
-      <h2 className='text-sm font-semibold text-primary-token'>
-        Unified URL intake
-      </h2>
-      <p className='mt-1 text-xs text-secondary-token'>
-        Paste Linktree, Spotify, Instagram, Apple Music, or website URLs. The
-        pipeline classifies and queues them in one place.
-      </p>
-      <div className='mt-3 space-y-3'>
+    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Unified URL intake'
+        subtitle='Paste Linktree, Spotify, Instagram, Apple Music, or website URLs. The pipeline classifies and queues them in one place.'
+        className='px-5 py-3'
+      />
+      <div className='space-y-3 px-5 py-4'>
         <Textarea
           rows={5}
           value={input}
@@ -74,18 +70,20 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
           placeholder='https://linktr.ee/artist\nhttps://open.spotify.com/artist/...\nhttps://instagram.com/artist'
           className='text-xs'
         />
-        <Button
-          size='sm'
-          onClick={() => void submitUrls()}
-          disabled={submitting || input.trim().length === 0}
-        >
-          {submitting ? (
-            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-          ) : (
-            <Upload className='mr-2 h-4 w-4' />
-          )}
-          Queue URLs
-        </Button>
+        <div className='flex justify-end'>
+          <Button
+            size='sm'
+            onClick={() => void submitUrls()}
+            disabled={submitting || input.trim().length === 0}
+          >
+            {submitting ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Upload className='mr-2 h-4 w-4' />
+            )}
+            Queue URLs
+          </Button>
+        </div>
       </div>
     </ContentSurfaceCard>
   );

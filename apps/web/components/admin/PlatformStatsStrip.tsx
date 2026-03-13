@@ -1,6 +1,6 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2 } from 'lucide-react';
-import { ContentMetricStat } from '@/components/molecules/ContentMetricStat';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminPlatformStats } from '@/lib/admin/platform-stats';
 
@@ -8,18 +8,20 @@ interface PlatformStatsStripProps {
   readonly stats: AdminPlatformStats;
 }
 
-interface StatItemProps {
+interface StatCardProps {
   readonly value: number;
   readonly label: string;
 }
 
-function StatItem({ value, label }: Readonly<StatItemProps>) {
+function StatCard({ value, label }: Readonly<StatCardProps>) {
   return (
-    <ContentMetricStat
+    <ContentMetricCard
       label={label}
       value={value.toLocaleString('en-US')}
-      valueClassName='text-[32px] font-[620] leading-none tracking-[-0.035em] text-(--linear-text-primary) tabular-nums'
-      labelClassName='text-[12px] leading-[17px] tracking-[-0.01em] text-(--linear-text-secondary)'
+      className='p-3.5'
+      bodyClassName='space-y-1'
+      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.034em] text-(--linear-text-primary) tabular-nums'
+      labelClassName='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'
     />
   );
 }
@@ -45,27 +47,24 @@ export function PlatformStatsStrip({
   stats,
 }: Readonly<PlatformStatsStripProps>) {
   return (
-    <ContentSurfaceCard
-      data-testid='platform-stats-strip'
-      className='space-y-6 p-5'
-    >
-      <div className='grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7'>
-        <StatItem value={stats.labelsOnPlatform} label='Labels on platform' />
-        <StatItem
+    <div data-testid='platform-stats-strip' className='space-y-4'>
+      <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7'>
+        <StatCard value={stats.labelsOnPlatform} label='Labels on platform' />
+        <StatCard
           value={stats.totalUniqueVisitors}
           label='Total unique visitors'
         />
-        <StatItem value={stats.dspClicksDriven} label='DSP clicks driven' />
-        <StatItem value={stats.contactsCaptured} label='Contacts captured' />
-        <StatItem
+        <StatCard value={stats.dspClicksDriven} label='DSP clicks driven' />
+        <StatCard value={stats.contactsCaptured} label='Contacts captured' />
+        <StatCard
           value={stats.creatorsOnPlatform}
           label='Creators on platform'
         />
-        <StatItem value={stats.releasesTracked} label='Releases tracked' />
-        <StatItem value={stats.tracksTracked} label='Tracks tracked' />
+        <StatCard value={stats.releasesTracked} label='Releases tracked' />
+        <StatCard value={stats.tracksTracked} label='Tracks tracked' />
       </div>
 
-      <div className='space-y-3 border-t border-(--linear-border-subtle) pt-4'>
+      <ContentSurfaceCard className='space-y-3 p-4'>
         <p className='flex items-center gap-2 text-app font-medium text-secondary-token'>
           <Building2 className='size-4 text-tertiary-token' />
           {getUsageCopy(stats)}
@@ -110,7 +109,7 @@ export function PlatformStatsStrip({
             </TooltipContent>
           </Tooltip>
         )}
-      </div>
-    </ContentSurfaceCard>
+      </ContentSurfaceCard>
+    </div>
   );
 }

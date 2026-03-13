@@ -4,6 +4,7 @@ import { Button, Input, Switch } from '@jovie/ui';
 import { Loader2, Play, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface PipelineSettings {
@@ -13,6 +14,43 @@ interface PipelineSettings {
   autoIngestMinFitScore: number;
   dailyQueryBudget: number;
   queriesUsedToday: number;
+}
+
+interface LeadSettingRowProps {
+  readonly title: string;
+  readonly description: string;
+  readonly checked: boolean;
+  readonly onCheckedChange: (checked: boolean) => void;
+  readonly ariaLabel: string;
+  readonly disabled?: boolean;
+}
+
+function LeadSettingRow({
+  title,
+  description,
+  checked,
+  onCheckedChange,
+  ariaLabel,
+  disabled = false,
+}: Readonly<LeadSettingRowProps>) {
+  return (
+    <ContentSurfaceCard className='flex items-start justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'>
+      <div className='space-y-1'>
+        <p className='text-[13px] font-[560] text-(--linear-text-primary)'>
+          {title}
+        </p>
+        <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
+          {description}
+        </p>
+      </div>
+      <Switch
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-label={ariaLabel}
+        disabled={disabled}
+      />
+    </ContentSurfaceCard>
+  );
 }
 
 export function LeadPipelineControls() {
@@ -113,91 +151,84 @@ export function LeadPipelineControls() {
 
   if (loading) {
     return (
-      <div className='border-b border-(--linear-border-subtle) px-4 py-4 text-sm text-(--linear-text-secondary)'>
-        Loading pipeline settings...
-      </div>
+      <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Pipeline controls'
+          subtitle='Discovery, qualification, and auto-ingest settings'
+          className='px-5 py-3'
+        />
+        <div className='px-5 py-4 text-sm text-(--linear-text-secondary)'>
+          Loading pipeline settings...
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
   if (!settings) {
     return (
-      <div className='border-b border-(--linear-border-subtle) px-4 py-4 text-sm text-destructive'>
-        Unable to load pipeline settings. Please refresh.
-      </div>
+      <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Pipeline controls'
+          subtitle='Discovery, qualification, and auto-ingest settings'
+          className='px-5 py-3'
+        />
+        <div className='px-5 py-4 text-sm text-destructive'>
+          Unable to load pipeline settings. Please refresh.
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      className='rounded-none border-0 border-b border-(--linear-border-subtle) p-4 sm:p-6'
-    >
-      <div className='mb-4'>
-        <h2 className='text-sm font-semibold text-primary-token'>
-          Pipeline controls
-        </h2>
-        <p className='mt-1 text-xs text-secondary-token'>
-          Toggle discovery, qualification, and auto-ingest settings.
-        </p>
-      </div>
+    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Pipeline controls'
+        subtitle='Discovery, qualification, and auto-ingest settings'
+        className='px-5 py-3'
+      />
 
-      <div className='space-y-4'>
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='text-sm text-primary-token'>Pipeline enabled</p>
-            <p className='text-xs text-secondary-token'>
-              Master switch for the entire lead discovery pipeline.
-            </p>
-          </div>
-          <Switch
+      <div className='space-y-4 px-5 py-4'>
+        <div className='grid gap-3 lg:grid-cols-3'>
+          <LeadSettingRow
+            title='Pipeline enabled'
+            description='Master switch for the entire lead discovery pipeline.'
             checked={settings.enabled}
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, enabled: checked } : s))
             }
-            aria-label='Toggle pipeline'
+            ariaLabel='Toggle pipeline'
             disabled={saving}
           />
-        </div>
-
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='text-sm text-primary-token'>Discovery enabled</p>
-            <p className='text-xs text-secondary-token'>
-              Run Google CSE searches on cron to find new leads.
-            </p>
-          </div>
-          <Switch
+          <LeadSettingRow
+            title='Discovery enabled'
+            description='Run Google CSE searches on cron to find new leads.'
             checked={settings.discoveryEnabled}
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, discoveryEnabled: checked } : s))
             }
-            aria-label='Toggle discovery'
+            ariaLabel='Toggle discovery'
             disabled={saving}
           />
-        </div>
-
-        <div className='flex items-center justify-between gap-3'>
-          <div>
-            <p className='text-sm text-primary-token'>Auto-ingest on approve</p>
-            <p className='text-xs text-secondary-token'>
-              Automatically create creator profiles when leads are approved.
-            </p>
-          </div>
-          <Switch
+          <LeadSettingRow
+            title='Auto-ingest on approve'
+            description='Automatically create creator profiles when leads are approved.'
             checked={settings.autoIngestEnabled}
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, autoIngestEnabled: checked } : s))
             }
-            aria-label='Toggle auto-ingest'
+            ariaLabel='Toggle auto-ingest'
             disabled={saving}
           />
         </div>
 
-        <div className='flex flex-wrap gap-4'>
-          <label htmlFor='auto-ingest-min-score' className='block'>
-            <span className='text-sm text-primary-token'>
+        <div className='grid gap-3 sm:grid-cols-2'>
+          <ContentSurfaceCard className='space-y-2 bg-(--linear-bg-surface-0) p-3.5'>
+            <label
+              htmlFor='auto-ingest-min-score'
+              className='text-[13px] font-[560] text-(--linear-text-primary)'
+            >
               Min fit score for auto-ingest
-            </span>
+            </label>
             <Input
               id='auto-ingest-min-score'
               type='number'
@@ -215,15 +246,22 @@ export function LeadPipelineControls() {
                     : s
                 );
               }}
-              className='mt-1 w-24'
+              className='w-28'
               disabled={saving}
             />
-          </label>
+            <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
+              Qualified leads at or above this score can be ingested
+              automatically.
+            </p>
+          </ContentSurfaceCard>
 
-          <label htmlFor='daily-query-budget' className='block'>
-            <span className='text-sm text-primary-token'>
+          <ContentSurfaceCard className='space-y-2 bg-(--linear-bg-surface-0) p-3.5'>
+            <label
+              htmlFor='daily-query-budget'
+              className='text-[13px] font-[560] text-(--linear-text-primary)'
+            >
               Daily query budget
-            </span>
+            </label>
             <Input
               id='daily-query-budget'
               type='number'
@@ -241,16 +279,16 @@ export function LeadPipelineControls() {
                     : s
                 );
               }}
-              className='mt-1 w-24'
+              className='w-28'
               disabled={saving}
             />
-            <p className='mt-1 text-xs text-secondary-token'>
+            <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
               Used today: {settings.queriesUsedToday}
             </p>
-          </label>
+          </ContentSurfaceCard>
         </div>
 
-        <div className='flex flex-wrap gap-2 pt-2'>
+        <div className='flex flex-wrap gap-2 pt-1'>
           <Button onClick={() => void save()} disabled={saving} size='sm'>
             {saving && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
             Save settings

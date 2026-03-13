@@ -4,6 +4,8 @@ import { Badge, Button, Switch, Textarea } from '@jovie/ui';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface Keyword {
@@ -124,108 +126,117 @@ export function LeadKeywordsManager() {
 
   if (loading) {
     return (
-      <div className='border-b border-(--linear-border-subtle) px-4 py-4 text-sm text-secondary-token'>
-        Loading keywords...
-      </div>
+      <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Discovery keywords'
+          subtitle='Google CSE queries used to find new Linktree leads.'
+          className='px-5 py-3'
+        />
+        <div className='px-5 py-4 text-sm text-(--linear-text-secondary)'>
+          Loading keywords...
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      className='rounded-none border-0 border-b border-(--linear-border-subtle) p-4 sm:p-6'
-    >
-      <div className='mb-4 flex items-center justify-between'>
-        <div>
-          <h2 className='text-sm font-semibold text-primary-token'>
-            Discovery keywords
-          </h2>
-          <p className='mt-1 text-xs text-secondary-token'>
+    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Discovery keywords'
+        subtitle={
+          <>
             Google CSE queries used to find new Linktree leads.{' '}
             {keywords.length} keyword{keywords.length === 1 ? '' : 's'}{' '}
             configured.
-          </p>
-        </div>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={() => void seedFeatureFm()}
-          disabled={seeding}
-        >
-          {seeding ? (
-            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-          ) : (
-            <Sparkles className='mr-2 h-4 w-4' />
-          )}
-          Seed Feature.fm
-        </Button>
-      </div>
+          </>
+        }
+        className='px-5 py-3'
+        actions={
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void seedFeatureFm()}
+            disabled={seeding}
+          >
+            {seeding ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Sparkles className='mr-2 h-4 w-4' />
+            )}
+            Seed Feature.fm
+          </Button>
+        }
+        actionsClassName='shrink-0'
+      />
 
-      {keywords.length > 0 && (
-        <div className='mb-4 max-h-64 space-y-1 overflow-y-auto'>
-          {keywords.map(keyword => (
-            <div
-              key={keyword.id}
-              className='flex items-center justify-between gap-2 rounded-md border border-subtle px-3 py-2'
+      <div className='space-y-4 px-5 py-4'>
+        {keywords.length > 0 && (
+          <div className='max-h-72 space-y-2 overflow-y-auto pr-1'>
+            {keywords.map(keyword => (
+              <ContentSurfaceCard
+                key={keyword.id}
+                className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
+              >
+                <div className='flex min-w-0 flex-1 items-center gap-2'>
+                  <Switch
+                    checked={keyword.enabled}
+                    onCheckedChange={checked =>
+                      void toggleKeyword(keyword.id, checked)
+                    }
+                    disabled={togglingId === keyword.id}
+                    aria-label={`Toggle ${keyword.query}`}
+                  />
+                  <code className='truncate text-xs text-(--linear-text-primary)'>
+                    {keyword.query}
+                  </code>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <Badge variant='secondary' className='text-2xs'>
+                    {keyword.resultsFoundTotal} results
+                  </Badge>
+                  <AppIconButton
+                    onClick={() => void deleteKeyword(keyword.id)}
+                    disabled={deletingId === keyword.id}
+                    ariaLabel={`Delete ${keyword.query}`}
+                    className='h-7 w-7 rounded-[7px] border-(--linear-border-subtle) bg-transparent text-(--linear-text-tertiary) hover:text-destructive'
+                  >
+                    {deletingId === keyword.id ? (
+                      <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    ) : (
+                      <Trash2 className='h-3.5 w-3.5' />
+                    )}
+                  </AppIconButton>
+                </div>
+              </ContentSurfaceCard>
+            ))}
+          </div>
+        )}
+
+        <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-3.5'>
+          <Textarea
+            value={newQueries}
+            onChange={e => setNewQueries(e.target.value)}
+            placeholder={
+              'Add keywords (one per line):\nsite:linktr.ee "ffm.to"\nsite:linktr.ee "feature.fm" spotify'
+            }
+            rows={3}
+            className='text-xs'
+          />
+          <div className='flex justify-end'>
+            <Button
+              size='sm'
+              onClick={() => void addKeywords()}
+              disabled={adding || !newQueries.trim()}
             >
-              <div className='flex min-w-0 flex-1 items-center gap-2'>
-                <Switch
-                  checked={keyword.enabled}
-                  onCheckedChange={checked =>
-                    void toggleKeyword(keyword.id, checked)
-                  }
-                  disabled={togglingId === keyword.id}
-                  aria-label={`Toggle ${keyword.query}`}
-                />
-                <code className='truncate text-xs text-primary-token'>
-                  {keyword.query}
-                </code>
-              </div>
-              <div className='flex items-center gap-2'>
-                <Badge variant='secondary' className='text-2xs'>
-                  {keyword.resultsFoundTotal} results
-                </Badge>
-                <button
-                  type='button'
-                  onClick={() => void deleteKeyword(keyword.id)}
-                  disabled={deletingId === keyword.id}
-                  className='text-secondary-token hover:text-destructive disabled:opacity-50'
-                  aria-label={`Delete ${keyword.query}`}
-                >
-                  {deletingId === keyword.id ? (
-                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
-                  ) : (
-                    <Trash2 className='h-3.5 w-3.5' />
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className='space-y-2'>
-        <Textarea
-          value={newQueries}
-          onChange={e => setNewQueries(e.target.value)}
-          placeholder={
-            'Add keywords (one per line):\nsite:linktr.ee "ffm.to"\nsite:linktr.ee "feature.fm" spotify'
-          }
-          rows={3}
-          className='text-xs'
-        />
-        <Button
-          size='sm'
-          onClick={() => void addKeywords()}
-          disabled={adding || !newQueries.trim()}
-        >
-          {adding ? (
-            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-          ) : (
-            <Plus className='mr-2 h-4 w-4' />
-          )}
-          Add keywords
-        </Button>
+              {adding ? (
+                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+              ) : (
+                <Plus className='mr-2 h-4 w-4' />
+              )}
+              Add keywords
+            </Button>
+          </div>
+        </ContentSurfaceCard>
       </div>
     </ContentSurfaceCard>
   );
