@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, type CommonDropdownItem } from '@jovie/ui';
+import type { CommonDropdownItem } from '@jovie/ui';
 import { Copy, Download, ExternalLink, QrCode } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
@@ -9,7 +9,12 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerButton,
+  DrawerSectionHeading,
+  DrawerSurfaceCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
@@ -173,17 +178,15 @@ export function PreviewPanel() {
       contentClassName='space-y-0 px-4 py-4'
       footerClassName='px-4 py-4'
       footer={
-        <div className='space-y-2'>
-          <h3 className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
-            Your profile URL
-          </h3>
-          <div className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-[12px] font-medium tracking-[-0.01em] text-(--linear-text-primary)'>
+        <DrawerSurfaceCard className='space-y-2.5 p-3'>
+          <DrawerSectionHeading>Your profile URL</DrawerSectionHeading>
+          <div className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-[12px] font-medium tracking-[-0.01em] text-(--linear-text-primary)'>
             <div className='truncate'>{profileUrl || 'Loading...'}</div>
           </div>
           <p className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
             Share this link with your audience.
           </p>
-        </div>
+        </DrawerSurfaceCard>
       }
     >
       <div className='flex flex-col items-center gap-4 pb-6'>
@@ -197,12 +200,17 @@ export function PreviewPanel() {
           />
         </div>
 
-        <Button asChild variant='primary' className='w-full max-w-[360px]'>
+        <DrawerButton
+          asChild
+          tone='primary'
+          size='sm'
+          className='h-10 w-full max-w-[360px] rounded-[10px] text-[13px]'
+        >
           <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
             <ExternalLink className='mr-2 h-4 w-4' aria-hidden='true' />
             View Jovie Profile
           </a>
-        </Button>
+        </DrawerButton>
       </div>
     </EntitySidebarShell>
   );

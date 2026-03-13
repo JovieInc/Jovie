@@ -14,6 +14,7 @@ export interface ShortcutConfig {
 
 export interface KeyboardShortcutOptions {
   readonly allowInInputs?: boolean;
+  /** Limit shortcut handling to events originating inside this element subtree. */
   readonly scopeRef?: React.RefObject<HTMLElement | null>;
 }
 
@@ -65,6 +66,10 @@ export function useKeyboardShortcuts(
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const { allowInInputs = false, scopeRef } = optionsRef.current;
+
+      if (scopeRef && !scopeRef.current) {
+        return;
+      }
 
       if (scopeRef?.current) {
         const target = e.target;

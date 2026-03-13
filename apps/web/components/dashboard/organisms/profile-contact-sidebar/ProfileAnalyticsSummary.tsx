@@ -9,8 +9,10 @@ import {
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
 import {
+  DrawerButton,
   DrawerEmptyState,
   DrawerStatGrid,
+  DrawerSurfaceCard,
   StatTile,
 } from '@/components/molecules/drawer';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
@@ -48,7 +50,7 @@ export function ProfileAnalyticsSummary() {
   // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+      <DrawerSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
         <DrawerStatGrid className={cn('p-3.5', STAT_MIN_HEIGHT)}>
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
@@ -59,7 +61,7 @@ export function ProfileAnalyticsSummary() {
             <div className='mt-2 h-6 w-14 rounded skeleton' />
           </div>
         </DrawerStatGrid>
-      </div>
+      </DrawerSurfaceCard>
     );
   }
 
@@ -71,7 +73,7 @@ export function ProfileAnalyticsSummary() {
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+    <DrawerSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
       <DrawerStatGrid
         className={cn(
           'p-3.5 transition-opacity duration-150',
@@ -97,9 +99,10 @@ export function ProfileAnalyticsSummary() {
       <div className='flex justify-end border-t border-(--linear-border-subtle) px-3 py-1.5'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
+            <DrawerButton
               type='button'
-              className='inline-flex items-center gap-1 rounded-[7px] px-1.5 py-0.5 text-[11px] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)'
+              tone='ghost'
+              className='h-6 rounded-[7px] border-transparent px-1.5 py-0.5 text-[11px] font-normal text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
             >
               <span>Last {currentOption.label}</span>
               <ChevronDown
@@ -107,7 +110,7 @@ export function ProfileAnalyticsSummary() {
                 className='text-(--linear-text-tertiary)'
                 aria-hidden='true'
               />
-            </button>
+            </DrawerButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' className='w-36'>
             {RANGE_OPTIONS.map(option => {
@@ -144,6 +147,6 @@ export function ProfileAnalyticsSummary() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
+    </DrawerSurfaceCard>
   );
 }

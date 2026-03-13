@@ -36,7 +36,12 @@ function SearchDropdownState({
   readonly tone?: 'default' | 'error';
 }) {
   return (
-    <div className='p-3'>
+    <div
+      className='p-3'
+      role={tone === 'error' ? 'alert' : 'status'}
+      aria-live={tone === 'error' ? undefined : 'polite'}
+      aria-atomic='true'
+    >
       <DrawerSurfaceCard className='flex min-h-[64px] items-center rounded-[10px] px-3'>
         <p
           className={cn(
@@ -53,7 +58,12 @@ function SearchDropdownState({
 
 function SearchResultsLoadingSkeleton() {
   return (
-    <div className='p-3 space-y-1.5' aria-busy='true'>
+    <output
+      className='block p-3 space-y-1.5'
+      aria-live='polite'
+      aria-label='Loading Spotify artist results'
+      aria-busy='true'
+    >
       {LOADING_SKELETON_KEYS.map(key => (
         <DrawerSurfaceCard
           key={key}
@@ -68,7 +78,7 @@ function SearchResultsLoadingSkeleton() {
           <div className='h-4 w-4 shrink-0 rounded-full skeleton' />
         </DrawerSurfaceCard>
       ))}
-    </div>
+    </output>
   );
 }
 
