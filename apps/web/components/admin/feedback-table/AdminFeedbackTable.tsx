@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ClipboardCopy } from 'lucide-react';
+import { ClipboardCopy, MessageSquareText } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
   AdminTableHeader,
@@ -12,13 +12,16 @@ import {
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
+  DrawerButton,
   DrawerPropertyRow,
   DrawerSection,
+  DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
+  TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
@@ -70,7 +73,7 @@ const columnHelper = createColumnHelper<FeedbackRow>();
 function renderUserCell({ getValue }: { getValue: () => any }) {
   const user = getValue() as FeedbackRow['user'];
   return (
-    <span className='font-medium text-primary-token'>
+    <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
       {getFeedbackUserLabel(user)}
     </span>
   );
@@ -79,7 +82,7 @@ function renderUserCell({ getValue }: { getValue: () => any }) {
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
 function renderMessageCell({ getValue }: { getValue: () => any }) {
   return (
-    <TruncatedText lines={2} className='text-primary-token'>
+    <TruncatedText lines={2} className='text-(--linear-text-primary)'>
       {getValue() as string}
     </TruncatedText>
   );
@@ -87,9 +90,16 @@ function renderMessageCell({ getValue }: { getValue: () => any }) {
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
 function renderStatusCell({ getValue }: { getValue: () => any }) {
+  const status = getValue() as FeedbackRow['status'];
   return (
-    <span className='rounded-full border border-subtle px-2.5 py-1 text-xs text-secondary-token'>
-      {getValue() as FeedbackRow['status']}
+    <span
+      className={
+        status === 'dismissed'
+          ? 'inline-flex min-h-[22px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-tertiary)'
+          : 'inline-flex min-h-[22px] items-center rounded-[8px] border border-(--linear-border-default) bg-(--linear-bg-surface-1) px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'
+      }
+    >
+      {status}
     </span>
   );
 }
@@ -102,7 +112,6 @@ export function AdminFeedbackTable({
   );
   const [dismissingId, setDismissingId] = useState<string | null>(null);
   const [rows, setRows] = useState(items);
-  const [copyToast, setCopyToast] = useState<string | null>(null);
 
   const selected = useMemo(
     () => rows.find(item => item.id === selectedId) ?? null,
@@ -131,24 +140,19 @@ export function AdminFeedbackTable({
     setDismissingId(null);
   };
 
-  const showCopyToast = useCallback((message: string) => {
-    setCopyToast(message);
-    setTimeout(() => setCopyToast(null), 2000);
-  }, []);
-
   const copySelectedAsMarkdown = useCallback(async () => {
     if (!selected) return;
     await navigator.clipboard.writeText(formatFeedbackAsMarkdown(selected));
-    showCopyToast('Copied to clipboard');
-  }, [selected, showCopyToast]);
+    toast.success('Copied to clipboard');
+  }, [selected]);
 
   const copyAllAsMarkdown = useCallback(async () => {
     const markdown = rows
       .map(item => formatFeedbackAsMarkdown(item))
       .join('\n---\n\n');
     await navigator.clipboard.writeText(markdown);
-    showCopyToast(`Copied ${rows.length} items to clipboard`);
-  }, [rows, showCopyToast]);
+    toast.success(`Copied ${rows.length} items to clipboard`);
+  }, [rows]);
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
@@ -184,20 +188,13 @@ export function AdminFeedbackTable({
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'cursor-pointer bg-(--linear-row-selected)'
-        : 'group cursor-pointer hover:bg-(--linear-row-hover)',
+        ? 'cursor-pointer bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.18)] hover:bg-(--linear-bg-surface-1)'
+        : 'group cursor-pointer bg-transparent hover:bg-(--linear-bg-surface-1)',
     [selectedId]
   );
 
   return (
     <div className='flex h-full min-h-[620px] overflow-hidden'>
-      {/* Toast notification */}
-      {copyToast && (
-        <div className='fixed top-4 right-4 z-50 rounded-lg bg-surface-2 border border-subtle px-4 py-2.5 text-sm text-primary-token shadow-lg'>
-          {copyToast}
-        </div>
-      )}
-
       <div className='h-full w-full border-r border-(--linear-border-subtle) bg-(--linear-app-content-surface) lg:w-[58%]'>
         <AdminTableHeader
           title='Feedback'
@@ -233,9 +230,14 @@ export function AdminFeedbackTable({
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[13px]'
               emptyState={
-                <div className='px-4 py-10 text-center text-sm text-secondary-token'>
-                  <p className='font-medium'>No feedback found</p>
-                </div>
+                <TableEmptyState
+                  icon={
+                    <MessageSquareText className='h-5 w-5' aria-hidden='true' />
+                  }
+                  title='No feedback found'
+                  description='New feedback will appear here once users submit it.'
+                  className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
+                />
               }
             />
           )}
@@ -272,22 +274,23 @@ export function AdminFeedbackTable({
           selected ? (
             <div className='space-y-3'>
               <div className='flex items-center gap-2'>
-                <Button
+                <DrawerButton
                   type='button'
+                  tone='secondary'
                   onClick={dismissSelected}
                   disabled={selected.status === 'dismissed'}
                   loading={dismissingId === selected.id}
                 >
                   Dismiss
-                </Button>
-                <Button
+                </DrawerButton>
+                <DrawerButton
                   type='button'
-                  variant='secondary'
+                  tone='secondary'
                   onClick={copySelectedAsMarkdown}
                 >
                   <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
                   Copy as Markdown
-                </Button>
+                </DrawerButton>
               </div>
               <span className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
                 {(() => {
@@ -327,15 +330,17 @@ export function AdminFeedbackTable({
             </DrawerSection>
 
             <DrawerSection title='Feedback'>
-              <div className='rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-(--linear-text-primary)'>
+              <DrawerSurfaceCard className='rounded-[12px] bg-(--linear-bg-surface-0) px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-(--linear-text-primary)'>
                 {selected.message}
-              </div>
+              </DrawerSurfaceCard>
             </DrawerSection>
 
             <DrawerSection title='Context'>
-              <pre className='overflow-auto rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3 text-[11px] leading-[16px] text-(--linear-text-secondary)'>
-                {JSON.stringify(selected.context, null, 2)}
-              </pre>
+              <DrawerSurfaceCard className='overflow-auto rounded-[12px] bg-(--linear-bg-surface-0) p-0'>
+                <pre className='p-3 text-[11px] leading-[16px] text-(--linear-text-secondary)'>
+                  {JSON.stringify(selected.context, null, 2)}
+                </pre>
+              </DrawerSurfaceCard>
             </DrawerSection>
           </>
         ) : null}
