@@ -24,6 +24,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import {
   Sidebar,
@@ -337,8 +338,34 @@ export function DemoShell({
                   {TAB_LABEL[activeTab]}
                 </span>
               </div>
-              <div className='flex items-center gap-1'>
-                {activeTab === 'releases' && (
+              <DashboardHeaderActionGroup
+                trailing={
+                  hasRightPanel ? (
+                    <DashboardHeaderActionButton
+                      ariaLabel={
+                        isRightPanelOpen
+                          ? 'Hide details panel'
+                          : 'Show details panel'
+                      }
+                      icon={
+                        <PanelRightOpen
+                          className='size-3.5'
+                          aria-hidden='true'
+                        />
+                      }
+                      iconOnly
+                      pressed={isRightPanelOpen}
+                      onClick={() => setIsRightPanelOpen(open => !open)}
+                      tooltipLabel={
+                        isRightPanelOpen
+                          ? 'Hide Details Panel'
+                          : 'Show Details Panel'
+                      }
+                    />
+                  ) : null
+                }
+              >
+                {activeTab === 'releases' ? (
                   <DashboardHeaderActionButton
                     ariaLabel='Create release'
                     icon={<Plus className='size-3.5' aria-hidden='true' />}
@@ -346,8 +373,8 @@ export function DemoShell({
                     tooltipLabel='New Release'
                     className='h-8 w-8'
                   />
-                )}
-              </div>
+                ) : null}
+              </DashboardHeaderActionGroup>
             </header>
 
             {(activeTab === 'releases' || activeTab === 'audience') && (
@@ -374,34 +401,6 @@ export function DemoShell({
                 }
                 end={
                   <>
-                    {hasRightPanel ? (
-                      <PageToolbarActionButton
-                        label={
-                          isRightPanelOpen
-                            ? 'Hide details panel'
-                            : 'Show details panel'
-                        }
-                        icon={
-                          <PanelRightOpen
-                            className='size-3.5'
-                            aria-hidden='true'
-                          />
-                        }
-                        iconOnly
-                        active={isRightPanelOpen}
-                        onClick={() => setIsRightPanelOpen(open => !open)}
-                        tooltipLabel={
-                          isRightPanelOpen
-                            ? 'Hide Details Panel'
-                            : 'Show Details Panel'
-                        }
-                        ariaLabel={
-                          isRightPanelOpen
-                            ? 'Hide details panel'
-                            : 'Show details panel'
-                        }
-                      />
-                    ) : null}
                     <PageToolbarActionButton
                       label='Filter'
                       icon={

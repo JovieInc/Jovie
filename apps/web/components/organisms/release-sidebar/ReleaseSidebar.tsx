@@ -32,8 +32,8 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
-import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
+import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
