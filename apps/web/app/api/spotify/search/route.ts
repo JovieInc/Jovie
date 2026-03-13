@@ -8,10 +8,13 @@ import {
   getClientIP,
   spotifySearchApiLimiter,
 } from '@/lib/rate-limit';
-import { buildSpotifyArtistUrl } from '@/lib/spotify';
+import {
+  buildSpotifyArtistUrl,
+  isSpotifyAvailable,
+  spotifyClient,
+} from '@/lib/spotify';
 import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
-import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 import { applyVipBoost, parseLimit } from './helpers';

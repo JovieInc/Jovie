@@ -21,7 +21,7 @@ import {
   validationError,
 } from '@/lib/errors/ingest';
 import { checkSpotifySearchRateLimit } from '@/lib/rate-limit';
-import { spotifyClient } from '@/lib/spotify/client';
+import { spotifyClient } from '@/lib/spotify';
 import { type SanitizedArtist } from '@/lib/spotify/sanitize';
 import { playlistExtractionSchema } from '@/lib/validation/schemas/spotify';
 

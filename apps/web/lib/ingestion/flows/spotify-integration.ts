@@ -54,10 +54,7 @@ export async function fetchSpotifyArtistData(
         name: artist.name,
         spotifyId: artist.id,
         imageUrl: bestImage?.url ?? null,
-        genres:
-          'genres' in artist
-            ? (((artist as Record<string, unknown>).genres as string[]) ?? [])
-            : [],
+        genres: artist.genres ?? [],
         followerCount: artist.followers?.total ?? 0,
         popularity: artist.popularity ?? 0,
         spotifyUrl: `https://open.spotify.com/artist/${artist.id}`,

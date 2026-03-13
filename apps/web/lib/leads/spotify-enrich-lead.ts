@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
-import { spotifyClient } from '@/lib/spotify/client';
+import { spotifyClient } from '@/lib/spotify';
 import { SPOTIFY_API_BASE } from '@/lib/spotify/env';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { computePriorityScore } from './priority-score';
