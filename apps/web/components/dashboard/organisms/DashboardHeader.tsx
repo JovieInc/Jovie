@@ -37,7 +37,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) supports-[backdrop-filter]:backdrop-blur-md',
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) supports-[backdrop-filter]:backdrop-blur-md',
         className
       )}
     >
@@ -57,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-1 px-[var(--linear-app-header-padding-x)] sm:flex'>
+      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-1.5 px-[var(--linear-app-header-padding-x)] sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -72,7 +72,7 @@ export function DashboardHeader({
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.01em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[14px] font-[510] tracking-[-0.01em] text-primary-token'>
+            <span className='truncate text-[13.5px] font-[510] tracking-[-0.01em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (

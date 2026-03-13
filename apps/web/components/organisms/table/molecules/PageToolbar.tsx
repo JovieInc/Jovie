@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex flex-col gap-0.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-1 md:min-h-[40px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-0.5';
+  'flex flex-col gap-0.5 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-1 md:min-h-[40px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-0.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 md:w-auto md:flex-none';
