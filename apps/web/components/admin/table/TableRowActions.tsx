@@ -30,14 +30,14 @@ export function TableRowActions({
     <div className='flex items-center justify-end gap-1'>
       {/* Refresh button */}
       <AppIconButton
-        ariaLabel='Refresh ingest data'
+        ariaLabel='Refresh creator music data'
         className={rowActionClassName}
         onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
           await onRefreshIngest();
         }}
         disabled={isRefreshLoading}
-        title='Refresh ingest data'
+        title='Refresh creator music data'
       >
         <RefreshCw
           className={cn('h-3.5 w-3.5', isRefreshLoading && 'animate-spin')}
