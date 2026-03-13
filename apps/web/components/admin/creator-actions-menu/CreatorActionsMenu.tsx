@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 import type { CreatorActionsMenuProps } from './types';
 
@@ -163,15 +164,13 @@ export function CreatorActionsMenu({
       <div className='flex w-full items-center justify-end gap-1'>
         <DropdownMenu open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger asChild>
-            <Button
-              type='button'
-              size='icon'
-              variant='ghost'
-              className='h-8 w-8 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
+            <AppIconButton
+              ariaLabel='Open creator actions'
+              className='h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
               disabled={isLoading}
             >
               <MoreVertical className='h-3.5 w-3.5' />
-            </Button>
+            </AppIconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' sideOffset={8}>
             <MenuItems
