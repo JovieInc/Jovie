@@ -22,12 +22,11 @@ import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
-  getTracksForReleaseWithProviders,
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
-  type TrackWithProviders,
   upsertProviderLink,
 } from '@/lib/discography/queries';
+import { loadReleaseTracksForProfile } from '@/lib/discography/release-track-loader';
 import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
@@ -1341,42 +1340,11 @@ export async function connectSpotifyArtist(params: {
 }
 
 /**
- * Map track database data to view model
- */
-function mapTrackToViewModel(
-  track: TrackWithProviders,
-  _providerLabels: Record<ProviderKey, string>,
-  profileHandle: string,
-  _releaseSlug: string
-): TrackViewModel {
-  return {
-    id: track.id,
-    releaseId: track.releaseId,
-    title: track.title,
-    slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
-    trackNumber: track.trackNumber,
-    discNumber: track.discNumber,
-    durationMs: track.durationMs,
-    isrc: track.isrc,
-    isExplicit: track.isExplicit,
-    previewUrl: track.previewUrl,
-    audioUrl: track.audioUrl,
-    audioFormat: track.audioFormat,
-    providers: mapProviderLinksToViewModel({
-      providerLinks: track.providerLinks,
-      profileHandle,
-      slug: track.slug,
-    }),
-  };
-}
-
-/**
  * Load tracks for a release (lazy loading for expandable rows)
  */
 export async function loadTracksForRelease(params: {
   releaseId: string;
-  releaseSlug: string;
+  releaseSlug?: string;
 }): Promise<TrackViewModel[]> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -1387,23 +1355,11 @@ export async function loadTracksForRelease(params: {
 
   const profile = await requireProfile();
 
-  // Verify the release belongs to the user's profile
-  const release = await getReleaseById(params.releaseId);
-  if (release?.creatorProfileId !== profile.id) {
-    throw new TypeError('Release not found');
-  }
-
-  const providerLabels = buildProviderLabels();
-  const { tracks } = await getTracksForReleaseWithProviders(params.releaseId);
-
-  return tracks.map(track =>
-    mapTrackToViewModel(
-      track,
-      providerLabels,
-      profile.handle,
-      params.releaseSlug
-    )
-  );
+  return loadReleaseTracksForProfile({
+    releaseId: params.releaseId,
+    profileId: profile.id,
+    profileHandle: profile.handle,
+  });
 }
 
 /**
