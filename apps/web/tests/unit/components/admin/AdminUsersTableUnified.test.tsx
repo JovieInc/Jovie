@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
+import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 
 const mockUseBreakpointDown = vi.fn<
   (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') => boolean
@@ -43,6 +44,17 @@ vi.mock('@/components/organisms/table', () => ({
       {start}
       {end}
     </div>
+  ),
+  PageToolbarActionButton: ({
+    label,
+    ariaLabel,
+  }: {
+    label: ReactNode;
+    ariaLabel: string;
+  }) => (
+    <button type='button' aria-label={ariaLabel}>
+      {label}
+    </button>
   ),
   PageToolbarSearchForm: ({ submitAriaLabel }: { submitAriaLabel: string }) => (
     <button type='submit'>{submitAriaLabel}</button>
@@ -93,14 +105,16 @@ describe('AdminUsersTableUnified', () => {
 
     render(
       <TooltipProvider>
-        <AdminUsersTableUnified
-          users={[userRow]}
-          page={1}
-          pageSize={20}
-          total={1}
-          search=''
-          sort='created_desc'
-        />
+        <TableMetaProvider>
+          <AdminUsersTableUnified
+            users={[userRow]}
+            page={1}
+            pageSize={20}
+            total={1}
+            search=''
+            sort='created_desc'
+          />
+        </TableMetaProvider>
       </TooltipProvider>
     );
 
@@ -128,14 +142,16 @@ describe('AdminUsersTableUnified', () => {
 
     render(
       <TooltipProvider>
-        <AdminUsersTableUnified
-          users={[userRow]}
-          page={1}
-          pageSize={20}
-          total={1}
-          search=''
-          sort='created_desc'
-        />
+        <TableMetaProvider>
+          <AdminUsersTableUnified
+            users={[userRow]}
+            page={1}
+            pageSize={20}
+            total={1}
+            search=''
+            sort='created_desc'
+          />
+        </TableMetaProvider>
       </TooltipProvider>
     );
 

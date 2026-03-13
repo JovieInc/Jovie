@@ -12,6 +12,8 @@ import {
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
@@ -29,7 +31,7 @@ import {
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminUsersInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
@@ -147,10 +149,34 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Detail drawer state
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
+  const { setTableMeta } = useTableMeta();
+  const usersRef = useRef(users);
+  usersRef.current = users;
 
   const handleRowClick = useCallback((user: AdminUserRow) => {
     setSelectedUser(prev => (prev?.id === user.id ? null : user));
   }, []);
+
+  useEffect(() => {
+    const toggle = () => {
+      if (selectedUser) {
+        setSelectedUser(null);
+        return;
+      }
+
+      const firstUser = usersRef.current[0];
+      if (firstUser) {
+        setSelectedUser(firstUser);
+      }
+    };
+
+    setTableMeta({
+      rowCount: users.length,
+      toggle: users.length > 0 ? toggle : null,
+      rightPanelWidth: selectedUser ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [selectedUser, users.length]);
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -474,6 +500,12 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         chrome='page-toolbar'
                         iconOnly
                         tooltipLabel='Export'
+                      />
+                      <DrawerToggleButton
+                        chrome='page-toolbar'
+                        ariaLabel='Toggle user details'
+                        label='Details'
+                        tooltipLabel='Details'
                       />
                     </div>
                   }
