@@ -43,8 +43,8 @@ export function DefaultStatusBanner({
 
   if (isUnavailable) {
     statusLabel = 'Status Unavailable';
-    statusTone = 'text-tertiary-token';
-    badgeTone = 'border-subtle bg-surface-2';
+    statusTone = 'text-(--linear-text-tertiary)';
+    badgeTone = 'border-(--linear-border-default) bg-(--linear-bg-surface-2)';
     Icon = HelpCircle;
   } else if (isAlive) {
     statusLabel = 'Default Alive';
@@ -79,7 +79,7 @@ export function DefaultStatusBanner({
 
   return (
     <Card
-      className='border-subtle bg-transparent'
+      className='border-(--linear-border-default) bg-(--linear-bg-surface-1)'
       data-testid='default-status-banner'
     >
       <CardContent className='flex flex-col gap-4 p-4 sm:p-6 md:flex-row md:items-center md:justify-between'>
@@ -91,7 +91,7 @@ export function DefaultStatusBanner({
             <Icon className={`size-4 ${statusTone}`} />
           </div>
           <div className='min-w-0 space-y-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.15em] text-tertiary-token sm:tracking-[0.2em]'>
+            <p className='text-xs font-semibold uppercase tracking-[0.15em] text-(--linear-text-tertiary) sm:tracking-[0.2em]'>
               Company Health
             </p>
             <p
@@ -99,11 +99,11 @@ export function DefaultStatusBanner({
             >
               {statusLabel}
             </p>
-            <p className='text-sm text-secondary-token'>{detail}</p>
+            <p className='text-sm text-(--linear-text-secondary)'>{detail}</p>
           </div>
         </div>
-        <div className='mt-2 flex flex-row justify-between gap-4 border-t border-subtle pt-3 text-sm text-tertiary-token sm:mt-0 sm:flex-col sm:gap-2 sm:border-t-0 sm:pt-0 md:text-right'>
-          <span className='font-medium text-primary-token tabular-nums'>
+        <div className='mt-2 flex flex-row justify-between gap-4 border-t border-(--linear-border-default) pt-3 text-sm text-(--linear-text-tertiary) sm:mt-0 sm:flex-col sm:gap-2 sm:border-t-0 sm:pt-0 md:text-right'>
+          <span className='font-medium text-(--linear-text-primary) tabular-nums'>
             {runwayCopy}
           </span>
           <span className='text-right tabular-nums'>

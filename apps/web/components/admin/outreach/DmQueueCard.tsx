@@ -62,10 +62,10 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
       <div className='flex items-start justify-between'>
         <div className='flex items-center gap-3'>
           <div className='flex size-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-            <User className='size-5 text-tertiary-token' />
+            <User className='size-5 text-(--linear-text-tertiary)' />
           </div>
           <div>
-            <p className='text-sm font-medium text-primary-token'>
+            <p className='text-sm font-medium text-(--linear-text-primary)'>
               {lead.displayName || 'Unknown'}
             </p>
             {lead.instagramHandle && (
@@ -73,7 +73,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
                 href={`https://instagram.com/${lead.instagramHandle}`}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='flex items-center gap-1 text-xs text-secondary-token hover:text-primary-token'
+                className='flex items-center gap-1 text-xs text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
               >
                 @{lead.instagramHandle}
                 <ExternalLink className='size-3' />
@@ -82,7 +82,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           </div>
         </div>
         {lead.priorityScore != null && (
-          <span className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-1 text-xs font-medium tabular-nums text-secondary-token'>
+          <span className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-1 text-xs font-medium tabular-nums text-(--linear-text-secondary)'>
             Score: {lead.priorityScore}
           </span>
         )}
@@ -93,7 +93,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           readOnly
           value={lead.dmCopy}
           rows={4}
-          className='w-full resize-none rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-xs text-secondary-token'
+          className='w-full resize-none rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-xs text-(--linear-text-secondary)'
         />
       )}
 
