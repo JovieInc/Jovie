@@ -1,16 +1,8 @@
 'use client';
 
-import { BarChart3, User } from 'lucide-react';
 import { memo } from 'react';
-import {
-  ExportCSVButton,
-  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  PAGE_TOOLBAR_ICON_CLASS,
-  PageToolbar,
-  PageToolbarActionButton,
-} from '@/components/organisms/table';
+import { ExportCSVButton, PageToolbar } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
-import type { AudiencePanelMode } from '../AudiencePanelContext';
 import { AudienceFilterDropdown } from './AudienceFilterDropdown';
 import { AudienceHeaderBadge } from './AudienceHeaderBadge';
 import type { AudienceFilters, AudienceView } from './types';
@@ -38,10 +30,6 @@ interface AudienceTableSubheaderProps {
   readonly total: number | null;
   /** Total audience members across all views. Null when the COUNT query was skipped (JOV-1262). */
   readonly totalAudienceCount?: number | null;
-  /** Current open sidebar mode. */
-  readonly panelMode: AudiencePanelMode | null;
-  /** Toggle a right sidebar mode. */
-  readonly onTogglePanel: (panel: AudiencePanelMode) => void;
 }
 
 /**
@@ -57,8 +45,6 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   subscriberCount,
   total,
   totalAudienceCount,
-  panelMode,
-  onTogglePanel,
 }: AudienceTableSubheaderProps) {
   const hasData = rows.length > 0;
   const exportTooltipLabel =
@@ -76,38 +62,9 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
       }
       end={
         <>
-          <PageToolbarActionButton
-            label='Contact details'
-            ariaLabel={
-              panelMode === 'contact'
-                ? 'Close contact sidebar'
-                : 'Open contact sidebar'
-            }
-            icon={<User className={PAGE_TOOLBAR_ICON_CLASS} />}
-            iconOnly
-            active={panelMode === 'contact'}
-            ariaPressed={panelMode === 'contact'}
-            onClick={() => onTogglePanel('contact')}
-            tooltipLabel='Contact details'
-          />
-          <PageToolbarActionButton
-            label='Analytics'
-            ariaLabel={
-              panelMode === 'analytics'
-                ? 'Close analytics sidebar'
-                : 'Open analytics sidebar'
-            }
-            icon={<BarChart3 className={PAGE_TOOLBAR_ICON_CLASS} />}
-            iconOnly
-            active={panelMode === 'analytics'}
-            ariaPressed={panelMode === 'analytics'}
-            onClick={() => onTogglePanel('analytics')}
-            tooltipLabel='Analytics'
-          />
           <AudienceFilterDropdown
             filters={filters}
             onFiltersChange={onFiltersChange}
-            buttonClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
             iconOnly
           />
           <ExportCSVButton

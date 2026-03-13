@@ -15,6 +15,9 @@ import {
 import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
+import { Icon } from '@/components/atoms/Icon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
 import { AnalyticsSidebar } from '@/components/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/components/dashboard/organisms/AudiencePanelContext';
@@ -26,6 +29,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { queryKeys } from '@/lib/queries/keys';
@@ -272,6 +276,7 @@ export const DashboardAudienceTableUnified = memo(
       open: openPanel,
       close: closePanel,
     } = useAudiencePanel();
+    const { setHeaderActions } = useSetHeaderActions();
 
     // Auto-select first row when contact panel opens with no selection
     React.useEffect(() => {
@@ -516,6 +521,51 @@ export const DashboardAudienceTableUnified = memo(
 
     useRegisterRightPanel(sidebarPanel);
 
+    const headerActions = useMemo(
+      () => (
+        <DashboardHeaderActionGroup
+          trailing={
+            <DashboardHeaderActionButton
+              ariaLabel={
+                panelMode === 'contact'
+                  ? 'Close contact details'
+                  : 'Open contact details'
+              }
+              pressed={panelMode === 'contact'}
+              onClick={() => toggle('contact')}
+              icon={<Icon name='User' className='h-4 w-4' strokeWidth={1.9} />}
+              iconOnly
+              tooltipLabel='Contact details'
+            />
+          }
+        >
+          <DashboardHeaderActionButton
+            ariaLabel={
+              panelMode === 'analytics'
+                ? 'Close analytics panel'
+                : 'Open analytics panel'
+            }
+            pressed={panelMode === 'analytics'}
+            onClick={() => toggle('analytics')}
+            icon={
+              <Icon name='ChartBar' className='h-4 w-4' strokeWidth={1.9} />
+            }
+            iconOnly
+            tooltipLabel='Analytics'
+          />
+        </DashboardHeaderActionGroup>
+      ),
+      [panelMode, toggle]
+    );
+
+    React.useEffect(() => {
+      setHeaderActions(headerActions);
+
+      return () => {
+        setHeaderActions(null);
+      };
+    }, [headerActions, setHeaderActions]);
+
     return (
       <AudienceTableStableProvider value={stableContextValue}>
         <AudienceTableVolatileProvider value={volatileContextValue}>
@@ -539,8 +589,6 @@ export const DashboardAudienceTableUnified = memo(
               subscriberCount={subscriberCount}
               totalAudienceCount={totalAudienceCount}
               total={total}
-              panelMode={panelMode}
-              onTogglePanel={toggle}
             />
 
             <div className='flex-1 min-h-0 flex flex-col bg-(--linear-app-content-surface)'>
