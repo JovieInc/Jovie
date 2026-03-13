@@ -170,9 +170,15 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
         };
       })}
       countLabel='social links'
+      summaryCount={filteredLinks.length}
+      summaryAriaLabel={`${filteredLinks.length} social links`}
       maxVisible={maxLinks}
       className={className}
-      railClassName={useCollapsedMode ? undefined : 'gap-1'}
+      railClassName={
+        useCollapsedMode
+          ? 'max-w-[148px] lg:max-w-[188px]'
+          : 'max-w-[176px] lg:max-w-[232px]'
+      }
     />
   );
 });

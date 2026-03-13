@@ -53,10 +53,11 @@ function getLayoutClasses(
 ): string {
   if (collapsed) {
     return cn(
-      'inline-grid max-w-[26px] grid-cols-[18px_0fr] items-center gap-1 overflow-hidden rounded-full px-[4px] py-[4px]',
+      'inline-grid max-w-[24px] grid-cols-[18px_0fr] items-center gap-0.5 overflow-hidden rounded-full px-[3px] py-[3px]',
       !defaultExpanded &&
-        'group-hover/pill:max-w-[132px] group-hover/pill:grid-cols-[18px_minmax(0,1fr)] group-focus-visible/pill:max-w-[132px] group-focus-visible/pill:grid-cols-[18px_minmax(0,1fr)]',
-      defaultExpanded && 'max-w-[132px] grid-cols-[18px_minmax(0,1fr)]'
+        'group-hover/pill:max-w-[132px] group-hover/pill:grid-cols-[18px_minmax(0,1fr)] group-focus-visible/pill:max-w-[132px] group-focus-visible/pill:grid-cols-[18px_minmax(0,1fr)] lg:group-hover/pill:max-w-[164px] lg:group-focus-visible/pill:max-w-[164px]',
+      defaultExpanded &&
+        'max-w-[132px] grid-cols-[18px_minmax(0,1fr)] lg:max-w-[164px]'
     );
   }
   return 'inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-[3px] min-h-[24px]';

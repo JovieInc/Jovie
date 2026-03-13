@@ -232,7 +232,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             summaryAriaLabel={`${availableCount} of ${totalCount} DSP links`}
             maxVisible={4}
             className='pointer-events-none flex-1 justify-start'
-            railClassName='max-w-[142px]'
+            railClassName='max-w-[164px] lg:max-w-[196px]'
           />
           <Icon
             name='ChevronDown'
