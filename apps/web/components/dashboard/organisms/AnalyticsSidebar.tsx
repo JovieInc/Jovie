@@ -86,7 +86,7 @@ function FunnelStage({
     return (
       <div className='flex w-full flex-col items-center'>
         <div
-          className='w-full rounded-xl border border-subtle bg-surface-1 px-5 py-4 text-center'
+          className='w-full rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-5 py-4 text-center'
           style={{ maxWidth: width }}
         >
           <LoadingSkeleton
@@ -112,23 +112,25 @@ function FunnelStage({
         className={cn(
           'relative w-full overflow-hidden rounded-xl border px-5 py-4 text-center',
           isLast
-            ? 'border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--color-bg-surface-1)] ring-1 ring-accent/15'
-            : 'border-subtle bg-gradient-to-r from-[var(--color-bg-surface-1)] to-[var(--color-bg-surface-2)]'
+            ? 'border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--linear-bg-surface-1)] ring-1 ring-accent/15'
+            : 'border-(--linear-border-subtle) bg-gradient-to-r from-[var(--linear-bg-surface-1)] to-[var(--linear-bg-surface-2)]'
         )}
         style={{ maxWidth: width }}
       >
-        <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+        <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
           {label}
         </p>
-        <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+        <p className='text-2xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
           {value}
         </p>
-        <p className='mt-0.5 text-[11px] text-secondary-token'>{description}</p>
+        <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+          {description}
+        </p>
       </div>
 
       {!isLast && (
         <div className='flex min-h-[40px] flex-col items-center py-2'>
-          <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
+          <ArrowDown className='h-3.5 w-3.5 text-(--linear-text-tertiary)/60' />
           <span
             className={cn(
               'mt-0.5 min-h-[16px] text-[11px] font-[510] tabular-nums',
@@ -182,7 +184,9 @@ function RankedList({
   if (items.length === 0) {
     return (
       <div className='min-h-[196px]'>
-        <p className='py-4 text-[13px] text-tertiary-token'>{emptyMessage}</p>
+        <p className='py-4 text-[13px] text-(--linear-text-tertiary)'>
+          {emptyMessage}
+        </p>
       </div>
     );
   }
@@ -195,15 +199,15 @@ function RankedList({
           className='group flex h-8 items-center justify-between rounded-lg px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>
+            <span className='w-3 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
               {index + 1}
             </span>
-            <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
+            <IconComponent className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
+            <span className='truncate text-[13px] text-(--linear-text-secondary) transition-colors group-hover:text-(--linear-text-primary)'>
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-[510] text-primary-token tabular-nums'>
+          <span className='ml-2 text-[13px] font-[510] text-(--linear-text-primary) tabular-nums'>
             {item.value}
           </span>
         </li>
@@ -237,10 +241,12 @@ function EngagementMetricCard({
         </>
       ) : (
         <>
-          <p className='text-xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+          <p className='text-xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
             {value}
           </p>
-          <p className='mt-1 text-[11px] text-tertiary-token'>{label}</p>
+          <p className='mt-1 text-[11px] text-(--linear-text-tertiary)'>
+            {label}
+          </p>
         </>
       )}
     </DrawerSurfaceCard>

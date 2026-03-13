@@ -59,12 +59,12 @@ function StatCard({
 
   return (
     <ContentSurfaceCard className='p-4 lg:p-5'>
-      <p className='text-[13px] text-secondary-token'>{label}</p>
-      <p className='mt-1 text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+      <p className='text-[13px] text-(--linear-text-secondary)'>{label}</p>
+      <p className='mt-1 text-2xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
         {value}
       </p>
       {meta && (
-        <p className='mt-1 text-[11px] text-tertiary-token tabular-nums'>
+        <p className='mt-1 text-[11px] text-(--linear-text-tertiary) tabular-nums'>
           {meta}
         </p>
       )}
@@ -98,8 +98,10 @@ function ListSection({
   return (
     <ContentSurfaceCard className='p-4 lg:p-5'>
       <div className='mb-3 flex items-center gap-2'>
-        <Icon className='h-4 w-4 text-tertiary-token' />
-        <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
+        <Icon className='h-4 w-4 text-(--linear-text-tertiary)' />
+        <h3 className='text-[13px] font-[510] text-(--linear-text-secondary)'>
+          {title}
+        </h3>
       </div>
 
       {loading && (
@@ -120,14 +122,14 @@ function ListSection({
               className='flex items-center justify-between group'
             >
               <div className='flex items-center gap-2 min-w-0 flex-1'>
-                <span className='text-[11px] font-[510] text-tertiary-token w-4 tabular-nums'>
+                <span className='w-4 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
                   {index + 1}
                 </span>
-                <span className='text-[13px] text-secondary-token group-hover:text-primary-token transition-colors truncate'>
+                <span className='truncate text-[13px] text-(--linear-text-secondary) transition-colors group-hover:text-(--linear-text-primary)'>
                   {item.label}
                 </span>
               </div>
-              <span className='text-[13px] font-[510] text-primary-token tabular-nums ml-2'>
+              <span className='ml-2 text-[13px] font-[510] text-(--linear-text-primary) tabular-nums'>
                 {item.value}
               </span>
             </li>
@@ -135,7 +137,7 @@ function ListSection({
         </ul>
       )}
       {!loading && items.length === 0 && (
-        <p className='text-[13px] text-tertiary-token py-4 text-center'>
+        <p className='py-4 text-center text-[13px] text-(--linear-text-tertiary)'>
           {emptyMessage}
         </p>
       )}
@@ -179,7 +181,9 @@ export function DashboardAnalytics() {
 
       {/* Header */}
       <div className='flex items-center justify-between'>
-        <p className='text-[13px] text-secondary-token'>{rangeLabel}</p>
+        <p className='text-[13px] text-(--linear-text-secondary)'>
+          {rangeLabel}
+        </p>
         <div className='flex items-center gap-2'>
           <DashboardRefreshButton
             ariaLabel='Refresh analytics'
