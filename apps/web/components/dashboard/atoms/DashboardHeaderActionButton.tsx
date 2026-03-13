@@ -29,7 +29,10 @@ export interface DashboardHeaderActionButtonProps {
   readonly onClick?: () => void;
   readonly icon: ReactNode;
   readonly label?: ReactNode;
+  readonly iconOnly?: boolean;
   readonly hideLabelOnMobile?: boolean;
+  readonly tooltipLabel?: string;
+  readonly tooltipShortcut?: string;
   readonly className?: string;
 }
 
@@ -40,10 +43,13 @@ export function DashboardHeaderActionButton({
   onClick,
   icon,
   label,
+  iconOnly = false,
   hideLabelOnMobile = false,
+  tooltipLabel,
+  tooltipShortcut,
   className,
 }: DashboardHeaderActionButtonProps) {
-  if (label) {
+  if (label && !iconOnly) {
     return (
       <Button
         type='button'
@@ -73,6 +79,10 @@ export function DashboardHeaderActionButton({
       ariaLabel={ariaLabel}
       aria-pressed={pressed}
       disabled={disabled}
+      tooltipLabel={
+        tooltipLabel ?? (typeof label === 'string' ? label : undefined)
+      }
+      tooltipShortcut={tooltipShortcut}
       className={cn(
         DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
         pressed && DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS,

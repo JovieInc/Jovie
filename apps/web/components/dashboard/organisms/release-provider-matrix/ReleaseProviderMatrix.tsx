@@ -513,7 +513,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             onClick={handleNewRelease}
             icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
             label='New Release'
-            hideLabelOnMobile
+            iconOnly
+            tooltipLabel='New Release'
           />
         </DashboardHeaderActionGroup>
       ) : null,

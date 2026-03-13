@@ -8,6 +8,7 @@ import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { cn } from '@/lib/utils';
 import {
+  PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
 } from './PageToolbar';
@@ -87,7 +88,7 @@ export function PageToolbarSearchForm({
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
               PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               (isOpen || searchValue.length > 0) &&
-                'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
+                PAGE_TOOLBAR_ACTION_ACTIVE_CLASS
             )}
           >
             {submitIcon}

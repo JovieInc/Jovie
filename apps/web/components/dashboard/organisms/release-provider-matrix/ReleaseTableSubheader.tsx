@@ -312,6 +312,12 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       }
       end={
         <>
+          <DrawerToggleButton
+            chrome='page-toolbar'
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
+          />
           <PageToolbarSearchForm
             searchValue={searchQuery}
             onSearchValueChange={onSearchQueryChange}
@@ -352,12 +358,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             onReleaseViewChange={onReleaseViewChange}
             triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
             compact
-          />
-          <DrawerToggleButton
-            chrome='page-toolbar'
-            ariaLabel='Toggle release preview'
-            label='Preview'
-            tooltipLabel='Preview'
           />
           <ExportCSVButton
             getData={() => getReleasesForExport(releases, selectedIds)}

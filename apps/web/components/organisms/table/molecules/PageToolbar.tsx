@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex flex-col gap-0.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-1.5 md:min-h-[42px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-1';
+  'flex flex-col gap-0.5 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-3 py-1 md:min-h-[40px] md:flex-row md:items-center md:justify-between md:px-[var(--linear-app-header-padding-x)] md:py-0.5';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 md:w-auto md:flex-none';
@@ -20,7 +20,7 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3 text-[12.5px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
@@ -28,11 +28,11 @@ export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-8 rounded-[6px] border border-transparent bg-transparent px-2.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 rounded-[6px] border border-transparent bg-transparent px-2 text-[12.5px] font-[510] text-(--linear-text-tertiary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
-  'w-8 justify-center px-0';
+  'w-8 justify-center px-0 text-(--linear-text-tertiary)';
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
   'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
