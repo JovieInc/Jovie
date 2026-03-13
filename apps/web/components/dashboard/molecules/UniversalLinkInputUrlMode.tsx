@@ -120,19 +120,19 @@ export function UniversalLinkInputUrlMode({
   return (
     <div className='relative w-full'>
       {isVoiceRecording ? (
-        <div className='flex w-full items-center gap-2 rounded-3xl border border-default bg-surface-1 px-2 py-1 shadow-xs'>
+        <div className='flex w-full items-center gap-2 rounded-3xl border border-(--linear-border-default) bg-(--linear-bg-surface-1) px-2 py-1 shadow-xs'>
           <button
             type='button'
             onClick={onCancelVoiceRecording}
-            className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+            className='flex h-10 w-10 items-center justify-center rounded-full text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
             aria-label='Cancel voice recording'
           >
             <X className='h-4 w-4' />
           </button>
 
-          <div className='flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl bg-surface-2 px-3 py-2'>
+          <div className='flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl bg-(--linear-bg-surface-2) px-3 py-2'>
             <VoiceRecordingWaveform levels={waveformLevels} />
-            <span className='text-sm font-medium tabular-nums text-primary-token'>
+            <span className='text-sm font-medium tabular-nums text-(--linear-text-primary)'>
               {recordingDurationLabel}
             </span>
           </div>
@@ -149,10 +149,10 @@ export function UniversalLinkInputUrlMode({
       ) : (
         <div
           className={cn(
-            'relative flex w-full items-center gap-2 overflow-hidden bg-surface-1 px-2 py-1 shadow-xs transition-all',
+            'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-bg-surface-1) px-2 py-1 shadow-xs transition-all',
             isDropdownOpen
               ? 'rounded-t-3xl border-2 border-b-0 border-accent'
-              : 'rounded-full border border-default focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+              : 'rounded-full border border-(--linear-border-default) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
             disabled && 'opacity-50'
           )}
         >
@@ -199,7 +199,7 @@ export function UniversalLinkInputUrlMode({
               <button
                 type='button'
                 onClick={onVoiceInput}
-                className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                className='flex h-10 w-10 items-center justify-center rounded-full text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
                 aria-label='Start voice input'
               >
                 <Mic className='h-4 w-4' />
@@ -226,7 +226,7 @@ export function UniversalLinkInputUrlMode({
               <button
                 type='button'
                 onClick={onClear}
-                className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+                className='flex h-9 w-9 items-center justify-center rounded-full text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
                 aria-label='Clear input'
               >
                 <X className='h-4 w-4' />
@@ -251,7 +251,7 @@ export function UniversalLinkInputUrlMode({
       </div>
 
       {url && !detectedLink?.isValid && (
-        <output className='hidden text-xs text-secondary-token'>
+        <output className='hidden text-xs text-(--linear-text-secondary)'>
           Paste links from Spotify, Instagram, TikTok, YouTube, and more for
           automatic detection
         </output>
