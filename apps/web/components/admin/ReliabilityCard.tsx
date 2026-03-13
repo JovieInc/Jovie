@@ -56,13 +56,13 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         title='Reliability'
         subtitle='System health metrics'
         actions={
-          <span className={`text-app font-medium ${tone.labelClassName}`}>
+          <span className={`text-[12px] font-medium ${tone.labelClassName}`}>
             {tone.label}
           </span>
         }
         className='px-5 py-3'
       />
-      <div className='space-y-3 p-5 text-app text-secondary-token'>
+      <div className='space-y-3 p-5 text-[12px] leading-[17px] text-(--linear-text-secondary)'>
         <ContentMetricRow
           label='Error rate'
           value={errorRateLabel}
@@ -85,7 +85,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         />
 
         {summary.lastIncidentAt && (
-          <p className='pt-1 text-2xs text-tertiary-token'>
+          <p className='pt-1 text-[11px] text-(--linear-text-tertiary)'>
             Last incident on {lastIncidentLabel}.
             {tone.label !== 'Healthy' && (
               <> Review logs and alerts before shipping new changes.</>
