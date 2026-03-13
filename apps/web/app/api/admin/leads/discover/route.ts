@@ -52,7 +52,7 @@ export async function POST() {
       );
     }
 
-    const result = await runDiscovery(settings!, keywords);
+    const result = await runDiscovery(settings, keywords);
 
     return NextResponse.json(
       { result },
