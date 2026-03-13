@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   Input,
   Kbd,
   Sheet,
@@ -11,6 +10,8 @@ import {
 } from '@jovie/ui';
 import { ChevronLeft, Search, X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import {
   KEYBOARD_SHORTCUTS,
@@ -90,14 +91,14 @@ function ShortcutCategorySection({
 
   return (
     <div className='space-y-1'>
-      <h3 className='px-3 py-2 text-xs font-medium uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h3 className='px-3 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
-      <div className='space-y-0.5'>
+      <ContentSurfaceCard className='space-y-0.5 p-1.5'>
         {shortcuts.map(shortcut => (
           <ShortcutItem key={shortcut.id} shortcut={shortcut} />
         ))}
-      </div>
+      </ContentSurfaceCard>
     </div>
   );
 }
@@ -170,37 +171,34 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='top-1 right-1 bottom-1 h-auto w-full rounded-xl border border-(--linear-border-default) p-0 sm:max-w-md'
+        className='top-1 right-1 bottom-1 h-auto w-full rounded-[12px] border border-(--linear-app-shell-border) bg-(--linear-app-drawer-surface) p-0 shadow-[var(--linear-app-drawer-shadow)] sm:max-w-md'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
         {/* Header with back button and title */}
-        <SheetHeader className='flex shrink-0 flex-row items-center gap-3 space-y-0 border-b border-(--linear-border-subtle) px-4 py-3'>
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-8 w-8 shrink-0'
+        <SheetHeader className='flex shrink-0 flex-row items-center gap-3 space-y-0 border-b border-(--linear-app-frame-seam) px-4 py-2.5'>
+          <HeaderIconButton
+            size='sm'
             onClick={close}
-            aria-label='Close keyboard shortcuts'
+            ariaLabel='Close keyboard shortcuts'
           >
             <ChevronLeft className='h-4 w-4' />
-          </Button>
-          <SheetTitle className='text-sm font-medium'>
+          </HeaderIconButton>
+          <SheetTitle className='text-[13px] font-[560] tracking-[-0.01em]'>
             Keyboard Shortcuts
           </SheetTitle>
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-8 w-8 shrink-0 ml-auto'
+          <HeaderIconButton
+            size='sm'
+            className='ml-auto'
             onClick={close}
-            aria-label='Close'
+            ariaLabel='Close'
           >
             <X className='h-4 w-4' />
-          </Button>
+          </HeaderIconButton>
         </SheetHeader>
 
         {/* Search input */}
-        <div className='shrink-0 border-b border-(--linear-border-subtle) px-4 py-3'>
+        <div className='shrink-0 border-b border-(--linear-app-frame-seam) px-4 py-3'>
           <div className='relative'>
             <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--linear-text-tertiary)' />
             <Input
@@ -209,19 +207,18 @@ export function KeyboardShortcutsSheet() {
               placeholder='Search shortcuts'
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className='border-(--linear-border-default) bg-(--linear-bg-surface-2) pl-9'
+              className='border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) pl-9'
               inputSize='sm'
             />
             {searchQuery && (
-              <Button
-                variant='ghost'
-                size='icon'
-                className='absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6'
+              <HeaderIconButton
+                size='xs'
+                className='absolute right-1 top-1/2 -translate-y-1/2'
                 onClick={() => setSearchQuery('')}
-                aria-label='Clear search'
+                ariaLabel='Clear search'
               >
                 <X className='h-3 w-3' />
-              </Button>
+              </HeaderIconButton>
             )}
           </div>
         </div>
@@ -239,12 +236,12 @@ export function KeyboardShortcutsSheet() {
               ))}
             </div>
           ) : (
-            <div className='flex flex-col items-center justify-center py-12 text-center'>
+            <ContentSurfaceCard className='flex flex-col items-center justify-center py-12 text-center'>
               <Search className='mb-3 h-8 w-8 text-(--linear-text-tertiary)' />
               <p className='text-sm text-(--linear-text-tertiary)'>
                 No shortcuts found for &quot;{searchQuery}&quot;
               </p>
-            </div>
+            </ContentSurfaceCard>
           )}
         </div>
       </SheetContent>

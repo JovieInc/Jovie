@@ -3,6 +3,7 @@
 import { X } from 'lucide-react';
 import {
   DrawerButton,
+  DrawerInlineIconButton,
   DrawerPropertyRow,
   DrawerSectionHeading,
   DrawerSurfaceCard,
@@ -40,18 +41,17 @@ export function DemoReleaseDetail({
   return (
     <div className='flex h-full flex-col'>
       {/* Header */}
-      <div className='flex min-h-11 items-center justify-between border-b border-(--linear-border-subtle) px-4 py-2'>
+      <div className='flex min-h-10 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 py-2'>
         <div className='min-w-0 flex-1 text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
-        <button
-          type='button'
+        <DrawerInlineIconButton
           onClick={onClose}
-          className='flex size-7 shrink-0 items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='size-7 rounded-[7px]'
           aria-label='Close detail panel'
         >
           <X className='size-4' />
-        </button>
+        </DrawerInlineIconButton>
       </div>
 
       {/* Scrollable content */}
@@ -162,7 +162,7 @@ export function DemoReleaseDetail({
         {/* Activity */}
         <div className='mt-4'>
           <DrawerSectionHeading className='mb-3'>Activity</DrawerSectionHeading>
-          <div className='space-y-0.5'>
+          <DrawerSurfaceCard className='space-y-0.5 p-3'>
             {DEMO_ACTIVITY_TEMPLATE.map((activity, index) => (
               <div
                 key={activity.id}
@@ -195,16 +195,18 @@ export function DemoReleaseDetail({
                 </div>
               </div>
             ))}
-          </div>
+          </DrawerSurfaceCard>
         </div>
 
         {/* Note */}
         {release.note && (
           <div className='mt-4 mb-4'>
             <DrawerSectionHeading className='mb-2'>Note</DrawerSectionHeading>
-            <p className='text-[13px] text-(--linear-text-secondary)'>
-              {release.note}
-            </p>
+            <DrawerSurfaceCard className='p-3'>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
+                {release.note}
+              </p>
+            </DrawerSurfaceCard>
           </div>
         )}
 

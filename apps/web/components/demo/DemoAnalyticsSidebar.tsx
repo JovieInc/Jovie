@@ -2,12 +2,12 @@
 
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerSurfaceCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { cn } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
 /*  Hardcoded mock analytics data                                       */
@@ -69,26 +69,14 @@ function SidebarRangeToggle({
   readonly onChange: (v: DemoRange) => void;
 }) {
   return (
-    <div className='inline-flex items-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5'>
-      {RANGE_OPTIONS.map(opt => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type='button'
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              'rounded-full px-3 py-1 text-[13px] font-[510] transition-all duration-150',
-              active
-                ? 'bg-(--linear-bg-surface-3) text-(--linear-text-primary)'
-                : 'text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary)'
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <AppSegmentControl
+      value={value}
+      onValueChange={value => onChange(value as DemoRange)}
+      options={RANGE_OPTIONS}
+      size='sm'
+      className='shrink-0'
+      aria-label='Analytics time range'
+    />
   );
 }
 
@@ -147,7 +135,7 @@ function FunnelSection() {
         {stages.map((stage, i) => (
           <div key={stage.label}>
             <div
-              className='flex items-center justify-between rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2'
+              className='flex items-center justify-between rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-3 py-2'
               style={{ width: stage.width }}
             >
               <span className='text-[13px] text-(--linear-text-secondary)'>
@@ -205,7 +193,7 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.name}
-          className='group flex h-8 items-center justify-between rounded-lg px-2'
+          className='group flex h-8 items-center justify-between rounded-[7px] px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
             <span className='w-3 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
@@ -259,7 +247,7 @@ export function DemoAnalyticsSidebar({
     >
       <div className='space-y-4'>
         {/* Engagement metrics */}
-        <div className='flex gap-2'>
+        <div className='grid grid-cols-3 gap-2'>
           <EngagementMetric
             label='Total Clicks'
             value={numberFormatter.format(
@@ -282,7 +270,7 @@ export function DemoAnalyticsSidebar({
         <FunnelSection />
 
         {/* Tabs + range toggle */}
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-1.5'>
           <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}

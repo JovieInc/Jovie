@@ -280,7 +280,7 @@ export function ProfileNotificationsMenu({
               id='preferred-dsp-select'
               value={selectedDspPreference}
               onChange={event => handleDspPreferenceChange(event.target.value)}
-              className='h-9 w-full rounded-md border border-(--linear-border-default) bg-(--linear-bg-surface-0) px-2 text-sm text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+              className='h-9 w-full rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-2.5 text-sm text-(--linear-text-primary) shadow-none focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
             >
               <option value=''>Choose your platform</option>
               {availableDspPreferences.map(preference => (
@@ -336,7 +336,7 @@ export function ProfileNotificationsMenu({
           }
         }}
       >
-        <AlertDialogContent className='max-w-md'>
+        <AlertDialogContent className='max-w-md rounded-[12px] border border-(--linear-app-shell-border) bg-(--linear-bg-surface-0) shadow-[var(--linear-app-drawer-shadow)]'>
           <AlertDialogHeader className='gap-2'>
             <AlertDialogTitle className='text-base font-semibold text-(--linear-text-primary)'>
               {confirmChannel
@@ -352,14 +352,14 @@ export function ProfileNotificationsMenu({
           <AlertDialogFooter className='gap-2 sm:gap-2'>
             <AlertDialogCancel
               disabled={isConfirming}
-              className='flex-1 sm:flex-none'
+              className='flex-1 rounded-[8px] border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) sm:flex-none'
             >
               Keep
             </AlertDialogCancel>
             <AlertDialogAction
               variant='destructive'
               disabled={isConfirming || confirmChannel === null}
-              className='flex-1 sm:flex-none'
+              className='flex-1 rounded-[8px] sm:flex-none'
               onClick={() => handleConfirm(onUnsubscribe)}
             >
               {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}
