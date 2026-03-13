@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import {
   Check,
   Copy,
@@ -17,6 +16,7 @@ import Image from 'next/image';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -403,17 +403,17 @@ export function EarningsTab() {
             </div>
 
             {/* Tip URL display */}
-            <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5'>
+            <DrawerSurfaceCard className='flex items-center gap-2 rounded-[10px] bg-(--linear-bg-surface-0) px-3 py-2.5'>
               <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
                 {tipUrl}
               </span>
-            </div>
+            </DrawerSurfaceCard>
 
             {/* Action buttons */}
             <div className='flex flex-wrap gap-2'>
-              <Button
-                variant='secondary'
+              <DrawerButton
+                tone='secondary'
                 size='sm'
                 className='gap-2'
                 onClick={handleDownloadPng}
@@ -421,10 +421,10 @@ export function EarningsTab() {
               >
                 <FileImage className='h-3.5 w-3.5' />
                 {isDownloadingPng ? 'Generating...' : 'Download PNG'}
-              </Button>
+              </DrawerButton>
 
-              <Button
-                variant='secondary'
+              <DrawerButton
+                tone='secondary'
                 size='sm'
                 className='gap-2'
                 onClick={handleDownloadSvg}
@@ -432,10 +432,10 @@ export function EarningsTab() {
               >
                 <FileCode2 className='h-3.5 w-3.5' />
                 {isDownloadingSvg ? 'Generating...' : 'Download SVG'}
-              </Button>
+              </DrawerButton>
 
-              <Button
-                variant='ghost'
+              <DrawerButton
+                tone='ghost'
                 size='sm'
                 className='gap-2'
                 onClick={handleCopyLink}
@@ -446,7 +446,7 @@ export function EarningsTab() {
                   <Copy className='h-3.5 w-3.5' />
                 )}
                 {isCopySuccess ? 'Copied' : 'Copy tip link'}
-              </Button>
+              </DrawerButton>
             </div>
           </div>
         </div>

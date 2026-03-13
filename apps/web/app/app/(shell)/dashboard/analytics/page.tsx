@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { DashboardAnalytics } from '@/components/dashboard/dashboard-analytics';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -67,15 +68,6 @@ async function AnalyticsContentSection() {
 const SKELETON_STAT_KEYS = Array.from({ length: 3 }, (_, i) => `stat-${i}`);
 const SKELETON_LIST_KEYS = Array.from({ length: 3 }, (_, i) => `list-${i}`);
 
-function AnalyticsHeaderSkeleton() {
-  return (
-    <div className='flex items-center justify-between'>
-      <div className='h-4 w-24 skeleton motion-reduce:animate-none rounded' />
-      <div className='h-8 w-32 skeleton motion-reduce:animate-none rounded-full' />
-    </div>
-  );
-}
-
 function AnalyticsStatsSkeleton() {
   return (
     <div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
@@ -127,8 +119,13 @@ export default async function AnalyticsPage() {
           remains stable while streaming.  */}
       <Suspense
         fallback={
-          <div className='max-w-5xl space-y-8'>
-            <AnalyticsHeaderSkeleton />
+          <div className='max-w-5xl space-y-6'>
+            <ContentSectionHeaderSkeleton
+              titleWidth='w-24'
+              descriptionWidth='w-32'
+              actionWidths={['w-8', 'w-32']}
+              actionsClassName='gap-2'
+            />
             <div className='space-y-6'>
               <AnalyticsStatsSkeleton />
               <AnalyticsListsSkeleton />

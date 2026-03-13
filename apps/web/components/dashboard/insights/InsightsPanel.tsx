@@ -1,8 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useMemo, useState } from 'react';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
 import { useInsightsQuery } from '@/lib/queries/useInsightsQuery';
@@ -167,45 +168,31 @@ export function InsightsPanel() {
           </p>
         </div>
 
-        <Button
-          variant='secondary'
-          size='sm'
+        <DashboardHeaderActionButton
+          ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}
           disabled={isGenerating}
           onClick={() => generate()}
-          className='h-8 gap-2 px-3'
-        >
-          <Icon
-            name={isGenerating ? 'Loader2' : 'Sparkles'}
-            className={
-              isGenerating ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'
-            }
-          />
-          {isGenerating ? 'Generating...' : 'Generate'}
-        </Button>
+          icon={
+            <Icon
+              name={isGenerating ? 'Loader2' : 'Sparkles'}
+              className={isGenerating ? 'animate-spin' : undefined}
+            />
+          }
+          label={isGenerating ? 'Generating...' : 'Generate'}
+          className='h-8 px-3'
+        />
       </div>
 
       {/* Category filter pills */}
-      <div
-        className='flex flex-wrap gap-1.5'
-        role='toolbar'
+      <AppSegmentControl
+        value={selectedCategory}
+        onValueChange={setSelectedCategory}
+        options={CATEGORY_FILTERS}
         aria-label='Filter insights by category'
-      >
-        {CATEGORY_FILTERS.map(filter => (
-          <button
-            key={filter.value}
-            type='button'
-            onClick={() => setSelectedCategory(filter.value)}
-            aria-pressed={selectedCategory === filter.value}
-            className={`rounded-[8px] border px-3 py-1 text-[12.5px] font-[510] tracking-[-0.01em] transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 ${
-              selectedCategory === filter.value
-                ? 'border-(--linear-border-default) bg-(--linear-bg-surface-0) text-(--linear-text-primary)'
-                : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
+        surface='ghost'
+        className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
+        triggerClassName='min-h-8 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1 text-[12.5px] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) data-[state=active]:border-(--linear-border-default) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary)'
+      />
 
       {/* Content */}
       <InsightsPanelContent
