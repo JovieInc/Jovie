@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import {
   DrawerButton,
   DrawerInlineIconButton,
@@ -207,41 +208,32 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show provider availability details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex h-7 items-center gap-1.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-[7px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-1.5 py-1 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
-          {/* Compact provider icons */}
-          <div className='flex -space-x-1'>
-            {compactProviders.map(providerKey => {
-              const status = getProviderStatus(providerKey);
-
-              return (
-                <div
-                  key={providerKey}
+          <CompactLinkRail
+            items={compactProviders.map(providerKey => ({
+              id: providerKey,
+              platformIcon: providerKey,
+              platformName: providerConfig[providerKey].label,
+              primaryText: providerConfig[providerKey].label,
+              summaryIcon: (
+                <ProviderIcon
+                  provider={providerKey}
                   className={cn(
-                    'relative flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-bg-surface-0) bg-(--linear-bg-surface-0)',
-                    status === 'missing' && 'opacity-70'
+                    'h-2.5 w-2.5',
+                    getProviderStatus(providerKey) === 'missing' && 'opacity-35'
                   )}
-                >
-                  <ProviderIcon
-                    provider={providerKey}
-                    className={cn(
-                      'h-3 w-3',
-                      status === 'missing' && 'opacity-30'
-                    )}
-                    aria-label={providerConfig[providerKey].label}
-                  />
-                  {status === 'manual' && (
-                    <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full border border-(--linear-bg-surface-0) bg-(--color-warning)' />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Summary text */}
-          <span className='tabular-nums text-(--linear-text-secondary)'>
-            {availableCount}/{totalCount}
-          </span>
+                  aria-hidden='true'
+                />
+              ),
+            }))}
+            countLabel='DSP links'
+            summaryCount={availableCount}
+            summaryAriaLabel={`${availableCount} of ${totalCount} DSP links`}
+            maxVisible={4}
+            className='pointer-events-none flex-1 justify-start'
+            railClassName='max-w-[142px]'
+          />
           <Icon
             name='ChevronDown'
             className='h-3 w-3 text-(--linear-text-tertiary)'

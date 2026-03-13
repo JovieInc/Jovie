@@ -26,11 +26,11 @@ export interface PillClassNameParams {
  * Base classes applied to all pills
  */
 const BASE_CLASSES = [
-  'group/pill relative inline-flex items-center rounded-lg border text-[13px] font-[510]',
+  'group/pill relative min-w-0 border text-[12px] font-[510] tracking-[-0.01em]',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
-  'bg-surface-1 hover:bg-(--pill-bg-hover) dark:bg-surface-1/60 dark:hover:bg-(--pill-bg-hover) dark:backdrop-blur-sm',
-  'text-secondary-token hover:text-primary-token',
-  'transition-all duration-200',
+  'bg-(--linear-bg-surface-1) hover:bg-(--pill-bg-hover)',
+  'text-(--linear-text-secondary) hover:text-(--linear-text-primary)',
+  'transition-[background-color,border-color,color,grid-template-columns,max-width,opacity,padding,margin] duration-180 ease-out',
 ] as const;
 
 /**
@@ -53,12 +53,13 @@ function getLayoutClasses(
 ): string {
   if (collapsed) {
     return cn(
-      'h-7 justify-center px-2',
-      !defaultExpanded && 'w-7 p-0',
-      defaultExpanded && 'w-auto gap-1'
+      'inline-grid max-w-[26px] grid-cols-[18px_0fr] items-center gap-1 overflow-hidden rounded-full px-[4px] py-[4px]',
+      !defaultExpanded &&
+        'group-hover/pill:max-w-[132px] group-hover/pill:grid-cols-[18px_minmax(0,1fr)] group-focus-visible/pill:max-w-[132px] group-focus-visible/pill:grid-cols-[18px_minmax(0,1fr)]',
+      defaultExpanded && 'max-w-[132px] grid-cols-[18px_minmax(0,1fr)]'
     );
   }
-  return 'max-w-full gap-1.5 px-2 py-[3px] min-h-[24px]';
+  return 'inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-[3px] min-h-[24px]';
 }
 
 /**
