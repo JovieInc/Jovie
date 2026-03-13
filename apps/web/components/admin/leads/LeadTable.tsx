@@ -100,7 +100,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const updateLeadStatusMutation = useUpdateLeadStatusMutation();
 
   useEffect(() => {
-    void queryClient.invalidateQueries({
+    queryClient.invalidateQueries({
       queryKey: queryKeys.admin.leads.all(),
     });
   }, [queryClient, refreshKey]);
