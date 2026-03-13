@@ -358,7 +358,7 @@ export function ReleaseTable({
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '154px' },
+        { variant: 'meta', width: '194px' },
       ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedRowIds}

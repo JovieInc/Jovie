@@ -147,6 +147,7 @@ export function AddReleaseSidebar({
         <EntityHeaderCard
           image={
             <DrawerMediaThumb
+              src={artworkUrl.trim() || undefined}
               alt='New release artwork'
               sizeClassName='h-10 w-10'
               sizes='40px'

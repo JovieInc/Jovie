@@ -95,12 +95,12 @@ export function SidebarInstallBanner() {
             type='button'
             aria-label='Dismiss version update banner'
             onClick={dismissVersionUpdate}
-            className='absolute top-1.5 right-1.5 flex size-4.5 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground'
+            className='absolute top-1 right-1 flex size-7 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
           >
             <X className='size-3' />
           </button>
 
-          <div className='flex items-start gap-1.5 pr-4'>
+          <div className='flex items-start gap-1.5 pr-7'>
             <RefreshCw className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon' />
             <div className='min-w-0'>
               <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
@@ -112,7 +112,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={reload}
-                className='mt-1 inline-flex h-5 items-center rounded-[6px] border border-sidebar-border/50 px-1.5 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active'
+                className='mt-1 inline-flex min-h-7 items-center rounded-[6px] border border-sidebar-border/50 px-2 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
               >
                 Reload
               </button>
@@ -133,12 +133,12 @@ export function SidebarInstallBanner() {
           type='button'
           aria-label='Dismiss install banner'
           onClick={dismissPwa}
-          className='absolute top-1.5 right-1.5 flex size-4.5 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground'
+          className='absolute top-1 right-1 flex size-7 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
         >
           <X className='size-3' />
         </button>
 
-        <div className='flex items-start gap-1.5 pr-4'>
+        <div className='flex items-start gap-1.5 pr-7'>
           <Download className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon' />
           <div className='min-w-0'>
             <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
@@ -153,7 +153,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={install}
-                className='mt-1 inline-flex h-5 items-center rounded-[6px] border border-sidebar-border/50 px-1.5 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active'
+                className='mt-1 inline-flex min-h-7 items-center rounded-[6px] border border-sidebar-border/50 px-2 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
               >
                 Install
               </button>

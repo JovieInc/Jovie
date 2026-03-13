@@ -144,7 +144,7 @@ export function DisplayMenuDropdown({
       type='button'
       className='inline-flex items-center gap-1.5 rounded-[7px] border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
     >
-      <Settings2 className='h-3.5 w-3.5' />
+      <Settings2 className='h-4 w-4' />
       Display
     </button>
   );
@@ -162,7 +162,7 @@ export function DisplayMenuDropdown({
             aria-label='Close'
             className='rounded-[7px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
           >
-            <X className='h-3.5 w-3.5' />
+            <X className='h-4 w-4' />
           </PopoverPrimitive.Close>
         </div>
 
@@ -194,7 +194,7 @@ export function DisplayMenuDropdown({
                 aria-pressed={viewMode === 'list'}
                 aria-label='List view'
               >
-                <LayoutList className='h-3.5 w-3.5' />
+                <LayoutList className='h-4 w-4' />
                 <span>List</span>
               </button>
 
@@ -210,7 +210,7 @@ export function DisplayMenuDropdown({
                 aria-pressed={viewMode === 'board'}
                 aria-label='Board view'
               >
-                <LayoutGrid className='h-3.5 w-3.5' />
+                <LayoutGrid className='h-4 w-4' />
                 <span>Board</span>
               </button>
             </fieldset>

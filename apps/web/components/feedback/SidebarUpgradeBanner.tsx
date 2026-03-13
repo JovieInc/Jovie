@@ -76,7 +76,7 @@ export function SidebarUpgradeBanner() {
               type='button'
               onClick={() => handleUpgrade()}
               disabled={!selectedPrice?.priceId || checkoutMutation.isPending}
-              className='mt-1 inline-flex h-5 items-center rounded-[6px] border border-sidebar-border/50 px-1.5 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active disabled:cursor-not-allowed disabled:opacity-60'
+              className='mt-1 inline-flex min-h-7 items-center rounded-[6px] border border-sidebar-border/50 px-2 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring disabled:cursor-not-allowed disabled:opacity-60'
             >
               {checkoutMutation.isPending ? 'Opening…' : 'Upgrade'}
             </button>

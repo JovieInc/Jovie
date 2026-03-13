@@ -3,7 +3,7 @@
 import { Badge, Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Search, Users, X } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AdminTableHeader,
@@ -123,6 +123,10 @@ function AdminUserMobileCard({
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const { users: initialUsers, pageSize, total, search, sort } = props;
   const [searchTerm, setSearchTerm] = useState(search);
+
+  useEffect(() => {
+    setSearchTerm(search);
+  }, [search]);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminUsersInfiniteQuery({

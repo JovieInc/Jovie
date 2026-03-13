@@ -92,21 +92,23 @@ export function TrackMetaSummary({
           ) : null}
         </div>
 
-        <div
-          className={cn(
-            'flex items-center gap-3 text-(--linear-text-secondary)',
-            styles.meta
-          )}
-        >
-          {durationMs != null ? (
-            <span className='tabular-nums'>{formatDuration(durationMs)}</span>
-          ) : null}
-          {isrc ? (
-            <span className='font-mono text-[9.5px] tracking-[0.02em] text-(--linear-text-tertiary)'>
-              {isrc}
-            </span>
-          ) : null}
-        </div>
+        {durationMs != null || isrc ? (
+          <div
+            className={cn(
+              'flex items-center gap-3 text-(--linear-text-secondary)',
+              styles.meta
+            )}
+          >
+            {durationMs != null ? (
+              <span className='tabular-nums'>{formatDuration(durationMs)}</span>
+            ) : null}
+            {isrc ? (
+              <span className='font-mono text-[9.5px] tracking-[0.02em] text-(--linear-text-tertiary)'>
+                {isrc}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {artwork ? artwork : null}
