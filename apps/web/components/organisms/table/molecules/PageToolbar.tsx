@@ -15,6 +15,9 @@ export const PAGE_TOOLBAR_START_CLASS =
 export const PAGE_TOOLBAR_END_CLASS =
   'ml-auto flex w-full items-center justify-end gap-0.5 md:w-auto';
 
+export const PAGE_TOOLBAR_META_TEXT_CLASS =
+  'text-xs text-(--linear-text-tertiary) tabular-nums';
+
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
   'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3.5 text-[13px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'

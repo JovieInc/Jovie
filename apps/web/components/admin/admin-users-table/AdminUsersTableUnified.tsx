@@ -18,6 +18,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   ExportCSVButton,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarSearchForm,
   TableBulkActionsToolbar,
   UnifiedTable,
@@ -469,7 +470,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                 />
                 <AdminTableSubheader
                   start={
-                    <div className='text-xs text-secondary-token tabular-nums'>
+                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                       Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
                       {total.toLocaleString()} users
                     </div>

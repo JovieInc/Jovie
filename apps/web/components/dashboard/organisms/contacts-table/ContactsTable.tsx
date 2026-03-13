@@ -8,7 +8,11 @@ import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleBut
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
-import { UnifiedTable } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbar,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
@@ -78,7 +82,7 @@ export const ContactsTable = memo(function ContactsTable({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedContactId, contacts.length, isSidebarOpen]);
 
-  // Set header actions (add contact button + drawer toggle on right)
+  // Set header actions (add contact button on right)
   const { setHeaderActions } = useSetHeaderActions();
 
   // Use ref for onAddContact to keep header actions stable
@@ -96,7 +100,6 @@ export const ContactsTable = memo(function ContactsTable({
           label='Add Contact'
           hideLabelOnMobile
         />
-        <DrawerToggleButton ariaLabel='Toggle contact details' />
       </DashboardHeaderActionGroup>
     ),
     []
@@ -176,6 +179,25 @@ export const ContactsTable = memo(function ContactsTable({
           Manage bookings, management, and press contacts for {artistName}
         </p>
 
+        {!isEmpty ? (
+          <PageToolbar
+            start={
+              <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                {contacts.length}{' '}
+                {contacts.length === 1 ? 'contact' : 'contacts'}
+              </span>
+            }
+            end={
+              <DrawerToggleButton
+                chrome='page-toolbar'
+                ariaLabel='Toggle contact details'
+                label='Details'
+                tooltipLabel='Details'
+              />
+            }
+          />
+        ) : null}
+
         {/* Scrollable content area */}
         <div className='flex-1 min-h-0 overflow-auto'>
           {isEmpty ? (
@@ -206,15 +228,6 @@ export const ContactsTable = memo(function ContactsTable({
             />
           )}
         </div>
-
-        {/* Footer - contact count */}
-        {!isEmpty && (
-          <div className='shrink-0 flex items-center border-t border-subtle px-4 py-1.5'>
-            <span className='text-[13px] text-tertiary-token tabular-nums'>
-              {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* Right sidebar */}

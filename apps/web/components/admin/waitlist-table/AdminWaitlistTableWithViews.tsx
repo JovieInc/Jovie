@@ -19,6 +19,7 @@ import {
   ExportCSVButton,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
   TableBulkActionsToolbar,
   useRowSelection,
@@ -233,7 +234,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             />
             <AdminTableSubheader
               start={
-                <div className='text-xs text-secondary-token tabular-nums'>
+                <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
                   Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
                   {total.toLocaleString()} entries
                 </div>

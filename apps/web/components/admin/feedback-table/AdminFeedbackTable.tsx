@@ -17,7 +17,8 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import {
-  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PageToolbarActionButton,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
@@ -204,22 +205,20 @@ export function AdminFeedbackTable({
         />
         <AdminTableSubheader
           start={
-            <span className='text-xs text-secondary-token'>
+            <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
               {rows.length} item{rows.length === 1 ? '' : 's'}
             </span>
           }
           end={
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={copyAllAsMarkdown}
+            <PageToolbarActionButton
+              label='Copy all as Markdown'
+              ariaLabel='Copy all feedback as Markdown'
+              tooltipLabel='Copy all as Markdown'
+              iconOnly
               disabled={rows.length === 0}
-              className={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
-            >
-              <ClipboardCopy className='h-3.5 w-3.5' />
-              <span>Copy All as Markdown</span>
-            </Button>
+              onClick={copyAllAsMarkdown}
+              icon={<ClipboardCopy className='h-3.5 w-3.5' />}
+            />
           }
         />
         <AdminTableShell testId='admin-feedback-table'>

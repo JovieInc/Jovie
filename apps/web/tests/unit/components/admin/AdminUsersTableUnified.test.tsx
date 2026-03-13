@@ -39,6 +39,7 @@ vi.mock('@/components/admin/table/AdminTableShell', () => ({
 vi.mock('@/components/organisms/table', () => ({
   convertContextMenuItems: () => [],
   ExportCSVButton: () => <button type='button'>Export</button>,
+  PAGE_TOOLBAR_META_TEXT_CLASS: 'page-toolbar-meta-text',
   PageToolbar: ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
     <div>
       {start}

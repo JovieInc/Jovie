@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import {
   ExportCSVButton,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarSearchForm,
 } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -72,7 +73,7 @@ export function AdminCreatorsToolbar({
     <AdminTableSubheader
       start={
         hasSelection ? undefined : (
-          <div className='text-xs text-secondary-token tabular-nums'>
+          <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
             Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
             {total.toLocaleString()} profiles
           </div>

@@ -9,7 +9,10 @@ import {
   AdminTableHeader,
   AdminTableSubheader,
 } from '@/components/admin/table/AdminTableHeader';
-import { UnifiedTable } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
@@ -131,7 +134,7 @@ export function ActivityTableUnified({
         subtitle='Monitor operational actions and recent system outcomes.'
       />
       <AdminTableSubheader
-        start={<p className='text-xs text-secondary-token'>Last 7 days.</p>}
+        start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
       />
       <div className='overflow-x-auto'>
         <UnifiedTable
