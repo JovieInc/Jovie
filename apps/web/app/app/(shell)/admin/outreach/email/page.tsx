@@ -82,8 +82,15 @@ export default function AdminOutreachEmailPage() {
     <div className='flex flex-col gap-4'>
       <ContentSurfaceCard className='overflow-hidden'>
         <ContentSectionHeader
-          title={`Email Queue (${total})`}
+          title='Email Queue'
+          subtitle='Highest-priority leads queued for email outreach'
+          actions={
+            <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
+              {total} queued
+            </span>
+          }
           className='min-h-0 px-4 py-3 sm:px-6'
+          actionsClassName='shrink-0'
         />
 
         <ContentTable>

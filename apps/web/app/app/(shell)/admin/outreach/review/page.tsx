@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import {
   ContentTable,
   ContentTableStateRow,
 } from '@/components/molecules/ContentTable';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 interface ReviewLead {
@@ -116,8 +117,15 @@ export default function AdminOutreachReviewPage() {
     <div className='flex flex-col gap-4'>
       <ContentSurfaceCard className='overflow-hidden'>
         <ContentSectionHeader
-          title={`Manual Review (${total})`}
+          title='Manual Review'
+          subtitle='Leads requiring a human pass before outreach continues'
+          actions={
+            <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
+              {total} queued
+            </span>
+          }
           className='min-h-0 px-4 py-3 sm:px-6'
+          actionsClassName='shrink-0'
         />
 
         <ContentTable>
@@ -193,12 +201,12 @@ export default function AdminOutreachReviewPage() {
                     </div>
                   </td>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <Button
-                      variant='outline'
+                    <DrawerButton
+                      tone='secondary'
                       size='sm'
                       onClick={() => void handleSkip(lead.id)}
                       disabled={skippingId === lead.id}
-                      className='h-8 rounded-[7px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 text-[12px] font-[510] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+                      className='h-8 px-3 text-[12px]'
                     >
                       {skippingId === lead.id ? (
                         <LoadingSpinner
@@ -208,7 +216,7 @@ export default function AdminOutreachReviewPage() {
                         />
                       ) : null}
                       Skip
-                    </Button>
+                    </DrawerButton>
                   </td>
                 </tr>
               ))

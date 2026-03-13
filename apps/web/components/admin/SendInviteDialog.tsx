@@ -1,11 +1,16 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Input } from '@jovie/ui';
 import Image from 'next/image';
 import { useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  DrawerButton,
+  DrawerFormField,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { useCreateInviteMutation } from '@/lib/queries/useInviteMutation';
@@ -123,13 +128,10 @@ export function SendInviteDialog({
           </ContentSurfaceCard>
 
           {/* Email input */}
-          <div className='space-y-2'>
-            <label
-              htmlFor='invite-email'
-              className='text-sm font-medium text-primary-token'
-            >
-              Email Address
-            </label>
+          <DrawerFormField
+            label='Email Address'
+            helperText='An invite will be queued to send to this email address'
+          >
             <Input
               id='invite-email'
               type='email'
@@ -142,25 +144,22 @@ export function SendInviteDialog({
               autoFocus
               className='w-full'
             />
-            <p className='text-xs text-secondary-token'>
-              An invite will be queued to send to this email address
-            </p>
-          </div>
+          </DrawerFormField>
 
           {/* Error message */}
           {error && (
-            <div className='flex items-center gap-2 rounded-[10px] border border-destructive/20 bg-destructive/8 px-3 py-2'>
+            <DrawerSurfaceCard className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'>
               <Icon
                 name='XCircle'
                 className='h-3.5 w-3.5 text-destructive shrink-0'
               />
               <p className='text-xs font-medium text-destructive'>{error}</p>
-            </div>
+            </DrawerSurfaceCard>
           )}
 
           {/* Success message */}
           {success && (
-            <div className='flex items-center gap-2 rounded-[10px] border border-success/20 bg-success/8 px-3 py-2'>
+            <DrawerSurfaceCard className='flex items-center gap-2 border-success/20 bg-success/8 px-3 py-2'>
               <Icon
                 name='CheckCircle'
                 className='h-3.5 w-3.5 text-success shrink-0'
@@ -168,22 +167,22 @@ export function SendInviteDialog({
               <p className='text-xs font-medium text-success'>
                 Invite created successfully!
               </p>
-            </div>
+            </DrawerSurfaceCard>
           )}
 
           {/* Actions */}
           <div className='flex gap-3 justify-end pt-2'>
-            <Button
+            <DrawerButton
               type='button'
-              variant='ghost'
+              tone='ghost'
               onClick={handleClose}
               disabled={isLoading}
             >
               Cancel
-            </Button>
-            <Button
+            </DrawerButton>
+            <DrawerButton
               type='submit'
-              variant='primary'
+              tone='primary'
               disabled={isLoading || success || !email.trim()}
             >
               {isLoading ? (
@@ -200,7 +199,7 @@ export function SendInviteDialog({
                   Create Invite
                 </>
               )}
-            </Button>
+            </DrawerButton>
           </div>
         </form>
       </DialogBody>

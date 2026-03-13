@@ -93,7 +93,7 @@ export function OutreachPipelineCard({
         subtitle='Last 7 days · Email & DM campaigns'
         actions={
           hasOutreachData ? (
-            <span className='text-app font-medium tabular-nums text-primary-token'>
+            <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
               {formatPercent(metrics.claimRate)} conv.
             </span>
           ) : null

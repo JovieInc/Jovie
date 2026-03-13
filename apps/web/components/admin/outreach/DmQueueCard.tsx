@@ -1,11 +1,10 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 interface DmQueueLead {
@@ -99,15 +98,12 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
       )}
 
       <div className='flex gap-2'>
-        <Button
-          variant='outline'
+        <DrawerButton
+          tone='secondary'
           size='sm'
           onClick={() => void handleCopy()}
           disabled={!lead.dmCopy || markedDone}
-          className={cn(
-            APP_CONTROL_BUTTON_CLASS,
-            'h-8 rounded-[7px] px-3 text-[12px]'
-          )}
+          className='h-8 px-3 text-[12px]'
         >
           {copied ? (
             <Check className='mr-1.5 size-3.5' />
@@ -115,13 +111,13 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
             <Copy className='mr-1.5 size-3.5' />
           )}
           {copied ? 'Copied' : 'Copy DM'}
-        </Button>
-        <Button
-          variant='primary'
+        </DrawerButton>
+        <DrawerButton
+          tone='primary'
           size='sm'
           onClick={() => void handleMarkSent()}
           disabled={marking || markedDone}
-          className='h-8 rounded-[7px] px-3 text-[12px] font-[510]'
+          className='h-8 px-3 text-[12px]'
         >
           {marking ? (
             <Loader2 className='mr-1.5 size-3.5 animate-spin' />
@@ -129,7 +125,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
             <Check className='mr-1.5 size-3.5' />
           )}
           {markedDone ? 'Sent' : "Mark as DM'd"}
-        </Button>
+        </DrawerButton>
       </div>
     </ContentSurfaceCard>
   );
