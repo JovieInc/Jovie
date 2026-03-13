@@ -2,7 +2,12 @@
 
 import { ArrowDown, Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useCallback, useState } from 'react';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
+import {
+  DrawerSurfaceCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
@@ -45,26 +50,14 @@ function SidebarRangeToggle({
   readonly onChange: (v: AnalyticsRange) => void;
 }) {
   return (
-    <div className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5'>
-      {RANGE_OPTIONS.map(opt => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type='button'
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              'rounded-full px-3 py-1 text-[13px] font-[510] transition-all duration-150',
-              active
-                ? 'bg-surface-3 text-primary-token'
-                : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <AppSegmentControl
+      value={value}
+      onValueChange={onChange}
+      options={RANGE_OPTIONS}
+      size='sm'
+      className='shrink-0'
+      aria-label='Analytics time range'
+    />
   );
 }
 
@@ -231,7 +224,7 @@ function EngagementMetricCard({
   const showSkeleton = loading || !value;
 
   return (
-    <div className='min-h-[72px] rounded-xl border border-subtle bg-surface-1 p-3'>
+    <DrawerSurfaceCard className='min-h-[72px] p-3'>
       {showSkeleton ? (
         <>
           <LoadingSkeleton
@@ -250,7 +243,7 @@ function EngagementMetricCard({
           <p className='mt-1 text-[11px] text-tertiary-token'>{label}</p>
         </>
       )}
-    </div>
+    </DrawerSurfaceCard>
   );
 }
 

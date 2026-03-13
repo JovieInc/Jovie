@@ -36,15 +36,11 @@ export function AppSegmentControl<T extends string>({
       size={size}
       variant={surface === 'ghost' ? 'ghost' : 'default'}
       className={cn(
-        surface === 'muted'
-          ? 'rounded-[var(--linear-app-control-radius)] bg-(--linear-bg-surface-1) p-0.5'
-          : 'rounded-[var(--linear-app-control-radius)] border-(--linear-border-subtle) bg-transparent p-0.5',
+        surface === 'ghost' &&
+          'border-(--linear-border-subtle) bg-transparent shadow-none',
         className
       )}
-      triggerClassName={cn(
-        'rounded-[calc(var(--linear-app-control-radius)-1px)] px-2 py-0.5 text-[12px] font-[510] tracking-[-0.01em] data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:shadow-none',
-        triggerClassName
-      )}
+      triggerClassName={cn('data-[state=active]:shadow-none', triggerClassName)}
       {...props}
     />
   );

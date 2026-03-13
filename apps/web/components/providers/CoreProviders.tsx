@@ -26,13 +26,12 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   return <>{children}</>;
 }
 
-function ThemeKeyboardShortcut() {
+function ThemeKeyboardShortcut({
+  canPreviewLightMode,
+}: {
+  readonly canPreviewLightMode: boolean;
+}) {
   const { resolvedTheme, setTheme } = useTheme();
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-  const canPreviewLightMode = env.IS_DEV || isLightModeEnabled;
 
   useEffect(() => {
     if (!canPreviewLightMode) return;
@@ -161,7 +160,7 @@ function CoreProvidersInner({
       disableTransitionOnChange
       storageKey='jovie-theme'
     >
-      <ThemeKeyboardShortcut />
+      <ThemeKeyboardShortcut canPreviewLightMode={canPreviewLightMode} />
       <TooltipProvider delayDuration={1200}>
         <LazyProviders enableAnalytics={enableAnalytics}>
           {children}
