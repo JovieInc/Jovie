@@ -13,6 +13,7 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   type ContextMenuItemType,
@@ -77,21 +78,24 @@ function AdminUserMobileCard({
   const actionItems = convertContextMenuItems(contextMenuItems);
 
   return (
-    <article className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
-      <div className='mb-3 flex items-start justify-between gap-3'>
+    <ContentSurfaceCard
+      as='article'
+      className='overflow-hidden bg-(--linear-bg-surface-0) p-0'
+    >
+      <div className='flex items-start justify-between gap-3 border-b border-(--linear-border-subtle) px-4 py-3'>
         <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
           <input
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded border-subtle text-accent focus:ring-accent'
+            className='mt-0.5 h-4 w-4 rounded-[4px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
-            <p className='truncate text-sm font-semibold text-primary-token'>
+            <p className='truncate text-[14px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
               {user.name || 'Email Subscriber'}
             </p>
-            <p className='truncate text-xs text-secondary-token'>
+            <p className='truncate text-[12px] text-(--linear-text-secondary)'>
               {user.email ?? 'No email'}
             </p>
           </div>
@@ -99,7 +103,7 @@ function AdminUserMobileCard({
         <TableActionMenu items={actionItems} align='end' />
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 text-xs'>
+      <div className='flex flex-wrap items-center gap-2 px-4 py-3 text-[12px]'>
         <Badge
           size='sm'
           variant={user.plan === 'pro' ? 'primary' : 'secondary'}
@@ -115,11 +119,11 @@ function AdminUserMobileCard({
             Active
           </Badge>
         )}
-        <span className='text-secondary-token'>
+        <span className='text-(--linear-text-secondary)'>
           Joined {user.createdAt ? dateFormatter.format(user.createdAt) : '—'}
         </span>
       </div>
-    </article>
+    </ContentSurfaceCard>
   );
 }
 
@@ -518,17 +522,19 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
               isMobile ? (
                 <div className='space-y-3 p-3'>
                   {users.length === 0 ? (
-                    <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                    <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='font-medium'>No users found</div>
-                        <div className='text-xs'>
+                        <div className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+                          No users found
+                        </div>
+                        <div className='text-[12px] text-(--linear-text-secondary)'>
                           {search
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
                       </div>
-                    </div>
+                    </ContentSurfaceCard>
                   ) : (
                     users.map(user => (
                       <AdminUserMobileCard
@@ -563,17 +569,19 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   rowSelection={rowSelection}
                   isLoading={false}
                   emptyState={
-                    <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                    <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='font-medium'>No users found</div>
-                        <div className='text-xs'>
+                        <div className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+                          No users found
+                        </div>
+                        <div className='text-[12px] text-(--linear-text-secondary)'>
                           {search
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
                       </div>
-                    </div>
+                    </ContentSurfaceCard>
                   }
                   getRowId={row => row.id}
                   getRowClassName={getRowClassName}
