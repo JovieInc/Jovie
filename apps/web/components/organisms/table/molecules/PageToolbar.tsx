@@ -15,6 +15,9 @@ export const PAGE_TOOLBAR_START_CLASS =
 export const PAGE_TOOLBAR_END_CLASS =
   'ml-auto flex w-full items-center justify-end gap-0.5 md:w-auto';
 
+export const PAGE_TOOLBAR_END_GROUP_CLASS =
+  'flex w-full flex-wrap items-center gap-0.5 sm:w-auto sm:flex-nowrap';
+
 export const PAGE_TOOLBAR_META_TEXT_CLASS =
   'text-xs text-(--linear-text-tertiary) tabular-nums';
 
@@ -33,6 +36,11 @@ export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
   'w-8 justify-center px-0 text-(--linear-text-tertiary)';
+
+export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  'min-w-[108px] justify-between gap-1.5 px-2.5 text-(--linear-text-secondary)'
+);
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
   'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';

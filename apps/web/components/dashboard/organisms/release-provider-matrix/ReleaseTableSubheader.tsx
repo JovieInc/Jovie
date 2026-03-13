@@ -19,6 +19,7 @@ import {
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+  PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
@@ -311,7 +312,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
         ) : null
       }
       end={
-        <>
+        <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
           <DrawerToggleButton
             chrome='page-toolbar'
             ariaLabel='Toggle release preview'
@@ -370,7 +371,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             iconOnly
             tooltipLabel='Export'
           />
-        </>
+        </div>
       }
     />
   );

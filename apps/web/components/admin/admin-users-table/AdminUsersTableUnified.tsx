@@ -19,6 +19,7 @@ import {
   type ContextMenuItemType,
   convertContextMenuItems,
   ExportCSVButton,
+  PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarSearchForm,
   TableBulkActionsToolbar,
@@ -480,7 +481,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                     </div>
                   }
                   end={
-                    <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'>
+                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
                       <PageToolbarSearchForm
                         action={APP_ROUTES.ADMIN_USERS}
                         searchValue={searchTerm}

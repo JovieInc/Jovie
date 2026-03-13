@@ -24,8 +24,9 @@ import { toast } from 'sonner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
-  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PAGE_TOOLBAR_START_CLASS,
   PageToolbar,
@@ -231,7 +232,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         ))}
         startClassName={cn(PAGE_TOOLBAR_START_CLASS, 'flex-wrap')}
         end={
-          <>
+          <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
             <PageToolbarSearchForm
               compact
               searchValue={search}
@@ -259,8 +260,8 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
               <SelectTrigger
                 aria-label='Sort leads'
                 className={cn(
-                  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-                  'h-8 min-w-[112px] justify-between gap-2 border-transparent bg-transparent px-2.5'
+                  PAGE_TOOLBAR_MENU_TRIGGER_CLASS,
+                  'h-8 border-transparent bg-transparent'
                 )}
               >
                 <div className='flex items-center gap-1.5'>
@@ -273,7 +274,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
                 <SelectItem value='fitScore'>Fit Score</SelectItem>
               </SelectContent>
             </Select>
-          </>
+          </div>
         }
       />
 

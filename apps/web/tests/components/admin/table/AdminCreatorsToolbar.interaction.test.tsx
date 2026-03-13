@@ -25,6 +25,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/components/organisms/table', () => ({
+  PAGE_TOOLBAR_END_GROUP_CLASS: 'page-toolbar-end-group',
   PAGE_TOOLBAR_META_TEXT_CLASS: 'page-toolbar-meta-text',
   PageToolbar: ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
     <div>
