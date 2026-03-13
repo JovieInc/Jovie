@@ -2,6 +2,7 @@
 
 import { Plus, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { track } from '@/lib/analytics';
 import type { SuggestedLink } from './hooks/useSuggestions';
@@ -253,14 +254,13 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
                 />
               </button>
 
-              <button
-                type='button'
-                aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
-                className='absolute top-1/2 right-2 z-10 grid h-6 w-6 -translate-y-1/2 place-items-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition hover:bg-surface-2 hover:text-primary-token'
+              <AppIconButton
+                ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}
+                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-full bg-(--linear-bg-surface-1) text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={event => handleDismiss(suggestion, event)}
               >
                 <X className='h-3.5 w-3.5' aria-hidden />
-              </button>
+              </AppIconButton>
             </div>
           );
         })}

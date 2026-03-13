@@ -4,6 +4,7 @@ import { SegmentControl } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/components/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
 import { ProfileContactHeader } from '@/components/dashboard/organisms/profile-contact-sidebar/ProfileContactHeader';
@@ -94,9 +95,9 @@ export function AdminProfileSidebar({
                 className='flex-1'
                 inputClassName='h-8 px-3 py-2'
               />
-              <button
-                type='button'
-                className='h-8 w-8 shrink-0 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+              <AppIconButton
+                ariaLabel='Open public profile'
+                className='h-8 w-8 shrink-0 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={() =>
                   globalThis.open(
                     `${BASE_URL}/${profile.username}`,
@@ -104,10 +105,9 @@ export function AdminProfileSidebar({
                     'noopener,noreferrer'
                   )
                 }
-                aria-label='Open public profile'
               >
                 <ExternalLink className='h-4 w-4' aria-hidden='true' />
-              </button>
+              </AppIconButton>
             </div>
           </div>
         </div>
