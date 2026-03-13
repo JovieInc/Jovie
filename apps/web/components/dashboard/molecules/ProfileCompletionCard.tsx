@@ -4,7 +4,7 @@ import { AlertCircle, ArrowRight, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { captureWarning } from '@/lib/error-tracking';
 
 function getStorageKey(profileId: string, percentage: number): string {
@@ -74,10 +74,10 @@ export const ProfileCompletionCard = memo(
       : 'Complete these essentials so fans can find you.';
 
     return (
-      <DashboardCard variant='analytics' hover={false} className='mb-4 sm:mb-6'>
+      <ContentSurfaceCard className='mb-4 p-4 sm:mb-6 sm:p-5'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
-            <div className='flex items-center gap-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <div className='flex items-center gap-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
               {profileIsLive ? (
                 <Sparkles className='h-3 w-3' aria-hidden='true' />
               ) : (
@@ -86,14 +86,16 @@ export const ProfileCompletionCard = memo(
               {sectionLabel}
             </div>
             <div className='space-y-0.5'>
-              <p className='text-[14px] font-[590] text-primary-token'>
+              <p className='text-[14px] font-[590] text-(--linear-text-primary)'>
                 {heading}
               </p>
-              <p className='text-[13px] text-secondary-token'>{subtext}</p>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
+                {subtext}
+              </p>
             </div>
 
             <progress
-              className='h-1.5 w-full overflow-hidden rounded-full bg-surface-2 [&::-webkit-progress-bar]:bg-surface-2 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-gradient-to-r [&::-webkit-progress-value]:from-accent [&::-webkit-progress-value]:to-accent-hover [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-gradient-to-r [&::-moz-progress-bar]:from-accent [&::-moz-progress-bar]:to-accent-hover'
+              className='h-1.5 w-full overflow-hidden rounded-full bg-(--linear-bg-surface-0) [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-gradient-to-r [&::-moz-progress-bar]:from-accent [&::-moz-progress-bar]:to-accent-hover [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-(--linear-bg-surface-0) [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-gradient-to-r [&::-webkit-progress-value]:from-accent [&::-webkit-progress-value]:to-accent-hover [&::-webkit-progress-value]:transition-all [&::-webkit-progress-value]:duration-500'
               max={100}
               value={completionPercentage}
               aria-label='Profile completion'
@@ -106,18 +108,18 @@ export const ProfileCompletionCard = memo(
                 <li key={step.id}>
                   <Link
                     href={step.href}
-                    className='group flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-2/30 px-3 py-2 transition-colors hover:bg-surface-2/60'
+                    className='group flex items-center justify-between gap-3 rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)'
                   >
                     <div className='min-w-0'>
-                      <p className='text-[13px] font-[510] text-primary-token'>
+                      <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                         {step.label}
                       </p>
-                      <p className='truncate text-[13px] text-secondary-token'>
+                      <p className='truncate text-[13px] text-(--linear-text-secondary)'>
                         {step.description}
                       </p>
                     </div>
                     <ArrowRight
-                      className='h-4 w-4 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5'
+                      className='h-4 w-4 shrink-0 text-(--linear-text-tertiary) transition-transform group-hover:translate-x-0.5'
                       aria-hidden='true'
                     />
                   </Link>
@@ -131,13 +133,13 @@ export const ProfileCompletionCard = memo(
               type='button'
               onClick={handleDismiss}
               aria-label='Dismiss profile completion card'
-              className='shrink-0 rounded-full border border-subtle p-1.5 text-tertiary-token transition-colors hover:bg-surface-2/50 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive'
+              className='shrink-0 rounded-full border border-(--linear-border-subtle) p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
               <X className='h-4 w-4' aria-hidden='true' />
             </button>
           )}
         </div>
-      </DashboardCard>
+      </ContentSurfaceCard>
     );
   }
 );
