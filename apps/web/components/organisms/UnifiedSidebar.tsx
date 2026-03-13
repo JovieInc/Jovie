@@ -238,7 +238,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       variant='sidebar'
       collapsible='icon'
       className={cn(
-        'border-r border-(--linear-border-subtle) bg-(--linear-bg-page)',
+        'border-r border-(--linear-app-shell-sidebar-seam) bg-(--linear-bg-page) lg:my-[var(--linear-app-shell-gap)] lg:ml-[var(--linear-app-shell-gap)] lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-bg-surface-0) lg:shadow-[var(--linear-app-shell-shadow)]',
         '[--sidebar-width:var(--linear-app-sidebar-width)]',
         '[--sidebar-background:var(--linear-app-sidebar-background-rgb)]',
         '[--sidebar-foreground:var(--linear-app-sidebar-foreground-rgb)]',

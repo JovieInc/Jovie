@@ -201,6 +201,10 @@
   --linear-app-radius-menu: 8px;
   --linear-app-shell-gap: 8px;
   --linear-app-shell-radius: 12px;
+  --linear-app-shell-border: rgba(0, 0, 0, 0.08);
+  --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.06);
+  --linear-app-shell-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.04), 0 16px 36px rgba(0, 0, 0, 0.05);
   --linear-app-header-height: 40px;
   --linear-app-header-padding-x: 16px;
   --linear-app-content-padding-x: 16px;
@@ -340,6 +344,10 @@
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
   --linear-app-content-surface: var(--linear-bg-surface-1);
   --linear-app-drawer-surface: var(--linear-bg-surface-0);
+  --linear-app-shell-border: rgba(255, 255, 255, 0.05);
+  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.06);
+  --linear-app-shell-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04), 0 18px 44px rgba(0, 0, 0, 0.28);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.04), -12px 0 28px rgba(0, 0, 0, 0.24);
   --linear-row-hover: rgba(255, 255, 255, 0.028);

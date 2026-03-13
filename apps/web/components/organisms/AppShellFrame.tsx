@@ -45,7 +45,7 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex flex-1 min-h-0 overflow-hidden border-l border-(--linear-border-subtle) bg-(--linear-bg-page) lg:m-[var(--linear-app-shell-gap)] lg:ml-0 lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:bg-(--linear-app-content-surface)'
+        className='flex min-h-0 flex-1 overflow-hidden border-l border-(--linear-app-shell-sidebar-seam) bg-(--linear-bg-page) lg:m-[var(--linear-app-shell-gap)] lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)]'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
