@@ -10,6 +10,7 @@ import {
 import { useTheme } from 'next-themes';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
@@ -51,19 +52,15 @@ export function SettingsAppearanceSection() {
     <DashboardCard
       variant='settings'
       padding='none'
-      className='divide-y divide-subtle'
+      className='overflow-hidden divide-y divide-(--linear-border-subtle)'
     >
       {isLightModeEnabled && (
-        <div className='px-4 py-3 flex items-center justify-between'>
-          <div className='flex-1 min-w-0'>
-            <h3 className='text-[13px] font-[510] text-primary-token'>
-              Interface theme
-            </h3>
-            <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
-              Select or customize your interface color scheme
-            </p>
-          </div>
-          <div className='shrink-0'>
+        <ContentSectionHeader
+          title='Interface theme'
+          subtitle='Select or customize your interface color scheme'
+          className='min-h-0 px-4 py-3'
+          actionsClassName='w-auto shrink-0'
+          actions={
             <Select
               value={theme ?? 'system'}
               onValueChange={handleThemeChange}
@@ -80,8 +77,8 @@ export function SettingsAppearanceSection() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          }
+        />
       )}
 
       <div className='px-4 py-3'>
