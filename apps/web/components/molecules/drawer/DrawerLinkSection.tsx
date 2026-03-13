@@ -22,6 +22,8 @@ export interface DrawerLinkSectionProps {
   readonly emptyMessage?: string;
   /** Whether the section has no links */
   readonly isEmpty?: boolean;
+  /** Stable selector for the empty state container */
+  readonly emptyStateTestId?: string;
   /** The link list items */
   readonly children: ReactNode;
   readonly className?: string;
@@ -42,6 +44,7 @@ export function DrawerLinkSection({
   headerActions,
   emptyMessage = 'No links yet.',
   isEmpty = false,
+  emptyStateTestId,
   children,
   className,
 }: DrawerLinkSectionProps) {
@@ -69,7 +72,11 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <DrawerEmptyState message={emptyMessage} className='min-h-[96px]' />
+        <DrawerEmptyState
+          message={emptyMessage}
+          className='min-h-[96px]'
+          testId={emptyStateTestId}
+        />
       ) : (
         <div className='-mx-5 lg:mx-0'>{children}</div>
       )}

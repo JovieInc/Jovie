@@ -460,9 +460,10 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         clearHref='?'
                         clearAriaLabel='Clear user search'
                         hiddenInputs={[{ name: 'sort', value: sort }]}
-                        fieldClassName='sm:w-[280px]'
                         submitIcon={<Search />}
                         clearIcon={<X />}
+                        compact
+                        tooltipLabel='Search'
                       />
                       <ExportCSVButton<AdminUserRow>
                         getData={() => users}
@@ -471,7 +472,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         disabled={users.length === 0}
                         ariaLabel='Export users to CSV file'
                         chrome='page-toolbar'
-                        className='whitespace-nowrap'
+                        iconOnly
+                        tooltipLabel='Export'
                       />
                     </div>
                   }

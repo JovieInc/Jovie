@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -37,6 +38,10 @@ vi.mock('@/lib/nuqs/hooks', () => ({
     { sort: 'createdAt', direction: 'desc' },
     vi.fn(),
   ],
+}));
+
+vi.mock('@/hooks/useBreakpoint', () => ({
+  useBreakpointDown: () => false,
 }));
 
 const runDemoAction = vi.fn(() => Promise.resolve());
@@ -165,7 +170,8 @@ function renderDemo() {
 }
 
 describe('DemoReleasesExperience', () => {
-  it('renders fixture data and opens the selected release in the drawer', () => {
+  it('renders fixture data and opens the selected release in the drawer', async () => {
+    const user = userEvent.setup();
     renderDemo();
 
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
@@ -175,10 +181,15 @@ describe('DemoReleasesExperience', () => {
     expect(screen.getAllByText('Take Me Over').length).toBeGreaterThan(0);
 
     // Click a release row to open the detail drawer
-    fireEvent.click(screen.getByText('Take Me Over'));
+    await user.click(screen.getByText('Take Me Over'));
+    const previewToggle = screen.getByRole('button', {
+      name: 'Toggle release preview',
+    });
 
-    // Detail drawer should show the release info
-    expect(screen.getAllByText('Take Me Over').length).toBeGreaterThan(0);
+    // Preview toggle should reflect the opened drawer state
+    await waitFor(() =>
+      expect(previewToggle).toHaveAttribute('aria-pressed', 'true')
+    );
   });
 
   it('renders release data in the table', () => {

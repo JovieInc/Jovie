@@ -247,8 +247,9 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                     disabled={entries.length === 0}
                     ariaLabel='Export waitlist to CSV file'
                     chrome='page-toolbar'
-                    className='whitespace-nowrap'
                     label='Export'
+                    iconOnly
+                    tooltipLabel='Export'
                   />
                   <DisplayMenuDropdown
                     trigger={
@@ -262,6 +263,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
                           />
                         }
                         active={viewMode !== 'list' || groupingEnabled}
+                        iconOnly
                         tooltipLabel='Display'
                         tooltipShortcut={`${GLYPH_SHIFT}V`}
                       />

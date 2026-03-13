@@ -8,15 +8,20 @@ export interface DrawerSurfaceCardProps {
   readonly children: ReactNode;
   readonly as?: ElementType;
   readonly className?: string;
+  readonly testId?: string;
 }
 
 export function DrawerSurfaceCard({
   children,
   as: Component = 'div',
   className,
+  testId,
 }: DrawerSurfaceCardProps) {
   return (
-    <Component className={cn(DRAWER_SURFACE_CARD_CLASSNAME, className)}>
+    <Component
+      data-testid={testId}
+      className={cn(DRAWER_SURFACE_CARD_CLASSNAME, className)}
+    >
       {children}
     </Component>
   );

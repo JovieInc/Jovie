@@ -7,15 +7,18 @@ export interface DrawerEmptyStateProps {
   readonly message: string;
   readonly tone?: 'default' | 'error';
   readonly className?: string;
+  readonly testId?: string;
 }
 
 export function DrawerEmptyState({
   message,
   tone = 'default',
   className,
+  testId,
 }: DrawerEmptyStateProps) {
   return (
     <DrawerSurfaceCard
+      testId={testId}
       className={cn('flex min-h-[140px] items-center px-3', className)}
     >
       <p

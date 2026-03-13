@@ -356,7 +356,12 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             iconOnly
             tooltipLabel='Export'
           />
-          <DrawerToggleButton chrome='page-toolbar' />
+          <DrawerToggleButton
+            chrome='page-toolbar'
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
+          />
         </>
       }
     />

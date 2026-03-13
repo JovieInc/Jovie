@@ -96,7 +96,7 @@ export const ContactsTable = memo(function ContactsTable({
           label='Add Contact'
           hideLabelOnMobile
         />
-        <DrawerToggleButton />
+        <DrawerToggleButton ariaLabel='Toggle contact details' />
       </DashboardHeaderActionGroup>
     ),
     []

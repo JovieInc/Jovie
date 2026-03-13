@@ -28,6 +28,7 @@ export function TrackPlatformLinksSection({
       title='Available on'
       isEmpty={providers.length === 0}
       emptyMessage={emptyMessage}
+      emptyStateTestId='track-platforms-empty'
     >
       <div className='space-y-1'>
         {providers.map(provider => (

@@ -42,7 +42,7 @@ export function AdminCreatorsPageWrapper(
           onIngestPending={handleIngestPending}
           hideLabelOnMobile
         />
-        <DrawerToggleButton />
+        <DrawerToggleButton ariaLabel='Toggle creator details' />
       </DashboardHeaderActionGroup>
     );
 

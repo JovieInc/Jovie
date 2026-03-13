@@ -9,9 +9,15 @@ import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 export function DrawerToggleButton({
   className,
   chrome = 'header',
+  ariaLabel = 'Toggle details sidebar',
+  label = 'Details',
+  tooltipLabel = label,
 }: {
   readonly className?: string;
   readonly chrome?: 'header' | 'page-toolbar';
+  readonly ariaLabel?: string;
+  readonly label?: string;
+  readonly tooltipLabel?: string;
 }) {
   const { tableMeta } = useTableMeta();
   const [isOpen, setIsOpen] = useState(false);
@@ -28,15 +34,15 @@ export function DrawerToggleButton({
   if (chrome === 'page-toolbar') {
     return (
       <PageToolbarActionButton
-        ariaLabel='Toggle details sidebar'
-        label='Details'
+        ariaLabel={ariaLabel}
+        label={label}
         icon={<Icon className='h-3.5 w-3.5' />}
         iconOnly
         active={isOpen}
         ariaPressed={isOpen}
         disabled={!tableMeta.toggle}
         onClick={() => tableMeta.toggle?.()}
-        tooltipLabel='Details'
+        tooltipLabel={tooltipLabel}
         className={className}
       />
     );
@@ -44,7 +50,7 @@ export function DrawerToggleButton({
 
   return (
     <DashboardHeaderActionButton
-      ariaLabel='Toggle contact details'
+      ariaLabel={ariaLabel}
       pressed={isOpen}
       disabled={!tableMeta.toggle}
       onClick={() => tableMeta.toggle?.()}

@@ -1,10 +1,16 @@
 'use client';
 
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import { X } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { cn } from '@/lib/utils';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+} from './PageToolbar';
 
 interface HiddenInput {
   readonly name: string;
@@ -26,6 +32,8 @@ export interface PageToolbarSearchFormProps {
   readonly fieldClassName?: string;
   readonly submitIcon: ReactNode;
   readonly clearIcon: ReactNode;
+  readonly compact?: boolean;
+  readonly tooltipLabel?: string;
 }
 
 export function PageToolbarSearchForm({
@@ -43,7 +51,94 @@ export function PageToolbarSearchForm({
   fieldClassName,
   submitIcon,
   clearIcon,
+  compact = false,
+  tooltipLabel,
 }: Readonly<PageToolbarSearchFormProps>) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (compact) {
+    const triggerLabel = tooltipLabel ?? 'Search';
+    const showClearAction = Boolean(clearHref && searchValue);
+
+    return (
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type='button'
+            variant='ghost'
+            size='sm'
+            aria-label={submitAriaLabel}
+            aria-pressed={isOpen}
+            className={cn(
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+              (isOpen || searchValue.length > 0) &&
+                'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
+            )}
+          >
+            {submitIcon}
+            <span className='sr-only'>{triggerLabel}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align='end' className='w-[320px] p-0'>
+          <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
+            <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+              {triggerLabel}
+            </span>
+            <AppIconButton
+              type='button'
+              ariaLabel={`Close ${triggerLabel.toLowerCase()} panel`}
+              className='border-transparent bg-transparent'
+              onClick={() => setIsOpen(false)}
+            >
+              <X className='h-3.5 w-3.5' />
+            </AppIconButton>
+          </div>
+          <form
+            action={action}
+            method='get'
+            className='flex flex-col gap-3 p-3'
+            onSubmit={() => setIsOpen(false)}
+          >
+            {hiddenInputs.map(input =>
+              input.value === undefined || input.value === null ? null : (
+                <input
+                  key={input.name}
+                  type='hidden'
+                  name={input.name}
+                  value={String(input.value)}
+                />
+              )
+            )}
+            <input type='hidden' name={searchParamName} value={searchValue} />
+            <AppSearchField
+              value={searchValue}
+              onChange={onSearchValueChange}
+              placeholder={placeholder}
+              ariaLabel={ariaLabel}
+              autoFocus
+              onEscape={() => setIsOpen(false)}
+              className='w-full'
+              inputClassName='text-[13px]'
+            />
+            <div className='flex items-center justify-end gap-2'>
+              {showClearAction ? (
+                <Button variant='ghost' size='sm' asChild>
+                  <Link href={clearHref!} onClick={() => setIsOpen(false)}>
+                    Clear
+                  </Link>
+                </Button>
+              ) : null}
+              <Button type='submit' variant='secondary' size='sm'>
+                Apply
+              </Button>
+            </div>
+          </form>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
   return (
     <form
       action={action}

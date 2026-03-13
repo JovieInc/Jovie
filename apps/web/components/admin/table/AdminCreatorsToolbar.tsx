@@ -94,9 +94,10 @@ export function AdminCreatorsToolbar({
                 { name: 'pageSize', value: pageSize },
                 { name: 'page', value: 1 },
               ]}
-              fieldClassName='sm:w-[240px]'
               submitIcon={<Search />}
               clearIcon={<X />}
+              compact
+              tooltipLabel='Search'
             />
             <ExportCSVButton<AdminCreatorProfileRow>
               getData={() => profiles}
@@ -105,7 +106,8 @@ export function AdminCreatorsToolbar({
               disabled={profiles.length === 0}
               ariaLabel='Export creator profiles to CSV file'
               chrome='page-toolbar'
-              className='whitespace-nowrap'
+              iconOnly
+              tooltipLabel='Export'
             />
           </div>
         )
