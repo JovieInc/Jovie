@@ -1,17 +1,38 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
 import {
+  Badge,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@jovie/ui';
+import {
+  ArrowUpDown,
   Check,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   Loader2,
+  Search,
   X,
 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  PAGE_TOOLBAR_START_CLASS,
+  PageToolbar,
+  PageToolbarSearchForm,
+  PageToolbarTabButton,
+} from '@/components/organisms/table';
+import { cn } from '@/lib/utils';
 
 interface Lead {
   id: string;
@@ -184,101 +205,133 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      className='rounded-none border-0 p-4 sm:p-6'
-    >
-      <div className='mb-4'>
-        <h2 className='text-sm font-semibold text-primary-token'>
-          Leads ({total})
-        </h2>
-      </div>
+    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Review queue'
+        subtitle='Approve or reject discovered and qualified leads before ingestion.'
+        actions={
+          <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+            {total.toLocaleString()} lead{total === 1 ? '' : 's'}
+          </span>
+        }
+        className='px-5 py-3'
+      />
 
-      {/* Filters */}
-      <div className='mb-4 flex flex-wrap items-center gap-2'>
-        {STATUS_OPTIONS.map(opt => (
-          <button
+      <PageToolbar
+        start={STATUS_OPTIONS.map(opt => (
+          <PageToolbarTabButton
             key={opt.value}
-            type='button'
+            label={opt.label}
+            active={statusFilter === opt.value}
             onClick={() => {
               setStatusFilter(opt.value);
               setPage(1);
             }}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              statusFilter === opt.value
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-surface-2 text-secondary-token hover:bg-surface-3'
-            }`}
-          >
-            {opt.label}
-          </button>
+          />
         ))}
+        startClassName={cn(PAGE_TOOLBAR_START_CLASS, 'flex-wrap')}
+        end={
+          <>
+            <PageToolbarSearchForm
+              compact
+              searchValue={search}
+              onSearchValueChange={value => {
+                setSearch(value);
+                setPage(1);
+              }}
+              onApply={() => undefined}
+              placeholder='Search handle or name...'
+              ariaLabel='Search leads'
+              submitAriaLabel='Open lead search'
+              applyLabel='Apply'
+              submitIcon={
+                <Search className={PAGE_TOOLBAR_ICON_CLASS} strokeWidth={2} />
+              }
+              clearIcon={<X />}
+              tooltipLabel='Search'
+            />
+            <Select
+              value={sortBy}
+              onValueChange={value =>
+                setSortBy(value as 'createdAt' | 'fitScore')
+              }
+            >
+              <SelectTrigger
+                aria-label='Sort leads'
+                className={cn(
+                  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                  'h-8 min-w-[112px] justify-between gap-2 border-transparent bg-transparent px-2.5'
+                )}
+              >
+                <div className='flex items-center gap-1.5'>
+                  <ArrowUpDown className={PAGE_TOOLBAR_ICON_CLASS} />
+                  <SelectValue />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value='createdAt'>Newest</SelectItem>
+                <SelectItem value='fitScore'>Fit Score</SelectItem>
+              </SelectContent>
+            </Select>
+          </>
+        }
+      />
 
-        <input
-          type='text'
-          placeholder='Search handle or name...'
-          value={search}
-          onChange={e => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          className='ml-auto h-8 w-48 rounded-md border border-subtle bg-surface-2 px-3 text-xs text-primary-token'
-        />
-
-        <select
-          value={sortBy}
-          onChange={e => setSortBy(e.target.value as 'createdAt' | 'fitScore')}
-          className='h-8 rounded-md border border-subtle bg-surface-2 px-2 text-xs text-primary-token'
-        >
-          <option value='createdAt'>Newest</option>
-          <option value='fitScore'>Fit Score</option>
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className='overflow-x-auto'>
+      <div className='overflow-x-auto px-5 py-4 pt-3'>
         <table className='w-full text-xs'>
           <thead>
-            <tr className='border-b border-subtle text-left text-secondary-token'>
-              <th className='pb-2 pr-3 font-medium'>Name / Handle</th>
-              <th className='pb-2 pr-3 font-medium'>Status</th>
-              <th className='pb-2 pr-3 font-medium'>Score</th>
-              <th className='pb-2 pr-3 font-medium'>Signals</th>
-              <th className='pb-2 pr-3 font-medium'>Tools</th>
-              <th className='pb-2 font-medium'>Actions</th>
+            <tr className='border-b border-(--linear-border-subtle) text-left text-(--linear-text-tertiary)'>
+              <th className='pb-2.5 pr-3 text-[11px] font-[510] tracking-[0.04em]'>
+                Name / Handle
+              </th>
+              <th className='pb-2.5 pr-3 text-[11px] font-[510] tracking-[0.04em]'>
+                Status
+              </th>
+              <th className='pb-2.5 pr-3 text-[11px] font-[510] tracking-[0.04em]'>
+                Score
+              </th>
+              <th className='pb-2.5 pr-3 text-[11px] font-[510] tracking-[0.04em]'>
+                Signals
+              </th>
+              <th className='pb-2.5 pr-3 text-[11px] font-[510] tracking-[0.04em]'>
+                Tools
+              </th>
+              <th className='pb-2.5 text-[11px] font-[510] tracking-[0.04em]'>
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
             {renderLeadRows(loading, loadError, leads, lead => (
               <tr
                 key={lead.id}
-                className='border-b border-subtle/50 hover:bg-white/[0.02]'
+                className='border-b border-(--linear-border-subtle)/60 transition-colors hover:bg-(--linear-bg-surface-0)'
               >
-                <td className='py-2.5 pr-3'>
+                <td className='py-3 pr-3'>
                   <div className='flex flex-col'>
-                    <span className='font-medium text-primary-token'>
+                    <span className='text-[13px] font-[560] text-(--linear-text-primary)'>
                       {lead.displayName || lead.linktreeHandle}
                     </span>
                     <a
                       href={lead.linktreeUrl}
                       target='_blank'
                       rel='noopener noreferrer'
-                      className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
+                      className='flex items-center gap-1 text-[12px] text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
                     >
                       @{lead.linktreeHandle}
                       <ExternalLink className='h-3 w-3' />
                     </a>
                   </div>
                 </td>
-                <td className='py-2.5 pr-3'>
+                <td className='py-3 pr-3'>
                   <Badge variant={STATUS_VARIANT[lead.status] ?? 'secondary'}>
                     {lead.status}
                   </Badge>
                 </td>
-                <td className='py-2.5 pr-3 tabular-nums'>
+                <td className='py-3 pr-3 tabular-nums text-[12px] text-(--linear-text-secondary)'>
                   {lead.fitScore ?? '-'}
                 </td>
-                <td className='py-2.5 pr-3'>
+                <td className='py-3 pr-3'>
                   <div className='flex gap-1'>
                     {lead.hasSpotifyLink && (
                       <Badge variant='secondary' className='text-2xs'>
@@ -302,16 +355,16 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
                     )}
                   </div>
                 </td>
-                <td className='py-2.5 pr-3'>
+                <td className='py-3 pr-3'>
                   {lead.musicToolsDetected.length > 0 ? (
-                    <span className='text-secondary-token'>
+                    <span className='text-[12px] text-(--linear-text-secondary)'>
                       {lead.musicToolsDetected.join(', ')}
                     </span>
                   ) : (
-                    <span className='text-tertiary-token'>-</span>
+                    <span className='text-(--linear-text-tertiary)'>-</span>
                   )}
                 </td>
-                <td className='py-2.5'>
+                <td className='py-3'>
                   {(lead.status === 'qualified' ||
                     lead.status === 'discovered') && (
                     <div className='flex gap-1'>
@@ -321,7 +374,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
                           void updateLeadStatus(lead.id, 'approved')
                         }
                         disabled={actioningId === lead.id}
-                        className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
+                        className='rounded-[7px] p-1.5 text-success transition-colors hover:bg-success/10 disabled:opacity-50'
                         title='Approve & ingest'
                       >
                         {actioningId === lead.id ? (
@@ -336,7 +389,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
                           void updateLeadStatus(lead.id, 'rejected')
                         }
                         disabled={actioningId === lead.id}
-                        className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
+                        className='rounded-[7px] p-1.5 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50'
                         title='Reject'
                       >
                         <X className='h-4 w-4' />
@@ -352,8 +405,8 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className='mt-3 flex items-center justify-between'>
-          <span className='text-xs text-secondary-token'>
+        <div className='flex items-center justify-between border-t border-(--linear-border-subtle) px-5 py-3'>
+          <span className='text-xs text-(--linear-text-tertiary)'>
             Page {page} of {totalPages}
           </span>
           <div className='flex gap-1'>
