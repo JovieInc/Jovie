@@ -130,3 +130,10 @@ export interface TrackViewModel {
     }
   >;
 }
+
+export type AppRelease = ReleaseViewModel;
+
+export type AppTrack = TrackViewModel;
+
+/** Canonical track contract used by release sidebar and API boundary adapters */
+export type ReleaseSidebarTrack = TrackViewModel;
