@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   Dialog,
   DialogBody,
@@ -89,8 +90,8 @@ export function VerificationModal({
 
       <DialogBody>
         {isVerified ? (
-          <div
-            className='flex items-center gap-3 rounded-lg border border-success bg-success-subtle p-4'
+          <ContentSurfaceCard
+            className='flex items-center gap-3 border-success/25 bg-success/5 p-4'
             data-testid='verification-success'
           >
             <CheckCircle2 className='h-5 w-5 text-success shrink-0' />
@@ -102,7 +103,7 @@ export function VerificationModal({
                 {hostname} has been successfully verified.
               </p>
             </div>
-          </div>
+          </ContentSurfaceCard>
         ) : (
           <div className='space-y-5'>
             {/* Step-by-step instructions */}
@@ -132,12 +133,14 @@ export function VerificationModal({
                 TXT Record Value
               </span>
               <div className='flex items-center gap-2'>
-                <code
-                  className='flex-1 rounded-lg border border-subtle bg-surface-secondary px-3 py-2.5 text-xs font-mono break-all select-all'
-                  data-testid='verification-token'
-                >
-                  {verificationToken}
-                </code>
+                <ContentSurfaceCard className='flex-1 bg-(--linear-bg-surface-0) px-3 py-2.5'>
+                  <code
+                    className='block break-all select-all text-xs font-mono text-(--linear-text-primary)'
+                    data-testid='verification-token'
+                  >
+                    {verificationToken}
+                  </code>
+                </ContentSurfaceCard>
                 <Button
                   type='button'
                   variant='outline'
@@ -163,11 +166,11 @@ export function VerificationModal({
             </div>
 
             {/* DNS provider help */}
-            <div className='border border-subtle rounded-lg'>
+            <ContentSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0) p-0'>
               <button
                 type='button'
                 onClick={() => setShowProviders(prev => !prev)}
-                className='flex w-full items-center justify-between px-3 py-2.5 text-[13px] font-[510] text-secondary-token hover:text-primary-token transition-colors'
+                className='flex w-full items-center justify-between px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
                 aria-expanded={showProviders}
                 data-testid='provider-tips-toggle'
               >
@@ -180,7 +183,7 @@ export function VerificationModal({
               </button>
               {showProviders && (
                 <div
-                  className='border-t border-subtle px-3 py-2.5 space-y-1.5'
+                  className='space-y-1.5 border-t border-(--linear-border-subtle) px-3 py-2.5'
                   data-testid='provider-links'
                 >
                   {DNS_PROVIDER_LINKS.map(provider => (
@@ -197,7 +200,7 @@ export function VerificationModal({
                   ))}
                 </div>
               )}
-            </div>
+            </ContentSurfaceCard>
 
             {/* Propagation note */}
             <p className='text-xs text-tertiary-token'>
@@ -207,14 +210,14 @@ export function VerificationModal({
 
             {/* Error display */}
             {displayError && (
-              <div
-                className='flex items-start gap-2.5 rounded-lg border border-error bg-error-subtle p-3'
+              <ContentSurfaceCard
+                className='flex items-start gap-2.5 border-destructive/25 bg-destructive/5 p-3'
                 role='alert'
                 data-testid='verification-error'
               >
                 <AlertCircle className='h-4 w-4 text-error shrink-0 mt-0.5' />
                 <p className='text-[13px] text-error'>{displayError}</p>
-              </div>
+              </ContentSurfaceCard>
             )}
 
             {/* Actions */}
