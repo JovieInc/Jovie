@@ -137,7 +137,7 @@ export interface ReleaseSidebarProps {
     durationMs: number | null;
     isrc: string | null;
     isExplicit: boolean;
-    providers: Array<{ key: string; label: string; url: string }>;
+    providers: Array<{ key: ProviderKey; label: string; url: string }>;
     releaseId: string;
     previewUrl?: string | null;
     audioUrl?: string | null;

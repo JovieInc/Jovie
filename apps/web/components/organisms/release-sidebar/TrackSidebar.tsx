@@ -23,6 +23,7 @@ import {
 } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import type { ProviderKey } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { TrackMetaSummary } from './TrackMetaSummary';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
@@ -47,7 +48,7 @@ export interface TrackSidebarData {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
-  providers: Array<{ key: string; label: string; url: string }>;
+  providers: Array<{ key: ProviderKey; label: string; url: string }>;
   releaseTitle: string;
   releaseArtworkUrl?: string | null;
   releaseId: string;
@@ -179,6 +180,7 @@ export function TrackSidebar({
                 src={track.releaseArtworkUrl}
                 alt={`${track.releaseTitle} artwork`}
                 sizeClassName='h-20 w-20'
+                sizes='80px'
                 fallback={
                   <Icon
                     name='Music'

@@ -4,6 +4,7 @@ import { Badge, Button, Switch, Textarea } from '@jovie/ui';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface Keyword {
   id: string;
@@ -123,14 +124,17 @@ export function LeadKeywordsManager() {
 
   if (loading) {
     return (
-      <div className='rounded-lg border border-subtle p-4 text-sm text-secondary-token'>
+      <div className='border-b border-(--linear-border-subtle) px-4 py-4 text-sm text-secondary-token'>
         Loading keywords...
       </div>
     );
   }
 
   return (
-    <section className='rounded-lg border border-subtle p-4 sm:p-6'>
+    <ContentSurfaceCard
+      as='section'
+      className='rounded-none border-0 border-b border-(--linear-border-subtle) p-4 sm:p-6'
+    >
       <div className='mb-4 flex items-center justify-between'>
         <div>
           <h2 className='text-sm font-semibold text-primary-token'>
@@ -223,6 +227,6 @@ export function LeadKeywordsManager() {
           Add keywords
         </Button>
       </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }

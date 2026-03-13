@@ -160,15 +160,17 @@ export function DemoReleaseDetail({
             Activity
           </h3>
           <div className='space-y-0.5'>
-            {DEMO_ACTIVITY_TEMPLATE.map(activity => (
+            {DEMO_ACTIVITY_TEMPLATE.map((activity, index) => (
               <div
                 key={activity.id}
                 className='relative flex items-start gap-3 py-2'
               >
-                <div
-                  aria-hidden='true'
-                  className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle) last:hidden'
-                />
+                {index < DEMO_ACTIVITY_TEMPLATE.length - 1 ? (
+                  <div
+                    aria-hidden='true'
+                    className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle)'
+                  />
+                ) : null}
                 <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
                   <div className='size-1.5 rounded-full bg-(--linear-text-tertiary)' />
                 </div>

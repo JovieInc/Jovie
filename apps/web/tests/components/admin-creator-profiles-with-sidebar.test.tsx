@@ -299,10 +299,7 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     await user.click(screen.getByText('Close'));
 
     await waitFor(() => {
-      expect(screen.getByTestId('contact-sidebar')).toHaveAttribute(
-        'aria-hidden',
-        'true'
-      );
+      expect(screen.queryByTestId('contact-sidebar')).not.toBeInTheDocument();
     });
   });
 });

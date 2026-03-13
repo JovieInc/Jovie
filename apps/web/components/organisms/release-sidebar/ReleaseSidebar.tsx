@@ -128,6 +128,7 @@ function ReleaseEntityHeader({
                 src={release.artworkUrl}
                 alt={artworkAlt}
                 sizeClassName='h-[92px] w-[92px]'
+                sizes='92px'
                 fallback={
                   <Icon
                     name='Disc3'

@@ -12,14 +12,19 @@ export const APP_ICON_BUTTON_CLASS = cn(
   'w-[var(--linear-app-control-height-sm)] shrink-0 px-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
-export interface AppIconButtonProps
-  extends Omit<ButtonProps, 'children' | 'size'> {
-  readonly children: React.ReactNode;
-  readonly ariaLabel?: string;
-  readonly 'aria-label'?: string;
-  readonly tooltipLabel?: string;
-  readonly tooltipShortcut?: string;
-}
+type AppIconButtonLabelProps =
+  | { readonly ariaLabel: string; readonly 'aria-label'?: never }
+  | { readonly ariaLabel?: never; readonly 'aria-label': string };
+
+export type AppIconButtonProps = Omit<
+  ButtonProps,
+  'children' | 'size' | 'aria-label'
+> &
+  AppIconButtonLabelProps & {
+    readonly children: React.ReactNode;
+    readonly tooltipLabel?: string;
+    readonly tooltipShortcut?: string;
+  };
 
 export const AppIconButton = React.forwardRef<
   HTMLButtonElement,

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface Lead {
   id: string;
@@ -183,7 +184,10 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const totalPages = Math.ceil(total / limit);
 
   return (
-    <section className='rounded-lg border border-subtle bg-surface-1 p-4 sm:p-6'>
+    <ContentSurfaceCard
+      as='section'
+      className='rounded-none border-0 p-4 sm:p-6'
+    >
       <div className='mb-4'>
         <h2 className='text-sm font-semibold text-primary-token'>
           Leads ({total})
@@ -372,6 +376,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
           </div>
         </div>
       )}
-    </section>
+    </ContentSurfaceCard>
   );
 }

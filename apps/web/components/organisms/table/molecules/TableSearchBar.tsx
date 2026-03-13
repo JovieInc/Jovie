@@ -45,10 +45,7 @@ export function TableSearchBar({
     <AppSearchField
       value={localValue}
       onChange={setValue}
-      onClear={() => {
-        clear();
-        onChange('');
-      }}
+      onClear={clear}
       placeholder={placeholder}
       ariaLabel={placeholder}
       className={className}

@@ -33,7 +33,7 @@ import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
@@ -172,7 +172,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       durationMs: number | null;
       isrc: string | null;
       isExplicit: boolean;
-      providers: Array<{ key: string; label: string; url: string }>;
+      providers: Array<{ key: ProviderKey; label: string; url: string }>;
       releaseId: string;
       previewUrl?: string | null;
       audioUrl?: string | null;

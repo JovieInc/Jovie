@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import React, { Suspense, useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
@@ -430,25 +430,17 @@ export function AdminCreatorProfilesWithSidebar({
           </AdminTableShell>
         </QueryErrorBoundary>
       </div>
-      <Suspense
-        fallback={
-          <div className='w-[320px] shrink-0 space-y-4 border-l border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) p-4'>
-            <div className='h-10 w-32 animate-pulse rounded-md bg-(--linear-bg-surface-1)' />
-            <div className='h-20 w-full animate-pulse rounded-md bg-(--linear-bg-surface-1)' />
-            <div className='h-40 w-full animate-pulse rounded-md bg-(--linear-bg-surface-1)' />
-          </div>
-        }
-      >
+      {sidebarOpen && effectiveContact ? (
         <ContactSidebar
           contact={effectiveContact}
           mode={mode}
-          isOpen={sidebarOpen && Boolean(effectiveContact)}
+          isOpen={true}
           onClose={handleSidebarClose}
           onRefresh={handleSidebarRefresh}
           onContactChange={handleContactChange}
           onAvatarUpload={handleAvatarUpload}
         />
-      </Suspense>
+      ) : null}
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}

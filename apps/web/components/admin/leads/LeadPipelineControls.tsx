@@ -4,6 +4,7 @@ import { Button, Input, Switch } from '@jovie/ui';
 import { Loader2, Play, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface PipelineSettings {
   enabled: boolean;
@@ -112,7 +113,7 @@ export function LeadPipelineControls() {
 
   if (loading) {
     return (
-      <div className='border-b border-subtle px-4 py-4 text-sm text-secondary-token'>
+      <div className='border-b border-(--linear-border-subtle) px-4 py-4 text-sm text-(--linear-text-secondary)'>
         Loading pipeline settings...
       </div>
     );
@@ -120,14 +121,17 @@ export function LeadPipelineControls() {
 
   if (!settings) {
     return (
-      <div className='border-b border-subtle px-4 py-4 text-sm text-destructive'>
+      <div className='border-b border-(--linear-border-subtle) px-4 py-4 text-sm text-destructive'>
         Unable to load pipeline settings. Please refresh.
       </div>
     );
   }
 
   return (
-    <section className='rounded-lg border border-subtle p-4 sm:p-6'>
+    <ContentSurfaceCard
+      as='section'
+      className='rounded-none border-0 border-b border-(--linear-border-subtle) p-4 sm:p-6'
+    >
       <div className='mb-4'>
         <h2 className='text-sm font-semibold text-primary-token'>
           Pipeline controls
@@ -281,6 +285,6 @@ export function LeadPipelineControls() {
           </Button>
         </div>
       </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }

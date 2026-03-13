@@ -31,6 +31,26 @@ interface ProfileField {
   filled: boolean;
 }
 
+function formatSocialPlatformLabel(
+  platform: string | null | undefined
+): string {
+  return String(platform ?? 'unknown').replaceAll('_', ' ');
+}
+
+function normalizeExternalUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    const protocol = url.protocol.toLowerCase();
+    return protocol === 'http:' || protocol === 'https:'
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function computeProfileCompleteness(user: AdminUserRow): {
   score: number;
   fields: ProfileField[];
@@ -169,23 +189,38 @@ function IdValue({
 }
 
 function SocialLinksSection({ user }: { readonly user: AdminUserRow }) {
-  if (!user.socialLinks || user.socialLinks.length === 0) return null;
+  const socialLinks =
+    user.socialLinks?.slice(0, 8).flatMap(link => {
+      const safeUrl = normalizeExternalUrl(link.url);
+      if (!safeUrl) return [];
+
+      return [
+        {
+          id: link.id,
+          href: safeUrl,
+          label: link.displayText ?? formatSocialPlatformLabel(link.platform),
+        },
+      ];
+    }) ?? [];
+
+  if (socialLinks.length === 0) return null;
 
   return (
     <DrawerSection title='Social & music links'>
       <div className='space-y-1'>
-        {user.socialLinks.slice(0, 8).map(link => (
+        {socialLinks.map(link => (
           <a
             key={link.id}
-            href={link.url}
+            href={link.href}
             target='_blank'
             rel='noopener noreferrer'
             className='flex min-h-[34px] items-center justify-between rounded-[8px] px-2.5 py-2 text-[13px] text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
           >
-            <span className='min-w-0 truncate capitalize'>
-              {link.displayText ?? link.platform.replaceAll('_', ' ')}
-            </span>
-            <ExternalLink className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)' />
+            <span className='min-w-0 truncate capitalize'>{link.label}</span>
+            <ExternalLink
+              className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
+              aria-hidden='true'
+            />
           </a>
         ))}
       </div>

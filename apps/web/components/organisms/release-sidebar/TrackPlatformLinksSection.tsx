@@ -9,7 +9,7 @@ import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { ProviderKey } from '@/lib/discography/types';
 
 export interface TrackPlatformLink {
-  readonly key: string;
+  readonly key: ProviderKey;
   readonly label: string;
   readonly url: string;
 }
@@ -35,9 +35,9 @@ export function TrackPlatformLinksSection({
             key={provider.key}
             icon={
               <ProviderIcon
-                provider={provider.key as ProviderKey}
+                provider={provider.key}
                 className='h-4 w-4'
-                aria-label={PROVIDER_LABELS[provider.key] ?? provider.label}
+                aria-hidden='true'
               />
             }
             label={PROVIDER_LABELS[provider.key] ?? provider.label}

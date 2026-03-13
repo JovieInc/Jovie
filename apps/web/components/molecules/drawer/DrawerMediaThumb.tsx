@@ -9,6 +9,7 @@ export interface DrawerMediaThumbProps {
   readonly alt: string;
   readonly fallback: ReactNode;
   readonly sizeClassName?: string;
+  readonly sizes?: string;
   readonly className?: string;
   readonly imageClassName?: string;
 }
@@ -18,6 +19,7 @@ export function DrawerMediaThumb({
   alt,
   fallback,
   sizeClassName = 'h-16 w-16',
+  sizes = '64px',
   className,
   imageClassName,
 }: DrawerMediaThumbProps) {
@@ -35,7 +37,7 @@ export function DrawerMediaThumb({
           alt={alt}
           fill
           className={cn('object-cover', imageClassName)}
-          sizes='80px'
+          sizes={sizes}
         />
       ) : (
         <div className='flex h-full w-full items-center justify-center'>

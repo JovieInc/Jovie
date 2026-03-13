@@ -9,6 +9,7 @@ import {
   DrawerBackButton,
   DrawerSection,
 } from '@/components/molecules/drawer';
+import type { ProviderKey } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { TrackMetaSummary } from './TrackMetaSummary';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
@@ -22,7 +23,7 @@ export interface TrackForDetail {
   durationMs: number | null;
   isrc: string | null;
   isExplicit: boolean;
-  providers: Array<{ key: string; label: string; url: string }>;
+  providers: Array<{ key: ProviderKey; label: string; url: string }>;
 }
 
 interface TrackDetailPanelProps {

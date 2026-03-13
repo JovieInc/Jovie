@@ -4,6 +4,7 @@ import { Button, Textarea } from '@jovie/ui';
 import { Loader2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface UnifiedUrlIntakeProps {
   readonly onSubmitted?: () => void;
@@ -54,7 +55,10 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
   }
 
   return (
-    <section className='rounded-lg border border-subtle bg-surface-1 p-4 sm:p-6'>
+    <ContentSurfaceCard
+      as='section'
+      className='rounded-none border-0 border-b border-(--linear-border-subtle) p-4 sm:p-6'
+    >
       <h2 className='text-sm font-semibold text-primary-token'>
         Unified URL intake
       </h2>
@@ -83,6 +87,6 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
           Queue URLs
         </Button>
       </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }
