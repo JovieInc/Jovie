@@ -180,7 +180,7 @@ export function PreviewPanel() {
       footer={
         <DrawerSurfaceCard className='space-y-2.5 p-3'>
           <DrawerSectionHeading>Your profile URL</DrawerSectionHeading>
-          <div className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-[12px] font-medium tracking-[-0.01em] text-(--linear-text-primary)'>
+          <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) px-3 py-2 text-[12px] font-medium tracking-[-0.01em] text-(--linear-text-primary)'>
             <div className='truncate'>{profileUrl || 'Loading...'}</div>
           </div>
           <p className='text-[12px] leading-[16px] text-(--linear-text-tertiary)'>
@@ -190,7 +190,7 @@ export function PreviewPanel() {
       }
     >
       <div className='flex flex-col items-center gap-4 pb-6'>
-        <div className='aspect-[9/19.5] max-h-[740px] w-full max-w-[360px] overflow-hidden rounded-[24px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) shadow-[0_20px_60px_rgba(0,0,0,0.24)] dark:shadow-[0_24px_72px_rgba(0,0,0,0.48)]'>
+        <div className='aspect-[9/19.5] max-h-[720px] w-full max-w-[344px] overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) shadow-[0_12px_34px_rgba(0,0,0,0.14)] dark:shadow-[0_18px_52px_rgba(0,0,0,0.34)]'>
           <ProfilePreview
             username={username}
             displayName={displayName}
@@ -204,7 +204,7 @@ export function PreviewPanel() {
           asChild
           tone='primary'
           size='sm'
-          className='h-10 w-full max-w-[360px] rounded-[10px] text-[13px]'
+          className='h-9 w-full max-w-[344px] rounded-[9px] text-[13px]'
         >
           <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
             <ExternalLink className='mr-2 h-4 w-4' aria-hidden='true' />

@@ -85,22 +85,21 @@ function FunnelStage({
   if (loading) {
     return (
       <div className='flex w-full flex-col items-center'>
-        <div
-          className='w-full rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-5 py-4 text-center'
-          style={{ maxWidth: width }}
-        >
-          <LoadingSkeleton
-            height='h-3'
-            width='w-20'
-            rounded='sm'
-            className='mx-auto mb-2'
-          />
-          <LoadingSkeleton
-            height='h-7'
-            width='w-16'
-            rounded='sm'
-            className='mx-auto'
-          />
+        <div className='w-full' style={{ maxWidth: width }}>
+          <DrawerSurfaceCard className='px-4 py-3 text-center'>
+            <LoadingSkeleton
+              height='h-3'
+              width='w-20'
+              rounded='sm'
+              className='mx-auto mb-2'
+            />
+            <LoadingSkeleton
+              height='h-7'
+              width='w-16'
+              rounded='sm'
+              className='mx-auto'
+            />
+          </DrawerSurfaceCard>
         </div>
       </div>
     );
@@ -108,24 +107,25 @@ function FunnelStage({
 
   return (
     <div className='flex w-full flex-col items-center'>
-      <div
-        className={cn(
-          'relative w-full overflow-hidden rounded-xl border px-5 py-4 text-center',
-          isLast
-            ? 'border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--linear-bg-surface-1)] ring-1 ring-accent/15'
-            : 'border-(--linear-border-subtle) bg-gradient-to-r from-[var(--linear-bg-surface-1)] to-[var(--linear-bg-surface-2)]'
-        )}
-        style={{ maxWidth: width }}
-      >
-        <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
-          {label}
-        </p>
-        <p className='text-2xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
-          {value}
-        </p>
-        <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
-          {description}
-        </p>
+      <div className='w-full' style={{ maxWidth: width }}>
+        <DrawerSurfaceCard
+          className={cn(
+            'relative overflow-hidden px-4 py-3 text-center',
+            isLast
+              ? 'border-(--linear-border-default) bg-(--linear-bg-surface-1)'
+              : 'bg-(--linear-bg-surface-1)'
+          )}
+        >
+          <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            {label}
+          </p>
+          <p className='text-2xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
+            {value}
+          </p>
+          <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+            {description}
+          </p>
+        </DrawerSurfaceCard>
       </div>
 
       {!isLast && (
@@ -196,7 +196,7 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.key}
-          className='group flex h-8 items-center justify-between rounded-lg px-2'
+          className='group flex h-8 items-center justify-between rounded-[7px] px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
             <span className='w-3 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
@@ -228,7 +228,7 @@ function EngagementMetricCard({
   const showSkeleton = loading || !value;
 
   return (
-    <DrawerSurfaceCard className='min-h-[72px] p-3'>
+    <DrawerSurfaceCard className='min-h-[68px] p-3'>
       {showSkeleton ? (
         <>
           <LoadingSkeleton
@@ -351,7 +351,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           />
         </div>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-1.5'>
           <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}
@@ -362,7 +362,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
 
-        <div className='min-h-[196px]'>
+        <DrawerSurfaceCard className='min-h-[196px] p-2'>
           {activeTab === 'cities' && (
             <RankedList
               icon={MapPin}
@@ -399,7 +399,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               emptyMessage='No link data yet'
             />
           )}
-        </div>
+        </DrawerSurfaceCard>
       </div>
     </EntitySidebarShell>
   );
