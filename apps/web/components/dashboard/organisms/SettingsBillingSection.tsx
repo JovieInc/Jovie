@@ -27,12 +27,14 @@ function BillingStateCard({
     <ContentSurfaceCard className='flex items-start gap-3 bg-(--linear-bg-surface-0) p-3.5'>
       <div className='mt-0.5 shrink-0'>{icon}</div>
       <div className='min-w-0 flex-1'>
-        <p className='text-[13px] font-[510] text-primary-token'>{title}</p>
-        <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          {title}
+        </p>
+        <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
           {description}
         </p>
         {detail ? (
-          <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+          <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
             {detail}
           </p>
         ) : null}
@@ -75,7 +77,10 @@ export function SettingsBillingSection() {
       <div className='space-y-3 px-4 py-3'>
         <BillingStateCard
           icon={
-            <CreditCard className='h-4 w-4 text-secondary-token' aria-hidden />
+            <CreditCard
+              className='h-4 w-4 text-(--linear-text-secondary)'
+              aria-hidden
+            />
           }
           title={isPro ? 'Pro plan active' : 'Upgrade available'}
           description={

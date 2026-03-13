@@ -63,7 +63,7 @@ export function SettingsProfileSection({
       />
       <div className='space-y-3 px-4 py-3'>
         <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-(--linear-bg-surface-0) px-4 py-3.5'>
-          <span className='text-[13px] text-primary-token'>
+          <span className='text-[13px] text-(--linear-text-primary)'>
             Profile picture
           </span>
           <AvatarUploadable
@@ -84,7 +84,7 @@ export function SettingsProfileSection({
         <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
           <label
             htmlFor='displayName'
-            className='shrink-0 text-[13px] text-primary-token'
+            className='shrink-0 text-[13px] text-(--linear-text-primary)'
           >
             Display name
           </label>
@@ -104,16 +104,16 @@ export function SettingsProfileSection({
           <div className='shrink-0'>
             <label
               htmlFor='username'
-              className='text-[13px] text-primary-token'
+              className='text-[13px] text-(--linear-text-primary)'
             >
               Username
             </label>
-            <p className='mt-0.5 text-[13px] text-secondary-token'>
+            <p className='mt-0.5 text-[13px] text-(--linear-text-secondary)'>
               Used in your profile URL
             </p>
           </div>
           <div className='flex w-full rounded-[8px] sm:max-w-[280px]'>
-            <span className='inline-flex items-center rounded-l-[8px] border border-r-0 border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-secondary-token select-none'>
+            <span className='inline-flex select-none items-center rounded-l-[8px] border border-r-0 border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-secondary)'>
               {profileDomain}/
             </span>
             <Input

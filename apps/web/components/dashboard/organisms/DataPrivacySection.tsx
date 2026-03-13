@@ -63,10 +63,10 @@ export function DataPrivacySection() {
         <div className='space-y-3 px-4 py-3'>
           <ContentSurfaceCard className='flex flex-col justify-between gap-3 bg-(--linear-bg-surface-0) p-4 sm:flex-row sm:items-start sm:gap-4'>
             <div className='min-w-0'>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                 Export your data
               </p>
-              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+              <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
                 Download a copy of your profile information, links, contacts,
                 and settings.
               </p>
@@ -84,10 +84,10 @@ export function DataPrivacySection() {
 
           <ContentSurfaceCard className='flex flex-col justify-between gap-3 bg-(--linear-bg-surface-0) p-4 sm:flex-row sm:items-start sm:gap-4'>
             <div className='min-w-0'>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                 Delete account
               </p>
-              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
+              <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
                 Permanently delete your account and all associated data. This
                 action cannot be undone.
               </p>
@@ -124,7 +124,7 @@ export function DataPrivacySection() {
           <div className='py-4'>
             <label
               htmlFor='delete-confirm'
-              className='text-[13px] text-secondary-token block mb-2'
+              className='mb-2 block text-[13px] text-(--linear-text-secondary)'
             >
               Type <strong>DELETE</strong> to confirm
             </label>
