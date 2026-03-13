@@ -1,22 +1,11 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import {
-  CheckCircle,
-  RefreshCw,
-  Search,
-  Star,
-  Trash2,
-  X,
-  XCircle,
-} from 'lucide-react';
-import { useState } from 'react';
-import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { CheckCircle, RefreshCw, Star, Trash2, XCircle } from 'lucide-react';
 import {
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
-  PageToolbarSearchForm,
 } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
@@ -26,14 +15,9 @@ import {
 import { AdminTableSubheader } from './AdminTableHeader';
 
 export interface AdminCreatorsToolbarProps {
-  readonly basePath: string;
-  readonly search: string;
-  readonly sort: string;
-  readonly pageSize: number;
   readonly from: number;
   readonly to: number;
   readonly total: number;
-  readonly clearHref: string;
   readonly profiles: AdminCreatorProfileRow[];
   readonly selectedIds?: ReadonlySet<string>;
   readonly onBulkVerify?: () => void;
@@ -45,14 +29,9 @@ export interface AdminCreatorsToolbarProps {
 }
 
 export function AdminCreatorsToolbar({
-  basePath,
-  search,
-  sort,
-  pageSize,
   from,
   to,
   total,
-  clearHref,
   profiles,
   selectedIds = new Set(),
   onBulkVerify,
@@ -62,7 +41,6 @@ export function AdminCreatorsToolbar({
   onBulkDelete,
   onClearSelection,
 }: AdminCreatorsToolbarProps) {
-  const [searchTerm, setSearchTerm] = useState(search);
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
 
@@ -83,25 +61,6 @@ export function AdminCreatorsToolbar({
       end={
         hasSelection ? undefined : (
           <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-            <PageToolbarSearchForm
-              action={basePath}
-              searchValue={searchTerm}
-              onSearchValueChange={setSearchTerm}
-              placeholder='Search by handle'
-              ariaLabel='Search creators by handle'
-              submitAriaLabel='Search creators'
-              clearHref={clearHref}
-              clearAriaLabel='Clear creator search'
-              hiddenInputs={[
-                { name: 'sort', value: sort },
-                { name: 'pageSize', value: pageSize },
-                { name: 'page', value: 1 },
-              ]}
-              submitIcon={<Search />}
-              clearIcon={<X />}
-              compact
-              tooltipLabel='Search'
-            />
             <ExportCSVButton<AdminCreatorProfileRow>
               getData={() => profiles}
               columns={creatorsCSVColumns}
@@ -111,12 +70,6 @@ export function AdminCreatorsToolbar({
               chrome='page-toolbar'
               iconOnly
               tooltipLabel='Export'
-            />
-            <DrawerToggleButton
-              chrome='page-toolbar'
-              ariaLabel='Toggle creator details'
-              label='Details'
-              tooltipLabel='Details'
             />
           </div>
         )

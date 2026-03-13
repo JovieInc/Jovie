@@ -5,6 +5,7 @@ import AdminOutreachEmailPage from '@/app/app/(shell)/admin/outreach/email/page'
 import AdminOutreachPage from '@/app/app/(shell)/admin/outreach/page';
 import AdminOutreachReviewPage from '@/app/app/(shell)/admin/outreach/review/page';
 import { LeadTable } from '@/components/admin/leads/LeadTable';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 
 vi.mock('sonner', () => ({
   toast: {
@@ -39,7 +40,11 @@ describe('admin load failures', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { toast } = await import('sonner');
-    render(<LeadTable />);
+    render(
+      <HeaderActionsProvider>
+        <LeadTable />
+      </HeaderActionsProvider>
+    );
 
     await waitFor(() => {
       expect(

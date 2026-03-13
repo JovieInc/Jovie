@@ -16,13 +16,14 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
-  Search,
   X,
 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_ICON_CLASS,
@@ -30,9 +31,9 @@ import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PAGE_TOOLBAR_START_CLASS,
   PageToolbar,
-  PageToolbarSearchForm,
   PageToolbarTabButton,
 } from '@/components/organisms/table';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { cn } from '@/lib/utils';
 
 interface Lead {
@@ -129,6 +130,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'createdAt' | 'fitScore'>('createdAt');
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const { setHeaderActions } = useSetHeaderActions();
   const limit = 25;
 
   const fetchLeads = useCallback(async () => {
@@ -163,6 +165,29 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads, refreshKey]);
+
+  useEffect(() => {
+    setHeaderActions(
+      <DashboardHeaderActionGroup>
+        <HeaderSearchAction
+          searchValue={search}
+          onSearchValueChange={value => {
+            setSearch(value);
+            setPage(1);
+          }}
+          onApply={() => undefined}
+          placeholder='Search handle or name...'
+          ariaLabel='Search leads'
+          submitAriaLabel='Search leads'
+          tooltipLabel='Search'
+        />
+      </DashboardHeaderActionGroup>
+    );
+
+    return () => {
+      setHeaderActions(null);
+    };
+  }, [search, setHeaderActions]);
 
   async function updateLeadStatus(id: string, status: 'approved' | 'rejected') {
     setActioningId(id);
@@ -233,24 +258,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         startClassName={cn(PAGE_TOOLBAR_START_CLASS, 'flex-wrap')}
         end={
           <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-            <PageToolbarSearchForm
-              compact
-              searchValue={search}
-              onSearchValueChange={value => {
-                setSearch(value);
-                setPage(1);
-              }}
-              onApply={() => undefined}
-              placeholder='Search handle or name...'
-              ariaLabel='Search leads'
-              submitAriaLabel='Open lead search'
-              applyLabel='Apply'
-              submitIcon={
-                <Search className={PAGE_TOOLBAR_ICON_CLASS} strokeWidth={2} />
-              }
-              clearIcon={<X />}
-              tooltipLabel='Search'
-            />
             <Select
               value={sortBy}
               onValueChange={value =>

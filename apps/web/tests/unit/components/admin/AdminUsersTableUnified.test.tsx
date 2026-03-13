@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
 import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 
 const mockUseBreakpointDown = vi.fn<
   (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') => boolean
@@ -107,16 +108,18 @@ describe('AdminUsersTableUnified', () => {
 
     render(
       <TooltipProvider>
-        <TableMetaProvider>
-          <AdminUsersTableUnified
-            users={[userRow]}
-            page={1}
-            pageSize={20}
-            total={1}
-            search=''
-            sort='created_desc'
-          />
-        </TableMetaProvider>
+        <HeaderActionsProvider>
+          <TableMetaProvider>
+            <AdminUsersTableUnified
+              users={[userRow]}
+              page={1}
+              pageSize={20}
+              total={1}
+              search=''
+              sort='created_desc'
+            />
+          </TableMetaProvider>
+        </HeaderActionsProvider>
       </TooltipProvider>
     );
 
@@ -144,16 +147,18 @@ describe('AdminUsersTableUnified', () => {
 
     render(
       <TooltipProvider>
-        <TableMetaProvider>
-          <AdminUsersTableUnified
-            users={[userRow]}
-            page={1}
-            pageSize={20}
-            total={1}
-            search=''
-            sort='created_desc'
-          />
-        </TableMetaProvider>
+        <HeaderActionsProvider>
+          <TableMetaProvider>
+            <AdminUsersTableUnified
+              users={[userRow]}
+              page={1}
+              pageSize={20}
+              total={1}
+              search=''
+              sort='created_desc'
+            />
+          </TableMetaProvider>
+        </HeaderActionsProvider>
       </TooltipProvider>
     );
 

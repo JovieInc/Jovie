@@ -182,13 +182,13 @@ describe('DemoReleasesExperience', () => {
 
     // Click a release row to open the detail drawer
     await user.click(screen.getByText('Take Me Over'));
-    const previewToggle = screen.getByRole('button', {
-      name: 'Toggle release preview',
-    });
-
-    // Preview toggle should reflect the opened drawer state
+    // Header preview toggles render for both mobile and desktop shells in jsdom.
     await waitFor(() =>
-      expect(previewToggle).toHaveAttribute('aria-pressed', 'true')
+      expect(
+        screen
+          .getAllByRole('button', { name: 'Toggle release preview' })
+          .every(button => button.getAttribute('aria-pressed') === 'true')
+      ).toBe(true)
     );
   });
 

@@ -13,7 +13,6 @@ import { memo, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import {
   ExportCSVButton,
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -23,7 +22,6 @@ import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
-  PageToolbarSearchForm,
   PageToolbarTabButton,
 } from '@/components/organisms/table';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
@@ -73,10 +71,6 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
-  /** Whether search is currently active */
-  readonly searchQuery: string;
-  /** Callback to update search query */
-  readonly onSearchQueryChange: (value: string) => void;
 }
 
 /** Options for release view segmented control */
@@ -294,8 +288,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
-  searchQuery,
-  onSearchQueryChange,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
@@ -313,38 +305,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       }
       end={
         <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-          <DrawerToggleButton
-            chrome='page-toolbar'
-            ariaLabel='Toggle release preview'
-            label='Preview'
-            tooltipLabel='Preview'
-          />
-          <PageToolbarSearchForm
-            searchValue={searchQuery}
-            onSearchValueChange={onSearchQueryChange}
-            onClearAction={() => onSearchQueryChange('')}
-            onApply={() => undefined}
-            applyLabel='Done'
-            placeholder='Search releases'
-            ariaLabel='Search releases'
-            submitAriaLabel='Search releases'
-            submitIcon={
-              <Icon
-                name='Search'
-                className={PAGE_TOOLBAR_ICON_CLASS}
-                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-              />
-            }
-            clearIcon={
-              <Icon
-                name='X'
-                className={PAGE_TOOLBAR_ICON_CLASS}
-                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-              />
-            }
-            compact
-            tooltipLabel='Search'
-          />
           <ReleaseFilterDropdown
             filters={filters}
             onFiltersChange={onFiltersChange}

@@ -94,14 +94,9 @@ function renderToolbar(
     <TooltipProvider>
       <TableMetaProvider>
         <AdminCreatorsToolbar
-          basePath='/admin/creators'
-          search=''
-          sort='newest'
-          pageSize={20}
           from={1}
           to={2}
           total={2}
-          clearHref='/admin/creators'
           profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
           {...handlers}
           {...props}
@@ -169,9 +164,7 @@ describe('AdminCreatorsToolbar interactions', () => {
   it('renders normal toolbar mode without bulk actions when no rows are selected', () => {
     renderToolbar({ selectedIds: new Set() });
 
-    expect(
-      screen.getByRole('button', { name: 'Search creators' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Delete' })
     ).not.toBeInTheDocument();

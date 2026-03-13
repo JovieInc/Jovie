@@ -20,10 +20,12 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import {
   DrawerButton,
   DrawerLoadingSkeleton,
 } from '@/components/molecules/drawer';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
@@ -505,9 +507,30 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
-    () =>
-      canCreateManualReleases ? (
-        <DashboardHeaderActionGroup>
+    () => (
+      <DashboardHeaderActionGroup
+        trailing={
+          <DrawerToggleButton
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
+          />
+        }
+      >
+        <HeaderSearchAction
+          searchValue={searchQuery}
+          onSearchValueChange={setSearchQuery}
+          onClearAction={() => setSearchQuery('')}
+          onApply={() => undefined}
+          placeholder='Search releases'
+          ariaLabel='Search releases'
+          submitAriaLabel='Search releases'
+          submitIcon={
+            <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
+          }
+          tooltipLabel='Search'
+        />
+        {canCreateManualReleases ? (
           <DashboardHeaderActionButton
             ariaLabel='Create a new release'
             onClick={handleNewRelease}
@@ -516,9 +539,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             iconOnly
             tooltipLabel='New Release'
           />
-        </DashboardHeaderActionGroup>
-      ) : null,
-    [canCreateManualReleases, handleNewRelease]
+        ) : null}
+      </DashboardHeaderActionGroup>
+    ),
+    [canCreateManualReleases, handleNewRelease, searchQuery]
   );
 
   useEffect(() => {
@@ -687,8 +711,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
-              searchQuery={searchQuery}
-              onSearchQueryChange={setSearchQuery}
             />
           )}
 

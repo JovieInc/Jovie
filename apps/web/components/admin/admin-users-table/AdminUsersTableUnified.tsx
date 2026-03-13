@@ -2,7 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Copy, ExternalLink, Search, Users, X } from 'lucide-react';
+import { Copy, ExternalLink, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -12,8 +12,10 @@ import {
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   type ContextMenuItemType,
@@ -21,12 +23,12 @@ import {
   ExportCSVButton,
   PAGE_TOOLBAR_END_GROUP_CLASS,
   PAGE_TOOLBAR_META_TEXT_CLASS,
-  PageToolbarSearchForm,
   TableBulkActionsToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
@@ -156,6 +158,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   // Detail drawer state
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
   const { setTableMeta } = useTableMeta();
+  const { setHeaderActions } = useSetHeaderActions();
   const usersRef = useRef(users);
   usersRef.current = users;
 
@@ -183,6 +186,41 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [selectedUser, users.length]);
+
+  const headerActions = useMemo(
+    () => (
+      <DashboardHeaderActionGroup
+        trailing={
+          <DrawerToggleButton
+            ariaLabel='Toggle user details'
+            label='Details'
+            tooltipLabel='Details'
+          />
+        }
+      >
+        <HeaderSearchAction
+          action={APP_ROUTES.ADMIN_USERS}
+          clearHref={`${APP_ROUTES.ADMIN_USERS}?sort=${sort}`}
+          searchValue={searchTerm}
+          onSearchValueChange={setSearchTerm}
+          placeholder='Search by email, name, or handle'
+          ariaLabel='Search users by email, name, or handle'
+          submitAriaLabel='Search users'
+          hiddenInputs={[{ name: 'sort', value: sort }]}
+          tooltipLabel='Search'
+        />
+      </DashboardHeaderActionGroup>
+    ),
+    [searchTerm, sort]
+  );
+
+  useEffect(() => {
+    setHeaderActions(headerActions);
+
+    return () => {
+      setHeaderActions(null);
+    };
+  }, [headerActions, setHeaderActions]);
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -482,21 +520,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   }
                   end={
                     <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-                      <PageToolbarSearchForm
-                        action={APP_ROUTES.ADMIN_USERS}
-                        searchValue={searchTerm}
-                        onSearchValueChange={setSearchTerm}
-                        placeholder='Search by email, name, or handle'
-                        ariaLabel='Search users by email, name, or handle'
-                        submitAriaLabel='Search users'
-                        clearHref='?'
-                        clearAriaLabel='Clear user search'
-                        hiddenInputs={[{ name: 'sort', value: sort }]}
-                        submitIcon={<Search />}
-                        clearIcon={<X />}
-                        compact
-                        tooltipLabel='Search'
-                      />
                       <ExportCSVButton<AdminUserRow>
                         getData={() => users}
                         columns={usersCSVColumns}
@@ -506,12 +529,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                         chrome='page-toolbar'
                         iconOnly
                         tooltipLabel='Export'
-                      />
-                      <DrawerToggleButton
-                        chrome='page-toolbar'
-                        ariaLabel='Toggle user details'
-                        label='Details'
-                        tooltipLabel='Details'
                       />
                     </div>
                   }

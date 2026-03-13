@@ -1,14 +1,25 @@
 'use client';
 
 import type { RowSelectionState } from '@tanstack/react-table';
-import { UserCircle2 } from 'lucide-react';
+import { ListPlus, UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   TableEmptyState,
@@ -17,6 +28,7 @@ import {
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
@@ -53,6 +65,12 @@ const SendInviteDialog = dynamic(
   { ssr: false }
 );
 
+interface AdminCreatorProfilesUnifiedProps
+  extends AdminCreatorProfilesWithSidebarProps {
+  readonly onOpenBatchModal: () => void;
+  readonly onIngestPending: () => void;
+}
+
 export function AdminCreatorProfilesUnified({
   profiles: initialProfiles,
   pageSize,
@@ -61,7 +79,9 @@ export function AdminCreatorProfilesUnified({
   sort,
   mode: _mode = 'admin',
   basePath = APP_ROUTES.ADMIN_CREATORS,
-}: Readonly<AdminCreatorProfilesWithSidebarProps>) {
+  onOpenBatchModal,
+  onIngestPending,
+}: Readonly<AdminCreatorProfilesUnifiedProps>) {
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);
 
@@ -108,7 +128,12 @@ export function AdminCreatorProfilesUnified({
 
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const clearHref = basePath;
+  const [searchTerm, setSearchTerm] = useState(search);
+  const { setHeaderActions } = useSetHeaderActions();
+
+  useEffect(() => {
+    setSearchTerm(search);
+  }, [search]);
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -264,6 +289,56 @@ export function AdminCreatorProfilesUnified({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [filteredProfiles.length, selectedId, setDraftContact, sidebarOpen]);
 
+  const headerActions = useMemo(
+    () => (
+      <DashboardHeaderActionGroup
+        trailing={
+          <DrawerToggleButton
+            ariaLabel='Toggle creator details'
+            label='Details'
+            tooltipLabel='Details'
+          />
+        }
+      >
+        <HeaderSearchAction
+          action={basePath}
+          clearHref={basePath}
+          searchValue={searchTerm}
+          onSearchValueChange={setSearchTerm}
+          placeholder='Search by handle'
+          ariaLabel='Search creators by handle'
+          submitAriaLabel='Search creators'
+          hiddenInputs={[
+            { name: 'sort', value: sort },
+            { name: 'pageSize', value: pageSize },
+            { name: 'page', value: 1 },
+          ]}
+          tooltipLabel='Search'
+        />
+        <DashboardHeaderActionButton
+          ariaLabel='Batch ingest creators'
+          onClick={onOpenBatchModal}
+          icon={<ListPlus className='h-3.5 w-3.5' />}
+          label='Batch Ingest'
+          hideLabelOnMobile
+        />
+        <IngestProfileDropdown
+          onIngestPending={onIngestPending}
+          hideLabelOnMobile
+        />
+      </DashboardHeaderActionGroup>
+    ),
+    [basePath, onIngestPending, onOpenBatchModal, pageSize, searchTerm, sort]
+  );
+
+  useEffect(() => {
+    setHeaderActions(headerActions);
+
+    return () => {
+      setHeaderActions(null);
+    };
+  }, [headerActions, setHeaderActions]);
+
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
       setSelectedId(profilesWithActions[0]?.id);
@@ -396,14 +471,9 @@ export function AdminCreatorProfilesUnified({
           }}
           toolbar={
             <AdminCreatorsToolbar
-              basePath={basePath}
-              search={search}
-              sort={sort}
-              pageSize={pageSize}
               from={from}
               to={to}
               total={total}
-              clearHref={clearHref}
               profiles={profilesWithActions}
               selectedIds={selectedIds}
               onBulkVerify={handleBulkVerify}

@@ -27,8 +27,6 @@ export function DrawerToggleButton({
     setIsOpen((tableMeta.rightPanelWidth ?? 0) > 0);
   }, [tableMeta.rightPanelWidth]);
 
-  if (isOpen && chrome === 'header') return null;
-
   const Icon = PanelRight;
 
   if (chrome === 'page-toolbar') {

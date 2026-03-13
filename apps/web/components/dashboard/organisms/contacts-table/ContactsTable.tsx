@@ -92,7 +92,15 @@ export const ContactsTable = memo(function ContactsTable({
   // Memoize header actions to avoid creating new JSX on every render
   const headerActions = useMemo(
     () => (
-      <DashboardHeaderActionGroup>
+      <DashboardHeaderActionGroup
+        trailing={
+          <DrawerToggleButton
+            ariaLabel='Toggle contact details'
+            label='Details'
+            tooltipLabel='Details'
+          />
+        }
+      >
         <DashboardHeaderActionButton
           ariaLabel='Add contact'
           onClick={() => onAddContactRef.current()}
@@ -186,14 +194,6 @@ export const ContactsTable = memo(function ContactsTable({
                 {contacts.length}{' '}
                 {contacts.length === 1 ? 'contact' : 'contacts'}
               </span>
-            }
-            end={
-              <DrawerToggleButton
-                chrome='page-toolbar'
-                ariaLabel='Toggle contact details'
-                label='Details'
-                tooltipLabel='Details'
-              />
             }
           />
         ) : null}
