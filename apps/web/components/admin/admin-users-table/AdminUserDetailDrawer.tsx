@@ -1,14 +1,17 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import {
+  DrawerButton,
+  DrawerLinkSection,
   DrawerPropertyRow,
   DrawerSection,
   EntitySidebarShell,
+  SidebarLinkRow,
 } from '@/components/molecules/drawer';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/users';
@@ -206,25 +209,23 @@ function SocialLinksSection({ user }: { readonly user: AdminUserRow }) {
   if (socialLinks.length === 0) return null;
 
   return (
-    <DrawerSection title='Social & music links'>
-      <div className='space-y-1'>
+    <DrawerLinkSection title='Social & music links'>
+      <div className='space-y-1 px-3'>
         {socialLinks.map(link => (
-          <a
+          <SidebarLinkRow
             key={link.id}
-            href={link.href}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='flex min-h-[34px] items-center justify-between rounded-[8px] px-2.5 py-2 text-[13px] text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
-          >
-            <span className='min-w-0 truncate capitalize'>{link.label}</span>
-            <ExternalLink
-              className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
-              aria-hidden='true'
-            />
-          </a>
+            icon={
+              <ExternalLink
+                className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
+                aria-hidden='true'
+              />
+            }
+            label={link.label}
+            url={link.href}
+          />
         ))}
       </div>
-    </DrawerSection>
+    </DrawerLinkSection>
   );
 }
 
@@ -296,10 +297,9 @@ export function AdminUserDetailDrawer({
       entityHeader={user ? <UserHeader user={user} /> : undefined}
       footer={
         user?.clerkId ? (
-          <Button
+          <DrawerButton
             type='button'
-            variant='secondary'
-            size='sm'
+            tone='secondary'
             className='w-full'
             onClick={() => {
               globalThis.open(
@@ -311,7 +311,7 @@ export function AdminUserDetailDrawer({
           >
             <ExternalLink className='mr-1.5 h-3.5 w-3.5' />
             Open in Clerk
-          </Button>
+          </DrawerButton>
         ) : undefined
       }
     >

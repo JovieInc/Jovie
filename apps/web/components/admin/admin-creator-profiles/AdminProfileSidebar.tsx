@@ -1,6 +1,5 @@
 'use client';
 
-import { SegmentControl } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -12,7 +11,7 @@ import {
   type CategoryOption,
   ProfileLinkList,
 } from '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { Contact } from '@/types';
@@ -113,13 +112,13 @@ export function AdminProfileSidebar({
         </div>
       }
       tabs={
-        <SegmentControl
+        <DrawerTabs
           value={selectedCategory}
-          onValueChange={setSelectedCategory}
+          onValueChange={value =>
+            setSelectedCategory(value as CategoryOption | 'about')
+          }
           options={PROFILE_TAB_OPTIONS}
-          size='sm'
-          className='w-full'
-          aria-label='Creator profile sidebar view'
+          ariaLabel='Creator profile sidebar view'
         />
       }
     >
