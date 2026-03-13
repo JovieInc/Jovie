@@ -543,7 +543,7 @@ export const DashboardAudienceTableUnified = memo(
               onTogglePanel={toggle}
             />
 
-            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+            <div className='flex-1 min-h-0 flex flex-col bg-(--linear-app-content-surface)'>
               {/* Scrollable content area */}
               <div className='flex-1 min-h-0 overflow-auto'>
                 {rows.length === 0 ? (
