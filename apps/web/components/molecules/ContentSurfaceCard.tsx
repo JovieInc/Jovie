@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from 'react';
+import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const CONTENT_SURFACE_CARD_CLASSNAME =
@@ -8,15 +8,23 @@ export interface ContentSurfaceCardProps {
   readonly children?: ReactNode;
   readonly as?: ElementType;
   readonly className?: string;
+  readonly id?: string;
+  readonly role?: string;
+  readonly 'data-testid'?: string;
+  readonly 'aria-hidden'?: ComponentPropsWithoutRef<'div'>['aria-hidden'];
 }
 
 export function ContentSurfaceCard({
   children,
   as: Component = 'div',
   className,
+  ...props
 }: Readonly<ContentSurfaceCardProps>) {
   return (
-    <Component className={cn(CONTENT_SURFACE_CARD_CLASSNAME, className)}>
+    <Component
+      className={cn(CONTENT_SURFACE_CARD_CLASSNAME, className)}
+      {...props}
+    >
       {children}
     </Component>
   );

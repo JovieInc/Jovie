@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
@@ -42,10 +43,20 @@ export default function AdminPage() {
           </Suspense>
 
           <ContentSurfaceCard as='details' className='overflow-hidden'>
-            <summary className='cursor-pointer list-none border-b border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-3 text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
-              Platform reach metrics
+            <summary className='list-none [&::-webkit-details-marker]:hidden'>
+              <ContentSectionHeader
+                title='Platform reach metrics'
+                subtitle='Secondary platform stats kept below the fold'
+                actions={
+                  <span className='text-[12px] font-[560] text-(--linear-text-tertiary)'>
+                    Expand
+                  </span>
+                }
+                className='min-h-0 cursor-pointer px-[var(--linear-app-header-padding-x)] py-3'
+                actionsClassName='shrink-0'
+              />
             </summary>
-            <div className='space-y-4 px-[var(--linear-app-header-padding-x)] py-4'>
+            <div className='space-y-4 border-t border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-4'>
               <p className='text-app text-secondary-token'>
                 Secondary platform stats are intentionally below the fold so
                 core business KPIs stay front and center.
