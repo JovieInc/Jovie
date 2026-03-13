@@ -381,12 +381,14 @@ async function fetchMembersData(
 
   const ownershipFilter = buildOwnershipFilter(clerkUserId);
   const memberIdFilter = buildMemberIdFilter(memberId);
-  const typeCondition =
-    viewFilter === 'anonymous'
-      ? eq(audienceMembers.type, 'anonymous')
-      : viewFilter === 'identified'
-        ? ne(audienceMembers.type, 'anonymous')
-        : drizzleSql<boolean>`true`;
+  let typeCondition: SQL<boolean>;
+  if (viewFilter === 'anonymous') {
+    typeCondition = eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
+  } else if (viewFilter === 'identified') {
+    typeCondition = ne(audienceMembers.type, 'anonymous') as SQL<boolean>;
+  } else {
+    typeCondition = drizzleSql<boolean>`true`;
+  }
   const segmentCondition = buildSegmentFilter(segmentFilter);
 
   // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).

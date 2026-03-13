@@ -111,7 +111,7 @@ export function ReleaseTrackList({
             </p>
           )}
 
-          {!isLoading && !hasError && tracks && tracks.length === 0 && (
+          {!isLoading && !hasError && tracks?.length === 0 && (
             <p className='py-2 text-[13px] text-tertiary-token'>
               No track data available.
             </p>

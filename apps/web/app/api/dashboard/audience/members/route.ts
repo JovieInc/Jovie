@@ -118,17 +118,19 @@ export async function GET(request: NextRequest) {
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const segmentCondition = buildSegmentCondition(segments);
-      const viewCondition =
-        view === 'anonymous'
-          ? eq(audienceMembers.type, 'anonymous')
-          : view === 'identified'
-            ? or(
-                eq(audienceMembers.type, 'email'),
-                eq(audienceMembers.type, 'sms'),
-                eq(audienceMembers.type, 'spotify'),
-                eq(audienceMembers.type, 'customer')
-              )
-            : drizzleSql<boolean>`true`;
+      let viewCondition: SQL<boolean>;
+      if (view === 'anonymous') {
+        viewCondition = eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
+      } else if (view === 'identified') {
+        viewCondition = or(
+          eq(audienceMembers.type, 'email'),
+          eq(audienceMembers.type, 'sms'),
+          eq(audienceMembers.type, 'spotify'),
+          eq(audienceMembers.type, 'customer')
+        ) as SQL<boolean>;
+      } else {
+        viewCondition = drizzleSql<boolean>`true`;
+      }
 
       // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
       let cursorCondition: SQL<unknown> = drizzleSql`true`;
