@@ -104,9 +104,9 @@ export function renderCreatedDateCell({
   const createdAt = row.original.createdAt;
 
   return (
-    <span className='inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-[450] tabular-nums text-secondary-token'>
+    <span className='inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-[450] tabular-nums text-(--linear-text-secondary)'>
       <CalendarDays
-        className='h-3.5 w-3.5 text-tertiary-token'
+        className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
         aria-hidden='true'
       />
       {createdAt

@@ -184,7 +184,10 @@ describe('AdminCreatorProfilesWithSidebar', () => {
       />
     );
 
-    expect(screen.getByText('No creator profiles found.')).toBeInTheDocument();
+    expect(screen.getByText('No creator profiles found')).toBeInTheDocument();
+    expect(
+      screen.getByText('Creator profiles will appear here once created.')
+    ).toBeInTheDocument();
   });
 
   it('renders actions menu for unclaimed profiles', () => {

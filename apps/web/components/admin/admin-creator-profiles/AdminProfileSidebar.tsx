@@ -84,7 +84,7 @@ export function AdminProfileSidebar({
             avatarUrl={profile.avatarUrl}
           />
           <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
-            <span className='text-xs font-medium text-secondary-token'>
+            <span className='text-[11px] font-[510] text-(--linear-text-tertiary)'>
               Profile link
             </span>
             <div className='flex items-center gap-2'>

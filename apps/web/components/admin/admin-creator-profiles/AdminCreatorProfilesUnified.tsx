@@ -10,7 +10,11 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import {
+  TableEmptyState,
+  UnifiedTable,
+  useRowSelection,
+} from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -417,15 +421,12 @@ export function AdminCreatorProfilesUnified({
               columns={columns}
               isLoading={false}
               emptyState={
-                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
-                  <UserCircle2 className='h-6 w-6' />
-                  <div>
-                    <div className='font-medium'>No creator profiles found</div>
-                    <div className='text-xs'>
-                      Creator profiles will appear here once created.
-                    </div>
-                  </div>
-                </div>
+                <TableEmptyState
+                  icon={<UserCircle2 className='h-6 w-6' aria-hidden='true' />}
+                  title='No creator profiles found'
+                  description='Creator profiles will appear here once created.'
+                  className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
+                />
               }
               rowSelection={rowSelection}
               onRowSelectionChange={handleRowSelectionChange}

@@ -1,5 +1,6 @@
 'use client';
 
+import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -15,8 +16,9 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
+import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import { useRowSelection } from '@/components/organisms/table';
+import { TableEmptyState, useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
@@ -61,7 +63,12 @@ const ContactSidebar = dynamic(
       default: mod.ContactSidebar,
     })),
   {
-    loading: () => <div className='h-full w-full animate-pulse bg-surface-1' />,
+    loading: () => (
+      <DrawerLoadingSkeleton
+        ariaLabel='Loading creator details'
+        contentRows={5}
+      />
+    ),
     ssr: false,
   }
 );
@@ -408,14 +415,15 @@ export function AdminCreatorProfilesWithSidebar({
                 />
                 <tbody>
                   {profilesWithActions.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className='px-4 py-10 text-center text-sm text-secondary-token'
-                      >
-                        No creator profiles found.
-                      </td>
-                    </tr>
+                    <TableEmptyState
+                      colSpan={6}
+                      icon={
+                        <UserCircle2 className='h-6 w-6' aria-hidden='true' />
+                      }
+                      title='No creator profiles found'
+                      description='Creator profiles will appear here once created.'
+                      className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
+                    />
                   ) : (
                     profilesWithActions.map((profile, index) => {
                       const handlers = rowActionHandlers.get(profile.id);
