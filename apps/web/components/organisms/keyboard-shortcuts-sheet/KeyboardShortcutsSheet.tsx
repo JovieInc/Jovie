@@ -60,7 +60,7 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
   const Icon = shortcut.icon;
 
   return (
-    <div className='flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-(--linear-bg-surface-2)'>
+    <div className='group flex items-center justify-between rounded-lg border border-transparent px-3 py-2 transition-[background-color,border-color] hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-2)'>
       <div className='flex items-center gap-3 min-w-0'>
         {Icon && (
           <Icon
@@ -90,7 +90,7 @@ function ShortcutCategorySection({
   if (shortcuts.length === 0) return null;
 
   return (
-    <div className='space-y-1'>
+    <section className='space-y-1'>
       <h3 className='px-3 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
@@ -99,7 +99,7 @@ function ShortcutCategorySection({
           <ShortcutItem key={shortcut.id} shortcut={shortcut} />
         ))}
       </ContentSurfaceCard>
-    </div>
+    </section>
   );
 }
 
@@ -226,7 +226,7 @@ export function KeyboardShortcutsSheet() {
         {/* Shortcuts list */}
         <div className='flex-1 overflow-y-auto px-2 py-3'>
           {hasResults ? (
-            <div className='space-y-4'>
+            <div className='space-y-4 pb-1'>
               {categoryOrder.map(category => (
                 <ShortcutCategorySection
                   key={category}
