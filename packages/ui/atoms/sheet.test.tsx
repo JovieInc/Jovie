@@ -269,7 +269,7 @@ describe('Sheet', () => {
       render(<TestSheet open={true} />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('fixed');
-      expect(content.className).toContain('z-50');
+      expect(content.className).toContain('z-[65]');
       expect(content.className).toContain('bg-surface-1');
     });
 

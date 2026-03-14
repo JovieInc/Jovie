@@ -81,14 +81,14 @@ export function ToastProvider({ children }: ToastProviderProps) {
         expand
         // Close button on every toast for accessibility
         closeButton
-        // Linear-style tonal backgrounds for stronger success/error hierarchy
-        richColors
+        // Keep transient feedback quiet and secondary to primary workflows
+        richColors={false}
         // Gap between toasts
         gap={8}
         // Dynamic offset: pushes toasts above cookie banner when visible
         offset={bottomOffset}
         // Maximum visible toasts (stacked); Sonner queues overflow
-        visibleToasts={4}
+        visibleToasts={3}
         // Styling driven by CSS overrides in globals.css on
         // [data-sonner-toaster] / [data-sonner-toast] selectors.
         // Sonner CSS variables (--normal-bg, --success-bg, etc.) are
@@ -96,18 +96,19 @@ export function ToastProvider({ children }: ToastProviderProps) {
         // lightweight classNames here for icon coloring.
         toastOptions={{
           classNames: {
-            toast: 'items-start',
-            title: 'font-medium',
-            description: 'font-normal',
+            toast:
+              'items-start border border-(--linear-border-subtle)/80 bg-(--linear-bg-surface-1)/90 shadow-none backdrop-blur-[2px]',
+            title: 'font-medium text-(--linear-text-secondary)',
+            description: 'font-normal text-(--linear-text-tertiary)',
             actionButton:
               'border border-default bg-transparent text-primary-token font-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
               'bg-surface-2 text-secondary-token font-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-            success: '[&>svg]:text-success',
-            error: '[&>svg]:text-error',
-            warning: '[&>svg]:text-warning',
-            info: '[&>svg]:text-info',
-            loading: '[&>svg]:text-accent',
+            success: '[&>svg]:text-(--linear-text-tertiary)',
+            error: '[&>svg]:text-(--linear-text-tertiary)',
+            warning: '[&>svg]:text-(--linear-text-tertiary)',
+            info: '[&>svg]:text-(--linear-text-tertiary)',
+            loading: '[&>svg]:text-(--linear-text-tertiary)',
           },
         }}
       />

@@ -144,7 +144,7 @@ async function loadMusicFetchData(
 
 async function loadSpotifyArtistIfNeeded(
   spotifyArtistId: string,
-  profile: {
+  _profile: {
     displayNameLocked: boolean | null;
     displayName: string | null;
     avatarLockedByUser: boolean | null;
@@ -153,15 +153,12 @@ async function loadSpotifyArtistIfNeeded(
     spotifyFollowers: number | null;
     spotifyPopularity: number | null;
   },
-  musicFetch: MusicFetchArtistResult | null
+  _musicFetch: MusicFetchArtistResult | null
 ): Promise<Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null> {
   // Always fetch Spotify artist metadata during onboarding so we can persist
   // genres/followers/popularity even when MusicFetch already provided
   // display name or image fields.
   if (!spotifyArtistId) return null;
-
-  void profile;
-  void musicFetch;
 
   const [result] = await Promise.allSettled([
     getSpotifyArtistProfile(spotifyArtistId),

@@ -1,38 +1,44 @@
-export type { AudienceActionsCellProps } from './AudienceActionsCell';
-export { AudienceActionsCell } from './AudienceActionsCell';
-export type { AudienceCountryCellProps } from './AudienceCountryCell';
-export { AudienceCountryCell } from './AudienceCountryCell';
-export type { AudienceCreatedAtCellProps } from './AudienceCreatedAtCell';
-export { AudienceCreatedAtCell } from './AudienceCreatedAtCell';
-export type { AudienceDeviceCellProps } from './AudienceDeviceCell';
-export { AudienceDeviceCell } from './AudienceDeviceCell';
-export type { AudienceIdentificationIndicatorProps } from './AudienceIdentificationIndicator';
-export { AudienceIdentificationIndicator } from './AudienceIdentificationIndicator';
-export type { AudienceIntentScoreCellProps } from './AudienceIntentScoreCell';
-export { AudienceIntentScoreCell } from './AudienceIntentScoreCell';
-export type { AudienceLastActionCellProps } from './AudienceLastActionCell';
-export { AudienceLastActionCell } from './AudienceLastActionCell';
-export type { AudienceLastSeenCellProps } from './AudienceLastSeenCell';
-export { AudienceLastSeenCell } from './AudienceLastSeenCell';
-export type { AudienceLocationCellProps } from './AudienceLocationCell';
-export { AudienceLocationCell } from './AudienceLocationCell';
-export type { AudienceLtvCellProps } from './AudienceLtvCell';
-export { AudienceLtvCell } from './AudienceLtvCell';
-export type { AudienceMobileCardProps } from './AudienceMobileCard';
-export { AudienceMobileCard } from './AudienceMobileCard';
-export type { AudienceQuickActionsCellProps } from './AudienceQuickActionsCell';
-export { AudienceQuickActionsCell } from './AudienceQuickActionsCell';
-export type { AudienceReturningCellProps } from './AudienceReturningCell';
-export { AudienceReturningCell } from './AudienceReturningCell';
-export type { AudienceRowSelectionCellProps } from './AudienceRowSelectionCell';
-export { AudienceRowSelectionCell } from './AudienceRowSelectionCell';
-export type { AudienceSourceCellProps } from './AudienceSourceCell';
-export { AudienceSourceCell } from './AudienceSourceCell';
-export type { AudienceTouringBadgeProps } from './AudienceTouringBadge';
-export { AudienceTouringBadge } from './AudienceTouringBadge';
-export type { AudienceTypeBadgeProps } from './AudienceTypeBadge';
-export { AudienceTypeBadge } from './AudienceTypeBadge';
-export type { AudienceUserCellProps } from './AudienceUserCell';
-export { AudienceUserCell } from './AudienceUserCell';
-export type { AudienceVisitsCellProps } from './AudienceVisitsCell';
-export { AudienceVisitsCell } from './AudienceVisitsCell';
+/**
+ * @deprecated Import from @/components/organisms/table instead
+ * Re-exports from organisms/table for backwards compatibility
+ */
+export {
+  AudienceActionsCell,
+  type AudienceActionsCellProps,
+  AudienceCountryCell,
+  type AudienceCountryCellProps,
+  AudienceCreatedAtCell,
+  type AudienceCreatedAtCellProps,
+  AudienceDeviceCell,
+  type AudienceDeviceCellProps,
+  AudienceIdentificationIndicator,
+  type AudienceIdentificationIndicatorProps,
+  AudienceIntentScoreCell,
+  type AudienceIntentScoreCellProps,
+  AudienceLastActionCell,
+  type AudienceLastActionCellProps,
+  AudienceLastSeenCell,
+  type AudienceLastSeenCellProps,
+  AudienceLocationCell,
+  type AudienceLocationCellProps,
+  AudienceLtvCell,
+  type AudienceLtvCellProps,
+  AudienceMobileCard,
+  type AudienceMobileCardProps,
+  AudienceQuickActionsCell,
+  type AudienceQuickActionsCellProps,
+  AudienceReturningCell,
+  type AudienceReturningCellProps,
+  AudienceRowSelectionCell,
+  type AudienceRowSelectionCellProps,
+  AudienceSourceCell,
+  type AudienceSourceCellProps,
+  AudienceTouringBadge,
+  type AudienceTouringBadgeProps,
+  AudienceTypeBadge,
+  type AudienceTypeBadgeProps,
+  AudienceUserCell,
+  type AudienceUserCellProps,
+  AudienceVisitsCell,
+  type AudienceVisitsCellProps,
+} from '@/components/organisms/table';

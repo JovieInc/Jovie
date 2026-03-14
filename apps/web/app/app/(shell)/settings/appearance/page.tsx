@@ -1,7 +1,23 @@
 import { redirect } from 'next/navigation';
 
+import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedAuth } from '@/lib/auth/cached';
+import { getDashboardData } from '../../dashboard/actions';
 
-export default function SettingsAppearancePage() {
-  redirect(APP_ROUTES.SETTINGS);
+export const runtime = 'nodejs';
+
+export default async function SettingsAppearancePage() {
+  const { userId } = await getCachedAuth();
+
+  if (!userId) {
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/appearance`);
+  }
+
+  const dashboardData = await getDashboardData();
+  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
+    redirect('/onboarding');
+  }
+
+  return <DashboardSettings focusSection='account' />;
 }

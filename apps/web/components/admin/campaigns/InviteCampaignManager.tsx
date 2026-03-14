@@ -100,14 +100,13 @@ function CampaignCallout({
   className?: string;
 }> &
   ComponentPropsWithoutRef<'div'>) {
-  const toneClassName =
-    tone === 'destructive'
-      ? 'border-destructive/20 bg-destructive/10 text-destructive'
-      : tone === 'info'
-        ? 'border-info/20 bg-info/5 text-info'
-        : tone === 'success'
-          ? 'border-success/20 bg-success/10 text-success'
-          : 'border-warning/20 bg-warning/10 text-warning';
+  const toneClassNames: Record<typeof tone, string> = {
+    destructive: 'border-destructive/20 bg-destructive/10 text-destructive',
+    info: 'border-info/20 bg-info/5 text-info',
+    success: 'border-success/20 bg-success/10 text-success',
+    warning: 'border-warning/20 bg-warning/10 text-warning',
+  };
+  const toneClassName = toneClassNames[tone];
 
   return (
     <div

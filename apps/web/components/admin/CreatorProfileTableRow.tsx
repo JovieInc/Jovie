@@ -38,14 +38,14 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-(--linear-border-subtle)/70 transition-[background-color,box-shadow] duration-150 last:border-b-0';
+    'group cursor-pointer border-b border-(--linear-border-subtle) transition-[background-color,box-shadow] duration-150 last:border-b-0';
   if (isChecked || isSelected) {
     return cn(
       baseClasses,
-      'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.18)] hover:bg-(--linear-bg-surface-1)'
+      'bg-(--linear-row-selected) shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
     );
   }
-  return cn(baseClasses, 'bg-transparent hover:bg-(--linear-bg-surface-1)');
+  return cn(baseClasses, 'bg-transparent hover:bg-(--linear-row-hover)');
 };
 
 const renderContextMenuItem = ({
@@ -224,7 +224,10 @@ function CreatorProfileTableRowComponent({
 
   const rowContent = (
     <tr
-      className={getRowClassName(isChecked, isSelected)}
+      className={cn(
+        getRowClassName(isChecked, isSelected),
+        'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
+      )}
       onClick={() => onRowClick(profile.id)}
       onKeyDown={event =>
         handleActivationKeyDown(event, _e => onRowClick(profile.id))
