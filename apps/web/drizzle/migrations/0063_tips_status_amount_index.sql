@@ -3,5 +3,5 @@
 -- The (creator_profile_id, status, created_at) ordering allows the planner to use an
 -- index scan for both the dashboard tipping stats (time-bounded) and the earnings
 -- API (status = 'completed') without falling back to a sequential scan on the tips table.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "idx_tips_status_amount"
+CREATE INDEX IF NOT EXISTS "idx_tips_status_amount"
   ON "tips" ("creator_profile_id", "status", "created_at");
