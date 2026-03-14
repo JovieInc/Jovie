@@ -15,7 +15,7 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
-import { getContactRowContextMenuItems } from './row-actions';
+import { buildContactActions } from './contact-actions';
 
 const contactColumnHelper = createColumnHelper<EditableContact>();
 
@@ -142,7 +142,7 @@ export function createContactColumns(
       cell: ({ row }) => {
         const contact = row.original;
         const items: TableActionMenuItem[] = convertContextMenuItems(
-          getContactRowContextMenuItems(contact, {
+          buildContactActions(contact, {
             onDelete: callbacks.onDelete,
           })
         );

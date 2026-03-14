@@ -18,7 +18,7 @@ import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
 import { ContactDetailSidebar } from './ContactDetailSidebar';
 import { createContactColumns } from './columns';
-import { getContactRowContextMenuItems } from './row-actions';
+import { buildContactActions } from './contact-actions';
 
 interface ContactsTableProps {
   readonly contacts: EditableContact[];
@@ -136,7 +136,7 @@ export const ContactsTable = memo(function ContactsTable({
 
   const getContextMenuItems = useCallback(
     (contact: EditableContact) =>
-      getContactRowContextMenuItems(contact, {
+      buildContactActions(contact, {
         onDelete,
       }),
     [onDelete]

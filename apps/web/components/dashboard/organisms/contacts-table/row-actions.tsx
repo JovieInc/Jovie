@@ -2,12 +2,13 @@
 
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
 import type { ContextMenuItemType } from '@/components/organisms/table';
+
+export type { BuildContactActionsCallbacks as ContactRowActionCallbacks } from './contact-actions';
+
 import {
   type BuildContactActionsCallbacks,
   buildContactActions,
 } from './contact-actions';
-
-export type { BuildContactActionsCallbacks as ContactRowActionCallbacks };
 
 /**
  * @deprecated Use `buildContactActions` directly from `./contact-actions`.
