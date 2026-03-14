@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { track } from '@/lib/analytics';
+import { useTrackingMutation } from '@/lib/queries';
 
 interface ProfileViewTrackerProps {
   readonly handle: string;
@@ -20,6 +21,9 @@ export function ProfileViewTracker({
   source,
 }: ProfileViewTrackerProps) {
   const hasTracked = useRef(false);
+  const trackView = useTrackingMutation<{ handle: string }>({
+    endpoint: '/api/profile/view',
+  });
 
   useEffect(() => {
     // Only track once per mount
@@ -39,15 +43,8 @@ export function ProfileViewTracker({
       if (sent) return;
     }
 
-    fetch('/api/profile/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      keepalive: true,
-    }).catch(() => {
-      // Ignore tracking errors
-    });
-  }, [handle, artistId, source]);
+    trackView.mutate({ handle });
+  }, [handle, artistId, source, trackView]);
 
   // This component renders nothing - it's purely for tracking
   return null;
