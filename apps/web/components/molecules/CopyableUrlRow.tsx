@@ -16,6 +16,7 @@ interface CopyableUrlRowProps {
   readonly copyButtonTitle?: string;
   readonly openButtonTitle?: string;
   readonly testId?: string;
+  readonly surface?: 'boxed' | 'flat';
 }
 
 export function CopyableUrlRow({
@@ -29,6 +30,7 @@ export function CopyableUrlRow({
   copyButtonTitle = 'Copy link',
   openButtonTitle = 'Open link',
   testId,
+  surface = 'boxed',
 }: CopyableUrlRowProps) {
   const [isCopied, setIsCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -87,7 +89,10 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) transition-[background-color,border-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
+        'flex items-center transition-[background-color,border-color] duration-150',
+        surface === 'boxed'
+          ? 'border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)'
+          : 'border border-transparent bg-(--linear-bg-surface-0) hover:bg-(--linear-bg-surface-1)',
         styles.container,
         className
       )}

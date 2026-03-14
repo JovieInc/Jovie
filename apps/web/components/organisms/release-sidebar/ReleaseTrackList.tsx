@@ -93,7 +93,7 @@ export function ReleaseTrackList({
           'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         )}
       >
-        <span>Tracklist ({release.totalTracks})</span>
+        <span>Tracks ({release.totalTracks})</span>
         {isExpanded ? (
           <ChevronDown className='h-3.5 w-3.5' />
         ) : (
