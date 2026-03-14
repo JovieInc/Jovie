@@ -1,9 +1,11 @@
 'use client';
 
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { TableContextMenu } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
+import { buildLinkActions } from './link-actions-builder';
 import type { LinkActionsProps } from './types';
 import { useLinkActionsMenu } from './useLinkActionsMenu';
 
@@ -57,7 +59,21 @@ export const LinkActions = memo(function LinkActions({
     onOpenChange,
   });
 
+  const contextMenuItems = useMemo(
+    () =>
+      buildLinkActions({
+        isVisible,
+        callbacks: {
+          onEdit,
+          onToggle,
+          onRemove: handleRemoveClick,
+        },
+      }),
+    [isVisible, onEdit, onToggle, handleRemoveClick]
+  );
+
   return (
+    <TableContextMenu items={contextMenuItems}>
     <div className={cn('flex items-center gap-1', className)}>
       {showDragHandle ? (
         <button
@@ -151,6 +167,7 @@ export const LinkActions = memo(function LinkActions({
         onConfirm={onRemove}
       />
     </div>
+    </TableContextMenu>
   );
 });
 

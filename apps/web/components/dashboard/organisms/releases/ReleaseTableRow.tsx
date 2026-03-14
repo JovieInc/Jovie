@@ -1,19 +1,21 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { PencilLine, QrCode, Trash2 } from 'lucide-react';
+import { QrCode } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Icon } from '@/components/atoms/Icon';
 import { ReleaseArtworkThumb } from '@/components/atoms/ReleaseArtworkThumb';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
+import {
+  convertContextMenuItems,
+} from '@/components/organisms/table';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildUTMContext, getUTMShareActionMenuItems } from '@/lib/utm';
+import { buildReleaseActions } from './release-actions';
 import {
   AddProviderUrlPopover,
   NotFoundCopyButton,
@@ -87,21 +89,6 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     [onCopy]
   );
 
-  const handleEdit = useCallback(() => onEdit(release), [onEdit, release]);
-
-  const handleCopySmartLink = useCallback(() => {
-    void handleCopyWithFeedback(
-      release.smartLinkPath,
-      `${release.title} smart link`,
-      `action-copy-${release.id}`
-    );
-  }, [
-    handleCopyWithFeedback,
-    release.smartLinkPath,
-    release.title,
-    release.id,
-  ]);
-
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
 
   const handleCopyQrCode = useCallback(async () => {
@@ -142,59 +129,24 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     }
   }, [release.slug, smartLinkUrl]);
 
-  const utmShareItems = useMemo(
-    () =>
-      getUTMShareActionMenuItems({
-        smartLinkUrl,
-        context: buildUTMContext({
-          smartLinkUrl,
-          releaseSlug: release.slug,
-          releaseTitle: release.title,
-          artistName,
-          releaseDate: release.releaseDate,
-        }),
-      }),
-    [smartLinkUrl, release.slug, release.title, artistName, release.releaseDate]
-  );
+  const qrCodeIcon = useMemo(() => <QrCode className='h-3.5 w-3.5' />, []);
 
   const menuItems = useMemo(
-    () => [
-      {
-        id: 'edit',
-        label: 'Edit links',
-        icon: PencilLine,
-        onClick: handleEdit,
-      },
-      {
-        id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: <Icon name='Copy' className='h-3.5 w-3.5' />,
-        onClick: handleCopySmartLink,
-      },
-      {
-        id: 'copy-qr-code',
-        label: 'Copy QR code',
-        icon: QrCode,
-        onClick: () => {
-          handleCopyQrCode().catch(() => {});
-        },
-      },
-      ...utmShareItems,
-      {
-        id: 'separator',
-        label: '',
-        onClick: () => {},
-      },
-      {
-        id: 'delete',
-        label: 'Delete release',
-        icon: Trash2,
-        variant: 'destructive' as const,
-        onClick: () => setShowDeleteDialog(true),
-        disabled: !onDelete,
-      },
-    ],
-    [handleEdit, handleCopySmartLink, handleCopyQrCode, utmShareItems, onDelete]
+    () =>
+      convertContextMenuItems(
+        buildReleaseActions({
+          release,
+          onEdit,
+          onCopy: handleCopyWithFeedback,
+          artistName,
+          onDelete: onDelete ? () => setShowDeleteDialog(true) : undefined,
+          onCopyQrCode: () => {
+            handleCopyQrCode().catch(() => {});
+          },
+          qrCodeIcon,
+        })
+      ),
+    [release, onEdit, handleCopyWithFeedback, artistName, onDelete, handleCopyQrCode, qrCodeIcon]
   );
 
   const manualOverrideCount = release.providers.filter(
