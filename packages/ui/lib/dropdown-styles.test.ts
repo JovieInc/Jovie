@@ -95,8 +95,9 @@ describe('dropdown-styles', () => {
       expect(selectContentClasses).toContain('relative');
     });
 
-    it('subMenuContentClasses has no max-height constraint', () => {
-      expect(subMenuContentClasses).not.toContain('max-h');
+    it('subMenuContentClasses includes overflow constraints for deep nesting', () => {
+      expect(subMenuContentClasses).toContain('max-h');
+      expect(subMenuContentClasses).toContain('overflow-y-auto');
       expect(subMenuContentClasses).toContain(DROPDOWN_CONTENT_BASE);
       expect(subMenuContentClasses).toContain(DROPDOWN_SHADOW);
     });
@@ -125,13 +126,15 @@ describe('dropdown-styles', () => {
   describe('menu item styles', () => {
     it('MENU_ITEM_BASE includes default sizing', () => {
       expect(MENU_ITEM_BASE).toContain('text-[13px]');
-      expect(MENU_ITEM_BASE).toContain('leading-');
+      expect(MENU_ITEM_BASE).toContain('leading-5');
+      expect(MENU_ITEM_BASE).toContain('font-[450]');
       expect(MENU_ITEM_BASE).toContain('py-1.5');
     });
 
     it('MENU_ITEM_COMPACT uses smaller sizing', () => {
       expect(MENU_ITEM_COMPACT).toContain('text-[12.5px]');
-      expect(MENU_ITEM_COMPACT).toContain('leading-');
+      expect(MENU_ITEM_COMPACT).toContain('leading-4');
+      expect(MENU_ITEM_COMPACT).toContain('font-[450]');
       expect(MENU_ITEM_COMPACT).toContain('py-1');
     });
 
@@ -145,6 +148,7 @@ describe('dropdown-styles', () => {
 
     it('CHECKBOX_RADIO_ITEM_BASE has left padding for indicator', () => {
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain('pl-8');
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('leading-5');
     });
 
     it('SELECT_ITEM_BASE has left padding for check indicator', () => {
