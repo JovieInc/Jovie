@@ -6,7 +6,7 @@
  * Stripe webhook handlers).
  */
 
-import { and, count, desc, eq, sum } from 'drizzle-orm';
+import { and, count, desc, eq, sql as drizzleSql, sum } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { tips } from '@/lib/db/schema/analytics';
@@ -48,6 +48,10 @@ export async function GET() {
           { status: 404, headers: NO_STORE_HEADERS }
         );
       }
+
+      // Set a PostgreSQL-level statement timeout to prevent long-running queries
+      // from holding Neon WebSocket connections (JOVIE-WEB-8D / JOVIE-WEB-DP).
+      await tx.execute(drizzleSql`SET LOCAL statement_timeout = '5s'`);
 
       // Fetch aggregated stats for completed tips
       const [statsRow] = await tx
