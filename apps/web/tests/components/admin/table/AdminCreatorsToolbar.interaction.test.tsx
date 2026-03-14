@@ -5,25 +5,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
-vi.mock('next/link', () => ({
-  default: ({
-    children,
-    href,
-    ...props
-  }: {
-    children: React.ReactNode;
-    href: string;
-    [key: string]: unknown;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
-
 vi.mock('@/components/organisms/table', () => ({
+  ACTION_BAR_BUTTON_CLASS: 'action-bar-button',
+  ActionBar: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  ActionBarItem: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   ExportCSVButton: ({ disabled }: { disabled: boolean }) => (
-    <button type='button' disabled={disabled}>
+    <button
+      type='button'
+      disabled={disabled}
+      aria-label='Export creator profiles to CSV file'
+    >
       Export
     </button>
   ),
@@ -67,14 +62,9 @@ function renderToolbar(
 
   render(
     <AdminCreatorsToolbar
-      basePath='/admin/creators'
-      search=''
-      sort='newest'
-      pageSize={20}
       from={1}
       to={2}
       total={2}
-      clearHref='/admin/creators'
       profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
       {...handlers}
       {...props}
@@ -140,7 +130,11 @@ describe('AdminCreatorsToolbar interactions', () => {
   it('renders normal toolbar mode without bulk actions when no rows are selected', () => {
     renderToolbar({ selectedIds: new Set() });
 
-    expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Export creator profiles to CSV file',
+      })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Delete' })
     ).not.toBeInTheDocument();
