@@ -1,0 +1,111 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { type ReactNode } from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
+import type { Artist } from '@/types/db';
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    refresh: vi.fn(),
+  }),
+}));
+
+vi.mock('@/components/dashboard/atoms/DashboardCard', () => ({
+  DashboardCard: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
+vi.mock('@/components/dashboard/organisms/account-settings', () => ({
+  AccountSettingsSection: () => <div>Account Settings</div>,
+}));
+vi.mock('@/components/dashboard/organisms/DataPrivacySection', () => ({
+  DataPrivacySection: () => <div>Data Privacy</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsAdminSection', () => ({
+  SettingsAdminSection: () => <div>Admin Settings</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsAdPixelsSection', () => ({
+  SettingsAdPixelsSection: () => <div>Pixels</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsAnalyticsSection', () => ({
+  SettingsAnalyticsSection: () => <div>Analytics</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsAudienceSection', () => ({
+  SettingsAudienceSection: () => <div>Audience</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsBillingSection', () => ({
+  SettingsBillingSection: () => <div>Billing</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsBrandingSection', () => ({
+  SettingsBrandingSection: () => <div>Branding</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsContactsSection', () => ({
+  SettingsContactsSection: () => <div>Contacts</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsPaymentsSection', () => ({
+  SettingsPaymentsSection: () => <div>Payments</div>,
+}));
+vi.mock('@/components/dashboard/organisms/SettingsTouringSection', () => ({
+  SettingsTouringSection: () => <div>Touring</div>,
+}));
+vi.mock(
+  '@/components/dashboard/organisms/settings-artist-profile-section',
+  () => ({
+    SettingsArtistProfileSection: () => <div>Profile</div>,
+  })
+);
+
+vi.mock('@/lib/env-public', () => ({
+  publicEnv: {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_123',
+  },
+}));
+
+vi.mock('@/lib/feature-flags/client', () => ({
+  useFeatureGate: () => false,
+}));
+
+vi.mock('@/lib/feature-flags/shared', () => ({
+  FEATURE_FLAG_KEYS: {
+    STRIPE_CONNECT_ENABLED: 'stripe_connect_enabled',
+  },
+}));
+
+vi.mock('@/lib/queries', () => ({
+  useBillingStatusQuery: () => ({
+    data: {
+      isPro: false,
+      plan: 'free',
+    },
+  }),
+}));
+
+describe('SettingsPolished', () => {
+  it('renders run-all button and scrolls to first section', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SettingsPolished
+        artist={{ id: 'artist_1' } as Artist}
+        onArtistUpdate={vi.fn()}
+      />
+    );
+
+    const firstSection = document.getElementById('account');
+    expect(firstSection).toBeTruthy();
+
+    const scrollIntoViewSpy = vi.fn();
+    if (firstSection) {
+      firstSection.scrollIntoView = scrollIntoViewSpy;
+    }
+
+    await user.click(screen.getByRole('button', { name: 'Run all' }));
+
+    expect(scrollIntoViewSpy).toHaveBeenCalledWith({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  });
+});
