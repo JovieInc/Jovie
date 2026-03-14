@@ -52,12 +52,9 @@ export function SettingsAppearanceSection() {
   };
 
   const selectedTheme = (theme ?? 'system') as ThemeValue;
-  const resolvedThemeLabel =
-    resolvedTheme === 'light'
-      ? 'Light'
-      : resolvedTheme === 'dark'
-        ? 'Dark'
-        : '';
+  let resolvedThemeLabel = '';
+  if (resolvedTheme === 'light') resolvedThemeLabel = 'Light';
+  else if (resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
 
   return (
     <DashboardCard

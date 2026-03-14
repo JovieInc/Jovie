@@ -235,18 +235,14 @@ function ReleasePhone({
         {SMART_LINK_DSPS.map(key => {
           const config = DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG];
           if (!config) return null;
+          let label = 'Spotify';
+          if (key === 'apple_music') label = 'Apple Music';
+          else if (key === 'youtube_music') label = 'YouTube Music';
+          else if (key === 'amazon_music') label = 'Amazon Music';
           return (
             <SmartLinkProviderButton
               key={key}
-              label={
-                key === 'apple_music'
-                  ? 'Apple Music'
-                  : key === 'youtube_music'
-                    ? 'YouTube Music'
-                    : key === 'amazon_music'
-                      ? 'Amazon Music'
-                      : 'Spotify'
-              }
+              label={label}
               iconPath={config.iconPath}
               className='bg-[var(--linear-bg-surface-1)] ring-[color:var(--linear-border-subtle)] hover:bg-[var(--linear-bg-hover)]'
             />
