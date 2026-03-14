@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { EnvHealthResponse } from '@/lib/contracts/api';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
@@ -12,31 +13,6 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-interface EnvHealthResponse {
-  service: 'env';
-  status: 'ok' | 'warning' | 'error';
-  ok: boolean;
-  timestamp: string;
-  details: {
-    environment: string;
-    platform: string;
-    nodeVersion: string;
-    startupValidationCompleted: boolean;
-    currentValidation: {
-      valid: boolean;
-      errors: string[];
-      warnings: string[];
-      critical: string[];
-    };
-    integrations: {
-      database: boolean;
-      auth: boolean;
-      payments: boolean;
-      images: boolean;
-    };
-  };
-}
 
 export async function GET(request: Request) {
   const now = new Date().toISOString();

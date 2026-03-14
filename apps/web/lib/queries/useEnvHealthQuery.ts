@@ -1,20 +1,12 @@
 'use client';
 
 import { type QueryClient, useQuery } from '@tanstack/react-query';
+import type { EnvHealthResponse } from '@/lib/contracts/api';
 import { fetchWithTimeout } from './fetch';
-import { queryKeys } from './keys';
 
-export interface EnvHealthResponse {
-  ok: boolean;
-  status: 'ok' | 'warning' | 'error';
-  details: {
-    currentValidation: {
-      critical: string[];
-      errors: string[];
-      warnings: string[];
-    };
-  };
-}
+export type { EnvHealthResponse } from '@/lib/contracts/api';
+
+import { queryKeys } from './keys';
 
 /**
  * Query function for fetching environment health status.

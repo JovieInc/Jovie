@@ -10,6 +10,10 @@
  * @see https://tanstack.com/pacer
  */
 
+import type { SpotifyArtistResult } from '@/lib/contracts/api';
+
+export type { SpotifyArtistResult } from '@/lib/contracts/api';
+
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import {
@@ -18,16 +22,6 @@ import {
 } from './useUnifiedArtistSearchQuery';
 
 export type { ArtistSearchState } from './useUnifiedArtistSearchQuery';
-
-export interface SpotifyArtistResult {
-  id: string;
-  name: string;
-  url: string;
-  imageUrl?: string;
-  followers?: number;
-  popularity: number;
-  verified?: boolean;
-}
 
 export interface UseArtistSearchQueryOptions {
   /** Debounce delay in ms (default 300) */
