@@ -74,11 +74,7 @@ export function RightDrawer({
   const hasContextMenu =
     contextMenuItems != null && contextMenuItems.length > 0;
 
-  const innerContent = (
-    <div className='h-full overflow-y-auto overflow-x-hidden overscroll-contain'>
-      {children}
-    </div>
-  );
+  const innerContent = <div className='h-full overflow-hidden'>{children}</div>;
 
   const content = hasContextMenu ? (
     <CommonDropdown variant='context' size='compact' items={contextMenuItems}>
@@ -121,7 +117,8 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-1 border-l border-subtle',
+        'bg-surface-0 border-l border-subtle shadow-[var(--linear-shadow-card-elevated)]',
+        'lg:rounded-l-xl lg:my-2 lg:h-[calc(100%-1rem)]',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen

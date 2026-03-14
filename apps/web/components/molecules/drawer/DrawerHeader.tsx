@@ -15,7 +15,7 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-4 py-2 min-h-12 shrink-0',
+        'flex items-center justify-between border-b border-subtle px-5 py-3 min-h-14 shrink-0 bg-surface-0',
         className
       )}
     >
