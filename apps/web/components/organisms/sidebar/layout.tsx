@@ -14,7 +14,7 @@ export const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         'relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden overflow-x-hidden bg-base',
-        'peer-data-[variant=inset]:min-h-[calc(100svh-(--spacing(4)))] lg:peer-data-[state=closed]:peer-data-[variant=inset]:ml-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ml-0 lg:peer-data-[variant=inset]:rounded-xl lg:peer-data-[variant=inset]:shadow',
+        'peer-data-[variant=inset]:min-h-[calc(100svh-1rem)] lg:peer-data-[state=closed]:peer-data-[variant=inset]:ml-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ml-0 lg:peer-data-[variant=inset]:rounded-xl lg:peer-data-[variant=inset]:shadow',
         className
       )}
       {...props}
@@ -65,7 +65,7 @@ export const SidebarFooter = React.forwardRef<
       ref={ref}
       data-sidebar='footer'
       className={cn(
-        'flex flex-col gap-2 overflow-hidden p-2 transition-all duration-normal ease-interactive',
+        'shrink-0 flex flex-col gap-2 overflow-hidden p-2 transition-all duration-normal ease-interactive',
         'group-data-[collapsible=icon]:px-0',
         className
       )}
@@ -97,7 +97,7 @@ export const SidebarContent = React.forwardRef<
       ref={ref}
       data-sidebar='content'
       className={cn(
-        'flex min-h-0 flex-1 flex-col gap-2 overflow-auto px-0.5 group-data-[collapsible=icon]:overflow-hidden',
+        'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-0.5 group-data-[collapsible=icon]:overflow-hidden',
         className
       )}
       {...props}
