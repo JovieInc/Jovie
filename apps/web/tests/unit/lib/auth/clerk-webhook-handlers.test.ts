@@ -54,9 +54,9 @@ vi.mock('@/lib/email/send', () => ({
 }));
 
 vi.mock('@/lib/notifications/sender-policy', () => ({
-  formatFounderSender: vi.fn(() => 'Tim White <tim@jov.ie>'),
+  formatFounderSender: vi.fn(() => 'Tim White <tim@notify.jov.ie>'),
   getSenderPolicy: vi.fn(() => ({
-    fromEmail: 'tim@jov.ie',
+    fromEmail: 'tim@notify.jov.ie',
     replyToEmail: 'tim@jov.ie',
   })),
 }));
@@ -196,7 +196,7 @@ describe('user-created-handler', () => {
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'riley@example.com',
-        from: 'Tim White <tim@jov.ie>',
+        from: 'Tim White <tim@notify.jov.ie>',
         replyTo: 'tim@jov.ie',
       })
     );
