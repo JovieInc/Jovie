@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { useTrackingMutation } from '@/lib/queries';
 import {
   getOrCreateSessionId,
   isTrackingAllowed,
@@ -37,6 +38,9 @@ interface PixelEventPayload {
 export function JoviePixel({ profileId }: JoviePixelProps) {
   const hasTrackedPageView = useRef(false);
   const sessionId = useRef<string>('');
+  const trackPixel = useTrackingMutation<PixelEventPayload>({
+    endpoint: '/api/px',
+  });
 
   // Initialize session ID on mount
   useEffect(() => {
@@ -45,10 +49,10 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
 
   /**
    * Send event to /api/px using sendBeacon for reliability
-   * Falls back to fetch if sendBeacon unavailable
+   * Falls back to TanStack mutation if sendBeacon unavailable
    */
   const sendEvent = useCallback(
-    async (
+    (
       eventType: PixelEventPayload['eventType'],
       eventData?: Record<string, unknown>
     ) => {
@@ -70,28 +74,18 @@ export function JoviePixel({ profileId }: JoviePixelProps) {
         pageUrl: globalThis.location.href,
       };
 
-      const body = JSON.stringify(payload);
-
       // Use sendBeacon for reliability (survives page unload)
       if (navigator.sendBeacon) {
+        const body = JSON.stringify(payload);
         const blob = new Blob([body], { type: 'application/json' });
         const sent = navigator.sendBeacon('/api/px', blob);
         if (sent) return;
       }
 
-      // Fallback to fetch
-      try {
-        await fetch('/api/px', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-          keepalive: true,
-        });
-      } catch {
-        // Silently fail - tracking should never break the page
-      }
+      // Fallback to TanStack mutation
+      trackPixel.mutate(payload);
     },
-    [profileId]
+    [profileId, trackPixel]
   );
 
   // Track page view on mount

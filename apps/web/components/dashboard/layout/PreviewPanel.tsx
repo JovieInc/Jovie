@@ -15,6 +15,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
+import { useQrCodeDownloadMutation } from '@/lib/queries';
 
 export const PREVIEW_PANEL_WIDTH = 360;
 
@@ -32,6 +33,7 @@ function downloadBlob(blob: Blob, filename: string): void {
 export function PreviewPanel() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData } = usePreviewPanelData();
+  const qrCodeDownload = useQrCodeDownloadMutation();
 
   const profileUrl = useMemo(() => {
     if (!previewData) return '';
@@ -47,18 +49,14 @@ export function PreviewPanel() {
     }
   }, [profileUrl]);
 
-  const handleDownloadQr = useCallback(async () => {
+  const handleDownloadQr = useCallback(() => {
     if (!previewData) return;
-    try {
-      const qrUrl = getQrCodeUrl(profileUrl, 512);
-      const response = await fetch(qrUrl);
-      const blob = await response.blob();
-      downloadBlob(blob, `${previewData.username || 'jovie'}-qr-code.png`);
-      toast.success('QR code downloaded');
-    } catch {
-      toast.error('Failed to download QR code');
-    }
-  }, [profileUrl, previewData]);
+    const qrUrl = getQrCodeUrl(profileUrl, 512);
+    qrCodeDownload.mutate({
+      qrUrl,
+      filename: `${previewData.username || 'jovie'}-qr-code.png`,
+    });
+  }, [profileUrl, previewData, qrCodeDownload]);
 
   const handleDownloadVcard = useCallback(() => {
     if (!previewData) return;
