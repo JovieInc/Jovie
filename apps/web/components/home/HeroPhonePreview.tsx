@@ -96,6 +96,15 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
         </PhoneFrame>
       </div>
 
+      <div className='flex flex-col items-center gap-1.5 text-center'>
+        <p className='text-[12px] font-medium text-[var(--linear-text-secondary)]'>
+          Smart artist profile
+        </p>
+        <p className='max-w-[15rem] text-[11px] leading-5 text-[var(--linear-text-tertiary)]'>
+          New fans can subscribe fast. Returning fans get the next best action.
+        </p>
+      </div>
+
       {/* URL caption below the phone */}
       <div
         className='flex items-center rounded-full px-4 py-2'
