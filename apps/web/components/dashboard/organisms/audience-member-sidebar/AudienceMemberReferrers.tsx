@@ -7,7 +7,6 @@
  */
 
 import { Link2 } from 'lucide-react';
-import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 
@@ -21,29 +20,26 @@ export function AudienceMemberReferrers({
 }: AudienceMemberReferrersProps) {
   if (member.referrerHistory.length === 0) {
     return (
-      <DrawerEmptyState
-        className='min-h-[96px]'
-        message='No referrer data yet.'
-      />
+      <div className='text-sm text-secondary-token'>No referrer data yet.</div>
     );
   }
 
   return (
-    <ul className='space-y-1'>
+    <ul className='space-y-1.5'>
       {member.referrerHistory.slice(0, 6).map(ref => (
         <li
           key={`${member.id}-${ref.url}-${ref.timestamp ?? ''}`}
-          className='rounded-[8px] border border-transparent px-2.5 py-2 text-sm text-(--linear-text-primary) transition-[background-color,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1)'
+          className='rounded-md border border-transparent px-1.5 py-1.5 text-sm text-primary-token transition-colors hover:border-subtle hover:bg-surface-2/60'
         >
           <div className='flex items-start gap-2'>
             <Link2
-              className='mt-0.5 h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
+              className='mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary-token'
               aria-hidden
             />
             <div className='min-w-0'>
               <div className='truncate'>{ref.url}</div>
               {ref.timestamp ? (
-                <div className='mt-0.5 text-xs text-(--linear-text-tertiary)'>
+                <div className='mt-0.5 text-[11px] text-secondary-token'>
                   {formatTimeAgo(ref.timestamp)}
                 </div>
               ) : null}

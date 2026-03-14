@@ -26,12 +26,12 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
   }
 
   return (
-    <ul className='space-y-1'>
+    <ul className='space-y-1.5'>
       {member.latestActions.slice(0, 6).map(action => (
         <li
           key={`${member.id}-${action.label}-${action.timestamp ?? ''}`}
           className={cn(
-            'group flex items-start gap-2.5 rounded-[8px] border border-transparent px-2.5 py-2 text-sm text-(--linear-text-primary) transition-[background-color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1)'
+            'group flex items-start gap-2 rounded-md border border-transparent px-1.5 py-1.5 text-sm text-primary-token transition-colors hover:border-subtle hover:bg-surface-2/60'
           )}
         >
           <span
@@ -47,7 +47,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
             {formatActionLabel(action.label)}
           </span>
           {action.timestamp ? (
-            <span className='ml-2 whitespace-nowrap text-xs text-(--linear-text-tertiary)'>
+            <span className='ml-2 whitespace-nowrap text-[11px] text-secondary-token'>
               {formatTimeAgo(action.timestamp)}
             </span>
           ) : null}
