@@ -74,7 +74,7 @@ export function RightDrawer({
   const hasContextMenu =
     contextMenuItems != null && contextMenuItems.length > 0;
 
-  const innerContent = <div className='h-full overflow-hidden'>{children}</div>;
+  const innerContent = <div className='h-full min-h-0'>{children}</div>;
 
   const content = hasContextMenu ? (
     <CommonDropdown variant='context' size='compact' items={contextMenuItems}>
