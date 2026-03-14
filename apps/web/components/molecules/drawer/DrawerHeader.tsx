@@ -6,8 +6,6 @@ import { cn } from '@/lib/utils';
 export interface DrawerHeaderProps {
   /** Title displayed on the left side of the header */
   readonly title: ReactNode;
-  /** Close handler — passed down for the actions area to handle */
-  readonly onClose?: () => void;
   /** Additional actions rendered in the header */
   readonly actions?: ReactNode;
   readonly className?: string;

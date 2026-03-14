@@ -25,6 +25,8 @@ export interface AdminCreatorProfileRow {
   usernameNormalized: string;
   avatarUrl: string | null;
   displayName?: string | null;
+  bio?: string | null;
+  genres?: string[] | null;
   isVerified: boolean;
   isFeatured: boolean;
   marketingOptOut: boolean;
@@ -125,6 +127,8 @@ function mapRowToProfile(
     usernameNormalized: string;
     avatarUrl: string | null;
     displayName?: string | null;
+    bio?: string | null;
+    genres?: string[] | null;
     isVerified: boolean | null;
     isFeatured: boolean | null;
     marketingOptOut: boolean | null;
@@ -154,6 +158,8 @@ function mapRowToProfile(
     usernameNormalized: row.usernameNormalized,
     avatarUrl: row.avatarUrl ?? null,
     displayName: row.displayName ?? null,
+    bio: row.bio ?? null,
+    genres: row.genres ?? null,
     isVerified: row.isVerified ?? false,
     isFeatured: row.isFeatured ?? false,
     marketingOptOut: row.marketingOptOut ?? false,
@@ -287,6 +293,8 @@ export async function getAdminCreatorProfiles(
           usernameNormalized: creatorProfiles.usernameNormalized,
           avatarUrl: creatorProfiles.avatarUrl,
           displayName: creatorProfiles.displayName,
+          bio: creatorProfiles.bio,
+          genres: creatorProfiles.genres,
           isVerified: creatorProfiles.isVerified,
           isFeatured: creatorProfiles.isFeatured,
           marketingOptOut: creatorProfiles.marketingOptOut,
@@ -321,6 +329,8 @@ export async function getAdminCreatorProfiles(
           {
             ...row,
             displayName: (row as { displayName?: string | null }).displayName,
+            bio: (row as { bio?: string | null }).bio,
+            genres: (row as { genres?: string[] | null }).genres,
             claimTokenExpiresAt: (row as { claimTokenExpiresAt?: Date | null })
               .claimTokenExpiresAt,
           },

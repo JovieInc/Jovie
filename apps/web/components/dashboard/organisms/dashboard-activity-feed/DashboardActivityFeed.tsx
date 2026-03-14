@@ -2,6 +2,7 @@
 
 import { Zap } from 'lucide-react';
 import Link from 'next/link';
+import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Activity, DashboardActivityFeedProps } from './types';
@@ -34,9 +35,11 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <p className='text-[13px] text-tertiary-token'>
-        No recent activity. Share your profile to see engagement here.
-      </p>
+      <div className='flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+          No recent activity. Share your profile to see engagement here.
+        </p>
+      </div>
     </div>
   );
 }
@@ -161,7 +164,7 @@ export function DashboardActivityFeed({
           }
 
           if (isLoading) {
-            return <ActivityLoadingSkeleton />;
+            return <ActivityFeedSkeleton rows={4} />;
           }
 
           if (activities.length === 0) {

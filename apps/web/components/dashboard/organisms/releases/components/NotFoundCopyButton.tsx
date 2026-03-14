@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 export interface NotFoundCopyButtonProps {
@@ -27,8 +28,10 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
   onCopy,
 }: Readonly<NotFoundCopyButtonProps>) {
   return (
-    <button
+    <DrawerButton
       type='button'
+      tone={isCopied ? 'secondary' : 'ghost'}
+      size='sm'
       className={cn(
         'group/btn inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
         isCopied
@@ -52,6 +55,6 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       <span className='line-clamp-1 text-(--linear-text-tertiary)'>
         {isCopied ? 'Copied!' : '—'}
       </span>
-    </button>
+    </DrawerButton>
   );
 });

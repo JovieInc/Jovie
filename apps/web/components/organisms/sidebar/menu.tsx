@@ -144,7 +144,7 @@ const SidebarMenuButtonInner = React.forwardRef<
           align='center'
           hidden={isMobile}
           className={
-            typeof tooltip !== 'string' ? 'flex items-center' : undefined
+            typeof tooltip === 'string' ? undefined : 'flex items-center'
           }
         >
           {tooltipContent}

@@ -1,22 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Hoist mocks before module resolution
-const { mockAuth, mockCurrentUser, mockCache } = vi.hoisted(() => ({
-  mockAuth: vi.fn(),
-  mockCurrentUser: vi.fn(),
-  mockCache: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => {
-    let hasValue = false;
-    let value: ReturnType<T>;
+const { mockAuth, mockCurrentUser, mockCache, mockHeaders } = vi.hoisted(
+  () => ({
+    mockAuth: vi.fn(),
+    mockCurrentUser: vi.fn(),
+    mockHeaders: vi.fn(),
+    mockCache: vi.fn(<T extends (...args: never[]) => unknown>(fn: T) => {
+      let hasValue = false;
+      let value: ReturnType<T>;
 
-    return ((...args: never[]) => {
-      if (!hasValue) {
-        hasValue = true;
-        value = fn(...args) as ReturnType<T>;
-      }
-      return value;
-    }) as T;
-  }),
-}));
+      return ((...args: never[]) => {
+        if (!hasValue) {
+          hasValue = true;
+          value = fn(...args) as ReturnType<T>;
+        }
+        return value;
+      }) as T;
+    }),
+  })
+);
 
 // Mock Clerk's auth functions
 vi.mock('@clerk/nextjs/server', () => ({
@@ -33,14 +36,20 @@ vi.mock('react', async importOriginal => {
   };
 });
 
+vi.mock('next/headers', () => ({
+  headers: mockHeaders,
+}));
+
 // Import after mocks are set up
 // Note: We need to use dynamic import or resetModules to test cache() deduplication
 // because React's cache() memoizes at module level
 describe('cached auth utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
     // Reset modules to clear the React cache between tests
     vi.resetModules();
+    mockHeaders.mockResolvedValue(new Headers());
   });
 
   describe('getCachedAuth', () => {
@@ -115,6 +124,22 @@ describe('cached auth utilities', () => {
 
       expect(result1).toBe(result2); // Should be the same reference
       expect(mockAuth).toHaveBeenCalledTimes(1);
+    });
+
+    it('bypasses Clerk auth in test mode when bypass header is present', async () => {
+      vi.stubEnv('NODE_ENV', 'test');
+      mockHeaders.mockResolvedValue(
+        new Headers({
+          'x-test-mode': 'bypass-auth',
+          'x-test-user-id': 'user_hdr',
+        })
+      );
+
+      const { getCachedAuth } = await import('@/lib/auth/cached');
+      const result = await getCachedAuth();
+
+      expect(result.userId).toBe('user_hdr');
+      expect(mockAuth).not.toHaveBeenCalled();
     });
   });
 

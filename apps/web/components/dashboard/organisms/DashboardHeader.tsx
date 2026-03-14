@@ -78,9 +78,18 @@ export function DashboardHeader({
               <span className='font-[510] text-primary-token'>
                 {currentLabel}
               </span>
+              <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
+              {breadcrumbSuffix ? (
+                <div className='min-w-0 truncate text-[12.5px] text-(--linear-text-secondary)'>
+                  {breadcrumbSuffix}
+                </div>
+              ) : (
+                <span className='truncate text-[12.5px] font-[510] text-primary-token'>
+                  {currentLabel}
+                </span>
+              )}
             </>
           )}
-          {breadcrumbSuffix}
         </div>
         {action ? (
           <div className='ml-auto flex items-center gap-[var(--linear-app-toolbar-gap)]'>

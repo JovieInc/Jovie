@@ -16,14 +16,8 @@ export function ArtistContactsButton({
   artistName,
   onNavigate,
 }: ArtistContactsButtonProps) {
-  const {
-    available,
-    performAction,
-    onIconClick,
-    primaryChannel,
-    buildTerritoryLabel,
-    isEnabled,
-  } = useArtistContacts({ contacts, artistHandle, onNavigate });
+  const { available, onIconClick, primaryChannel, isEnabled } =
+    useArtistContacts({ contacts, artistHandle, onNavigate });
 
   const isMobile = useBreakpointDown('md');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -55,9 +49,7 @@ export function ArtistContactsButton({
           artistName={artistName}
           artistHandle={artistHandle}
           contacts={available}
-          performAction={performAction}
           primaryChannel={primaryChannel}
-          buildTerritoryLabel={buildTerritoryLabel}
         />
       </>
     );

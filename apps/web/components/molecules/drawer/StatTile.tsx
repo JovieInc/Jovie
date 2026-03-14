@@ -1,3 +1,5 @@
+import { DrawerSectionHeading } from './DrawerSectionHeading';
+
 export interface StatTileProps {
   readonly label: string;
   readonly value: string;

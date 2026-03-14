@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export interface DrawerSectionProps {
   readonly title?: string;

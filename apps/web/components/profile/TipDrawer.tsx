@@ -4,21 +4,9 @@ import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Drawer } from 'vaul';
 import { TipSelector } from '@/components/molecules/TipSelector';
+import { isAllowedVenmoUrl } from '@/components/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
-
-const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-
-function isAllowedVenmoUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === 'https:' && ALLOWED_VENMO_HOSTS.has(parsed.hostname)
-    );
-  } catch {
-    return false;
-  }
-}
 
 interface TipDrawerProps {
   readonly open: boolean;

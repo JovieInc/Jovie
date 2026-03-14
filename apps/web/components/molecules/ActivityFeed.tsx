@@ -92,17 +92,34 @@ function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
 export interface ActivityFeedProps {
   readonly events: ActivityEvent[];
   readonly emptyMessage?: string;
+  readonly isLoading?: boolean;
 }
 
 export function ActivityFeed({
   events,
   emptyMessage = 'No activity yet.',
+  isLoading = false,
 }: ActivityFeedProps) {
+  if (isLoading) {
+    return (
+      <div
+        className='space-y-1'
+        role='feed'
+        aria-label='Activity feed'
+        aria-busy='true'
+      >
+        <ActivityFeedSkeleton rows={4} />
+      </div>
+    );
+  }
+
   if (events.length === 0) {
     return (
-      <p className='py-4 text-center text-[13px] text-quaternary-token'>
-        {emptyMessage}
-      </p>
+      <div className='flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
+        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+          {emptyMessage}
+        </p>
+      </div>
     );
   }
 

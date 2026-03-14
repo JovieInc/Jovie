@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { fetchWithTimeout } from './fetch';
+import { fetchWithTimeout, fetchWithTimeoutResponse } from './fetch';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 
 interface DeleteAccountInput {
@@ -38,10 +38,7 @@ export function useDeleteAccountMutation() {
 export function useExportDataMutation() {
   return useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/account/export');
-      if (!response.ok) {
-        throw new Error('Failed to export data');
-      }
+      const response = await fetchWithTimeoutResponse('/api/account/export');
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

@@ -1,6 +1,5 @@
 'use client';
 
-import { BarChart3, User } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
   parseAsArrayOf,
@@ -10,28 +9,18 @@ import {
   useQueryStates,
 } from 'nuqs';
 import * as React from 'react';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
 import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
-import {
-  type AudiencePanelMode,
-  AudiencePanelProvider,
-  useAudiencePanel,
-} from './AudiencePanelContext';
+import { AudiencePanelProvider } from './AudiencePanelContext';
+import { AudienceTableLoadingShell } from './dashboard-audience-table/AudienceTableLoadingShell';
 import type {
   AudienceFilters,
   AudienceView,
 } from './dashboard-audience-table/types';
-
-const DASHBOARD_AUDIENCE_LOADING_ROW_KEYS = Array.from(
-  { length: 10 },
-  (_, i) => `dashboard-audience-loading-row-${i + 1}`
-);
 
 const DashboardAudienceTable = dynamic(
   () =>
@@ -41,19 +30,7 @@ const DashboardAudienceTable = dynamic(
       })
     ),
   {
-    loading: () => (
-      <div className='h-full w-full space-y-4 p-4'>
-        <div className='flex items-center justify-between'>
-          <div className='h-8 w-48 rounded skeleton' />
-          <div className='h-8 w-32 rounded skeleton' />
-        </div>
-        <div className='space-y-2'>
-          {DASHBOARD_AUDIENCE_LOADING_ROW_KEYS.map(key => (
-            <div key={key} className='h-14 rounded-lg skeleton' />
-          ))}
-        </div>
-      </div>
-    ),
+    loading: () => <AudienceTableLoadingShell />,
     ssr: false,
   }
 );
@@ -89,38 +66,6 @@ const audienceUrlParsers = {
   direction: parseAsStringLiteral(['asc', 'desc'] as const).withDefault('desc'),
 };
 
-/** Header action buttons for toggling right panel between contact and analytics */
-function AudienceHeaderActions({
-  mode,
-  onToggle,
-}: {
-  readonly mode: AudiencePanelMode | null;
-  readonly onToggle: (panel: AudiencePanelMode) => void;
-}) {
-  return (
-    <div className='flex items-center gap-1'>
-      <DashboardHeaderActionButton
-        ariaLabel={
-          mode === 'contact' ? 'Close contact sidebar' : 'Open contact sidebar'
-        }
-        pressed={mode === 'contact'}
-        onClick={() => onToggle('contact')}
-        icon={<User className='h-4 w-4' />}
-      />
-      <DashboardHeaderActionButton
-        ariaLabel={
-          mode === 'analytics'
-            ? 'Close analytics sidebar'
-            : 'Open analytics sidebar'
-        }
-        pressed={mode === 'analytics'}
-        onClick={() => onToggle('analytics')}
-        icon={<BarChart3 className='h-4 w-4' />}
-      />
-    </div>
-  );
-}
-
 export function DashboardAudienceClient({
   mode,
   view,
@@ -136,7 +81,7 @@ export function DashboardAudienceClient({
   tourDates,
 }: Readonly<DashboardAudienceClientProps>) {
   return (
-    <AudiencePanelProvider>
+    <AudiencePanelProvider initialMode='analytics'>
       <DashboardAudienceClientInner
         mode={mode}
         view={view}
@@ -169,20 +114,6 @@ function DashboardAudienceClientInner({
   filters: initialFilters,
   tourDates,
 }: Readonly<Omit<DashboardAudienceClientProps, 'page' | 'pageSize'>>) {
-  // Register header actions with both panel toggle buttons
-  const { setHeaderActions } = useSetHeaderActions();
-  const { mode: panelMode, toggle: togglePanel } = useAudiencePanel();
-
-  const headerActions = React.useMemo(
-    () => <AudienceHeaderActions mode={panelMode} onToggle={togglePanel} />,
-    [panelMode, togglePanel]
-  );
-
-  React.useEffect(() => {
-    setHeaderActions(headerActions);
-    return () => setHeaderActions(null);
-  }, [setHeaderActions, headerActions]);
-
   // State comes from server props; we only use nuqs to update the URL
   const [, setUrlParams] = useQueryStates(audienceUrlParsers, {
     shallow: false,

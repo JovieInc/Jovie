@@ -25,6 +25,15 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   getDashboardData: vi.fn().mockResolvedValue({}),
 }));
 
+// Mock releases actions to simulate an Apple Music disconnected response.
+vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  checkAppleMusicConnection: vi.fn().mockResolvedValue({
+    connected: false,
+    artistName: null,
+    artistId: null,
+  }),
+}));
+
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));

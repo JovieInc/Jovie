@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  BLOCKED_HOSTNAMES,
+  INTERNAL_DOMAIN_SUFFIXES,
+  isPrivateIpAddress,
+  METADATA_HOSTNAMES,
+} from '@/lib/constants/url-safety';
 
 /**
  * Base validation schemas for common Zod primitives.
@@ -75,36 +81,6 @@ export const httpUrlSchema = z
   .refine(hasSafeHttpProtocol, 'URL must start with http or https');
 
 /**
- * Private IP patterns for SSRF protection.
- * Covers both IPv4 and IPv6 private/internal address ranges.
- */
-const PRIVATE_IP_PATTERNS = [
-  // IPv4 patterns
-  /^127\./, // Loopback (127.0.0.0/8)
-  /^10\./, // Class A private (10.0.0.0/8)
-  /^172\.(1[6-9]|2\d|3[0-1])\./, // Class B private (172.16.0.0/12)
-  /^192\.168\./, // Class C private (192.168.0.0/16)
-  /^169\.254\./, // Link-local (169.254.0.0/16)
-  /^0\./, // Current network (0.0.0.0/8)
-  // IPv6 patterns
-  /^::1$/, // IPv6 loopback
-  /^fe80:/i, // IPv6 link-local (fe80::/10)
-  /^fc[\da-f]{2}:/i, // IPv6 unique local fc00::/7 (fc00::/8)
-  /^fd[\da-f]{2}:/i, // IPv6 unique local fc00::/7 (fd00::/8)
-  /^\[::1\]$/, // IPv6 loopback in bracket notation
-  /^\[fe80:/i, // IPv6 link-local in bracket notation
-  /^\[fc[\da-f]{2}:/i, // IPv6 unique local in bracket notation
-  /^\[fd[\da-f]{2}:/i, // IPv6 unique local in bracket notation
-];
-
-const BLOCKED_HOSTNAMES = new Set([
-  'localhost',
-  'localhost.localdomain',
-  '127.0.0.1',
-  '::1',
-]);
-
-/**
  * Validates a URL is safe from SSRF attacks by checking for private IPs and internal hosts.
  */
 const isSsrfSafeUrl = (value: string): boolean => {
@@ -118,21 +94,17 @@ const isSsrfSafeUrl = (value: string): boolean => {
     }
 
     // Block private IP addresses
-    if (PRIVATE_IP_PATTERNS.some(pattern => pattern.test(hostname))) {
+    if (isPrivateIpAddress(hostname)) {
       return false;
     }
 
     // Block internal domain suffixes
-    if (
-      hostname.endsWith('.local') ||
-      hostname.endsWith('.internal') ||
-      hostname.endsWith('.localhost')
-    ) {
+    if (INTERNAL_DOMAIN_SUFFIXES.some(suffix => hostname.endsWith(suffix))) {
       return false;
     }
 
     // Block cloud metadata endpoints
-    if (hostname === '169.254.169.254' || hostname.includes('metadata')) {
+    if (METADATA_HOSTNAMES.has(hostname) || hostname.includes('metadata')) {
       return false;
     }
 

@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@jovie/ui';
+import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import {
   type FormEvent,
   memo,
@@ -42,6 +36,14 @@ interface AvailabilityCellProps {
     url: string
   ) => Promise<void>;
   readonly isAddingUrl?: boolean;
+}
+
+function AvailabilityEmptyAction() {
+  return (
+    <div className='flex min-w-[150px] justify-end'>
+      <div className='h-8 w-[84px] rounded-[8px] border border-dashed border-(--linear-border-subtle) bg-(--linear-bg-surface-1)' />
+    </div>
+  );
 }
 
 /**
@@ -212,8 +214,8 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 <div
                   key={providerKey}
                   className={cn(
-                    'relative flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-bg-surface-0) bg-(--linear-bg-surface-0)',
-                    status === 'missing' && 'opacity-70'
+                    'h-2.5 w-2.5',
+                    getProviderStatus(providerKey) === 'missing' && 'opacity-35'
                   )}
                 >
                   <ProviderIcon
@@ -269,9 +271,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             return (
               <div
                 key={providerKey}
-                className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2.5 last:border-b-0'
+                className='flex min-h-11 items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2 last:border-b-0'
               >
-                <div className='flex items-center gap-2'>
+                <div className='flex min-w-0 items-center gap-2.5'>
                   {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
                     <span
@@ -310,9 +312,8 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 {(() => {
                   if (provider?.url) {
                     return (
-                      <div className='flex items-center gap-1'>
-                        <button
-                          type='button'
+                      <div className='flex min-w-[150px] items-center justify-end gap-1'>
+                        <DrawerInlineIconButton
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
                             globalThis.open(
@@ -321,16 +322,15 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               'noopener,noreferrer'
                             )
                           }
-                          className='rounded-md p-1.5 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+                          className='p-1 text-(--linear-text-tertiary)'
                         >
                           <Icon
                             name='ExternalLink'
                             className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
-                        </button>
-                        <button
-                          type='button'
+                        </DrawerInlineIconButton>
+                        <DrawerInlineIconButton
                           aria-label={
                             isCopied
                               ? `Copied ${config.label} link`
@@ -338,7 +338,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           }
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
-                            'rounded-md p-1.5 text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)',
+                            'rounded-[7px] border border-transparent p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                             isCopied && 'text-emerald-600 dark:text-emerald-400'
                           )}
                         >
@@ -347,7 +347,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
-                        </button>
+                        </DrawerInlineIconButton>
                       </div>
                     );
                   }
@@ -356,7 +356,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     return (
                       <form
                         onSubmit={handleAddUrl}
-                        className='flex items-center gap-1'
+                        className='flex min-w-[150px] items-center justify-end gap-1'
                       >
                         <Input
                           ref={inputRef}
@@ -369,62 +369,59 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-6 w-32 text-[13px]'
+                          className='h-8 w-[150px] rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
                           autoFocus
                         />
-                        <Button
+                        <DrawerButton
                           type='submit'
-                          variant='ghost'
-                          size='sm'
+                          tone='ghost'
+                          size='icon'
                           aria-label='Confirm URL'
                           disabled={!urlInput.trim() || isAddingUrl}
-                          className='h-6 px-1.5'
+                          className='h-8 w-8 rounded-[8px] text-(--linear-text-tertiary)'
                         >
                           <Icon
                             name='Check'
                             className='h-4 w-4'
                             aria-hidden='true'
                           />
-                        </Button>
-                        <Button
+                        </DrawerButton>
+                        <DrawerButton
                           type='button'
-                          variant='ghost'
-                          size='sm'
+                          tone='ghost'
+                          size='icon'
                           aria-label='Cancel adding URL'
                           onClick={() => {
                             setAddingProvider(null);
                             setUrlInput('');
                             setValidationError('');
                           }}
-                          className='h-6 px-1.5'
+                          className='h-8 w-8 rounded-[8px] text-(--linear-text-tertiary)'
                         >
                           <Icon
                             name='X'
                             className='h-4 w-4'
                             aria-hidden='true'
                           />
-                        </Button>
+                        </DrawerButton>
                       </form>
                     );
                   }
 
                   if (onAddUrl) {
                     return (
-                      <button
-                        type='button'
+                      <DrawerButton
                         onClick={() => setAddingProvider(providerKey)}
-                        className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 py-1 text-[11px] font-[450] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
+                        tone='secondary'
+                        size='sm'
+                        className='min-w-[84px] rounded-[8px] text-[11px] font-[510]'
                       >
                         + Add link
-                      </button>
+                      </DrawerButton>
                     );
                   }
 
-                  return (
-                    <span className='text-[11px] text-(--linear-text-tertiary)'>
-                      —
-                    </span>
-                  );
+                  return <AvailabilityEmptyAction />;
                 })()}
               </div>
             );
@@ -432,7 +429,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </div>
 
         {validationError && (
-          <div className='border-t border-(--linear-border-subtle) px-3 py-2'>
+          <div className='min-h-[36px] border-t border-(--linear-border-subtle) px-3 py-2'>
             <p className='text-[11px] text-(--linear-error)'>
               {validationError}
             </p>

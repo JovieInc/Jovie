@@ -25,17 +25,17 @@ export function SortableHeaderButton({
       type='button'
       onClick={onClick}
       className={cn(
-        'inline-flex w-full items-center gap-2 text-xs font-medium text-left hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+        'inline-flex w-full items-center gap-2 text-left text-[11px] font-[510] tracking-[0.08em] text-(--linear-text-tertiary) uppercase hover:text-(--linear-text-primary) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
         className
       )}
     >
       {label}
       <span
         className={cn(
-          'text-[10px] transition-opacity',
+          'text-[9px] transition-opacity',
           direction
-            ? 'opacity-100 text-primary-token'
-            : 'opacity-50 text-secondary-token'
+            ? 'opacity-100 text-(--linear-text-primary)'
+            : 'opacity-50 text-(--linear-text-secondary)'
         )}
         aria-hidden='true'
       >

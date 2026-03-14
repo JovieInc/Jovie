@@ -1,5 +1,6 @@
 'use client';
 
+import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 export interface TableEmptyStateProps {
@@ -51,9 +52,9 @@ export function TableEmptyState({
   colSpan,
 }: TableEmptyStateProps) {
   const content = (
-    <div
+    <DrawerSurfaceCard
       className={cn(
-        'flex flex-1 flex-col items-center justify-center gap-4 py-12 px-4 text-center',
+        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-4 rounded-[10px] px-4 py-12 text-center',
         className
       )}
     >
@@ -78,7 +79,7 @@ export function TableEmptyState({
           {secondaryAction}
         </div>
       )}
-    </div>
+    </DrawerSurfaceCard>
   );
 
   if (colSpan !== undefined) {

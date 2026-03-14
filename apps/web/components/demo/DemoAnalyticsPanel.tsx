@@ -4,78 +4,89 @@ import {
   ANALYTICS_SUMMARY,
   PLATFORM_CLICKS,
 } from '@/components/home/demo/mock-data';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 const maxClicks = Math.max(...PLATFORM_CLICKS.map(p => p.clicks));
 
 export function DemoAnalyticsPanel() {
   return (
-    <div className='h-full overflow-y-auto'>
-      {/* Summary cards */}
-      <div className='grid grid-cols-2 gap-3 border-b border-subtle p-4 sm:grid-cols-4'>
-        <StatCard
-          label='Total Clicks'
-          value={ANALYTICS_SUMMARY.totalClicks.toLocaleString()}
-        />
-        <StatCard
-          label='Unique Visitors'
-          value={ANALYTICS_SUMMARY.uniqueVisitors.toLocaleString()}
-        />
-        <StatCard label='Top Platform' value={ANALYTICS_SUMMARY.topPlatform} />
-        <StatCard
-          label='Growth'
-          value={`+${ANALYTICS_SUMMARY.clickGrowth}%`}
-          positive
-        />
-      </div>
-
-      {/* Platform breakdown */}
-      <div className='p-4'>
-        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
-          Clicks by Platform
-        </h3>
-        <div className='space-y-3'>
-          {PLATFORM_CLICKS.map(platform => {
-            const pct = (platform.clicks / maxClicks) * 100;
-            return (
-              <div key={platform.platform} className='space-y-1'>
-                <div className='flex items-center justify-between text-app'>
-                  <span className='text-primary-token'>
-                    {platform.platform}
-                  </span>
-                  <span className='text-2xs text-tertiary-token'>
-                    {platform.clicks.toLocaleString()}
-                  </span>
-                </div>
-                <div className='h-2 w-full overflow-hidden rounded-full bg-surface-2'>
-                  <div
-                    className='h-full rounded-full transition-all duration-slow'
-                    style={{
-                      width: `${pct}%`,
-                      backgroundColor: platform.color,
-                      opacity: 0.8,
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+    <div className='h-full overflow-y-auto p-4'>
+      <div className='space-y-4'>
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
+          <StatCard
+            label='Total Clicks'
+            value={ANALYTICS_SUMMARY.totalClicks.toLocaleString()}
+          />
+          <StatCard
+            label='Unique Visitors'
+            value={ANALYTICS_SUMMARY.uniqueVisitors.toLocaleString()}
+          />
+          <StatCard
+            label='Top Platform'
+            value={ANALYTICS_SUMMARY.topPlatform}
+          />
+          <StatCard
+            label='Growth'
+            value={`+${ANALYTICS_SUMMARY.clickGrowth}%`}
+            positive
+          />
         </div>
-      </div>
 
-      {/* Top country + meta */}
-      <div className='border-t border-subtle p-4'>
-        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
-          Top Geography
-        </h3>
-        <div className='flex items-center justify-between text-app'>
-          <span className='text-primary-token'>
-            {ANALYTICS_SUMMARY.topCountry}
-          </span>
-          <span className='text-2xs text-tertiary-token'>
-            {Math.round(ANALYTICS_SUMMARY.totalClicks * 0.42).toLocaleString()}{' '}
-            clicks
-          </span>
-        </div>
+        <ContentSurfaceCard className='overflow-hidden p-0'>
+          <ContentSectionHeader
+            title='Clicks by Platform'
+            subtitle='Relative performance of the most-clicked DSP destinations.'
+            className='px-4 py-3'
+          />
+          <div className='space-y-3 px-4 py-3'>
+            {PLATFORM_CLICKS.map(platform => {
+              const pct = (platform.clicks / maxClicks) * 100;
+              return (
+                <div key={platform.platform} className='space-y-1.5'>
+                  <div className='flex items-center justify-between text-[13px]'>
+                    <span className='text-(--linear-text-primary)'>
+                      {platform.platform}
+                    </span>
+                    <span className='text-[12px] text-(--linear-text-tertiary)'>
+                      {platform.clicks.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className='h-2 w-full overflow-hidden rounded-full bg-(--linear-bg-surface-1)'>
+                    <div
+                      className='h-full rounded-full transition-all duration-slow'
+                      style={{
+                        width: `${pct}%`,
+                        backgroundColor: platform.color,
+                        opacity: 0.8,
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ContentSurfaceCard>
+
+        <ContentSurfaceCard className='overflow-hidden p-0'>
+          <ContentSectionHeader
+            title='Top Geography'
+            subtitle='Most active market from the current analytics window.'
+            className='px-4 py-3'
+          />
+          <div className='flex items-center justify-between px-4 py-3 text-[13px]'>
+            <span className='text-(--linear-text-primary)'>
+              {ANALYTICS_SUMMARY.topCountry}
+            </span>
+            <span className='text-[12px] text-(--linear-text-tertiary)'>
+              {Math.round(
+                ANALYTICS_SUMMARY.totalClicks * 0.42
+              ).toLocaleString()}{' '}
+              clicks
+            </span>
+          </div>
+        </ContentSurfaceCard>
       </div>
     </div>
   );
@@ -91,18 +102,17 @@ function StatCard({
   readonly positive?: boolean;
 }) {
   return (
-    <div className='rounded-md border border-subtle p-3'>
-      <p className='text-2xs text-tertiary-token'>{label}</p>
-      <p
-        className='mt-1 text-lg font-semibold'
-        style={{
-          color: positive
-            ? 'var(--color-success)'
-            : 'var(--color-text-primary-token)',
-        }}
-      >
-        {value}
-      </p>
-    </div>
+    <ContentMetricCard
+      label={label}
+      value={value}
+      className='p-3'
+      labelClassName='text-[11px] tracking-[0.04em]'
+      subtitleClassName='hidden'
+      valueClassName={
+        positive
+          ? 'text-[22px] font-[620] tracking-[-0.025em] text-[var(--color-success)]'
+          : 'text-[22px] font-[620] tracking-[-0.025em]'
+      }
+    />
   );
 }

@@ -10,12 +10,19 @@ import {
 } from '@jovie/ui';
 import { useMemo, useRef } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import {
+  DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS,
+  DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
+} from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { cn } from '@/lib/utils';
 import { INGEST_NETWORKS } from './ingest-network-options';
 import type { IngestProfileDropdownProps } from './types';
 import { useIngestProfile } from './useIngestProfile';
 
 export function IngestProfileDropdown({
   onIngestPending,
+  buttonClassName,
+  hideLabelOnMobile = false,
 }: Readonly<IngestProfileDropdownProps>) {
   const {
     open,
@@ -48,9 +55,20 @@ export function IngestProfileDropdown({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type='button' size='sm' variant='ghost'>
+        <Button
+          type='button'
+          size='sm'
+          variant='ghost'
+          className={cn(
+            DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS,
+            open && DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS,
+            buttonClassName
+          )}
+        >
           <Icon name='Plus' className='h-3.5 w-3.5' />
-          Ingest Profile
+          <span className={hideLabelOnMobile ? 'hidden sm:inline' : undefined}>
+            Ingest Profile
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -66,14 +84,14 @@ export function IngestProfileDropdown({
             <div className='flex items-center gap-2'>
               <Icon
                 name='UserPlus'
-                className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
                 aria-hidden='true'
               />
-              <span className='text-xs font-medium text-primary-token'>
+              <span className='text-xs font-medium text-(--linear-text-primary)'>
                 Ingest social profile
               </span>
             </div>
-            <p className='text-[11px] text-tertiary-token'>
+            <p className='text-[11px] text-(--linear-text-tertiary)'>
               Paste a URL or handle. We’ll normalize it and match the platform
               automatically.
             </p>
@@ -106,7 +124,9 @@ export function IngestProfileDropdown({
           />
 
           {network === 'spotify' && spotifyState === 'loading' && (
-            <p className='text-xs text-tertiary-token'>Searching Spotify...</p>
+            <p className='text-xs text-(--linear-text-tertiary)'>
+              Searching Spotify...
+            </p>
           )}
 
           {network === 'spotify' &&
@@ -121,14 +141,14 @@ export function IngestProfileDropdown({
                     onClick={() => selectSpotifyArtist(artist)}
                   >
                     <span>{artist.name}</span>
-                    <span className='text-tertiary-token'>Use</span>
+                    <span className='text-(--linear-text-tertiary)'>Use</span>
                   </button>
                 ))}
               </div>
             )}
 
           {network === 'spotify' && spotifyState === 'empty' && (
-            <p className='text-xs text-tertiary-token'>
+            <p className='text-xs text-(--linear-text-tertiary)'>
               No artists found. Try a different search.
             </p>
           )}
@@ -140,7 +160,7 @@ export function IngestProfileDropdown({
           )}
 
           {detectedPlatform && (
-            <div className='flex items-center gap-2 text-xs text-secondary-token'>
+            <div className='flex items-center gap-2 text-xs text-(--linear-text-secondary)'>
               <span
                 className='h-2 w-2 shrink-0 rounded-full bg-secondary'
                 style={

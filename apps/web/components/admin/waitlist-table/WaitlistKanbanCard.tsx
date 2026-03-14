@@ -2,6 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { Mail } from 'lucide-react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DateCell } from '@/components/organisms/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
@@ -41,22 +42,22 @@ export function WaitlistKanbanCard({
     : null;
 
   return (
-    <div
+    <ContentSurfaceCard
       className={cn(
-        'rounded-lg border border-subtle p-3',
-        'transition-shadow duration-200 hover:shadow-md',
+        'bg-(--linear-bg-surface-0) p-3',
+        'transition-[border-color,box-shadow,background-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)',
         'cursor-grab active:cursor-grabbing'
       )}
     >
       {/* Header: Name + Status */}
       <div className='flex items-start justify-between gap-2 mb-2'>
         <div className='flex-1 min-w-0'>
-          <h4 className='font-semibold text-sm text-primary-token truncate'>
+          <h4 className='truncate text-sm font-semibold text-(--linear-text-primary)'>
             {entry.fullName}
           </h4>
           <a
             href={`mailto:${entry.email}`}
-            className='text-xs text-secondary-token hover:underline flex items-center gap-1 mt-0.5'
+            className='mt-0.5 flex items-center gap-1 text-xs text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
           >
             <Mail className='h-3 w-3' />
             <span className='truncate'>{entry.email}</span>
@@ -72,7 +73,7 @@ export function WaitlistKanbanCard({
         {/* Primary Goal */}
         {primaryGoalLabel && (
           <div>
-            <span className='text-tertiary-token'>Goal: </span>
+            <span className='text-(--linear-text-tertiary)'>Goal: </span>
             <Badge size='sm' variant='secondary'>
               {primaryGoalLabel}
             </Badge>
@@ -81,7 +82,7 @@ export function WaitlistKanbanCard({
 
         {/* Primary Social */}
         <div>
-          <span className='text-tertiary-token'>Platform: </span>
+          <span className='text-(--linear-text-tertiary)'>Platform: </span>
           <Badge size='sm' variant='secondary'>
             {platformLabel}
           </Badge>
@@ -93,7 +94,7 @@ export function WaitlistKanbanCard({
             href={entry.primarySocialUrlNormalized}
             target='_blank'
             rel='noopener noreferrer'
-            className='text-accent hover:underline block truncate'
+            className='block truncate text-(--linear-accent) hover:underline'
           >
             {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
           </a>
@@ -102,12 +103,12 @@ export function WaitlistKanbanCard({
         {/* Spotify */}
         {entry.spotifyUrlNormalized && (
           <div>
-            <span className='text-tertiary-token'>Spotify: </span>
+            <span className='text-(--linear-text-tertiary)'>Spotify: </span>
             <a
               href={entry.spotifyUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-accent hover:underline'
+              className='text-(--linear-accent) hover:underline'
             >
               Profile
             </a>
@@ -115,7 +116,7 @@ export function WaitlistKanbanCard({
         )}
 
         {/* Created Date */}
-        <div className='text-tertiary-token'>
+        <div className='text-(--linear-text-tertiary)'>
           <DateCell
             date={entry.createdAt}
             formatOptions={{
@@ -129,7 +130,7 @@ export function WaitlistKanbanCard({
 
       {/* Actions */}
       {onApprove && (
-        <div className='mt-3 pt-3 border-t border-subtle'>
+        <div className='mt-3 border-t border-(--linear-border-subtle) pt-3'>
           <Button
             size='sm'
             variant='primary'
@@ -147,6 +148,6 @@ export function WaitlistKanbanCard({
           </Button>
         </div>
       )}
-    </div>
+    </ContentSurfaceCard>
   );
 }

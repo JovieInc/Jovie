@@ -81,12 +81,14 @@ export function ToastProvider({ children }: ToastProviderProps) {
         expand
         // Close button on every toast for accessibility
         closeButton
+        // Linear-style tonal backgrounds for stronger success/error hierarchy
+        richColors
         // Gap between toasts
         gap={8}
         // Dynamic offset: pushes toasts above cookie banner when visible
         offset={bottomOffset}
         // Maximum visible toasts (stacked); Sonner queues overflow
-        visibleToasts={3}
+        visibleToasts={4}
         // Styling driven by CSS overrides in globals.css on
         // [data-sonner-toaster] / [data-sonner-toast] selectors.
         // Sonner CSS variables (--normal-bg, --success-bg, etc.) are

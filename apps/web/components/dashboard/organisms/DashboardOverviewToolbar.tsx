@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export interface DashboardOverviewToolbarProps {
   readonly range: '7d' | '30d' | '90d';
@@ -22,41 +24,28 @@ export function DashboardOverviewToolbar({
 
   return (
     <div className='flex items-center justify-end gap-2'>
-      <fieldset aria-label='Dashboard window' className='border-0 p-0 m-0'>
-        <div className='inline-flex rounded-full border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/3 dark:ring-white/5 backdrop-blur-sm'>
-          {(['7d', '30d', '90d'] as const).map(value => {
-            const active = range === value;
-            return (
-              <button
-                key={value}
-                type='button'
-                onClick={() => onRangeChange(value)}
-                aria-pressed={active}
-                className={
-                  active
-                    ? 'h-6 rounded-full bg-surface-1 px-2.5 text-[13px] font-[510] text-primary-token shadow-card shadow-black/10 dark:shadow-black/40'
-                    : 'h-6 rounded-full px-2.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token'
-                }
-              >
-                {value}
-              </button>
-            );
-          })}
-        </div>
-      </fieldset>
+      <AppSegmentControl
+        value={range}
+        onValueChange={onRangeChange}
+        options={[
+          { value: '7d', label: '7d' },
+          { value: '30d', label: '30d' },
+          { value: '90d', label: '90d' },
+        ]}
+        size='sm'
+        aria-label='Dashboard window'
+      />
 
-      <button
-        type='button'
-        aria-label='Refresh dashboard'
+      <DashboardHeaderActionButton
+        ariaLabel='Refresh dashboard'
         onClick={onRefresh}
-        className='inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-subtle bg-surface-1/40 px-2.5 text-[13px] font-[510] text-primary-token ring-1 ring-inset ring-white/3 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page dark:ring-white/5'
-      >
-        <Icon name='RefreshCw' className='h-3.5 w-3.5' />
-        <span className='text-[11px] font-[510]'>Refresh</span>
-      </button>
+        icon={<Icon name='RefreshCw' className='h-4 w-4' />}
+        label='Refresh'
+        iconOnly
+      />
 
       {rangeLabel ? (
-        <p className='hidden min-w-26 whitespace-nowrap text-right text-[13px] text-tertiary-token sm:block'>
+        <p className='hidden min-w-26 whitespace-nowrap text-right text-[12.5px] text-(--linear-text-tertiary) sm:block'>
           {rangeLabel}
         </p>
       ) : null}

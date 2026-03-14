@@ -27,7 +27,7 @@ export function useAvatarUpload(): UseAvatarUploadReturn {
         profileId: contact.id,
       });
 
-      return result.blobUrl;
+      return result;
     },
     []
   );

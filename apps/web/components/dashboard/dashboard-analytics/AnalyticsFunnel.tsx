@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDown } from 'lucide-react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 const numberFormatter = new Intl.NumberFormat();
 
@@ -64,9 +65,9 @@ export function AnalyticsFunnel({
           <div key={stage.label} className='w-full flex flex-col items-center'>
             {index > 0 && (
               <div className='flex flex-col items-center py-2'>
-                <ArrowDown className='h-4 w-4 text-tertiary-token' />
+                <ArrowDown className='h-4 w-4 text-(--linear-text-tertiary)' />
                 {conversionRate && (
-                  <span className='text-[11px] font-[510] text-accent mt-0.5 tabular-nums'>
+                  <span className='mt-0.5 text-[11px] font-[510] tabular-nums text-primary'>
                     {conversionRate}
                   </span>
                 )}
@@ -77,26 +78,26 @@ export function AnalyticsFunnel({
               className='relative transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]'
               style={{ width: `${widthPercent}%` }}
             >
-              <div
+              <ContentSurfaceCard
                 className={`
-                  relative overflow-hidden rounded-xl border border-subtle
-                  bg-gradient-to-r from-[var(--color-bg-surface-1)] to-[var(--color-bg-surface-2)]
+                  relative overflow-hidden rounded-xl
+                  bg-gradient-to-r from-[var(--linear-bg-surface-1)] to-[var(--linear-bg-surface-2)]
                   px-6 py-5 text-center
-                  ${isLast ? '' : 'hover:border-[var(--color-border-default)]'}
-                  ${isLast ? 'ring-2 ring-accent/20 border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--color-bg-surface-1)]' : ''}
+                  ${isLast ? '' : 'hover:border-(--linear-border-default)'}
+                  ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--linear-bg-surface-1))] to-[var(--linear-bg-surface-1)]' : ''}
                   transition-all duration-200
                 `}
               >
-                <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token mb-2'>
+                <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
                   {stage.label}
                 </p>
-                <p className='text-4xl font-[590] tracking-[-0.022em] text-primary-token tabular-nums'>
+                <p className='text-4xl font-[590] tracking-[-0.022em] text-(--linear-text-primary) tabular-nums'>
                   {formatNumber(stage.value)}
                 </p>
-                <p className='text-[13px] text-secondary-token mt-1'>
+                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
                   {stage.description}
                 </p>
-              </div>
+              </ContentSurfaceCard>
             </div>
           </div>
         );

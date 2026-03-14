@@ -6,6 +6,7 @@
 
 import type { OutputInfo } from 'sharp';
 import { HEIC_MIME_TYPES } from '@/lib/images/config';
+import { withTimeout as withSharedTimeout } from '@/lib/resilience/primitives';
 import { AVATAR_CANONICAL_SIZE } from './constants';
 import type { SharpConstructor } from './types';
 
@@ -166,17 +167,8 @@ export async function withTimeout<T>(
   timeoutMs: number,
   operation: string
 ): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(`${operation} timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
+  return withSharedTimeout(promise, {
+    timeoutMs,
+    context: operation,
   });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
 }

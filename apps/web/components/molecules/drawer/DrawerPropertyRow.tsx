@@ -7,20 +7,43 @@ export interface DrawerPropertyRowProps {
   readonly label: ReactNode;
   readonly value: ReactNode;
   readonly labelWidth?: number;
+  readonly size?: 'sm' | 'md';
+  readonly align?: 'center' | 'start';
   readonly interactive?: boolean;
   readonly onClick?: () => void;
+  readonly labelClassName?: string;
+  readonly valueClassName?: string;
   readonly className?: string;
 }
 
 export function DrawerPropertyRow({
   label,
   value,
-  labelWidth = 88,
+  labelWidth = 76,
+  size = 'md',
+  align = 'center',
   interactive = false,
   onClick,
+  labelClassName,
+  valueClassName,
   className,
 }: DrawerPropertyRowProps) {
   const Wrapper = interactive ? 'button' : 'div';
+
+  const sizeClasses = {
+    sm: {
+      container: 'min-h-[22px] gap-2 rounded-[7px] px-1.5 py-0.5',
+      label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
+      value: 'text-[11px] leading-[14px]',
+    },
+    md: {
+      container: 'min-h-[24px] gap-2 rounded-[7px] px-1.5 py-0.5',
+      label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
+      value: 'text-[11.5px] leading-[15px]',
+    },
+  } as const;
+
+  const styles = sizeClasses[size];
 
   const gridStyle = useMemo(
     () => ({ gridTemplateColumns: `${labelWidth}px minmax(0, 1fr)` }),

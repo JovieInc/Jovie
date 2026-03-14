@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -11,6 +10,8 @@ import {
 import { Copy, MoreHorizontal } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AudienceMember } from '@/types';
 
@@ -18,19 +19,6 @@ interface AudienceRowActionsMenuProps {
   readonly row: AudienceMember;
   readonly open?: boolean;
   readonly onOpenChange?: (open: boolean) => void;
-}
-
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
-    return false;
-  }
-
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function AudienceRowActionsMenu({
@@ -43,7 +31,7 @@ export function AudienceRowActionsMenu({
 
   const handleCopyEmail = useCallback(async () => {
     if (!row.email) return;
-    const success = await copyTextToClipboard(row.email);
+    const success = await copyToClipboard(row.email);
     if (success) {
       setCopySuccess(true);
       notifications.success('Copied email');
@@ -55,7 +43,7 @@ export function AudienceRowActionsMenu({
 
   const handleCopyPhone = useCallback(async () => {
     if (!row.phone) return;
-    const success = await copyTextToClipboard(row.phone);
+    const success = await copyToClipboard(row.phone);
     if (success) {
       setCopySuccess(true);
       notifications.success('Copied phone number');
@@ -71,14 +59,12 @@ export function AudienceRowActionsMenu({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button
-          type='button'
-          size='icon'
-          variant='ghost'
-          className='h-8 w-8 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors duration-150 ease-out hover:bg-interactive-hover hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
+        <AppIconButton
+          ariaLabel='Open audience row actions'
+          className='h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
         >
           <MoreHorizontal className='h-4 w-4' />
-        </Button>
+        </AppIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={8}>
         <DropdownMenuItem disabled={!hasEmail} onClick={handleCopyEmail}>

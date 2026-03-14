@@ -21,11 +21,11 @@ export function classifyIntent(message: string): DetectedIntent | null {
   }
 
   for (const { category, pattern, extract } of INTENT_PATTERNS) {
-    const match = trimmed.match(pattern);
+    const match = pattern.exec(trimmed);
     if (match) {
       return {
         category,
-        confidence: 1.0,
+        confidence: 1,
         extractedData: extract(match, trimmed),
         rawMessage: trimmed,
       };

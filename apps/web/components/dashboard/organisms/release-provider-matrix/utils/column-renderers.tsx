@@ -262,9 +262,11 @@ export function createRightMetaCellRenderer(
       ? new Date(release.releaseDate).getFullYear()
       : null;
     const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
+    const yearLabel = year === null ? '—' : String(year);
+    const yearTitle = year === null ? 'Unknown release year' : String(year);
 
     return (
-      <div className='grid min-w-[220px] grid-cols-[minmax(0,1fr)_20px_44px] items-center justify-end gap-x-3 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary)'>
+      <div className='grid min-w-[236px] grid-cols-[minmax(160px,1fr)_14px_auto] items-center justify-end gap-x-2.5 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) lg:min-w-[264px]'>
         <div className='min-w-0'>
           <SmartLinkCell
             release={release}
@@ -273,12 +275,15 @@ export function createRightMetaCellRenderer(
           />
         </div>
 
-        <div className='flex w-4 items-center justify-center'>
+        <div className='flex w-[14px] items-center justify-center'>
           <PopularityIcon popularity={release.spotifyPopularity} />
         </div>
 
-        <span className='hidden w-12 text-right tabular-nums text-(--linear-text-tertiary) sm:block'>
-          {year ?? 'Unknown'}
+        <span
+          className='w-[42px] text-right tabular-nums text-[11px] text-(--linear-text-tertiary) lg:w-[46px]'
+          title={yearTitle}
+        >
+          {yearLabel}
         </span>
       </div>
     );
@@ -346,14 +351,14 @@ export function renderReleaseTypeCell({
 export function renderIsrcCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
-  return <CopyableMonospaceCell value={getValue()} label='ISRC' />;
+  return <CopyableMonospaceCell value={getValue()} label='ISRC' size='sm' />;
 }
 
 /** Renders the UPC cell */
 export function renderUpcCell({
   getValue,
 }: CellContext<ReleaseViewModel, string | null | undefined>) {
-  return <CopyableMonospaceCell value={getValue()} label='UPC' />;
+  return <CopyableMonospaceCell value={getValue()} label='UPC' size='sm' />;
 }
 
 /** Renders the label cell with truncation and tooltip */
@@ -491,7 +496,7 @@ export function renderStatsCell({
   const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
   return (
-    <div className='flex items-center gap-2 text-[13px] text-secondary-token tabular-nums'>
+    <div className='flex items-center gap-2 text-[13px] tabular-nums text-(--linear-text-secondary)'>
       {/* Popularity icon first */}
       <div className='w-4 flex justify-center'>
         <PopularityIcon popularity={release.spotifyPopularity} />

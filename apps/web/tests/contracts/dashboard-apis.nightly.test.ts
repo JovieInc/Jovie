@@ -13,6 +13,9 @@ const mockRequireAuth = vi.fn();
 const mockWithDbSession = vi.fn();
 const mockWithDbSessionTx = vi.fn();
 const mockGetUserDashboardAnalytics = vi.fn();
+
+const mockCacheQuery = vi.fn();
+const mockInvalidateCache = vi.fn();
 const mockDashboardLinksRateLimit = vi.fn();
 const mockInvalidateSocialLinksCache = vi.fn();
 const mockComputeLinkConfidence = vi.fn();
@@ -85,6 +88,11 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/db/queries/analytics', () => ({
   getUserDashboardAnalytics: (...args: any[]) =>
     mockGetUserDashboardAnalytics(...args),
+}));
+
+vi.mock('@/lib/db/cache', () => ({
+  cacheQuery: (...args: any[]) => mockCacheQuery(...args),
+  invalidateCache: (...args: any[]) => mockInvalidateCache(...args),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
@@ -188,6 +196,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbSelectResponses = [];
   dbSelectCallIndex = 0;
+  mockCacheQuery.mockImplementation(
+    async (_key: string, cb: () => Promise<unknown>) => cb()
+  );
+  mockInvalidateCache.mockResolvedValue(undefined);
 });
 
 describe('Dashboard API contracts', () => {

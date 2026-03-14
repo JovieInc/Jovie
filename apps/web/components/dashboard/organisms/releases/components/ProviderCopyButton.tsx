@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -39,14 +40,15 @@ export function ProviderCopyButton({
   const buttonLabel = getButtonLabel();
 
   return (
-    <button
-      type='button'
+    <DrawerButton
       data-testid={testId}
       data-url={path ? `${getBaseUrl()}${path}` : undefined}
       onClick={() => {
         if (!path) return;
         void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
       }}
+      tone={isCopied ? 'secondary' : 'ghost'}
+      size='sm'
       className={cn(
         'group/btn inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
         isCopied
@@ -58,7 +60,7 @@ export function ProviderCopyButton({
         <Icon
           name='Copy'
           className={cn(
-            'absolute h-3.5 w-3.5 transition-all duration-150',
+            'absolute h-3 w-3 transition-all duration-150',
             isCopied
               ? 'scale-50 opacity-0'
               : 'scale-100 opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
@@ -68,13 +70,13 @@ export function ProviderCopyButton({
         <Icon
           name='Check'
           className={cn(
-            'absolute h-3.5 w-3.5 transition-all duration-150',
+            'absolute h-3 w-3 transition-all duration-150',
             isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
           )}
           aria-hidden='true'
         />
       </span>
       <span className='line-clamp-1'>{buttonLabel}</span>
-    </button>
+    </DrawerButton>
   );
 }

@@ -37,8 +37,8 @@ export function CreatorAvatarCell({
     const result = await uploadAvatar(
       { file, profileId },
       {
-        onSuccess: data => {
-          setPreviewUrl(data.blobUrl);
+        onSuccess: blobUrl => {
+          setPreviewUrl(blobUrl);
           notifications.success('Avatar updated');
         },
         onError: error => {
@@ -50,7 +50,7 @@ export function CreatorAvatarCell({
       }
     );
 
-    return result.blobUrl;
+    return result;
   };
 
   return (

@@ -17,6 +17,9 @@ import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
+  DrawerActionRow,
+  DrawerBackButton,
+  DrawerMediaThumb,
   DrawerSection,
   DrawerTabs,
   EntitySidebarShell,
@@ -27,6 +30,8 @@ import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { ProviderKey } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { TrackMetaSummary } from './TrackMetaSummary';
+import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 
 type TrackSidebarTab = 'details' | 'platforms';
 
@@ -48,7 +53,7 @@ export interface TrackSidebarData {
   previewUrl: string | null;
   audioUrl: string | null;
   audioFormat: string | null;
-  providers: Array<{ key: string; label: string; url: string }>;
+  providers: Array<{ key: ProviderKey; label: string; url: string }>;
   releaseTitle: string;
   releaseArtworkUrl?: string | null;
   releaseId: string;
@@ -125,12 +130,6 @@ export function TrackSidebar({
   }, [track, onBackToRelease]);
 
   const streamingProviders = track?.providers.filter(p => p.url) ?? [];
-
-  const trackLabel = (() => {
-    if (!track) return '';
-    if (track.discNumber > 1) return `${track.discNumber}-${track.trackNumber}`;
-    return String(track.trackNumber);
-  })();
 
   const overflowActions = useMemo<DrawerHeaderAction[]>(() => {
     if (!track) return [];
@@ -222,10 +221,10 @@ export function TrackSidebar({
                     className='h-7 w-7 text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
-                </div>
-              </div>
-            )}
-          </div>
+                }
+              />
+            }
+          />
         ) : undefined
       }
       tabs={
@@ -242,8 +241,8 @@ export function TrackSidebar({
       {track && (
         <div className='space-y-5'>
           {onBackToRelease && (
-            <button
-              type='button'
+            <DrawerBackButton
+              label={track.releaseTitle}
               onClick={handleBackToRelease}
               className='flex items-center gap-1.5 rounded-[7px] border border-transparent px-1.5 py-1 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
@@ -261,6 +260,7 @@ export function TrackSidebar({
               </p>
               <CopyableUrlRow
                 url={smartLinkUrl}
+                size='lg'
                 copyButtonTitle='Copy smart link'
                 openButtonTitle='Open smart link'
                 onCopySuccess={() => {
@@ -280,8 +280,7 @@ export function TrackSidebar({
               </p>
               <div className='space-y-1'>
                 {track.isrc && (
-                  <button
-                    type='button'
+                  <DrawerActionRow
                     onClick={handleCopyIsrc}
                     className='flex w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                   >

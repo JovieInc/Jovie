@@ -89,12 +89,12 @@ export function ReleaseSmartLinkAnalytics({
               <div className='space-y-1'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
-                <div className='h-[11px] w-10 rounded skeleton' />
+                <div className='h-3 w-10 rounded skeleton' />
               </div>
               <div className='space-y-1 border-l border-(--linear-border-subtle) pl-3'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
-                <div className='h-[11px] w-10 rounded skeleton' />
+                <div className='h-3 w-10 rounded skeleton' />
               </div>
             </div>
           </div>
@@ -128,7 +128,7 @@ export function ReleaseSmartLinkAnalytics({
                   hint='Recent'
                 />
               </div>
-            </div>
+            </DrawerStatGrid>
 
             {showEmpty && (
               <p className='mt-1.5 text-[11px] leading-[14px] text-(--linear-text-tertiary)'>

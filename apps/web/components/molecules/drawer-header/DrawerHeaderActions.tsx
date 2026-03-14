@@ -8,6 +8,9 @@ import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
+const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
+  'h-[26px] w-[26px] border-transparent bg-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)';
+
 export interface DrawerHeaderAction {
   readonly id: string;
   readonly label: string;
@@ -67,7 +70,7 @@ export function DrawerHeaderActions({
     : baseMenuItems;
 
   return (
-    <div className='flex items-center gap-1'>
+    <div className='flex items-center gap-0.5'>
       {/* Primary actions - always visible */}
       {displayActions.map(action => {
         const Icon =
@@ -84,7 +87,7 @@ export function DrawerHeaderActions({
               ariaLabel={action.label}
             >
               <Link href={action.href}>
-                <Icon className='h-3.5 w-3.5' />
+                <Icon className='h-3.5 w-3.5' aria-hidden='true' />
               </Link>
             </AppIconButton>
           );
@@ -113,6 +116,7 @@ export function DrawerHeaderActions({
                     ? 'scale-50 opacity-0'
                     : 'scale-100 opacity-100'
                 )}
+                aria-hidden='true'
               />
               {ActiveIcon && (
                 <ActiveIcon
@@ -122,6 +126,7 @@ export function DrawerHeaderActions({
                       ? 'scale-100 opacity-100'
                       : 'scale-50 opacity-0'
                   )}
+                  aria-hidden='true'
                 />
               )}
             </span>

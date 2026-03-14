@@ -47,7 +47,7 @@ export function ReleaseFields({
             {formatReleaseDate(releaseDate)}
           </>
         ) : (
-          <span className='italic'>No release date</span>
+          <span className='text-(--linear-text-tertiary)'>No release date</span>
         )}
       </p>
       {parts.length > 0 && (

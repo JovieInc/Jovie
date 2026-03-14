@@ -95,7 +95,7 @@ export function SidebarInstallBanner() {
             type='button'
             aria-label='Dismiss version update banner'
             onClick={dismissVersionUpdate}
-            className='absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground'
+            className='absolute top-1 right-1 flex size-7 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
           >
             <X className='size-3' />
           </button>
@@ -106,7 +106,7 @@ export function SidebarInstallBanner() {
               <p className='text-[12px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
                 {title}
               </p>
-              <p className='mt-0.5 text-2xs leading-snug text-sidebar-muted'>
+              <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted'>
                 An improved version of Jovie is available. Reload to update.
               </p>
               <button
@@ -133,7 +133,7 @@ export function SidebarInstallBanner() {
           type='button'
           aria-label='Dismiss install banner'
           onClick={dismissPwa}
-          className='absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground'
+          className='absolute top-1 right-1 flex size-7 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
         >
           <X className='size-3' />
         </button>
@@ -144,7 +144,7 @@ export function SidebarInstallBanner() {
             <p className='text-[12px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
               {TOAST_MESSAGES.PWA_INSTALL}
             </p>
-            <p className='mt-0.5 text-2xs leading-snug text-sidebar-muted'>
+            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted'>
               {isIOS
                 ? TOAST_MESSAGES.PWA_INSTALL_IOS
                 : TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION}

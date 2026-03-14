@@ -2,8 +2,9 @@
 
 import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
 import {
@@ -12,6 +13,9 @@ import {
 } from '@/lib/images/config';
 import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
+
+const PROFILE_INPUT_CLASS =
+  'block w-full rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 export function SettingsProfileSection({
   artist,
@@ -49,82 +53,84 @@ export function SettingsProfileSection({
   };
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='relative divide-y divide-subtle'
-    >
-      <SettingsStatusPill
-        status={profileSaveStatus}
-        className='absolute right-5 top-4'
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='Profile identity'
+        subtitle='Control the display name, username, and public profile image fans see.'
+        className='min-h-0 px-4 py-3'
+        actions={<SettingsStatusPill status={profileSaveStatus} />}
+        actionsClassName='w-auto shrink-0'
       />
-
-      {/* Profile picture row */}
-      <div className='flex items-center justify-between px-4 py-3'>
-        <span className='text-[13px] text-primary-token'>Profile picture</span>
-        <AvatarUploadable
-          src={artist.image_url}
-          alt={artist.name || 'Profile photo'}
-          name={artist.name || artist.handle}
-          size='sm'
-          uploadable
-          showHoverOverlay
-          onUpload={handleAvatarUpload}
-          onSuccess={handleAvatarUpdate}
-          onError={message => toast.error(message)}
-          maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
-          acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
-        />
-      </div>
-
-      {/* Display Name row */}
-      <div className='flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
-        <label
-          htmlFor='displayName'
-          className='text-[13px] text-primary-token shrink-0'
-        >
-          Display name
-        </label>
-        <Input
-          type='text'
-          name='displayName'
-          id='displayName'
-          value={formData.displayName}
-          onChange={e => handleFieldChange('displayName', e.target.value)}
-          onBlur={() => flushSave()}
-          placeholder='The name your fans will see'
-          className='block w-full sm:max-w-[260px] px-3 py-1.5 border border-subtle rounded-md bg-surface-1 text-primary text-[13px] placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent transition-colors'
-        />
-      </div>
-
-      {/* Username row */}
-      <div className='flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'>
-        <div className='shrink-0'>
-          <label htmlFor='username' className='text-[13px] text-primary-token'>
-            Username
-          </label>
-          <p className='text-[13px] text-secondary-token mt-0.5'>
-            Used in your profile URL
-          </p>
-        </div>
-        <div className='flex rounded-md shadow-card w-full sm:max-w-[260px]'>
-          <span className='inline-flex items-center px-3 rounded-l-md border border-r-0 border-subtle bg-surface-2 text-secondary-token text-[13px] select-none'>
-            {profileDomain}/
+      <div className='space-y-3 px-4 py-3'>
+        <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <span className='text-[13px] text-(--linear-text-primary)'>
+            Profile picture
           </span>
+          <AvatarUploadable
+            src={artist.image_url}
+            alt={artist.name || 'Profile photo'}
+            name={artist.name || artist.handle}
+            size='sm'
+            uploadable
+            showHoverOverlay
+            onUpload={handleAvatarUpload}
+            onSuccess={handleAvatarUpdate}
+            onError={message => toast.error(message)}
+            maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+            acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
+          />
+        </ContentSurfaceCard>
+
+        <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+          <label
+            htmlFor='displayName'
+            className='shrink-0 text-[13px] text-(--linear-text-primary)'
+          >
+            Display name
+          </label>
           <Input
             type='text'
-            name='username'
-            id='username'
-            data-1p-ignore
-            autoComplete='off'
-            value={formData.username}
-            onChange={e => handleFieldChange('username', e.target.value)}
+            name='displayName'
+            id='displayName'
+            value={formData.displayName}
+            onChange={e => handleFieldChange('displayName', e.target.value)}
             onBlur={() => flushSave()}
-            placeholder='yourname'
-            className='flex-1 min-w-0 block w-full px-3 py-1.5 rounded-none rounded-r-md border border-subtle bg-surface-1 text-primary text-[13px] placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent transition-colors'
+            placeholder='The name your fans will see'
+            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
           />
-        </div>
+        </ContentSurfaceCard>
+
+        <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='shrink-0'>
+            <label
+              htmlFor='username'
+              className='text-[13px] text-(--linear-text-primary)'
+            >
+              Username
+            </label>
+            <p className='mt-0.5 text-[13px] text-(--linear-text-secondary)'>
+              Used in your profile URL
+            </p>
+          </div>
+          <div className='flex w-full rounded-[8px] sm:max-w-[280px]'>
+            <span className='inline-flex select-none items-center rounded-l-[8px] border border-r-0 border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-secondary)'>
+              {profileDomain}/
+            </span>
+            <Input
+              type='text'
+              name='username'
+              id='username'
+              data-1p-ignore
+              autoComplete='off'
+              value={formData.username}
+              onChange={e => handleFieldChange('username', e.target.value)}
+              onBlur={() => flushSave()}
+              placeholder='yourname'
+              className={`min-w-0 flex-1 rounded-none rounded-r-[8px] border-l-0 ${PROFILE_INPUT_CLASS}`}
+            />
+          </div>
+        </ContentSurfaceCard>
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

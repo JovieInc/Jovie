@@ -16,6 +16,15 @@ describe('OnboardingCompleteStep', () => {
     spotifyImportMessage: '',
   };
 
+  it('keeps spotify progress region mounted but hidden while idle', () => {
+    render(
+      <OnboardingCompleteStep {...baseProps} spotifyImportStatus='idle' />
+    );
+
+    const progressRegion = screen.getByText('1/3').closest('div[aria-hidden]');
+    expect(progressRegion).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('shows spotify import progress when import is active', () => {
     render(
       <OnboardingCompleteStep

@@ -48,8 +48,8 @@ function ProfileCompletenessBar({
   score,
   fields,
 }: {
-  score: number;
-  fields: ProfileField[];
+  readonly score: number;
+  readonly fields: ProfileField[];
 }) {
   return (
     <div className='space-y-3'>
@@ -84,7 +84,13 @@ function ProfileCompletenessBar({
   );
 }
 
-function CopyButton({ value, label }: { value: string; label: string }) {
+function CopyButton({
+  value,
+  label,
+}: {
+  readonly value: string;
+  readonly label: string;
+}) {
   const handleCopy = useCallback(async () => {
     const ok = await copyToClipboard(value);
     if (ok) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import {
   extractUsernameFromLabel,
   extractUsernameFromUrl,
@@ -121,28 +121,24 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
     return <span className={typography.cellTertiary}>—</span>;
   }
 
-  // Use collapsed mode (circles) when there are 2+ links
-  const useCollapsedMode = filteredLinks.length >= 2;
   const visibleLinks = filteredLinks.slice(0, maxLinks);
+  const useCollapsedMode = filteredLinks.length >= 2;
 
   return (
-    <div className='flex items-center overflow-hidden'>
-      {visibleLinks.map((link, index) => {
-        const isLast = index === visibleLinks.length - 1;
+    <CompactLinkRail
+      items={visibleLinks.map(link => {
         const username =
           extractUsernameFromUrl(link.url) ??
           extractUsernameFromLabel(link.displayText ?? '') ??
-          link.displayText ?? // Add fallback to raw displayText
+          link.displayText ??
           '';
         const displayUsername = formatUsername(username);
 
-        // Handle generic platform types like "music_streaming" by using platformType instead
         const platformLower = link.platform.toLowerCase();
         const isGenericType =
           platformLower === 'music_streaming' ||
           platformLower === 'social_media';
 
-        // Use platformType if platform is generic, otherwise use platform
         const platformIcon = isGenericType
           ? link.platformType.toLowerCase()
           : platformLower;
@@ -150,7 +146,6 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
           ? toDisplayLabel(link.platformType)
           : toDisplayLabel(link.platform);
 
-        // Distinguish between music platforms (show artist name) and social platforms (show username)
         const isMusicPlatform = [
           'spotify',
           'apple_music',
@@ -160,24 +155,29 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
 
         const primaryText =
           isMusicPlatform && link.displayText
-            ? link.displayText // Artist name for music platforms
-            : displayUsername || platformName; // Username for social platforms
+            ? link.displayText
+            : displayUsername || platformName;
 
-        return (
-          <PlatformPill
-            key={link.id}
-            platformIcon={platformIcon}
-            platformName={platformName}
-            primaryText={primaryText}
-            collapsed={useCollapsedMode}
-            stackable={useCollapsedMode}
-            defaultExpanded={isLast && useCollapsedMode}
-            onClick={() => {
-              globalThis.open(link.url, '_blank', 'noopener,noreferrer');
-            }}
-          />
-        );
+        return {
+          id: link.id,
+          platformIcon,
+          platformName,
+          primaryText,
+          onClick: () => {
+            globalThis.open(link.url, '_blank', 'noopener,noreferrer');
+          },
+        };
       })}
-    </div>
+      countLabel='social links'
+      summaryCount={filteredLinks.length}
+      summaryAriaLabel={`${filteredLinks.length} social links`}
+      maxVisible={maxLinks}
+      className={className}
+      railClassName={
+        useCollapsedMode
+          ? 'max-w-[148px] lg:max-w-[188px]'
+          : 'max-w-[176px] lg:max-w-[232px]'
+      }
+    />
   );
 });

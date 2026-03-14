@@ -1,7 +1,6 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
-import { ArrowLeft, Copy, ExternalLink } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
@@ -11,6 +10,8 @@ import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import type { ProviderKey } from '@/lib/discography/types';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { TrackMetaSummary } from './TrackMetaSummary';
+import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 
 /** Track shape accepted by the detail panel (subset of TrackViewModel). */
 export interface TrackForDetail {
@@ -21,7 +22,7 @@ export interface TrackForDetail {
   durationMs: number | null;
   isrc: string | null;
   isExplicit: boolean;
-  providers: Array<{ key: string; label: string; url: string }>;
+  providers: Array<{ key: ProviderKey; label: string; url: string }>;
 }
 
 interface TrackDetailPanelProps {
@@ -46,11 +47,6 @@ export function TrackDetailPanel({
       );
     }
   }, [track.isrc]);
-
-  const trackLabel =
-    track.discNumber > 1
-      ? `${track.discNumber}-${track.trackNumber}`
-      : String(track.trackNumber);
 
   return (
     <div className='space-y-4'>
@@ -99,8 +95,7 @@ export function TrackDetailPanel({
         </p>
         <div className='space-y-1'>
           {track.isrc && (
-            <button
-              type='button'
+            <DrawerActionRow
               onClick={handleCopyIsrc}
               className='flex w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
             >
@@ -113,6 +108,7 @@ export function TrackDetailPanel({
           )}
           <CopyableUrlRow
             url={smartLinkUrl}
+            size='lg'
             copyButtonTitle='Copy smart link'
             openButtonTitle='Open smart link'
             onCopySuccess={() => {

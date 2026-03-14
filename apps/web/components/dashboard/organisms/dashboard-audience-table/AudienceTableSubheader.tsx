@@ -52,17 +52,25 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
   totalAudienceCount,
 }: AudienceTableSubheaderProps) {
   const hasData = rows.length > 0;
+  const exportTooltipLabel =
+    selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export';
 
   return (
-    <div className='border-b border-subtle bg-transparent'>
-      <div className='flex items-center justify-between px-4 py-1'>
-        {/* Left: Audience view selector */}
-        <div className='flex items-center gap-2'>
-          <AudienceHeaderBadge
-            view={view}
-            onViewChange={onViewChange}
-            totalAudienceCount={totalAudienceCount ?? total}
-            subscriberCount={subscriberCount}
+    <PageToolbar
+      start={
+        <AudienceHeaderBadge
+          view={view}
+          onViewChange={onViewChange}
+          totalAudienceCount={totalAudienceCount ?? total}
+          subscriberCount={subscriberCount}
+        />
+      }
+      end={
+        <>
+          <AudienceFilterDropdown
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            iconOnly
           />
         </div>
 

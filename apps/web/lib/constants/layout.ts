@@ -9,7 +9,7 @@
  * Standard sidebar width across all tables
  * Used by: Audience, Creators, Releases, Contact sidebars
  */
-export const SIDEBAR_WIDTH = 400; // px
+export const SIDEBAR_WIDTH = 420; // px
 
 /**
  * Standard table row heights

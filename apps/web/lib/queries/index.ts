@@ -80,6 +80,25 @@ export {
 } from './useAccountMutations';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
+export {
+  type AdminLead,
+  type AdminLeadKeyword,
+  type AdminLeadListResponse,
+  type LeadPipelineSettings,
+  useAddLeadKeywordsMutation,
+  useDeleteLeadKeywordMutation,
+  useLeadKeywordsQuery,
+  useLeadPipelineSettingsQuery,
+  useLeadsListQuery,
+  useMarkLeadDmSentMutation,
+  useQueueLeadUrlsMutation,
+  useRunLeadDiscoveryMutation,
+  useRunLeadQualificationMutation,
+  useSeedLeadKeywordsMutation,
+  useToggleLeadKeywordMutation,
+  useUpdateLeadPipelineSettingsMutation,
+  useUpdateLeadStatusMutation,
+} from './useAdminLeadsPrimitives';
 // Admin social links query
 export {
   type AdminSocialLink,
@@ -282,6 +301,11 @@ export {
 } from './useReleaseMutations';
 // Release queries and mutations
 export { useReleasesQuery } from './useReleasesQuery';
+
+export {
+  type ReleaseTrack,
+  useReleaseTracksQuery,
+} from './useReleaseTracksQuery';
 // Settings mutations
 export {
   type SettingsUpdateInput,

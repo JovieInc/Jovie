@@ -9,9 +9,10 @@ import {
   type EditableContact,
   useContactsManager,
 } from '@/components/dashboard/hooks/useContactsManager';
-import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { ContactDetailSidebar } from '@/components/dashboard/organisms/contacts-table/ContactDetailSidebar';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
@@ -41,18 +42,50 @@ export function SettingsContactsSection({
 
   if (isLoading) {
     return (
-      <DashboardCard variant='settings'>
-        <ContactsSectionSkeleton />
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Contacts'
+          subtitle={`Manage bookings, management, and press contacts for ${artist.name}.`}
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContactsSectionSkeleton />
+        </div>
       </DashboardCard>
     );
   }
 
   if (isError) {
     return (
-      <SettingsErrorState
-        message='Failed to load contacts.'
-        onRetry={() => refetch()}
-      />
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Contacts'
+          subtitle={`Manage bookings, management, and press contacts for ${artist.name}.`}
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-8 text-center'>
+            <UserPlus
+              className='h-8 w-8 text-(--linear-text-tertiary)'
+              aria-hidden
+            />
+            <p className='text-[13px] text-secondary-token'>
+              Failed to load contacts.
+            </p>
+            <Button variant='ghost' size='sm' onClick={() => refetch()}>
+              Try again
+            </Button>
+          </ContentSurfaceCard>
+        </div>
+      </DashboardCard>
     );
   }
 
@@ -133,20 +166,15 @@ function ContactsListInner({
 
   const handleAddContact = useCallback(() => {
     addContact('bookings');
-    // The new contact will have isNew flag — auto-select it
-    setTimeout(() => {
-      // Find the temp contact that was just added
-      // This works because addContact updates state synchronously
-    }, 0);
   }, [addContact]);
 
   // Auto-select newly added contacts
-  const newContact = contacts.find(c => c.isNew);
+  const newContactId = contacts.find(c => c.isNew)?.id ?? null;
   useEffect(() => {
-    if (newContact && newContact.id !== selectedContactId) {
-      setSelectedContactId(newContact.id);
+    if (newContactId && newContactId !== selectedContactId) {
+      setSelectedContactId(newContactId);
     }
-  }, [newContact?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [newContactId, selectedContactId]);
 
   const deleteLabel = pendingDeleteContact
     ? getContactRoleLabel(
@@ -183,32 +211,41 @@ function ContactsListInner({
 
   return (
     <>
-      <DashboardCard variant='settings'>
-        <div className='space-y-3'>
-          <div className='flex items-center justify-between'>
-            <p className='text-[13px] text-secondary-token'>
-              Manage bookings, management, and press contacts for {artistName}.
-            </p>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Contacts'
+          subtitle={`Manage bookings, management, and press contacts for ${artistName}.`}
+          className='min-h-0 px-4 py-3'
+          actions={
             <Button
               variant='ghost'
               size='sm'
               onClick={handleAddContact}
               className='gap-1.5 text-secondary-token hover:text-primary-token'
             >
-              <Plus className='h-4 w-4' />
+              <Plus className='h-4 w-4' aria-hidden />
               Add contact
             </Button>
-          </div>
-
+          }
+          actionsClassName='w-auto shrink-0'
+        />
+        <div className='px-4 py-3'>
           {isEmpty ? (
-            <div className='text-center py-6'>
-              <UserPlus className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
+            <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-10 text-center'>
+              <UserPlus
+                className='h-8 w-8 text-(--linear-text-tertiary)'
+                aria-hidden
+              />
               <p className='text-[13px] text-secondary-token'>
                 No contacts yet. Add your first contact to get started.
               </p>
-            </div>
+            </ContentSurfaceCard>
           ) : (
-            <div className='divide-y divide-subtle'>
+            <div className='space-y-1'>
               {contacts.map(contact => (
                 <ContactRow
                   key={contact.id}
@@ -255,8 +292,11 @@ function ContactRow({
     <button
       type='button'
       onClick={onClick}
-      className={`flex items-center gap-3 w-full text-left py-3 px-2 -mx-2 rounded-md transition-colors cursor-pointer ${
-        isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'
+      aria-pressed={isSelected}
+      className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/35 ${
+        isSelected
+          ? 'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+          : 'border-transparent hover:bg-(--linear-bg-surface-0)'
       }`}
     >
       <div className='min-w-0 flex-1'>

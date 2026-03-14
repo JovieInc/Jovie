@@ -205,8 +205,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     <>
       <tr
         className={cn(
-          'group transition-colors duration-150 hover:bg-white/[0.02]',
-          index !== totalRows - 1 && 'border-b border-subtle'
+          'group transition-[background-color,border-color] duration-150 hover:bg-(--linear-bg-surface-1)',
+          index !== totalRows - 1 && 'border-b border-(--linear-border-subtle)'
         )}
       >
         {/* Release info cell */}
@@ -220,7 +220,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
             {/* Title and metadata */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='line-clamp-1 text-[13px] font-[510] tracking-[-0.011em] text-primary-token'>
+                <span className='line-clamp-1 text-[13px] font-[510] tracking-[-0.011em] text-(--linear-text-primary)'>
                   {release.title}
                 </span>
                 {manualOverrideCount > 0 && (

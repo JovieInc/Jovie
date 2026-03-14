@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useCallback } from 'react';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import {
   extractUsernameFromLabel,
   extractUsernameFromUrl,
@@ -22,30 +22,33 @@ export const CreatorProfileSocialLinks = memo(
     }, []);
 
     if (!socialLinks || socialLinks.length === 0) {
-      return <span className='text-xs text-tertiary-token'>—</span>;
+      return (
+        <span className='text-[12px] text-(--linear-text-tertiary)'>—</span>
+      );
     }
 
     return (
-      <>
-        {socialLinks.slice(0, 3).map(link => {
+      <CompactLinkRail
+        items={socialLinks.slice(0, 3).map(link => {
           const username =
             extractUsernameFromUrl(link.url) ??
             extractUsernameFromLabel(link.displayText ?? '') ??
             '';
           const displayUsername = formatUsername(username);
 
-          return (
-            <PlatformPill
-              key={link.id}
-              platformIcon={link.platformType}
-              platformName={link.platform}
-              primaryText={displayUsername || link.platformType}
-              onClick={() => handleOpenLink(link.url)}
-              className='shrink-0'
-            />
-          );
+          return {
+            id: link.id,
+            platformIcon: link.platformType,
+            platformName: link.platform,
+            primaryText: displayUsername || link.platformType,
+            onClick: () => handleOpenLink(link.url),
+          };
         })}
-      </>
+        countLabel='social links'
+        summaryCount={socialLinks.length}
+        summaryAriaLabel={`${socialLinks.length} social links`}
+        maxVisible={3}
+      />
     );
   }
 );

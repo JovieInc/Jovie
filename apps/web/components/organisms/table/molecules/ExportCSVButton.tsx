@@ -22,6 +22,11 @@ import {
   downloadCSVBlob,
   generateTimestampedFilename,
 } from '@/lib/utils/download';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+} from './PageToolbar';
 
 export interface ExportCSVButtonProps<T extends object> {
   /**
@@ -73,6 +78,16 @@ export interface ExportCSVButtonProps<T extends object> {
    * Tooltip label shown on hover. When provided, wraps the button in TooltipShortcut.
    */
   readonly tooltipLabel?: string;
+  /**
+   * Visual chrome preset for dashboard utility toolbars.
+   * @default 'default'
+   */
+  readonly chrome?: 'default' | 'page-toolbar';
+  /**
+   * Render toolbar export action as icon-only.
+   * @default false
+   */
+  readonly iconOnly?: boolean;
 }
 
 export function ExportCSVButton<T extends object>({
@@ -86,6 +101,8 @@ export function ExportCSVButton<T extends object>({
   label = 'Export CSV',
   ariaLabel = 'Export data to CSV file',
   tooltipLabel,
+  chrome = 'default',
+  iconOnly = false,
 }: ExportCSVButtonProps<T>) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -171,11 +188,24 @@ export function ExportCSVButton<T extends object>({
       aria-busy={isExporting}
     >
       {isExporting ? (
-        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+        <Loader2
+          className={cn(
+            chrome === 'page-toolbar' ? PAGE_TOOLBAR_ICON_CLASS : 'h-4 w-4',
+            'animate-spin'
+          )}
+          aria-hidden='true'
+        />
       ) : (
-        <Download className='h-4 w-4' aria-hidden='true' />
+        <Download
+          className={
+            chrome === 'page-toolbar' ? PAGE_TOOLBAR_ICON_CLASS : 'h-4 w-4'
+          }
+          aria-hidden='true'
+        />
       )}
-      <span>{isExporting ? 'Exporting...' : label}</span>
+      <span className={cn(iconOnly && 'sr-only')}>
+        {isExporting ? 'Exporting...' : label}
+      </span>
     </Button>
   );
 

@@ -2,6 +2,7 @@
 
 import { Button, Input } from '@jovie/ui';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import type { ProfileFormProps } from './types';
@@ -99,12 +100,12 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           helpText='Control whether Jovie branding appears on your profile'
           id='branding-toggle'
         >
-          <div className='flex items-center justify-between'>
+          <ContentSurfaceCard className='flex items-center justify-between bg-(--linear-bg-surface-0) px-4 py-3.5'>
             <div className='flex flex-col'>
-              <span className='text-[13px] font-[510] text-primary-token'>
+              <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
                 Show Jovie branding
               </span>
-              <span className='text-[11px] text-secondary-token'>
+              <span className='text-[11px] text-(--linear-text-secondary)'>
                 Display Jovie branding on your profile
               </span>
             </div>
@@ -134,7 +135,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
                 aria-hidden='true'
               />
             </button>
-          </div>
+          </ContentSurfaceCard>
         </FormField>
       )}
 
@@ -156,14 +157,15 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       </Button>
 
       {success && (
-        <output
-          className='bg-green-500/10 border border-green-500/20 rounded-lg p-3 block'
+        <ContentSurfaceCard
+          className='block border-emerald-500/20 bg-emerald-500/5 p-3'
           aria-live='polite'
+          as='output'
         >
-          <p className='text-[13px] text-success'>
+          <p className='text-[13px] text-emerald-600 dark:text-emerald-400'>
             Profile updated successfully!
           </p>
-        </output>
+        </ContentSurfaceCard>
       )}
     </form>
   );

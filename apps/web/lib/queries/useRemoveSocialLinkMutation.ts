@@ -9,6 +9,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchWithTimeoutResponse } from './fetch';
 import { queryKeys } from './keys';
 import { handleMutationError } from './mutation-utils';
 
@@ -25,15 +26,18 @@ interface RemoveSocialLinkResponse {
 async function removeSocialLink(
   input: RemoveSocialLinkInput
 ): Promise<RemoveSocialLinkResponse> {
-  const response = await fetch('/api/dashboard/social-links', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      profileId: input.profileId,
-      linkId: input.linkId,
-      action: 'dismiss',
-    }),
-  });
+  const response = await fetchWithTimeoutResponse(
+    '/api/dashboard/social-links',
+    {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: input.profileId,
+        linkId: input.linkId,
+        action: 'dismiss',
+      }),
+    }
+  );
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as {

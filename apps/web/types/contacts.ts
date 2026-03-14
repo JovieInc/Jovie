@@ -33,7 +33,7 @@ export interface DashboardContactInput {
 }
 
 export interface PublicContactChannel {
-  type: ContactChannel;
+  type: ContactChannel | 'sms';
   encoded: string;
   preferred?: boolean;
 }

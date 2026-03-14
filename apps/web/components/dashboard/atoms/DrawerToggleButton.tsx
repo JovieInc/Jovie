@@ -3,6 +3,7 @@
 import { PanelRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { PageToolbarActionButton } from '@/components/organisms/table';
 import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
 export function DrawerToggleButton({
@@ -18,14 +19,28 @@ export function DrawerToggleButton({
     setIsOpen((tableMeta.rightPanelWidth ?? 0) > 0);
   }, [tableMeta.rightPanelWidth]);
 
-  // Hide when drawer is open — the drawer's X button handles closing
-  if (isOpen) return null;
-
   const Icon = PanelRight;
+
+  if (chrome === 'page-toolbar') {
+    return (
+      <PageToolbarActionButton
+        ariaLabel={ariaLabel}
+        label={label}
+        icon={<Icon className='h-3.5 w-3.5' />}
+        iconOnly
+        active={isOpen}
+        ariaPressed={isOpen}
+        disabled={!tableMeta.toggle}
+        onClick={() => tableMeta.toggle?.()}
+        tooltipLabel={tooltipLabel}
+        className={className}
+      />
+    );
+  }
 
   return (
     <DashboardHeaderActionButton
-      ariaLabel='Toggle contact details'
+      ariaLabel={ariaLabel}
       pressed={isOpen}
       disabled={!tableMeta.toggle}
       onClick={() => tableMeta.toggle?.()}

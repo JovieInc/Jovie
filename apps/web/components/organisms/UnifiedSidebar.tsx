@@ -30,8 +30,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
@@ -223,9 +221,7 @@ function SidebarHeaderNav({
  * No footer — user menu lives in the header.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { state, isMobile, setOpen } = useSidebar();
   const { isAdmin: isUserAdmin } = useDashboardData();
-  const isCollapsed = state === 'closed';
   const pathname = usePathname();
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
@@ -236,7 +232,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   return (
     <Sidebar
       variant='sidebar'
-      collapsible='icon'
+      collapsible='offcanvas'
       className={cn(
         'border-r border-(--linear-border-subtle) bg-(--linear-bg-page)',
         '[--sidebar-width:var(--linear-app-sidebar-width)]',
@@ -272,8 +268,9 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarUpgradeBanner />
-      <SidebarInstallBanner />
+      <div className='mt-auto shrink-0'>
+        <SidebarUpgradeBanner />
+        <SidebarInstallBanner />
 
       <div className='pl-2 pr-3 pb-3 pt-1 group-data-[collapsible=icon]:hidden'>
         <span className='text-2xs text-sidebar-muted select-none'>
@@ -283,18 +280,6 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
             : ''}
         </span>
       </div>
-
-      <SidebarRail />
-
-      {isCollapsed && !isMobile && (
-        <button
-          type='button'
-          aria-label='Expand sidebar'
-          onClick={() => setOpen(true)}
-          className='absolute inset-0 z-10 cursor-pointer bg-transparent'
-          style={{ pointerEvents: 'auto' }}
-        />
-      )}
     </Sidebar>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { formatReleaseDateShort } from '@/lib/discography/formatting';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 interface ProviderInfo {
@@ -56,7 +57,7 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
+      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-(--linear-text-primary)'>
         <Icon
           name='Link'
           className='h-5 w-5 text-(--linear-text-secondary)'
@@ -115,7 +116,7 @@ export function ReleaseEditDialog({
                 );
 
                 return (
-                  <div
+                  <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3 shadow-none'
                   >
@@ -126,7 +127,7 @@ export function ReleaseEditDialog({
                           className='h-4 w-4'
                           aria-label={provider.label}
                         />
-                        <p className='text-[13px] font-[510] text-primary-token'>
+                        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                           {provider.label}
                         </p>
                       </div>
@@ -152,27 +153,25 @@ export function ReleaseEditDialog({
                         data-testid={`provider-input-${release.id}-${provider.key}`}
                       />
                       <div className='flex items-center justify-between gap-2'>
-                        <Button
-                          variant='primary'
-                          size='sm'
+                        <DrawerButton
+                          tone='primary'
                           disabled={isSaving || !value.trim()}
                           data-testid={`save-provider-${release.id}-${provider.key}`}
                           onClick={() => onSave(provider.key)}
                         >
                           Save
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
+                        </DrawerButton>
+                        <DrawerButton
+                          tone='ghost'
                           disabled={isSaving}
                           data-testid={`reset-provider-${release.id}-${provider.key}`}
                           onClick={() => onReset(provider.key)}
                         >
                           Reset
-                        </Button>
+                        </DrawerButton>
                       </div>
-                    </div>
-                  </div>
+                    </DrawerFormField>
+                  </DrawerSurfaceCard>
                 );
               })}
             </div>
@@ -180,9 +179,7 @@ export function ReleaseEditDialog({
         ) : null}
       </DialogBody>
       <DialogActions className='justify-end'>
-        <Button variant='secondary' size='sm' onClick={onClose}>
-          Done
-        </Button>
+        <DrawerButton onClick={onClose}>Done</DrawerButton>
       </DialogActions>
     </Dialog>
   );

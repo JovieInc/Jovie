@@ -1,10 +1,9 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, ExternalLink, Users } from 'lucide-react';
-import Link from 'next/link';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   AdminTableHeader,
@@ -13,15 +12,23 @@ import {
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import {
   type ContextMenuItemType,
   convertContextMenuItems,
   ExportCSVButton,
+  PAGE_TOOLBAR_END_GROUP_CLASS,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
   TableBulkActionsToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import {
@@ -29,7 +36,7 @@ import {
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
-import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminUsersInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
@@ -74,21 +81,24 @@ function AdminUserMobileCard({
   const actionItems = convertContextMenuItems(contextMenuItems);
 
   return (
-    <article className='rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
-      <div className='mb-3 flex items-start justify-between gap-3'>
+    <ContentSurfaceCard
+      as='article'
+      className='overflow-hidden bg-(--linear-bg-surface-0) p-0'
+    >
+      <div className='flex items-start justify-between gap-3 border-b border-(--linear-border-subtle) px-4 py-3'>
         <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
           <input
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded border-subtle text-accent focus:ring-accent'
+            className='mt-0.5 h-4 w-4 rounded-[4px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
-            <p className='truncate text-sm font-semibold text-primary-token'>
+            <p className='truncate text-[14px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
               {user.name || 'Email Subscriber'}
             </p>
-            <p className='truncate text-xs text-secondary-token'>
+            <p className='truncate text-[12px] text-(--linear-text-secondary)'>
               {user.email ?? 'No email'}
             </p>
           </div>
@@ -96,7 +106,7 @@ function AdminUserMobileCard({
         <TableActionMenu items={actionItems} align='end' />
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 text-xs'>
+      <div className='flex flex-wrap items-center gap-2 px-4 py-3 text-[12px]'>
         <Badge
           size='sm'
           variant={user.plan === 'pro' ? 'primary' : 'secondary'}
@@ -112,16 +122,21 @@ function AdminUserMobileCard({
             Active
           </Badge>
         )}
-        <span className='text-secondary-token'>
+        <span className='text-(--linear-text-secondary)'>
           Joined {user.createdAt ? dateFormatter.format(user.createdAt) : '—'}
         </span>
       </div>
-    </article>
+    </ContentSurfaceCard>
   );
 }
 
 export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const { users: initialUsers, pageSize, total, search, sort } = props;
+  const [searchTerm, setSearchTerm] = useState(search);
+
+  useEffect(() => {
+    setSearchTerm(search);
+  }, [search]);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useAdminUsersInfiniteQuery({
@@ -142,10 +157,70 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Detail drawer state
   const [selectedUser, setSelectedUser] = useState<AdminUserRow | null>(null);
+  const { setTableMeta } = useTableMeta();
+  const { setHeaderActions } = useSetHeaderActions();
+  const usersRef = useRef(users);
+  usersRef.current = users;
 
   const handleRowClick = useCallback((user: AdminUserRow) => {
     setSelectedUser(prev => (prev?.id === user.id ? null : user));
   }, []);
+
+  useEffect(() => {
+    const toggle = () => {
+      if (selectedUser) {
+        setSelectedUser(null);
+        return;
+      }
+
+      const firstUser = usersRef.current[0];
+      if (firstUser) {
+        setSelectedUser(firstUser);
+      }
+    };
+
+    setTableMeta({
+      rowCount: users.length,
+      toggle: users.length > 0 ? toggle : null,
+      rightPanelWidth: selectedUser ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [selectedUser, users.length]);
+
+  const headerActions = useMemo(
+    () => (
+      <DashboardHeaderActionGroup
+        trailing={
+          <DrawerToggleButton
+            ariaLabel='Toggle user details'
+            label='Details'
+            tooltipLabel='Details'
+          />
+        }
+      >
+        <HeaderSearchAction
+          action={APP_ROUTES.ADMIN_USERS}
+          clearHref={`${APP_ROUTES.ADMIN_USERS}?sort=${sort}`}
+          searchValue={searchTerm}
+          onSearchValueChange={setSearchTerm}
+          placeholder='Search by email, name, or handle'
+          ariaLabel='Search users by email, name, or handle'
+          submitAriaLabel='Search users'
+          hiddenInputs={[{ name: 'sort', value: sort }]}
+          tooltipLabel='Search'
+        />
+      </DashboardHeaderActionGroup>
+    ),
+    [searchTerm, sort]
+  );
+
+  useEffect(() => {
+    setHeaderActions(headerActions);
+
+    return () => {
+      setHeaderActions(null);
+    };
+  }, [headerActions, setHeaderActions]);
 
   // Row selection
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
@@ -436,46 +511,28 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   title='Users'
                   subtitle='Review lifecycle state, profile completion, and suppression health.'
                 />
-                <AdminTableSubheader>
-                  <div className='flex flex-wrap items-center justify-between gap-2 sm:gap-3'>
-                    <div className='text-xs text-secondary-token tabular-nums'>
-                      <span className='hidden sm:inline'>Showing </span>
-                      {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                      {total.toLocaleString()}
-                      <span className='hidden sm:inline'> users</span>
+                <AdminTableSubheader
+                  start={
+                    <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                      Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                      {total.toLocaleString()} users
                     </div>
-                    <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
-                      <form
-                        action={APP_ROUTES.ADMIN_USERS}
-                        method='get'
-                        className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
-                      >
-                        <input type='hidden' name='sort' value={sort} />
-                        <Input
-                          name='q'
-                          defaultValue={search}
-                          placeholder='Search by email, name, or handle'
-                          className='w-full sm:w-[280px]'
-                        />
-                        <Button type='submit' size='sm' variant='secondary'>
-                          Search
-                        </Button>
-                        {search ? (
-                          <Button asChild size='sm' variant='ghost'>
-                            <Link href='?'>Clear</Link>
-                          </Button>
-                        ) : null}
-                      </form>
+                  }
+                  end={
+                    <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
                       <ExportCSVButton<AdminUserRow>
                         getData={() => users}
                         columns={usersCSVColumns}
                         filename={USERS_CSV_FILENAME_PREFIX}
                         disabled={users.length === 0}
                         ariaLabel='Export users to CSV file'
+                        chrome='page-toolbar'
+                        iconOnly
+                        tooltipLabel='Export'
                       />
                     </div>
-                  </div>
-                </AdminTableSubheader>
+                  }
+                />
               </>
             }
           >
@@ -483,17 +540,19 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
               isMobile ? (
                 <div className='space-y-3 p-3'>
                   {users.length === 0 ? (
-                    <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                    <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='font-medium'>No users found</div>
-                        <div className='text-xs'>
+                        <div className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+                          No users found
+                        </div>
+                        <div className='text-[12px] text-(--linear-text-secondary)'>
                           {search
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
                       </div>
-                    </div>
+                    </ContentSurfaceCard>
                   ) : (
                     users.map(user => (
                       <AdminUserMobileCard
@@ -528,17 +587,19 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   rowSelection={rowSelection}
                   isLoading={false}
                   emptyState={
-                    <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                    <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='font-medium'>No users found</div>
-                        <div className='text-xs'>
+                        <div className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+                          No users found
+                        </div>
+                        <div className='text-[12px] text-(--linear-text-secondary)'>
                           {search
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
                         </div>
                       </div>
-                    </div>
+                    </ContentSurfaceCard>
                   }
                   getRowId={row => row.id}
                   getRowClassName={getRowClassName}

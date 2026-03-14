@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useMarkLeadDmSentMutation } from '@/lib/queries';
 
 interface DmQueueLead {
   id: string;
@@ -20,9 +21,9 @@ interface DmQueueCardProps {
 }
 
 export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
-  const [marking, setMarking] = useState(false);
   const [copied, setCopied] = useState(false);
   const [markedDone, setMarkedDone] = useState(false);
+  const markDmSentMutation = useMarkLeadDmSentMutation();
 
   async function handleCopy() {
     if (!lead.dmCopy) return;
@@ -37,19 +38,13 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
   }
 
   async function handleMarkSent() {
-    setMarking(true);
     try {
-      const res = await fetch(`/api/admin/leads/${lead.id}/dm-sent`, {
-        method: 'PATCH',
-      });
-      if (!res.ok) throw new Error('Failed to mark as sent');
+      await markDmSentMutation.mutateAsync(lead.id);
       setMarkedDone(true);
       toast.success('Marked as DM sent');
       onMarkedSent();
     } catch {
       toast.error('Failed to mark as sent');
-    } finally {
-      setMarking(false);
     }
   }
 
@@ -115,9 +110,9 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           variant='primary'
           size='sm'
           onClick={() => void handleMarkSent()}
-          disabled={marking || markedDone}
+          disabled={markDmSentMutation.isPending || markedDone}
         >
-          {marking ? (
+          {markDmSentMutation.isPending ? (
             <Loader2 className='mr-1.5 size-3.5 animate-spin' />
           ) : (
             <Check className='mr-1.5 size-3.5' />

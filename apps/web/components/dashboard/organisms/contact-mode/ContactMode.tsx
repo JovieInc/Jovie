@@ -13,6 +13,8 @@ import { Mail, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   getContactRoleLabel,
@@ -56,10 +58,10 @@ function ContactListItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className='group flex items-center justify-between gap-4 rounded-lg border border-subtle bg-surface-1 px-4 py-3 transition-colors hover:bg-surface-2'>
+        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <p className='text-[13px] font-[510] text-primary-token'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                 {roleLabel}
               </p>
               {territorySummary !== 'General' && (
@@ -67,7 +69,7 @@ function ContactListItem({
               )}
             </div>
             {secondaryLabel && (
-              <p className='truncate text-[13px] text-secondary-token'>
+              <p className='truncate text-[13px] text-(--linear-text-secondary)'>
                 {secondaryLabel}
               </p>
             )}
@@ -80,7 +82,7 @@ function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0'
+                  className='h-8 w-8 p-0 text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
                   title={`Email ${contact.email}`}
                 >
                   <a href={emailHref ?? '#'}>
@@ -94,7 +96,7 @@ function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0'
+                  className='h-8 w-8 p-0 text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
                   title={`Call ${contact.phone}`}
                 >
                   <a href={phoneHref ?? '#'}>
@@ -105,7 +107,7 @@ function ContactListItem({
               )}
             </div>
           )}
-        </div>
+        </ContentSurfaceCard>
       </ContextMenuTrigger>
 
       <ContextMenuContent>
@@ -165,7 +167,9 @@ export function ContactMode({
   if (hasError) {
     return (
       <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center'>
-        <p className='text-secondary-token'>Unable to load contacts</p>
+        <p className='text-(--linear-text-secondary)'>
+          Unable to load contacts
+        </p>
         <Button size='sm' variant='secondary' onClick={() => router.refresh()}>
           Try again
         </Button>
@@ -176,7 +180,7 @@ export function ContactMode({
   if (activeContacts.length === 0) {
     return (
       <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center'>
-        <p className='text-secondary-token'>No contacts yet</p>
+        <p className='text-(--linear-text-secondary)'>No contacts yet</p>
         <Button
           size='sm'
           variant='secondary'
@@ -189,11 +193,12 @@ export function ContactMode({
   }
 
   return (
-    <div className='flex h-full flex-col'>
-      <div className='border-b border-subtle px-4 py-3'>
-        <h1 className='text-[13px] font-[590] text-primary-token'>Contacts</h1>
-        <p className='text-[13px] text-secondary-token'>{artistName}</p>
-      </div>
+    <ContentSurfaceCard className='flex h-full flex-col overflow-hidden'>
+      <ContentSectionHeader
+        title='Contacts'
+        subtitle={artistName}
+        className='min-h-0 px-4 py-3'
+      />
 
       <div className='flex-1 overflow-y-auto'>
         <div className='space-y-2 p-4'>
@@ -208,16 +213,16 @@ export function ContactMode({
         </div>
       </div>
 
-      <div className='border-t border-subtle p-4'>
+      <div className='border-t border-(--linear-app-frame-seam) p-4'>
         <Button
           size='sm'
           variant='ghost'
           onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
-          className='w-full text-[13px] text-secondary-token'
+          className='w-full text-[13px] text-(--linear-text-secondary)'
         >
           Manage contacts
         </Button>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }

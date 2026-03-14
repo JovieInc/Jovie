@@ -65,26 +65,14 @@ function SidebarRangeToggle({
   readonly onChange: (v: DemoRange) => void;
 }) {
   return (
-    <div className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5'>
-      {RANGE_OPTIONS.map(opt => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type='button'
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              'rounded-full px-3 py-1 text-[13px] font-[510] transition-all duration-150',
-              active
-                ? 'bg-surface-3 text-primary-token'
-                : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <AppSegmentControl
+      value={value}
+      onValueChange={value => onChange(value as DemoRange)}
+      options={RANGE_OPTIONS}
+      size='sm'
+      className='shrink-0'
+      aria-label='Analytics time range'
+    />
   );
 }
 
@@ -100,14 +88,14 @@ function EngagementMetric({
   readonly value: string;
 }) {
   return (
-    <div className='flex min-w-0 flex-1 flex-col rounded-xl border border-subtle bg-surface-1 px-3 py-3'>
-      <p className='text-3xl font-[590] tracking-[-0.02em] text-primary-token tabular-nums'>
+    <DrawerSurfaceCard className='flex min-w-0 flex-1 flex-col px-3 py-3'>
+      <p className='text-3xl font-[590] tracking-[-0.02em] text-(--linear-text-primary) tabular-nums'>
         {value}
       </p>
-      <p className='mt-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='mt-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         {label}
       </p>
-    </div>
+    </DrawerSurfaceCard>
   );
 }
 
@@ -136,20 +124,20 @@ function FunnelSection() {
 
   return (
     <div className='space-y-2'>
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         Funnel
       </p>
       <div className='space-y-1.5'>
         {stages.map((stage, i) => (
           <div key={stage.label}>
             <div
-              className='flex items-center justify-between rounded-lg bg-surface-2 px-3 py-2'
+              className='flex items-center justify-between rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-3 py-2'
               style={{ width: stage.width }}
             >
-              <span className='text-[13px] text-secondary-token'>
+              <span className='text-[13px] text-(--linear-text-secondary)'>
                 {stage.label}
               </span>
-              <span className='text-[13px] font-[510] text-primary-token tabular-nums'>
+              <span className='text-[13px] font-[510] text-(--linear-text-primary) tabular-nums'>
                 {numberFormatter.format(stage.value)}
               </span>
             </div>
@@ -160,7 +148,7 @@ function FunnelSection() {
                   height='12'
                   viewBox='0 0 8 12'
                   fill='none'
-                  className='text-tertiary-token'
+                  className='text-(--linear-text-tertiary)'
                   aria-hidden='true'
                 >
                   <path
@@ -171,7 +159,7 @@ function FunnelSection() {
                     strokeLinejoin='round'
                   />
                 </svg>
-                <span className='text-[11px] text-tertiary-token tabular-nums'>
+                <span className='text-[11px] text-(--linear-text-tertiary) tabular-nums'>
                   {i === 0
                     ? `${((MOCK_ANALYTICS.funnel.uniqueVisitors / MOCK_ANALYTICS.funnel.profileViews) * 100).toFixed(0)}%`
                     : `${((MOCK_ANALYTICS.funnel.followers / MOCK_ANALYTICS.funnel.uniqueVisitors) * 100).toFixed(0)}%`}
@@ -201,18 +189,18 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.name}
-          className='group flex h-8 items-center justify-between rounded-lg px-2'
+          className='group flex h-8 items-center justify-between rounded-[7px] px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>
+            <span className='w-3 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
               {index + 1}
             </span>
-            <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
+            <IconComponent className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
+            <span className='truncate text-[13px] text-(--linear-text-secondary) transition-colors group-hover:text-(--linear-text-primary)'>
               {item.name}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-[510] text-primary-token tabular-nums'>
+          <span className='ml-2 text-[13px] font-[510] text-(--linear-text-primary) tabular-nums'>
             {numberFormatter.format(item.count)}
           </span>
         </li>
@@ -255,7 +243,7 @@ export function DemoAnalyticsSidebar({
     >
       <div className='space-y-4'>
         {/* Engagement metrics */}
-        <div className='flex gap-2'>
+        <div className='grid grid-cols-3 gap-2'>
           <EngagementMetric
             label='Total Clicks'
             value={numberFormatter.format(
@@ -290,7 +278,7 @@ export function DemoAnalyticsSidebar({
         </div>
 
         {/* Ranked lists */}
-        <div className='min-h-[212px] rounded-xl border border-subtle bg-surface-0 p-2'>
+        <DrawerSurfaceCard className='min-h-[212px] p-2'>
           {activeTab === 'cities' && (
             <RankedList icon={MapPin} items={MOCK_ANALYTICS.topCities} />
           )}
@@ -300,32 +288,34 @@ export function DemoAnalyticsSidebar({
           {activeTab === 'links' && (
             <RankedList icon={Link2} items={MOCK_ANALYTICS.topLinks} />
           )}
-        </div>
+        </DrawerSurfaceCard>
 
         {/* Extra engagement stats */}
-        <div className='rounded-xl border border-subtle bg-surface-1 p-3'>
-          <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+        <DrawerSurfaceCard className='p-3'>
+          <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Engagement
           </p>
-          <div className='grid grid-cols-2 gap-3'>
+          <div className='grid grid-cols-2 divide-x divide-(--linear-border-subtle)'>
             <div>
-              <p className='text-xl font-[590] text-primary-token tabular-nums'>
+              <p className='text-xl font-[590] text-(--linear-text-primary) tabular-nums'>
                 {MOCK_ANALYTICS.engagement.captureRate}
               </p>
-              <p className='text-[11px] text-tertiary-token'>Capture Rate</p>
+              <p className='text-[11px] text-(--linear-text-tertiary)'>
+                Capture Rate
+              </p>
             </div>
-            <div>
-              <p className='text-xl font-[590] text-primary-token tabular-nums'>
+            <div className='pl-3'>
+              <p className='text-xl font-[590] text-(--linear-text-primary) tabular-nums'>
                 {numberFormatter.format(
                   MOCK_ANALYTICS.engagement.identifiedUsers
                 )}
               </p>
-              <p className='text-[11px] text-tertiary-token'>
+              <p className='text-[11px] text-(--linear-text-tertiary)'>
                 Identified Users
               </p>
             </div>
           </div>
-        </div>
+        </DrawerSurfaceCard>
       </div>
     </EntitySidebarShell>
   );

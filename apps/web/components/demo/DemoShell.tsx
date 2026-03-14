@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import {
   Archive,
   ChevronDown,
@@ -14,6 +13,7 @@ import {
   ListFilter,
   MoreHorizontal,
   Music2,
+  PanelRightOpen,
   Plus,
   Repeat,
   SlidersHorizontal,
@@ -21,7 +21,10 @@ import {
   Users,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import {
   Sidebar,
@@ -39,8 +42,12 @@ import {
   SidebarMenuSubItem,
   SidebarProvider,
 } from '@/components/organisms/Sidebar';
+import {
+  PageToolbar,
+  PageToolbarActionButton,
+  PageToolbarTabButton,
+} from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
-import { cn } from '@/lib/utils';
 import type { DemoTab } from './demo-types';
 
 interface DemoShellProps {
@@ -69,9 +76,6 @@ const TAB_LABEL: Record<DemoTab, string> = {
   settings: 'Settings',
 };
 
-const toolbarBtnClass =
-  'flex items-center justify-center h-7 px-2 text-tertiary-token hover:text-primary-token transition-colors duration-normal rounded-sm hover:bg-interactive-hover gap-1.5 text-[13px] [font-weight:var(--font-weight-medium)]';
-
 const VIEW_TABS = ['All Releases', 'Active', 'Backlog'] as const;
 
 export function DemoShell({
@@ -81,6 +85,17 @@ export function DemoShell({
   rightPanel,
   containerClassName,
 }: Readonly<DemoShellProps>) {
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(() =>
+    Boolean(rightPanel)
+  );
+  const hasRightPanel = Boolean(rightPanel);
+
+  useEffect(() => {
+    if (hasRightPanel) {
+      setIsRightPanelOpen(true);
+    }
+  }, [hasRightPanel]);
+
   return (
     <SidebarProvider
       defaultOpen
@@ -123,7 +138,7 @@ export function DemoShell({
                       >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='text-[10px] text-secondary-token bg-interactive-hover rounded-[2px] border border-subtle px-1 py-px leading-none [font-weight:var(--font-weight-medium)]'>
+                        <span className='rounded-[2px] border border-(--linear-border-default) bg-(--linear-bg-surface-2) px-1 py-px text-[10px] leading-none text-(--linear-text-secondary) [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -304,7 +319,7 @@ export function DemoShell({
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
                 href={APP_ROUTES.SIGNUP}
-                className='flex h-7 items-center justify-center rounded-sm bg-interactive-hover border border-subtle text-[13px] text-secondary-token hover:text-primary-token hover:bg-interactive-active transition-colors [font-weight:var(--font-weight-medium)]'
+                className='flex h-7 items-center justify-center rounded-sm border border-(--linear-border-default) bg-(--linear-bg-surface-2) text-[13px] text-(--linear-text-secondary) transition-colors [font-weight:var(--font-weight-medium)] hover:bg-(--linear-bg-surface-3) hover:text-(--linear-text-primary)'
               >
                 Sign up for Jovie
               </a>
@@ -312,76 +327,114 @@ export function DemoShell({
           </Sidebar>
         }
         header={
-          <header className='flex h-11 shrink-0 items-center justify-between border-b border-subtle px-5 md:px-6'>
-            <div className='flex items-center gap-4'>
-              {/* Breadcrumb */}
-              <div className='flex items-center text-[13px]'>
-                <span className='text-tertiary-token'>Sora Vale</span>
-                <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
-                <span className='font-medium text-primary-token'>
+          <>
+            <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-[var(--linear-app-header-padding-x)]'>
+              <div className='flex min-w-0 items-center gap-1 text-[13px]'>
+                <span className='truncate text-(--linear-text-tertiary)'>
+                  Sora Vale
+                </span>
+                <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
+                <span className='truncate font-[510] text-(--linear-text-primary)'>
                   {TAB_LABEL[activeTab]}
                 </span>
               </div>
-
-              {/* View tabs */}
-              {activeTab === 'releases' && (
-                <div className='flex items-center gap-0.5 ml-2'>
-                  {VIEW_TABS.map((tab, i) => (
-                    <button
-                      key={tab}
-                      type='button'
-                      className={cn(
-                        'px-2 py-0.5 text-[13px] rounded-sm transition-colors duration-normal',
-                        i === 0
-                          ? 'text-primary-token bg-interactive-hover [font-weight:var(--font-weight-medium)]'
-                          : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
-                      )}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                  <button
-                    type='button'
-                    className='px-1 py-0.5 text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover rounded-sm transition-colors duration-normal'
-                    aria-label='Add view'
-                  >
-                    <Plus className='size-3.5' />
-                  </button>
-                </div>
-              )}
-            </div>
+              <DashboardHeaderActionGroup
+                trailing={
+                  hasRightPanel ? (
+                    <DashboardHeaderActionButton
+                      ariaLabel={
+                        isRightPanelOpen
+                          ? 'Hide details panel'
+                          : 'Show details panel'
+                      }
+                      icon={
+                        <PanelRightOpen
+                          className='size-3.5'
+                          aria-hidden='true'
+                        />
+                      }
+                      iconOnly
+                      pressed={isRightPanelOpen}
+                      onClick={() => setIsRightPanelOpen(open => !open)}
+                      tooltipLabel={
+                        isRightPanelOpen
+                          ? 'Hide Details Panel'
+                          : 'Show Details Panel'
+                      }
+                    />
+                  ) : null
+                }
+              >
+                {activeTab === 'releases' ? (
+                  <DashboardHeaderActionButton
+                    ariaLabel='Create release'
+                    icon={<Plus className='size-3.5' aria-hidden='true' />}
+                    iconOnly
+                    tooltipLabel='New Release'
+                    className='h-8 w-8'
+                  />
+                ) : null}
+              </DashboardHeaderActionGroup>
+            </header>
 
             {(activeTab === 'releases' || activeTab === 'audience') && (
-              <div className='flex items-center gap-2'>
-                <div className='flex items-center mr-2 gap-1'>
-                  <button
-                    type='button'
-                    className={toolbarBtnClass}
-                    aria-label='Open filter menu'
-                  >
-                    <ListFilter className='size-3.5' />
-                    <span>Filter</span>
-                  </button>
-                  <button
-                    type='button'
-                    className={toolbarBtnClass}
-                    aria-label='Open display options'
-                  >
-                    <SlidersHorizontal className='size-3.5' />
-                    <span>Display</span>
-                  </button>
-                </div>
-                {activeTab === 'releases' && (
-                  <Button size='sm' className='h-7 text-xs px-2.5'>
-                    Add release
-                  </Button>
-                )}
-              </div>
+              <PageToolbar
+                start={
+                  activeTab === 'releases' ? (
+                    <>
+                      {VIEW_TABS.map((tab, i) => (
+                        <PageToolbarTabButton
+                          key={tab}
+                          label={tab}
+                          active={i === 0}
+                        />
+                      ))}
+                      <PageToolbarActionButton
+                        label='Add view'
+                        icon={<Plus className='size-3.5' aria-hidden='true' />}
+                        iconOnly
+                        tooltipLabel='Add View'
+                        ariaLabel='Add view'
+                      />
+                    </>
+                  ) : null
+                }
+                end={
+                  <>
+                    <PageToolbarActionButton
+                      label='Filter'
+                      icon={
+                        <ListFilter
+                          className='size-3.5'
+                          strokeWidth={2}
+                          aria-hidden='true'
+                        />
+                      }
+                      iconOnly
+                      tooltipLabel='Filter'
+                      ariaLabel='Open filter menu'
+                    />
+                    <PageToolbarActionButton
+                      label='Display'
+                      icon={
+                        <SlidersHorizontal
+                          className='size-3.5'
+                          strokeWidth={2}
+                          aria-hidden='true'
+                        />
+                      }
+                      iconOnly
+                      tooltipLabel='Display'
+                      ariaLabel='Open display options'
+                    />
+                  </>
+                }
+              />
             )}
-          </header>
+          </>
         }
         main={children}
-        rightPanel={rightPanel}
+        rightPanel={isRightPanelOpen ? rightPanel : undefined}
         isTableRoute={activeTab === 'releases' || activeTab === 'audience'}
       />
     </SidebarProvider>

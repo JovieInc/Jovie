@@ -2,11 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
-import {
-  aiChatDailyFreeLimiter,
-  aiChatDailyGrowthLimiter,
-  aiChatDailyProLimiter,
-} from '@/lib/rate-limit';
+import { aiChatDailyPlanAwareLimiter } from '@/lib/rate-limit/limiters';
 import { getRedis } from '@/lib/redis';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
@@ -37,12 +33,6 @@ function resolvePlan(
     return plan;
   }
   return 'free';
-}
-
-function getDailyLimiter(plan: 'free' | 'pro' | 'growth') {
-  if (plan === 'growth') return aiChatDailyGrowthLimiter;
-  if (plan === 'pro') return aiChatDailyProLimiter;
-  return aiChatDailyFreeLimiter;
 }
 
 async function readCachedChatUsage(
@@ -113,8 +103,7 @@ export async function GET() {
   const plan = resolvePlan(billing.data?.plan);
   const entitlements = getEntitlements(plan);
   const dailyLimit = entitlements.limits.aiDailyMessageLimit;
-  const limiter = getDailyLimiter(plan);
-  const status = limiter.getStatus(userId);
+  const status = aiChatDailyPlanAwareLimiter.getStatus(userId, plan);
   const remaining = Math.max(0, Math.min(dailyLimit, status.remaining));
   const used = Math.max(0, dailyLimit - remaining);
   const warningThreshold = plan === 'free' ? 2 : 5;

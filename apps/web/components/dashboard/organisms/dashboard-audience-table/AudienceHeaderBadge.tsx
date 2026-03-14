@@ -1,6 +1,5 @@
 'use client';
 
-import { Ghost, UserCheck, Users } from 'lucide-react';
 import { memo } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import type { AudienceView } from './types';
@@ -16,11 +15,11 @@ interface AudienceHeaderBadgeProps {
 
 const VIEW_OPTIONS: {
   value: AudienceView;
-  Icon: typeof Users;
+  icon: string;
 }[] = [
-  { value: 'all', Icon: Users },
-  { value: 'identified', Icon: UserCheck },
-  { value: 'anonymous', Icon: Ghost },
+  { value: 'all', icon: 'Users' },
+  { value: 'identified', icon: 'User' },
+  { value: 'anonymous', icon: 'EyeOff' },
 ];
 
 export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
@@ -35,13 +34,13 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
       : null;
 
   const labels: Record<AudienceView, string> = {
-    all: totalAudienceCount !== null ? `All (${totalAudienceCount})` : 'All',
+    all: totalAudienceCount === null ? 'All' : `All (${totalAudienceCount})`,
     identified:
-      subscriberCount !== null
-        ? `Identified (${subscriberCount})`
-        : 'Identified',
+      subscriberCount === null
+        ? 'Identified'
+        : `Identified (${subscriberCount})`,
     anonymous:
-      anonymousCount !== null ? `Anonymous (${anonymousCount})` : 'Anonymous',
+      anonymousCount === null ? 'Anonymous' : `Anonymous (${anonymousCount})`,
   };
 
   return (

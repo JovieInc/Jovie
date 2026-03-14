@@ -10,10 +10,10 @@ export function BillingHeader({ plan }: { readonly plan: string | null }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: LINEAR_EASE }}
     >
-      <h1 className='text-3xl font-[590] tracking-[-0.022em] text-primary-token'>
+      <h1 className='text-[24px] font-[620] tracking-[-0.03em] text-(--linear-text-primary)'>
         Billing
       </h1>
-      <p className='mt-2 text-secondary-token'>
+      <p className='mt-2 text-[13px] text-(--linear-text-secondary)'>
         Manage your {getPlanDisplayName(plan)} plan, compare options, and review
         billing history.
       </p>

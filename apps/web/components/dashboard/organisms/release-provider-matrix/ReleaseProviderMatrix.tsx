@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
   lazy,
@@ -20,15 +19,18 @@ import {
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
+import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
 import { usePlanGate } from '@/lib/queries/usePlanGate';
 import { cn } from '@/lib/utils';
@@ -101,7 +103,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
-  const [_amArtistName, setAmArtistName] = useState(appleMusicArtistName);
+  const [, setAmArtistName] = useState(appleMusicArtistName);
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {
@@ -167,7 +169,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       durationMs: number | null;
       isrc: string | null;
       isExplicit: boolean;
-      providers: Array<{ key: string; label: string; url: string }>;
+      providers: Array<{ key: ProviderKey; label: string; url: string }>;
       releaseId: string;
       previewUrl?: string | null;
       audioUrl?: string | null;
@@ -197,15 +199,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Table display preferences (column visibility)
-  const {
-    columnVisibility,
-    rowHeight,
-    availableColumns,
-    onColumnVisibilityChange,
-    resetToDefaults,
-    groupByYear,
-    onGroupByYearChange,
-  } = useReleaseTablePreferences();
+  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
+    useReleaseTablePreferences();
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
@@ -217,11 +212,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const searchInputRef = useCallback((node: HTMLInputElement | null) => {
-    if (node) node.focus();
-  }, []);
 
   // Apply filters and search to rows
   const filteredRows = useMemo(() => {
@@ -508,7 +499,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   ]);
 
   // Set header badge (DSP pills on left) and actions (drawer toggle on right)
-  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+  const { setHeaderActions } = useSetHeaderActions();
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
@@ -529,7 +520,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <DrawerToggleButton className='h-[var(--linear-app-control-height-sm)] w-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)' />
       </div>
     ),
-    [handleNewRelease, canCreateManualReleases]
+    [canCreateManualReleases, handleNewRelease, searchQuery]
   );
 
   // Header search input — shown when search is open
@@ -555,18 +546,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
 
   useEffect(() => {
-    // Search input or null (for default breadcrumb) on left side of header
-    setHeaderBadge(headerBadgeContent);
-
-    // New Release button + drawer toggle on right side (use memoized element to prevent infinite loops)
+    // New Release button on the right side (use memoized element to prevent infinite loops)
     setHeaderActions(headerActions);
 
     return () => {
-      setHeaderBadge(null);
       setHeaderActions(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [headerBadgeContent, headerActions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
+  }, [headerActions]);
 
   // Register right panel with AuthShell - supports both release and track drawers
   const sidebarPanel = useMemo(() => {
@@ -578,9 +565,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return (
         <Suspense
           fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
+            <DrawerLoadingSkeleton
+              ariaLabel='Loading track details'
+              width={SIDEBAR_WIDTH}
+              showTabs={false}
+              contentRows={5}
             />
           }
         >
@@ -597,9 +586,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return (
         <Suspense
           fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
+            <DrawerLoadingSkeleton
+              ariaLabel='Loading release details'
+              width={SIDEBAR_WIDTH}
+              showTabs
+              contentRows={6}
             />
           }
         >
@@ -714,44 +705,36 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             <ReleaseTableSubheader
               releases={filteredRows}
               selectedIds={selectedIds}
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={onColumnVisibilityChange}
-              availableColumns={availableColumns}
-              onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
               groupByYear={groupByYear}
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
-              isSearchOpen={isSearchOpen}
-              onSearchToggle={() => setIsSearchOpen(open => !open)}
             />
           )}
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            {showImportProgress && (
+            {showReleasesTable && (
               <ImportProgressBanner
                 artistName={artistName}
                 importedCount={importedCount}
+                visible={showImportProgress}
               />
             )}
-
-            {showEmptyState && (
-              <ReleasesEmptyState
-                onConnectSpotify={() => setSpotifySearchOpen(true)}
-              />
-            )}
-
-            {/* Apple Music sync status banner — only when not already connected */}
             {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
               <AppleMusicSyncBanner
                 profileId={rows[0].profileId}
                 spotifyConnected={isConnected}
                 releases={rows}
-                className='mx-4 mt-2'
                 onMatchStatusChange={handleMatchStatusChange}
+                className='mx-4 mt-2'
+              />
+            )}
+            {showEmptyState && (
+              <ReleasesEmptyState
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
               />
             )}
 
@@ -804,25 +787,24 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
               <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-xl bg-surface-2'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
                   <Icon
                     name='Disc3'
-                    className='h-8 w-8 text-tertiary-token'
+                    className='h-8 w-8 text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
                 </div>
-                <h3 className='mt-4 text-lg font-[590] text-primary-token'>
+                <h3 className='mt-4 text-lg font-[590] text-(--linear-text-primary)'>
                   No releases yet
                 </h3>
-                <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
+                <p className='mt-1 max-w-sm text-[13px] text-(--linear-text-secondary)'>
                   {canCreateManualReleases
                     ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
                     : 'Sync your releases from Spotify to start generating smart links.'}
                 </p>
                 <div className='mt-4 flex items-center gap-3'>
-                  <Button
-                    variant='primary'
-                    size='sm'
+                  <DrawerButton
+                    tone='primary'
                     disabled={isSyncing}
                     onClick={
                       experienceAdapter?.onSync
@@ -841,11 +823,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                       aria-hidden='true'
                     />
                     {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                  </Button>
+                  </DrawerButton>
                   {canCreateManualReleases && (
-                    <Button
-                      variant='secondary'
-                      size='sm'
+                    <DrawerButton
                       onClick={handleNewRelease}
                       className='inline-flex items-center gap-2'
                       data-testid='create-release-empty-state'
@@ -856,7 +836,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                         aria-hidden='true'
                       />
                       Create Release
-                    </Button>
+                    </DrawerButton>
                   )}
                 </div>
               </div>
@@ -873,7 +853,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onArtistSelect={handleAppleMusicConnect}
       />
 
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          spotifySearchOpen ? (
+            <DialogLoadingSkeleton
+              open={spotifySearchOpen}
+              onClose={() => setSpotifySearchOpen(false)}
+              size='lg'
+              rows={3}
+            />
+          ) : null
+        }
+      >
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}

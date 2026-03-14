@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
@@ -31,6 +30,8 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/components/release/AlbumArtworkContextMenu';
+import { formatReleaseArtistLine } from '@/lib/discography/formatting';
+import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -118,8 +119,8 @@ function ReleaseEntityHeader({
   const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
 
   return (
-    <div className='space-y-3'>
-      <div className='flex items-start gap-3'>
+    <div className='space-y-3.5'>
+      <div className='flex items-start gap-3.5'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -151,16 +152,8 @@ function ReleaseEntityHeader({
                     className='object-cover'
                     sizes='96px'
                   />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    <Icon
-                      name='Disc3'
-                      className='h-12 w-12 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  </div>
-                )}
-              </div>
+                }
+              />
             )}
           </AlbumArtworkContextMenu>
 
@@ -386,9 +379,9 @@ export function ReleaseSidebar({
   }, [release?.id]);
 
   const handleTrackClick = useCallback(
-    (track: TrackForDetail & Record<string, unknown>) => {
+    (track: ReleaseSidebarTrack) => {
       if (externalTrackClick) {
-        externalTrackClick(track as Parameters<typeof externalTrackClick>[0]);
+        externalTrackClick(track);
         return;
       }
       setSelectedTrack(track);

@@ -1,6 +1,8 @@
 import { avg, count, eq } from 'drizzle-orm';
 import { BarChart2, CheckCircle, Search, Users } from 'lucide-react';
 import { KpiItem } from '@/components/admin/KpiItem';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 
@@ -51,43 +53,47 @@ export async function LeadPipelineKpis() {
   const kpis = await getLeadKpis();
 
   return (
-    <section className='space-y-3'>
-      <h2 className='text-sm font-semibold text-primary-token'>
-        Lead Pipeline
-      </h2>
-      <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
-        <KpiItem
-          title='TOTAL LEADS'
-          value={String(kpis.total)}
-          metadata={
-            <span>
-              {kpis.discovered} discovered, {kpis.ingested} ingested
-            </span>
-          }
-          icon={Users}
+    <section>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Lead pipeline'
+          subtitle='Discovery volume, qualification depth, and automation health'
+          className='px-5 py-3'
         />
-        <KpiItem
-          title='QUALIFIED'
-          value={String(kpis.qualified)}
-          metadata={<span>Ready for review</span>}
-          icon={CheckCircle}
-          iconClassName='text-success'
-        />
-        <KpiItem
-          title='QUERIES TODAY'
-          value={`${kpis.queriesUsedToday} / ${kpis.dailyQueryBudget}`}
-          metadata={
-            <span>Pipeline {kpis.pipelineEnabled ? 'active' : 'paused'}</span>
-          }
-          icon={Search}
-        />
-        <KpiItem
-          title='AVG FIT SCORE'
-          value={String(kpis.avgFitScore)}
-          metadata={<span>Across qualified leads</span>}
-          icon={BarChart2}
-        />
-      </div>
+        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
+          <KpiItem
+            title='TOTAL LEADS'
+            value={String(kpis.total)}
+            metadata={
+              <span>
+                {kpis.discovered} discovered, {kpis.ingested} ingested
+              </span>
+            }
+            icon={Users}
+          />
+          <KpiItem
+            title='QUALIFIED'
+            value={String(kpis.qualified)}
+            metadata={<span>Ready for review</span>}
+            icon={CheckCircle}
+            iconClassName='text-success'
+          />
+          <KpiItem
+            title='QUERIES TODAY'
+            value={`${kpis.queriesUsedToday} / ${kpis.dailyQueryBudget}`}
+            metadata={
+              <span>Pipeline {kpis.pipelineEnabled ? 'active' : 'paused'}</span>
+            }
+            icon={Search}
+          />
+          <KpiItem
+            title='AVG FIT SCORE'
+            value={String(kpis.avgFitScore)}
+            metadata={<span>Across qualified leads</span>}
+            icon={BarChart2}
+          />
+        </div>
+      </ContentSurfaceCard>
     </section>
   );
 }

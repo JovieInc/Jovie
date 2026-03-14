@@ -17,7 +17,7 @@ import { EMPTY_VALUE_FALLBACK, formatDeviceTypeLabel } from './utils';
 /** Returns the appropriate Lucide device icon for the given device type. */
 function DeviceIcon({ deviceType }: { readonly deviceType: string }) {
   const normalized = deviceType.trim().toLowerCase();
-  const cls = 'h-3.5 w-3.5 shrink-0 text-tertiary-token';
+  const cls = 'h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)';
   if (normalized === 'mobile')
     return <Smartphone className={cls} aria-hidden />;
   if (normalized === 'tablet') return <Tablet className={cls} aria-hidden />;
@@ -42,13 +42,13 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
           member.locationLabel ? (
             <span className='inline-flex items-center gap-1.5'>
               <MapPin
-                className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
                 aria-hidden
               />
               {member.locationLabel}
             </span>
           ) : (
-            <span className='text-secondary-token'>Unknown</span>
+            <span className='text-(--linear-text-secondary)'>Unknown</span>
           )
         }
       />
@@ -61,7 +61,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
               {formatDeviceTypeLabel(member.deviceType)}
             </span>
           ) : (
-            <span className='text-secondary-token'>Unknown</span>
+            <span className='text-(--linear-text-secondary)'>Unknown</span>
           )
         }
       />
@@ -97,7 +97,9 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
           member.email ? (
             <CopyableField value={member.email} label='Email' />
           ) : (
-            <span className='text-secondary-token'>{EMPTY_VALUE_FALLBACK}</span>
+            <span className='text-(--linear-text-secondary)'>
+              {EMPTY_VALUE_FALLBACK}
+            </span>
           )
         }
       />
@@ -107,7 +109,9 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
           member.phone ? (
             <CopyableField value={member.phone} label='Phone' />
           ) : (
-            <span className='text-secondary-token'>{EMPTY_VALUE_FALLBACK}</span>
+            <span className='text-(--linear-text-secondary)'>
+              {EMPTY_VALUE_FALLBACK}
+            </span>
           )
         }
       />

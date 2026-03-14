@@ -10,11 +10,11 @@ export function LeadPipelineWorkspace() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <>
+    <div className='space-y-4'>
       <LeadPipelineControls />
       <UnifiedUrlIntake onSubmitted={() => setRefreshKey(value => value + 1)} />
       <LeadKeywordsManager />
       <LeadTable refreshKey={refreshKey} />
-    </>
+    </div>
   );
 }

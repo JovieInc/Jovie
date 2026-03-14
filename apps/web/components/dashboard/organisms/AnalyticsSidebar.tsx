@@ -45,26 +45,14 @@ function SidebarRangeToggle({
   readonly onChange: (v: AnalyticsRange) => void;
 }) {
   return (
-    <div className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5'>
-      {RANGE_OPTIONS.map(opt => {
-        const active = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type='button'
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              'rounded-full px-3 py-1 text-[13px] font-[510] transition-all duration-150',
-              active
-                ? 'bg-surface-3 text-primary-token'
-                : 'text-tertiary-token hover:text-secondary-token hover:bg-surface-2'
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <AppSegmentControl
+      value={value}
+      onValueChange={onChange}
+      options={RANGE_OPTIONS}
+      size='sm'
+      className='shrink-0'
+      aria-label='Analytics time range'
+    />
   );
 }
 
@@ -92,22 +80,21 @@ function FunnelStage({
   if (loading) {
     return (
       <div className='flex w-full flex-col items-center'>
-        <div
-          className='w-full rounded-xl border border-subtle bg-surface-1 px-5 py-4 text-center'
-          style={{ maxWidth: width }}
-        >
-          <LoadingSkeleton
-            height='h-3'
-            width='w-20'
-            rounded='sm'
-            className='mx-auto mb-2'
-          />
-          <LoadingSkeleton
-            height='h-7'
-            width='w-16'
-            rounded='sm'
-            className='mx-auto'
-          />
+        <div className='w-full' style={{ maxWidth: width }}>
+          <DrawerSurfaceCard className='px-4 py-3 text-center'>
+            <LoadingSkeleton
+              height='h-3'
+              width='w-20'
+              rounded='sm'
+              className='mx-auto mb-2'
+            />
+            <LoadingSkeleton
+              height='h-7'
+              width='w-16'
+              rounded='sm'
+              className='mx-auto'
+            />
+          </DrawerSurfaceCard>
         </div>
       </div>
     );
@@ -115,27 +102,30 @@ function FunnelStage({
 
   return (
     <div className='flex w-full flex-col items-center'>
-      <div
-        className={cn(
-          'relative w-full overflow-hidden rounded-xl border px-5 py-4 text-center',
-          isLast
-            ? 'border-accent/30 bg-gradient-to-r from-[var(--color-accent-subtle)] to-[var(--color-bg-surface-1)] ring-1 ring-accent/15'
-            : 'border-subtle bg-gradient-to-r from-[var(--color-bg-surface-1)] to-[var(--color-bg-surface-2)]'
-        )}
-        style={{ maxWidth: width }}
-      >
-        <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-          {label}
-        </p>
-        <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
-          {value}
-        </p>
-        <p className='mt-0.5 text-[11px] text-secondary-token'>{description}</p>
+      <div className='w-full' style={{ maxWidth: width }}>
+        <DrawerSurfaceCard
+          className={cn(
+            'relative overflow-hidden px-4 py-3 text-center',
+            isLast
+              ? 'border-(--linear-border-default) bg-(--linear-bg-surface-1)'
+              : 'bg-(--linear-bg-surface-1)'
+          )}
+        >
+          <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            {label}
+          </p>
+          <p className='text-2xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
+            {value}
+          </p>
+          <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+            {description}
+          </p>
+        </DrawerSurfaceCard>
       </div>
 
       {!isLast && (
         <div className='flex min-h-[40px] flex-col items-center py-2'>
-          <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
+          <ArrowDown className='h-3.5 w-3.5 text-(--linear-text-tertiary)/60' />
           <span
             className={cn(
               'mt-0.5 min-h-[16px] text-[11px] font-[510] tabular-nums',
@@ -189,7 +179,9 @@ function RankedList({
   if (items.length === 0) {
     return (
       <div className='min-h-[196px]'>
-        <p className='py-4 text-[13px] text-tertiary-token'>{emptyMessage}</p>
+        <p className='py-4 text-[13px] text-(--linear-text-tertiary)'>
+          {emptyMessage}
+        </p>
       </div>
     );
   }
@@ -199,18 +191,18 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.key}
-          className='group flex h-8 items-center justify-between rounded-lg px-2'
+          className='group flex h-8 items-center justify-between rounded-[7px] px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>
+            <span className='w-3 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
               {index + 1}
             </span>
-            <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
+            <IconComponent className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
+            <span className='truncate text-[13px] text-(--linear-text-secondary) transition-colors group-hover:text-(--linear-text-primary)'>
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-[510] text-primary-token tabular-nums'>
+          <span className='ml-2 text-[13px] font-[510] text-(--linear-text-primary) tabular-nums'>
             {item.value}
           </span>
         </li>
@@ -231,7 +223,7 @@ function EngagementMetricCard({
   const showSkeleton = loading || !value;
 
   return (
-    <div className='min-h-[72px] rounded-xl border border-subtle bg-surface-1 p-3'>
+    <DrawerSurfaceCard className='min-h-[68px] p-3'>
       {showSkeleton ? (
         <>
           <LoadingSkeleton
@@ -244,13 +236,15 @@ function EngagementMetricCard({
         </>
       ) : (
         <>
-          <p className='text-xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
+          <p className='text-xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
             {value}
           </p>
-          <p className='mt-1 text-[11px] text-tertiary-token'>{label}</p>
+          <p className='mt-1 text-[11px] text-(--linear-text-tertiary)'>
+            {label}
+          </p>
         </>
       )}
-    </div>
+    </DrawerSurfaceCard>
   );
 }
 
@@ -363,7 +357,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
 
-        <div className='min-h-[196px]'>
+        <DrawerSurfaceCard className='min-h-[196px] p-2'>
           {activeTab === 'cities' && (
             <RankedList
               icon={MapPin}
@@ -400,7 +394,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               emptyMessage='No link data yet'
             />
           )}
-        </div>
+        </DrawerSurfaceCard>
       </div>
     </EntitySidebarShell>
   );

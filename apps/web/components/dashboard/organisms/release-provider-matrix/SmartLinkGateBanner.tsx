@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 type SmartLinkGateBannerProps = {
@@ -52,7 +54,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='min-w-0 flex-1'>
         {mode === 'soft-cap' ? (
           <>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
               You have {props.releasedCount} smart links
             </p>
             <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
@@ -64,10 +66,20 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
                 Request a higher limit
               </a>
             </p>
+            <DrawerButton
+              asChild
+              tone='ghost'
+              size='sm'
+              className='mt-2 h-7 w-fit px-2 text-[11px]'
+            >
+              <a href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'>
+                Email support
+              </a>
+            </DrawerButton>
           </>
         ) : (
           <>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
               You have {props.unreleasedCount} upcoming{' '}
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>
@@ -80,9 +92,17 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               </Link>{' '}
               to enable pre-release pages with countdowns and notify-me.
             </p>
+            <DrawerButton
+              asChild
+              tone='ghost'
+              size='sm'
+              className='mt-2 h-7 w-fit px-2 text-[11px]'
+            >
+              <Link href={APP_ROUTES.LAUNCH_PRICING}>Upgrade to Pro</Link>
+            </DrawerButton>
           </>
         )}
       </div>
-    </aside>
+    </DrawerSurfaceCard>
   );
 }

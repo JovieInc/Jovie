@@ -182,6 +182,22 @@ vi.mock(
 );
 
 vi.mock(
+  '@/components/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
+  () => ({
+    ImportProgressBanner: ({ visible = true }: { visible?: boolean }) => (
+      <div
+        data-testid='spotify-import-progress-banner'
+        aria-hidden={!visible}
+        style={{
+          visibility: visible ? 'visible' : 'hidden',
+          opacity: visible ? 1 : 0,
+        }}
+      />
+    ),
+  })
+);
+
+vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/hooks/useReleaseTablePreferences',
   () => ({
     useReleaseTablePreferences: () => ({
@@ -359,6 +375,38 @@ describe('ReleaseProviderMatrix', () => {
       );
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
+    });
+
+    it('keeps spotify import banner mounted and hidden when import is idle', () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease()]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+          initialImporting={false}
+        />
+      );
+
+      const banner = screen.getByTestId('spotify-import-progress-banner');
+      expect(banner).toHaveAttribute('aria-hidden', 'true');
+      expect(banner).toHaveStyle({ visibility: 'hidden', opacity: '0' });
+    });
+
+    it('shows spotify import banner when import is active', () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease()]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+          initialImporting={true}
+        />
+      );
+
+      const banner = screen.getByTestId('spotify-import-progress-banner');
+      expect(banner).toHaveAttribute('aria-hidden', 'false');
+      expect(banner).toHaveStyle({ visibility: 'visible', opacity: '1' });
     });
   });
 

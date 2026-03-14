@@ -17,6 +17,9 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check, Search, X } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
+import { PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS } from '@/components/organisms/table';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';
@@ -119,14 +122,13 @@ function SearchInput({
           aria-label={placeholder}
         />
         {value && (
-          <button
-            type='button'
+          <DrawerInlineIconButton
             onClick={onClear}
             className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
-          </button>
+          </DrawerInlineIconButton>
         )}
       </div>
     </div>
@@ -165,14 +167,13 @@ function ActiveFilterPill({
         <span className='text-(--linear-text-tertiary)'>is</span>
         <span className='font-[510] text-primary-token'>{displayValue}</span>
       </div>
-      <button
-        type='button'
+      <DrawerInlineIconButton
         onClick={onClear}
         className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-2) hover:text-primary-token focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
-      </button>
+      </DrawerInlineIconButton>
     </div>
   );
 }
@@ -236,7 +237,11 @@ function SubmenuCheckboxItem({
         onCheckedChange();
       }}
       onKeyDown={handleKeyDown}
-      className={cn(MENU_ITEM_BASE, 'w-full', checked && 'text-primary-token')}
+      className={cn(
+        MENU_ITEM_BASE,
+        'w-full',
+        checked && 'text-(--linear-text-primary)'
+      )}
     >
       <span
         className={cn(
@@ -373,13 +378,18 @@ interface ReleaseFilterDropdownProps {
   readonly onFiltersChange: (filters: ReleaseFilters) => void;
   readonly counts: ReleaseFilterCounts;
   readonly buttonClassName?: string;
+  readonly iconOnly?: boolean;
 }
+
+const FILTER_TRIGGER_ACTIVE_CLASS =
+  'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
 
 export function ReleaseFilterDropdown({
   filters,
   onFiltersChange,
   counts,
   buttonClassName,
+  iconOnly = false,
 }: ReleaseFilterDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mainSearch, setMainSearch] = useState('');
@@ -496,9 +506,14 @@ export function ReleaseFilterDropdown({
                 'h-7 gap-1.5 rounded-md border border-transparent text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token',
                 buttonClassName
               )}
+              aria-pressed={isOpen || hasAnyFilter}
             >
-              <Icon name='Filter' className='h-3.5 w-3.5' />
-              Filter
+              <Icon name='Filter' className='h-3.5 w-3.5' strokeWidth={2} />
+              <span
+                className={cn(iconOnly ? 'sr-only' : 'sr-only md:not-sr-only')}
+              >
+                Filter
+              </span>
             </Button>
           </DropdownMenuTrigger>
         </TooltipShortcut>
@@ -576,7 +591,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-[510] text-primary'>
+                          <span className='rounded-full bg-(--linear-accent-subtle) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
                             {labelFilterCount}
                           </span>
                         )}

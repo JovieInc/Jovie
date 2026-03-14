@@ -69,7 +69,7 @@ export function SidebarUpgradeBanner() {
             <p className='text-[12px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
               Get Verified — {priceLabel}
             </p>
-            <p className='mt-0.5 text-2xs leading-snug text-sidebar-muted'>
+            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted'>
               Stand out with trusted verification.
             </p>
             <button

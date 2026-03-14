@@ -1,5 +1,6 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
+import { APP_ICON_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { SocialBioNudge } from '@/components/dashboard/molecules/SocialBioNudge';
@@ -17,6 +18,8 @@ import {
   getIncompleteTaskLabelClass,
 } from '@/components/dashboard/organisms/dashboard-overview-helpers';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
@@ -84,7 +87,7 @@ function SetupTaskItem({
       {!isComplete && (
         <Link
           href={actionHref}
-          className='text-[13px] text-accent-token opacity-0 transition-opacity group-hover:opacity-100'
+          className='text-[12.5px] font-[510] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
         >
           {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
@@ -137,19 +140,22 @@ export function DashboardOverview({
   const greetingName = getGreetingName(artist.name);
 
   const header = (
-    <header className='flex flex-col gap-0.5 rounded-2xl bg-transparent p-3'>
-      <div className='grid grid-cols-1 gap-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-4'>
-        <div className='min-w-0'>
-          <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
-            <h1 className='text-xl font-[590] text-primary-token'>
-              Welcome back, {greetingName}
-            </h1>
+    <ContentSurfaceCard as='header' className='overflow-hidden'>
+      <ContentSectionHeader
+        title={
+          <span className='text-[15px] font-[590] tracking-[-0.01em] text-(--linear-text-primary)'>
+            Welcome back, {greetingName}
+          </span>
+        }
+        subtitle='Keep your profile polished and ready to share.'
+        actions={
+          <div className='flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-nowrap sm:justify-end'>
             <div className='flex items-center gap-1'>
               <Button
                 asChild
-                variant='secondary'
-                size='sm'
-                className='h-8 w-8 sm:h-11 sm:w-11 rounded-full p-0'
+                variant='ghost'
+                size='icon'
+                className={APP_ICON_BUTTON_CLASS}
               >
                 <Link
                   href={`/${artist.handle}`}
@@ -159,7 +165,7 @@ export function DashboardOverview({
                 >
                   <Icon
                     name='ArrowUpRight'
-                    className='h-4 w-4 sm:h-5 sm:w-5'
+                    className='h-3.5 w-3.5'
                     aria-hidden='true'
                   />
                   <span className='sr-only'>View profile</span>
@@ -169,41 +175,32 @@ export function DashboardOverview({
                 relativePath={`/${artist.handle}`}
                 idleLabel='Copy URL'
                 iconName='Copy'
-                className='h-8 w-8 sm:h-11 sm:w-11 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
+                className={APP_ICON_BUTTON_CLASS}
               />
             </div>
+            <DashboardOverviewHeaderToolbarClient />
           </div>
-        </div>
-
-        <div className='flex shrink-0 items-center justify-end sm:self-start'>
-          <DashboardOverviewHeaderToolbarClient />
-        </div>
-
-        <p className='text-[13px] text-secondary-token sm:col-span-2'>
-          Keep your profile polished and ready to share.
-        </p>
-      </div>
-    </header>
+        }
+        actionsClassName='w-full sm:w-auto'
+      />
+    </ContentSurfaceCard>
   );
 
   if (!allTasksComplete) {
     return (
       <DashboardOverviewControlsProvider>
         <div
-          className='flex min-h-[60vh] items-center justify-center'
+          className='flex min-h-[60vh] items-center justify-center px-4 py-6 sm:px-0'
           data-testid='dashboard-overview'
         >
-          <div className='w-full max-w-sm space-y-6'>
-            <div className='space-y-0.5 text-center'>
-              <h1 className='text-lg font-normal text-primary-token'>
-                Complete your setup
-              </h1>
-              <p className='text-[13px] text-tertiary-token'>
-                {completedCount} of {totalSteps} complete
-              </p>
-            </div>
+          <ContentSurfaceCard className='w-full max-w-md overflow-hidden'>
+            <ContentSectionHeader
+              title='Complete your setup'
+              subtitle={`${completedCount} of ${totalSteps} complete`}
+              bodyClassName='space-y-0'
+            />
 
-            <ul className='space-y-3'>
+            <ul className='space-y-1 p-2 sm:p-3'>
               <SetupTaskItem
                 isComplete={isHandleClaimed}
                 stepNumber={1}
@@ -226,7 +223,7 @@ export function DashboardOverview({
                 actionLabel='Add'
               />
             </ul>
-          </div>
+          </ContentSurfaceCard>
         </div>
       </DashboardOverviewControlsProvider>
     );

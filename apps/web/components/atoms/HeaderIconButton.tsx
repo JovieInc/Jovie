@@ -7,7 +7,7 @@ import { AppIconButton } from '@/components/atoms/AppIconButton';
 export type HeaderIconButtonSize = 'xs' | 'sm' | 'md';
 
 export interface HeaderIconButtonProps
-  extends Omit<ButtonProps, 'children' | 'size' | 'variant'> {
+  extends Omit<ButtonProps, 'children' | 'size' | 'variant' | 'aria-label'> {
   readonly children: React.ReactNode;
   readonly ariaLabel: string;
   readonly size?: HeaderIconButtonSize;

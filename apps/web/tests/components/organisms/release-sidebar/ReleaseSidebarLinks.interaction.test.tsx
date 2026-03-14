@@ -109,6 +109,12 @@ vi.mock('@jovie/ui', async () => {
 
 // Mock drawer molecules — EntitySidebarShell renders children with empty state support.
 vi.mock('@/components/molecules/drawer', () => ({
+  DRAWER_SECTION_HEADING_CLASSNAME: 'drawer-heading',
+  DrawerButton: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
   EntitySidebarShell: ({
     children,
     isEmpty,
@@ -178,6 +184,49 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
+  ),
+  DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerSurfaceCard: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
+  DrawerFormGridRow: ({
+    children,
+    label,
+  }: {
+    children: React.ReactNode;
+    label: React.ReactNode;
+  }) => (
+    <div>
+      <span>{label}</span>
+      {children}
+    </div>
+  ),
+  DrawerTabs: ({
+    value,
+    onValueChange,
+    options,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: Array<{ value: string; label: string }>;
+  }) => (
+    <div>
+      {options.map(option => (
+        <button
+          key={option.value}
+          type='button'
+          aria-selected={value === option.value}
+          role='tab'
+          onClick={() => onValueChange(option.value)}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   ),
 }));
 

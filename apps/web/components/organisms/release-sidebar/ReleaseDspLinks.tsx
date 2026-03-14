@@ -9,7 +9,6 @@
 import {
   Button,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -23,7 +22,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
   DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME,
+  DrawerButton,
+  DrawerFormGridRow,
   DrawerLinkSection,
+  DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -223,15 +225,8 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <div
-          className={[
-            'mt-2 space-y-2 rounded-lg',
-            'border border-dashed border-subtle',
-            'bg-surface-1 p-3',
-          ].join(' ')}
-        >
-          <div className={FORM_ROW_CLASS}>
-            <Label className='text-[11px] text-tertiary-token'>Provider</Label>
+        <DrawerSurfaceCard className='mt-2 space-y-2.5 rounded-[10px] p-3'>
+          <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
               onValueChange={(value: string) => {
@@ -240,7 +235,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='w-full'>
+              <SelectTrigger className='h-8 w-full rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -256,9 +251,8 @@ export function ReleaseDspLinks({
                 })}
               </SelectContent>
             </Select>
-          </div>
-          <div className={FORM_ROW_CLASS}>
-            <Label className='text-[11px] text-tertiary-token'>URL</Label>
+          </DrawerFormGridRow>
+          <DrawerFormGridRow label='URL'>
             <Input
               type='url'
               value={newLinkUrl}
@@ -271,34 +265,33 @@ export function ReleaseDspLinks({
               autoCapitalize='none'
               autoCorrect='off'
               autoFocus
+              className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'
             />
-          </div>
+          </DrawerFormGridRow>
           <div className='flex justify-end gap-2 pt-1'>
-            <Button
+            <DrawerButton
               type='button'
-              size='sm'
-              variant='ghost'
               onClick={() => {
                 onSetIsAddingLink(false);
                 onSetNewLinkUrl('');
                 onSetSelectedProvider(null);
               }}
+              tone='ghost'
             >
               Cancel
-            </Button>
-            <Button
+            </DrawerButton>
+            <DrawerButton
               type='button'
-              size='sm'
-              variant='primary'
               onClick={() => void onAddLink()}
               disabled={
                 !isValidUrl(newLinkUrl) || !selectedProvider || isAddingDspLink
               }
+              className='min-w-[68px]'
             >
               {isAddingDspLink ? 'Adding...' : 'Add'}
-            </Button>
+            </DrawerButton>
           </div>
-        </div>
+        </DrawerSurfaceCard>
       )}
     </DrawerLinkSection>
   );
