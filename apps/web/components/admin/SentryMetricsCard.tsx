@@ -1,5 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { AlertOctagon, Bug, Flame, Users } from 'lucide-react';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminSentryMetrics } from '@/lib/admin/sentry-metrics';
 
 interface SentryMetricsCardProps {
@@ -20,15 +22,15 @@ function MetricBlock({
   value,
 }: Readonly<MetricBlockProps>) {
   return (
-    <div className='rounded-lg bg-surface-2 p-3'>
-      <p className='flex items-center gap-2 text-2xs text-secondary-token'>
-        <Icon className={`h-4 w-4 ${iconClassName}`} />
-        {label}
-      </p>
-      <p className='mt-2 text-2xl font-semibold text-primary-token tabular-nums'>
-        {value}
-      </p>
-    </div>
+    <ContentMetricCard
+      className='p-3.5'
+      label={label}
+      value={value}
+      icon={Icon}
+      iconClassName={iconClassName}
+      bodyClassName='space-y-1'
+      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.032em] text-(--linear-text-primary) tabular-nums'
+    />
   );
 }
 
@@ -41,19 +43,17 @@ export function SentryMetricsCard({
 }: Readonly<SentryMetricsCardProps>) {
   if (!metrics.isConfigured || !metrics.isAvailable) {
     return (
-      <Card className='border-subtle bg-transparent'>
-        <CardHeader className='p-5 pb-2'>
-          <CardTitle className='text-lg tracking-tight'>Sentry</CardTitle>
-        </CardHeader>
-        <CardContent className='p-5 pt-0'>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeader title='Sentry' className='px-5 py-3' />
+        <div className='p-5 pt-4'>
           <p className='text-app text-secondary-token'>
             {metrics.isConfigured
               ? (metrics.errorMessage ??
                 'Sentry metrics are temporarily unavailable. Please try again shortly.')
               : 'Sentry integration not configured. Add SENTRY_AUTH_TOKEN and SENTRY_ORG_SLUG to enable error tracking.'}
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
@@ -63,15 +63,14 @@ export function SentryMetricsCard({
       : 'No unresolved issues in the last 24 hours.';
 
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardHeader className='space-y-1 p-5 pb-3'>
-        <CardTitle className='text-lg tracking-tight'>Sentry</CardTitle>
-        <p className='text-2xs text-tertiary-token'>
-          Production errors from the last 24 hours
-        </p>
-      </CardHeader>
-      <CardContent className='space-y-4 p-5 pt-0'>
-        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='Sentry'
+        subtitle='Production errors from the last 24 hours'
+        className='px-5 py-3'
+      />
+      <div className='space-y-4 p-5 pt-4'>
+        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
           <MetricBlock
             icon={Bug}
             iconClassName='text-info'
@@ -98,13 +97,18 @@ export function SentryMetricsCard({
           />
         </div>
 
-        <p
-          className='truncate text-2xs text-tertiary-token'
-          title={topIssueLabel}
-        >
-          {topIssueLabel}
-        </p>
-      </CardContent>
-    </Card>
+        <ContentSurfaceCard className='p-3.5'>
+          <p className='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'>
+            Top unresolved issue
+          </p>
+          <p
+            className='mt-1 truncate text-[12px] leading-[18px] text-(--linear-text-secondary)'
+            title={topIssueLabel}
+          >
+            {topIssueLabel}
+          </p>
+        </ContentSurfaceCard>
+      </div>
+    </ContentSurfaceCard>
   );
 }

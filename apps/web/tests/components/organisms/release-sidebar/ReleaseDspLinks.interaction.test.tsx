@@ -62,13 +62,19 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
-vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
-  DspProviderIcon: ({ provider }: { provider: string }) => (
+vi.mock('@/components/atoms/ProviderIcon', () => ({
+  ProviderIcon: ({ provider }: { provider: ProviderKey }) => (
     <span data-testid={`provider-icon-${provider}`} />
   ),
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({
+  DRAWER_SECTION_HEADING_CLASSNAME: 'drawer-heading',
+  DrawerButton: ({ children, ...props }: React.ComponentProps<'button'>) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
   DrawerLinkSection: ({
     title,
     children,
@@ -107,6 +113,25 @@ vi.mock('@/components/molecules/drawer', () => ({
           Remove {label}
         </button>
       ) : null}
+    </div>
+  ),
+  DrawerSurfaceCard: ({
+    children,
+    className,
+  }: {
+    children: React.ReactNode;
+    className?: string;
+  }) => <div className={className}>{children}</div>,
+  DrawerFormGridRow: ({
+    children,
+    label,
+  }: {
+    children: React.ReactNode;
+    label: React.ReactNode;
+  }) => (
+    <div>
+      <span>{label}</span>
+      {children}
     </div>
   ),
 }));

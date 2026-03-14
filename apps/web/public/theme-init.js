@@ -1,12 +1,24 @@
 (function () {
   try {
-    // Force dark mode app-wide (JOV-1479). Light mode disabled until further notice.
     var root = document.documentElement;
-    root.classList.add('dark');
+    var storedTheme =
+      typeof localStorage !== 'undefined' && localStorage
+        ? localStorage.getItem('jovie-theme')
+        : null;
+    var nextTheme =
+      storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : 'dark';
+
+    root.classList.remove('light', 'dark');
+    root.classList.add(nextTheme);
 
     // Update theme-color meta tag for PWA system bar color
     var metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', '#0a0a0a');
+    if (metaTheme) {
+      metaTheme.setAttribute(
+        'content',
+        nextTheme === 'light' ? '#f7f8f9' : '#0a0a0a'
+      );
+    }
 
     // High contrast mode (independent of light/dark)
     if (typeof localStorage !== 'undefined' && localStorage) {

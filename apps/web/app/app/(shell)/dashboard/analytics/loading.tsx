@@ -40,7 +40,7 @@ export default function AnalyticsLoading() {
         {STAT_CARD_KEYS.map(key => (
           <div
             key={key}
-            className='space-y-2 rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'
+            className='space-y-2 rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-4 lg:p-5'
           >
             <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
             <LoadingSkeleton height='h-7' width='w-24' rounded='md' />
@@ -54,7 +54,7 @@ export default function AnalyticsLoading() {
         {LIST_SECTION_KEYS.map(key => (
           <div
             key={key}
-            className='rounded-xl border border-subtle bg-surface-1 p-4 lg:p-5'
+            className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-4 lg:p-5'
           >
             {/* Section header */}
             <div className='mb-4 flex items-center gap-2'>

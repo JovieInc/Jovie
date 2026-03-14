@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { BadgeCheck, RefreshCw, Star } from 'lucide-react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 export interface TableRowActionsProps {
@@ -23,56 +23,55 @@ export function TableRowActions({
 }: Readonly<TableRowActionsProps>) {
   const isVerificationLoading = verificationStatus === 'loading';
   const isRefreshLoading = refreshIngestStatus === 'loading';
+  const rowActionClassName =
+    'h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
   return (
     <div className='flex items-center justify-end gap-1'>
       {/* Refresh button */}
-      <Button
-        type='button'
-        size='icon'
-        variant='ghost'
-        className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token disabled:opacity-50'
+      <AppIconButton
+        ariaLabel='Refresh creator music data'
+        className={rowActionClassName}
         onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
           await onRefreshIngest();
         }}
         disabled={isRefreshLoading}
-        aria-label='Refresh ingest data'
-        title='Refresh ingest data'
+        title='Refresh creator music data'
       >
         <RefreshCw
           className={cn('h-3.5 w-3.5', isRefreshLoading && 'animate-spin')}
         />
-      </Button>
+      </AppIconButton>
 
       {/* Claimed icon - read-only indicator */}
-      <Button
-        type='button'
-        size='icon'
-        variant='ghost'
+      <AppIconButton
+        ariaLabel={isClaimed ? 'Claimed' : 'Not claimed'}
         className={cn(
-          'h-8 w-8 rounded-md transition-colors cursor-default',
+          rowActionClassName,
+          'cursor-default',
           isClaimed
-            ? 'text-yellow-500 hover:bg-surface-2'
-            : 'text-tertiary-token/40 hover:bg-transparent'
+            ? 'text-yellow-500 hover:bg-transparent hover:text-yellow-500'
+            : 'text-(--linear-text-quaternary)/40 hover:bg-transparent hover:text-(--linear-text-quaternary)/40'
         )}
         disabled
-        aria-label={isClaimed ? 'Claimed' : 'Not claimed'}
         title={isClaimed ? 'Claimed' : 'Not claimed'}
       >
         <Star className={cn('h-3.5 w-3.5', isClaimed && 'fill-current')} />
-      </Button>
+      </AppIconButton>
 
       {/* Verified toggle button */}
-      <Button
-        type='button'
-        size='icon'
-        variant='ghost'
-        className={cn(
-          'h-8 w-8 rounded-md transition-colors hover:bg-surface-2 disabled:opacity-50',
+      <AppIconButton
+        ariaLabel={
           isVerified
-            ? 'text-info [&_svg]:fill-info [&_svg]:stroke-white'
-            : 'text-tertiary-token/40'
+            ? 'Verified - click to unverify'
+            : 'Not verified - click to verify'
+        }
+        className={cn(
+          rowActionClassName,
+          isVerified
+            ? 'text-info hover:text-info [&_svg]:fill-info [&_svg]:stroke-white'
+            : 'text-(--linear-text-quaternary)/40'
         )}
         onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();
@@ -84,11 +83,6 @@ export function TableRowActions({
         }}
         disabled={isVerificationLoading}
         aria-pressed={isVerified}
-        aria-label={
-          isVerified
-            ? 'Verified - click to unverify'
-            : 'Not verified - click to verify'
-        }
         title={
           isVerified
             ? 'Verified - click to unverify'
@@ -101,7 +95,7 @@ export function TableRowActions({
             isVerificationLoading && 'animate-pulse'
           )}
         />
-      </Button>
+      </AppIconButton>
     </div>
   );
 }

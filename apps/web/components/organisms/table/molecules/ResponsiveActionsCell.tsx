@@ -123,11 +123,11 @@ export function ResponsiveActionsCell({
           onClick={action.onClick}
           disabled={action.disabled}
           className={cn(
-            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-[510] transition-colors duration-150 ease-out',
+            'inline-flex items-center gap-2 rounded-[7px] border border-transparent px-2.5 py-1.5 text-[12px] font-[510] tracking-[-0.01em] transition-[background-color,border-color,color,box-shadow] duration-150 ease-out',
             action.destructive
-              ? 'text-destructive hover:text-destructive hover:bg-destructive/10 [&_svg]:text-destructive'
-              : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token',
-            action.disabled && 'opacity-50 cursor-not-allowed'
+              ? 'text-destructive hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive [&_svg]:text-destructive'
+              : 'text-(--linear-text-secondary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
+            action.disabled && 'cursor-not-allowed opacity-50'
           )}
         >
           {action.icon && (
@@ -145,7 +145,7 @@ export function ResponsiveActionsCell({
           <DropdownMenuTrigger asChild>
             <button
               type='button'
-              className='inline-flex items-center justify-center rounded-full h-8 w-8 border border-subtle bg-transparent text-tertiary-token transition-colors duration-150 ease-out hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 ease-out hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
               aria-label='More actions'
             >
               <MoreVertical className='h-4 w-4' />

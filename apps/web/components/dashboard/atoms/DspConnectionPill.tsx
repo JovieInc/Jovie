@@ -23,6 +23,12 @@ import {
   PROVIDER_LABELS,
 } from './DspProviderIcon';
 
+const BASE_PILL_CLASSNAME =
+  'inline-flex min-h-[28px] items-center gap-1.5 rounded-[9px] border px-2.5 py-1 text-[12px] font-[510] tracking-[-0.01em] shadow-none transition-[background-color,border-color,color,box-shadow] duration-150';
+
+const INTERACTIVE_PILL_CLASSNAME =
+  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 disabled:opacity-50 disabled:cursor-not-allowed';
+
 const CONNECTION_PILL_PROVIDERS = [
   'spotify',
   'apple_music',
@@ -67,7 +73,8 @@ export function DspConnectionPill({
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md border py-1 pl-2.5 pr-3 text-xs font-medium',
+          BASE_PILL_CLASSNAME,
+          'text-(--linear-text-secondary)',
           className
         )}
         style={{
@@ -94,17 +101,16 @@ export function DspConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-md border py-1 pl-2.5 pr-3 text-xs font-medium transition-colors cursor-pointer',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-              'disabled:opacity-50 disabled:cursor-not-allowed',
+              BASE_PILL_CLASSNAME,
+              INTERACTIVE_PILL_CLASSNAME,
+              'cursor-pointer text-(--linear-text-secondary)',
               className
             )}
             style={
               {
                 borderColor: `${accent}30`,
                 backgroundColor: `${accent}10`,
-                '--tw-ring-color': `${accent}50`,
-              } as React.CSSProperties
+              } satisfies React.CSSProperties
             }
             aria-label={`${label} connection: ${artistName || 'Connected'}`}
           >
@@ -150,16 +156,11 @@ export function DspConnectionPill({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-md border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-xs font-medium text-secondary-token transition-colors',
-        'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
+        BASE_PILL_CLASSNAME,
+        INTERACTIVE_PILL_CLASSNAME,
+        'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
         className
       )}
-      style={
-        {
-          '--tw-ring-color': `${accent}50`,
-        } as React.CSSProperties
-      }
       aria-label={`Connect ${label}`}
     >
       <DspProviderIcon provider={provider} size='sm' className='gap-0' />

@@ -22,8 +22,8 @@ export interface DotBadgeProps {
 }
 
 const SIZE_CLASSES = {
-  sm: 'px-1.5 py-0.5 text-[10px]',
-  md: 'px-2 py-0.5 text-[11px]',
+  sm: 'min-h-[20px] px-1.5 py-0.5 text-[10px]',
+  md: 'min-h-[22px] px-2 py-0.5 text-[11px]',
 } as const;
 
 const DOT_SIZE_CLASSES = {
@@ -54,7 +54,7 @@ export function DotBadge({
   return (
     <span
       className={cn(
-        'inline-flex w-fit items-center rounded-full border font-medium tracking-wide',
+        'inline-flex w-fit items-center rounded-[8px] border font-[510] tracking-[-0.01em] shadow-none',
         SIZE_CLASSES[size],
         variant.className,
         className

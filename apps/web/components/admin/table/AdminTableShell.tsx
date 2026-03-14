@@ -127,8 +127,9 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/60',
-              headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
+              'sticky top-0 z-30 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface)/95 backdrop-blur supports-backdrop-filter:bg-(--linear-app-content-surface)/85',
+              headerElevated &&
+                'shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)]'
             )}
           >
             {toolbar}
@@ -138,7 +139,9 @@ export function AdminTableShell({
         {children({ headerElevated, stickyTopPx })}
       </div>
 
-      {footer ? <div className='border-t border-subtle'>{footer}</div> : null}
+      {footer ? (
+        <div className='border-t border-(--linear-border-subtle)'>{footer}</div>
+      ) : null}
     </div>
   );
 }

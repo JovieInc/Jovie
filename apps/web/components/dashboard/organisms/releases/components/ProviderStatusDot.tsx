@@ -12,8 +12,8 @@ export const ProviderStatusDot = memo(function ProviderStatusDot({
 }: Readonly<ProviderStatusDotProps>) {
   if (status === 'missing') {
     return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
-        <span className='h-1 w-1 rounded-full bg-tertiary-token' />
+      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
+        <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
       </span>
     );
   }

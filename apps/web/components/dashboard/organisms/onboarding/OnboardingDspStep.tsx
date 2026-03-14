@@ -10,6 +10,7 @@ import {
   type ReleasesEmptyStateAction,
   type ReleasesEmptyStateState,
 } from '@/components/dashboard/organisms/release-provider-matrix/releases-empty-state/types';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { SpotifyArtistResult } from '@/lib/queries/useArtistSearchQuery';
@@ -124,9 +125,11 @@ export function OnboardingDspStep({
           <div className='relative'>
             <div
               className={[
-                'w-full flex items-center gap-2 rounded-[6px] border bg-surface-0 dark:bg-surface-1 px-4 py-2.5',
-                'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-surface-0',
-                state.error ? 'border-error' : 'border-subtle',
+                'flex w-full items-center gap-2 rounded-[8px] border bg-(--linear-bg-surface-1) px-4 py-2.5',
+                'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
+                state.error
+                  ? 'border-error'
+                  : 'border-(--linear-border-subtle)',
               ].join(' ')}
             >
               <svg
@@ -136,7 +139,7 @@ export function OnboardingDspStep({
                 strokeWidth='2'
                 strokeLinecap='round'
                 strokeLinejoin='round'
-                className='h-4 w-4 shrink-0 text-secondary-token'
+                className='h-4 w-4 shrink-0 text-(--linear-text-tertiary)'
                 aria-hidden='true'
               >
                 <circle cx='11' cy='11' r='8' />
@@ -152,15 +155,21 @@ export function OnboardingDspStep({
                 autoCapitalize='none'
                 autoCorrect='off'
                 spellCheck={false}
-                className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
+                className='min-w-0 flex-1 bg-transparent text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none'
               />
               {searchState === 'loading' && (
-                <LoadingSpinner size='sm' className='text-secondary-token' />
+                <LoadingSpinner
+                  size='sm'
+                  className='text-(--linear-text-tertiary)'
+                />
               )}
             </div>
 
             {state.showResults && results.length > 0 && (
-              <ul className='absolute left-0 right-0 top-full z-10 mt-1 max-h-[240px] overflow-y-auto rounded-lg border border-subtle bg-surface-1 shadow-card-elevated'>
+              <ContentSurfaceCard
+                as='ul'
+                className='absolute top-full right-0 left-0 z-10 mt-1 max-h-[240px] overflow-y-auto py-1'
+              >
                 {results.map((artist, index) => (
                   <li key={artist.id}>
                     <button
@@ -175,8 +184,8 @@ export function OnboardingDspStep({
                       className={[
                         'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
                         state.activeResultIndex === index
-                          ? 'bg-surface-2/60'
-                          : 'hover:bg-surface-2/40',
+                          ? 'bg-(--linear-bg-surface-0)'
+                          : 'hover:bg-(--linear-bg-surface-0)',
                       ].join(' ')}
                     >
                       {artist.imageUrl ? (
@@ -189,14 +198,14 @@ export function OnboardingDspStep({
                           unoptimized
                         />
                       ) : (
-                        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-2' />
+                        <div className='h-8 w-8 shrink-0 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)' />
                       )}
                       <div className='min-w-0 flex-1'>
-                        <p className='truncate text-[13px] font-[510] text-primary-token'>
+                        <p className='truncate text-[13px] font-[510] text-(--linear-text-primary)'>
                           {artist.name}
                         </p>
                         {artist.followers != null && (
-                          <p className='text-[11px] text-secondary-token'>
+                          <p className='text-[11px] text-(--linear-text-tertiary)'>
                             {artist.followers.toLocaleString()} followers
                           </p>
                         )}
@@ -204,7 +213,7 @@ export function OnboardingDspStep({
                     </button>
                   </li>
                 ))}
-              </ul>
+              </ContentSurfaceCard>
             )}
           </div>
 

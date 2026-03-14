@@ -212,12 +212,6 @@ export function PixelsSectionSkeleton() {
 export function ContactsSectionSkeleton() {
   return (
     <div className='space-y-3' aria-hidden='true'>
-      {/* Header row: description + add button */}
-      <div className='flex items-center justify-between'>
-        <div className='h-4 w-3/5 rounded skeleton' />
-        <div className='h-8 w-28 rounded skeleton' />
-      </div>
-
       {/* Contact rows */}
       <div className='divide-y divide-subtle'>
         <div className='py-3 space-y-1.5'>

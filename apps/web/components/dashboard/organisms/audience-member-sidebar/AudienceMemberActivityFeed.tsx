@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 import { formatActionLabel, resolveAudienceActionIcon } from './utils';
@@ -16,17 +17,10 @@ export function AudienceMemberActivityFeed({
 
   if (actions.length === 0) {
     return (
-      <div className='flex flex-col items-center justify-center py-8 text-center'>
-        <Icon
-          name='Clock'
-          className='h-8 w-8 text-tertiary-token/40 mb-2'
-          aria-hidden='true'
-        />
-        <p className='text-sm text-secondary-token'>No activity yet</p>
-        <p className='text-xs text-tertiary-token mt-1'>
-          Activity will appear here as this contact interacts with your profile.
-        </p>
-      </div>
+      <DrawerEmptyState
+        className='min-h-[120px]'
+        message='Activity will appear here as this contact interacts with your profile.'
+      />
     );
   }
 
@@ -42,7 +36,7 @@ export function AudienceMemberActivityFeed({
     <div className='relative'>
       {/* Timeline line */}
       <div
-        className='absolute left-[13px] top-3 bottom-3 w-px bg-subtle'
+        className='absolute top-3 bottom-3 left-[13px] w-px bg-(--linear-border-subtle)'
         aria-hidden='true'
       />
 
@@ -54,7 +48,7 @@ export function AudienceMemberActivityFeed({
           >
             {/* Icon circle */}
             <span
-              className='relative z-10 inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
+              className='relative z-10 inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-tertiary)'
               aria-hidden='true'
             >
               <Icon
@@ -65,11 +59,11 @@ export function AudienceMemberActivityFeed({
 
             {/* Content */}
             <div className='min-w-0 flex-1 pt-0.5'>
-              <p className='text-[13px] text-primary-token leading-tight'>
+              <p className='text-[13px] leading-tight text-(--linear-text-primary)'>
                 {formatActionLabel(action.label)}
               </p>
               {action.timestamp && (
-                <p className='text-[11px] text-tertiary-token mt-0.5'>
+                <p className='mt-0.5 text-[11px] text-(--linear-text-tertiary)'>
                   {formatTimeAgo(action.timestamp)}
                 </p>
               )}

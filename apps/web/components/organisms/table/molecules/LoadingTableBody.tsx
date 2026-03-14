@@ -20,7 +20,13 @@ interface LoadingTableBodyProps {
    */
   readonly columnConfig?: Array<{
     readonly width?: string;
-    readonly variant?: 'text' | 'avatar' | 'badge' | 'button';
+    readonly variant?:
+      | 'text'
+      | 'avatar'
+      | 'badge'
+      | 'button'
+      | 'release'
+      | 'meta';
   }>;
 
   /**

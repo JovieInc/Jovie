@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Button,
   Checkbox,
   ContextMenu,
   ContextMenuContent,
@@ -10,7 +9,6 @@ import {
   ContextMenuTrigger,
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
-import { RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import {
   memo,
@@ -40,10 +38,14 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-subtle transition-colors duration-150 last:border-b-0';
-  if (isChecked) return cn(baseClasses, 'bg-white/[0.04]');
-  if (isSelected) return cn(baseClasses, 'bg-white/[0.04]');
-  return cn(baseClasses, 'hover:bg-white/[0.02]');
+    'group cursor-pointer border-b border-(--linear-border-subtle)/70 transition-[background-color,box-shadow] duration-150 last:border-b-0';
+  if (isChecked || isSelected) {
+    return cn(
+      baseClasses,
+      'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.18)] hover:bg-(--linear-bg-surface-1)'
+    );
+  }
+  return cn(baseClasses, 'bg-transparent hover:bg-(--linear-bg-surface-1)');
 };
 
 const renderContextMenuItem = ({
@@ -240,7 +242,7 @@ function CreatorProfileTableRowComponent({
         <div className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'>
           <span
             className={cn(
-              'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
+              'select-none text-[11px] tabular-nums text-(--linear-text-tertiary) transition-opacity',
               isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
             )}
             aria-hidden='true'
@@ -257,19 +259,12 @@ function CreatorProfileTableRowComponent({
               aria-label={`Select ${profile.username}`}
               checked={isChecked}
               onCheckedChange={() => onToggleSelect(profile.id)}
-              className='border-2 border-tertiary-token/50 data-[state=checked]:border-sidebar-accent data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+              className='border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-border-focus) data-[state=checked]:border-(--linear-border-focus) data-[state=checked]:bg-(--linear-border-focus) data-[state=checked]:text-white'
             />
           </div>
         </div>
       </td>
-      <td
-        className={cn(
-          'px-4 py-3 align-middle',
-          isChecked
-            ? 'bg-accent-subtle'
-            : isSelected && 'bg-base dark:bg-surface-2'
-        )}
-      >
+      <td className='px-4 py-3 align-middle'>
         <div className='flex items-center gap-3'>
           <CreatorAvatarCell
             profileId={profile.id}
@@ -280,15 +275,17 @@ function CreatorProfileTableRowComponent({
           />
           <div className='min-w-0'>
             {displayName ? (
-              <div className='font-medium text-primary-token line-clamp-1 overflow-hidden text-ellipsis'>
+              <div className='line-clamp-1 overflow-hidden text-ellipsis text-[13px] font-[510] text-(--linear-text-primary)'>
                 {displayName}
               </div>
             ) : null}
             <Link
               href={`/${profile.username}`}
               className={cn(
-                'text-secondary-token transition-colors hover:text-primary-token line-clamp-1 overflow-hidden text-ellipsis',
-                displayName ? 'text-xs' : 'font-medium text-primary-token'
+                'line-clamp-1 overflow-hidden text-ellipsis text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)',
+                displayName
+                  ? 'text-[12px]'
+                  : 'text-[13px] font-[510] text-(--linear-text-primary)'
               )}
               onClick={event => event.stopPropagation()}
             >
@@ -298,11 +295,11 @@ function CreatorProfileTableRowComponent({
         </div>
       </td>
       <td className='px-4 py-3 align-middle hidden lg:table-cell'>
-        <div className='flex gap-1.5 overflow-hidden'>
+        <div className='flex max-w-[230px] justify-end overflow-hidden'>
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
-      <td className='px-4 py-3 text-center align-middle text-xs text-tertiary-token whitespace-nowrap hidden md:table-cell'>
+      <td className='hidden whitespace-nowrap px-4 py-3 text-center align-middle text-[12px] text-(--linear-text-tertiary) md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td
@@ -312,28 +309,7 @@ function CreatorProfileTableRowComponent({
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
       >
-        <div className='flex items-center justify-end gap-2'>
-          <Button
-            type='button'
-            size='sm'
-            variant='ghost'
-            className='h-8 gap-1.5 px-2 text-xs text-secondary-token hover:text-primary-token'
-            onClick={async e => {
-              e.stopPropagation();
-              await onRefreshIngest();
-            }}
-            disabled={refreshIngestStatus === 'loading'}
-            aria-label='Refresh creator music data'
-            title='Refresh creator music data'
-          >
-            <RefreshCw
-              className={cn(
-                'h-3.5 w-3.5',
-                refreshIngestStatus === 'loading' && 'animate-spin'
-              )}
-            />
-            Refresh
-          </Button>
+        <div className='flex items-center justify-end gap-1.5'>
           {/* Icon action buttons - always visible on hover */}
           <div
             className={cn(

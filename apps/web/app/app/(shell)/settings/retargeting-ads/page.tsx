@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { Download, RefreshCw } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 type AdVariant = {
@@ -91,9 +92,9 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
   const previewUrl = `${getAdCreativeUrl(variant.type, variant.size)}${cacheSuffix}`;
 
   return (
-    <div className='flex flex-col gap-3 rounded-xl border border-subtle bg-surface-0 p-4'>
+    <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) p-4'>
       <div
-        className={`relative overflow-hidden rounded-lg bg-surface-2 ${
+        className={`relative overflow-hidden rounded-lg bg-(--linear-bg-surface-2) ${
           variant.size === 'story' ? 'aspect-[9/16]' : 'aspect-square'
         }`}
       >
@@ -108,10 +109,12 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 
       <div className='flex items-center justify-between'>
         <div>
-          <p className='text-sm font-medium text-primary-token'>
+          <p className='text-sm font-medium text-(--linear-text-primary)'>
             {variant.label}
           </p>
-          <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>
+          <p className='text-xs text-(--linear-text-tertiary)'>
+            {variant.dimensions}
+          </p>
         </div>
         <div className='flex items-center gap-2'>
           <Button
@@ -140,28 +143,28 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
           </Button>
         </div>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }
 
 export default function RetargetingAdsPage() {
   return (
     <div className='mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6'>
-      <div>
-        <h1 className='text-xl font-semibold text-primary-token'>
+      <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-5 sm:p-6'>
+        <h1 className='text-xl font-semibold text-(--linear-text-primary)'>
           Retargeting Ads
         </h1>
-        <p className='mt-1 text-sm text-secondary-token'>
+        <p className='mt-1 text-sm text-(--linear-text-secondary)'>
           Download ad images to use in your Instagram and Facebook campaigns.
           Upload them to Meta Ads Manager to retarget profile visitors.
         </p>
-      </div>
+      </ContentSurfaceCard>
 
       <div className='space-y-4'>
-        <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>
+        <h2 className='text-sm font-medium uppercase tracking-wide text-(--linear-text-tertiary)'>
           Fan retargeting
         </h2>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-sm text-(--linear-text-secondary)'>
           Show these to fans who visited your profile but haven&apos;t turned on
           notifications yet.
         </p>
@@ -176,10 +179,10 @@ export default function RetargetingAdsPage() {
       </div>
 
       <div className='space-y-4'>
-        <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>
+        <h2 className='text-sm font-medium uppercase tracking-wide text-(--linear-text-tertiary)'>
           Profile claim
         </h2>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-sm text-(--linear-text-secondary)'>
           Show these to artists who have an unclaimed profile to encourage them
           to claim it.
         </p>
@@ -193,11 +196,11 @@ export default function RetargetingAdsPage() {
         </div>
       </div>
 
-      <div className='rounded-xl border border-subtle bg-surface-0 p-4'>
-        <h3 className='text-sm font-medium text-primary-token'>
+      <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+        <h3 className='text-sm font-medium text-(--linear-text-primary)'>
           How to use these ads
         </h3>
-        <ol className='mt-2 list-inside list-decimal space-y-1 text-sm text-secondary-token'>
+        <ol className='mt-2 list-inside list-decimal space-y-1 text-sm text-(--linear-text-secondary)'>
           <li>Download the ad images above</li>
           <li>
             In Meta Ads Manager, create a new campaign with the Traffic
@@ -217,7 +220,7 @@ export default function RetargetingAdsPage() {
           </li>
           <li>Set your daily budget and let it run</li>
         </ol>
-      </div>
+      </ContentSurfaceCard>
     </div>
   );
 }

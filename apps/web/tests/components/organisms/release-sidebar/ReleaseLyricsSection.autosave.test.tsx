@@ -4,6 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock drawer components
 vi.mock('@/components/molecules/drawer', () => ({
+  DrawerButton: ({
+    children,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
   DrawerSection: ({
     title,
     children,

@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@jovie/ui/atoms/badge';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
@@ -9,6 +8,7 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import {
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
@@ -90,7 +90,6 @@ export function DashboardNav(_: DashboardNavProps) {
     });
   }, [artistName, releaseCount]);
 
-  const genres = selectedProfile?.genres ?? [];
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -160,6 +159,9 @@ export function DashboardNav(_: DashboardNavProps) {
         </>
       ) : (
         <SidebarGroup className='mb-1'>
+          <SidebarGroupLabel className='px-2 text-2xs tracking-tight text-sidebar-item-icon [font-weight:var(--font-weight-nav)]'>
+            Workspace
+          </SidebarGroupLabel>
           <SidebarGroupContent className='space-y-0'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
@@ -172,20 +174,6 @@ export function DashboardNav(_: DashboardNavProps) {
             ))}
           </SidebarGroupContent>
         </SidebarGroup>
-      )}
-
-      {!isInSettings && genres.length > 0 && (
-        <div className='mt-3 group-data-[collapsible=icon]:hidden'>
-          <SidebarCollapsibleGroup label='Genres' defaultOpen>
-            <div className='flex flex-wrap gap-1.5 px-2 py-1'>
-              {genres.map(genre => (
-                <Badge key={genre} variant='secondary' size='sm'>
-                  {genre}
-                </Badge>
-              ))}
-            </div>
-          </SidebarCollapsibleGroup>
-        </div>
       )}
 
       {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && !env.IS_E2E && (

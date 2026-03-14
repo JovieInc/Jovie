@@ -71,34 +71,31 @@ const iconSizeStyles: Record<CircleIconButtonSize, string> = {
 const variantStyles: Record<CircleIconButtonVariant, string> = {
   // Surface - elevated card style with subtle border
   surface: cn(
-    'bg-surface-0 text-primary-token',
-    'ring-1 ring-[var(--color-border-subtle)]',
+    'border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)',
     'shadow-sm',
-    'hover:bg-surface-1 hover:shadow-md'
+    'hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) hover:shadow-md'
   ),
   // Frosted - glassmorphic with backdrop blur
   frosted: cn(
-    'bg-surface-0/80 backdrop-blur-sm text-primary-token',
-    'border border-subtle',
+    'border border-(--linear-border-subtle) bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)] text-(--linear-text-primary) backdrop-blur-sm',
     'shadow-sm',
-    'hover:bg-surface-1 hover:border-subtle'
+    'hover:bg-[color-mix(in_srgb,var(--linear-bg-surface-2)_88%,transparent)]'
   ),
   // Ghost - transparent with hover background
   ghost: cn(
-    'bg-transparent text-secondary-token',
-    'hover:bg-surface-1 hover:text-primary-token'
+    'bg-transparent text-(--linear-text-secondary)',
+    'hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
   ),
   // Secondary - subtle background without border
   secondary: cn(
-    'bg-surface-1 text-secondary-token',
+    'bg-(--linear-bg-surface-2) text-(--linear-text-secondary)',
     'shadow-sm',
-    'hover:bg-surface-2 hover:text-primary-token'
+    'hover:bg-(--linear-bg-surface-3) hover:text-(--linear-text-primary)'
   ),
   // Outline - transparent with visible border
   outline: cn(
-    'bg-transparent text-tertiary-token',
-    'border border-subtle',
-    'hover:bg-surface-2 hover:text-primary-token'
+    'border border-(--linear-border-subtle) bg-transparent text-(--linear-text-tertiary)',
+    'hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
   ),
 };
 

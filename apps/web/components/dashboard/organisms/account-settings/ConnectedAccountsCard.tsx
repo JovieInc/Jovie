@@ -10,9 +10,8 @@
 import { Button } from '@jovie/ui';
 import { Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
-
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { ClerkExternalAccountResource, ClerkUserResource } from './types';
@@ -79,58 +78,70 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
   };
 
   if (accounts.length === 0) {
-    return null;
+    return (
+      <ContentSurfaceCard className='overflow-hidden'>
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
+              No connected accounts yet.
+            </p>
+          </ContentSurfaceCard>
+        </div>
+      </ContentSurfaceCard>
+    );
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
-      {accounts.map(account => {
-        const label = getProviderLabel(account.provider);
-        const identifier = getProviderIdentifier(account);
-        const isVerified = account.verification?.status === 'verified';
+    <ContentSurfaceCard className='overflow-hidden'>
+      <div className='space-y-3 px-4 py-3'>
+        {accounts.map(account => {
+          const label = getProviderLabel(account.provider);
+          const identifier = getProviderIdentifier(account);
+          const isVerified = account.verification?.status === 'verified';
 
-        return (
-          <div
-            key={account.id}
-            className='flex items-center justify-between px-4 py-3'
-          >
-            <div className='flex items-center gap-3'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10'>
-                <Link2 className='h-4 w-4 text-accent' />
-              </div>
-              <div>
-                <p className='text-[13px] text-primary-token flex items-center gap-2'>
-                  {label}
-                  {isVerified && (
-                    <span className='text-[11px] text-emerald-600'>
-                      Verified
-                    </span>
-                  )}
-                </p>
-                <p className='text-[11px] text-secondary-token mt-0.5'>
-                  {identifier}
-                </p>
-              </div>
-            </div>
-
-            <Button
-              variant='destructive'
-              size='sm'
-              disabled={disconnectingId === account.id}
-              onClick={() => setAccountToDisconnect(account)}
+          return (
+            <ContentSurfaceCard
+              key={account.id}
+              className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
             >
-              <Link2Off className='h-4 w-4 mr-1.5' />
-              {disconnectingId === account.id
-                ? 'Disconnecting\u2026'
-                : 'Disconnect'}
-            </Button>
-          </div>
-        );
-      })}
+              <div className='flex min-w-0 items-center gap-3'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1)'>
+                  <Link2
+                    className='h-4 w-4 text-(--linear-text-secondary)'
+                    aria-hidden
+                  />
+                </div>
+                <div className='min-w-0'>
+                  <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
+                    {label}
+                    {isVerified ? (
+                      <span className='text-[11px] text-emerald-600'>
+                        Verified
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className='mt-0.5 truncate text-[11px] text-(--linear-text-secondary)'>
+                    {identifier}
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant='destructive'
+                size='sm'
+                disabled={disconnectingId === account.id}
+                onClick={() => setAccountToDisconnect(account)}
+                className='shrink-0'
+              >
+                <Link2Off className='mr-1.5 h-4 w-4' aria-hidden />
+                {disconnectingId === account.id
+                  ? 'Disconnecting\u2026'
+                  : 'Disconnect'}
+              </Button>
+            </ContentSurfaceCard>
+          );
+        })}
+      </div>
 
       <ConfirmDialog
         open={Boolean(accountToDisconnect)}
@@ -145,6 +156,6 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           if (accountToDisconnect) await handleDisconnect(accountToDisconnect);
         }}
       />
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

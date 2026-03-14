@@ -7,6 +7,8 @@ export interface IngestProfileDropdownProps {
     id: string;
     username: string;
   }) => void;
+  readonly buttonClassName?: string;
+  readonly hideLabelOnMobile?: boolean;
 }
 
 export interface UseIngestProfileReturn {

@@ -8,7 +8,13 @@ import {
 } from '@jovie/ui';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
-import { StatTile } from '@/components/molecules/drawer';
+import {
+  DrawerButton,
+  DrawerEmptyState,
+  DrawerStatGrid,
+  DrawerSurfaceCard,
+  StatTile,
+} from '@/components/molecules/drawer';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -44,13 +50,8 @@ export function ProfileAnalyticsSummary() {
   // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <div className='rounded-lg border border-subtle/60 bg-surface-2/40'>
-        <div
-          className={cn(
-            'grid grid-cols-2 divide-x divide-subtle/80 p-3.5',
-            STAT_MIN_HEIGHT
-          )}
-        >
+      <DrawerSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
+        <DrawerStatGrid className={cn('p-3.5', STAT_MIN_HEIGHT)}>
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
             <div className='mt-2 h-6 w-14 rounded skeleton' />
@@ -59,23 +60,23 @@ export function ProfileAnalyticsSummary() {
             <div className='h-[10px] w-16 rounded skeleton' />
             <div className='mt-2 h-6 w-14 rounded skeleton' />
           </div>
-        </div>
-      </div>
+        </DrawerStatGrid>
+      </DrawerSurfaceCard>
     );
   }
 
   if (isError && !data) {
-    return <p className='text-xs text-tertiary-token'>No data yet.</p>;
+    return <DrawerEmptyState message='No data yet.' />;
   }
 
   const profileViews = data?.profile_views ?? 0;
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <div className='rounded-lg border border-subtle/60 bg-surface-2/40'>
-      <div
+    <DrawerSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
+      <DrawerStatGrid
         className={cn(
-          'grid grid-cols-2 divide-x divide-subtle/80 p-3.5 transition-opacity duration-150',
+          'p-3.5 transition-opacity duration-150',
           STAT_MIN_HEIGHT,
           isFetching && 'opacity-50'
         )}
@@ -92,23 +93,24 @@ export function ProfileAnalyticsSummary() {
             value={numberFormatter.format(totalClicks)}
           />
         </div>
-      </div>
+      </DrawerStatGrid>
 
       {/* Time range selector */}
-      <div className='flex justify-end border-t border-subtle/60 px-3 py-1.5'>
+      <div className='flex justify-end border-t border-(--linear-border-subtle) px-3 py-1.5'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
+            <DrawerButton
               type='button'
-              className='inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-secondary-token transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:bg-surface-2'
+              tone='ghost'
+              className='h-6 rounded-[7px] border-transparent px-1.5 py-0.5 text-[11px] font-normal text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
             >
               <span>Last {currentOption.label}</span>
               <ChevronDown
                 size={10}
-                className='text-tertiary-token'
+                className='text-(--linear-text-tertiary)'
                 aria-hidden='true'
               />
-            </button>
+            </DrawerButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' className='w-36'>
             {RANGE_OPTIONS.map(option => {
@@ -127,14 +129,14 @@ export function ProfileAnalyticsSummary() {
                     {option.requiresPro && (
                       <Lock
                         size={12}
-                        className='text-tertiary-token'
+                        className='text-(--linear-text-tertiary)'
                         aria-hidden='true'
                       />
                     )}
                     {isActive && !option.requiresPro && (
                       <Check
                         size={14}
-                        className='ml-auto text-primary-token'
+                        className='ml-auto text-(--linear-text-primary)'
                         aria-hidden='true'
                       />
                     )}
@@ -145,6 +147,6 @@ export function ProfileAnalyticsSummary() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </div>
+    </DrawerSurfaceCard>
   );
 }

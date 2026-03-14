@@ -7,11 +7,13 @@
  * Supports drag-and-drop upload and right-click context menu for downloads.
  */
 
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 
-import { EntityHeaderCard } from '@/components/molecules/drawer';
+import {
+  DrawerMediaThumb,
+  EntityHeaderCard,
+} from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
@@ -58,26 +60,18 @@ export function ReleaseArtwork({
   }, [artworkUrl]);
 
   const staticImage = (
-    <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded bg-surface-2 shadow-card'>
-      {artworkUrl && !imgError ? (
-        <Image
-          src={artworkUrl}
-          alt={altText}
-          fill
-          className='object-cover'
-          sizes='64px'
-          onError={() => setImgError(true)}
+    <DrawerMediaThumb
+      src={!imgError ? artworkUrl : null}
+      alt={altText}
+      sizeClassName='h-16 w-16'
+      fallback={
+        <Icon
+          name='Disc3'
+          className='h-6 w-6 text-(--linear-text-tertiary)'
+          aria-hidden='true'
         />
-      ) : (
-        <div className='flex h-full w-full items-center justify-center'>
-          <Icon
-            name='Disc3'
-            className='h-6 w-6 text-tertiary-token'
-            aria-hidden='true'
-          />
-        </div>
-      )}
-    </div>
+      }
+    />
   );
 
   const innerImage =

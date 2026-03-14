@@ -1,3 +1,4 @@
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   PageContent,
   PageHeader,
@@ -16,11 +17,14 @@ export default function ScreenshotsLoading() {
       <PageContent>
         <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
           {SKELETON_KEYS.map(key => (
-            <div key={key} className='space-y-2'>
+            <ContentSurfaceCard
+              key={key}
+              className='space-y-3 rounded-[12px] bg-(--linear-bg-surface-0) p-3.5'
+            >
               <div className='aspect-video w-full rounded-lg skeleton' />
               <div className='h-4 w-3/4 skeleton' />
               <div className='h-8 w-24 rounded-md skeleton' />
-            </div>
+            </ContentSurfaceCard>
           ))}
         </div>
       </PageContent>

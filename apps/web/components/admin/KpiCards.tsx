@@ -27,7 +27,7 @@ interface KpiCardsProps {
 function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-warning/10 px-2 py-0.5 text-2xs font-medium text-warning'
+      className='inline-flex min-h-[22px] items-center gap-1 rounded-[8px] border border-warning/25 bg-warning/10 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-warning'
       title={message ?? 'Data source unavailable'}
     >
       <AlertTriangle className='size-3' aria-hidden='true' />
@@ -42,7 +42,7 @@ function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
 function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex items-center gap-1 rounded-full bg-surface-2 px-2 py-0.5 text-2xs font-medium text-tertiary-token'
+      className='inline-flex min-h-[22px] items-center gap-1 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-tertiary)'
       title={message ?? 'Data source not configured'}
     >
       <span className='hidden truncate max-w-[10rem] sm:inline'>

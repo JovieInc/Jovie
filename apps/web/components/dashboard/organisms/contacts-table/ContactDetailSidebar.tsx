@@ -243,7 +243,9 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     if (isEditing) {
       return (
         <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-          <Label className='text-[13px] text-secondary-token'>{label}</Label>
+          <Label className='text-[13px] text-(--linear-text-secondary)'>
+            {label}
+          </Label>
           <Input
             ref={inputRef}
             value={editValue}
@@ -261,10 +263,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       <button
         type='button'
         onClick={() => startEditing(field)}
-        className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8 w-full text-left rounded-md -mx-2 px-2 hover:bg-surface-2 transition-colors cursor-pointer'
+        className='-mx-2 grid min-h-8 w-full grid-cols-[96px_minmax(0,1fr)] items-center gap-2 rounded-[8px] px-2 text-left transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
       >
-        <span className='text-[13px] text-secondary-token'>{label}</span>
-        <span className='text-[13px] text-primary-token hover:text-primary-token transition-colors truncate'>
+        <span className='text-[13px] text-(--linear-text-secondary)'>
+          {label}
+        </span>
+        <span className='truncate text-[13px] text-(--linear-text-primary)'>
           {displayValue}
         </span>
       </button>
@@ -286,11 +290,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {/* Role Section */}
           <DrawerSection title='Role'>
             <div className='space-y-2'>
-              <Label className='text-[13px] text-secondary-token'>
+              <Label className='text-[13px] text-(--linear-text-secondary)'>
                 Contact type
               </Label>
               <Select value={contact.role} onValueChange={handleRoleChange}>
-                <SelectTrigger className='h-9 text-[13px] rounded-lg border border-subtle bg-surface-1 px-3'>
+                <SelectTrigger className='h-9 rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px]'>
                   <SelectValue>{roleLabel}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className='p-1'>
@@ -298,12 +302,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                     <SelectItem
                       key={option.value}
                       value={option.value}
-                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-2 data-highlighted:text-primary-token'
+                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-(--linear-text-secondary) data-highlighted:bg-(--linear-bg-surface-0) data-highlighted:text-(--linear-text-primary)'
                     >
                       <div className='flex items-center gap-2'>
                         <Icon
                           name={option.iconName}
-                          className='h-4 w-4 text-tertiary-token'
+                          className='h-4 w-4 text-(--linear-text-tertiary)'
                         />
                         <span>{option.label}</span>
                       </div>
@@ -338,7 +342,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {hasEmailAndPhone && (
             <DrawerSection title='Preferred Contact'>
               <div className='space-y-2'>
-                <Label className='text-[13px] text-secondary-token'>
+                <Label className='text-[13px] text-(--linear-text-secondary)'>
                   Default action
                 </Label>
                 <Select
@@ -363,7 +367,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           <DrawerSection title='Territories'>
             <div className='space-y-3'>
               <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-                <span className='text-[13px] text-secondary-token'>
+                <span className='text-[13px] text-(--linear-text-secondary)'>
                   Coverage
                 </span>
                 <Badge size='sm'>{territorySummary}</Badge>
@@ -377,10 +381,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       type='button'
                       onClick={() => handleTerritoryToggle(territory)}
                       className={cn(
-                        'px-2 py-1 text-[13px] rounded-md border transition-colors',
+                        'rounded-[8px] border px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
                         isSelected
-                          ? 'bg-primary text-primary-foreground border-primary'
-                          : 'bg-surface-2 text-secondary-token border-subtle hover:bg-surface-3'
+                          ? 'border-(--linear-border-focus) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
+                          : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)'
                       )}
                     >
                       {territory}
@@ -393,14 +397,14 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Error display */}
           {contact.error && (
-            <div className='rounded-md border border-error/30 bg-error-subtle p-3'>
+            <div className='rounded-[10px] border border-red-500/20 bg-red-500/5 p-3'>
               <p className='text-[13px] text-destructive'>{contact.error}</p>
             </div>
           )}
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='text-[13px] text-tertiary-token text-center'>
+            <div className='text-center text-[13px] text-(--linear-text-tertiary)'>
               Saving...
             </div>
           )}

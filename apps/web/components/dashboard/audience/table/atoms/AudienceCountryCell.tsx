@@ -16,13 +16,13 @@ export function AudienceCountryCell({
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-2 text-[13px] text-secondary-token',
+        'inline-flex items-center gap-2 text-[13px] text-(--linear-text-secondary)',
         className
       )}
     >
       <Icon
         name='MapPin'
-        className='h-4 w-4 text-tertiary-token'
+        className='h-4 w-4 text-(--linear-text-tertiary)'
         aria-hidden='true'
       />
       <span className='line-clamp-1'>

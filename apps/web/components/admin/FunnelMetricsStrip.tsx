@@ -1,4 +1,3 @@
-import { Card, CardContent } from '@jovie/ui';
 import {
   CalendarClock,
   ChartNoAxesCombined,
@@ -9,6 +8,9 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
@@ -63,20 +65,13 @@ function MetricCard({
   iconClassName,
 }: MetricCardProps) {
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardContent className='space-y-1.5 p-4'>
-        <div className='flex items-center gap-1.5'>
-          <Icon
-            className={`size-3.5 ${iconClassName ?? 'text-tertiary-token'}`}
-          />
-          <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
-        </div>
-        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
-          {value}
-        </p>
-        <p className='text-app text-secondary-token'>{subtitle}</p>
-      </CardContent>
-    </Card>
+    <ContentMetricCard
+      label={title}
+      value={value}
+      subtitle={subtitle}
+      icon={Icon}
+      iconClassName={iconClassName}
+    />
   );
 }
 
@@ -90,23 +85,25 @@ function PlaceholderMetricCard({
   description,
 }: Readonly<PlaceholderMetricCardProps>) {
   return (
-    <Card className='border-subtle bg-transparent'>
-      <CardContent className='space-y-2 p-4'>
-        <p className='text-2xs tracking-wide text-tertiary-token'>{title}</p>
-        <div className='flex items-center justify-between gap-3'>
-          <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
-            —
-          </p>
-          <Link
-            href={APP_ROUTES.SETTINGS_BILLING}
-            className='text-app font-medium text-info transition-colors hover:text-info/80'
-          >
-            Configure
-          </Link>
-        </div>
-        <p className='text-app text-secondary-token'>{description}</p>
-      </CardContent>
-    </Card>
+    <ContentSurfaceCard className='space-y-2 p-4'>
+      <p className='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'>
+        {title}
+      </p>
+      <div className='flex items-center justify-between gap-3'>
+        <p className='text-2xl font-semibold tabular-nums tracking-tight text-(--linear-text-primary)'>
+          —
+        </p>
+        <Link
+          href={APP_ROUTES.SETTINGS_BILLING}
+          className='text-[12px] font-medium text-(--linear-text-primary) transition-colors hover:text-(--linear-text-secondary)'
+        >
+          Configure
+        </Link>
+      </div>
+      <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+        {description}
+      </p>
+    </ContentSurfaceCard>
   );
 }
 
@@ -121,9 +118,13 @@ export function FunnelMetricsStrip({
 
   return (
     <div className='space-y-6' data-testid='funnel-metrics-strip'>
-      <section className='space-y-3'>
-        <h2 className='text-sm font-semibold text-primary-token'>Core KPIs</h2>
-        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Core KPIs'
+          subtitle='Revenue, runway, and monetization health'
+          className='min-h-0 px-5 py-3'
+        />
+        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-3'>
           <MetricCard
             title='MRR'
             value={mrrDisplay}
@@ -180,11 +181,18 @@ export function FunnelMetricsStrip({
             iconClassName='text-success'
           />
         </div>
-      </section>
+      </ContentSurfaceCard>
 
-      <section className='space-y-3' data-testid='yc-metrics-section'>
-        <h2 className='text-sm font-semibold text-primary-token'>YC metrics</h2>
-        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+      <ContentSurfaceCard
+        className='overflow-hidden p-0'
+        data-testid='yc-metrics-section'
+      >
+        <ContentSectionHeader
+          title='YC metrics'
+          subtitle='Benchmark gaps and operating signals'
+          className='min-h-0 px-5 py-3'
+        />
+        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
           <PlaceholderMetricCard
             title='Churn rate'
             description='Customer churn in the trailing 30 days.'
@@ -209,7 +217,7 @@ export function FunnelMetricsStrip({
             description='Unit economics for sustainable growth.'
           />
         </div>
-      </section>
+      </ContentSurfaceCard>
     </div>
   );
 }

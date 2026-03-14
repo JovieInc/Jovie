@@ -8,10 +8,34 @@ import type {
   ProviderKey,
   ProviderLink,
   ReleaseViewModel,
+  TrackViewModel,
 } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export type Release = ReleaseViewModel;
+export type ReleaseSidebarTrack = Pick<
+  TrackViewModel,
+  | 'id'
+  | 'releaseId'
+  | 'title'
+  | 'slug'
+  | 'smartLinkPath'
+  | 'trackNumber'
+  | 'discNumber'
+  | 'durationMs'
+  | 'isrc'
+  | 'isExplicit'
+  | 'previewUrl'
+  | 'audioUrl'
+  | 'audioFormat'
+  | 'providers'
+>;
+
+export interface ReleaseSidebarAnalytics {
+  totalClicks: number;
+  last7DaysClicks: number;
+  providerClicks: Array<{ provider: string; clicks: number }>;
+}
 
 export interface DspLink extends ProviderLink {
   label: string;
@@ -92,11 +116,17 @@ export interface ReleaseSidebarProps {
    * Controls the visibility of the "Allow album art downloads" setting.
    */
   readonly allowDownloads?: boolean;
+  /** Optional override for the artwork downloads toggle action */
+  readonly onToggleArtworkDownloads?: (enabled: boolean) => Promise<void>;
   /**
    * When true, disables editing capabilities (artwork upload, add/remove links).
    * Used for free-plan users who can view but not modify their smartlinks.
    */
   readonly readOnly?: boolean;
+  /** Optional static track data used instead of the live sidebar API */
+  readonly tracksOverride?: ReleaseSidebarTrack[];
+  /** Optional static analytics data used instead of the live sidebar API */
+  readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
   readonly onTrackClick?: (track: {
     id: string;
     title: string;
@@ -107,7 +137,7 @@ export interface ReleaseSidebarProps {
     durationMs: number | null;
     isrc: string | null;
     isExplicit: boolean;
-    providers: Array<{ key: string; label: string; url: string }>;
+    providers: Array<{ key: ProviderKey; label: string; url: string }>;
     releaseId: string;
     previewUrl?: string | null;
     audioUrl?: string | null;

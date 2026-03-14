@@ -41,11 +41,11 @@ export interface PillIconProps {
 export function PillIcon({ platformIcon, style }: Readonly<PillIconProps>) {
   return (
     <span
-      className='flex shrink-0 items-center justify-center rounded-lg bg-surface-2/60 p-0.5 transition-colors'
+      className='flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-(--linear-bg-surface-0) p-0.5 transition-colors'
       style={style}
       aria-hidden='true'
     >
-      <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+      <SocialIcon platform={platformIcon} className='h-3 w-3' />
     </span>
   );
 }
@@ -68,10 +68,10 @@ export function CollapsedContent({
   return (
     <span
       className={cn(
-        'whitespace-nowrap overflow-hidden transition-all duration-200',
+        'inline-block min-w-0 max-w-0 overflow-hidden whitespace-nowrap text-ellipsis pr-0 text-[12px] text-(--linear-text-primary) transition-[max-width,opacity,padding] duration-180 ease-out',
         !defaultExpanded &&
-          'w-0 opacity-0 group-hover/pill:w-auto group-hover/pill:opacity-100',
-        defaultExpanded && 'w-auto opacity-100'
+          'opacity-0 group-hover/pill:max-w-[104px] group-hover/pill:pr-0.5 group-hover/pill:opacity-100 group-focus-visible/pill:max-w-[104px] group-focus-visible/pill:pr-0.5 group-focus-visible/pill:opacity-100 lg:group-hover/pill:max-w-[136px] lg:group-focus-visible/pill:max-w-[136px]',
+        defaultExpanded && 'max-w-[104px] pr-0.5 opacity-100 lg:max-w-[136px]'
       )}
     >
       {primaryText}

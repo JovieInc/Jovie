@@ -5,11 +5,11 @@ import { Pause, Play } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { DspProviderIcon } from '@/components/dashboard/atoms/DspProviderIcon';
+import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { PROVIDER_TO_DSP } from '@/lib/discography/provider-domains';
 import type {
   ProviderKey,
   ReleaseViewModel,
@@ -55,11 +55,11 @@ export const TrackRow = memo(function TrackRow({
 }: TrackRowProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const rowStateClassName = isSelected
-    ? 'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)'
-    : 'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-150 ease-out';
+    ? 'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-(--linear-bg-surface-1)'
+    : 'bg-transparent hover:bg-(--linear-bg-surface-1) transition-[background-color,box-shadow] duration-150 ease-out';
 
   const rowClassName = [
-    'group rounded-md',
+    'group rounded-[8px]',
     onClick ? 'cursor-pointer' : '',
     rowStateClassName,
   ]
@@ -122,7 +122,7 @@ export const TrackRow = memo(function TrackRow({
               <button
                 type='button'
                 onClick={handleTogglePlayback}
-                className='flex h-6 w-6 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-(--linear-bg-surface-2)'
+                className='flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={
                   isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
                 }
@@ -141,9 +141,9 @@ export const TrackRow = memo(function TrackRow({
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
         <td className='py-2 pr-4'>
-          <div className='flex items-center gap-3 pl-8'>
+          <div className='flex items-center gap-2.5 pl-6'>
             {/* Track number */}
-            <span className='w-8 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
+            <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
               {trackLabel}.
             </span>
 
@@ -152,7 +152,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-[13px] text-primary-token'
+                  className='text-[13px] text-(--linear-text-primary)'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -161,7 +161,7 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 bg-surface-2 px-1 py-0 text-[10px] text-tertiary-token'
+                    className='shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-0 text-[9px] text-(--linear-text-tertiary)'
                   >
                     E
                   </Badge>
@@ -180,35 +180,31 @@ export const TrackRow = memo(function TrackRow({
         <td className='py-2'>
           <div className='flex items-center gap-2'>
             {linkedProviders.length > 0 ? (
-              <>
-                <div className='flex -space-x-1'>
-                  {linkedProviders.slice(0, 4).map(providerKey => {
-                    const config = providerConfig[providerKey];
-                    const dspId = PROVIDER_TO_DSP[providerKey];
-
-                    return (
-                      <div
-                        key={providerKey}
-                        className='relative flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-1'
-                      >
-                        {dspId ? (
-                          <DspProviderIcon provider={dspId} size='sm' />
-                        ) : (
-                          <span
-                            className='h-2 w-2 rounded-full'
-                            style={{ backgroundColor: config.accent }}
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <span className='text-[11px] text-tertiary-token'>
-                  {availableCount}/{allProviders.length}
-                </span>
-              </>
+              <CompactLinkRail
+                items={linkedProviders.slice(0, 4).map(providerKey => ({
+                  id: providerKey,
+                  platformIcon: providerKey,
+                  platformName: providerConfig[providerKey].label,
+                  primaryText: providerConfig[providerKey].label,
+                  summaryIcon: (
+                    <ProviderIcon
+                      provider={providerKey}
+                      className='h-2.5 w-2.5'
+                      aria-hidden='true'
+                    />
+                  ),
+                }))}
+                countLabel='track DSP links'
+                summaryCount={availableCount}
+                summaryAriaLabel={`${availableCount} of ${allProviders.length} track DSP links`}
+                maxVisible={4}
+                className='justify-start'
+                railClassName='max-w-[132px] lg:max-w-[164px]'
+              />
             ) : (
-              <span className='text-[11px] text-tertiary-token'>—</span>
+              <span className='text-[11px] text-(--linear-text-tertiary)'>
+                —
+              </span>
             )}
           </div>
         </td>
@@ -224,11 +220,11 @@ export const TrackRow = memo(function TrackRow({
       {isVisible('metrics') && (
         <td className='py-2'>
           {track.durationMs ? (
-            <span className='text-[11px] text-secondary-token tabular-nums'>
+            <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
               {formatDuration(track.durationMs)}
             </span>
           ) : (
-            <span className='text-[11px] text-tertiary-token'>—</span>
+            <span className='text-[11px] text-(--linear-text-tertiary)'>—</span>
           )}
         </td>
       )}
@@ -239,7 +235,7 @@ export const TrackRow = memo(function TrackRow({
       {/* 9. ISRC */}
       {isVisible('primaryIsrc') && (
         <td className='py-2'>
-          <CopyableMonospaceCell value={track.isrc} label='ISRC' />
+          <CopyableMonospaceCell value={track.isrc} label='ISRC' size='sm' />
         </td>
       )}
 
@@ -303,10 +299,10 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
 
   if (tracks.length === 0) {
     return (
-      <tr className='bg-surface-1/50'>
+      <tr className='bg-(--linear-bg-surface-1)/60'>
         <td
           colSpan={columnCount}
-          className='py-3 pl-20 text-[11px] text-tertiary-token'
+          className='py-3 pl-20 text-[11px] text-(--linear-text-tertiary)'
         >
           <div className='flex items-center gap-2'>
             <Icon name='AlertCircle' className='h-3.5 w-3.5' />

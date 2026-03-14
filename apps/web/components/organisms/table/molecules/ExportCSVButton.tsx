@@ -14,6 +14,7 @@ import {
 } from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import { type CSVColumn, toCSVBlob } from '@/lib/utils/csv';
@@ -21,6 +22,11 @@ import {
   downloadCSVBlob,
   generateTimestampedFilename,
 } from '@/lib/utils/download';
+import {
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+  PAGE_TOOLBAR_ICON_CLASS,
+} from './PageToolbar';
 
 export interface ExportCSVButtonProps<T extends object> {
   /**
@@ -72,6 +78,16 @@ export interface ExportCSVButtonProps<T extends object> {
    * Tooltip label shown on hover. When provided, wraps the button in TooltipShortcut.
    */
   readonly tooltipLabel?: string;
+  /**
+   * Visual chrome preset for dashboard utility toolbars.
+   * @default 'default'
+   */
+  readonly chrome?: 'default' | 'page-toolbar';
+  /**
+   * Render toolbar export action as icon-only.
+   * @default false
+   */
+  readonly iconOnly?: boolean;
 }
 
 export function ExportCSVButton<T extends object>({
@@ -85,6 +101,8 @@ export function ExportCSVButton<T extends object>({
   label = 'Export CSV',
   ariaLabel = 'Export data to CSV file',
   tooltipLabel,
+  chrome = 'default',
+  iconOnly = false,
 }: ExportCSVButtonProps<T>) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -165,16 +183,37 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleOpenConfirmation}
       disabled={disabled || isExporting}
-      className={cn('gap-2 rounded-lg border-subtle hover:bg-base', className)}
+      className={cn(
+        chrome === 'page-toolbar'
+          ? cn(
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS
+            )
+          : APP_CONTROL_BUTTON_CLASS,
+        className
+      )}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >
       {isExporting ? (
-        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+        <Loader2
+          className={cn(
+            chrome === 'page-toolbar' ? PAGE_TOOLBAR_ICON_CLASS : 'h-4 w-4',
+            'animate-spin'
+          )}
+          aria-hidden='true'
+        />
       ) : (
-        <Download className='h-4 w-4' aria-hidden='true' />
+        <Download
+          className={
+            chrome === 'page-toolbar' ? PAGE_TOOLBAR_ICON_CLASS : 'h-4 w-4'
+          }
+          aria-hidden='true'
+        />
       )}
-      <span>{isExporting ? 'Exporting...' : label}</span>
+      <span className={cn(iconOnly && 'sr-only')}>
+        {isExporting ? 'Exporting...' : label}
+      </span>
     </Button>
   );
 
@@ -197,7 +236,7 @@ export function ExportCSVButton<T extends object>({
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <dl className='space-y-2 text-[13px] text-secondary-token'>
+          <dl className='space-y-2 text-[13px] text-(--linear-text-secondary)'>
             <div className='flex items-center justify-between gap-4'>
               <dt>Rows</dt>
               <dd className='font-[510] text-primary-token'>

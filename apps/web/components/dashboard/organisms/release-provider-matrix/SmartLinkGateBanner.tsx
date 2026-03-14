@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 
 type SmartLinkGateBannerProps = {
@@ -31,11 +33,9 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
   const { className, mode } = props;
 
   return (
-    <aside
-      className={cn(
-        'flex items-start gap-3 rounded-lg border border-subtle bg-surface-1 p-3',
-        className
-      )}
+    <DrawerSurfaceCard
+      as='aside'
+      className={cn('flex items-start gap-3 rounded-[10px] p-3', className)}
       aria-label={
         mode === 'soft-cap'
           ? 'Smart link limit notice'
@@ -45,44 +45,50 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10'>
         <Icon
           name='Sparkles'
-          className='h-4 w-4 text-primary'
+          className='h-4 w-4 text-(--linear-accent)'
           aria-hidden='true'
         />
       </div>
       <div className='min-w-0 flex-1'>
         {mode === 'soft-cap' ? (
           <>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
               You have {props.releasedCount} smart links
             </p>
-            <p className='mt-0.5 text-[11px] text-secondary-token'>
-              Need more than {props.softCap}?{' '}
-              <a
-                href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'
-                className='font-[510] text-primary underline-offset-2 hover:underline'
-              >
-                Request a higher limit
-              </a>
+            <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+              Need more than {props.softCap}? Request a higher limit.
             </p>
+            <DrawerButton
+              asChild
+              tone='ghost'
+              size='sm'
+              className='mt-2 h-7 w-fit px-2 text-[11px]'
+            >
+              <a href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'>
+                Email support
+              </a>
+            </DrawerButton>
           </>
         ) : (
           <>
-            <p className='text-[13px] font-[510] text-primary-token'>
+            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
               You have {props.unreleasedCount} upcoming{' '}
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>
-            <p className='mt-0.5 text-[11px] text-secondary-token'>
-              <Link
-                href='/launch/pricing'
-                className='font-[510] text-primary underline-offset-2 hover:underline'
-              >
-                Upgrade to Pro
-              </Link>{' '}
-              to enable pre-release pages with countdowns and notify-me.
+            <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+              Enable pre-release pages with countdowns and notify-me.
             </p>
+            <DrawerButton
+              asChild
+              tone='ghost'
+              size='sm'
+              className='mt-2 h-7 w-fit px-2 text-[11px]'
+            >
+              <Link href={APP_ROUTES.LAUNCH_PRICING}>Upgrade to Pro</Link>
+            </DrawerButton>
           </>
         )}
       </div>
-    </aside>
+    </DrawerSurfaceCard>
   );
 }

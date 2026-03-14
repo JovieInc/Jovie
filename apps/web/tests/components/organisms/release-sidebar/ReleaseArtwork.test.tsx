@@ -11,6 +11,13 @@ vi.mock('@/components/molecules/drawer', () => ({
   EntityHeaderCard: ({ image }: { image: ReactNode }) => (
     <div data-testid='entity-header-card'>{image}</div>
   ),
+  DrawerMediaThumb: ({
+    children,
+    fallback,
+  }: {
+    children?: ReactNode;
+    fallback?: ReactNode;
+  }) => <div data-testid='drawer-media-thumb'>{children ?? fallback}</div>,
 }));
 
 vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
@@ -41,5 +48,17 @@ describe('ReleaseArtwork', () => {
       'data-rounded',
       'md'
     );
+  });
+
+  it('renders drawer media thumb fallback when artwork is missing', () => {
+    render(
+      <ReleaseArtwork
+        artworkUrl={null}
+        title='Midnight Echo'
+        canUploadArtwork={false}
+      />
+    );
+
+    expect(screen.getByTestId('drawer-media-thumb')).toBeInTheDocument();
   });
 });

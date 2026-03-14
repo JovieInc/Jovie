@@ -191,6 +191,7 @@ function mapReleaseToViewModel(
     profileId,
     id: release.id,
     title: release.title,
+    artistNames: release.artistNames,
     releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,
     slug,

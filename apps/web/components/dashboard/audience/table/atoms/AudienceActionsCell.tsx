@@ -43,7 +43,7 @@ export function AudienceActionsCell({
         return (
           <span
             key={`${rowId}-${actionLabel}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}-${idx}`}
-            className='inline-flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
+            className='inline-flex h-6 w-6 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary)'
             title={actionLabel}
           >
             <Icon name={iconName} className='h-3 w-3' aria-hidden='true' />

@@ -19,6 +19,7 @@ import {
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { cn } from '@/lib/utils';
@@ -106,15 +107,14 @@ export function LinkPill({
     menuItems.length > 0 ? firstItemRef : floatingRefs.floating;
 
   const trailing = (
-    <button
-      type='button'
-      aria-label={menuButtonAria}
+    <AppIconButton
+      ariaLabel={menuButtonAria}
       ref={setReferenceRef}
-      className='inline-flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2/30 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.97] -mr-2'
+      className='-mr-2 h-10 w-10 rounded-lg border-transparent bg-(--linear-bg-surface-1)/55 text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-5 [&_svg]:w-5'
       {...getReferenceProps()}
     >
       <Icon name='MoreHorizontal' className='h-5 w-5 opacity-90' />
-    </button>
+    </AppIconButton>
   );
 
   return (
