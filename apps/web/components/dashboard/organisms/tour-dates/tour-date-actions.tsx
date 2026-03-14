@@ -1,6 +1,6 @@
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 
 export interface BuildTourDateActionsCallbacks {
   readonly onEdit: (tourDate: TourDateViewModel) => void;
@@ -37,11 +37,7 @@ export function buildTourDateActions(
       label: 'Open ticket link',
       icon: <Icon name='ExternalLink' className='h-4 w-4' />,
       onClick: () =>
-        globalThis.open(
-          tourDate.ticketUrl!,
-          '_blank',
-          'noopener,noreferrer'
-        ),
+        globalThis.open(tourDate.ticketUrl!, '_blank', 'noopener,noreferrer'),
     });
   }
 

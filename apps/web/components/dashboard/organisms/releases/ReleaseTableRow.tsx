@@ -9,19 +9,17 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
-import {
-  convertContextMenuItems,
-} from '@/components/organisms/table';
+import { convertContextMenuItems } from '@/components/organisms/table';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildReleaseActions } from './release-actions';
 import {
   AddProviderUrlPopover,
   NotFoundCopyButton,
   ProviderCopyButton,
   ProviderStatusDot,
 } from './components';
+import { buildReleaseActions } from './release-actions';
 
 interface ProviderConfig {
   label: string;
@@ -146,7 +144,15 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
           qrCodeIcon,
         })
       ),
-    [release, onEdit, handleCopyWithFeedback, artistName, onDelete, handleCopyQrCode, qrCodeIcon]
+    [
+      release,
+      onEdit,
+      handleCopyWithFeedback,
+      artistName,
+      onDelete,
+      handleCopyQrCode,
+      qrCodeIcon,
+    ]
   );
 
   const manualOverrideCount = release.providers.filter(

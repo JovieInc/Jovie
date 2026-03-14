@@ -15,10 +15,10 @@ import {
   type ContextMenuItemType,
   UnifiedTable,
 } from '@/components/organisms/table';
-import { buildTourDateActions } from './tour-date-actions';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
+import { buildTourDateActions } from './tour-date-actions';
 
 /** Check if a date is in the past */
 function isPastDate(date: Date): boolean {
