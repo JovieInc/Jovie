@@ -85,7 +85,7 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[124px]'>
+    <div className='min-h-[112px]'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
@@ -136,10 +136,9 @@ export function ReleaseSmartLinkAnalytics({
             </DrawerStatGrid>
 
             {showEmpty && (
-              <DrawerEmptyState
-                className='mt-1 min-h-[40px] px-3'
-                message='Share your smart link to start tracking clicks.'
-              />
+              <p className='mt-2 px-1 text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+                Share your smart link to start tracking clicks.
+              </p>
             )}
           </div>
         )}
