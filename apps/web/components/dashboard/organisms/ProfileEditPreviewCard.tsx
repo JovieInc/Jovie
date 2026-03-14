@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
-import { useConfirmChatEditMutation } from '@/lib/queries/useConfirmChatEditMutation';
+import { useConfirmChatEditMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 export interface ProfileEditPreview {

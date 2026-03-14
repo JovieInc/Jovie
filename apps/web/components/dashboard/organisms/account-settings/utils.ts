@@ -4,7 +4,7 @@
  * Shared utility functions for account settings components.
  */
 
-import { fetchWithTimeout } from '@/lib/queries/fetch';
+import { fetchWithTimeout } from '@/lib/queries';
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat('en', {
   numeric: 'auto',

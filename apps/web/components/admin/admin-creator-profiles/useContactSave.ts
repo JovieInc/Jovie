@@ -3,8 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { queryKeys } from '@/lib/queries';
-import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
+import { FetchError, fetchWithTimeout, queryKeys } from '@/lib/queries';
 import type { Contact } from '@/types';
 import type { AdminCreatorSocialLinksResponse } from './types';
 

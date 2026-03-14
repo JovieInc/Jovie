@@ -6,13 +6,13 @@ import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
+  queryKeys,
   useAddLeadKeywordsMutation,
   useDeleteLeadKeywordMutation,
   useLeadKeywordsQuery,
   useSeedLeadKeywordsMutation,
   useToggleLeadKeywordMutation,
 } from '@/lib/queries';
-import { queryKeys } from '@/lib/queries/keys';
 
 export function LeadKeywordsManager() {
   const queryClient = useQueryClient();

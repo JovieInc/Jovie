@@ -32,9 +32,11 @@ import {
 } from '@/lib/admin/csv-configs/waitlist';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
-import { useAdminWaitlistInfiniteQuery } from '@/lib/queries/admin-infinite';
-import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
-import { useUpdateWaitlistStatusMutation } from '@/lib/queries/useWaitlistMutations';
+import {
+  QueryErrorBoundary,
+  useAdminWaitlistInfiniteQuery,
+  useUpdateWaitlistStatusMutation,
+} from '@/lib/queries';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
 import {
   persistGroupingPreference,

@@ -4,7 +4,7 @@ import {
   createQueryFn,
   FetchError,
   fetchWithTimeout,
-} from '@/lib/queries/fetch';
+} from '@/lib/queries';
 
 // Mock global fetch with proper isolation
 const mockFetch = vi.fn();

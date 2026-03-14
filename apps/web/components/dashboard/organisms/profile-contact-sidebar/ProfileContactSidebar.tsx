@@ -18,8 +18,8 @@ import { BASE_URL } from '@/constants/domains';
 import {
   useAvatarMutation,
   useProfileSaveMutation,
-} from '@/lib/queries/useProfileMutation';
-import { useRemoveSocialLinkMutation } from '@/lib/queries/useRemoveSocialLinkMutation';
+  useRemoveSocialLinkMutation,
+} from '@/lib/queries';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileAboutTab } from './ProfileAboutTab';
 import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';

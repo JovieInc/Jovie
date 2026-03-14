@@ -17,10 +17,12 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   loadReleaseMatrix: vi.fn(),
 }));
 
-import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
-import { queryKeys } from '@/lib/queries/keys';
-import { useBuildInfoQuery } from '@/lib/queries/useBuildInfoQuery';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import {
+  queryKeys,
+  STANDARD_CACHE,
+  useBuildInfoQuery,
+  useReleasesQuery,
+} from '@/lib/queries';
 
 describe('query gcTime coverage', () => {
   beforeEach(() => {

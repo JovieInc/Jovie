@@ -24,7 +24,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { queryKeys } from '@/lib/queries/keys';
+import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
   buildTouringCityMap,

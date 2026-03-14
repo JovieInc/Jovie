@@ -9,7 +9,7 @@ import {
 } from '@/app/app/(shell)/dashboard/contacts/actions';
 import { track } from '@/lib/analytics';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
-import { queryKeys } from '@/lib/queries/keys';
+import { queryKeys } from '@/lib/queries';
 import type {
   ContactRole,
   DashboardContact,

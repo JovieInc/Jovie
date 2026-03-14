@@ -14,7 +14,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
-import type { EarningsResponse } from '@/lib/queries/useEarningsQuery';
+import type { EarningsResponse } from '@/lib/queries';
 
 export const runtime = 'nodejs';
 

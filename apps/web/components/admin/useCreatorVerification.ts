@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { useToggleVerificationMutation } from '@/lib/queries/useCreatorVerificationMutation';
+import { useToggleVerificationMutation } from '@/lib/queries';
 
 export type CreatorVerificationStatus =
   | 'idle'

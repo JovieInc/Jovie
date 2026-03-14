@@ -7,7 +7,7 @@ import {
   useCreateConversationMutation,
   useDeleteConversationMutation,
   useUpdateConversationMutation,
-} from '@/lib/queries/useChatMutations';
+} from '@/lib/queries';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;

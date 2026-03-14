@@ -7,13 +7,11 @@ import { DspMatchCard } from '@/components/dashboard/molecules/DspMatchCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import {
-  useConfirmDspMatchMutation,
-  useRejectDspMatchMutation,
-} from '@/lib/queries/useDspEnrichmentMutations';
-import {
   countMatchesByStatus,
+  useConfirmDspMatchMutation,
   useDspMatchesQuery,
-} from '@/lib/queries/useDspMatchesQuery';
+  useRejectDspMatchMutation,
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 import { DspMatchEmptyState } from './DspMatchEmptyState';

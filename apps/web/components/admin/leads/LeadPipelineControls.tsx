@@ -7,12 +7,12 @@ import { type ChangeEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   type LeadPipelineSettings,
+  queryKeys,
   useLeadPipelineSettingsQuery,
   useRunLeadDiscoveryMutation,
   useRunLeadQualificationMutation,
   useUpdateLeadPipelineSettingsMutation,
 } from '@/lib/queries';
-import { queryKeys } from '@/lib/queries/keys';
 
 export function LeadPipelineControls() {
   const queryClient = useQueryClient();

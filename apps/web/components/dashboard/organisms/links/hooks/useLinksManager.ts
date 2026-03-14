@@ -13,7 +13,7 @@ import {
   MAX_MODE_LINKS,
   MAX_PROFILE_LINKS,
 } from '@/lib/profile/social-link-limits';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
+import { fetchWithTimeout } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { findDuplicate, mergeDuplicate } from '../services/duplicate-detection';

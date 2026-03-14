@@ -58,7 +58,7 @@ import {
   useNotificationSettingsMutation,
   useThemeMutation,
   useUpdateSettingsMutation,
-} from '@/lib/queries/useSettingsMutation';
+} from '@/lib/queries';
 
 /* ------------------------------------------------------------------ */
 /*  Shared test infrastructure                                        */

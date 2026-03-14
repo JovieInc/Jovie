@@ -28,7 +28,7 @@ import {
   useCampaignStatsQuery,
   useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
-} from '@/lib/queries/useCampaignInvites';
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 interface ThrottlingConfig {

@@ -15,15 +15,13 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
-import { queryKeys } from '@/lib/queries/keys';
-import {
-  useRejectDspMatchMutation,
-  useTriggerDiscoveryMutation,
-} from '@/lib/queries/useDspEnrichmentMutations';
 import {
   type DspMatch,
+  queryKeys,
   useDspMatchesQuery,
-} from '@/lib/queries/useDspMatchesQuery';
+  useRejectDspMatchMutation,
+  useTriggerDiscoveryMutation,
+} from '@/lib/queries';
 
 type PrimaryDspProvider = 'spotify' | 'apple_music';
 

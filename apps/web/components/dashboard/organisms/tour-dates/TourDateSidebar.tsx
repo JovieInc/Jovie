@@ -12,7 +12,7 @@ import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import {
   useDeleteTourDateMutation,
   useUpdateTourDateMutation,
-} from '@/lib/queries/useTourDateMutations';
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatISODate } from '@/lib/utils/date-formatting';
 import { buildTourDateActions } from './tour-date-actions';

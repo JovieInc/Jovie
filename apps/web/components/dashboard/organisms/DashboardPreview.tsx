@@ -6,7 +6,7 @@ import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToCl
 import { StatusBarMock } from '@/components/dashboard/molecules/StatusBarMock';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { BASE_URL } from '@/constants/domains';
-import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
+import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 /**

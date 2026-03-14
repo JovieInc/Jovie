@@ -8,7 +8,7 @@ import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsSta
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
+import { useBrandingSettingsMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 export interface SettingsBrandingSectionProps {
