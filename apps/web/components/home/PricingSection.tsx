@@ -3,43 +3,53 @@ import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
-const free = ENTITLEMENT_REGISTRY.free;
-const founding = ENTITLEMENT_REGISTRY.founding;
+const FREE_OUTCOMES = [
+  'Get live fast with a smart artist profile',
+  'Capture contacts and prove demand',
+  'Start building an owned audience',
+] as const;
+
+const FOUNDING_OUTCOMES = [
+  'Capture and own more fan data',
+  'See richer analytics and export contacts',
+  'Support bigger release campaigns without extra tools',
+] as const;
 
 export function PricingSection() {
+  const freePlan = ENTITLEMENT_REGISTRY.free.marketing;
+  const foundingPlan = ENTITLEMENT_REGISTRY.founding.marketing;
+
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          {/* Header */}
-          <div className='reveal-on-scroll flex flex-col items-center text-center gap-5 mb-16'>
-            <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+          <div className='reveal-on-scroll mb-16 flex flex-col items-center gap-5 text-center'>
+            <span className='inline-flex items-center gap-1.5 rounded-full border border-[var(--linear-border-subtle)] px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
               Pricing
             </span>
             <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
               Start free. Pay when it pays you back.
             </h2>
             <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
-              Free gets an artist live fast. {founding.marketing.displayName}{' '}
-              adds the tools that turn attention into revenue and repeat reach.
+              Free gets an artist live, capturing contacts and proving demand.
+              Founding Member adds more leverage for audience ownership,
+              analytics, and monetization.
             </p>
           </div>
 
-          {/* Cards */}
           <div
-            className='reveal-on-scroll grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto'
+            className='reveal-on-scroll mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-2'
             data-delay='80'
           >
-            {/* Free tier */}
             <div
-              className='relative rounded-xl p-8 flex flex-col'
+              className='relative flex flex-col rounded-xl p-8'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
               }}
             >
               <p className='text-[13px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
-                {free.marketing.displayName}
+                {freePlan.displayName}
               </p>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
@@ -50,11 +60,12 @@ export function PricingSection() {
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                Get your page live and start growing your audience.
+                Get live, capture contacts, and prove demand before you pay for
+                more leverage.
               </p>
 
-              <ul className='mt-8 flex flex-col gap-3 flex-1'>
-                {free.marketing.features.map(feature => (
+              <ul className='mt-8 flex flex-1 flex-col gap-3'>
+                {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
                     className='flex items-center gap-3 text-[14px] text-[color:var(--linear-text-secondary)]'
@@ -65,8 +76,17 @@ export function PricingSection() {
                 ))}
               </ul>
 
+              <div className='mt-6 rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] p-4'>
+                <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)]'>
+                  Includes
+                </p>
+                <p className='mt-2 text-[13px] leading-6 text-[color:var(--linear-text-secondary)]'>
+                  {freePlan.features.slice(0, 4).join(' • ')}
+                </p>
+              </div>
+
               <Link
-                href='/signup'
+                href='/claim'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-2)',
@@ -78,9 +98,8 @@ export function PricingSection() {
               </Link>
             </div>
 
-            {/* Founding Member tier */}
             <div
-              className='relative rounded-xl p-8 flex flex-col overflow-hidden'
+              className='relative flex flex-col overflow-hidden rounded-xl p-8'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid rgba(94,106,210,0.4)',
@@ -88,7 +107,6 @@ export function PricingSection() {
                   'var(--linear-shadow-card-elevated), 0 0 0 1px rgba(94,106,210,0.15)',
               }}
             >
-              {/* Top accent bar */}
               <div
                 aria-hidden='true'
                 className='absolute inset-x-0 top-0 h-px'
@@ -97,10 +115,9 @@ export function PricingSection() {
                     'linear-gradient(90deg, transparent, #5e6ad2 40%, #5e6ad2 60%, transparent)',
                 }}
               />
-              {/* Badge */}
               <div className='flex items-center justify-between'>
                 <p className='text-[13px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
-                  {founding.marketing.displayName}
+                  {foundingPlan.displayName}
                 </p>
                 <span
                   className='rounded-full px-2.5 py-0.5 text-[11px] font-medium'
@@ -115,18 +132,19 @@ export function PricingSection() {
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
-                  ${founding.marketing.price!.monthly}
+                  ${foundingPlan.price?.monthly ?? 0}
                 </span>
                 <span className='text-[14px] text-[color:var(--linear-text-tertiary)]'>
                   /mo
                 </span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
-                {founding.marketing.tagline}
+                Scale audience ownership, analytics, and monetization once your
+                profile is already pulling weight.
               </p>
 
-              <ul className='mt-8 flex flex-col gap-3 flex-1'>
-                {founding.marketing.features.map(feature => (
+              <ul className='mt-8 flex flex-1 flex-col gap-3'>
+                {FOUNDING_OUTCOMES.map(feature => (
                   <li
                     key={feature}
                     className='flex items-center gap-3 text-[14px] text-[color:var(--linear-text-secondary)]'
@@ -137,16 +155,38 @@ export function PricingSection() {
                 ))}
               </ul>
 
+              <div className='mt-6 rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] p-4'>
+                <p className='text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)]'>
+                  Includes
+                </p>
+                <p className='mt-2 text-[13px] leading-6 text-[color:var(--linear-text-secondary)]'>
+                  {foundingPlan.features
+                    .filter(feature => !feature.endsWith('+'))
+                    .slice(0, 4)
+                    .join(' • ')}
+                </p>
+              </div>
+
               <Link
-                href='/signup'
+                href='/claim'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
                   backgroundColor: '#5e6ad2',
                   color: '#ffffff',
                 }}
               >
-                Choose {founding.marketing.displayName}
+                Choose Founding Member
               </Link>
+
+              <p className='mt-3 text-center text-[12px] text-[color:var(--linear-text-tertiary)]'>
+                Need the full plan breakdown?{' '}
+                <Link
+                  href='/pricing'
+                  className='text-[color:var(--linear-text-secondary)] underline underline-offset-4'
+                >
+                  See all pricing
+                </Link>
+              </p>
             </div>
           </div>
         </div>
