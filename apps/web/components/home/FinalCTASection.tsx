@@ -54,15 +54,15 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-white'
           >
-            Give the next fan one clear place to go.
+            Own the next fan who finds your music.
           </h2>
 
           <p
             className='mt-5 max-w-md marketing-lead-linear'
             style={{ color: 'rgba(255,255,255,0.5)' }}
           >
-            Claim your handle, launch your page, and start collecting the
-            audience data every other profile page leaves behind.
+            Launch a smart artist profile that captures contacts, routes fans to
+            the right action, and keeps your release growth compounding.
           </p>
 
           {/* Form */}

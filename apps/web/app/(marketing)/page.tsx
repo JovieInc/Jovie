@@ -18,7 +18,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} | Turn profile visits into fans you can reach`;
   const description =
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.';
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -140,7 +140,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.',
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -207,7 +207,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.',
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
