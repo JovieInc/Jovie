@@ -6,7 +6,7 @@
  * Stripe webhook handlers).
  */
 
-import { and, count, desc, eq, sql as drizzleSql, sum } from 'drizzle-orm';
+import { and, count, desc, sql as drizzleSql, eq, sum } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { tips } from '@/lib/db/schema/analytics';
