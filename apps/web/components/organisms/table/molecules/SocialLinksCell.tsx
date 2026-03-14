@@ -122,13 +122,7 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
   }
 
   const visibleLinks = filteredLinks.slice(0, maxLinks);
-  const overflowCount = Math.max(filteredLinks.length - visibleLinks.length, 0);
   const useCollapsedMode = filteredLinks.length >= 2;
-
-  const summaryLabel =
-    filterPlatformType === 'music'
-      ? `${filteredLinks.length} DSP links`
-      : `${filteredLinks.length} social links`;
 
   return (
     <CompactLinkRail
