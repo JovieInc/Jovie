@@ -510,7 +510,6 @@ export function UnifiedTable<TData>({
   // Common table styles
   const tableClassName = cn(
     'w-full border-separate border-spacing-0 text-[13px]',
-    hideHeader && '[&_tbody>tr:first-child>td]:pt-1.5',
     className
   );
 
