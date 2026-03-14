@@ -16,14 +16,9 @@ import {
 import { AdminTableSubheader } from './AdminTableHeader';
 
 export interface AdminCreatorsToolbarProps {
-  readonly basePath?: string;
-  readonly search?: string;
-  readonly sort?: string;
-  readonly pageSize?: number;
   readonly from: number;
   readonly to: number;
   readonly total: number;
-  readonly clearHref?: string;
   readonly profiles: AdminCreatorProfileRow[];
   readonly selectedIds?: ReadonlySet<string>;
   readonly onBulkVerify?: () => void;
