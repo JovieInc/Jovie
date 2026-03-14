@@ -1,10 +1,12 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fetchWithTimeout } from '@/lib/queries/fetch';
+import { queryKeys } from '@/lib/queries/keys';
 
 const MAX_SUGGESTIONS = 4;
 const DEBOUNCE_MS = 350;
-const FETCH_TIMEOUT_MS = 5_000;
 
 export interface HandleSuggestion {
   readonly handle: string;
@@ -24,6 +26,34 @@ function toSuggestionCandidates(baseHandle: string): string[] {
   ]).slice(0, MAX_SUGGESTIONS);
 }
 
+interface HandleCheckResponse {
+  available?: boolean;
+}
+
+async function fetchHandleSuggestions(
+  candidates: string[],
+  signal?: AbortSignal
+): Promise<HandleSuggestion[]> {
+  const checks = await Promise.all(
+    candidates.map(async candidate => {
+      try {
+        const payload = await fetchWithTimeout<HandleCheckResponse>(
+          `/api/handle/check?handle=${encodeURIComponent(candidate)}`,
+          { signal, timeout: 5_000 }
+        );
+        return {
+          handle: candidate,
+          available: Boolean(payload.available),
+        } satisfies HandleSuggestion;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  return checks.filter((value): value is HandleSuggestion => !!value);
+}
+
 export function useHandleSuggestions(
   handle: string,
   disabled: boolean
@@ -31,72 +61,23 @@ export function useHandleSuggestions(
   readonly suggestions: HandleSuggestion[];
   readonly checkingSuggestions: boolean;
 } {
-  const [suggestions, setSuggestions] = useState<HandleSuggestion[]>([]);
-  const [checkingSuggestions, setCheckingSuggestions] = useState(false);
+  const [debouncedHandle, setDebouncedHandle] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
-  const candidates = useMemo(() => {
-    if (!handle) {
-      return [];
-    }
-    return toSuggestionCandidates(handle);
-  }, [handle]);
-
+  // Debounce the handle input
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    abortRef.current?.abort();
 
-    if (disabled || candidates.length === 0) {
-      setSuggestions([]);
-      setCheckingSuggestions(false);
+    if (disabled || !handle) {
+      setDebouncedHandle('');
       return;
     }
 
-    setCheckingSuggestions(true);
-
-    debounceRef.current = setTimeout(async () => {
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-      try {
-        const checks = await Promise.all(
-          candidates.map(async candidate => {
-            const response = await fetch(
-              `/api/handle/check?handle=${encodeURIComponent(candidate)}`,
-              { signal: controller.signal }
-            );
-
-            if (!response.ok) {
-              return null;
-            }
-
-            const payload = (await response.json()) as { available?: boolean };
-            return {
-              handle: candidate,
-              available: Boolean(payload.available),
-            } satisfies HandleSuggestion;
-          })
-        );
-
-        clearTimeout(timeoutId);
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setSuggestions(
-          checks.filter((value): value is HandleSuggestion => !!value)
-        );
-        setCheckingSuggestions(false);
-      } catch {
-        clearTimeout(timeoutId);
-        setSuggestions([]);
-        setCheckingSuggestions(false);
-      }
+    debounceRef.current = setTimeout(() => {
+      setDebouncedHandle(handle);
     }, DEBOUNCE_MS);
 
     return () => {
@@ -104,9 +85,30 @@ export function useHandleSuggestions(
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      abortRef.current?.abort();
     };
-  }, [candidates, disabled]);
+  }, [handle, disabled]);
+
+  const candidates = useMemo(() => {
+    if (!debouncedHandle) {
+      return [];
+    }
+    return toSuggestionCandidates(debouncedHandle);
+  }, [debouncedHandle]);
+
+  const { data: suggestions = [], isFetching } = useQuery({
+    queryKey: queryKeys.handle.suggestions(candidates),
+    queryFn: ({ signal }) => fetchHandleSuggestions(candidates, signal),
+    enabled: candidates.length > 0,
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // Show checking state when debounce is pending or query is fetching
+  const isDebouncing =
+    !disabled && Boolean(handle) && handle !== debouncedHandle;
+  const checkingSuggestions = isDebouncing || isFetching;
 
   return { suggestions, checkingSuggestions };
 }

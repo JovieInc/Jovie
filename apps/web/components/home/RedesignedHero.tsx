@@ -3,6 +3,11 @@ import { ClaimHandleForm } from './claim-handle';
 import { HeroPhonePreview } from './HeroPhonePreview';
 
 const DEMO_HANDLES = ['tim', 'tiesto', 'x'];
+const HERO_PROOF_POINTS = [
+  'Capture emails and fan intent',
+  'Send fans to listen, tip, tour, or follow',
+  'Auto-create links for every release',
+] as const;
 
 export async function RedesignedHero() {
   let previewHandles: string[] = DEMO_HANDLES;
@@ -53,8 +58,23 @@ export async function RedesignedHero() {
               <ClaimHandleForm size='hero' />
             </div>
 
+            <div className='mt-5 grid w-full max-w-[35rem] gap-2.5 sm:grid-cols-3 lg:max-w-full'>
+              {HERO_PROOF_POINTS.map(point => (
+                <div
+                  key={point}
+                  className='flex items-center gap-2 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] px-3.5 py-3 text-left text-[12px] font-medium text-[var(--linear-text-secondary)]'
+                >
+                  <span
+                    aria-hidden='true'
+                    className='inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
+                  />
+                  <span>{point}</span>
+                </div>
+              ))}
+            </div>
+
             <p
-              className='mt-3 flex items-center justify-center gap-2 self-stretch lg:justify-start'
+              className='mt-4 flex items-center justify-center gap-2 self-stretch lg:justify-start'
               style={{
                 fontSize: '12px',
                 fontWeight: 450,

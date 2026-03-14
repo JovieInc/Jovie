@@ -19,11 +19,14 @@ export function DrawerEmptyState({
   return (
     <DrawerSurfaceCard
       testId={testId}
-      className={cn('flex min-h-[140px] items-center px-3', className)}
+      className={cn(
+        'flex min-h-[140px] items-center rounded-[10px] border border-subtle/70 bg-surface-1/50 px-4 py-4',
+        className
+      )}
     >
       <p
         className={cn(
-          'text-[12px] leading-[17px]',
+          'text-[12px] leading-[18px]',
           tone === 'error' ? 'text-error' : 'text-(--linear-text-secondary)'
         )}
       >

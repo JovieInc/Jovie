@@ -241,10 +241,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Refs for selection state to avoid column recreation on every selection change
   const selectedIdsRef = useRef(selectedIds);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   selectedIdsRef.current = selectedIds;
   const headerCheckboxStateRef = useRef(headerCheckboxState);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
   headerCheckboxStateRef.current = headerCheckboxState;
 
   // Context menu items for right-click AND actions button
@@ -363,17 +361,14 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
 
   // Create memoized cell renderers using refs to avoid column recreation on selection change
   const SelectHeader = useMemo(
-    // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
     () => createSelectHeaderRenderer(headerCheckboxStateRef, toggleSelectAll),
     [toggleSelectAll]
   );
 
-  /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
   const SelectCell = useMemo(
     () => createSelectCellRenderer(selectedIdsRef, toggleSelect),
     [toggleSelect]
   );
-  /* eslint-enable react-hooks/refs */
 
   const ActionsCell = useMemo(
     () => createActionsCellRenderer(getContextMenuItems),
@@ -486,8 +481,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
       row.id === selectedUser?.id
-        ? 'bg-white/[0.04] cursor-pointer'
-        : 'group hover:bg-white/[0.02] cursor-pointer',
+        ? 'group cursor-pointer bg-(--linear-row-selected) shadow-[inset_2px_0_0_0_var(--linear-border-focus)]'
+        : 'group cursor-pointer hover:bg-(--linear-row-hover)',
     [selectedUser?.id]
   );
 

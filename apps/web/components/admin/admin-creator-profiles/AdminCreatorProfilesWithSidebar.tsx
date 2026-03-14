@@ -24,8 +24,9 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { useAvatarUploadMutation } from '@/lib/queries/useAvatarUploadMutation';
+import type { Contact } from '@/types';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
-import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useDebouncedContactSave } from './useDebouncedContactSave';
@@ -159,7 +160,13 @@ export function AdminCreatorProfilesWithSidebar({
     onRefreshComplete: refetchSocialLinks,
   });
 
-  const { handleAvatarUpload } = useAvatarUpload();
+  const { mutateAsync: uploadAvatar } = useAvatarUploadMutation();
+  const handleAvatarUpload = useCallback(
+    async (file: File, contact: Contact): Promise<string> => {
+      return uploadAvatar({ file, profileId: contact.id });
+    },
+    [uploadAvatar]
+  );
 
   const { saveContact, isSaving } = useContactSave({
     onSaveSuccess: updatedContact => {

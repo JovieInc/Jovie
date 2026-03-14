@@ -125,7 +125,7 @@ function VirtualizedTableRowComponent<TData>({
         shouldEnableKeyboardNav &&
           'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         focusedIndex === rowIndex &&
-          'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]',
+          'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_65%,transparent)]',
         getRowClassName?.(rowData, rowIndex)
       )}
       onClick={handleClick}

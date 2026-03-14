@@ -1,7 +1,8 @@
 'use client';
 
 import { CheckCircle2, Music2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useApplePreSaveMutation } from '@/lib/queries';
 
 interface PreSaveActionsProps {
   readonly releaseId: string;
@@ -20,9 +21,7 @@ export function PreSaveActions({
   hasSpotify,
   hasAppleMusic,
 }: PreSaveActionsProps) {
-  const [appleState, setAppleState] = useState<'idle' | 'done' | 'loading'>(
-    'idle'
-  );
+  const applePreSave = useApplePreSaveMutation();
 
   const spotifyHref = useMemo(() => {
     const params = new URLSearchParams({
@@ -39,8 +38,7 @@ export function PreSaveActions({
   }, [releaseId, trackId, slug, username]);
 
   const handleApplePreAdd = async () => {
-    if (appleState === 'loading') return;
-    setAppleState('loading');
+    if (applePreSave.isPending) return;
 
     try {
       const music = globalThis.window
@@ -58,23 +56,13 @@ export function PreSaveActions({
       }
 
       const userToken = await music.getInstance().authorize();
-      const response = await fetch('/api/pre-save/apple', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          releaseId,
-          trackId,
-          appleMusicUserToken: userToken,
-        }),
+      applePreSave.mutate({
+        releaseId,
+        trackId,
+        appleMusicUserToken: userToken,
       });
-
-      if (!response.ok) {
-        throw new Error('Apple pre-add failed');
-      }
-
-      setAppleState('done');
     } catch {
-      setAppleState('idle');
+      // MusicKit authorization failed - no action needed
     }
   };
 
@@ -100,7 +88,7 @@ export function PreSaveActions({
             onClick={handleApplePreAdd}
             className='inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-apple px-4 text-sm font-semibold text-background transition-colors hover:bg-brand-apple-hover'
           >
-            {appleState === 'done' ? (
+            {applePreSave.isSuccess ? (
               <>
                 <CheckCircle2 className='size-4' aria-hidden='true' />
                 Added on Apple Music
