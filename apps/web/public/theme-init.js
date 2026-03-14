@@ -3,12 +3,7 @@
     var root = document.documentElement;
     var pathname = globalThis.location?.pathname ?? '/';
     var isThemeEnabledRoute =
-      pathname.startsWith('/app') ||
-      pathname.startsWith('/onboarding') ||
-      pathname.startsWith('/account') ||
-      pathname.startsWith('/billing') ||
-      pathname.startsWith('/artist-selection') ||
-      pathname.startsWith('/sso-callback');
+      pathname.startsWith('/app') || pathname.startsWith('/onboarding');
 
     if (isThemeEnabledRoute) {
       var storageValue =
@@ -28,8 +23,7 @@
       var resolvedDark =
         theme === 'dark' || (theme === 'system' && systemPrefersDark);
 
-      root.classList.remove('light', 'dark');
-      if (resolvedDark) root.classList.add('dark');
+      root.classList.toggle('dark', resolvedDark);
       root.style.colorScheme = resolvedDark ? 'dark' : 'light';
 
       var metaThemeEnabled = document.querySelector('meta[name="theme-color"]');
@@ -41,7 +35,6 @@
       }
     } else {
       // Public surfaces are intentionally forced dark.
-      root.classList.remove('light', 'dark');
       root.classList.add('dark');
       root.style.colorScheme = 'dark';
 
