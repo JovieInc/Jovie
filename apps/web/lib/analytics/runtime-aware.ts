@@ -27,7 +27,7 @@ function getRuntime(): 'nodejs' | 'edge' | 'unknown' {
   }
 
   // Check for Node.js
-  if (typeof process !== 'undefined' && process.versions?.node) {
+  if (typeof process !== 'undefined') {
     return 'nodejs';
   }
 
