@@ -218,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 232,
-      minSize: 188,
+      size: 340,
+      minSize: 220,
       meta: { className: 'hidden sm:table-cell' },
     });
 

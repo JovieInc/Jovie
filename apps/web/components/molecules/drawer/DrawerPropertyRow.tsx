@@ -59,7 +59,7 @@ export function DrawerPropertyRow({
         align === 'start' ? 'items-start' : 'items-center',
         styles.container,
         interactive &&
-          'cursor-pointer hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'cursor-pointer border border-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
       style={gridStyle}
