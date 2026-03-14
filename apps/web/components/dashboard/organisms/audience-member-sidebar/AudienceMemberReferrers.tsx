@@ -6,8 +6,8 @@
  * Renders the referrer history section with URLs and timestamps
  */
 
-import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { Link2 } from 'lucide-react';
+import { DrawerEmptyState } from '@/components/molecules/drawer';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 
