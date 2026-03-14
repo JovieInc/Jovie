@@ -4,7 +4,6 @@ import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-
 import {
   AdminTableHeader,
   AdminTableSubheader,
@@ -25,6 +24,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { useDismissFeedbackMutation } from '@/lib/queries/useAdminFeedbackMutation';
 
 interface FeedbackRow {
   id: string;
@@ -110,7 +110,8 @@ export function AdminFeedbackTable({
   const [selectedId, setSelectedId] = useState<string | null>(
     items[0]?.id ?? null
   );
-  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const { mutateAsync: dismissFeedback, isPending: isDismissing } =
+    useDismissFeedbackMutation();
   const [rows, setRows] = useState(items);
 
   const selected = useMemo(
@@ -120,24 +121,22 @@ export function AdminFeedbackTable({
 
   const dismissSelected = async () => {
     if (!selected || selected.status === 'dismissed') return;
-    setDismissingId(selected.id);
-    const response = await fetch(`/api/admin/feedback/${selected.id}/dismiss`, {
-      method: 'POST',
-    });
-    if (response.ok) {
+    try {
+      await dismissFeedback(selected.id);
       setRows(current =>
         current.map(row =>
           row.id === selected.id
             ? {
                 ...row,
-                status: 'dismissed',
+                status: 'dismissed' as const,
                 dismissedAtIso: new Date().toISOString(),
               }
             : row
         )
       );
+    } catch {
+      // Error toast handled by mutation's onError callback
     }
-    setDismissingId(null);
   };
 
   const copySelectedAsMarkdown = useCallback(async () => {
@@ -279,7 +278,7 @@ export function AdminFeedbackTable({
                   tone='secondary'
                   onClick={dismissSelected}
                   disabled={selected.status === 'dismissed'}
-                  loading={dismissingId === selected.id}
+                  loading={isDismissing}
                 >
                   Dismiss
                 </DrawerButton>

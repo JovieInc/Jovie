@@ -80,6 +80,10 @@ export {
 } from './useAccountMutations';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
+// Admin bulk refresh mutation
+export { useAdminBulkRefreshMutation } from './useAdminBulkRefreshMutation';
+// Admin feedback mutation
+export { useDismissFeedbackMutation } from './useAdminFeedbackMutation';
 export {
   type AdminLead,
   type AdminLeadKeyword,
@@ -258,13 +262,17 @@ export {
   useUpdateContentPreferencesMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
-// Pixel settings mutation
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
   usePixelSettingsDeleteMutation,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
+// Pixel settings query and mutation
+export {
+  type PixelSettingsData,
+  usePixelSettingsQuery,
+} from './usePixelSettingsQuery';
 // Plan gate hook
 export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 export {
