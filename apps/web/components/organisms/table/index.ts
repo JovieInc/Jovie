@@ -39,30 +39,6 @@
 // =============================================================================
 
 export { ActionsCell } from './atoms/ActionsCell';
-export { AvatarCell } from './atoms/AvatarCell';
-export { DateCell } from './atoms/DateCell';
-export { GroupHeader } from './atoms/GroupHeader';
-export { SkeletonCell } from './atoms/SkeletonCell';
-export { SkeletonRow } from './atoms/SkeletonRow';
-export { TableBadge } from './atoms/TableBadge';
-export type { TableCellProps } from './atoms/TableCell';
-export { TableCell } from './atoms/TableCell';
-export type {
-  TableCheckboxCellLegacyProps,
-  TableCheckboxCellProps,
-  TableCheckboxCellTanStackProps,
-} from './atoms/TableCheckboxCell';
-export { TableCheckboxCell } from './atoms/TableCheckboxCell';
-export type { TableCountBadgeProps } from './atoms/TableCountBadge';
-export { TableCountBadge } from './atoms/TableCountBadge';
-export type { TableEmptyStateProps } from './atoms/TableEmptyState';
-export { TableEmptyState } from './atoms/TableEmptyState';
-export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
-export { TableHeaderCell } from './atoms/TableHeaderCell';
-export { TableIconButton } from './atoms/TableIconButton';
-export type { TableRowProps } from './atoms/TableRow';
-export { TableRow } from './atoms/TableRow';
-
 // Audience-specific atoms (consolidated from dashboard/audience/table/atoms)
 export type { AudienceActionsCellProps } from './atoms/AudienceActionsCell';
 export { AudienceActionsCell } from './atoms/AudienceActionsCell';
@@ -102,6 +78,29 @@ export type { AudienceUserCellProps } from './atoms/AudienceUserCell';
 export { AudienceUserCell } from './atoms/AudienceUserCell';
 export type { AudienceVisitsCellProps } from './atoms/AudienceVisitsCell';
 export { AudienceVisitsCell } from './atoms/AudienceVisitsCell';
+export { AvatarCell } from './atoms/AvatarCell';
+export { DateCell } from './atoms/DateCell';
+export { GroupHeader } from './atoms/GroupHeader';
+export { SkeletonCell } from './atoms/SkeletonCell';
+export { SkeletonRow } from './atoms/SkeletonRow';
+export { TableBadge } from './atoms/TableBadge';
+export type { TableCellProps } from './atoms/TableCell';
+export { TableCell } from './atoms/TableCell';
+export type {
+  TableCheckboxCellLegacyProps,
+  TableCheckboxCellProps,
+  TableCheckboxCellTanStackProps,
+} from './atoms/TableCheckboxCell';
+export { TableCheckboxCell } from './atoms/TableCheckboxCell';
+export type { TableCountBadgeProps } from './atoms/TableCountBadge';
+export { TableCountBadge } from './atoms/TableCountBadge';
+export type { TableEmptyStateProps } from './atoms/TableEmptyState';
+export { TableEmptyState } from './atoms/TableEmptyState';
+export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
+export { TableHeaderCell } from './atoms/TableHeaderCell';
+export { TableIconButton } from './atoms/TableIconButton';
+export type { TableRowProps } from './atoms/TableRow';
+export { TableRow } from './atoms/TableRow';
 
 // =============================================================================
 // Molecules

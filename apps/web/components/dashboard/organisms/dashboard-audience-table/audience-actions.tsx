@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Bell,
-  Copy,
-  Download,
-  Eye,
-  Phone,
-  UserMinus,
-} from 'lucide-react';
+import { Bell, Copy, Download, Eye, Phone, UserMinus } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 
