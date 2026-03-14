@@ -149,14 +149,22 @@ async function loadSpotifyArtistIfNeeded(
     displayName: string | null;
     avatarLockedByUser: boolean | null;
     avatarUrl: string | null;
+    genres: string[] | null;
+    spotifyFollowers: number | null;
+    spotifyPopularity: number | null;
   },
   musicFetch: MusicFetchArtistResult | null
 ): Promise<Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null> {
+  if (!spotifyArtistId) return null;
+
   const needsData =
     (!profile.displayNameLocked && !profile.displayName && !musicFetch?.name) ||
     (!profile.avatarLockedByUser &&
       !profile.avatarUrl &&
-      !musicFetch?.image?.url);
+      !musicFetch?.image?.url) ||
+    !profile.genres?.length ||
+    profile.spotifyFollowers == null ||
+    profile.spotifyPopularity == null;
 
   if (!needsData) return null;
 
@@ -289,6 +297,9 @@ export async function enrichProfileFromDsp(
       avatarUrl: creatorProfiles.avatarUrl,
       avatarLockedByUser: creatorProfiles.avatarLockedByUser,
       bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
       usernameNormalized: creatorProfiles.usernameNormalized,
       spotifyUrl: creatorProfiles.spotifyUrl,
       spotifyId: creatorProfiles.spotifyId,
