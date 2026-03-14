@@ -137,13 +137,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_78%,transparent)] shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_86%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_86%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_75%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_82%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
       }
 
       const refreshClassName = isRefreshing
@@ -218,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 232,
-      minSize: 188,
+      size: 320,
+      minSize: 208,
       meta: { className: 'hidden sm:table-cell' },
     });
 

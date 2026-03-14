@@ -14,6 +14,7 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 async function interceptAnalytics(page: Page): Promise<void> {
   await page.route('**/api/profile/view', r =>
@@ -30,6 +31,11 @@ async function interceptAnalytics(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth - Sign Up', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
+  );
+
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await page.goto(APP_ROUTES.SIGNUP, { waitUntil: 'domcontentloaded' });
@@ -111,6 +117,11 @@ test.describe('Auth - Sign Up', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth - Sign In', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
+  );
+
   test.beforeEach(async ({ page }) => {
     await interceptAnalytics(page);
     await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'domcontentloaded' });
@@ -162,6 +173,11 @@ test.describe('Auth - Sign In', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth - Navigation', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
+  );
+
   test('can navigate from sign in to sign up and back', async ({ page }) => {
     await interceptAnalytics(page);
     await page.goto('/signin', { waitUntil: 'domcontentloaded' });
@@ -196,6 +212,11 @@ test.describe('Auth - Navigation', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Auth - Error Layout Stability', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Auth UI flows are covered by smoke-auth and golden-path in the fast gate'
+  );
+
   test('error messages do not cause layout shift on sign-up email step', async ({
     page,
   }) => {

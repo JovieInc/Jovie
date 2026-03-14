@@ -7,6 +7,15 @@ import {
 
 const mockSendSlackMessage = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
+const mockFormatFounderSender = vi.hoisted(() =>
+  vi.fn(() => 'Tim White <tim@jov.ie>')
+);
+const mockGetSenderPolicy = vi.hoisted(() =>
+  vi.fn(() => ({
+    fromEmail: 'tim@jov.ie',
+    replyToEmail: 'tim@jov.ie',
+  }))
+);
 
 vi.mock('@/lib/notifications/providers/slack', () => ({
   sendSlackMessage: mockSendSlackMessage,
@@ -14,6 +23,11 @@ vi.mock('@/lib/notifications/providers/slack', () => ({
 
 vi.mock('@/lib/email/send', () => ({
   sendEmail: mockSendEmail,
+}));
+
+vi.mock('@/lib/notifications/sender-policy', () => ({
+  formatFounderSender: mockFormatFounderSender,
+  getSenderPolicy: mockGetSenderPolicy,
 }));
 
 describe('verification notifications', () => {
@@ -56,6 +70,8 @@ describe('verification notifications', () => {
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'pro@example.com',
+        from: 'Tim White <tim@jov.ie>',
+        replyTo: 'tim@jov.ie',
         subject: 'Quick update from Tim',
       })
     );

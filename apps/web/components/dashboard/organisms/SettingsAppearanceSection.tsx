@@ -1,33 +1,37 @@
 'use client';
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 const THEME_OPTIONS = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
-  { value: 'system', label: 'System' },
+  {
+    value: 'light',
+    label: 'Light',
+    description: 'Bright surfaces for daytime editing.',
+    icon: Sun,
+  },
+  {
+    value: 'dark',
+    label: 'Dark',
+    description: 'Dimmed surfaces for low-light focus.',
+    icon: Moon,
+  },
+  {
+    value: 'system',
+    label: 'System',
+    description: 'Automatically follows your device preference.',
+    icon: Laptop,
+  },
 ] as const;
 
 export function SettingsAppearanceSection() {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const { updateTheme, isPending: isThemePending } = useThemeMutation();
   const { isHighContrast, setHighContrast } = useHighContrast();
   const { setHighContrast: saveHighContrast, isPending: isContrastPending } =
@@ -45,37 +49,87 @@ export function SettingsAppearanceSection() {
     saveHighContrast(enabled, currentTheme);
   };
 
-  const currentLabel =
-    THEME_OPTIONS.find(o => o.value === theme)?.label ?? 'System';
+  const selectedTheme = (theme ?? 'system') as 'light' | 'dark' | 'system';
+  const resolvedThemeLabel =
+    resolvedTheme === 'light'
+      ? 'Light'
+      : resolvedTheme === 'dark'
+        ? 'Dark'
+        : '';
 
   return (
-    <ContentSurfaceCard className='overflow-hidden divide-y divide-(--linear-border-subtle)'>
-      {isLightModeEnabled && (
-        <ContentSectionHeader
-          title='Interface theme'
-          subtitle='Select or customize your interface color scheme'
-          className='min-h-0 px-4 py-3'
-          actionsClassName='w-auto shrink-0'
-          actions={
-            <Select
-              value={theme ?? 'system'}
-              onValueChange={handleThemeChange}
-              disabled={isThemePending}
-            >
-              <SelectTrigger className='w-[120px] h-8 text-[13px]'>
-                <SelectValue>{currentLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent position='item-aligned'>
-                {THEME_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-        />
-      )}
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle'
+    >
+      <div className='px-4 py-3'>
+        <div className='min-w-0'>
+          <h3 className='text-[13px] font-[510] text-primary-token'>
+            Interface theme
+          </h3>
+          <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
+            Pick the appearance style that feels most comfortable.
+          </p>
+        </div>
+        <div className='mt-3 grid gap-2 sm:grid-cols-3'>
+          {THEME_OPTIONS.map(option => {
+            const isSelected = selectedTheme === option.value;
+            const Icon = option.icon;
+
+            return (
+              <Button
+                key={option.value}
+                type='button'
+                variant='ghost'
+                onClick={() => handleThemeChange(option.value)}
+                disabled={isThemePending}
+                className={cn(
+                  'h-auto justify-start rounded-lg border px-3 py-2 text-left',
+                  'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
+                  isSelected
+                    ? 'border-accent/60 bg-accent/8 text-primary-token'
+                    : 'border-subtle bg-transparent text-secondary-token hover:bg-surface-2'
+                )}
+                aria-pressed={isSelected}
+                data-testid={`theme-option-${option.value}`}
+              >
+                <span className='flex w-full items-start gap-2'>
+                  <span className='mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center'>
+                    <Icon className='h-4 w-4' aria-hidden='true' />
+                  </span>
+                  <span className='min-w-0 flex-1'>
+                    <span className='flex items-center gap-1 text-[13px] font-[510] text-primary-token'>
+                      {option.label}
+                      {option.value === 'system' && resolvedThemeLabel ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className='inline-flex cursor-help rounded text-[11px] text-tertiary-token underline decoration-dotted underline-offset-2'>
+                              {resolvedThemeLabel}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side='top'>
+                            Your device currently resolves System to{' '}
+                            {resolvedThemeLabel}.
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                    </span>
+                    <span className='mt-0.5 block text-[12px] leading-normal text-tertiary-token'>
+                      {option.description}
+                    </span>
+                  </span>
+                  <span className='mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center'>
+                    {isSelected ? (
+                      <Check className='h-4 w-4 text-accent' />
+                    ) : null}
+                  </span>
+                </span>
+              </Button>
+            );
+          })}
+        </div>
+      </div>
 
       <div className='px-4 py-3'>
         <SettingsToggleRow
@@ -87,6 +141,6 @@ export function SettingsAppearanceSection() {
           ariaLabel='Toggle high contrast mode'
         />
       </div>
-    </ContentSurfaceCard>
+    </DashboardCard>
   );
 }

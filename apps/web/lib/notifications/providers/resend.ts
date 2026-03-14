@@ -1,12 +1,8 @@
 import { Resend } from 'resend';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import {
-  EMAIL_FROM_ADDRESS,
-  EMAIL_REPLY_TO,
-  NOTIFICATIONS_BRAND_NAME,
-  RESEND_ENABLED,
-} from '@/lib/notifications/config';
+import { EMAIL_REPLY_TO, RESEND_ENABLED } from '@/lib/notifications/config';
+import { formatSystemSender } from '@/lib/notifications/sender-policy';
 import type {
   EmailMessage,
   EmailProvider,
@@ -40,8 +36,7 @@ export class ResendEmailProvider implements EmailProvider {
     try {
       const resend = getClient();
       const response = await resend.emails.send({
-        from:
-          message.from ?? `${NOTIFICATIONS_BRAND_NAME} <${EMAIL_FROM_ADDRESS}>`,
+        from: message.from ?? formatSystemSender(),
         to: [message.to],
         subject: message.subject,
         text: message.text,

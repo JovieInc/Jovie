@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Marketing Homepage Visual Regression & Accessibility Test
  *
@@ -50,6 +52,11 @@ const HOMEPAGE_SECTIONS = [
 ] as const;
 
 test.describe('Homepage Visual & A11y @visual-regression @a11y', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Homepage visual and accessibility regression runs in the slower visual lane'
+  );
+
   test.describe('Section Visibility', () => {
     test('all critical sections render with content (not blank)', async ({
       page,

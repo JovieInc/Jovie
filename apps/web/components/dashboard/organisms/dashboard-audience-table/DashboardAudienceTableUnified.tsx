@@ -3,27 +3,19 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  Bell,
-  Copy,
-  Download,
-  Eye,
-  Phone,
-  UserMinus,
-  Users,
-} from 'lucide-react';
+import { Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
-import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
 import { AnalyticsSidebar } from '@/components/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
+  AudienceMobileCard,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
   UnifiedTable,
@@ -44,6 +36,7 @@ import {
   AudienceTableVolatileProvider,
 } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
+import { buildAudienceActions } from './audience-actions';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { copyTextToClipboard, downloadVCard } from './utils';
@@ -58,14 +51,6 @@ import {
 } from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
-
-// Module-level icon constants — allocated once, reused across all rows and renders.
-const ICON_EYE = <Eye className='h-3.5 w-3.5' />;
-const ICON_COPY = <Copy className='h-3.5 w-3.5' />;
-const ICON_PHONE = <Phone className='h-3.5 w-3.5' />;
-const ICON_BELL = <Bell className='h-3.5 w-3.5' />;
-const ICON_DOWNLOAD = <Download className='h-3.5 w-3.5' />;
-const ICON_USER_MINUS = <UserMinus className='h-3.5 w-3.5' />;
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
@@ -324,83 +309,43 @@ export const DashboardAudienceTableUnified = memo(
       [touringCityMap]
     );
 
-    // Context menu items for right-click
+    // Context menu items for right-click — uses canonical builder
     const getContextMenuItems = React.useCallback(
       (member: AudienceMember): ContextMenuItemType[] => {
-        return [
-          {
-            id: 'view-details',
-            label: 'View details',
-            icon: ICON_EYE,
-            onClick: () => setSelectedMember(member),
+        return buildAudienceActions(member, {
+          onViewDetails: setSelectedMember,
+          onCopyEmail: m => {
+            if (m.email) {
+              void copyTextToClipboard(m.email).then(success => {
+                if (success) {
+                  toast.success('Email copied to clipboard');
+                  return;
+                }
+                toast.error('Unable to copy email');
+              });
+            }
           },
-          {
-            id: 'copy-email',
-            label: 'Copy email',
-            icon: ICON_COPY,
-            onClick: () => {
-              if (member.email) {
-                void copyTextToClipboard(member.email).then(success => {
-                  if (success) {
-                    toast.success('Email copied to clipboard');
-                    return;
-                  }
-
-                  toast.error('Unable to copy email');
-                });
-              }
-            },
-            disabled: !member.email,
+          onCopyPhone: m => {
+            if (m.phone) {
+              void copyTextToClipboard(m.phone).then(success => {
+                if (success) {
+                  toast.success('Phone number copied to clipboard');
+                  return;
+                }
+                toast.error('Unable to copy phone number');
+              });
+            }
           },
-          {
-            id: 'copy-phone',
-            label: 'Copy phone',
-            icon: ICON_PHONE,
-            onClick: () => {
-              if (member.phone) {
-                void copyTextToClipboard(member.phone).then(success => {
-                  if (success) {
-                    toast.success('Phone number copied to clipboard');
-                    return;
-                  }
-
-                  toast.error('Unable to copy phone number');
-                });
-              }
-            },
-            disabled: !member.phone,
+          onSendNotification: handleSendNotification,
+          onExportVCard: m => {
+            downloadVCard(m);
+            toast.success('Contact exported as vCard');
           },
-          {
-            id: 'send-notification',
-            label: 'Send notification',
-            icon: ICON_BELL,
-            onClick: () => {
-              handleSendNotification(member);
-            },
-            disabled: !member.email && !member.phone,
+          onBlock: m => {
+            handleRemoveMember(m).catch(() => {});
           },
-          { type: 'separator' as const },
-          {
-            id: 'export-contact',
-            label: 'Export as vCard',
-            icon: ICON_DOWNLOAD,
-            onClick: () => {
-              downloadVCard(member);
-              toast.success('Contact exported as vCard');
-            },
-          },
-          { type: 'separator' as const },
-          {
-            id: 'remove-member',
-            label: 'Block',
-            icon: ICON_USER_MINUS,
-            onClick: () => {
-              handleRemoveMember(member).catch(() => {});
-            },
-            disabled: !profileId,
-            destructive: true,
-          },
-        ];
+          canBlock: Boolean(profileId),
+        });
       },
       [setSelectedMember, profileId, handleRemoveMember, handleSendNotification]
     );
@@ -453,7 +398,7 @@ export const DashboardAudienceTableUnified = memo(
         }
       : {
           label: 'Open profile settings',
-          href: APP_ROUTES.CHAT,
+          href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
         };
     const emptyStateSecondaryAction = {
       label: 'Learn about audience',

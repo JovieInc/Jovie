@@ -71,7 +71,7 @@ function SidebarRangeToggle({
   return (
     <AppSegmentControl
       value={value}
-      onValueChange={value => onChange(value as DemoRange)}
+      onValueChange={onChange}
       options={RANGE_OPTIONS}
       size='sm'
       className='shrink-0'

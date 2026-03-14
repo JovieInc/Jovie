@@ -90,7 +90,7 @@ export function ReleaseTrackList({
         aria-controls={`release-tracklist-${release.id}`}
         className={cn(
           DRAWER_SECTION_HEADING_CLASSNAME,
-          'flex w-full items-center justify-between rounded-[8px] px-2.5 py-1 tracking-[0.08em] transition-[background-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         )}
       >
         <span>Tracklist ({release.totalTracks})</span>
@@ -126,7 +126,7 @@ export function ReleaseTrackList({
 
           {!isLoading && hasError && (
             <DrawerEmptyState
-              className='min-h-[56px] px-3'
+              className='min-h-[48px] px-3'
               message='Failed to load tracks. Collapse and expand to retry.'
               tone='error'
             />
@@ -134,7 +134,7 @@ export function ReleaseTrackList({
 
           {!isLoading && !hasError && tracks?.length === 0 && (
             <DrawerEmptyState
-              className='min-h-[56px] px-3'
+              className='min-h-[48px] px-3'
               message='No track data available.'
             />
           )}
@@ -231,7 +231,7 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-3 rounded-[8px] border border-transparent px-3 py-2 transition-[background-color,box-shadow,border-color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
+    <div className='group flex items-start gap-3 rounded-[10px] px-2.5 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-app-frame-seam)]'>
       <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>

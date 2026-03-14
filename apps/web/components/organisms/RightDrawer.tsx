@@ -117,8 +117,8 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-0 border-l border-subtle shadow-[var(--linear-shadow-card-elevated)]',
-        'lg:rounded-l-xl lg:my-2 lg:h-[calc(100%-1rem)]',
+        'bg-(--linear-bg-surface-0) border-l border-(--linear-app-frame-seam) shadow-[var(--linear-shadow-card)]',
+        'lg:rounded-l-[18px] lg:my-2 lg:h-[calc(100%-1rem)]',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen

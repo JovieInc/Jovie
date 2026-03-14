@@ -187,7 +187,7 @@ export const ContactsTable = memo(function ContactsTable({
           Manage bookings, management, and press contacts for {artistName}
         </p>
 
-        {!isEmpty ? (
+        {isEmpty ? null : (
           <PageToolbar
             start={
               <span className={PAGE_TOOLBAR_META_TEXT_CLASS}>
@@ -196,7 +196,7 @@ export const ContactsTable = memo(function ContactsTable({
               </span>
             }
           />
-        ) : null}
+        )}
 
         {/* Scrollable content area */}
         <div className='flex-1 min-h-0 overflow-auto'>

@@ -65,7 +65,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
             <div className='mt-2.5 text-center'>
               <ArtistName
                 name={MOCK_ARTIST.name}
-                handle={displayHandle}
+                handle={MOCK_ARTIST.handle}
                 isVerified={MOCK_ARTIST.isVerified}
                 size='md'
                 showLink={false}
@@ -96,6 +96,15 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
         </PhoneFrame>
       </div>
 
+      <div className='flex flex-col items-center gap-1.5 text-center'>
+        <p className='text-[12px] font-medium text-[var(--linear-text-secondary)]'>
+          Smart artist profile
+        </p>
+        <p className='max-w-[15rem] text-[11px] leading-5 text-[var(--linear-text-tertiary)]'>
+          New fans can subscribe fast. Returning fans get the next best action.
+        </p>
+      </div>
+
       {/* URL caption below the phone */}
       <div
         className='flex items-center rounded-full px-4 py-2'
@@ -108,7 +117,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
         }}
       >
         <span className='text-[12px] text-[var(--linear-text-tertiary)]'>
-          {'jov.ie/'}
+          jov.ie/
           <span className='font-semibold text-[var(--linear-text-secondary)]'>
             {displayHandle}
           </span>

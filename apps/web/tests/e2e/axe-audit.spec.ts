@@ -16,8 +16,14 @@ import { waitForLoad } from './utils/smoke-test-utils';
 
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 test.describe('Axe WCAG 2.1 Compliance', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Accessibility audits run in the dedicated a11y lane, not the fast deploy gate'
+  );
+
   // Turbopack cold compilation can take 30-90s per route
   test.setTimeout(180_000);
 
@@ -117,6 +123,11 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
 });
 
 test.describe('Axe Best Practices', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Accessibility audits run in the dedicated a11y lane, not the fast deploy gate'
+  );
+
   test('Homepage should follow best practices', async ({ page }) => {
     await page.route('**/api/profile/view', r =>
       r.fulfill({ status: 200, body: '{}' })

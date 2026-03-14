@@ -21,6 +21,12 @@ import { waitForHydration } from './utils/smoke-test-utils';
 
 const WCAG_AA_NON_TEXT = 3.0;
 const baseUrl = process.env.BASE_URL || 'http://localhost:3100';
+const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+
+test.skip(
+  isFastIteration,
+  'Contrast auditing runs in the slower visual regression lane'
+);
 
 interface ContrastViolation {
   theme: 'light' | 'dark';

@@ -43,7 +43,7 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // Single Domain Architecture
 // ============================================================================
 // - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
-// - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
+// - meetjovie.com: 301 redirects to jov.ie (legacy redirect domain)
 // ============================================================================
 
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
@@ -94,7 +94,6 @@ const DASHBOARD_ROUTES = [
   '/app/earnings',
   '/app/links',
   '/app/chat',
-  '/app/analytics',
 ] as const;
 
 const SETTINGS_ROUTES = [

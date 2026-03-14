@@ -731,7 +731,6 @@ describe('proxy.ts path categorization', () => {
       '/app/earnings',
       '/app/links',
       '/app/chat',
-      '/app/analytics',
       '/app/settings',
       '/app/admin',
       '/app/billing',

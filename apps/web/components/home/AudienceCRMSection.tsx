@@ -18,6 +18,11 @@ const STATS = [
   { label: 'Cities reached', value: '189', icon: MapPin },
   { label: 'Tips earned', value: '$1,204', icon: DollarSign },
 ];
+const BENEFITS = [
+  'See who clicked',
+  'Know where they came from',
+  'Re-engage high-intent fans',
+] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Loading skeleton (matches old FansTable layout)                     */
@@ -108,20 +113,32 @@ export function AudienceCRMSection() {
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)] reveal-on-scroll'>
-              Stop renting your audience.
-              <br />
-              Start building it.
+              Turn listeners into contacts you own.
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Every visit captures first-party fan data — emails, streaming
-                preferences, locations. Message fans directly. No algorithm. No
-                platform tax.
+                Most profile traffic disappears into Spotify, Instagram, and
+                ticketing pages. Jovie captures emails, source, city, and intent
+                so you can follow up later.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                Fan list with contacts & history
+                Built-in fan CRM
               </span>
             </div>
+          </div>
+
+          <div
+            className='mt-8 grid gap-3 sm:grid-cols-3 reveal-on-scroll'
+            data-delay='120'
+          >
+            {BENEFITS.map(benefit => (
+              <div
+                key={benefit}
+                className='rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-4 py-3 text-[13px] font-medium text-[var(--linear-text-secondary)]'
+              >
+                {benefit}
+              </div>
+            ))}
           </div>
 
           {/* Product demo */}
@@ -182,11 +199,17 @@ export function AudienceCRMSection() {
                 ))}
               </div>
 
-              {/* Urgency line */}
-              <p className='px-5 pt-4 pb-2 text-[13px] text-[var(--linear-text-tertiary)] italic'>
-                Every show, every release, every link tap — fans you&apos;d
-                never hear from again, captured.
-              </p>
+              <div className='flex flex-wrap items-center gap-2 border-t border-[var(--linear-border-subtle)] px-5 py-3 text-[11px] text-[var(--linear-text-tertiary)]'>
+                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 font-medium text-[var(--linear-text-secondary)]'>
+                  Captured from profile
+                </span>
+                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1'>
+                  Source tracked
+                </span>
+                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1'>
+                  High-intent fan scoring
+                </span>
+              </div>
 
               {/* Real audience table (lazy-loaded, clipped to ~5 visible rows) */}
               <div className='relative max-h-[360px] overflow-hidden'>

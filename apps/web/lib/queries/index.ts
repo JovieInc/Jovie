@@ -80,6 +80,10 @@ export {
 } from './useAccountMutations';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
+// Admin bulk refresh mutation
+export { useAdminBulkRefreshMutation } from './useAdminBulkRefreshMutation';
+// Admin feedback mutation
+export { useDismissFeedbackMutation } from './useAdminFeedbackMutation';
 export {
   type AdminLead,
   type AdminLeadKeyword,
@@ -126,8 +130,17 @@ export {
   type ArtistThemeResponse,
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
+// Artwork download mutation
+export { useArtworkDownloadMutation } from './useArtworkDownloadMutation';
 // Bandsintown connection status
 export { useBandsintownConnectionQuery } from './useBandsintownConnectionQuery';
+// Batch ingest mutation (admin)
+export {
+  type BatchIngestApiResponse,
+  type BatchIngestInput,
+  type BatchResult,
+  useBatchIngestMutation,
+} from './useBatchIngestMutation';
 export {
   type BillingHistoryEntry,
   useBillingHistoryQuery,
@@ -218,6 +231,8 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Feedback mutation
+export { useFeedbackMutation } from './useFeedbackMutation';
 // Growth plan early access request
 export {
   type GrowthAccessRequestInput,
@@ -258,15 +273,21 @@ export {
   useUpdateContentPreferencesMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
-// Pixel settings mutation
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
   usePixelSettingsDeleteMutation,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
+// Pixel settings query and mutation
+export {
+  type PixelSettingsData,
+  usePixelSettingsQuery,
+} from './usePixelSettingsQuery';
 // Plan gate hook
 export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
+// Pre-save mutation
+export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
   type PricingOption,
   type PricingOptionsResponse,
@@ -289,6 +310,8 @@ export {
   type UsePublicProfileQueryOptions,
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
+// QR code download mutation
+export { useQrCodeDownloadMutation } from './useQrCodeDownloadMutation';
 export {
   useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
@@ -328,6 +351,8 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+// Tracking mutation (fire-and-forget)
+export { useTrackingMutation } from './useTrackingMutation';
 // User avatar upload mutation
 export {
   type UseUserAvatarMutationOptions,
@@ -344,3 +369,10 @@ export {
   type WaitlistSubmitInput,
   type WaitlistSubmitResponse,
 } from './useWaitlistMutations';
+// Waitlist settings query and mutation (admin)
+export {
+  useWaitlistSettingsMutation,
+  useWaitlistSettingsQuery,
+  type WaitlistSettingsResponse,
+  type WaitlistSettingsUpdateInput,
+} from './useWaitlistSettingsQuery';

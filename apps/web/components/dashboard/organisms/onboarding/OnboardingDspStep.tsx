@@ -13,6 +13,7 @@ import {
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { env } from '@/lib/env-client';
 import type { SpotifyArtistResult } from '@/lib/queries/useArtistSearchQuery';
 import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
 
@@ -83,7 +84,7 @@ export function OnboardingDspStep({
       dispatch,
       searchClear,
       onConnected,
-      fireAndForget: true, // JOV-1340: non-blocking import
+      fireAndForget: !env.IS_E2E, // Keep onboarding deterministic in Playwright
     });
 
   const handleInputChange = useCallback(

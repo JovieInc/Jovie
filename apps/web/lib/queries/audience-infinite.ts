@@ -100,6 +100,10 @@ export function useAudienceInfiniteQuery({
         }
       : undefined,
     placeholderData: keepPreviousData,
+    // Audience views already sit behind a query error boundary. Surface API
+    // failures immediately instead of spending time in retry/loading limbo.
+    throwOnError: true,
+    retry: false,
     ...PAGINATED_CACHE,
   });
 }
