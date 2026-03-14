@@ -42,10 +42,22 @@ vi.mock('@/lib/notifications/suppression', () => ({
   logDelivery: vi.fn(),
 }));
 
+vi.mock('@/lib/notifications/quota', () => ({
+  checkQuota: vi.fn(),
+  incrementQuota: vi.fn(),
+}));
+
+vi.mock('@/lib/notifications/reputation', () => ({
+  checkReputation: vi.fn(),
+  recordSend: vi.fn(),
+}));
+
 import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
+import { checkQuota } from '@/lib/notifications/quota';
+import { checkReputation } from '@/lib/notifications/reputation';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
 import {
   dismissNotification,
@@ -76,6 +88,22 @@ describe('Notification Service', () => {
     // Default mock for suppression check (not suppressed)
     vi.mocked(isEmailSuppressed).mockResolvedValue({
       suppressed: false,
+    });
+
+    vi.mocked(checkReputation).mockResolvedValue({
+      canSend: true,
+      status: 'good',
+      metrics: {
+        bounceRate: 0,
+        complaintRate: 0,
+        totalSent: 0,
+      },
+    });
+
+    vi.mocked(checkQuota).mockResolvedValue({
+      allowed: true,
+      remaining: { daily: 100, monthly: 1000 },
+      limits: { daily: 100, monthly: 1000 },
     });
 
     // Default mock for delivery logging
