@@ -8,17 +8,31 @@ import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareContextMenuItems } from '@/lib/utm';
 
 const menuIcon = (
-  name: 'PencilLine' | 'Link2' | 'Hash' | 'ExternalLink' | 'Lock' | 'Clock' | 'Trash2' | 'Copy'
+  name:
+    | 'PencilLine'
+    | 'Link2'
+    | 'Hash'
+    | 'ExternalLink'
+    | 'Lock'
+    | 'Clock'
+    | 'Trash2'
+    | 'Copy'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
 
 export interface BuildReleaseActionsOptions {
   readonly release: ReleaseViewModel;
   readonly onEdit: (release: ReleaseViewModel) => void;
-  readonly onCopy: (path: string, label: string, testId: string) => Promise<string | void>;
+  readonly onCopy: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string | void>;
   readonly artistName?: string | null;
   /** Smart link lock check (Pro feature gating) */
   readonly isSmartLinkLocked?: (releaseId: string) => boolean;
-  readonly getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null;
+  readonly getSmartLinkLockReason?: (
+    releaseId: string
+  ) => 'scheduled' | 'cap' | null;
   /** Delete handler — when provided, a delete action is included */
   readonly onDelete?: (releaseId: string) => void;
   /** QR code handler — when provided, a QR code copy action is included */
@@ -65,9 +79,7 @@ export function buildReleaseActions({
     items.push({
       id: 'copy-smart-link',
       label:
-        lockReason === 'scheduled'
-          ? 'Scheduled (Pro)'
-          : 'Smart link (Pro)',
+        lockReason === 'scheduled' ? 'Scheduled (Pro)' : 'Smart link (Pro)',
       icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
       disabled: true,
       onClick: () => {},

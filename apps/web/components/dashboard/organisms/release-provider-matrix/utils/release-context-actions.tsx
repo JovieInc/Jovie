@@ -1,6 +1,6 @@
+import { buildReleaseActions } from '@/components/dashboard/organisms/releases/release-actions';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { buildReleaseActions } from '@/components/dashboard/organisms/releases/release-actions';
 
 interface GetReleaseContextMenuItemsOptions {
   release: ReleaseViewModel;

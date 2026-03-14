@@ -3,9 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  Users,
-} from 'lucide-react';
+import { Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
@@ -22,7 +20,6 @@ import {
   convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
-import { buildAudienceActions } from './audience-actions';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
@@ -39,6 +36,7 @@ import {
   AudienceTableVolatileProvider,
 } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
+import { buildAudienceActions } from './audience-actions';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { copyTextToClipboard, downloadVCard } from './utils';
@@ -316,7 +314,7 @@ export const DashboardAudienceTableUnified = memo(
       (member: AudienceMember): ContextMenuItemType[] => {
         return buildAudienceActions(member, {
           onViewDetails: setSelectedMember,
-          onCopyEmail: (m) => {
+          onCopyEmail: m => {
             if (m.email) {
               void copyTextToClipboard(m.email).then(success => {
                 if (success) {
@@ -327,7 +325,7 @@ export const DashboardAudienceTableUnified = memo(
               });
             }
           },
-          onCopyPhone: (m) => {
+          onCopyPhone: m => {
             if (m.phone) {
               void copyTextToClipboard(m.phone).then(success => {
                 if (success) {
@@ -339,11 +337,11 @@ export const DashboardAudienceTableUnified = memo(
             }
           },
           onSendNotification: handleSendNotification,
-          onExportVCard: (m) => {
+          onExportVCard: m => {
             downloadVCard(m);
             toast.success('Contact exported as vCard');
           },
-          onBlock: (m) => {
+          onBlock: m => {
             handleRemoveMember(m).catch(() => {});
           },
           canBlock: Boolean(profileId),
