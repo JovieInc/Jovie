@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, Input, Switch } from '@jovie/ui';
-import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import {
   type FormEvent,
@@ -19,7 +18,7 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import { usePixelSettingsMutation } from '@/lib/queries';
-import { queryKeys } from '@/lib/queries/keys';
+import { usePixelSettingsQuery } from '@/lib/queries/usePixelSettingsQuery';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
@@ -147,23 +146,6 @@ function PlatformSection({
 // Token placeholder shown when a token is configured but not revealed
 const TOKEN_PLACEHOLDER = '••••••••';
 
-interface PixelSettingsResponse {
-  pixels: {
-    facebookPixelId: string | null;
-    googleMeasurementId: string | null;
-    tiktokPixelId: string | null;
-    enabled: boolean;
-    facebookEnabled: boolean;
-    googleEnabled: boolean;
-    tiktokEnabled: boolean;
-  };
-  hasTokens: {
-    facebook: boolean;
-    google: boolean;
-    tiktok: boolean;
-  };
-}
-
 export interface SettingsAdPixelsSectionProps {
   readonly isPro?: boolean;
 }
@@ -187,17 +169,7 @@ export function SettingsAdPixelsSection({
     isLoading,
     isError,
     refetch,
-  } = useQuery<PixelSettingsResponse>({
-    queryKey: queryKeys.pixels.settings(),
-    queryFn: async ({ signal }) => {
-      const res = await fetch('/api/dashboard/pixels', { signal });
-      if (!res.ok) throw new Error('Failed to fetch pixel settings');
-      return res.json();
-    },
-    enabled: isPro,
-    staleTime: 5 * 60 * 1000, // 5 minutes - pixel settings rarely change
-    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache after unmount
-  });
+  } = usePixelSettingsQuery({ enabled: isPro });
 
   const [pixelData, setPixelData] = useState({
     facebookPixelId: '',
