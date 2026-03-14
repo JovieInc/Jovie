@@ -87,6 +87,21 @@ fi
 # 2. Make hook scripts executable
 chmod +x "$PROJECT_DIR"/.claude/hooks/*.sh 2>/dev/null || true
 
+# 2.5. Install Bun if not available (required by gstack)
+if ! command -v bun &> /dev/null; then
+  echo "Installing Bun runtime (required by gstack)..."
+  curl -fsSL https://bun.sh/install | bash 2>/dev/null \
+    && export PATH="$HOME/.bun/bin:$PATH" \
+    && echo "Bun installed: $(bun --version)" \
+    || echo "WARNING: Failed to install Bun. gstack browser skills will not work."
+fi
+
+# 2.6. Initialize gstack skills if submodule is present
+if [ -f "$PROJECT_DIR/.claude/skills/gstack/setup" ]; then
+  echo "Initializing gstack skills..."
+  (cd "$PROJECT_DIR/.claude/skills/gstack" && bash ./setup 2>&1) || echo "WARNING: gstack setup had issues (browser skills may need manual setup)"
+fi
+
 # 3. Verify critical tools
 echo ""
 echo "=============================================="
