@@ -3,115 +3,61 @@
 import { Button, Input } from '@jovie/ui';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
-
-interface WaitlistSettingsResponse {
-  gateEnabled: boolean;
-  autoAcceptEnabled: boolean;
-  autoAcceptDailyLimit: number;
-  autoAcceptedToday: number;
-  autoAcceptResetsAt: string;
-}
+import {
+  useWaitlistSettingsMutation,
+  useWaitlistSettingsQuery,
+  type WaitlistSettingsResponse,
+} from '@/lib/queries/useWaitlistSettingsQuery';
 
 export function WaitlistSettingsPanel() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: fetchedSettings,
+    isLoading: loading,
+    isError,
+    error,
+  } = useWaitlistSettingsQuery();
+
+  const { mutate: save, isPending: saving } = useWaitlistSettingsMutation();
+
+  // Local state for form edits (initialized from query data)
   const [settings, setSettings] = useState<WaitlistSettingsResponse | null>(
     null
   );
 
+  // Sync fetched data into local state
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadSettings() {
-      try {
-        setError(null);
-        const response = await fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to load waitlist settings');
-        }
-
-        const payload = (await response.json()) as {
-          settings?: WaitlistSettingsResponse;
-        };
-
-        if (!payload.settings) {
-          throw new Error('Invalid waitlist settings response');
-        }
-
-        setSettings(payload.settings);
-      } catch {
-        if (!controller.signal.aborted) {
-          setError(
-            'Unable to load waitlist settings. Please refresh and try again.'
-          );
-          toast.error('Unable to load waitlist settings');
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
+    if (fetchedSettings && !settings) {
+      setSettings(fetchedSettings);
     }
+  }, [fetchedSettings, settings]);
 
-    void loadSettings();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  async function save() {
+  const handleSave = () => {
     if (!settings) return;
-    setSaving(true);
-    try {
-      const response = await fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gateEnabled: settings.gateEnabled,
-          autoAcceptEnabled: settings.autoAcceptEnabled,
-          autoAcceptDailyLimit: settings.autoAcceptDailyLimit,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Save failed');
-      const payload = (await response.json()) as {
-        settings: WaitlistSettingsResponse;
-      };
-      setSettings(payload.settings);
-      setError(null);
-      toast.success('Waitlist settings saved');
-    } catch {
-      toast.error('Failed to save waitlist settings');
-    } finally {
-      setSaving(false);
-    }
-  }
+    save({
+      gateEnabled: settings.gateEnabled,
+      autoAcceptEnabled: settings.autoAcceptEnabled,
+      autoAcceptDailyLimit: settings.autoAcceptDailyLimit,
+    });
+  };
 
   if (loading) {
     return (
       <ContentSurfaceCard className='flex items-center gap-2 px-4 py-3.5 text-[13px] text-(--linear-text-secondary)'>
         <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
-        Loading waitlist settings…
+        Loading waitlist settings...
       </ContentSurfaceCard>
     );
   }
 
-  if (error || !settings) {
+  if (isError || !settings) {
     return (
       <ContentSurfaceCard className='border-destructive/25 bg-destructive/5 px-4 py-3.5 text-[13px] text-destructive'>
-        {error ??
-          'Unable to load waitlist settings. Please refresh and try again.'}
+        {error instanceof Error
+          ? error.message
+          : 'Unable to load waitlist settings. Please refresh and try again.'}
       </ContentSurfaceCard>
     );
   }
@@ -191,7 +137,7 @@ export function WaitlistSettingsPanel() {
           <Button
             variant='primary'
             size='sm'
-            onClick={() => void save()}
+            onClick={handleSave}
             disabled={saving}
           >
             {saving && <Loader2 className='mr-1.5 h-3 w-3 animate-spin' />}

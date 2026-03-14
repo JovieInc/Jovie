@@ -207,6 +207,8 @@ export const queryKeys = {
     all: ['handle'] as const,
     availability: (handle: string) =>
       [...queryKeys.handle.all, 'availability', handle.toLowerCase()] as const,
+    suggestions: (candidates: string[]) =>
+      [...queryKeys.handle.all, 'suggestions', candidates] as const,
   },
 
   // Link wrapping queries
@@ -226,6 +228,8 @@ export const queryKeys = {
   admin: {
     all: ['admin'] as const,
     impersonation: () => [...queryKeys.admin.all, 'impersonation'] as const,
+    waitlistSettings: () =>
+      [...queryKeys.admin.all, 'waitlist-settings'] as const,
     leads: {
       all: () => [...queryKeys.admin.all, 'leads'] as const,
       list: (filters: {
