@@ -557,6 +557,43 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
   }, [headerActions]);
 
+  const releaseSidebarHandlers = useMemo(
+    () => ({
+      refresh: editingRelease
+        ? () =>
+            (experienceAdapter?.onRefreshRelease ?? handleRefreshRelease)(
+              editingRelease.id
+            )
+        : undefined,
+      rescan: editingRelease
+        ? () =>
+            (experienceAdapter?.onRescanIsrc ?? handleRescanIsrc)(
+              editingRelease.id
+            )
+        : undefined,
+      artworkRevert: experienceAdapter?.onArtworkRevert
+        ? (releaseId: string) =>
+            experienceAdapter.onArtworkRevert?.(
+              releaseId,
+              editingRelease ?? null
+            ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
+        : handleArtworkRevert,
+      formatLyrics: experienceAdapter?.onFormatLyrics
+        ? (releaseId: string, lyrics: string) =>
+            experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
+            Promise.resolve([])
+        : handleFormatLyrics,
+    }),
+    [
+      editingRelease,
+      experienceAdapter,
+      handleArtworkRevert,
+      handleFormatLyrics,
+      handleRefreshRelease,
+      handleRescanIsrc,
+    ]
+  );
+
   // Register right panel with AuthShell - supports both release and track drawers
   const sidebarPanel = useMemo(() => {
     if (isTrackSidebarOpen) {
@@ -585,34 +622,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     const selectedSidebarData =
       experienceAdapter?.sidebarDataByReleaseId?.[editingRelease?.id ?? ''];
 
-    const refreshHandler = editingRelease
-      ? () =>
-          (experienceAdapter?.onRefreshRelease ?? handleRefreshRelease)(
-            editingRelease.id
-          )
-      : undefined;
-
-    const rescanHandler = editingRelease
-      ? () =>
-          (experienceAdapter?.onRescanIsrc ?? handleRescanIsrc)(
-            editingRelease.id
-          )
-      : undefined;
-
-    const artworkRevertHandler = experienceAdapter?.onArtworkRevert
-      ? (releaseId: string) =>
-          experienceAdapter.onArtworkRevert?.(
-            releaseId,
-            editingRelease ?? null
-          ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
-      : handleArtworkRevert;
-
-    const formatLyricsHandler = experienceAdapter?.onFormatLyrics
-      ? (releaseId: string, lyrics: string) =>
-          experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
-          Promise.resolve([])
-      : handleFormatLyrics;
-
     return (
       <Suspense
         fallback={
@@ -631,18 +640,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           providerConfig={providerConfig}
           artistName={artistName}
           onClose={closeEditor}
-          onRefresh={refreshHandler}
+          onRefresh={releaseSidebarHandlers.refresh}
           isRefreshing={refreshingReleaseId === editingRelease?.id}
           onAddDspLink={experienceAdapter?.onAddDspLink ?? handleAddUrl}
-          onRescanIsrc={rescanHandler}
+          onRescanIsrc={releaseSidebarHandlers.rescan}
           isRescanningIsrc={isRescanningIsrc}
           onArtworkUpload={
             experienceAdapter?.onArtworkUpload ?? handleArtworkUpload
           }
-          onArtworkRevert={artworkRevertHandler}
+          onArtworkRevert={releaseSidebarHandlers.artworkRevert}
           onReleaseChange={handleReleaseChange}
           onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
-          onFormatLyrics={formatLyricsHandler}
+          onFormatLyrics={releaseSidebarHandlers.formatLyrics}
           isLyricsSaving={isLyricsSaving}
           isSaving={isSaving}
           allowDownloads={allowArtworkDownloads}
@@ -666,25 +675,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     artistName,
     closeEditor,
     closeTrackDrawer,
-    handleRefreshRelease,
     experienceAdapter,
     handleBackToReleaseFromTrack,
     handleTrackClickFromRelease,
     refreshingReleaseId,
     handleAddUrl,
-    handleRescanIsrc,
     isRescanningIsrc,
     handleArtworkUpload,
-    handleArtworkRevert,
     handleReleaseChange,
     handleSaveLyrics,
-    handleFormatLyrics,
     isLyricsSaving,
     isSaving,
     allowArtworkDownloads,
     canEditSmartLinks,
     experienceMode,
     handleCanvasStatusUpdate,
+    releaseSidebarHandlers,
   ]);
 
   useRegisterRightPanel(sidebarPanel);
