@@ -1,0 +1,33 @@
+---
+description: gstack workflow skills available in this repo
+---
+
+# gstack Skills
+
+This repo includes [gstack](https://github.com/garrytan/gstack) — a workflow toolkit providing specialized AI agent skills. These are installed as a git submodule at `.claude/skills/gstack/`.
+
+## Available Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+| `/review` | Pre-landing PR review analyzing diffs for SQL safety, trust boundary violations, side effects |
+| `/plan-ceo-review` | Founder/CEO mode: rethink problems from first principles, find the 10-star product |
+| `/plan-eng-review` | Engineering manager mode: lock in execution plans with architecture and edge cases |
+| `/browse` | Fast headless browser (~100ms/cmd) for QA testing and site verification |
+| `/qa` | Systematic QA testing with diff-aware, full, quick, and regression modes |
+| `/retro` | Weekly engineering retrospective analyzing commit history and code quality |
+| `/setup-browser-cookies` | Import authenticated browser sessions for testing |
+| `/gstack-upgrade` | Upgrade gstack to latest version |
+
+## When gstack conflicts with other commands
+
+gstack commands are **canonical** — if a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
+
+## Setup
+
+gstack requires Bun (v1.0+). The session-start hook installs Bun and runs gstack setup automatically. For manual setup:
+
+```bash
+cd .claude/skills/gstack && ./setup
+```
