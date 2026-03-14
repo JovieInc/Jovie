@@ -173,7 +173,7 @@ describe('SegmentControl', () => {
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
       expect(tab.className).toContain('text-[13px]');
-      expect(tab.className).toContain('px-3');
+      expect(tab.className).toContain('px-2.5');
     });
 
     it('applies sm size', () => {
@@ -186,8 +186,8 @@ describe('SegmentControl', () => {
         />
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
-      expect(tab.className).toContain('text-[13px]');
-      expect(tab.className).toContain('px-2.5');
+      expect(tab.className).toContain('text-[12px]');
+      expect(tab.className).toContain('px-2');
     });
 
     it('applies lg size', () => {
@@ -303,7 +303,9 @@ describe('SegmentControl', () => {
       );
       const root = container.firstChild;
       expect((root as HTMLElement).className).toContain('inline-flex');
-      expect((root as HTMLElement).className).toContain('rounded-md');
+      expect((root as HTMLElement).className).toContain(
+        'rounded-[var(--linear-app-control-radius)]'
+      );
     });
 
     it('merges custom className', () => {
