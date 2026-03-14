@@ -7,7 +7,7 @@ import {
   AudienceCountryCell,
   AudienceCreatedAtCell,
   AudienceRowSelectionCell,
-} from '../atoms';
+} from '@/components/organisms/table';
 
 export interface AudienceSubscriberRowProps {
   readonly row: AudienceMember;

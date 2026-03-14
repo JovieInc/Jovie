@@ -13,7 +13,7 @@ import {
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
-} from '../atoms';
+} from '@/components/organisms/table';
 
 export interface AudienceMemberRowProps {
   readonly row: AudienceMember;

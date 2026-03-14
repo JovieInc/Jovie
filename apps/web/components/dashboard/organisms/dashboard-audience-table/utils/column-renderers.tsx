@@ -20,8 +20,8 @@ import {
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
-} from '@/components/dashboard/audience/table/atoms';
-import { convertContextMenuItems } from '@/components/organisms/table';
+  convertContextMenuItems,
+} from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import {
   useAudienceTableStableContext,
