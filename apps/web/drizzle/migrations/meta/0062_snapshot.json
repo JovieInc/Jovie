@@ -1,6 +1,6 @@
 {
-  "id": "678f53d1-032c-4f66-9527-087a23d31025",
-  "prevId": "edc48920-f8df-4427-ba48-8b14216d9b71",
+  "id": "99053396-a35e-407f-a88a-29671b1a6f61",
+  "prevId": "678f53d1-032c-4f66-9527-087a23d31025",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4104,6 +4104,112 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.daily_profile_views": {
+      "name": "daily_profile_views",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "creator_profile_id": {
+          "name": "creator_profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "view_date": {
+          "name": "view_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "view_count": {
+          "name": "view_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "daily_profile_views_creator_profile_id_view_date_unique": {
+          "name": "daily_profile_views_creator_profile_id_view_date_unique",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "view_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "daily_profile_views_creator_profile_id_view_date_idx": {
+          "name": "daily_profile_views_creator_profile_id_view_date_idx",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "view_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "daily_profile_views_creator_profile_id_creator_profiles_id_fk": {
+          "name": "daily_profile_views_creator_profile_id_creator_profiles_id_fk",
+          "tableFrom": "daily_profile_views",
+          "tableTo": "creator_profiles",
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.dashboard_idempotency_keys": {
       "name": "dashboard_idempotency_keys",
       "schema": "",
@@ -6498,6 +6604,13 @@
           "notNull": false,
           "default": "'Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here''s your free page: {claimLink}'"
         },
+        "dm_opener_template": {
+          "name": "dm_opener_template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'Hey {displayName}! Came across your music on Spotify — really dig your sound. I actually built a link-in-bio tool made specifically for musicians. Would love to show you if you''re interested!'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -6809,6 +6922,12 @@
         },
         "dm_copy": {
           "name": "dm_copy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dm_opener": {
+          "name": "dm_opener",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -9835,6 +9954,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "social_links_creator_profile_platform_idx": {
+          "name": "social_links_creator_profile_platform_idx",
+          "columns": [
+            {
+              "expression": "creator_profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -10949,6 +11089,30 @@
         },
         "last_billing_event_at": {
           "name": "last_billing_event_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "founder_welcome_sent_at": {
+          "name": "founder_welcome_sent_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "welcome_failed_at": {
+          "name": "welcome_failed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "outbound_suppressed_at": {
+          "name": "outbound_suppressed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "suppression_failed_at": {
+          "name": "suppression_failed_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false

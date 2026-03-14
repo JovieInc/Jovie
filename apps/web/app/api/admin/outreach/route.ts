@@ -145,6 +145,7 @@ export async function GET(request: NextRequest) {
             outreachQueuedAt: leads.outreachQueuedAt,
             dmSentAt: leads.dmSentAt,
             dmCopy: leads.dmCopy,
+            dmOpener: leads.dmOpener,
             scrapedAt: leads.scrapedAt,
             createdAt: leads.createdAt,
             updatedAt: leads.updatedAt,

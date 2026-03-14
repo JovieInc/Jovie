@@ -75,6 +75,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
 
   // 7. Build DM copy if needed
   let dmCopy: string | null = null;
+  let dmOpener: string | null = null;
   if (route === 'dm' || route === 'both') {
     const [settings] = await db
       .select()
@@ -85,9 +86,17 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
       settings?.dmTemplate ??
       "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}";
 
+    const openerTemplate =
+      settings?.dmOpenerTemplate ??
+      "Hey {displayName}! Came across your music on Spotify — really dig your sound. I actually built a link-in-bio tool made specifically for musicians. Would love to show you if you're interested!";
+
+    const displayName = lead.displayName ?? lead.linktreeHandle;
+
     dmCopy = template
-      .replaceAll('{displayName}', lead.displayName ?? lead.linktreeHandle)
+      .replaceAll('{displayName}', displayName)
       .replaceAll('{claimLink}', claimUrl);
+
+    dmOpener = openerTemplate.replaceAll('{displayName}', displayName);
   }
 
   // 8. Update lead row
@@ -105,6 +114,7 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
       hasRepresentation: repResult.hasRepresentation,
       representationSignal: repResult.signal,
       dmCopy,
+      dmOpener,
       updatedAt: new Date(),
     })
     .where(eq(leads.id, leadId));

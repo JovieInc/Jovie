@@ -1,39 +1,86 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Link2,
+  Loader2,
+  Send,
+  User,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useMarkLeadDmSentMutation } from '@/lib/queries';
 
-interface DmQueueLead {
+export interface DmQueueLead {
   id: string;
   displayName: string | null;
   instagramHandle: string | null;
   priorityScore: number | null;
   dmCopy: string | null;
+  dmOpener: string | null;
+  claimToken: string | null;
   outreachStatus: string;
 }
 
 interface DmQueueCardProps {
   readonly lead: DmQueueLead;
   readonly onMarkedSent: () => void;
+  readonly onSendDm?: () => void;
 }
 
-export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
+export function DmQueueCard({
+  lead,
+  onMarkedSent,
+  onSendDm,
+}: DmQueueCardProps) {
   const [copied, setCopied] = useState(false);
+  const [claimCopied, setClaimCopied] = useState(false);
   const [markedDone, setMarkedDone] = useState(false);
   const markDmSentMutation = useMarkLeadDmSentMutation();
 
-  async function handleCopy() {
-    if (!lead.dmCopy) return;
+  const openerText = lead.dmOpener ?? lead.dmCopy;
+
+  async function handleSendDm() {
+    if (!lead.instagramHandle || !openerText) return;
     try {
-      await navigator.clipboard.writeText(lead.dmCopy);
+      await navigator.clipboard.writeText(openerText);
+      toast.success('DM copied — opening Instagram');
+    } catch {
+      toast.error('Copy failed — opening Instagram anyway');
+    }
+    window.open(
+      `https://ig.me/m/${lead.instagramHandle}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+    onSendDm?.();
+  }
+
+  async function handleCopy() {
+    if (!openerText) return;
+    try {
+      await navigator.clipboard.writeText(openerText);
       setCopied(true);
       toast.success('DM copied to clipboard');
       setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error('Failed to copy');
+    }
+  }
+
+  async function handleCopyClaimLink() {
+    if (!lead.claimToken) return;
+    const claimUrl = `${window.location.origin}/claim/${lead.claimToken}`;
+    try {
+      await navigator.clipboard.writeText(claimUrl);
+      setClaimCopied(true);
+      toast.success('Claim link copied — send after they reply');
+      setTimeout(() => setClaimCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy claim link');
     }
   }
 
@@ -83,21 +130,34 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
         )}
       </div>
 
-      {lead.dmCopy && (
+      {openerText && (
         <textarea
           readOnly
-          value={lead.dmCopy}
+          value={openerText}
           rows={4}
-          className='w-full resize-none rounded-md border border-subtle bg-background px-3 py-2 text-xs text-secondary-token'
+          className='w-full resize-none rounded-md border border-subtle bg-background px-3 py-2 text-sm sm:text-xs text-secondary-token'
         />
       )}
 
-      <div className='flex gap-2'>
+      {/* Primary action: Send DM (copy opener + open Instagram DM) */}
+      <Button
+        variant='accent'
+        size='lg'
+        className='w-full'
+        onClick={() => void handleSendDm()}
+        disabled={!lead.instagramHandle || !openerText || markedDone}
+      >
+        <Send className='mr-1.5 size-4' />
+        Send DM
+      </Button>
+
+      {/* Secondary actions */}
+      <div className='flex flex-wrap gap-2'>
         <Button
           variant='outline'
           size='sm'
           onClick={() => void handleCopy()}
-          disabled={!lead.dmCopy || markedDone}
+          disabled={!openerText || markedDone}
         >
           {copied ? (
             <Check className='mr-1.5 size-3.5' />
@@ -105,6 +165,19 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
             <Copy className='mr-1.5 size-3.5' />
           )}
           {copied ? 'Copied' : 'Copy DM'}
+        </Button>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={() => void handleCopyClaimLink()}
+          disabled={!lead.claimToken || markedDone}
+        >
+          {claimCopied ? (
+            <Check className='mr-1.5 size-3.5' />
+          ) : (
+            <Link2 className='mr-1.5 size-3.5' />
+          )}
+          {claimCopied ? 'Copied' : 'Claim Link'}
         </Button>
         <Button
           variant='primary'

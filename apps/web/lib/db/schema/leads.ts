@@ -93,6 +93,7 @@ export const leads = pgTable(
     outreachQueuedAt: timestamp('outreach_queued_at'),
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
+    dmOpener: text('dm_opener'),
 
     scrapedAt: timestamp('scraped_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -141,6 +142,9 @@ export const leadPipelineSettings = pgTable('lead_pipeline_settings', {
     .notNull(),
   dmTemplate: text('dm_template').default(
     "Hey {displayName}! I found your Linktree and love your music on Spotify. I built Jovie to help artists like you create a better link-in-bio. Here's your free page: {claimLink}"
+  ),
+  dmOpenerTemplate: text('dm_opener_template').default(
+    "Hey {displayName}! Came across your music on Spotify — really dig your sound. I actually built a link-in-bio tool made specifically for musicians. Would love to show you if you're interested!"
   ),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
