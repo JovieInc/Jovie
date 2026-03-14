@@ -3,6 +3,11 @@ import Stripe from 'stripe';
 import { signInUser } from '../helpers/clerk-auth';
 import { expect, test } from './setup';
 
+test.skip(
+  process.env.E2E_FAST_ITERATION === '1',
+  'End-to-end billing checkout runs in the slower billing lane'
+);
+
 const stripePriceId =
   process.env.STRIPE_PRICE_PRO_MONTHLY ||
   process.env.STRIPE_PRICE_PRO_YEARLY ||

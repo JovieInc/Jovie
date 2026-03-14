@@ -10,6 +10,11 @@ import { expect, test } from '@playwright/test';
 
 // Override global storageState to run these tests as unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+test.skip(
+  FAST_ITERATION,
+  'Onboarding behavior is covered by the dedicated golden path in the fast lane'
+);
 
 test.describe('Onboarding Flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -138,6 +143,11 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('handle validation works correctly', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Standalone handle-check API coverage runs in the slower onboarding lane'
+    );
+
     // Test the handle check API directly
     const response = await page.request.get(
       '/api/handle/check?handle=testuser123'
@@ -150,6 +160,11 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('handle check API rejects invalid handles', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Standalone invalid-handle API coverage runs in the slower onboarding lane'
+    );
+
     // Test with empty handle
     const emptyResponse = await page.request.get('/api/handle/check?handle=');
     expect(emptyResponse.status()).toBe(400);
@@ -163,6 +178,11 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('handle check API handles existing handles', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Existing-handle API coverage runs in the slower onboarding lane'
+    );
+
     // Test with known existing handle from seed data
     const response = await page.request.get(
       '/api/handle/check?handle=musicmaker'
@@ -174,6 +194,11 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('handle check API handles race conditions', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Race-condition handle API coverage runs in the slower onboarding lane'
+    );
+
     // Fire multiple rapid requests to test race condition handling
     const handles = ['race1', 'race2', 'race3', 'race4', 'race5'];
     const promises = handles.map(handle =>
@@ -253,6 +278,11 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('onboarding form prevents double submission', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Double-submission onboarding API coverage runs in the slower onboarding lane'
+    );
+
     // This test would need authentication setup to be fully functional
     // For now, we test the API doesn't allow duplicate rapid calls
 

@@ -1,8 +1,10 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test as setup } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 const AUTH_FILE = 'tests/.auth/user.json';
+const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 
 setup.describe.configure({ mode: 'serial' });
 
@@ -112,13 +114,11 @@ setup('authenticate', async ({ page, baseURL }) => {
     }
   }
 
-  // 5. Navigate to chat to verify auth + warm up route
-  // DASHBOARD_PROFILE is deprecated (it just redirects to CHAT), so navigate
-  // directly to CHAT to avoid a 307 → 404 chain on certain server configs.
-  // Use 'domcontentloaded' to avoid Sentry blocking 'load'/'networkidle'
-  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-    waitUntil: 'domcontentloaded',
+  // 5. Navigate to a stable authenticated shell route to verify auth.
+  // Profile data can fail independently of auth and should not be the auth probe.
+  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
     timeout: 120_000,
+    retries: 2,
   });
 
   // 6. Wait for dashboard to be usable, dismissing Next.js dev error overlays
@@ -154,12 +154,26 @@ setup('authenticate', async ({ page, baseURL }) => {
     // This reliably recovers from stuck error overlays and Turbopack issues
     const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
     const userButton = page.locator('[data-clerk-element="userButton"]');
-    const shellReady = dashNav.or(userButton);
-    if (!(await shellReady.isVisible().catch(() => false)) && !hasReloaded) {
+    const chatComposer = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    const main = page.locator('main').first();
+    const isShellReady = async () =>
+      (page.url().includes('/app') &&
+        !page.url().includes('/signin') &&
+        !page.url().includes('/sign-in') &&
+        !page.url().includes('/onboarding') &&
+        (await main.isVisible().catch(() => false))) ||
+      (await dashNav.isVisible().catch(() => false)) ||
+      (await userButton.isVisible().catch(() => false)) ||
+      (await chatComposer.isVisible().catch(() => false));
+    if (!(await isShellReady()) && !hasReloaded) {
       hasReloaded = true;
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
     }
-    await expect(shellReady).toBeVisible({ timeout: 5000 });
+    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
   }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
 
   // 7. Save authenticated session

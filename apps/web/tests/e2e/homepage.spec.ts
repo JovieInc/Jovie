@@ -1,6 +1,8 @@
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
+const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Homepage E2E Tests (consolidated from homepage + featured-artists)
  *
@@ -9,6 +11,10 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.skip(
+  isFastIteration,
+  'Homepage coverage runs in the lighter smoke-public and content-gate fast lanes'
+);
 
 /**
  * Force all DeferredSections to render by patching IntersectionObserver
@@ -66,9 +72,11 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'AI to power your music career'
+      'The link your music deserves.'
     );
-    await expect(page.getByText(/Built to amplify your work/i)).toBeVisible();
+    await expect(
+      page.getByText(/Connect your Spotify, capture every fan/i)
+    ).toBeVisible();
 
     // Claim handle input in hero
     const heroSection = page.locator('main section').first();
@@ -105,7 +113,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     await expect(page.locator('h1')).toContainText(
-      'AI to power your music career',
+      'The link your music deserves.',
       { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     );
 
@@ -129,13 +137,13 @@ test.describe('Homepage - Featured Creators Carousel', () => {
     await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    const showcaseHeading = page
-      .locator('h2')
-      .filter({ hasText: /see it in action|featured/i });
-    const dataTestId = page.locator('[data-testid="featured-creators"]');
-    await expect(showcaseHeading.first().or(dataTestId.first())).toBeVisible({
-      timeout: 20000,
-    });
+    const trustHeading = page.getByText(/Trusted by artists on/i).first();
+    const trustLogo = page
+      .locator(
+        'img[alt="Universal Music Group"], img[alt="AWAL"], img[alt="The Orchard"], img[alt="Armada Music"], img[alt="Black Hole Recordings"]'
+      )
+      .first();
+    await expect(trustHeading.or(trustLogo)).toBeVisible({ timeout: 20000 });
   });
 
   test('showcase section has images with alt text', async ({ page }) => {
@@ -143,22 +151,18 @@ test.describe('Homepage - Featured Creators Carousel', () => {
     await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    const showcaseHeading = page
-      .locator('h2')
-      .filter({ hasText: /see it in action|featured/i });
-    await expect(showcaseHeading.first()).toBeVisible({ timeout: 20000 });
+    const trustHeading = page.getByText(/Trusted by artists on/i).first();
+    await expect(trustHeading).toBeVisible({ timeout: 20000 });
 
-    const images = page.locator('img');
-    const imageCount = await images.count();
-    expect(imageCount).toBeGreaterThan(0);
-
-    const visibleImages = page.locator('img:visible');
-    const visibleCount = await visibleImages.count();
-    if (visibleCount > 0) {
-      const firstImage = visibleImages.first();
-      const alt = await firstImage.getAttribute('alt');
-      expect(alt).not.toBeNull();
-    }
+    await expect(
+      page.getByRole('img', { name: 'Universal Music Group' })
+    ).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('img', { name: 'AWAL' })).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByRole('img', { name: 'The Orchard' })).toBeVisible({
+      timeout: 20000,
+    });
   });
 
   test('showcase loads without critical console errors', async ({ page }) => {

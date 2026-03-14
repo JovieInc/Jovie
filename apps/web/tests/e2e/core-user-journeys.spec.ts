@@ -6,6 +6,8 @@ import {
   waitForLoad,
 } from './utils/smoke-test-utils';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Core User Journey Tests
  *
@@ -21,6 +23,11 @@ import {
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Core User Journeys', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Core public journeys duplicate smoke-public and smoke-auth coverage in the fast lane'
+  );
+
   test('Homepage loads correctly for anonymous users', async ({ page }) => {
     await smokeNavigate(page, '/');
 

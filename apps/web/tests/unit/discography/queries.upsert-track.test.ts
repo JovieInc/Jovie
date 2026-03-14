@@ -77,11 +77,11 @@ describe('upsertTrack', () => {
     );
   });
 
-  it('rethrows non-ISRC uniqueness errors', async () => {
+  it('rethrows unhandled uniqueness errors', async () => {
     const otherUniqueError = new Error('duplicate key value');
     Object.assign(otherUniqueError, {
       code: '23505',
-      constraint: 'discog_tracks_release_slug_unique',
+      constraint: 'discog_tracks_release_disc_track_unique',
     });
 
     hoisted.insertMock.mockReturnValueOnce(createInsertChain(otherUniqueError));

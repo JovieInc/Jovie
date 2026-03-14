@@ -195,7 +195,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     await waitForHydration(page);
 
     // Navigate between 2 key tabs to verify routing works
-    const tabs = ['/app/dashboard/analytics', '/app/dashboard/releases'];
+    const tabs = ['/app/dashboard/audience', '/app/dashboard/releases'];
 
     for (const tabPath of tabs) {
       await page.goto(tabPath, {

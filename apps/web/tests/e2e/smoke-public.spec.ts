@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
+
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 /**
  * Suite 1: Public Profile Experience + Public Pages (JOV-1427)
@@ -14,10 +17,8 @@ import { expect, test } from '@playwright/test';
  * @smoke @critical
  */
 
-// Run unauthenticated
 test.use({ storageState: { cookies: [], origins: [] } });
 
-/** Block analytics fire-and-forget calls that interfere with test stability */
 async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/profile/view', r =>
     r.fulfill({ status: 200, body: '{}' })
@@ -28,7 +29,6 @@ async function blockAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
 }
 
-/** Skip if Clerk middleware hijacked the page (CI without dev-browser cookie) */
 function isClerkRedirect(url: string): boolean {
   return (
     url.includes('clerk') &&
@@ -36,17 +36,14 @@ function isClerkRedirect(url: string): boolean {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HOMEPAGE
-// ─────────────────────────────────────────────────────────────────────────────
-
-test('homepage: hero heading, CTA, multiple sections, footer', async ({
-  page,
-}) => {
+test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
+  test.skip(
+    FAST_ITERATION,
+    'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+  );
   test.setTimeout(120_000);
   await blockAnalytics(page);
 
-  // Warmup pre-compiles this route — 120s timeout handles cold-start on first run
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 120_000 });
 
   if (isClerkRedirect(page.url())) {
@@ -54,10 +51,8 @@ test('homepage: hero heading, CTA, multiple sections, footer', async ({
     return;
   }
 
-  // h1 must be visible — if missing, the hero is broken
   await expect(page.locator('h1').first()).toBeVisible({ timeout: 30_000 });
 
-  // CTA must be present — if no signup entry point, users can't convert
   const cta = page
     .locator(
       '#handle-input, a[href*="/signup"], a[href*="/sign-up"], a:has-text("Get started")'
@@ -65,17 +60,17 @@ test('homepage: hero heading, CTA, multiple sections, footer', async ({
     .first();
   await expect(cta).toBeVisible({ timeout: 20_000 });
 
-  // At least 2 sections — proves the page rendered beyond just the shell
-  const sectionCount = await page.locator('section').count();
-  expect(
-    sectionCount,
-    'Homepage missing sections — page may be blank'
-  ).toBeGreaterThanOrEqual(2);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const finalCtaHeadline = page.getByTestId('final-cta-headline');
+  await expect(
+    finalCtaHeadline,
+    'Homepage did not render the final claim CTA section'
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(
+    page.getByTestId('final-cta-dock'),
+    'Homepage did not render the final claim handle form'
+  ).toBeVisible({ timeout: 20_000 });
 
-  // Footer — proves the full page loaded (not a loading skeleton)
-  await expect(page.locator('footer').first()).toBeVisible({ timeout: 20_000 });
-
-  // No error text in visible content
   const bodyText =
     (await page
       .locator('body')
@@ -85,12 +80,7 @@ test('homepage: hero heading, CTA, multiple sections, footer', async ({
   expect(bodyText.toLowerCase()).not.toContain('internal server error');
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUBLIC PROFILE EXPERIENCE
-// Anonymous visitor hits a profile. This is the primary user journey for fans.
-// ─────────────────────────────────────────────────────────────────────────────
-
-test.describe('Public Profile — dualipa', () => {
+test.describe('Public Profile - dualipa', () => {
   const TEST_PROFILE = 'dualipa';
 
   test.beforeEach(async ({ page }) => {
@@ -100,6 +90,10 @@ test.describe('Public Profile — dualipa', () => {
   test('default view: artist name in h1, profile identity link, claim banner', async ({
     page,
   }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}`, {
@@ -107,7 +101,6 @@ test.describe('Public Profile — dualipa', () => {
       timeout: 60_000,
     });
 
-    // Hard fail if profile missing — seeding must have worked
     const bodyText =
       (await page
         .locator('body')
@@ -119,17 +112,15 @@ test.describe('Public Profile — dualipa', () => {
     ) {
       test.fail(
         true,
-        'Profile dualipa not seeded — global-setup.ts must seed this profile'
+        'Profile dualipa not seeded - global-setup.ts must seed this profile'
       );
       return;
     }
 
-    // Artist name in h1 — core identity element
     await expect(page.locator('h1').first()).toContainText(/dua lipa/i, {
       timeout: 60_000,
     });
 
-    // Claim CTA and profile identity link must both render for anonymous visitors.
     await expect(
       page.getByRole('link', { name: /claim profile for dua lipa/i })
     ).toBeVisible({ timeout: 15_000 });
@@ -139,6 +130,10 @@ test.describe('Public Profile — dualipa', () => {
   });
 
   test('listen mode: DSP streaming links render', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}?mode=listen`, {
@@ -159,8 +154,6 @@ test.describe('Public Profile — dualipa', () => {
       return;
     }
 
-    // DSP buttons must render — this is the entire point of listen mode
-    // If Spotify seeding worked, there must be at least one DSP link
     const dspActions = page.locator(
       'a[href*="spotify"], a[href*="apple"], a[href*="tidal"], button'
     );
@@ -188,7 +181,7 @@ test.describe('Public Profile — dualipa', () => {
           ),
         {
           message:
-            'No visible DSP links in listen mode — Spotify seeding failed or DSP rendering is broken',
+            'No visible DSP links in listen mode - Spotify seeding failed or DSP rendering is broken',
           timeout: 60_000,
         }
       )
@@ -196,6 +189,10 @@ test.describe('Public Profile — dualipa', () => {
   });
 
   test('tip mode: tipping UI renders', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
     const tipProfile = 'testartist';
 
@@ -217,18 +214,20 @@ test.describe('Public Profile — dualipa', () => {
       return;
     }
 
-    // testartist is seeded with a Venmo handle, so tip mode should expose the
-    // actual Venmo selector instead of the no-tip fallback.
     const tipUI = page
       .getByLabel('Venmo Tipping')
       .or(page.getByRole('button', { name: /continue with venmo/i }));
     await expect(
       tipUI.first(),
-      'No tipping UI rendered — tipping flow is broken for this profile'
+      'No tipping UI rendered - tipping flow is broken for this profile'
     ).toBeVisible({ timeout: 60_000 });
   });
 
   test('subscribe mode: notification capture UI renders', async ({ page }) => {
+    test.skip(
+      FAST_ITERATION,
+      'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+    );
     test.setTimeout(90_000);
 
     await page.goto(`/${TEST_PROFILE}?mode=subscribe`, {
@@ -263,27 +262,26 @@ test.describe('Public Profile — dualipa', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SIGNIN / SIGNUP — critical conversion pages
-// ─────────────────────────────────────────────────────────────────────────────
-
 test('signin and signup pages load', async ({ page }) => {
+  test.skip(
+    FAST_ITERATION,
+    'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+  );
   await blockAnalytics(page);
 
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   if (!pk || pk.includes('mock') || pk.includes('dummy')) {
-    test.skip(true, 'No real Clerk config — skipping auth page tests');
+    test.skip(true, 'No real Clerk config - skipping auth page tests');
     return;
   }
 
-  for (const route of ['/signin', '/sign-up']) {
+  for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
     const response = await page.goto(route, {
       waitUntil: 'domcontentloaded',
       timeout: 60_000,
     });
     expect(response?.status() ?? 0, `${route} returned 5xx`).toBeLessThan(500);
 
-    // Something must render — empty page = broken Clerk integration
     const bodyText = await page.locator('body').textContent();
     expect(
       bodyText?.trim().length,
@@ -292,11 +290,11 @@ test('signin and signup pages load', async ({ page }) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ERROR HANDLING — unknown routes must not 500
-// ─────────────────────────────────────────────────────────────────────────────
-
 test('unknown routes return <500, not server crash', async ({ page }) => {
+  test.skip(
+    FAST_ITERATION,
+    'Public smoke coverage runs in content-gate and targeted smoke-public loops'
+  );
   await blockAnalytics(page);
 
   for (const route of [
@@ -311,7 +309,7 @@ test('unknown routes return <500, not server crash', async ({ page }) => {
     const status = response?.status() ?? 0;
     expect(
       status,
-      `${route} returned ${status} — server crashed on unknown route`
+      `${route} returned ${status} - server crashed on unknown route`
     ).toBeLessThan(500);
 
     const bodyText = (await page.locator('body').textContent()) ?? '';

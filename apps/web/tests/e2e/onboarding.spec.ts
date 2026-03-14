@@ -2,6 +2,8 @@ import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page, test } from '@playwright/test';
 import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Onboarding E2E Tests (consolidated)
  *
@@ -17,6 +19,10 @@ import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
 
 test.describe('Onboarding', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  test.skip(
+    FAST_ITERATION,
+    'Onboarding end-to-end coverage is handled by the dedicated golden path in fast iteration'
+  );
 
   const runFull = process.env.E2E_ONBOARDING_FULL === '1';
 
