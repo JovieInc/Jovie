@@ -13,7 +13,7 @@ export function DrawerStatGrid({ children, className }: DrawerStatGridProps) {
   return (
     <DrawerSurfaceCard
       className={cn(
-        'grid grid-cols-2 divide-x divide-(--linear-border-subtle) p-3',
+        'grid grid-cols-2 divide-x divide-(--linear-app-frame-seam) p-3.5',
         className
       )}
     >

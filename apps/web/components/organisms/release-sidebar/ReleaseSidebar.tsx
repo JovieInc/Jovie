@@ -100,8 +100,8 @@ function ReleaseEntityHeader({
   const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
 
   return (
-    <div className='space-y-3.5'>
-      <div className='flex items-start gap-3.5'>
+    <div className='space-y-3'>
+      <div className='flex items-start gap-3'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -178,8 +178,8 @@ function ReleaseEntityHeader({
               platformCount={release.providers.length}
             />
           }
-          className='min-w-0 flex-1 gap-1'
-          bodyClassName='pt-1.5'
+          className='min-w-0 flex-1 gap-0.5'
+          bodyClassName='pt-1'
         />
       </div>
 
