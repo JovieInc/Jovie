@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useRef, useState, useTransition } from 'react';
-import { loadTracksForRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ReleaseViewModel, TrackViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
+import { fetchWithTimeout } from '@/lib/queries/fetch';
 
 export interface UseExpandedTracksResult {
   /** Set of release IDs that are currently expanded */
@@ -45,6 +45,15 @@ export function useExpandedTracks(): UseExpandedTracksResult {
     new Set()
   );
   const [, startTransition] = useTransition();
+
+  const fetchReleaseTracks = useCallback(
+    (releaseId: string, signal?: AbortSignal) =>
+      fetchWithTimeout<TrackViewModel[]>(
+        `/api/dashboard/releases/${releaseId}/tracks`,
+        { signal }
+      ),
+    []
+  );
 
   // Ref to track loading state for race condition prevention
   // This allows us to check if user collapsed during fetch
@@ -101,10 +110,7 @@ export function useExpandedTracks(): UseExpandedTracksResult {
 
       try {
         // Fetch tracks from server
-        const tracks = await loadTracksForRelease({
-          releaseId,
-          releaseSlug: release.slug,
-        });
+        const tracks = await fetchReleaseTracks(releaseId);
 
         // Only expand if still in loading state (user didn't collapse during load)
         if (loadingReleaseIdsRef.current.has(releaseId)) {
@@ -137,7 +143,7 @@ export function useExpandedTracks(): UseExpandedTracksResult {
         });
       }
     },
-    [expandedReleaseIds, tracksByReleaseId]
+    [expandedReleaseIds, fetchReleaseTracks, tracksByReleaseId]
   );
 
   const collapseAll = useCallback(() => {
