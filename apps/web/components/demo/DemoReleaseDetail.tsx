@@ -1,6 +1,6 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { MessageSquare, Paperclip, SendHorizontal, X } from 'lucide-react';
 import {
   DrawerButton,
   DrawerInlineIconButton,
@@ -162,39 +162,86 @@ export function DemoReleaseDetail({
         {/* Activity */}
         <div className='mt-4'>
           <DrawerSectionHeading className='mb-3'>Activity</DrawerSectionHeading>
-          <DrawerSurfaceCard className='space-y-0.5 p-3'>
+          <DrawerSurfaceCard className='space-y-0.5 border-(--linear-border-subtle)/70 bg-(--linear-bg-surface-1)/40 p-3'>
             {DEMO_ACTIVITY_TEMPLATE.map((activity, index) => (
               <div
                 key={activity.id}
-                className='relative flex items-start gap-3 py-2'
+                className='relative flex items-start gap-3 rounded-[7px] py-1.5 pr-1 transition-colors duration-150 hover:bg-(--linear-bg-surface-0)/60'
               >
                 {index < DEMO_ACTIVITY_TEMPLATE.length - 1 ? (
                   <div
                     aria-hidden='true'
-                    className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle)'
+                    className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle)/75'
                   />
                 ) : null}
-                <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
-                  <div className='size-1.5 rounded-full bg-(--linear-text-tertiary)' />
+                <div className='relative z-10 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle)/80 bg-(--linear-bg-surface-0) shadow-[0_0_0_2px_var(--linear-bg-surface-1)]'>
+                  <div className='size-1 rounded-full bg-(--linear-text-tertiary)' />
                 </div>
                 <div className='min-w-0 flex-1 leading-snug text-(--linear-text-secondary)'>
-                  <div className='text-[13px] tracking-[-0.01em]'>
-                    <span className='font-[510] text-(--linear-text-primary)'>
+                  <div className='text-[12.5px] tracking-[-0.005em]'>
+                    <span className='font-[500] text-(--linear-text-secondary)'>
                       {activity.action}
                     </span>
                     {activity.detail ? (
-                      <span className='text-(--linear-text-tertiary)'>
+                      <span className='text-(--linear-text-tertiary)/95'>
                         {' '}
                         - {activity.detail}
                       </span>
                     ) : null}
                   </div>
-                  <div className='mt-0.5 text-[11px] text-(--linear-text-tertiary)'>
+                  <div className='mt-0.5 text-[10.5px] text-(--linear-text-tertiary)'>
                     {activity.time}
                   </div>
                 </div>
               </div>
             ))}
+          </DrawerSurfaceCard>
+        </div>
+
+        <div className='mt-5'>
+          <DrawerSectionHeading className='mb-2'>Comments</DrawerSectionHeading>
+          <DrawerSurfaceCard className='border-(--linear-border-subtle)/80 bg-(--linear-bg-surface-1)/35 p-2.5'>
+            <div className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2.5 py-2'>
+              <label htmlFor='release-comment' className='sr-only'>
+                Add comment
+              </label>
+              <textarea
+                id='release-comment'
+                rows={3}
+                readOnly
+                value='Leave a note for your team. Comments in demo mode stay local.'
+                className='w-full resize-none bg-transparent text-[12.5px] leading-[1.45] text-(--linear-text-secondary) outline-none placeholder:text-(--linear-text-tertiary)'
+              />
+              <div className='mt-2 flex items-center justify-between border-t border-(--linear-border-subtle)/80 pt-2'>
+                <div className='inline-flex items-center gap-1.5 text-[11px] text-(--linear-text-tertiary)'>
+                  <MessageSquare className='size-3.5' aria-hidden />
+                  <span>Internal update</span>
+                </div>
+                <div className='flex items-center gap-1.5'>
+                  <DrawerInlineIconButton
+                    className='size-7 rounded-[7px] text-(--linear-text-tertiary)'
+                    aria-label='Attach file'
+                  >
+                    <Paperclip className='size-3.5' />
+                  </DrawerInlineIconButton>
+                  <DrawerButton
+                    size='icon'
+                    tone='secondary'
+                    className='h-7 w-7 rounded-[7px]'
+                    aria-label='Send comment'
+                    onClick={() =>
+                      runDemoAction({
+                        loadingMessage: 'Posting comment',
+                        successMessage:
+                          'Comment queued in demo mode. Nothing was sent.',
+                      })
+                    }
+                  >
+                    <SendHorizontal className='size-3.5' />
+                  </DrawerButton>
+                </div>
+              </div>
+            </div>
           </DrawerSurfaceCard>
         </div>
 
@@ -211,10 +258,10 @@ export function DemoReleaseDetail({
         )}
 
         {/* Actions */}
-        <div className='mt-8 grid grid-cols-2 gap-2'>
+        <div className='mt-8 grid grid-cols-2 gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
           <DrawerButton
             tone='secondary'
-            className='justify-center'
+            className='justify-center border-(--linear-border-subtle)/80 bg-transparent text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
             onClick={() =>
               runDemoAction({
                 loadingMessage: 'Syncing providers',
@@ -226,7 +273,7 @@ export function DemoReleaseDetail({
           </DrawerButton>
           <DrawerButton
             tone='secondary'
-            className='justify-center'
+            className='justify-center border-(--linear-border-subtle)/80 bg-transparent text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
             onClick={() =>
               runDemoAction({
                 loadingMessage: 'Publishing release',
