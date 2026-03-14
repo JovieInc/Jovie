@@ -106,7 +106,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
-  const [_amArtistName, setAmArtistName] = useState(appleMusicArtistName);
+  const [, setAmArtistName] = useState(appleMusicArtistName);
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {

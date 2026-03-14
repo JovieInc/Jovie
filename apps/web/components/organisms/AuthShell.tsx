@@ -46,7 +46,7 @@ function AuthShellInner({
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
 
-  const sidebarTrigger = !isMobile ? <SidebarTrigger /> : null;
+  const sidebarTrigger = isMobile ? null : <SidebarTrigger />;
 
   const isInSettings = section === 'settings';
 
