@@ -5,6 +5,12 @@ import { Icon } from '@/components/atoms/Icon';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
+  DrawerButton,
+  DrawerFormField,
+  DrawerSurfaceCard,
+  EntityHeaderCard,
+} from '@/components/molecules/drawer';
+import {
   Dialog,
   DialogActions,
   DialogBody,
@@ -73,35 +79,34 @@ export function ReleaseEditDialog({
         {release ? (
           <div className='space-y-4'>
             {/* Release info header */}
-            <div className='flex items-center gap-4 rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-4'>
-              {/* Artwork */}
-              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-none'>
-                <ImageWithFallback
-                  src={release.artworkUrl}
-                  alt={`${release.title} artwork`}
-                  fill
-                  className='object-cover'
-                  sizes='64px'
-                  fallbackVariant='release'
-                />
-              </div>
-              <div className='min-w-0 flex-1'>
-                <p className='text-base font-[590] text-primary-token'>
-                  {release.title}
-                </p>
-                <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
-                  Smart link: {release.smartLinkPath}
-                </p>
-                <Badge
-                  variant='secondary'
-                  className='mt-2 border border-(--linear-border-subtle) bg-transparent text-[11px] text-(--linear-text-secondary)'
-                >
-                  {release.releaseDate
-                    ? new Date(release.releaseDate).toLocaleDateString()
-                    : 'Date TBD'}
-                </Badge>
-              </div>
-            </div>
+            <DrawerSurfaceCard className='rounded-[12px] p-4'>
+              <EntityHeaderCard
+                image={
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-none'>
+                    <ImageWithFallback
+                      src={release.artworkUrl}
+                      alt={`${release.title} artwork`}
+                      fill
+                      className='object-cover'
+                      sizes='64px'
+                      fallbackVariant='release'
+                    />
+                  </div>
+                }
+                title={release.title}
+                subtitle={`Smart link: ${release.smartLinkPath}`}
+                badge={
+                  <Badge
+                    variant='secondary'
+                    className='border border-(--linear-border-subtle) bg-transparent text-[11px] text-(--linear-text-secondary)'
+                  >
+                    {release.releaseDate
+                      ? formatReleaseDateShort(release.releaseDate)
+                      : 'Date TBD'}
+                  </Badge>
+                }
+              />
+            </DrawerSurfaceCard>
 
             {/* Provider inputs grid */}
             <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
@@ -118,14 +123,14 @@ export function ReleaseEditDialog({
                 return (
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
-                    className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3 shadow-none'
+                    className='rounded-[10px] p-3 shadow-none'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
                         <ProviderIcon
                           provider={provider.key}
                           className='h-4 w-4'
-                          aria-label={provider.label}
+                          aria-hidden='true'
                         />
                         <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                           {provider.label}
@@ -140,10 +145,11 @@ export function ReleaseEditDialog({
                         </Badge>
                       ) : null}
                     </div>
-                    <p className='mt-1 text-[11px] text-(--linear-text-secondary)'>
-                      {helperText}
-                    </p>
-                    <div className='mt-2 space-y-2'>
+                    <DrawerFormField
+                      label='URL'
+                      helperText={helperText}
+                      className='mt-2 space-y-2'
+                    >
                       <Input
                         value={value}
                         onChange={event =>

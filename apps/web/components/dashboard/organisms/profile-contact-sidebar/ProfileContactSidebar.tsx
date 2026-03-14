@@ -404,7 +404,9 @@ export function ProfileContactSidebar() {
         <div className='flex items-center gap-1.5'>
           <DrawerTabs
             value={resolvedCategory}
-            onValueChange={value => setSelectedCategory(value)}
+            onValueChange={value =>
+              setSelectedCategory(value as CategoryOption | 'about')
+            }
             options={PROFILE_TAB_OPTIONS}
             className='flex-1'
             ariaLabel='Profile sidebar view'

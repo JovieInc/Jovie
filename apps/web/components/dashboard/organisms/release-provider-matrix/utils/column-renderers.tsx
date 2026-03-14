@@ -419,7 +419,7 @@ export function renderGenresCell({
     <div className='flex items-center gap-1'>
       <TruncatedText
         lines={1}
-        className='text-[13px] text-(--linear-text-secondary)'
+        className='min-w-0 flex-1 text-[13px] text-(--linear-text-secondary)'
       >
         {firstGenre}
       </TruncatedText>

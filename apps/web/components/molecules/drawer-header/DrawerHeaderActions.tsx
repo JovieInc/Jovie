@@ -83,7 +83,10 @@ export function DrawerHeaderActions({
             <AppIconButton
               key={action.id}
               asChild
-              className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+              className={cn(
+                DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
+                'text-(--linear-text-tertiary)'
+              )}
               ariaLabel={action.label}
             >
               <Link href={action.href}>
@@ -101,7 +104,7 @@ export function DrawerHeaderActions({
             key={action.id}
             onClick={action.onClick}
             className={cn(
-              'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)',
+              DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
               action.isActive
                 ? 'text-success hover:text-success'
                 : 'text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
@@ -138,10 +141,13 @@ export function DrawerHeaderActions({
       {menuItems.length > 0 && (
         <TableActionMenu items={menuItems} trigger='custom' align='end'>
           <AppIconButton
-            className='border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
+            className={cn(
+              DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
+              'text-(--linear-text-tertiary)'
+            )}
             ariaLabel='More actions'
           >
-            <MoreVertical className='h-3.5 w-3.5' />
+            <MoreVertical className='h-3.5 w-3.5' aria-hidden='true' />
           </AppIconButton>
         </TableActionMenu>
       )}

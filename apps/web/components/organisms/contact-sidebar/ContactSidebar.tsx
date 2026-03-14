@@ -142,7 +142,7 @@ export const ContactSidebar = memo(function ContactSidebar({
         contact ? (
           <DrawerTabs
             value={activeTab}
-            onValueChange={value => setActiveTab(value)}
+            onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
             ariaLabel='Contact sidebar view'
           />

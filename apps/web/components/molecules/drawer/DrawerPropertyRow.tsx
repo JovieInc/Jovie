@@ -55,17 +55,31 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid w-full min-h-[30px] items-center gap-2 rounded-[8px] px-1.5 py-1 text-left transition-[background-color,box-shadow,border-color] duration-150',
+        'grid w-full text-left transition-[background-color,box-shadow,border-color] duration-150',
+        align === 'start' ? 'items-start' : 'items-center',
+        styles.container,
         interactive &&
-          'cursor-pointer hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'cursor-pointer border border-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
       style={gridStyle}
     >
-      <span className='text-[11px] font-[510] leading-[14px] tracking-[-0.01em] text-(--linear-text-tertiary)'>
+      <span
+        className={cn(
+          'font-[510] uppercase text-(--linear-text-tertiary)',
+          styles.label,
+          labelClassName
+        )}
+      >
         {label}
       </span>
-      <span className='min-w-0 text-[13px] leading-[17px] text-(--linear-text-secondary)'>
+      <span
+        className={cn(
+          'min-w-0 text-(--linear-text-secondary)',
+          styles.value,
+          valueClassName
+        )}
+      >
         {value}
       </span>
     </Wrapper>

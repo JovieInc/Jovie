@@ -17,12 +17,15 @@ import {
   connectAppleMusicArtist,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { AppSearchField } from '@/components/molecules/AppSearchField';
+import {
+  DrawerButton,
+  DrawerLoadingSkeleton,
+} from '@/components/molecules/drawer';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
@@ -505,45 +508,42 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-[var(--linear-app-toolbar-gap)]'>
-        {canCreateManualReleases && (
-          <Button
-            variant='ghost'
-            size='sm'
+      <DashboardHeaderActionGroup
+        trailing={
+          <DrawerToggleButton
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
+          />
+        }
+      >
+        <HeaderSearchAction
+          searchValue={searchQuery}
+          onSearchValueChange={setSearchQuery}
+          onClearAction={() => setSearchQuery('')}
+          onApply={() => undefined}
+          placeholder='Search releases'
+          ariaLabel='Search releases'
+          submitAriaLabel='Search releases'
+          submitIcon={
+            <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
+          }
+          tooltipLabel='Search'
+        />
+        {canCreateManualReleases ? (
+          <DashboardHeaderActionButton
+            ariaLabel='Create a new release'
             onClick={handleNewRelease}
-            className={APP_CONTROL_BUTTON_CLASS}
-          >
-            <Icon name='Plus' className='h-3.5 w-3.5' />
-            <span className='hidden sm:inline'>New Release</span>
-          </Button>
-        )}
-        <DrawerToggleButton className='h-[var(--linear-app-control-height-sm)] w-[var(--linear-app-control-height-sm)] rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)' />
-      </div>
+            icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
+            label='New Release'
+            iconOnly
+            tooltipLabel='New Release'
+          />
+        ) : null}
+      </DashboardHeaderActionGroup>
     ),
     [canCreateManualReleases, handleNewRelease, searchQuery]
   );
-
-  // Header search input — shown when search is open
-  const handleSearchClose = useCallback(() => {
-    setIsSearchOpen(false);
-    setSearchQuery('');
-  }, []);
-
-  const headerBadgeContent = useMemo(() => {
-    if (!isSearchOpen) return null; // Show default breadcrumb label
-
-    return (
-      <AppSearchField
-        inputRef={searchInputRef}
-        value={searchQuery}
-        onChange={setSearchQuery}
-        onEscape={handleSearchClose}
-        placeholder='Search releases…'
-        ariaLabel='Search releases'
-        className='flex-1'
-      />
-    );
-  }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
 
   useEffect(() => {
     // New Release button on the right side (use memoized element to prevent infinite loops)
@@ -874,7 +874,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       </Suspense>
 
       {experienceMode === 'live' && canCreateManualReleases && (
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            addReleaseOpen ? (
+              <DrawerLoadingSkeleton
+                ariaLabel='Loading add release form'
+                width={SIDEBAR_WIDTH}
+                showTabs={false}
+                contentRows={6}
+              />
+            ) : null
+          }
+        >
           <AddReleaseSidebar
             isOpen={addReleaseOpen}
             onClose={() => setAddReleaseOpen(false)}

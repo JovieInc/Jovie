@@ -174,7 +174,9 @@ export function AudienceFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-[7px] border border-transparent text-(--linear-text-secondary) transition-colors duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
+                PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+                iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+                (isOpen || hasAnyFilter) && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
                 buttonClassName
               )}
               aria-pressed={isOpen || hasAnyFilter}

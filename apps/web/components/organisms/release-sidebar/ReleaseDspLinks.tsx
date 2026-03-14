@@ -60,8 +60,6 @@ interface ReleaseDspLinksProps {
   readonly isRescanningIsrc?: boolean;
 }
 
-const FORM_ROW_CLASS = 'grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2';
-
 /**
  * Format remaining cooldown time for display.
  */

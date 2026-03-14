@@ -120,26 +120,26 @@ export function EntitySidebarShell({
           <>
             {/* Entity header — image + name area */}
             {entityHeader && (
-              <div className='shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-4 pb-3'>
+              <div className='shrink-0 overflow-hidden px-5 pt-4 pb-4'>
                 {entityHeader}
               </div>
             )}
 
             {/* Tabs */}
             {tabs && (
-              <div className='shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2 [&>*]:w-full'>
+              <div className='shrink-0 border-b border-subtle px-5 py-2.5 [&>*]:w-full'>
                 {tabs}
               </div>
             )}
 
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-3.5'>
+            <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] py-3'>
+              <div className='shrink-0 border-t border-subtle bg-surface-0 px-5 py-3'>
                 {footer}
               </div>
             )}

@@ -16,7 +16,8 @@ import {
 } from './mock-release-data';
 
 async function copyDemoLink(path: string, label: string, _testId: string) {
-  const absoluteUrl = `https://jov.ie${path}`;
+  const origin = globalThis.location?.origin ?? 'https://jov.ie';
+  const absoluteUrl = new URL(path, `${origin}/`).toString();
   try {
     await navigator.clipboard.writeText(absoluteUrl);
     toast.success(`${label} copied (demo)`);

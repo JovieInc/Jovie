@@ -52,7 +52,7 @@ const METADATA_BADGE_CLASSNAME = 'border text-[9.5px] font-[510] shadow-none';
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[13px] tabular-nums text-(--linear-text-secondary)'>
+    <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
       {clamped} / 100
     </span>
   );
@@ -71,7 +71,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='border-red-500/20 bg-red-500/10 text-red-600 shadow-none dark:text-red-300'
+          className='h-5 rounded-[6px] border-red-500/20 bg-red-500/10 px-1.5 text-[9.5px] font-[510] text-red-600 shadow-none dark:text-red-300'
         >
           E
         </Badge>
@@ -178,9 +178,7 @@ export function ReleaseMetadata({
               className='font-sans'
             />
           ) : (
-            <span className='text-[13px] text-(--linear-text-tertiary)'>
-              Unknown
-            </span>
+            <MetadataFallbackValue>Unknown</MetadataFallbackValue>
           )
         }
       />
@@ -194,7 +192,7 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='truncate text-[13px] text-(--linear-text-secondary)'>
+            <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
               {formatCopyrightLine(release.copyrightLine, '℗')}
             </span>
           }
@@ -212,7 +210,7 @@ export function ReleaseMetadata({
             />
           }
           value={
-            <span className='truncate text-[13px] text-(--linear-text-secondary)'>
+            <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
               {formatCopyrightLine(release.distributor, '©')}
             </span>
           }
@@ -238,9 +236,10 @@ export function ReleaseMetadata({
           onCanvasStatusChange ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
-                  type='button'
-                  className='-mx-1 inline-flex items-center gap-1 rounded-[6px] border border-transparent px-1 py-0.5 text-[13px] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                <DrawerButton
+                  tone='ghost'
+                  size='sm'
+                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[450] leading-[14px] text-(--linear-text-secondary)'
                 >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
@@ -263,7 +262,7 @@ export function ReleaseMetadata({
                       <span className='flex items-center gap-2 w-full'>
                         <Badge
                           variant='secondary'
-                          className={`border text-[10px] font-medium shadow-none ${config.className}`}
+                          className={`${METADATA_BADGE_CLASSNAME} ${config.className}`}
                         >
                           {config.label}
                         </Badge>
@@ -283,7 +282,7 @@ export function ReleaseMetadata({
           ) : (
             <Badge
               variant='secondary'
-              className={`border text-[10px] font-medium shadow-none ${canvasStatusConfig.className}`}
+              className={`${METADATA_BADGE_CLASSNAME} ${canvasStatusConfig.className}`}
             >
               {canvasStatusDisplayLabel}
             </Badge>
@@ -313,7 +312,7 @@ export function ReleaseMetadata({
                 <Badge
                   key={genre}
                   variant='secondary'
-                  className='bg-(--linear-bg-surface-1) text-[10px] font-normal shadow-none'
+                  className='rounded-[6px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0 text-[9.5px] font-[510] text-(--linear-text-secondary) shadow-none'
                 >
                   {genre}
                 </Badge>

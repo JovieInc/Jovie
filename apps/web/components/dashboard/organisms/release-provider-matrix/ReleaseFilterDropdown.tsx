@@ -115,7 +115,7 @@ function SearchInput({
           onKeyDown={handleKeyDown}
           className={cn(
             'w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px]',
-            'text-primary-token placeholder:text-(--linear-text-tertiary)',
+            'text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary)',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
           )}
@@ -124,7 +124,7 @@ function SearchInput({
         {value && (
           <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 rounded-[5px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
+            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-(--linear-text-tertiary)'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -157,7 +157,7 @@ function ActiveFilterPill({
 
   return (
     <div className='flex items-center gap-0.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[11px]'>
-      <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
+      <div className='flex items-center gap-1.5 py-1 pl-2.5 pr-1'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-(--linear-text-tertiary)'>
             {icon}
@@ -165,11 +165,13 @@ function ActiveFilterPill({
         )}
         <span className='text-(--linear-text-tertiary)'>{groupLabel}</span>
         <span className='text-(--linear-text-tertiary)'>is</span>
-        <span className='font-[510] text-primary-token'>{displayValue}</span>
+        <span className='font-[510] text-(--linear-accent)'>
+          {displayValue}
+        </span>
       </div>
       <DrawerInlineIconButton
         onClick={onClear}
-        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-2) hover:text-primary-token focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-2)'
+        className='h-full rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary)'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -247,7 +249,7 @@ function SubmenuCheckboxItem({
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
           checked
-            ? 'border-primary bg-primary text-white'
+            ? 'border-(--linear-accent) bg-(--linear-accent) text-white'
             : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
         )}
       >
@@ -302,10 +304,8 @@ function VirtualizedLabelList({
 
   if (options.length === 0) {
     return (
-      <div className='flex-1 overflow-y-auto p-1'>
-        <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
-          {emptyMessage}
-        </div>
+      <div className='flex-1 overflow-y-auto'>
+        <DropdownEmptyState message={emptyMessage} />
       </div>
     );
   }
@@ -503,8 +503,9 @@ export function ReleaseFilterDropdown({
               variant='ghost'
               size='sm'
               className={cn(
-                'h-7 gap-1.5 rounded-md border border-transparent text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token',
-                buttonClassName
+                iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+                buttonClassName,
+                (isOpen || hasAnyFilter) && FILTER_TRIGGER_ACTIVE_CLASS
               )}
               aria-pressed={isOpen || hasAnyFilter}
             >
@@ -539,9 +540,7 @@ export function ReleaseFilterDropdown({
           {/* Categories List */}
           <div className='flex-1 overflow-y-auto p-1'>
             {filteredCategories.length === 0 ? (
-              <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
-                No filters found
-              </div>
+              <DropdownEmptyState message='No filters found' />
             ) : (
               <>
                 {/* Release Type Submenu */}
@@ -635,7 +634,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='text-(--linear-text-tertiary) hover:text-primary-token'
+                  className='text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

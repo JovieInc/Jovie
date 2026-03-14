@@ -59,6 +59,29 @@ function ActivityIcon({ action }: { readonly action: ActivityAction }) {
   );
 }
 
+export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
+  const safeRows = Math.max(0, rows);
+
+  return (
+    <div className='space-y-1' aria-busy='true'>
+      {Array.from({ length: safeRows }, (_, index) => (
+        <div
+          key={`activity-skeleton-${index + 1}`}
+          className='relative flex items-start gap-3 rounded-[8px] px-2 py-2'
+          aria-hidden='true'
+        >
+          <div className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle)' />
+          <div className='relative z-10 h-6 w-6 shrink-0 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)] skeleton' />
+          <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
+            <div className='h-3 w-[72%] rounded skeleton' />
+            <div className='h-2.5 w-[24%] rounded skeleton' />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (

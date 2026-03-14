@@ -234,20 +234,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       variant='sidebar'
       collapsible='offcanvas'
       className={cn(
-        'border-r border-(--linear-border-subtle) bg-(--linear-bg-page)',
-        '[--sidebar-width:var(--linear-app-sidebar-width)]',
-        '[--sidebar-background:var(--linear-app-sidebar-background-rgb)]',
-        '[--sidebar-foreground:var(--linear-app-sidebar-foreground-rgb)]',
-        '[--sidebar-border:var(--linear-app-sidebar-border-rgb)]',
-        '[--sidebar-accent:var(--linear-app-sidebar-accent-rgb)]',
-        '[--sidebar-accent-active:var(--linear-app-sidebar-accent-active-rgb)]',
-        '[--sidebar-item-foreground:var(--linear-app-sidebar-item-foreground-rgb)]',
-        '[--sidebar-item-icon:var(--linear-app-sidebar-item-icon-rgb)]',
-        '[--sidebar-muted:var(--linear-app-sidebar-muted-rgb)]',
+        'bg-base',
+        '[--sidebar-width:244px]',
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-11 justify-center gap-0 pl-2 pr-3 pt-0 pb-0 lg:mt-2'>
+      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -256,7 +248,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3'>
+      <SidebarContent className='flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 pb-2'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -272,13 +264,14 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
-      <div className='pl-2 pr-3 pb-3 pt-1 group-data-[collapsible=icon]:hidden'>
-        <span className='text-2xs text-sidebar-muted select-none'>
-          v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
-            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-            : ''}
-        </span>
+        <div className='pl-2 pr-3.5 pb-3.5 pt-1'>
+          <span className='text-2xs text-sidebar-muted select-none'>
+            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+            {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
+              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+              : ''}
+          </span>
+        </div>
       </div>
     </Sidebar>
   );

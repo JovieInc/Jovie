@@ -488,7 +488,7 @@ async function renderListenMode(
 
   const body = (
     <>
-      {!isPublicNoAuthSmoke ? (
+      {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
       )}
       {!profileResult.profile.is_claimed && (

@@ -15,6 +15,7 @@ export interface AppSearchFieldProps {
   readonly ariaLabel: string;
   readonly autoFocus?: boolean;
   readonly inputRef?: React.Ref<HTMLInputElement>;
+  readonly showClearButton?: boolean;
   readonly className?: string;
   readonly inputClassName?: string;
 }
@@ -28,6 +29,7 @@ export function AppSearchField({
   ariaLabel,
   autoFocus = false,
   inputRef,
+  showClearButton = true,
   className,
   inputClassName,
 }: AppSearchFieldProps) {
@@ -55,7 +57,7 @@ export function AppSearchField({
           inputClassName
         )}
       />
-      {value ? (
+      {showClearButton && value ? (
         <AppIconButton
           type='button'
           ariaLabel='Clear search'

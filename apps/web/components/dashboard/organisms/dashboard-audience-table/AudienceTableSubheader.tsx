@@ -1,12 +1,7 @@
 'use client';
 
 import { memo } from 'react';
-import {
-  ACTION_BAR_BUTTON_CLASS,
-  ActionBar,
-  ActionBarItem,
-  ExportCSVButton,
-} from '@/components/organisms/table';
+import { ExportCSVButton, PageToolbar } from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import { AudienceFilterDropdown } from './AudienceFilterDropdown';
 import { AudienceHeaderBadge } from './AudienceHeaderBadge';
@@ -72,37 +67,20 @@ export const AudienceTableSubheader = memo(function AudienceTableSubheader({
             onFiltersChange={onFiltersChange}
             iconOnly
           />
-        </div>
-
-        {/* Right: Filter + Export CSV */}
-        <ActionBar>
-          <ActionBarItem tooltipLabel='Filter' shortcut='F'>
-            <AudienceFilterDropdown
-              filters={filters}
-              onFiltersChange={onFiltersChange}
-              buttonClassName='focus-visible:ring-accent focus-visible:ring-2 focus-visible:ring-offset-1'
-            />
-          </ActionBarItem>
-          <ActionBarItem
-            tooltipLabel={
-              selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'
-            }
-          >
-            <ExportCSVButton
-              getData={() => getAudienceForExport(rows, selectedIds)}
-              columns={AUDIENCE_CSV_COLUMNS}
-              filename='audience'
-              label={
-                selectedIds.size > 0 ? `Export ${selectedIds.size}` : 'Export'
-              }
-              disabled={!hasData && subscriberCount === 0}
-              variant='ghost'
-              size='sm'
-              className={`${ACTION_BAR_BUTTON_CLASS} whitespace-nowrap [&>span]:hidden [&>span]:sm:inline`}
-            />
-          </ActionBarItem>
-        </ActionBar>
-      </div>
-    </div>
+          <ExportCSVButton
+            getData={() => getAudienceForExport(rows, selectedIds)}
+            columns={AUDIENCE_CSV_COLUMNS}
+            filename='audience'
+            label='Export'
+            tooltipLabel={exportTooltipLabel}
+            disabled={!hasData && subscriberCount === 0}
+            variant='ghost'
+            size='sm'
+            chrome='page-toolbar'
+            iconOnly
+          />
+        </>
+      }
+    />
   );
 });

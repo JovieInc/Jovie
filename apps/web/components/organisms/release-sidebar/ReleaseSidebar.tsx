@@ -22,7 +22,9 @@ import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/release
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerAsyncToggle,
+  DrawerMediaThumb,
   DrawerTabs,
+  EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -60,30 +62,9 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'lyrics' as const, label: 'Lyrics' },
 ];
 
-const artistListFormatter = new Intl.ListFormat('en', {
-  style: 'long',
-  type: 'conjunction',
-});
-
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
   if (!hasPreview) return 'No preview available';
   return isPlaying ? 'Pause preview' : 'Play preview';
-}
-
-function formatReleaseArtistLine(
-  artistNames: string[] | undefined,
-  fallbackArtistName: string | null | undefined
-): string | null {
-  const normalizedNames = (artistNames ?? [])
-    .map(name => name.trim())
-    .filter(Boolean);
-
-  if (normalizedNames.length > 0) {
-    return artistListFormatter.format(normalizedNames);
-  }
-
-  const fallback = fallbackArtistName?.trim();
-  return fallback ? fallback : null;
 }
 
 interface ReleaseEntityHeaderProps {
@@ -143,14 +124,16 @@ function ReleaseEntityHeader({
                 showHoverOverlay
               />
             ) : (
-              <div className='relative h-[84px] w-[84px] overflow-hidden rounded-[10px] bg-(--linear-bg-surface-1) shadow-none'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt={artworkAlt}
-                    fill
-                    className='object-cover'
-                    sizes='96px'
+              <DrawerMediaThumb
+                src={release.artworkUrl}
+                alt={artworkAlt}
+                sizeClassName='h-[92px] w-[92px]'
+                sizes='92px'
+                fallback={
+                  <Icon
+                    name='Disc3'
+                    className='h-12 w-12 text-(--linear-text-tertiary)'
+                    aria-hidden='true'
                   />
                 }
               />
@@ -180,25 +163,24 @@ function ReleaseEntityHeader({
           </button>
         </div>
 
-        {/* Compact property stack */}
-        <div className='min-w-0 flex-1 space-y-1 pt-0.5'>
-          <div>
-            <p className='truncate text-[15px] font-[590] leading-[18px] tracking-[-0.015em] text-primary-token'>
-              {release.title}
-            </p>
-            {artistLine && (
-              <p className='line-clamp-2 text-[12px] leading-[16px] text-(--linear-text-secondary)'>
-                {artistLine}
-              </p>
-            )}
-          </div>
-          <ReleaseFields
-            releaseDate={release.releaseDate}
-            releaseType={release.releaseType}
-            totalTracks={release.totalTracks}
-            platformCount={release.providers.length}
-          />
-        </div>
+        <EntityHeaderCard
+          title={release.title}
+          subtitle={
+            artistLine ? (
+              <span className='line-clamp-2 block'>{artistLine}</span>
+            ) : null
+          }
+          meta={
+            <ReleaseFields
+              releaseDate={release.releaseDate}
+              releaseType={release.releaseType}
+              totalTracks={release.totalTracks}
+              platformCount={release.providers.length}
+            />
+          }
+          className='min-w-0 flex-1 gap-1'
+          bodyClassName='pt-1.5'
+        />
       </div>
 
       {/* Smart link — full width */}
@@ -493,7 +475,7 @@ export function ReleaseSidebar({
         release && !selectedTrack ? (
           <DrawerTabs
             value={activeTab}
-            onValueChange={value => setActiveTab(value)}
+            onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
             ariaLabel='Release sidebar view'
           />

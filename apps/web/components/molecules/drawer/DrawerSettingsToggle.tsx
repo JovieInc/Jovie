@@ -41,17 +41,21 @@ export function DrawerSettingsToggle({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[8px] py-1 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
-        density === 'compact' ? 'min-h-[32px]' : 'min-h-[44px] lg:min-h-0',
+        'flex items-center justify-between gap-3 rounded-[7px] py-0.5 transition-[background-color,box-shadow] duration-150',
+        !disabled &&
+          'hover:bg-[var(--linear-bg-surface-1)] focus-within:bg-[var(--linear-bg-surface-1)] focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
         density === 'compact' ? 'px-1.5' : 'px-2',
+        disabled && 'opacity-60',
         className
       )}
     >
       <label
         htmlFor={id}
         className={cn(
-          'cursor-pointer select-none text-(--linear-text-secondary)',
-          density === 'compact' ? 'text-[12px]' : 'text-[13px]'
+          'select-none text-[var(--linear-text-secondary)]',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+          density === 'compact' ? 'text-[11px]' : 'text-[12px]'
         )}
       >
         {label}

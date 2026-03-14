@@ -117,8 +117,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
                   hideBranding: !formData.hideBranding,
                 })
               }
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base ${
-                formData.hideBranding ? 'bg-surface-3' : 'bg-accent'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full border border-(--linear-border-subtle) p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) ${
+                formData.hideBranding
+                  ? 'bg-(--linear-bg-surface-0)'
+                  : 'bg-(--linear-border-focus)'
               }`}
               disabled={loading}
               aria-pressed={!formData.hideBranding}
@@ -129,7 +131,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               }
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-surface-1 transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-(--linear-bg-surface-1) transition-transform ${
                   formData.hideBranding ? 'translate-x-1' : 'translate-x-6'
                 }`}
                 aria-hidden='true'

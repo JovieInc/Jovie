@@ -183,7 +183,15 @@ export function ExportCSVButton<T extends object>({
       size={size}
       onClick={handleOpenConfirmation}
       disabled={disabled || isExporting}
-      className={cn(APP_CONTROL_BUTTON_CLASS, className)}
+      className={cn(
+        chrome === 'page-toolbar'
+          ? cn(
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              iconOnly && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS
+            )
+          : APP_CONTROL_BUTTON_CLASS,
+        className
+      )}
       aria-label={ariaLabel}
       aria-busy={isExporting}
     >

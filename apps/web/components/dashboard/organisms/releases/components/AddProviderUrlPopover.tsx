@@ -79,9 +79,11 @@ export function AddProviderUrlPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type='button'
-          className='group/add inline-flex items-center gap-1.5 rounded-[8px] border border-transparent px-2 py-1 text-[13px] text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-primary-token'
+        <DrawerButton
+          aria-label={`Add ${providerLabel} link`}
+          tone='ghost'
+          size='sm'
+          className='group/add h-7 min-w-[76px] gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[450] text-(--linear-text-tertiary)'
         >
           <Icon
             name='Plus'
@@ -98,7 +100,7 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-72 rounded-[10px] border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'
+        className='w-[288px] border-0 bg-transparent p-0 shadow-none'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();

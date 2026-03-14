@@ -87,17 +87,19 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex h-7 items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 transition-colors hover:bg-(--linear-bg-surface-0)',
+        'flex items-center border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) transition-[background-color,border-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
+        styles.container,
         className
       )}
     >
       <Link2
-        className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)'
+        className={cn(styles.icon, 'shrink-0 text-(--linear-text-tertiary)')}
         aria-hidden='true'
       />
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono text-[11px] tracking-[-0.01em] text-(--linear-text-secondary)',
+          'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-(--linear-text-secondary)',
+          styles.value,
           valueClassName
         )}
         title={url}
@@ -108,7 +110,8 @@ export function CopyableUrlRow({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : copyButtonTitle}
         className={cn(
-          'flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'shrink-0 text-(--linear-text-tertiary)',
+          styles.button,
           isCopied && 'text-success'
         )}
       >
@@ -118,7 +121,7 @@ export function CopyableUrlRow({
       <DrawerInlineIconButton
         onClick={handleOpen}
         title={openButtonTitle}
-        className='flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        className={cn('shrink-0 text-(--linear-text-tertiary)', styles.button)}
       >
         <ExternalLink className={styles.glyph} />
         <span className='sr-only'>Open</span>

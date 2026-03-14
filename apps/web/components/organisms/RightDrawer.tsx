@@ -95,7 +95,7 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
-          'overflow-hidden bg-(--linear-app-drawer-surface)',
+          'bg-surface-2 overflow-hidden',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
@@ -117,7 +117,8 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'border-l border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) shadow-[var(--linear-app-drawer-shadow)]',
+        'bg-surface-0 border-l border-subtle shadow-[var(--linear-shadow-card-elevated)]',
+        'lg:rounded-l-xl lg:my-2 lg:h-[calc(100%-1rem)]',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
@@ -127,10 +128,7 @@ export function RightDrawer({
       )}
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
     >
-      <div
-        className='flex h-full flex-col bg-(--linear-app-drawer-surface)'
-        style={{ minWidth: width }}
-      >
+      <div className='flex flex-col h-full' style={{ minWidth: width }}>
         {content}
       </div>
     </aside>

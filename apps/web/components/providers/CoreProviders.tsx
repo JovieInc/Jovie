@@ -26,14 +26,9 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
 
 function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-  const canPreviewLightMode = env.IS_DEV || isLightModeEnabled;
 
   useEffect(() => {
-    if (!canPreviewLightMode) return;
+    if (!isEnabled) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
@@ -49,7 +44,7 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resolvedTheme, setTheme, canPreviewLightMode]);
+  }, [resolvedTheme, setTheme, isEnabled]);
 
   return null;
 }
@@ -89,11 +84,6 @@ function CoreProvidersInner({
   initialThemeMode: ThemeMode;
   themeEnabled: boolean;
 }) {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
-  const canPreviewLightMode = env.IS_DEV || isLightModeEnabled;
   // Handle chunk load errors gracefully (common with version mismatches)
   useChunkErrorHandler();
 
@@ -155,9 +145,9 @@ function CoreProvidersInner({
   const content = (
     <ThemeProvider
       attribute='class'
-      forcedTheme={canPreviewLightMode ? undefined : 'dark'}
-      defaultTheme='dark'
-      enableSystem={canPreviewLightMode}
+      forcedTheme={themeEnabled ? undefined : 'dark'}
+      defaultTheme={themeEnabled ? initialThemeMode : 'dark'}
+      enableSystem={themeEnabled}
       disableTransitionOnChange
       storageKey='jovie-theme'
     >

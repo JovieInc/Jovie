@@ -7,6 +7,7 @@ import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell'
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import type {
@@ -142,7 +143,7 @@ export const TrackRow = memo(function TrackRow({
         <td className='py-2 pr-4'>
           <div className='flex items-center gap-2.5 pl-6'>
             {/* Track number */}
-            <span className='w-8 shrink-0 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
+            <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
               {trackLabel}.
             </span>
 
@@ -160,7 +161,7 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-0 text-[10px] text-(--linear-text-tertiary)'
+                    className='shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-0 text-[9px] text-(--linear-text-tertiary)'
                   >
                     E
                   </Badge>
@@ -179,26 +180,27 @@ export const TrackRow = memo(function TrackRow({
         <td className='py-2'>
           <div className='flex items-center gap-2'>
             {linkedProviders.length > 0 ? (
-              <>
-                <div className='flex -space-x-1'>
-                  {linkedProviders.slice(0, 4).map(providerKey => {
-                    return (
-                      <div
-                        key={providerKey}
-                        className='relative flex h-4 w-4 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
-                      >
-                        <ProviderIcon
-                          provider={providerKey}
-                          className='h-3 w-3'
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-                <span className='text-[11px] text-(--linear-text-tertiary)'>
-                  {availableCount}/{allProviders.length}
-                </span>
-              </>
+              <CompactLinkRail
+                items={linkedProviders.slice(0, 4).map(providerKey => ({
+                  id: providerKey,
+                  platformIcon: providerKey,
+                  platformName: providerConfig[providerKey].label,
+                  primaryText: providerConfig[providerKey].label,
+                  summaryIcon: (
+                    <ProviderIcon
+                      provider={providerKey}
+                      className='h-2.5 w-2.5'
+                      aria-hidden='true'
+                    />
+                  ),
+                }))}
+                countLabel='track DSP links'
+                summaryCount={availableCount}
+                summaryAriaLabel={`${availableCount} of ${allProviders.length} track DSP links`}
+                maxVisible={4}
+                className='justify-start'
+                railClassName='max-w-[132px] lg:max-w-[164px]'
+              />
             ) : (
               <span className='text-[11px] text-(--linear-text-tertiary)'>
                 —

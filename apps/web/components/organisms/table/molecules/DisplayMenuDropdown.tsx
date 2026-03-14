@@ -155,7 +155,7 @@ export function DisplayMenuDropdown({
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
-          <span className='text-[13px] font-[590] text-primary-token'>
+          <span className='text-[13px] font-[590] text-(--linear-text-primary)'>
             Display
           </span>
           <PopoverPrimitive.Close
@@ -188,7 +188,7 @@ export function DisplayMenuDropdown({
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'list'
-                    ? 'text-primary-token'
+                    ? 'text-(--linear-text-primary)'
                     : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
                 )}
                 aria-pressed={viewMode === 'list'}
@@ -204,7 +204,7 @@ export function DisplayMenuDropdown({
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'board'
-                    ? 'text-primary-token'
+                    ? 'text-(--linear-text-primary)'
                     : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
                 )}
                 aria-pressed={viewMode === 'board'}

@@ -1,7 +1,11 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
+import {
+  APP_CONTROL_BUTTON_CLASS,
+  AppIconButton,
+} from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
@@ -78,9 +82,8 @@ export function DashboardHeaderActionButton({
       tooltipLabel={tooltipLabel}
       tooltipShortcut={tooltipShortcut}
       className={cn(
-        'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)',
-        pressed &&
-          'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)',
+        DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
+        pressed && DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS,
         className
       )}
     >

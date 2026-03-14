@@ -8,8 +8,16 @@ import { DashboardHeaderActionButton } from './DashboardHeaderActionButton';
 
 export function DrawerToggleButton({
   className,
+  chrome = 'header',
+  ariaLabel = 'Toggle details sidebar',
+  label = 'Details',
+  tooltipLabel = label,
 }: {
   readonly className?: string;
+  readonly chrome?: 'header' | 'page-toolbar';
+  readonly ariaLabel?: string;
+  readonly label?: string;
+  readonly tooltipLabel?: string;
 }) {
   const { tableMeta } = useTableMeta();
   const [isOpen, setIsOpen] = useState(false);

@@ -227,7 +227,7 @@ const ICON_DATA: Record<string, { hex: string; path: string }> = {
 };
 
 function normalizePlatformKey(platform: string): string {
-  return platform.toLowerCase().replace(/[\s_-]+/g, '');
+  return platform.toLowerCase().replaceAll(/[\s_-]+/g, '');
 }
 
 /**

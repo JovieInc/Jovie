@@ -51,12 +51,10 @@ export function DrawerLinkSection({
   return (
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex min-h-[40px] items-center justify-between lg:min-h-0'>
-        <h4
-          className={[
-            'text-[11px] font-[510] uppercase',
-            'tracking-[0.08em] text-(--linear-text-tertiary)',
-          ].join(' ')}
+      <div className='flex min-h-[40px] items-center justify-between gap-2 lg:min-h-0'>
+        <DrawerSectionHeading
+          as='h4'
+          className='min-w-0 flex-1 truncate text-[11px] tracking-[0.08em]'
         >
           {title}
         </DrawerSectionHeading>
@@ -77,9 +75,11 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <p className='py-2 text-xs text-(--linear-text-tertiary)'>
-          {emptyMessage}
-        </p>
+        <DrawerEmptyState
+          message={emptyMessage}
+          className='min-h-[96px]'
+          testId={emptyStateTestId}
+        />
       ) : (
         <div className='-mx-5 lg:mx-0'>{children}</div>
       )}

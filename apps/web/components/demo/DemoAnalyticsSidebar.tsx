@@ -2,8 +2,12 @@
 
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
-import { cn } from '@/lib/utils';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
+import {
+  DrawerSurfaceCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 
 /* ------------------------------------------------------------------ */
 /*  Hardcoded mock analytics data                                       */
@@ -266,7 +270,7 @@ export function DemoAnalyticsSidebar({
         <FunnelSection />
 
         {/* Tabs + range toggle */}
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-1.5'>
           <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}

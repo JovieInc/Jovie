@@ -2,7 +2,12 @@
 
 import { ArrowDown, Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useCallback, useState } from 'react';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
+import {
+  DrawerSurfaceCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
 import { cn } from '@/lib/utils';
@@ -346,7 +351,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           />
         </div>
 
-        <div className='flex items-center gap-2'>
+        <div className='flex items-center gap-1.5'>
           <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}

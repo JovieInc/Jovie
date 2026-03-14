@@ -33,11 +33,9 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
   const { className, mode } = props;
 
   return (
-    <aside
-      className={cn(
-        'flex items-start gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-3',
-        className
-      )}
+    <DrawerSurfaceCard
+      as='aside'
+      className={cn('flex items-start gap-3 rounded-[10px] p-3', className)}
       aria-label={
         mode === 'soft-cap'
           ? 'Smart link limit notice'
@@ -47,7 +45,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10'>
         <Icon
           name='Sparkles'
-          className='h-4 w-4 text-primary-token'
+          className='h-4 w-4 text-(--linear-accent)'
           aria-hidden='true'
         />
       </div>
@@ -58,13 +56,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               You have {props.releasedCount} smart links
             </p>
             <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
-              Need more than {props.softCap}?{' '}
-              <a
-                href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'
-                className='font-[510] text-primary-token underline-offset-2 hover:underline'
-              >
-                Request a higher limit
-              </a>
+              Need more than {props.softCap}? Request a higher limit.
             </p>
             <DrawerButton
               asChild
@@ -84,13 +76,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>
             <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
-              <Link
-                href='/launch/pricing'
-                className='font-[510] text-primary-token underline-offset-2 hover:underline'
-              >
-                Upgrade to Pro
-              </Link>{' '}
-              to enable pre-release pages with countdowns and notify-me.
+              Enable pre-release pages with countdowns and notify-me.
             </p>
             <DrawerButton
               asChild

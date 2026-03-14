@@ -41,13 +41,13 @@ export function DemoReleaseDetail({
   return (
     <div className='flex h-full flex-col'>
       {/* Header */}
-      <div className='flex min-h-11 items-center justify-between border-b border-(--linear-border-subtle) px-4 py-2'>
+      <div className='flex min-h-10 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 py-2'>
         <div className='min-w-0 flex-1 text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
         <DrawerInlineIconButton
           onClick={onClose}
-          className='flex size-7 shrink-0 items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='size-7 rounded-[7px]'
           aria-label='Close detail panel'
         >
           <X className='size-4' />
@@ -161,19 +161,19 @@ export function DemoReleaseDetail({
 
         {/* Activity */}
         <div className='mt-4'>
-          <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
-            Activity
-          </h3>
-          <div className='space-y-0.5'>
-            {DEMO_ACTIVITY_TEMPLATE.map(activity => (
+          <DrawerSectionHeading className='mb-3'>Activity</DrawerSectionHeading>
+          <DrawerSurfaceCard className='space-y-0.5 p-3'>
+            {DEMO_ACTIVITY_TEMPLATE.map((activity, index) => (
               <div
                 key={activity.id}
                 className='relative flex items-start gap-3 py-2'
               >
-                <div
-                  aria-hidden='true'
-                  className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle) last:hidden'
-                />
+                {index < DEMO_ACTIVITY_TEMPLATE.length - 1 ? (
+                  <div
+                    aria-hidden='true'
+                    className='absolute bottom-0 left-3 top-0 w-px bg-(--linear-border-subtle)'
+                  />
+                ) : null}
                 <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
                   <div className='size-1.5 rounded-full bg-(--linear-text-tertiary)' />
                 </div>

@@ -38,13 +38,7 @@ export const ExpandButton = memo(function ExpandButton({
     <DrawerInlineIconButton
       onClick={onClick}
       disabled={isLoading}
-      className={cn(
-        'flex items-center justify-center w-5 h-5 rounded',
-        'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)',
-        'hover:bg-(--linear-bg-surface-1) transition-[background-color,color,box-shadow] duration-150',
-        'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
-        'disabled:opacity-50 disabled:cursor-not-allowed'
-      )}
+      className='h-[18px] w-[18px] rounded-[5px] p-0 text-(--linear-text-tertiary) disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >

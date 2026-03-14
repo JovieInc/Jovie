@@ -9,11 +9,8 @@ import {
 } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { X } from 'lucide-react';
-import { memo } from 'react';
-import {
-  APP_CONTROL_BUTTON_CLASS,
-  AppIconButton,
-} from '@/components/atoms/AppIconButton';
+import { memo, useState } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -82,32 +79,37 @@ const RELEASE_VIEW_OPTIONS = [
   { value: 'releases', label: 'Releases', icon: 'Disc3' },
 ] as const;
 
-function InlineReleaseViewTabs({
+function ReleaseViewButtons({
   value,
   onChange,
+  className,
 }: {
   readonly value: ReleaseView;
   readonly onChange: (value: ReleaseView) => void;
+  readonly className?: string;
 }) {
   return (
-    <AppSegmentControl
-      value={value}
-      onValueChange={onChange}
-      options={RELEASE_VIEW_OPTIONS.map(option => ({
-        value: option.value,
-        label: (
-          <span className='inline-flex items-center gap-1.5'>
-            <Icon name={option.icon} className='h-3.5 w-3.5' />
-            {option.label}
-          </span>
-        ),
-      }))}
-      size='sm'
-      className='hidden md:inline-flex'
-      surface='ghost'
-      triggerClassName='flex-none'
-      aria-label='Choose releases view'
-    />
+    <div className={cn('flex items-center gap-1', className)}>
+      {RELEASE_VIEW_OPTIONS.map(option => {
+        const isActive = value === option.value;
+
+        return (
+          <PageToolbarTabButton
+            key={option.value}
+            onClick={() => onChange(option.value)}
+            active={isActive}
+            icon={
+              <Icon
+                name={option.icon}
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            label={option.label}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -134,7 +136,7 @@ function ReleaseViewSegmentedControl({
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='h-auto min-h-16 px-2 py-3 text-[13px]'
+      triggerClassName='h-auto min-h-[52px] px-2 py-2 text-[12.5px]'
       aria-label='Choose releases view'
     />
   );
@@ -213,7 +215,12 @@ function LinearStyleDisplayMenu({
           <Button
             variant='ghost'
             size='sm'
-            className={cn(APP_CONTROL_BUTTON_CLASS, triggerClassName)}
+            className={cn(
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+              isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
+              triggerClassName
+            )}
           >
             <Icon
               name='SlidersHorizontal'
@@ -286,67 +293,46 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   const counts = useReleaseFilterCounts(releases);
 
   return (
-    <div className='flex items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-[var(--linear-app-header-padding-x)] py-2'>
-      <div className='flex items-center gap-3'>
-        {onReleaseViewChange ? (
-          <InlineReleaseViewTabs
+    <PageToolbar
+      start={
+        onReleaseViewChange ? (
+          <ReleaseViewButtons
             value={releaseView}
             onChange={onReleaseViewChange}
+            className='w-full overflow-x-auto pb-px md:w-auto'
           />
-        ) : null}
-      </div>
-
-      {/* Right: Search + Filter + Display + Export */}
-      <ActionBar className='ml-auto hidden items-center md:flex'>
-        {onSearchToggle && (
-          <TooltipShortcut label='Search' side='bottom'>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={onSearchToggle}
-              className={cn(
-                ACTION_BAR_BUTTON_CLASS,
-                isSearchOpen && 'bg-interactive-active text-primary-token'
-              )}
-              aria-pressed={isSearchOpen}
-            >
-              <Icon name='Search' className='h-3.5 w-3.5' />
-              Search
-            </Button>
-          </TooltipShortcut>
-        )}
-        <ReleaseFilterDropdown
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-          counts={counts}
-          buttonClassName={ACTION_BAR_BUTTON_CLASS}
-        />
-        <div
-          className='h-4 w-px bg-(--linear-border-subtle)'
-          aria-hidden='true'
-        />
-        <LinearStyleDisplayMenu
-          columnVisibility={columnVisibility}
-          onColumnVisibilityChange={onColumnVisibilityChange}
-          availableColumns={availableColumns}
-          onResetToDefaults={onResetToDefaults}
-          groupByYear={groupByYear}
-          onGroupByYearChange={onGroupByYearChange}
-          releaseView={releaseView}
-          onReleaseViewChange={onReleaseViewChange}
-          triggerClassName={ACTION_BAR_BUTTON_CLASS}
-        />
-        <ExportCSVButton
-          getData={() => getReleasesForExport(releases, selectedIds)}
-          columns={RELEASES_CSV_COLUMNS}
-          filename='releases'
-          label='Export'
-          variant='ghost'
-          size='sm'
-          className={ACTION_BAR_BUTTON_CLASS}
-          tooltipLabel='Export'
-        />
-      </ActionBar>
-    </div>
+        ) : null
+      }
+      end={
+        <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+          <ReleaseFilterDropdown
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            counts={counts}
+            buttonClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+            iconOnly
+          />
+          <LinearStyleDisplayMenu
+            groupByYear={groupByYear}
+            onGroupByYearChange={onGroupByYearChange}
+            releaseView={releaseView}
+            onReleaseViewChange={onReleaseViewChange}
+            triggerClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+            compact
+          />
+          <ExportCSVButton
+            getData={() => getReleasesForExport(releases, selectedIds)}
+            columns={RELEASES_CSV_COLUMNS}
+            filename='releases'
+            label='Export'
+            variant='ghost'
+            size='sm'
+            chrome='page-toolbar'
+            iconOnly
+            tooltipLabel='Export'
+          />
+        </div>
+      }
+    />
   );
 });
