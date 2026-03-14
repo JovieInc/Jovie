@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   Input,
   Kbd,
   Sheet,
@@ -10,8 +11,6 @@ import {
 } from '@jovie/ui';
 import { ChevronLeft, Search, X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import {
   KEYBOARD_SHORTCUTS,
@@ -30,7 +29,7 @@ function ShortcutKeys({ keys }: { keys: string }) {
     return (
       <div className='flex items-center gap-1.5'>
         <Kbd variant='default'>{first}</Kbd>
-        <span className='text-xs text-(--linear-text-tertiary)'>then</span>
+        <span className='text-xs text-tertiary-token'>then</span>
         <Kbd variant='default'>{second}</Kbd>
       </div>
     );
@@ -60,15 +59,12 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
   const Icon = shortcut.icon;
 
   return (
-    <div className='flex items-center justify-between rounded-lg px-3 py-2 transition-colors hover:bg-(--linear-bg-surface-2)'>
+    <div className='group flex items-center justify-between rounded-md border border-transparent px-3 py-2 transition-colors hover:border-subtle hover:bg-surface-2/70'>
       <div className='flex items-center gap-3 min-w-0'>
         {Icon && (
-          <Icon
-            className='h-4 w-4 shrink-0 text-(--linear-text-tertiary)'
-            aria-hidden
-          />
+          <Icon className='h-4 w-4 shrink-0 text-tertiary-token' aria-hidden />
         )}
-        <span className='truncate text-sm text-(--linear-text-primary)'>
+        <span className='text-sm text-primary-token truncate'>
           {shortcut.label}
         </span>
       </div>
@@ -90,16 +86,16 @@ function ShortcutCategorySection({
   if (shortcuts.length === 0) return null;
 
   return (
-    <div className='space-y-1'>
-      <h3 className='px-3 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+    <section className='space-y-1'>
+      <h3 className='px-3 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-tertiary-token'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
-      <ContentSurfaceCard className='space-y-0.5 p-1.5'>
+      <div className='space-y-0.5'>
         {shortcuts.map(shortcut => (
           <ShortcutItem key={shortcut.id} shortcut={shortcut} />
         ))}
-      </ContentSurfaceCard>
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -171,62 +167,66 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='top-1 right-1 bottom-1 h-auto w-full rounded-[12px] border border-(--linear-app-shell-border) bg-(--linear-app-drawer-surface) p-0 shadow-[var(--linear-app-drawer-shadow)] sm:max-w-md'
+        className='top-1 right-1 bottom-1 flex h-auto w-full flex-col gap-0 rounded-xl border border-subtle p-0 sm:max-w-md'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
-        {/* Header with back button and title */}
-        <SheetHeader className='flex shrink-0 flex-row items-center gap-3 space-y-0 border-b border-(--linear-app-frame-seam) px-4 py-2.5'>
-          <HeaderIconButton
-            size='sm'
-            onClick={close}
-            ariaLabel='Close keyboard shortcuts'
-          >
-            <ChevronLeft className='h-4 w-4' />
-          </HeaderIconButton>
-          <SheetTitle className='text-[13px] font-[560] tracking-[-0.01em]'>
-            Keyboard Shortcuts
-          </SheetTitle>
-          <HeaderIconButton
-            size='sm'
-            className='ml-auto'
-            onClick={close}
-            ariaLabel='Close'
-          >
-            <X className='h-4 w-4' />
-          </HeaderIconButton>
-        </SheetHeader>
+        <div className='sticky top-0 z-10 shrink-0 border-b border-subtle bg-surface-0/95 backdrop-blur-sm'>
+          <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-4 py-3'>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-8 w-8 shrink-0'
+              onClick={close}
+              aria-label='Close keyboard shortcuts'
+            >
+              <ChevronLeft className='h-4 w-4' />
+            </Button>
+            <SheetTitle className='text-sm font-medium'>
+              Keyboard Shortcuts
+            </SheetTitle>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='ml-auto h-8 w-8 shrink-0'
+              onClick={close}
+              aria-label='Close'
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          </SheetHeader>
 
-        {/* Search input */}
-        <div className='shrink-0 border-b border-(--linear-app-frame-seam) px-4 py-3'>
-          <div className='relative'>
-            <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--linear-text-tertiary)' />
-            <Input
-              ref={inputRef}
-              type='text'
-              placeholder='Search shortcuts'
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className='border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) pl-9'
-              inputSize='sm'
-            />
-            {searchQuery && (
-              <HeaderIconButton
-                size='xs'
-                className='absolute right-1 top-1/2 -translate-y-1/2'
-                onClick={() => setSearchQuery('')}
-                ariaLabel='Clear search'
-              >
-                <X className='h-3 w-3' />
-              </HeaderIconButton>
-            )}
+          <div className='border-t border-subtle/60 px-4 py-3'>
+            <div className='relative'>
+              <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
+              <Input
+                ref={inputRef}
+                type='text'
+                placeholder='Search shortcuts'
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className='border-subtle bg-surface-2 pl-9'
+                inputSize='sm'
+              />
+              {searchQuery && (
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2'
+                  onClick={() => setSearchQuery('')}
+                  aria-label='Clear search'
+                >
+                  <X className='h-3 w-3' />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Shortcuts list */}
         <div className='flex-1 overflow-y-auto px-2 py-3'>
           {hasResults ? (
-            <div className='space-y-4'>
+            <div className='space-y-4 pb-1'>
               {categoryOrder.map(category => (
                 <ShortcutCategorySection
                   key={category}
@@ -236,12 +236,12 @@ export function KeyboardShortcutsSheet() {
               ))}
             </div>
           ) : (
-            <ContentSurfaceCard className='flex flex-col items-center justify-center py-12 text-center'>
-              <Search className='mb-3 h-8 w-8 text-(--linear-text-tertiary)' />
-              <p className='text-sm text-(--linear-text-tertiary)'>
+            <div className='flex flex-col items-center justify-center py-12 text-center'>
+              <Search className='h-8 w-8 text-tertiary-token mb-3' />
+              <p className='text-sm text-tertiary-token'>
                 No shortcuts found for &quot;{searchQuery}&quot;
               </p>
-            </ContentSurfaceCard>
+            </div>
           )}
         </div>
       </SheetContent>
