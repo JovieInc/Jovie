@@ -20,6 +20,12 @@ const mockInvalidateProxyUserStateCache = vi.hoisted(() =>
 const mockNotifySlackSignup = vi.hoisted(() =>
   vi.fn().mockResolvedValue(undefined)
 );
+const mockStopEnrollmentsForEmail = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(undefined)
+);
+const mockSendEmail = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({ success: true, messageId: 'msg_123' })
+);
 
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: mockClerkClient,
@@ -37,6 +43,22 @@ vi.mock('@/lib/auth/proxy-state', () => ({
 
 vi.mock('@/lib/notifications/providers/slack', () => ({
   notifySlackSignup: mockNotifySlackSignup,
+}));
+
+vi.mock('@/lib/email/campaigns/enrollment', () => ({
+  stopEnrollmentsForEmail: mockStopEnrollmentsForEmail,
+}));
+
+vi.mock('@/lib/email/send', () => ({
+  sendEmail: mockSendEmail,
+}));
+
+vi.mock('@/lib/notifications/sender-policy', () => ({
+  formatFounderSender: vi.fn(() => 'Tim White <tim@jov.ie>'),
+  getSenderPolicy: vi.fn(() => ({
+    fromEmail: 'tim@jov.ie',
+    replyToEmail: 'tim@jov.ie',
+  })),
 }));
 
 import { userCreatedHandler } from '@/lib/auth/clerk-webhook/handlers/user-created-handler';
@@ -152,6 +174,31 @@ describe('user-created-handler', () => {
     expect(mockNotifySlackSignup).toHaveBeenCalledWith(
       'Jane Doe',
       'jane@example.com'
+    );
+  });
+
+  it('sends founder welcome from founder sender policy', async () => {
+    const context = makeContext('user.created', {
+      id: 'user_founder_email',
+      first_name: 'Riley',
+      last_name: 'Lane',
+      email_addresses: [
+        {
+          id: 'email_1',
+          email_address: 'riley@example.com',
+          verification: { status: 'verified' },
+        },
+      ],
+    });
+
+    await userCreatedHandler.handle(context);
+
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'riley@example.com',
+        from: 'Tim White <tim@jov.ie>',
+        replyTo: 'tim@jov.ie',
+      })
     );
   });
 

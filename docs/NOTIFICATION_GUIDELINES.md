@@ -11,7 +11,7 @@ Jovie uses a unified toast notification system that provides consistent user fee
 ## Server-delivered notifications (email/push/in-app)
 
 - Send cross-channel notifications through `lib/notifications/service.ts` to avoid duplicating provider logic.
-- Email delivery is handled by Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO_EMAIL`). Missing config skips sends gracefully.
+- Email delivery is handled by Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO_EMAIL`). Defaults are `notifications@jov.ie` for system sender/reply-to; founder-personal mail uses `tim@jov.ie`.
 - Preferences are resolved from creator profile settings (`settings.marketing_emails` + `marketingOptOut`) and channel toggles under `settings.notifications.channels`.
 - Provide a stable `id`/`dedupKey` so `dismissNotification` can stop the same message from fanning out across channels (e.g., when a user dismisses an in-app toast).
 - Example:
