@@ -13,7 +13,7 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { useAvatarUploadMutation } from '@/lib/queries/useAvatarUploadMutation';
+import { useAvatarUploadMutation } from '@/lib/queries';
 import type { Contact } from '@/types';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 import { useContactHydration } from './useContactHydration';

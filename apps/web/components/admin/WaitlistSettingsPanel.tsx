@@ -10,7 +10,7 @@ import {
   useWaitlistSettingsMutation,
   useWaitlistSettingsQuery,
   type WaitlistSettingsResponse,
-} from '@/lib/queries/useWaitlistSettingsQuery';
+} from '@/lib/queries';
 
 export function WaitlistSettingsPanel() {
   const {

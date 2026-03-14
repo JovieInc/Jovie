@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
+import { useHandleAvailabilityQuery } from '@/lib/queries';
 
 export interface HandleValidationResult {
   handleError: string | null;

@@ -2,8 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
-import { queryKeys } from '@/lib/queries/keys';
+import { fetchWithTimeout, queryKeys } from '@/lib/queries';
 
 const MAX_SUGGESTIONS = 4;
 const DEBOUNCE_MS = 350;
