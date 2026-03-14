@@ -447,7 +447,7 @@ export const DashboardAudienceTableUnified = memo(
         }
       : {
           label: 'Open profile settings',
-          href: APP_ROUTES.PROFILE,
+          href: APP_ROUTES.CHAT,
         };
     const emptyStateSecondaryAction = {
       label: 'Learn about audience',
