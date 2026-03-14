@@ -40,21 +40,22 @@ export function toPublicContacts(
           contactId: contact.id,
         });
 
-        channels.push({
-          type: 'phone',
-          encoded: encodedPhone,
-          preferred: contact.preferredChannel === 'phone',
-        });
-
-        channels.push({
-          type: 'sms',
-          encoded: encodeContactPayload({
+        channels.push(
+          {
+            type: 'phone',
+            encoded: encodedPhone,
+            preferred: contact.preferredChannel === 'phone',
+          },
+          {
             type: 'sms',
-            value: contact.phone,
-            contactId: contact.id,
-          }),
-          preferred: false,
-        });
+            encoded: encodeContactPayload({
+              type: 'sms',
+              value: contact.phone,
+              contactId: contact.id,
+            }),
+            preferred: false,
+          }
+        );
       }
 
       if (

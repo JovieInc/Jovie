@@ -40,13 +40,13 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
       : null;
 
   const labels: Record<AudienceView, string> = {
-    all: totalAudienceCount !== null ? `All (${totalAudienceCount})` : 'All',
+    all: totalAudienceCount === null ? 'All' : `All (${totalAudienceCount})`,
     identified:
-      subscriberCount !== null
-        ? `Identified (${subscriberCount})`
-        : 'Identified',
+      subscriberCount === null
+        ? 'Identified'
+        : `Identified (${subscriberCount})`,
     anonymous:
-      anonymousCount !== null ? `Anonymous (${anonymousCount})` : 'Anonymous',
+      anonymousCount === null ? 'Anonymous' : `Anonymous (${anonymousCount})`,
   };
 
   return (

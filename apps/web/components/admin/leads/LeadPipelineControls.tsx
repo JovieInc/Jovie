@@ -1,241 +1,167 @@
 'use client';
 
 import { Button, Input, Switch } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Play, Zap } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ChangeEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-
-interface PipelineSettings {
-  enabled: boolean;
-  discoveryEnabled: boolean;
-  autoIngestEnabled: boolean;
-  autoIngestMinFitScore: number;
-  dailyQueryBudget: number;
-  queriesUsedToday: number;
-}
-
-interface LeadSettingRowProps {
-  readonly title: string;
-  readonly description: string;
-  readonly checked: boolean;
-  readonly onCheckedChange: (checked: boolean) => void;
-  readonly ariaLabel: string;
-  readonly disabled?: boolean;
-}
-
-function LeadSettingRow({
-  title,
-  description,
-  checked,
-  onCheckedChange,
-  ariaLabel,
-  disabled = false,
-}: Readonly<LeadSettingRowProps>) {
-  return (
-    <ContentSurfaceCard className='flex items-start justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'>
-      <div className='space-y-1'>
-        <p className='text-[13px] font-[560] text-(--linear-text-primary)'>
-          {title}
-        </p>
-        <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
-          {description}
-        </p>
-      </div>
-      <Switch
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-        aria-label={ariaLabel}
-        disabled={disabled}
-      />
-    </ContentSurfaceCard>
-  );
-}
+import {
+  type LeadPipelineSettings,
+  useLeadPipelineSettingsQuery,
+  useRunLeadDiscoveryMutation,
+  useRunLeadQualificationMutation,
+  useUpdateLeadPipelineSettingsMutation,
+} from '@/lib/queries';
+import { queryKeys } from '@/lib/queries/keys';
 
 export function LeadPipelineControls() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [discovering, setDiscovering] = useState(false);
-  const [qualifying, setQualifying] = useState(false);
-  const [settings, setSettings] = useState<PipelineSettings | null>(null);
+  const queryClient = useQueryClient();
+  const [settings, setSettings] = useState<LeadPipelineSettings | null>(null);
+
+  const settingsQuery = useLeadPipelineSettingsQuery();
+  const saveSettingsMutation = useUpdateLeadPipelineSettingsMutation();
+  const discoveryMutation = useRunLeadDiscoveryMutation();
+  const qualificationMutation = useRunLeadQualificationMutation();
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function load() {
-      try {
-        const res = await fetch('/api/admin/leads/settings', {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error('Failed to load settings');
-        const data = (await res.json()) as { settings: PipelineSettings };
-        setSettings(data.settings);
-      } catch {
-        if (!controller.signal.aborted) {
-          toast.error('Failed to load pipeline settings');
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
+    if (settingsQuery.data?.settings) {
+      setSettings(settingsQuery.data.settings);
     }
-
-    void load();
-    return () => controller.abort();
-  }, []);
+  }, [settingsQuery.data]);
 
   async function save() {
     if (!settings) return;
-    setSaving(true);
     try {
-      const res = await fetch('/api/admin/leads/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled: settings.enabled,
-          discoveryEnabled: settings.discoveryEnabled,
-          autoIngestEnabled: settings.autoIngestEnabled,
-          autoIngestMinFitScore: settings.autoIngestMinFitScore,
-          dailyQueryBudget: settings.dailyQueryBudget,
-        }),
-      });
-      if (!res.ok) throw new Error('Save failed');
-      const data = (await res.json()) as { settings: PipelineSettings };
+      const data = await saveSettingsMutation.mutateAsync(settings);
       setSettings(data.settings);
       toast.success('Pipeline settings saved');
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.settings(),
+      });
     } catch {
       toast.error('Failed to save settings');
-    } finally {
-      setSaving(false);
     }
   }
 
   async function triggerDiscovery() {
-    setDiscovering(true);
     try {
-      const res = await fetch('/api/admin/leads/discover', { method: 'POST' });
-      const data = (await res.json()) as {
-        result?: { queriesUsed: number; newLeadsFound: number };
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
+      const data = await discoveryMutation.mutateAsync();
       toast.success(
-        `Discovery complete: ${data.result?.newLeadsFound ?? 0} new leads from ${data.result?.queriesUsed ?? 0} queries`
+        `Discovery complete: ${data.result.newLeadsFound} new leads from ${data.result.queriesUsed} queries`
       );
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.all(),
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Discovery failed');
-    } finally {
-      setDiscovering(false);
     }
   }
 
   async function triggerQualification() {
-    setQualifying(true);
     try {
-      const res = await fetch('/api/admin/leads/qualify', { method: 'POST' });
-      const data = (await res.json()) as {
-        message?: string;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? 'Qualification failed');
-      toast.success(data.message ?? 'Qualification complete');
+      const data = await qualificationMutation.mutateAsync();
+      toast.success(data.message);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.all(),
+      });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Qualification failed'
       );
-    } finally {
-      setQualifying(false);
     }
   }
 
-  if (loading) {
+  if (settingsQuery.isLoading) {
     return (
-      <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Pipeline controls'
-          subtitle='Discovery, qualification, and auto-ingest settings'
-          className='px-5 py-3'
-        />
-        <div className='px-5 py-4 text-sm text-(--linear-text-secondary)'>
-          Loading pipeline settings...
-        </div>
-      </ContentSurfaceCard>
+      <div className='border-b border-subtle px-4 py-4 text-sm text-secondary-token'>
+        Loading pipeline settings...
+      </div>
     );
   }
 
   if (!settings) {
     return (
-      <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
-        <ContentSectionHeader
-          title='Pipeline controls'
-          subtitle='Discovery, qualification, and auto-ingest settings'
-          className='px-5 py-3'
-        />
-        <div className='px-5 py-4 text-sm text-destructive'>
-          Unable to load pipeline settings. Please refresh.
-        </div>
-      </ContentSurfaceCard>
+      <div className='border-b border-subtle px-4 py-4 text-sm text-destructive'>
+        Unable to load pipeline settings. Please refresh.
+      </div>
     );
   }
 
   return (
-    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
-      <ContentSectionHeader
-        title='Pipeline controls'
-        subtitle='Discovery, qualification, and auto-ingest settings'
-        className='px-5 py-3'
-      />
+    <section className='rounded-lg border border-subtle p-4 sm:p-6'>
+      <div className='mb-4'>
+        <h2 className='text-sm font-semibold text-primary-token'>
+          Pipeline controls
+        </h2>
+        <p className='mt-1 text-xs text-secondary-token'>
+          Toggle discovery, qualification, and auto-ingest settings.
+        </p>
+      </div>
 
-      <div className='space-y-4 px-5 py-4'>
-        <div className='grid gap-3 lg:grid-cols-3'>
-          <LeadSettingRow
-            title='Pipeline enabled'
-            description='Master switch for the entire lead discovery pipeline.'
+      <div className='space-y-4'>
+        <div className='flex items-center justify-between gap-3'>
+          <div>
+            <p className='text-sm text-primary-token'>Pipeline enabled</p>
+            <p className='text-xs text-secondary-token'>
+              Master switch for the entire lead discovery pipeline.
+            </p>
+          </div>
+          <Switch
             checked={settings.enabled}
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, enabled: checked } : s))
             }
-            ariaLabel='Toggle pipeline'
-            disabled={saving}
+            aria-label='Toggle pipeline'
+            disabled={saveSettingsMutation.isPending}
           />
-          <LeadSettingRow
-            title='Discovery enabled'
-            description='Run Google CSE searches on cron to find new leads.'
+        </div>
+
+        <div className='flex items-center justify-between gap-3'>
+          <div>
+            <p className='text-sm text-primary-token'>Discovery enabled</p>
+            <p className='text-xs text-secondary-token'>
+              Run Google CSE searches on cron to find new leads.
+            </p>
+          </div>
+          <Switch
             checked={settings.discoveryEnabled}
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, discoveryEnabled: checked } : s))
             }
-            ariaLabel='Toggle discovery'
-            disabled={saving}
+            aria-label='Toggle discovery'
+            disabled={saveSettingsMutation.isPending}
           />
-          <LeadSettingRow
-            title='Auto-ingest on approve'
-            description='Automatically create creator profiles when leads are approved.'
+        </div>
+
+        <div className='flex items-center justify-between gap-3'>
+          <div>
+            <p className='text-sm text-primary-token'>Auto-ingest on approve</p>
+            <p className='text-xs text-secondary-token'>
+              Automatically create creator profiles when leads are approved.
+            </p>
+          </div>
+          <Switch
             checked={settings.autoIngestEnabled}
             onCheckedChange={checked =>
               setSettings(s => (s ? { ...s, autoIngestEnabled: checked } : s))
             }
-            ariaLabel='Toggle auto-ingest'
-            disabled={saving}
+            aria-label='Toggle auto-ingest'
+            disabled={saveSettingsMutation.isPending}
           />
         </div>
 
-        <div className='grid gap-3 sm:grid-cols-2'>
-          <ContentSurfaceCard className='space-y-2 bg-(--linear-bg-surface-0) p-3.5'>
-            <label
-              htmlFor='auto-ingest-min-score'
-              className='text-[13px] font-[560] text-(--linear-text-primary)'
-            >
+        <div className='flex flex-wrap gap-4'>
+          <label htmlFor='auto-ingest-min-score' className='block'>
+            <span className='text-sm text-primary-token'>
               Min fit score for auto-ingest
-            </label>
+            </span>
             <Input
               id='auto-ingest-min-score'
               type='number'
               min={0}
               max={100}
               value={settings.autoIngestMinFitScore}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 const val = Number.parseInt(e.target.value, 10);
                 setSettings(s =>
                   s
@@ -246,29 +172,22 @@ export function LeadPipelineControls() {
                     : s
                 );
               }}
-              className='w-28'
-              disabled={saving}
+              className='mt-1 w-24'
+              disabled={saveSettingsMutation.isPending}
             />
-            <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
-              Qualified leads at or above this score can be ingested
-              automatically.
-            </p>
-          </ContentSurfaceCard>
+          </label>
 
-          <ContentSurfaceCard className='space-y-2 bg-(--linear-bg-surface-0) p-3.5'>
-            <label
-              htmlFor='daily-query-budget'
-              className='text-[13px] font-[560] text-(--linear-text-primary)'
-            >
+          <label htmlFor='daily-query-budget' className='block'>
+            <span className='text-sm text-primary-token'>
               Daily query budget
-            </label>
+            </span>
             <Input
               id='daily-query-budget'
               type='number'
               min={1}
               max={10000}
               value={settings.dailyQueryBudget}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 const val = Number.parseInt(e.target.value, 10);
                 setSettings(s =>
                   s
@@ -279,18 +198,24 @@ export function LeadPipelineControls() {
                     : s
                 );
               }}
-              className='w-28'
-              disabled={saving}
+              className='mt-1 w-24'
+              disabled={saveSettingsMutation.isPending}
             />
-            <p className='text-[12px] leading-[18px] text-(--linear-text-secondary)'>
+            <p className='mt-1 text-xs text-secondary-token'>
               Used today: {settings.queriesUsedToday}
             </p>
-          </ContentSurfaceCard>
+          </label>
         </div>
 
-        <div className='flex flex-wrap gap-2 pt-1'>
-          <Button onClick={() => void save()} disabled={saving} size='sm'>
-            {saving && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+        <div className='flex flex-wrap gap-2 pt-2'>
+          <Button
+            onClick={() => void save()}
+            disabled={saveSettingsMutation.isPending}
+            size='sm'
+          >
+            {saveSettingsMutation.isPending && (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            )}
             Save settings
           </Button>
 
@@ -298,9 +223,9 @@ export function LeadPipelineControls() {
             variant='outline'
             size='sm'
             onClick={() => void triggerDiscovery()}
-            disabled={discovering}
+            disabled={discoveryMutation.isPending}
           >
-            {discovering ? (
+            {discoveryMutation.isPending ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
               <Play className='mr-2 h-4 w-4' />
@@ -312,9 +237,9 @@ export function LeadPipelineControls() {
             variant='outline'
             size='sm'
             onClick={() => void triggerQualification()}
-            disabled={qualifying}
+            disabled={qualificationMutation.isPending}
           >
-            {qualifying ? (
+            {qualificationMutation.isPending ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
               <Zap className='mr-2 h-4 w-4' />
@@ -323,6 +248,6 @@ export function LeadPipelineControls() {
           </Button>
         </div>
       </div>
-    </ContentSurfaceCard>
+    </section>
   );
 }

@@ -78,8 +78,6 @@ export function AudienceMemberRow({
       <AudienceUserCell
         displayName={row.displayName}
         type={row.type}
-        email={row.email}
-        phone={row.phone}
         deviceType={row.deviceType}
         geoCity={row.geoCity}
         geoCountry={row.geoCountry}

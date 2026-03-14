@@ -29,7 +29,7 @@ const VALID_PLAN_IDS: readonly PlanId[] = [
 ] as const;
 
 function isPlanId(value: string): value is PlanId {
-  return VALID_PLAN_IDS.some(planId => planId === value);
+  return (VALID_PLAN_IDS as ReadonlyArray<string>).includes(value);
 }
 
 /**

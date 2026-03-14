@@ -38,8 +38,6 @@ export function renderUserCell({
     <AudienceUserCell
       displayName={row.original.displayName}
       type={row.original.type}
-      email={row.original.email}
-      phone={row.original.phone}
       deviceType={row.original.deviceType}
       geoCity={row.original.geoCity}
       geoCountry={row.original.geoCountry}

@@ -10,8 +10,6 @@ import type { AudienceMemberType } from '@/types';
 export interface AudienceUserCellProps {
   readonly displayName: string | null;
   readonly type: AudienceMemberType;
-  readonly email?: string | null;
-  readonly phone?: string | null;
   readonly deviceType?: string | null;
   readonly geoCity?: string | null;
   readonly geoCountry?: string | null;

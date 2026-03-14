@@ -192,7 +192,7 @@ async function scheduleNotificationsForRelease(
     }
 
     if (page.length < SUBSCRIBER_PAGE_SIZE) break;
-    lastId = page[page.length - 1].id;
+    lastId = page.at(-1)!.id;
 
     // Drain completed inserts when concurrency ceiling is reached
     if (pendingInserts.length >= INSERT_CONCURRENCY) {
@@ -262,10 +262,11 @@ export async function scheduleReleaseNotifications(): Promise<{
   // Stream subscribers per-release, insert in parallel batches as we go
   let totalScheduled = 0;
   for (const release of eligibleReleases) {
-    if (!release.releaseDate) continue;
+    const { releaseDate } = release;
+    if (!releaseDate) continue;
     try {
       const count = await scheduleNotificationsForRelease(
-        release as typeof release & { releaseDate: Date },
+        { ...release, releaseDate },
         now
       );
       totalScheduled += count;

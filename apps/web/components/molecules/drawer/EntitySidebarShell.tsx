@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
-import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerHeader } from './DrawerHeader';
 
@@ -40,18 +39,6 @@ export interface EntitySidebarShellProps {
 
   /** Footer slot — pinned to bottom of drawer */
   readonly footer?: ReactNode;
-  /** Optional classes for the outer drawer */
-  readonly drawerClassName?: string;
-  /** Optional classes for the header row */
-  readonly headerClassName?: string;
-  /** Optional classes for the entity header wrapper */
-  readonly entityHeaderClassName?: string;
-  /** Optional classes for the tabs wrapper */
-  readonly tabsClassName?: string;
-  /** Optional classes for the scrollable content area */
-  readonly contentClassName?: string;
-  /** Optional classes for the footer wrapper */
-  readonly footerClassName?: string;
 
   /** When true, shows empty state instead of entityHeader + tabs + children */
   readonly isEmpty?: boolean;
@@ -96,12 +83,6 @@ export function EntitySidebarShell({
   tabs,
   children,
   footer,
-  drawerClassName,
-  headerClassName,
-  entityHeaderClassName,
-  tabsClassName,
-  contentClassName,
-  footerClassName,
   isEmpty = false,
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
@@ -113,13 +94,11 @@ export function EntitySidebarShell({
       onKeyDown={onKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid={testId}
-      className={drawerClassName}
     >
-      <div className='flex h-full flex-col'>
+      <div className='flex h-full min-h-0 flex-col'>
         {/* Header bar — close is in the overflow dropdown */}
         <DrawerHeader
           title={title}
-          className={headerClassName}
           actions={
             headerActions ??
             (onClose ? (
@@ -134,53 +113,33 @@ export function EntitySidebarShell({
 
         {isEmpty ? (
           /* Empty state */
-          <div className='flex-1 overflow-auto px-5 py-5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
             <DrawerEmptyState message={emptyMessage} />
           </div>
         ) : (
           <>
             {/* Entity header — image + name area */}
             {entityHeader && (
-              <div
-                className={cn(
-                  'shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] pt-2.5 pb-2',
-                  entityHeaderClassName
-                )}
-              >
+              <div className='shrink-0 overflow-hidden px-5 pt-4 pb-4'>
                 {entityHeader}
               </div>
             )}
 
             {/* Tabs */}
             {tabs && (
-              <div
-                className={cn(
-                  'shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-1 [&>*]:w-full',
-                  tabsClassName
-                )}
-              >
+              <div className='shrink-0 border-b border-subtle px-5 py-2.5 [&>*]:w-full'>
                 {tabs}
               </div>
             )}
 
             {/* Scrollable content */}
-            <div
-              className={cn(
-                'flex-1 min-h-0 space-y-2.5 overflow-y-auto overflow-x-hidden overscroll-contain bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-2.5',
-                contentClassName
-              )}
-            >
+            <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div
-                className={cn(
-                  'shrink-0 border-t border-(--linear-border-subtle) px-[var(--linear-app-drawer-padding-x)] py-2',
-                  footerClassName
-                )}
-              >
+              <div className='shrink-0 border-t border-subtle bg-surface-0 px-5 py-3'>
                 {footer}
               </div>
             )}

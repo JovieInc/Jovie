@@ -3,9 +3,10 @@
 import { Button } from '@jovie/ui';
 import { CheckCircle, RefreshCw, Star, Trash2, XCircle } from 'lucide-react';
 import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarItem,
   ExportCSVButton,
-  PAGE_TOOLBAR_END_GROUP_CLASS,
-  PAGE_TOOLBAR_META_TEXT_CLASS,
 } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
@@ -49,100 +50,103 @@ export function AdminCreatorsToolbar({
   const someSelectedVerified = selectedProfiles.some(p => p.isVerified);
 
   return (
-    <AdminTableSubheader
-      start={
-        hasSelection ? undefined : (
-          <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-            Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-            {total.toLocaleString()} profiles
-          </div>
-        )
-      }
-      end={
-        hasSelection ? undefined : (
-          <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
-            <ExportCSVButton<AdminCreatorProfileRow>
-              getData={() => profiles}
-              columns={creatorsCSVColumns}
-              filename={CREATORS_CSV_FILENAME_PREFIX}
-              disabled={profiles.length === 0}
-              ariaLabel='Export creator profiles to CSV file'
-              chrome='page-toolbar'
-              iconOnly
-              tooltipLabel='Export'
-            />
-          </div>
-        )
-      }
-    >
-      {hasSelection ? (
-        <div className='flex min-h-14 w-full flex-wrap items-center gap-3 px-4 py-2'>
-          <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3'>
-            <div className='text-[13px] font-[510] text-(--linear-text-secondary)'>
-              {selectedCount} {selectedCount === 1 ? 'creator' : 'creators'}{' '}
-              selected
-            </div>
-            <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
-              {someSelectedVerified ? (
+    <AdminTableSubheader>
+      <div className='flex min-h-14 w-full flex-wrap items-center gap-3'>
+        {hasSelection ? (
+          // Bulk Actions Mode - replaces "Creator" text
+          <>
+            <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3'>
+              <div className='text-sm font-medium text-primary-token'>
+                {selectedCount} {selectedCount === 1 ? 'creator' : 'creators'}{' '}
+                selected
+              </div>
+              <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
+                {someSelectedVerified ? (
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    onClick={onBulkUnverify}
+                    className='gap-2.5'
+                  >
+                    <XCircle className='h-3.5 w-3.5' />
+                    Unverify
+                  </Button>
+                ) : (
+                  <Button
+                    size='sm'
+                    variant='ghost'
+                    onClick={onBulkVerify}
+                    className='gap-2.5'
+                  >
+                    <CheckCircle className='h-3.5 w-3.5' />
+                    Verify
+                  </Button>
+                )}
                 <Button
                   size='sm'
                   variant='ghost'
-                  onClick={onBulkUnverify}
+                  onClick={onBulkFeature}
                   className='gap-2.5'
                 >
-                  <XCircle className='h-3.5 w-3.5' />
-                  Unverify
+                  <Star className='h-3.5 w-3.5' />
+                  Feature
                 </Button>
-              ) : (
                 <Button
                   size='sm'
                   variant='ghost'
-                  onClick={onBulkVerify}
+                  onClick={onBulkRefreshMusicFetch}
                   className='gap-2.5'
                 >
-                  <CheckCircle className='h-3.5 w-3.5' />
-                  Verify
+                  <RefreshCw className='h-3.5 w-3.5' />
+                  Refresh Music Data
                 </Button>
-              )}
-              <Button
-                size='sm'
-                variant='ghost'
-                onClick={onBulkFeature}
-                className='gap-2.5'
-              >
-                <Star className='h-3.5 w-3.5' />
-                Feature
-              </Button>
-              <Button
-                size='sm'
-                variant='ghost'
-                onClick={onBulkRefreshMusicFetch}
-                className='gap-2.5'
-              >
-                <RefreshCw className='h-3.5 w-3.5' />
-                Refresh Music Data
-              </Button>
-              <Button
-                size='sm'
-                variant='ghost'
-                onClick={onBulkDelete}
-                className='gap-2.5 text-destructive hover:text-destructive'
-              >
-                <Trash2 className='h-3.5 w-3.5' />
-                Delete
-              </Button>
+                <Button
+                  size='sm'
+                  variant='ghost'
+                  onClick={onBulkDelete}
+                  className='gap-2.5 text-destructive hover:text-destructive'
+                >
+                  <Trash2 className='h-3.5 w-3.5' />
+                  Delete
+                </Button>
+              </div>
             </div>
-          </div>
-          <Button
-            size='sm'
-            variant='ghost'
-            onClick={onClearSelection}
-            className='ml-auto'
-          >
-            Clear Selection
-          </Button>
-        </div>
-      ) : null}
+            <Button
+              size='sm'
+              variant='ghost'
+              onClick={onClearSelection}
+              className='ml-auto'
+            >
+              Clear Selection
+            </Button>
+          </>
+        ) : (
+          // Normal Mode
+          <>
+            <div className='hidden text-xs text-secondary-token tabular-nums md:block'>
+              Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()} profiles
+            </div>
+            <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3'>
+              <ActionBar>
+                <ActionBarItem tooltipLabel='Export'>
+                  <ExportCSVButton<AdminCreatorProfileRow>
+                    getData={() => profiles}
+                    columns={creatorsCSVColumns}
+                    filename={CREATORS_CSV_FILENAME_PREFIX}
+                    disabled={profiles.length === 0}
+                    ariaLabel='Export creator profiles to CSV file'
+                    variant='ghost'
+                    size='sm'
+                    className={`${ACTION_BAR_BUTTON_CLASS} [&>span]:sr-only`}
+                    label='Export'
+                  />
+                </ActionBarItem>
+              </ActionBar>
+            </div>
+          </>
+        )}
+      </div>
     </AdminTableSubheader>
   );
 }

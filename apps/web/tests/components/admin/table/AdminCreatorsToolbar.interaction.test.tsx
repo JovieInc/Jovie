@@ -1,54 +1,24 @@
-import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
-import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
-vi.mock('next/link', () => ({
-  default: ({
-    children,
-    href,
-    ...props
-  }: {
-    children: React.ReactNode;
-    href: string;
-    [key: string]: unknown;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
-}));
-
 vi.mock('@/components/organisms/table', () => ({
-  PAGE_TOOLBAR_END_GROUP_CLASS: 'page-toolbar-end-group',
-  PAGE_TOOLBAR_META_TEXT_CLASS: 'page-toolbar-meta-text',
-  PageToolbar: ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
-    <div>
-      {start}
-      {end}
-    </div>
+  ACTION_BAR_BUTTON_CLASS: 'action-bar-button',
+  ActionBar: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
   ),
-  PageToolbarActionButton: ({
-    label,
-    ariaLabel,
-  }: {
-    label: ReactNode;
-    ariaLabel: string;
-  }) => (
-    <button type='button' aria-label={ariaLabel}>
-      {label}
-    </button>
-  ),
-  PageToolbarSearchForm: ({ submitAriaLabel }: { submitAriaLabel: string }) => (
-    <button type='submit'>{submitAriaLabel}</button>
+  ActionBarItem: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
   ),
   ExportCSVButton: ({ disabled }: { disabled: boolean }) => (
-    <button type='button' disabled={disabled}>
+    <button
+      type='button'
+      disabled={disabled}
+      aria-label='Export creator profiles to CSV file'
+    >
       Export
     </button>
   ),
@@ -91,18 +61,14 @@ function renderToolbar(
   };
 
   render(
-    <TooltipProvider>
-      <TableMetaProvider>
-        <AdminCreatorsToolbar
-          from={1}
-          to={2}
-          total={2}
-          profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
-          {...handlers}
-          {...props}
-        />
-      </TableMetaProvider>
-    </TooltipProvider>
+    <AdminCreatorsToolbar
+      from={1}
+      to={2}
+      total={2}
+      profiles={[createProfile(), createProfile({ id: 'creator-2' })]}
+      {...handlers}
+      {...props}
+    />
   );
 
   return handlers;
@@ -164,7 +130,11 @@ describe('AdminCreatorsToolbar interactions', () => {
   it('renders normal toolbar mode without bulk actions when no rows are selected', () => {
     renderToolbar({ selectedIds: new Set() });
 
-    expect(screen.getByRole('button', { name: 'Export' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', {
+        name: 'Export creator profiles to CSV file',
+      })
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Delete' })
     ).not.toBeInTheDocument();

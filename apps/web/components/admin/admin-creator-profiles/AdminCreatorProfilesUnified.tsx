@@ -1,37 +1,19 @@
 'use client';
 
 import type { RowSelectionState } from '@tanstack/react-table';
-import { ListPlus, UserCircle2 } from 'lucide-react';
+import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
-import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
-import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
-import {
-  TableEmptyState,
-  UnifiedTable,
-  useRowSelection,
-} from '@/components/organisms/table';
+import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
-import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries/admin-infinite';
 import { cn } from '@/lib/utils';
 import { AdminProfileSidebar } from './AdminProfileSidebar';
@@ -65,12 +47,6 @@ const SendInviteDialog = dynamic(
   { ssr: false }
 );
 
-interface AdminCreatorProfilesUnifiedProps
-  extends AdminCreatorProfilesWithSidebarProps {
-  readonly onOpenBatchModal: () => void;
-  readonly onIngestPending: () => void;
-}
-
 export function AdminCreatorProfilesUnified({
   profiles: initialProfiles,
   pageSize,
@@ -78,10 +54,7 @@ export function AdminCreatorProfilesUnified({
   search,
   sort,
   mode: _mode = 'admin',
-  basePath = APP_ROUTES.ADMIN_CREATORS,
-  onOpenBatchModal,
-  onIngestPending,
-}: Readonly<AdminCreatorProfilesUnifiedProps>) {
+}: Readonly<AdminCreatorProfilesWithSidebarProps>) {
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);
 
@@ -128,12 +101,6 @@ export function AdminCreatorProfilesUnified({
 
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const [searchTerm, setSearchTerm] = useState(search);
-  const { setHeaderActions } = useSetHeaderActions();
-
-  useEffect(() => {
-    setSearchTerm(search);
-  }, [search]);
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -257,87 +224,6 @@ export function AdminCreatorProfilesUnified({
   const handleSidebarClose = useCallback(() => {
     setSidebarOpen(false);
   }, []);
-
-  const { setTableMeta } = useTableMeta();
-  const filteredProfilesRef = useRef(filteredProfiles);
-  filteredProfilesRef.current = filteredProfiles;
-
-  React.useEffect(() => {
-    const toggle = () => {
-      if (sidebarOpen) {
-        setSidebarOpen(false);
-        return;
-      }
-
-      const nextProfile =
-        filteredProfilesRef.current.find(
-          profile => profile.id === selectedId
-        ) ?? filteredProfilesRef.current[0];
-
-      if (!nextProfile) return;
-
-      setSelectedId(nextProfile.id);
-      setSidebarOpen(true);
-      setDraftContact(null);
-    };
-
-    setTableMeta({
-      rowCount: filteredProfiles.length,
-      toggle: filteredProfiles.length > 0 ? toggle : null,
-      rightPanelWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
-  }, [filteredProfiles.length, selectedId, setDraftContact, sidebarOpen]);
-
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup
-        trailing={
-          <DrawerToggleButton
-            ariaLabel='Toggle creator details'
-            label='Details'
-            tooltipLabel='Details'
-          />
-        }
-      >
-        <HeaderSearchAction
-          action={basePath}
-          clearHref={basePath}
-          searchValue={searchTerm}
-          onSearchValueChange={setSearchTerm}
-          placeholder='Search by handle'
-          ariaLabel='Search creators by handle'
-          submitAriaLabel='Search creators'
-          hiddenInputs={[
-            { name: 'sort', value: sort },
-            { name: 'pageSize', value: pageSize },
-            { name: 'page', value: 1 },
-          ]}
-          tooltipLabel='Search'
-        />
-        <DashboardHeaderActionButton
-          ariaLabel='Batch ingest creators'
-          onClick={onOpenBatchModal}
-          icon={<ListPlus className='h-3.5 w-3.5' />}
-          label='Batch Ingest'
-          hideLabelOnMobile
-        />
-        <IngestProfileDropdown
-          onIngestPending={onIngestPending}
-          hideLabelOnMobile
-        />
-      </DashboardHeaderActionGroup>
-    ),
-    [basePath, onIngestPending, onOpenBatchModal, pageSize, searchTerm, sort]
-  );
-
-  useEffect(() => {
-    setHeaderActions(headerActions);
-
-    return () => {
-      setHeaderActions(null);
-    };
-  }, [headerActions, setHeaderActions]);
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
@@ -491,12 +377,15 @@ export function AdminCreatorProfilesUnified({
               columns={columns}
               isLoading={false}
               emptyState={
-                <TableEmptyState
-                  icon={<UserCircle2 className='h-6 w-6' aria-hidden='true' />}
-                  title='No creator profiles found'
-                  description='Creator profiles will appear here once created.'
-                  className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
-                />
+                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                  <UserCircle2 className='h-6 w-6' />
+                  <div>
+                    <div className='font-medium'>No creator profiles found</div>
+                    <div className='text-xs'>
+                      Creator profiles will appear here once created.
+                    </div>
+                  </div>
+                </div>
               }
               rowSelection={rowSelection}
               onRowSelectionChange={handleRowSelectionChange}

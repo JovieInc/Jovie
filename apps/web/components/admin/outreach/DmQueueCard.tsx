@@ -1,11 +1,10 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DrawerButton } from '@/components/molecules/drawer';
-import { cn } from '@/lib/utils';
+import { useMarkLeadDmSentMutation } from '@/lib/queries';
 
 interface DmQueueLead {
   id: string;
@@ -22,9 +21,9 @@ interface DmQueueCardProps {
 }
 
 export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
-  const [marking, setMarking] = useState(false);
   const [copied, setCopied] = useState(false);
   const [markedDone, setMarkedDone] = useState(false);
+  const markDmSentMutation = useMarkLeadDmSentMutation();
 
   async function handleCopy() {
     if (!lead.dmCopy) return;
@@ -39,33 +38,29 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
   }
 
   async function handleMarkSent() {
-    setMarking(true);
     try {
-      const res = await fetch(`/api/admin/leads/${lead.id}/dm-sent`, {
-        method: 'PATCH',
-      });
-      if (!res.ok) throw new Error('Failed to mark as sent');
+      await markDmSentMutation.mutateAsync(lead.id);
       setMarkedDone(true);
       toast.success('Marked as DM sent');
       onMarkedSent();
     } catch {
       toast.error('Failed to mark as sent');
-    } finally {
-      setMarking(false);
     }
   }
 
   return (
-    <ContentSurfaceCard
-      className={cn('space-y-3 p-4', markedDone && 'opacity-50')}
+    <div
+      className={`rounded-lg border border-subtle p-4 space-y-3 ${
+        markedDone ? 'opacity-50' : ''
+      }`}
     >
       <div className='flex items-start justify-between'>
         <div className='flex items-center gap-3'>
-          <div className='flex size-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-            <User className='size-5 text-(--linear-text-tertiary)' />
+          <div className='flex size-10 items-center justify-center rounded-full bg-surface-2'>
+            <User className='size-5 text-tertiary-token' />
           </div>
           <div>
-            <p className='text-sm font-medium text-(--linear-text-primary)'>
+            <p className='text-sm font-medium text-primary-token'>
               {lead.displayName || 'Unknown'}
             </p>
             {lead.instagramHandle && (
@@ -73,7 +68,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
                 href={`https://instagram.com/${lead.instagramHandle}`}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='flex items-center gap-1 text-xs text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
+                className='flex items-center gap-1 text-xs text-secondary-token hover:text-primary-token'
               >
                 @{lead.instagramHandle}
                 <ExternalLink className='size-3' />
@@ -82,7 +77,7 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           </div>
         </div>
         {lead.priorityScore != null && (
-          <span className='rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-1 text-xs font-medium tabular-nums text-(--linear-text-secondary)'>
+          <span className='rounded-md bg-surface-2 px-2 py-1 text-xs font-medium tabular-nums text-secondary-token'>
             Score: {lead.priorityScore}
           </span>
         )}
@@ -93,17 +88,16 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           readOnly
           value={lead.dmCopy}
           rows={4}
-          className='w-full resize-none rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2 text-xs text-(--linear-text-secondary)'
+          className='w-full resize-none rounded-md border border-subtle bg-background px-3 py-2 text-xs text-secondary-token'
         />
       )}
 
       <div className='flex gap-2'>
-        <DrawerButton
-          tone='secondary'
+        <Button
+          variant='outline'
           size='sm'
           onClick={() => void handleCopy()}
           disabled={!lead.dmCopy || markedDone}
-          className='h-8 px-3 text-[12px]'
         >
           {copied ? (
             <Check className='mr-1.5 size-3.5' />
@@ -111,22 +105,21 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
             <Copy className='mr-1.5 size-3.5' />
           )}
           {copied ? 'Copied' : 'Copy DM'}
-        </DrawerButton>
-        <DrawerButton
-          tone='primary'
+        </Button>
+        <Button
+          variant='primary'
           size='sm'
           onClick={() => void handleMarkSent()}
-          disabled={marking || markedDone}
-          className='h-8 px-3 text-[12px]'
+          disabled={markDmSentMutation.isPending || markedDone}
         >
-          {marking ? (
+          {markDmSentMutation.isPending ? (
             <Loader2 className='mr-1.5 size-3.5 animate-spin' />
           ) : (
             <Check className='mr-1.5 size-3.5' />
           )}
           {markedDone ? 'Sent' : "Mark as DM'd"}
-        </DrawerButton>
+        </Button>
       </div>
-    </ContentSurfaceCard>
+    </div>
   );
 }

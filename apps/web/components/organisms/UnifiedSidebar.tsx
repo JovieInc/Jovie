@@ -30,8 +30,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
@@ -163,7 +161,7 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-8 items-center gap-2 rounded-md px-2.5 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-7 items-center gap-2 rounded-md px-2 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
@@ -181,12 +179,12 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-7 w-full items-center gap-2 rounded-md px-2 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
-                size={15}
+                size={14}
                 tone='auto'
                 className='rounded-[4px] shrink-0'
               />
@@ -206,7 +204,7 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-8 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-3.5' />
         </Link>
@@ -223,9 +221,7 @@ function SidebarHeaderNav({
  * No footer — user menu lives in the header.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { state, isMobile, setOpen } = useSidebar();
   const { isAdmin: isUserAdmin } = useDashboardData();
-  const isCollapsed = state === 'closed';
   const pathname = usePathname();
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
@@ -236,22 +232,14 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   return (
     <Sidebar
       variant='sidebar'
-      collapsible='icon'
+      collapsible='offcanvas'
       className={cn(
-        'border-r border-(--linear-app-shell-sidebar-seam) bg-(--linear-bg-page) lg:my-[var(--linear-app-shell-gap)] lg:ml-[var(--linear-app-shell-gap)] lg:overflow-hidden lg:rounded-[var(--linear-app-shell-radius)] lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-bg-surface-0) lg:shadow-[var(--linear-app-shell-shadow)]',
-        '[--sidebar-width:var(--linear-app-sidebar-width)]',
-        '[--sidebar-background:var(--linear-app-sidebar-background-rgb)]',
-        '[--sidebar-foreground:var(--linear-app-sidebar-foreground-rgb)]',
-        '[--sidebar-border:var(--linear-app-sidebar-border-rgb)]',
-        '[--sidebar-accent:var(--linear-app-sidebar-accent-rgb)]',
-        '[--sidebar-accent-active:var(--linear-app-sidebar-accent-active-rgb)]',
-        '[--sidebar-item-foreground:var(--linear-app-sidebar-item-foreground-rgb)]',
-        '[--sidebar-item-icon:var(--linear-app-sidebar-item-icon-rgb)]',
-        '[--sidebar-muted:var(--linear-app-sidebar-muted-rgb)]',
+        'bg-base',
+        '[--sidebar-width:244px]',
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-11 justify-center gap-0 pl-2.5 pr-2.5 pt-0 pb-0 lg:mt-1.5'>
+      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -260,8 +248,8 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-2.5'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
+      <SidebarContent className='flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 pb-2'>
+        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
               <DashboardNav />
@@ -272,29 +260,19 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarUpgradeBanner />
-      <SidebarInstallBanner />
+      <div className='mt-auto shrink-0'>
+        <SidebarUpgradeBanner />
+        <SidebarInstallBanner />
 
-      <div className='pl-2 pr-2.5 pb-2.5 pt-0.5 group-data-[collapsible=icon]:hidden'>
-        <span className='text-2xs text-sidebar-muted select-none'>
-          v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
-            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-            : ''}
-        </span>
+        <div className='pl-2 pr-3.5 pb-3.5 pt-1'>
+          <span className='text-2xs text-sidebar-muted select-none'>
+            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+            {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
+              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+              : ''}
+          </span>
+        </div>
       </div>
-
-      <SidebarRail />
-
-      {isCollapsed && !isMobile && (
-        <button
-          type='button'
-          aria-label='Expand sidebar'
-          onClick={() => setOpen(true)}
-          className='absolute inset-0 z-10 cursor-pointer bg-transparent'
-          style={{ pointerEvents: 'auto' }}
-        />
-      )}
     </Sidebar>
   );
 }

@@ -204,9 +204,9 @@ export function FunnelMetricsStrip({
           <MetricCard
             title='Engagement proxy'
             value={
-              metrics.engagementActiveProfiles30d !== null
-                ? metrics.engagementActiveProfiles30d.toLocaleString('en-US')
-                : '—'
+              metrics.engagementActiveProfiles30d === null
+                ? '—'
+                : metrics.engagementActiveProfiles30d.toLocaleString('en-US')
             }
             subtitle='Profiles with at least one visitor in the last 30 days'
             icon={CreditCard}

@@ -15,12 +15,7 @@ interface ContactDrawerProps {
   readonly artistName: string;
   readonly artistHandle: string;
   readonly contacts: PublicContact[];
-  readonly performAction: (
-    channel: PublicContactChannel,
-    contact: PublicContact
-  ) => void;
   readonly primaryChannel: (contact: PublicContact) => PublicContactChannel;
-  readonly buildTerritoryLabel: (contact: PublicContact) => string;
 }
 
 export function ContactDrawer({
@@ -112,12 +107,12 @@ export function ContactDrawer({
                         const channelHref = getActionHref(channel);
                         if (!channelHref) return null;
 
+                        const channelLabels: Record<string, string> = {
+                          email: 'Email',
+                          sms: 'Text',
+                        };
                         const channelLabel =
-                          channel.type === 'email'
-                            ? 'Email'
-                            : channel.type === 'sms'
-                              ? 'Text'
-                              : 'Call';
+                          channelLabels[channel.type] ?? 'Call';
                         return (
                           <a
                             key={`${contact.id}-${channel.type}`}

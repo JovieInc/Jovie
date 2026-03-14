@@ -488,15 +488,15 @@ async function renderListenMode(
 
   const body = (
     <>
-      {!isPublicNoAuthSmoke ? (
+      {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
-      ) : null}
+      )}
       {!profileResult.profile.is_claimed && (
         <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
       )}
-      {!isPublicNoAuthSmoke ? (
+      {isPublicNoAuthSmoke ? null : (
         <JoviePixel profileId={profileResult.profile.id} />
-      ) : null}
+      )}
       <StaticArtistPage
         mode='listen'
         artist={artist}
@@ -515,9 +515,9 @@ async function renderListenMode(
         tourDates={[]}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
       />
-      {!isPublicNoAuthSmoke ? (
+      {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
-      ) : null}
+      )}
     </>
   );
 
@@ -675,14 +675,14 @@ export default async function ArtistPage({
         {safeJsonLdStringify(breadcrumbSchema)}
       </script>
 
-      {!isPublicNoAuthSmoke ? (
+      {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
-      ) : null}
+      )}
       {!profile.is_claimed && (
         <ClaimBanner profileHandle={artist.handle} displayName={artist.name} />
       )}
       {/* Server-side pixel tracking */}
-      {!isPublicNoAuthSmoke ? <JoviePixel profileId={profile.id} /> : null}
+      {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
       <StaticArtistPage
         mode={mode}
         artist={artist}
@@ -702,9 +702,9 @@ export default async function ArtistPage({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
       />
-      {!isPublicNoAuthSmoke ? (
+      {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
-      ) : null}
+      )}
     </>
   );
 }

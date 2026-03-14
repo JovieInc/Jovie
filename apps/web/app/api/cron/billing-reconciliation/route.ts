@@ -173,7 +173,7 @@ async function reconcileUsersWithSubscriptions(
     if (batch.length === 0) break;
 
     // Update cursor to last user in batch before parallel processing
-    lastUserId = batch[batch.length - 1].id;
+    lastUserId = batch.at(-1)!.id;
 
     // Process users with bounded concurrency to avoid Stripe rate limits
     for (

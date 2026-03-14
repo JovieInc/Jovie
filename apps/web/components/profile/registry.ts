@@ -1,10 +1,6 @@
-import {
-  PROFILE_MODE_KEYS,
-  type ProfileMode,
-  type ProfileModeDefinition,
-} from './contracts';
+import { type ProfileMode, type ProfileModeDefinition } from './contracts';
 
-export const profileModes = PROFILE_MODE_KEYS;
+export { PROFILE_MODE_KEYS as profileModes } from './contracts';
 
 export const PROFILE_MODE_REGISTRY: Record<ProfileMode, ProfileModeDefinition> =
   {

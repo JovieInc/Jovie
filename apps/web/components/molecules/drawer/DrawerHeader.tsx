@@ -2,7 +2,6 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export interface DrawerHeaderProps {
   /** Title displayed on the left side of the header */
@@ -16,14 +15,14 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
   return (
     <div
       className={cn(
-        'sticky top-0 z-10 flex min-h-[var(--linear-app-drawer-header-height)] shrink-0 items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-[var(--linear-app-drawer-padding-x)] py-1',
+        'flex items-center justify-between border-b border-subtle px-5 py-3 min-h-14 shrink-0 bg-surface-0',
         className
       )}
     >
-      <DrawerSectionHeading as='p' className='truncate'>
+      <p className='text-[13px] font-[510] text-secondary-token truncate'>
         {title}
-      </DrawerSectionHeading>
-      {actions && <div className='flex items-center gap-0.5'>{actions}</div>}
+      </p>
+      {actions && <div className='flex items-center gap-1'>{actions}</div>}
     </div>
   );
 }

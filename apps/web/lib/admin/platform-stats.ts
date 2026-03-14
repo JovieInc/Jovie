@@ -36,7 +36,7 @@ export interface AdminPlatformStats {
 }
 
 function normalizeName(value: string): string {
-  return value.trim().replace(/\s+/g, ' ');
+  return value.trim().replaceAll(/\s+/g, ' ');
 }
 
 function buildLabelAggregates(

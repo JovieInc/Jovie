@@ -186,7 +186,7 @@ export function renderProfileCell({
  */
 export function renderFunnelCell({ row }: CellContext<AdminUserRow, string>) {
   const status = row.original.userStatus;
-  const label = status.replace(/_/g, ' ');
+  const label = status.replaceAll('_', ' ');
   let variant: 'success' | 'warning' | 'secondary';
   if (status === 'active') {
     variant = 'success';

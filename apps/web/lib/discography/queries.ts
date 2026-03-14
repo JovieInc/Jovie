@@ -593,7 +593,7 @@ export async function upsertProviderLink(
     // compilations, label samplers). Preserve the URL on this owner-specific
     // row and keep the provider external ID in metadata instead.
     const fallbackMetadata = {
-      ...(input.metadata ?? {}),
+      ...input.metadata,
       providerExternalId: input.externalId,
       providerExternalIdDeferred: true,
     };

@@ -127,7 +127,7 @@ export function OutreachPipelineCard({
 
         {metrics.signups7d > 0 && metrics.outreachSent7d === 0 && (
           <p className='text-2xs text-secondary-token'>
-            {metrics.signups7d} signup{metrics.signups7d !== 1 ? 's' : ''} this
+            {metrics.signups7d} signup{metrics.signups7d === 1 ? '' : 's'} this
             week from inbound &amp; organic sources.
           </p>
         )}
