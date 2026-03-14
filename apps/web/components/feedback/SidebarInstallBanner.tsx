@@ -4,6 +4,7 @@ import { Download, RefreshCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { env } from '@/lib/env-client';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { TOAST_MESSAGES } from '@/lib/hooks/useNotifications';
 import {
   useVersionMonitor,
@@ -123,8 +124,8 @@ export function SidebarInstallBanner() {
     );
   }
 
-  // Fall back to PWA install banner
-  if (!canPrompt) return null;
+  // Fall back to PWA install banner (gated by feature flag)
+  if (!FEATURE_FLAGS.PWA_INSTALL_BANNER || !canPrompt) return null;
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2 pb-0.5'>
