@@ -1,10 +1,28 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SocialBar } from '@/components/organisms/SocialBar';
 import type { LegacySocialLink } from '@/types/db';
 
 // Mock fetch for API calls
 global.fetch = vi.fn();
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 describe('SocialBar', () => {
   afterEach(() => {
@@ -31,7 +49,7 @@ describe('SocialBar', () => {
   ];
 
   it('renders social icons with cursor pointer styling', () => {
-    render(
+    renderWithQueryClient(
       <SocialBar
         handle='test-artist'
         artistName='Test Artist'
@@ -48,7 +66,7 @@ describe('SocialBar', () => {
   });
 
   it('hides container when no social links provided', () => {
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <SocialBar
         handle='test-artist'
         artistName='Test Artist'
@@ -61,7 +79,7 @@ describe('SocialBar', () => {
   });
 
   it('applies proper accessibility attributes', () => {
-    render(
+    renderWithQueryClient(
       <SocialBar
         handle='test-artist'
         artistName='Test Artist'
