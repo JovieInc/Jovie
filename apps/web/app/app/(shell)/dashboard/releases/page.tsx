@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { ReleaseProviderMatrix } from '@/components/dashboard/organisms/release-provider-matrix';
+import { ReleasesExperience } from '@/components/dashboard/organisms/release-provider-matrix';
 import { APP_ROUTES } from '@/constants/routes';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -80,7 +80,7 @@ export default async function ReleasesPage() {
     (profileSettings.spotifyImportStatus as string) ?? 'idle';
   return (
     <ReleasesClientBoundary>
-      <ReleaseProviderMatrix
+      <ReleasesExperience
         releases={releases}
         providerConfig={providerConfig}
         primaryProviders={primaryProviderKeys}

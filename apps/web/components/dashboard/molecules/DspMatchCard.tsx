@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import Image from 'next/image';
 import { useState } from 'react';
-
 import { Icon } from '@/components/atoms/Icon';
 import { ConfidenceBadge } from '@/components/dashboard/atoms/ConfidenceBadge';
 import {
@@ -11,6 +10,7 @@ import {
   PROVIDER_LABELS,
 } from '@/components/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/components/dashboard/atoms/MatchStatusBadge';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
@@ -86,10 +86,9 @@ export function DspMatchCard({
   const isLoading = isConfirming || isRejecting;
 
   return (
-    <div
+    <ContentSurfaceCard
       className={cn(
-        'rounded-xl border border-subtle bg-surface-1 p-4 shadow-card',
-        'transition-shadow hover:shadow-card-elevated',
+        'p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
         className
       )}
     >
@@ -98,7 +97,7 @@ export function DspMatchCard({
         <div className='flex items-center gap-3'>
           {/* Provider Icon or Artist Image */}
           {externalArtistImageUrl ? (
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-2'>
+            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
               <Image
                 src={externalArtistImageUrl}
                 alt={externalArtistName}
@@ -109,7 +108,7 @@ export function DspMatchCard({
               />
             </div>
           ) : (
-            <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-2'>
+            <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
               <DspProviderIcon provider={providerId} size='lg' />
             </div>
           )}
@@ -117,7 +116,7 @@ export function DspMatchCard({
           {/* Artist Info */}
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <span className='truncate font-[510] text-primary-token'>
+              <span className='truncate font-[510] text-(--linear-text-primary)'>
                 {externalArtistName}
               </span>
               {externalArtistUrl && (
@@ -125,17 +124,17 @@ export function DspMatchCard({
                   href={externalArtistUrl}
                   target='_blank'
                   rel='noopener noreferrer'
-                  className='shrink-0 text-tertiary-token transition-colors hover:text-secondary-token'
+                  className='shrink-0 text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-primary)'
                   title={`View on ${PROVIDER_LABELS[providerId]}`}
                 >
                   <Icon name='ExternalLink' className='h-3.5 w-3.5' />
                 </a>
               )}
             </div>
-            <div className='mt-0.5 flex items-center gap-2 text-[13px] text-tertiary-token'>
+            <div className='mt-0.5 flex items-center gap-2 text-[13px] text-(--linear-text-tertiary)'>
               <DspProviderIcon provider={providerId} size='sm' />
               <span>{PROVIDER_LABELS[providerId]}</span>
-              <span className='text-tertiary-token/50'>•</span>
+              <span className='text-(--linear-text-quaternary)'>•</span>
               <span>{matchingIsrcCount} ISRC matches</span>
             </div>
           </div>
@@ -150,11 +149,11 @@ export function DspMatchCard({
 
       {/* Expandable Confidence Breakdown */}
       {confidenceBreakdown && (
-        <div className='mt-3 border-t border-subtle pt-3'>
+        <div className='mt-3 border-t border-(--linear-border-subtle) pt-3'>
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex w-full items-center justify-between text-[13px] text-tertiary-token transition-colors hover:text-secondary-token'
+            className='flex w-full items-center justify-between rounded-[6px] text-[13px] text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           >
             <span>Confidence breakdown</span>
             <Icon
@@ -176,7 +175,7 @@ export function DspMatchCard({
 
       {/* Actions */}
       {isActionable && (
-        <div className='mt-3 flex items-center justify-end gap-2 border-t border-subtle pt-3'>
+        <div className='mt-3 flex items-center justify-end gap-2 border-t border-(--linear-border-subtle) pt-3'>
           {onReject && (
             <Button
               variant='ghost'
@@ -201,6 +200,6 @@ export function DspMatchCard({
           )}
         </div>
       )}
-    </div>
+    </ContentSurfaceCard>
   );
 }

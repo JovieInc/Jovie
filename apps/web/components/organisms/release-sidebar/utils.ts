@@ -4,6 +4,12 @@
  * Helper functions for form handling and URL validation.
  */
 
+export {
+  formatReleaseArtistLine,
+  formatReleaseDate,
+  formatReleaseDateShort,
+} from '@/lib/discography/formatting';
+
 /**
  * Check if an event target is a form element (input, textarea, select, button)
  */
@@ -29,37 +35,5 @@ export function isValidUrl(value: string): boolean {
     return protocol === 'http:' || protocol === 'https:';
   } catch {
     return false;
-  }
-}
-
-/**
- * Format a release date for display
- */
-export function formatReleaseDate(date: string | undefined): string {
-  if (!date) return 'Release date TBD';
-  try {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return 'Invalid date';
-  }
-}
-
-/**
- * Format a release date for short display
- */
-export function formatReleaseDateShort(date: string | undefined): string {
-  if (!date) return 'TBD';
-  try {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  } catch {
-    return 'Invalid';
   }
 }

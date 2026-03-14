@@ -93,6 +93,21 @@ describe('ExportCSVButton', () => {
       expect(button).toHaveClass('custom-class');
     });
 
+    it('should apply page-toolbar chrome classes', () => {
+      render(
+        <ExportCSVButton
+          getData={() => mockUsers}
+          columns={mockUserColumns}
+          filename='users'
+          chrome='page-toolbar'
+        />
+      );
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveClass('h-8');
+      expect(button).toHaveClass('rounded-[6px]');
+    });
+
     it('should have correct aria-label', () => {
       render(
         <ExportCSVButton

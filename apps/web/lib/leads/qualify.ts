@@ -121,8 +121,7 @@ export async function qualifyLead(
 function extractInstagramHandle(url: string): string | null {
   try {
     const pathname = new URL(url).pathname.replace(/\/$/, '');
-    const segments = pathname.split('/').filter(Boolean);
-    return segments[0] ?? null;
+    return pathname.split('/').find(Boolean) ?? null;
   } catch {
     return null;
   }

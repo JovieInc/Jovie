@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader, Textarea } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 import {
   CheckCircle2,
   ChevronRight,
@@ -8,6 +8,7 @@ import {
   CircleMinus,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -126,29 +127,31 @@ export function BatchIngestForm({
   }
 
   return (
-    <Card>
-      <CardHeader className='p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <div className='p-0'>
         <button
           type='button'
           onClick={() => setIsOpen(open => !open)}
-          className='flex w-full items-center gap-2 px-4 py-2.5 text-left'
+          className='flex w-full items-center gap-2 border-b border-(--linear-border-subtle) px-4 py-3 text-left'
         >
           <ChevronRight
             className={cn(
-              'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-200',
+              'h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary) transition-transform duration-200',
               isOpen && 'rotate-90'
             )}
           />
-          <span className='text-app font-medium'>Batch URL import</span>
+          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            Batch URL import
+          </span>
           {summaryText && !isOpen && (
-            <span className='ml-auto text-2xs text-tertiary-token'>
+            <span className='ml-auto text-[11px] text-(--linear-text-tertiary)'>
               {summaryText}
             </span>
           )}
         </button>
-      </CardHeader>
+      </div>
       <AnimatedAccordion isOpen={isOpen}>
-        <CardContent className='space-y-2 pt-0'>
+        <div className='space-y-2 px-4 py-3'>
           <Textarea
             rows={4}
             value={value}
@@ -157,7 +160,7 @@ export function BatchIngestForm({
 https://open.spotify.com/artist/...
 https://www.instagram.com/artistname, https://artist-website.com'
           />
-          <div className='flex flex-col gap-2 text-2xs text-tertiary-token sm:flex-row sm:items-center sm:justify-between'>
+          <div className='flex flex-col gap-2 text-[11px] text-(--linear-text-tertiary) sm:flex-row sm:items-center sm:justify-between'>
             <span>
               {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
             </span>
@@ -173,7 +176,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
           </div>
 
           {result && (
-            <div className='space-y-2 rounded-md border border-subtle p-3 text-xs'>
+            <div className='space-y-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3 text-[12px] text-(--linear-text-secondary)'>
               {/* Summary badges */}
               <div className='flex flex-wrap items-center gap-3'>
                 {result.summary.success > 0 && (
@@ -225,8 +228,8 @@ https://www.instagram.com/artistname, https://artist-website.com'
               </ul>
             </div>
           )}
-        </CardContent>
+        </div>
       </AnimatedAccordion>
-    </Card>
+    </ContentSurfaceCard>
   );
 }

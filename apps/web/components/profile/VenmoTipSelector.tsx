@@ -3,21 +3,8 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { TipSelector } from '@/components/molecules/TipSelector';
+import { isAllowedVenmoUrl } from '@/components/profile/utils/venmo';
 import { track } from '@/lib/analytics';
-
-const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-
-/** Validate that a URL points to venmo.com before opening it. */
-function isAllowedVenmoUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.protocol === 'https:' && ALLOWED_VENMO_HOSTS.has(parsed.hostname)
-    );
-  } catch {
-    return false;
-  }
-}
 
 type VenmoTipSelectorProps = {
   readonly venmoLink: string;

@@ -14,18 +14,21 @@ const INTENT_BADGES: Record<
 > = {
   high: {
     label: 'High',
-    className: 'border border-subtle bg-surface-2/40 text-secondary-token',
-    dotClassName: 'bg-secondary-token',
+    className:
+      'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+    dotClassName: 'bg-(--linear-text-secondary)',
   },
   medium: {
     label: 'Medium',
-    className: 'border border-subtle bg-transparent text-tertiary-token',
-    dotClassName: 'bg-tertiary-token',
+    className:
+      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary)',
+    dotClassName: 'bg-(--linear-text-tertiary)',
   },
   low: {
     label: 'Low',
-    className: 'border border-subtle bg-transparent text-tertiary-token',
-    dotClassName: 'bg-tertiary-token/60',
+    className:
+      'border-(--linear-border-subtle) bg-transparent text-(--linear-text-tertiary)',
+    dotClassName: 'bg-(--linear-text-tertiary)/70',
   },
 };
 

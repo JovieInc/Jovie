@@ -3,6 +3,7 @@
 import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { AuthButton } from '@/components/auth';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface HandleValidationState {
@@ -41,7 +42,9 @@ function ValidationIcon({
   readonly isValid: boolean;
 }) {
   if (checking) {
-    return <LoadingSpinner size='sm' className='text-secondary-token' />;
+    return (
+      <LoadingSpinner size='sm' className='text-(--linear-text-tertiary)' />
+    );
   }
 
   if (hasError) {
@@ -202,15 +205,15 @@ export function OnboardingHandleStep({
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
           {isReservedHandle ? (
-            <div className='flex flex-col items-center gap-2 rounded-2xl border border-subtle bg-surface-1 px-5 py-5 text-center mt-4'>
-              <p className='text-2xl font-[590] tracking-[-0.022em] text-primary-token sm:text-3xl'>
+            <ContentSurfaceCard className='mt-4 flex flex-col items-center gap-2 px-5 py-5 text-center'>
+              <p className='text-2xl font-[590] tracking-[-0.022em] text-(--linear-text-primary) sm:text-3xl'>
                 @{handleInput}
               </p>
-              <p className='text-[13px] text-secondary-token'>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
                 We reserved this for you. Edit below if you prefer something
                 else.
               </p>
-            </div>
+            </ContentSurfaceCard>
           ) : null}
         </div>
 
@@ -218,14 +221,14 @@ export function OnboardingHandleStep({
           <div>
             <div
               className={[
-                'w-full flex items-center gap-2 rounded-[6px] border bg-surface-0 dark:bg-surface-1 px-4 py-2.5',
-                'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-surface-0',
+                'flex w-full items-center gap-2 rounded-[8px] border bg-(--linear-bg-surface-1) px-4 py-2.5',
+                'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
                 stateError || handleValidation.error
                   ? 'border-error'
-                  : 'border-subtle',
+                  : 'border-(--linear-border-subtle)',
               ].join(' ')}
             >
-              <span className='text-[13px] text-secondary-token whitespace-nowrap'>
+              <span className='text-[13px] whitespace-nowrap text-(--linear-text-tertiary)'>
                 @
               </span>
               <input
@@ -249,7 +252,7 @@ export function OnboardingHandleStep({
                 autoCorrect='off'
                 spellCheck={false}
                 aria-invalid={handleValidation.error ? 'true' : undefined}
-                className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
+                className='min-w-0 flex-1 bg-transparent text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none'
               />
               <div className='h-5 w-5 flex items-center justify-center'>
                 <ValidationIcon
@@ -279,7 +282,7 @@ export function OnboardingHandleStep({
                         ? onSuggestionClick(suggestion)
                         : onHandleChange(suggestion)
                     }
-                    className='rounded-full border border-subtle px-3 py-1 text-[11px] text-secondary-token hover:text-primary-token hover:border-accent transition-colors'
+                    className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1 text-[11px] text-(--linear-text-secondary) transition-colors hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
                   >
                     @{suggestion}
                   </button>

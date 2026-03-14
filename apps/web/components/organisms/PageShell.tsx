@@ -1,3 +1,4 @@
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { cn } from '@/lib/utils';
 
 export interface PageShellProps {
@@ -43,15 +44,11 @@ export interface PageShellProps {
  * }
  * ```
  */
-export function PageShell({
-  children,
-  className,
-  noPadding = false,
-}: PageShellProps) {
+export function PageShell({ children, className }: PageShellProps) {
   return (
     <div
       className={cn(
-        'bg-surface-1 shadow-sm h-full overflow-hidden overflow-x-hidden flex flex-col',
+        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-(--linear-text-primary)',
         className
       )}
     >
@@ -105,30 +102,25 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header
-      className={cn(
-        'min-h-[56px] shrink-0 border-b border-subtle px-4 sm:px-6',
-        'flex items-center justify-between gap-3 sm:gap-4',
-        className
-      )}
-    >
-      <div className='flex items-center gap-2 sm:gap-3 min-w-0'>
-        {mobileSidebarTrigger}
-        {breadcrumbs}
-        <div className='min-w-0 flex-1'>
-          <h1 className='text-[15px] sm:text-sm font-semibold text-primary-token truncate'>
-            {title}
-          </h1>
-          {description && (
-            <p className='text-xs text-secondary-token truncate hidden sm:block'>
-              {description}
-            </p>
-          )}
-        </div>
-        {sidebarTrigger}
-      </div>
-      {action && <div className='shrink-0'>{action}</div>}
-    </header>
+    <ContentSectionHeader
+      title={
+        <span className='flex min-w-0 items-center gap-2 sm:gap-3'>
+          {mobileSidebarTrigger}
+          {breadcrumbs}
+          <span className='min-w-0 flex-1 truncate'>{title}</span>
+          {sidebarTrigger}
+        </span>
+      }
+      subtitle={
+        description ? (
+          <span className='hidden truncate sm:block'>{description}</span>
+        ) : undefined
+      }
+      actions={action}
+      actionsClassName='flex shrink-0 items-center gap-[var(--linear-app-toolbar-gap)]'
+      className={className}
+      bodyClassName='min-w-0'
+    />
   );
 }
 
@@ -170,7 +162,8 @@ export function PageContent({
     <div
       className={cn(
         'flex-1 min-h-0 min-w-0 overflow-auto overflow-x-hidden',
-        !noPadding && 'p-4 sm:p-6',
+        !noPadding &&
+          'px-[var(--linear-app-content-padding-x)] py-[var(--linear-app-content-padding-y)]',
         className
       )}
     >

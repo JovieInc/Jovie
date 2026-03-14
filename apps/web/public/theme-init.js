@@ -1,12 +1,55 @@
 (function () {
   try {
-    // Force dark mode app-wide (JOV-1479). Light mode disabled until further notice.
     var root = document.documentElement;
-    root.classList.add('dark');
+    var pathname = globalThis.location?.pathname ?? '/';
+    var isThemeEnabledRoute =
+      pathname.startsWith('/app') ||
+      pathname.startsWith('/onboarding') ||
+      pathname.startsWith('/account') ||
+      pathname.startsWith('/billing') ||
+      pathname.startsWith('/artist-selection') ||
+      pathname.startsWith('/sso-callback');
 
-    // Update theme-color meta tag for PWA system bar color
-    var metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', '#0a0a0a');
+    if (isThemeEnabledRoute) {
+      var storageValue =
+        typeof localStorage !== 'undefined'
+          ? localStorage.getItem('jovie-theme')
+          : null;
+      var theme =
+        storageValue === 'light' ||
+        storageValue === 'dark' ||
+        storageValue === 'system'
+          ? storageValue
+          : 'system';
+
+      var systemPrefersDark =
+        typeof globalThis.matchMedia === 'function' &&
+        globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
+      var resolvedDark =
+        theme === 'dark' || (theme === 'system' && systemPrefersDark);
+
+      root.classList.remove('light', 'dark');
+      if (resolvedDark) root.classList.add('dark');
+      root.style.colorScheme = resolvedDark ? 'dark' : 'light';
+
+      var metaThemeEnabled = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeEnabled) {
+        metaThemeEnabled.setAttribute(
+          'content',
+          resolvedDark ? '#0a0a0a' : '#ffffff'
+        );
+      }
+    } else {
+      // Public surfaces are intentionally forced dark.
+      root.classList.remove('light', 'dark');
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+
+      var metaThemeDark = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeDark) {
+        metaThemeDark.setAttribute('content', '#0a0a0a');
+      }
+    }
 
     // High contrast mode (independent of light/dark)
     if (typeof localStorage !== 'undefined' && localStorage) {

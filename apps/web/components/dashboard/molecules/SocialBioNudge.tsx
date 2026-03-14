@@ -2,8 +2,9 @@
 
 import { Share2, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { captureWarning } from '@/lib/error-tracking';
 
 const STORAGE_KEY_PREFIX = 'jovie_social_bio_nudge_dismissed';
@@ -46,29 +47,26 @@ export const SocialBioNudge = memo(function SocialBioNudge({
   }
 
   return (
-    <DashboardCard
-      variant='analytics'
-      hover={false}
-      padding='compact'
-      className='flex items-start gap-3'
-    >
+    <ContentSurfaceCard className='flex items-start gap-3 p-4 sm:p-5'>
       <div
-        className='shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2 ring-1 ring-inset ring-white/3 dark:ring-white/5'
+        className='shrink-0 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-2.5'
         aria-hidden='true'
       >
-        <Share2 className='h-5 w-5 text-accent-token' />
+        <Share2 className='h-4 w-4 text-(--linear-text-secondary)' />
       </div>
       <div className='min-w-0 flex-1 space-y-2'>
         <div className='space-y-1'>
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Grow your audience
           </p>
-          <p className='text-[14px] font-[590] leading-5 text-primary-token'>
+          <p className='text-[14px] font-[590] leading-5 text-(--linear-text-primary)'>
             Share your Jovie link
           </p>
-          <p className='text-[14px] leading-5 text-secondary-token'>
+          <p className='text-[13px] leading-5 text-(--linear-text-secondary)'>
             Add{' '}
-            <span className='font-[510] text-primary-token'>{profileUrl}</span>{' '}
+            <span className='font-[510] text-(--linear-text-primary)'>
+              {profileUrl}
+            </span>{' '}
             to your Instagram, TikTok, or Twitter bio to start capturing fans
             every time someone visits.
           </p>
@@ -78,7 +76,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             href='https://www.instagram.com/accounts/edit/'
             target='_blank'
             rel='noopener noreferrer'
-            className='flex items-center gap-1.5 text-[13px] text-secondary-token transition-colors hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 text-[12.5px] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
           >
             <SocialIcon
               platform='instagram'
@@ -91,7 +89,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             href='https://www.tiktok.com/setting/'
             target='_blank'
             rel='noopener noreferrer'
-            className='flex items-center gap-1.5 text-[13px] text-secondary-token transition-colors hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 text-[12.5px] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
           >
             <SocialIcon
               platform='tiktok'
@@ -104,7 +102,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
             href='https://x.com/settings/profile'
             target='_blank'
             rel='noopener noreferrer'
-            className='flex items-center gap-1.5 text-[13px] text-secondary-token transition-colors hover:text-primary-token'
+            className='inline-flex items-center gap-1.5 text-[12.5px] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
           >
             <SocialIcon
               platform='x'
@@ -115,14 +113,13 @@ export const SocialBioNudge = memo(function SocialBioNudge({
           </a>
         </div>
       </div>
-      <button
-        type='button'
+      <AppIconButton
         onClick={handleDismiss}
-        aria-label='Dismiss nudge'
-        className='shrink-0 rounded-full border border-subtle bg-transparent p-1.5 text-tertiary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base'
+        ariaLabel='Dismiss nudge'
+        className='self-start border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
       >
         <X className='h-4 w-4' aria-hidden='true' />
-      </button>
-    </DashboardCard>
+      </AppIconButton>
+    </ContentSurfaceCard>
   );
 });

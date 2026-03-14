@@ -6,8 +6,6 @@ import { cn } from '@/lib/utils';
 export interface DrawerHeaderProps {
   /** Title displayed on the left side of the header */
   readonly title: ReactNode;
-  /** Close handler — passed down for the actions area to handle */
-  readonly onClose?: () => void;
   /** Additional actions rendered in the header */
   readonly actions?: ReactNode;
   readonly className?: string;
@@ -17,7 +15,7 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
   return (
     <div
       className={cn(
-        'flex items-center justify-between px-4 py-2 min-h-12 shrink-0',
+        'flex items-center justify-between border-b border-subtle px-5 py-3 min-h-14 shrink-0 bg-surface-0',
         className
       )}
     >

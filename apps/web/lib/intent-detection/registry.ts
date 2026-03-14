@@ -77,7 +77,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   {
     category: IntentCategory.LINK_ADD,
     pattern: new RegExp(
-      `^(?:add|connect|link|set\\s+up)\\s+(?:my\\s+)?${platformPattern.source}(?:\\s+(?:link|url|account|page|profile))?`,
+      String.raw`^(?:add|connect|link|set\s+up)\s+(?:my\s+)?${platformPattern.source}(?:\s+(?:link|url|account|page|profile))?`,
       'i'
     ),
     extract: extractPlatform,
@@ -88,7 +88,7 @@ export const INTENT_PATTERNS: IntentPattern[] = [
   {
     category: IntentCategory.LINK_REMOVE,
     pattern: new RegExp(
-      `^(?:remove|delete|disconnect|unlink)\\s+(?:my\\s+)?${platformPattern.source}(?:\\s+(?:link|url|account|page|profile))?`,
+      String.raw`^(?:remove|delete|disconnect|unlink)\s+(?:my\s+)?${platformPattern.source}(?:\s+(?:link|url|account|page|profile))?`,
       'i'
     ),
     extract: extractPlatform,

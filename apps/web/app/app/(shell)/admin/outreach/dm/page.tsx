@@ -24,9 +24,9 @@ function DmQueueBody({
   leads,
   fetchQueue,
 }: {
-  loading: boolean;
-  leads: DmQueueLead[];
-  fetchQueue: () => void;
+  readonly loading: boolean;
+  readonly leads: DmQueueLead[];
+  readonly fetchQueue: () => void;
 }) {
   if (loading) {
     return (

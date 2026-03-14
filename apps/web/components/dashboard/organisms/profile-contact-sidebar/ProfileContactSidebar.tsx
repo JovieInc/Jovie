@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, CommonDropdown, Label, SegmentControl } from '@jovie/ui';
+import { Button, CommonDropdown, Label } from '@jovie/ui';
 import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,9 +10,10 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { CopyLinkInput } from '@/components/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import {
   useAvatarMutation,
@@ -370,7 +371,7 @@ export function ProfileContactSidebar() {
                 type='button'
                 size='icon'
                 variant='ghost'
-                className='h-8 w-8 shrink-0'
+                className='h-8 w-8 shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
                 onClick={() =>
                   globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                 }
@@ -385,15 +386,14 @@ export function ProfileContactSidebar() {
                 side='bottom'
                 items={profileShareItems}
                 trigger={
-                  <Button
+                  <AppIconButton
                     type='button'
-                    size='icon'
                     variant='ghost'
                     className='h-8 w-8 shrink-0'
-                    aria-label='Open profile share options'
+                    ariaLabel='Open profile share options'
                   >
                     <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
-                  </Button>
+                  </AppIconButton>
                 }
               />
             </div>
@@ -402,24 +402,25 @@ export function ProfileContactSidebar() {
       }
       tabs={
         <div className='flex items-center gap-1.5'>
-          <SegmentControl
+          <DrawerTabs
             value={resolvedCategory}
-            onValueChange={setSelectedCategory}
+            onValueChange={value =>
+              setSelectedCategory(value as CategoryOption | 'about')
+            }
             options={PROFILE_TAB_OPTIONS}
-            size='sm'
             className='flex-1'
-            aria-label='Profile sidebar view'
+            ariaLabel='Profile sidebar view'
           />
           <div className='h-6 w-6 shrink-0'>
             {supportsAddAction && (
-              <button
+              <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
-                className='h-6 w-6 p-1 rounded-md text-tertiary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
-                aria-label={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
+                className='h-7 w-7 border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+                ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
                 <Plus className='h-4 w-4' />
-              </button>
+              </AppIconButton>
             )}
           </div>
         </div>

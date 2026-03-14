@@ -1,6 +1,7 @@
 'use client';
 
 import { AuthButton, AuthLinkPreviewCard } from '@/components/auth';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 
 interface OnboardingCompleteStepProps {
@@ -45,8 +46,8 @@ export function OnboardingCompleteStep({
           hrefText={`${displayDomain}/${handle}`}
         />
 
-        <div
-          className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-3 transition-opacity duration-200'
+        <ContentSurfaceCard
+          className='w-full px-4 py-3 transition-opacity duration-200'
           aria-hidden={!showSpotifyImportProgress}
           aria-live={showSpotifyImportProgress ? 'polite' : 'off'}
           inert={!showSpotifyImportProgress}
@@ -57,20 +58,20 @@ export function OnboardingCompleteStep({
           }}
         >
           <div className='mb-2 flex items-center gap-2'>
-            <div className='h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2'>
+            <div className='h-1.5 flex-1 overflow-hidden rounded-full bg-(--linear-bg-surface-0)'>
               <div
-                className='h-full rounded-full bg-accent transition-all duration-500'
+                className='h-full rounded-full bg-(--linear-accent) transition-all duration-500'
                 style={{ width: `${((spotifyImportStage + 1) / 3) * 100}%` }}
               />
             </div>
-            <span className='text-[11px] text-secondary-token'>
+            <span className='text-[11px] text-(--linear-text-tertiary)'>
               {spotifyImportStage + 1}/3
             </span>
           </div>
-          <p className='text-center text-[13px] text-secondary-token'>
+          <p className='text-center text-[13px] text-(--linear-text-secondary)'>
             {spotifyImportMessage}
           </p>
-        </div>
+        </ContentSurfaceCard>
 
         <div className={FORM_LAYOUT.formInner}>
           <AuthButton

@@ -1,21 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { StatTile } from '@/components/molecules/drawer';
-import type { ProviderKey } from '@/lib/discography/types';
+import {
+  DrawerEmptyState,
+  DrawerStatGrid,
+  StatTile,
+} from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
-import type { Release } from './types';
-
-interface SmartLinkAnalyticsResponse {
-  totalClicks: number;
-  last7DaysClicks: number;
-  providerClicks: Array<{ provider: string; clicks: number }>;
-}
+import type { Release, ReleaseSidebarAnalytics } from './types';
 
 async function fetchReleaseAnalytics(
   releaseId: string,
   signal?: AbortSignal
-): Promise<SmartLinkAnalyticsResponse> {
+): Promise<ReleaseSidebarAnalytics> {
   const res = await fetch(
     `/api/dashboard/releases/${encodeURIComponent(releaseId)}/analytics`,
     { signal }
@@ -25,29 +22,36 @@ async function fetchReleaseAnalytics(
     throw new Error('Failed to load release analytics');
   }
 
-  return res.json() as Promise<SmartLinkAnalyticsResponse>;
+  return res.json() as Promise<ReleaseSidebarAnalytics>;
 }
 
 const numberFormatter = new Intl.NumberFormat();
 
 interface ReleaseSmartLinkAnalyticsProps {
   readonly release: Release;
-  readonly providerConfig: Record<
-    ProviderKey,
-    { label: string; accent: string }
-  >;
+  readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
 }
 
 export function ReleaseSmartLinkAnalytics({
   release,
-  providerConfig,
+  analyticsOverride,
 }: ReleaseSmartLinkAnalyticsProps) {
-  const [data, setData] = useState<SmartLinkAnalyticsResponse | null>(null);
+  const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
+    analyticsOverride ?? null
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
   const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
+    if (analyticsOverride) {
+      setData(analyticsOverride);
+      setIsLoading(false);
+      setIsSwitching(false);
+      setHasError(false);
+      return;
+    }
+
     const controller = new AbortController();
     setIsLoading(prev => (data === null ? true : prev));
     setIsSwitching(data !== null);
@@ -71,59 +75,40 @@ export function ReleaseSmartLinkAnalytics({
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- data ref is intentionally stale to detect first-load vs switch
-  }, [release.id]);
+  }, [release.id, analyticsOverride]);
 
   const totalClicks = data?.totalClicks ?? 0;
   const last7DaysClicks = data?.last7DaysClicks ?? 0;
-  const providerClicks = data?.providerClicks ?? [];
 
   const showEmpty = !isLoading && !hasError && totalClicks === 0;
-
-  const topProviders = providerClicks.slice(0, 4);
 
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[188px]'>
+    <div className='min-h-[124px]'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
-            <div className='grid grid-cols-2 rounded-md border border-subtle bg-surface-1 p-3'>
-              <div className='space-y-1'>
+            <DrawerStatGrid>
+              <div className='space-y-1.5 pr-3'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
-                <div className='h-[11px] w-10 rounded skeleton' />
+                <div className='h-3 w-10 rounded skeleton' />
               </div>
-              <div className='space-y-1 border-l border-subtle pl-3'>
+              <div className='space-y-1.5 pl-3'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
-                <div className='h-[11px] w-10 rounded skeleton' />
+                <div className='h-3 w-10 rounded skeleton' />
               </div>
-            </div>
-            <div className='space-y-2'>
-              <div className='h-[10px] w-20 rounded skeleton' />
-              <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>
-                {[1, 2, 3].map(item => (
-                  <div
-                    key={`provider-skeleton-${item}`}
-                    className='flex items-center justify-between px-3 py-2'
-                  >
-                    <div className='flex items-center gap-2'>
-                      <div className='h-2 w-2 rounded-full skeleton' />
-                      <div className='h-3 w-16 rounded skeleton' />
-                    </div>
-                    <div className='h-3 w-8 rounded skeleton' />
-                  </div>
-                ))}
-              </div>
-            </div>
+            </DrawerStatGrid>
           </div>
         )}
 
         {!showSkeleton && hasError && (
-          <p className='text-[13px] text-tertiary-token'>
-            Analytics unavailable
-          </p>
+          <DrawerEmptyState
+            className='min-h-[76px]'
+            message='Analytics unavailable'
+          />
         )}
 
         {!showSkeleton && !hasError && (
@@ -133,63 +118,28 @@ export function ReleaseSmartLinkAnalytics({
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 rounded-md border border-subtle bg-surface-1 p-3'>
-              <div>
+            <DrawerStatGrid>
+              <div className='pr-2.5'>
                 <StatTile
                   label='Total clicks'
                   value={numberFormatter.format(totalClicks)}
                   hint='All time'
                 />
               </div>
-              <div className='border-l border-subtle pl-3'>
+              <div className='pl-2.5'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
                   hint='Recent'
                 />
               </div>
-            </div>
+            </DrawerStatGrid>
 
             {showEmpty && (
-              <p className='mt-1.5 text-[11px] text-tertiary-token'>
-                Share your smart link to start tracking clicks.
-              </p>
-            )}
-
-            {!showEmpty && topProviders.length > 0 && (
-              <div className='mt-2 space-y-2'>
-                <p className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
-                  Top platforms
-                </p>
-                <div className='divide-y divide-subtle/60 rounded-lg border border-subtle/60 bg-surface-2/25'>
-                  {topProviders.map(provider => {
-                    const key = provider.provider as ProviderKey;
-                    const label =
-                      providerConfig[key]?.label ??
-                      provider.provider ??
-                      'Other';
-                    const accent = providerConfig[key]?.accent ?? '#64748B';
-                    return (
-                      <div
-                        key={provider.provider}
-                        className='flex items-center justify-between px-3 py-2 text-[13px]'
-                      >
-                        <div className='flex items-center gap-2 text-secondary-token'>
-                          <span
-                            className='h-2 w-2 rounded-full'
-                            style={{ backgroundColor: accent }}
-                            aria-hidden='true'
-                          />
-                          <span>{label}</span>
-                        </div>
-                        <span className='tabular-nums text-primary-token'>
-                          {numberFormatter.format(provider.clicks)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <DrawerEmptyState
+                className='mt-1 min-h-[40px] px-3'
+                message='Share your smart link to start tracking clicks.'
+              />
             )}
           </div>
         )}

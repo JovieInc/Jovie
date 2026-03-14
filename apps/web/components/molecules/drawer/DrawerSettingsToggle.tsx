@@ -41,16 +41,21 @@ export function DrawerSettingsToggle({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 py-1',
-        density === 'compact' ? 'min-h-[32px]' : 'min-h-[44px] lg:min-h-0',
+        'flex items-center justify-between gap-3 rounded-[7px] py-0.5 transition-[background-color,box-shadow] duration-150',
+        !disabled &&
+          'hover:bg-[var(--linear-bg-surface-1)] focus-within:bg-[var(--linear-bg-surface-1)] focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
+        density === 'compact' ? 'px-1.5' : 'px-2',
+        disabled && 'opacity-60',
         className
       )}
     >
       <label
         htmlFor={id}
         className={cn(
-          'select-none cursor-pointer text-secondary-token',
-          density === 'compact' ? 'text-[11px]' : 'text-xs'
+          'select-none text-[var(--linear-text-secondary)]',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+          density === 'compact' ? 'text-[11px]' : 'text-[12px]'
         )}
       >
         {label}

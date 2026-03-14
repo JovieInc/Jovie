@@ -1,3 +1,4 @@
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 const PROFILE_LOADING_LINK_KEYS = Array.from(
@@ -8,20 +9,16 @@ const PROFILE_LOADING_LINK_KEYS = Array.from(
 export default function ProfileLoading() {
   return (
     <div className='flex h-full min-h-0 flex-col'>
-      {/* Header */}
-      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
-        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
-          <div className='space-y-2'>
-            <LoadingSkeleton height='h-6' width='w-48' rounded='md' />
-            <LoadingSkeleton height='h-4' width='w-64' rounded='md' />
-          </div>
-        </div>
-      </div>
+      <ContentSectionHeaderSkeleton
+        titleWidth='w-48'
+        descriptionWidth='w-64'
+        className='bg-(--linear-app-content-surface)'
+      />
 
       {/* Content area */}
       <div className='flex-1 min-h-0 overflow-auto'>
         <div className='px-4 py-6 sm:px-6'>
-          <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+          <div className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)]'>
             {/* Profile avatar and name section */}
             <div className='flex items-center gap-4'>
               <LoadingSkeleton
@@ -43,7 +40,7 @@ export default function ProfileLoading() {
                 {PROFILE_LOADING_LINK_KEYS.map(key => (
                   <div
                     key={key}
-                    className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 p-3'
+                    className='flex items-center gap-3 rounded-lg border border-(--linear-border-subtle) bg-(--linear-app-surface-elevated) p-3'
                   >
                     <LoadingSkeleton
                       height='h-10'

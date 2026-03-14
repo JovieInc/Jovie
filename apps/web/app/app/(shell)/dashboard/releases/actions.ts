@@ -16,21 +16,17 @@ import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import {
-  PRIMARY_PROVIDER_KEYS,
-  PROVIDER_CONFIG,
-} from '@/lib/discography/config';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
-  getTracksForReleaseWithProviders,
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
-  type TrackWithProviders,
   upsertProviderLink,
 } from '@/lib/discography/queries';
+import { loadReleaseTracksForProfile } from '@/lib/discography/release-track-loader';
 import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
@@ -42,6 +38,10 @@ import type {
 } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
+import {
+  buildProviderLabels,
+  mapProviderLinksToViewModel,
+} from '@/lib/discography/view-models';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
@@ -65,7 +65,7 @@ import {
 } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { slugify } from '@/lib/utils';
-import { toISOStringOrFallback, toISOStringOrNull } from '@/lib/utils/date';
+import { toISOStringOrNull } from '@/lib/utils/date';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
@@ -85,16 +85,6 @@ function isSpotifyIdUniqueViolation(error: unknown): boolean {
     (dbError.constraint === 'creator_profiles_spotify_id_unique' ||
       message.includes('creator_profiles_spotify_id_unique') ||
       (message.includes('spotify_id') && message.includes('duplicate')))
-  );
-}
-
-function buildProviderLabels() {
-  return Object.entries(PROVIDER_CONFIG).reduce(
-    (acc, [key, value]) => {
-      acc[key as ProviderKey] = value.label;
-      return acc;
-    },
-    {} as Record<ProviderKey, string>
   );
 }
 
@@ -190,7 +180,7 @@ function extractGenres(metadata: Record<string, unknown> | null): string[] {
  */
 function mapReleaseToViewModel(
   release: ReleaseWithProviders,
-  providerLabels: Record<ProviderKey, string>,
+  _providerLabels: Record<ProviderKey, string>,
   profileId: string,
   profileHandle: string
 ): ReleaseViewModel {
@@ -201,33 +191,17 @@ function mapReleaseToViewModel(
     profileId,
     id: release.id,
     title: release.title,
+    artistNames: release.artistNames,
     releaseDate: toISOStringOrNull(release.releaseDate) ?? undefined,
     artworkUrl: release.artworkUrl ?? undefined,
     slug,
     smartLinkPath: buildSmartLinkPath(profileHandle, slug),
     spotifyPopularity: release.spotifyPopularity,
-    providers: Object.entries(providerLabels)
-      .map(([key, label]) => {
-        const providerKey = key as ProviderKey;
-        const match = release.providerLinks.find(
-          link => link.providerId === providerKey
-        );
-        const url = match?.url ?? '';
-        const source: 'manual' | 'ingested' =
-          match?.sourceType === 'manual' ? 'manual' : 'ingested';
-        const updatedAt = toISOStringOrFallback(match?.updatedAt);
-
-        return {
-          key: providerKey,
-          label,
-          url,
-          source,
-          updatedAt,
-          path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
-          isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
-        };
-      })
-      .filter(provider => provider.url !== ''),
+    providers: mapProviderLinksToViewModel({
+      providerLinks: release.providerLinks,
+      profileHandle,
+      slug,
+    }),
     // Extended fields
     releaseType: release.releaseType,
     isExplicit: release.isExplicit,
@@ -1367,61 +1341,11 @@ export async function connectSpotifyArtist(params: {
 }
 
 /**
- * Map track database data to view model
- */
-function mapTrackToViewModel(
-  track: TrackWithProviders,
-  providerLabels: Record<ProviderKey, string>,
-  profileHandle: string,
-  releaseSlug: string
-): TrackViewModel {
-  return {
-    id: track.id,
-    releaseId: track.releaseId,
-    title: track.title,
-    slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
-    trackNumber: track.trackNumber,
-    discNumber: track.discNumber,
-    durationMs: track.durationMs,
-    isrc: track.isrc,
-    isExplicit: track.isExplicit,
-    previewUrl: track.previewUrl,
-    audioUrl: track.audioUrl,
-    audioFormat: track.audioFormat,
-    providers: Object.entries(providerLabels)
-      .map(([key, label]) => {
-        const providerKey = key as ProviderKey;
-        const match = track.providerLinks.find(
-          link => link.providerId === providerKey
-        );
-        const url = match?.url ?? '';
-        const source: 'manual' | 'ingested' =
-          match?.sourceType === 'manual' ? 'manual' : 'ingested';
-        const updatedAt = toISOStringOrFallback(match?.updatedAt);
-
-        return {
-          key: providerKey,
-          label,
-          url,
-          source,
-          updatedAt,
-          path: url
-            ? buildSmartLinkPath(profileHandle, track.slug, providerKey)
-            : '',
-          isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
-        };
-      })
-      .filter(provider => provider.url !== ''),
-  };
-}
-
-/**
  * Load tracks for a release (lazy loading for expandable rows)
  */
 export async function loadTracksForRelease(params: {
   releaseId: string;
-  releaseSlug: string;
+  releaseSlug?: string;
 }): Promise<TrackViewModel[]> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -1432,23 +1356,11 @@ export async function loadTracksForRelease(params: {
 
   const profile = await requireProfile();
 
-  // Verify the release belongs to the user's profile
-  const release = await getReleaseById(params.releaseId);
-  if (release?.creatorProfileId !== profile.id) {
-    throw new TypeError('Release not found');
-  }
-
-  const providerLabels = buildProviderLabels();
-  const { tracks } = await getTracksForReleaseWithProviders(params.releaseId);
-
-  return tracks.map(track =>
-    mapTrackToViewModel(
-      track,
-      providerLabels,
-      profile.handle,
-      params.releaseSlug
-    )
-  );
+  return loadReleaseTracksForProfile({
+    releaseId: params.releaseId,
+    profileId: profile.id,
+    profileHandle: profile.handle,
+  });
 }
 
 /**

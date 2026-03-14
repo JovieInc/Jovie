@@ -1,6 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import type { SpotifyArtistResult } from '@/lib/contracts/api';
+
+export type { SpotifyArtistResult } from '@/lib/contracts/api';
+
 import { cacheQuery } from '@/lib/db/cache';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import {
@@ -8,10 +12,13 @@ import {
   getClientIP,
   spotifySearchApiLimiter,
 } from '@/lib/rate-limit';
-import { buildSpotifyArtistUrl } from '@/lib/spotify';
+import {
+  buildSpotifyArtistUrl,
+  isSpotifyAvailable,
+  spotifyClient,
+} from '@/lib/spotify';
 import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
-import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 import { applyVipBoost, parseLimit } from './helpers';
@@ -26,17 +33,6 @@ const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const SEARCH_CACHE_TTL_SECONDS = 300; // 5 minutes
-
-// Normalized response shape for client
-export interface SpotifyArtistResult {
-  id: string;
-  name: string;
-  url: string;
-  imageUrl?: string;
-  followers?: number;
-  popularity: number;
-  verified?: boolean;
-}
 
 function validateSearchQuery(q: string | undefined): NextResponse | null {
   if (!isSpotifyAvailable()) {

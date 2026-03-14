@@ -4,6 +4,7 @@ import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudiencePanelProvider } from '@/components/dashboard/organisms/AudiencePanelContext';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AudienceMember } from '@/types';
 
@@ -148,9 +149,11 @@ function renderWithProviders(
     wrapper: ({ children }) => (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <RightPanelProvider>
-            <AudiencePanelProvider>{children}</AudiencePanelProvider>
-          </RightPanelProvider>
+          <HeaderActionsProvider>
+            <RightPanelProvider>
+              <AudiencePanelProvider>{children}</AudiencePanelProvider>
+            </RightPanelProvider>
+          </HeaderActionsProvider>
         </TooltipProvider>
       </QueryClientProvider>
     ),

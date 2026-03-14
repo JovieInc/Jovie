@@ -1,6 +1,19 @@
 import type { LegacySocialLink } from '@/types/db';
 
-const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
+export const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
+
+/** Validate that a URL points to a canonical Venmo host over HTTPS. */
+export function isAllowedVenmoUrl(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    return (
+      parsedUrl.protocol === 'https:' &&
+      ALLOWED_VENMO_HOSTS.has(parsedUrl.hostname)
+    );
+  } catch {
+    return false;
+  }
+}
 
 export function extractVenmoUsername(url: string | null): string | null {
   if (!url) return null;

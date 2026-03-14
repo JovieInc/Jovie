@@ -18,21 +18,19 @@ export default async function AdminFeedbackPage() {
 
   return (
     <PageShell>
-      <PageContent noPadding>
-        <div className='p-6 h-full'>
-          <AdminFeedbackTable
-            items={items.map(item => ({
-              id: item.id,
-              message: item.message,
-              source: item.source,
-              status: item.status,
-              context: item.context,
-              dismissedAtIso: item.dismissedAt?.toISOString() ?? null,
-              createdAtIso: item.createdAt.toISOString(),
-              user: item.user,
-            }))}
-          />
-        </div>
+      <PageContent noPadding className='h-full'>
+        <AdminFeedbackTable
+          items={items.map(item => ({
+            id: item.id,
+            message: item.message,
+            source: item.source,
+            status: item.status,
+            context: item.context,
+            dismissedAtIso: item.dismissedAt?.toISOString() ?? null,
+            createdAtIso: item.createdAt.toISOString(),
+            user: item.user,
+          }))}
+        />
       </PageContent>
     </PageShell>
   );

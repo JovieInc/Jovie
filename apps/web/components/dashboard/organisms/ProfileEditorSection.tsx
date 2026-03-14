@@ -8,14 +8,75 @@
 'use client';
 
 import { Input } from '@jovie/ui';
+import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import type { EditingField } from './links/hooks/useProfileEditor';
+
+interface ProfileIdentityFieldRowProps {
+  readonly label: string;
+  readonly editing: boolean;
+  readonly value: string;
+  readonly emptyLabel: string;
+  readonly ariaLabel: string;
+  readonly onEdit: () => void;
+  readonly input: ReactNode;
+  readonly tone?: 'primary' | 'secondary';
+  readonly controlsId: string;
+  readonly className?: string;
+}
+
+function ProfileIdentityFieldRow({
+  label,
+  editing,
+  value,
+  emptyLabel,
+  ariaLabel,
+  onEdit,
+  input,
+  tone = 'secondary',
+  controlsId,
+  className,
+}: Readonly<ProfileIdentityFieldRowProps>) {
+  return (
+    <div
+      className={cn(
+        'space-y-2 border-b border-(--linear-border-subtle) px-4 py-3.5 last:border-b-0 sm:px-5',
+        className
+      )}
+    >
+      <p className='text-center text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+        {label}
+      </p>
+      {editing ? (
+        input
+      ) : (
+        <button
+          type='button'
+          className={cn(
+            'w-full rounded-[10px] border border-transparent px-4 py-3 text-center transition-[background-color,border-color,box-shadow,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 active:bg-(--linear-bg-surface-2)',
+            tone === 'primary'
+              ? 'min-h-[52px] text-[17px] font-[560] tracking-[-0.02em] text-(--linear-text-primary)'
+              : 'min-h-[44px] text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'
+          )}
+          onClick={onEdit}
+          aria-label={ariaLabel}
+          aria-pressed={editing}
+          aria-controls={controlsId}
+        >
+          {value || emptyLabel}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * Props for the ProfileEditorSection component
@@ -105,7 +166,7 @@ export function ProfileEditorSection({
 }: ProfileEditorSectionProps) {
   return (
     <div className='mx-auto w-full max-w-2xl px-4 sm:px-0'>
-      <div className='flex flex-col items-center gap-4'>
+      <div className='flex flex-col items-center gap-5'>
         <AvatarUploadable
           src={avatarUrl}
           alt={`Avatar for @${username}`}
@@ -123,10 +184,17 @@ export function ProfileEditorSection({
           showHoverOverlay
         />
 
-        <div className='w-full max-w-md space-y-2'>
-          {/* Display Name Field - Primary hierarchy */}
-          <div className='grid gap-1'>
-            {editingField === 'displayName' ? (
+        <ContentSurfaceCard className='w-full max-w-md overflow-hidden'>
+          <ProfileIdentityFieldRow
+            label='Display name'
+            editing={editingField === 'displayName'}
+            value={profileDisplayName}
+            emptyLabel='Add display name'
+            ariaLabel='Edit display name'
+            onEdit={() => setEditingField('displayName')}
+            controlsId='profile-display-name'
+            tone='primary'
+            input={
               <Input
                 ref={displayNameInputRef as React.RefObject<HTMLInputElement>}
                 id='profile-display-name'
@@ -136,23 +204,19 @@ export function ProfileEditorSection({
                 onChange={e => onDisplayNameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'displayName')}
                 onBlur={onInputBlur}
-                className='min-h-[48px] text-center text-base sm:min-h-[44px]'
+                className='min-h-[46px] rounded-[10px] border-(--linear-border-default) bg-(--linear-bg-surface-0) text-center text-[15px] font-[560] tracking-[-0.02em] text-(--linear-text-primary)'
               />
-            ) : (
-              <button
-                type='button'
-                className='min-h-[48px] w-full rounded-xl py-3 text-center text-lg font-[590] text-primary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] sm:min-h-[44px] sm:rounded-lg sm:py-2 sm:text-base sm:font-[510]'
-                onClick={() => setEditingField('displayName')}
-                aria-label='Edit display name'
-              >
-                {profileDisplayName || 'Add display name'}
-              </button>
-            )}
-          </div>
-
-          {/* Username Field - Secondary hierarchy */}
-          <div className='grid gap-1'>
-            {editingField === 'username' ? (
+            }
+          />
+          <ProfileIdentityFieldRow
+            label='Username'
+            editing={editingField === 'username'}
+            value={profileUsername}
+            emptyLabel='Add username'
+            ariaLabel='Edit username'
+            onEdit={() => setEditingField('username')}
+            controlsId='profile-username'
+            input={
               <Input
                 ref={usernameInputRef as React.RefObject<HTMLInputElement>}
                 id='profile-username'
@@ -164,20 +228,11 @@ export function ProfileEditorSection({
                 onChange={e => onUsernameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'username')}
                 onBlur={onInputBlur}
-                className='min-h-[44px] text-center text-[13px]'
+                className='min-h-[42px] rounded-[10px] border-(--linear-border-default) bg-(--linear-bg-surface-0) text-center text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'
               />
-            ) : (
-              <button
-                type='button'
-                className='min-h-[44px] w-full rounded-xl py-2.5 text-center text-[13px] font-[510] text-secondary-token transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent active:scale-[0.99] sm:rounded-lg sm:py-2'
-                onClick={() => setEditingField('username')}
-                aria-label='Edit username'
-              >
-                {profileUsername || 'Add username'}
-              </button>
-            )}
-          </div>
-        </div>
+            }
+          />
+        </ContentSurfaceCard>
       </div>
     </div>
   );

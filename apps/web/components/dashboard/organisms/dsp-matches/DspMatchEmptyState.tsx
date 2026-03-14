@@ -1,4 +1,5 @@
 import { Icon } from '@/components/atoms/Icon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 
 type FilterStatus = DspMatchStatus | 'all';
@@ -49,15 +50,19 @@ export function DspMatchEmptyState({ status }: DspMatchEmptyStateProps) {
   const { title, description, icon } = EMPTY_STATE_MESSAGES[status];
 
   return (
-    <div className='flex flex-col items-center justify-center gap-4 py-12 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-surface-2 text-secondary-token'>
+    <ContentSurfaceCard className='flex flex-col items-center justify-center gap-4 px-4 py-12 text-center'>
+      <div className='flex h-12 w-12 items-center justify-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary)'>
         <Icon name={icon} className='h-6 w-6' />
       </div>
 
       <div className='space-y-1'>
-        <h3 className='text-[13px] font-[510] text-secondary-token'>{title}</h3>
-        <p className='text-[13px] text-secondary-token'>{description}</p>
+        <h3 className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          {title}
+        </h3>
+        <p className='text-[13px] text-(--linear-text-secondary)'>
+          {description}
+        </p>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }

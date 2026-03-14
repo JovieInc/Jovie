@@ -1,14 +1,6 @@
 'use client';
 
 import {
-  Button,
-  Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@jovie/ui';
-import {
-  type FormEvent,
   type MouseEvent,
   memo,
   useCallback,
@@ -17,218 +9,15 @@ import {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { AddProviderUrlPopover, ProviderStatusDot } from '../components';
 
 interface ProviderConfig {
   label: string;
   readonly accent: string;
-}
-
-interface ProviderStatusDotProps {
-  readonly status: 'available' | 'manual' | 'missing';
-  readonly accent: string;
-}
-
-/**
- * ProviderStatusDot - Visual indicator for provider availability
- *
- * Statuses:
- * - available: Solid colored dot
- * - manual: Colored dot with warning ring
- * - missing: Gray outlined dot
- */
-const ProviderStatusDot = memo(function ProviderStatusDot({
-  status,
-  accent,
-}: ProviderStatusDotProps) {
-  if (status === 'missing') {
-    return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
-        <span className='h-1 w-1 rounded-full bg-tertiary-token' />
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={cn(
-        'relative flex h-2.5 w-2.5 items-center justify-center rounded-full',
-        status === 'manual' && 'ring-2 ring-amber-400/30'
-      )}
-      style={{ backgroundColor: accent }}
-    >
-      {status === 'manual' && (
-        <span className='absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-(--color-warning)' />
-      )}
-    </span>
-  );
-});
-
-interface AddProviderUrlPopoverProps {
-  readonly providerLabel: string;
-  readonly providerKey: ProviderKey;
-  readonly accent: string;
-  readonly onSave: (url: string) => Promise<void>;
-  readonly isSaving?: boolean;
-}
-
-/**
- * AddProviderUrlPopover - Popover for manually adding provider URLs
- *
- * Features:
- * - Auto-focus input on open
- * - URL validation (valid URL + provider domain check)
- * - Loading state during save
- * - Error handling (parent component shows toast)
- */
-function AddProviderUrlPopover({
-  providerLabel,
-  providerKey,
-  accent,
-  onSave,
-  isSaving,
-}: AddProviderUrlPopoverProps) {
-  const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState('');
-  const [validationError, setValidationError] = useState<string>('');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const isSavingRef = useRef(false);
-
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const trimmed = url.trim();
-    if (!trimmed) return;
-
-    // Validate URL format
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(trimmed);
-    } catch {
-      setValidationError('Please enter a valid URL');
-      return;
-    }
-
-    // Validate provider domain
-    const allowedDomains = PROVIDER_DOMAINS[providerKey];
-    const hostname = parsedUrl.hostname.toLowerCase();
-    const isValidDomain = allowedDomains.some(
-      domain => hostname === domain || hostname.endsWith(`.${domain}`)
-    );
-
-    if (!isValidDomain) {
-      const domainMsg =
-        allowedDomains.length === 1
-          ? allowedDomains[0]
-          : 'one of: ' + allowedDomains.join(', ');
-      setValidationError(`URL must be from ${domainMsg}`);
-      return;
-    }
-
-    // Clear validation error and proceed with save
-    setValidationError('');
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
-    try {
-      await onSave(trimmed);
-      setUrl('');
-      setOpen(false);
-    } catch {
-      // Error toast is shown by the hook; keep popover open so user can retry
-    } finally {
-      isSavingRef.current = false;
-    }
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type='button'
-          className='group/add inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
-        >
-          <Icon
-            name='Plus'
-            className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100'
-            aria-hidden='true'
-          />
-          <span className='line-clamp-1 text-tertiary-token/50 group-hover/add:hidden'>
-            —
-          </span>
-          <span className='line-clamp-1 hidden group-hover/add:inline'>
-            Add link
-          </span>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align='start'
-        className='w-72 p-3'
-        onOpenAutoFocus={e => {
-          e.preventDefault();
-          inputRef.current?.focus();
-        }}
-      >
-        <form onSubmit={handleSubmit} className='space-y-3'>
-          <div className='flex items-center gap-2'>
-            <span
-              className='h-2 w-2 shrink-0 rounded-full'
-              style={{ backgroundColor: accent }}
-              aria-hidden='true'
-            />
-            <span className='text-[13px] font-[510] text-primary-token'>
-              Add {providerLabel} link
-            </span>
-          </div>
-          <div className='space-y-1'>
-            <Input
-              ref={inputRef}
-              type='url'
-              inputSize='sm'
-              placeholder='Paste URL here...'
-              value={url}
-              onChange={e => {
-                setUrl(e.target.value);
-                setValidationError(''); // Clear error on change
-              }}
-              disabled={isSaving}
-              autoComplete='off'
-              className='text-[13px]'
-            />
-            {validationError && (
-              <p className='text-[13px] text-(--color-error)'>
-                {validationError}
-              </p>
-            )}
-          </div>
-          <div className='flex justify-end gap-2'>
-            <Button
-              type='button'
-              variant='ghost'
-              size='sm'
-              onClick={() => {
-                setUrl('');
-                setOpen(false);
-              }}
-              className='text-[13px]'
-            >
-              Cancel
-            </Button>
-            <Button
-              type='submit'
-              variant='primary'
-              size='sm'
-              disabled={!url.trim() || isSaving}
-              className='text-[13px]'
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </Button>
-          </div>
-        </form>
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 interface ProviderActionButtonsProps {
@@ -245,33 +34,25 @@ function ProviderActionButtons({
   onCopyClick,
 }: ProviderActionButtonsProps) {
   return (
-    <div className='inline-flex items-center overflow-hidden rounded-md border border-subtle'>
-      {/* Open button (left) */}
-      <button
-        type='button'
+    <div className='inline-flex items-center gap-1 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-1'>
+      <DrawerInlineIconButton
         title='Open'
         onClick={event => {
           event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
-        className='inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+        className='p-1 text-(--linear-text-secondary)'
       >
         <Icon name='ExternalLink' className='h-3.5 w-3.5' aria-hidden='true' />
         <span className='sr-only'>Open</span>
-      </button>
-
-      {/* Divider */}
-      <div className='h-4 w-px bg-subtle' />
-
-      {/* Copy button (right) */}
-      <button
-        type='button'
+      </DrawerInlineIconButton>
+      <DrawerInlineIconButton
         title={isCopied ? 'Copied' : 'Copy'}
         data-testid={testId}
         data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
         onClick={onCopyClick}
         className={cn(
-          'inline-flex cursor-pointer items-center justify-center p-1.5 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token',
+          'p-1 text-(--linear-text-secondary)',
           isCopied && 'text-success hover:text-success'
         )}
       >
@@ -292,7 +73,7 @@ function ProviderActionButtons({
           />
         </span>
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-      </button>
+      </DrawerInlineIconButton>
     </div>
   );
 }
@@ -417,7 +198,7 @@ export const ProviderCell = memo(function ProviderCell({
     }
 
     return (
-      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-tertiary-token/50'>
+      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-(--linear-text-tertiary)'>
         —
       </span>
     );

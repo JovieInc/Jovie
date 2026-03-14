@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   AdminBraggingRightsSection,
@@ -40,20 +42,30 @@ export default function AdminPage() {
             <AdminKpiSection />
           </Suspense>
 
-          <details className='rounded-xl border border-subtle bg-surface p-4'>
-            <summary className='cursor-pointer list-none text-sm font-semibold text-primary-token'>
-              Platform reach metrics
+          <ContentSurfaceCard as='details' className='overflow-hidden'>
+            <summary className='list-none [&::-webkit-details-marker]:hidden'>
+              <ContentSectionHeader
+                title='Platform reach metrics'
+                subtitle='Secondary platform stats kept below the fold'
+                actions={
+                  <span className='text-[12px] font-[560] text-(--linear-text-tertiary)'>
+                    Expand
+                  </span>
+                }
+                className='min-h-0 cursor-pointer px-[var(--linear-app-header-padding-x)] py-3'
+                actionsClassName='shrink-0'
+              />
             </summary>
-            <p className='mt-2 text-app text-secondary-token'>
-              Secondary platform stats are intentionally below the fold so core
-              business KPIs stay front and center.
-            </p>
-            <div className='mt-4'>
+            <div className='space-y-4 border-t border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-4'>
+              <p className='text-app text-secondary-token'>
+                Secondary platform stats are intentionally below the fold so
+                core business KPIs stay front and center.
+              </p>
               <Suspense fallback={<AdminPlatformStatsSectionSkeleton />}>
                 <AdminPlatformStatsSection />
               </Suspense>
             </div>
-          </details>
+          </ContentSurfaceCard>
 
           {/* Row 3: Outreach pipeline + Reliability side by side */}
 

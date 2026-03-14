@@ -30,8 +30,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
-  useSidebar,
 } from '@/components/organisms/Sidebar';
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
@@ -223,9 +221,7 @@ function SidebarHeaderNav({
  * No footer — user menu lives in the header.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { state, isMobile, setOpen } = useSidebar();
   const { isAdmin: isUserAdmin } = useDashboardData();
-  const isCollapsed = state === 'closed';
   const pathname = usePathname();
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
@@ -236,14 +232,14 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   return (
     <Sidebar
       variant='sidebar'
-      collapsible='icon'
+      collapsible='offcanvas'
       className={cn(
         'bg-base',
         '[--sidebar-width:244px]',
         'transition-[width] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0 lg:mt-2'>
+      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -252,7 +248,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5'>
+      <SidebarContent className='flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 pb-2'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -264,29 +260,19 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarUpgradeBanner />
-      <SidebarInstallBanner />
+      <div className='mt-auto shrink-0'>
+        <SidebarUpgradeBanner />
+        <SidebarInstallBanner />
 
-      <div className='pl-2 pr-3.5 pb-3.5 pt-1 group-data-[collapsible=icon]:hidden'>
-        <span className='text-2xs text-sidebar-muted select-none'>
-          v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-          {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
-            ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-            : ''}
-        </span>
+        <div className='pl-2 pr-3.5 pb-3.5 pt-1'>
+          <span className='text-2xs text-sidebar-muted select-none'>
+            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+            {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
+              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+              : ''}
+          </span>
+        </div>
       </div>
-
-      <SidebarRail />
-
-      {isCollapsed && !isMobile && (
-        <button
-          type='button'
-          aria-label='Expand sidebar'
-          onClick={() => setOpen(true)}
-          className='absolute inset-0 z-10 cursor-pointer bg-transparent'
-          style={{ pointerEvents: 'auto' }}
-        />
-      )}
     </Sidebar>
   );
 }

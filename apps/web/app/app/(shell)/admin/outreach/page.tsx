@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { OutreachKpis } from '@/components/admin/outreach/OutreachKpis';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface QueueResponse {
   items: unknown[];
@@ -65,18 +67,28 @@ export default function AdminOutreachPage() {
 
   if (loading) {
     return (
-      <div className='flex items-center justify-center py-16'>
-        <LoadingSpinner size='md' tone='muted' />
-      </div>
+      <ContentSurfaceCard className='overflow-hidden' aria-hidden='true'>
+        <ContentSectionHeaderSkeleton
+          titleWidth='w-36'
+          descriptionWidth='w-56'
+          actionWidths={['w-16']}
+          className='min-h-0 px-4 py-3 sm:px-5'
+        />
+        <div className='grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4'>
+          {['total', 'email', 'dm', 'review'].map(key => (
+            <ContentMetricCardSkeleton key={key} />
+          ))}
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
+    <div className='flex flex-col gap-4'>
       {loadError && (
-        <p className='rounded-md border border-subtle bg-surface-2 px-3 py-2 text-sm text-secondary-token'>
-          {loadError}
-        </p>
+        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+          <p>{loadError}</p>
+        </ContentSurfaceCard>
       )}
       <OutreachKpis counts={counts} />
     </div>

@@ -12,6 +12,7 @@ import {
   Target,
 } from 'lucide-react';
 import React, { useState } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /** Map platform ID to display name */
@@ -98,20 +99,20 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
   const approveButtonLabel = getApproveButtonLabel();
 
   return (
-    <div className='bg-surface-0 border border-subtle rounded-xl overflow-hidden'>
+    <ContentSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0) p-0'>
       {/* Main card content - always visible */}
       <div className='p-4'>
         {/* Header: Name, Status, Action */}
         <div className='flex items-start justify-between gap-3'>
           <div className='flex-1 min-w-0'>
-            <h3 className='font-semibold text-primary-token truncate text-base'>
+            <h3 className='truncate text-base font-semibold text-(--linear-text-primary)'>
               {entry.fullName}
             </h3>
             <a
               href={`mailto:${entry.email}`}
-              className='text-sm text-secondary-token hover:text-accent flex items-center gap-1.5 mt-0.5'
+              className='mt-0.5 flex items-center gap-1.5 text-sm text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
             >
-              <Mail className='h-3.5 w-3.5 flex-shrink-0' />
+              <Mail className='h-3.5 w-3.5 flex-shrink-0' aria-hidden />
               <span className='truncate'>{entry.email}</span>
             </a>
           </div>
@@ -127,13 +128,13 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           </Badge>
           {primaryGoalLabel && (
             <Badge size='sm' variant='secondary'>
-              <Target className='h-3 w-3 mr-1' />
+              <Target className='mr-1 h-3 w-3' aria-hidden />
               {primaryGoalLabel}
             </Badge>
           )}
           {formattedDate && (
-            <span className='text-xs text-tertiary-token flex items-center gap-1'>
-              <Calendar className='h-3 w-3' />
+            <span className='flex items-center gap-1 text-xs text-(--linear-text-tertiary)'>
+              <Calendar className='h-3 w-3' aria-hidden />
               {formattedDate}
             </span>
           )}
@@ -169,42 +170,45 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className='border-t border-subtle bg-surface-1/50 px-4 py-3 space-y-3'>
+        <div className='space-y-3 border-t border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-3'>
           {/* Primary Social */}
           <div className='flex items-start gap-3'>
-            <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium'>
+            <div className='w-20 flex-shrink-0 text-xs font-medium text-(--linear-text-tertiary)'>
               Social
             </div>
             <a
               href={entry.primarySocialUrlNormalized}
               target='_blank'
               rel='noopener noreferrer'
-              className='text-sm text-accent hover:underline flex items-center gap-1.5 min-w-0'
+              className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
             >
               <span className='truncate'>
                 {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
               </span>
-              <ExternalLink className='h-3.5 w-3.5 flex-shrink-0' />
+              <ExternalLink className='h-3.5 w-3.5 flex-shrink-0' aria-hidden />
             </a>
           </div>
 
           {/* Spotify */}
           {entry.spotifyUrlNormalized && (
             <div className='flex items-start gap-3'>
-              <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium flex items-center gap-1'>
-                <Music className='h-3 w-3' />
+              <div className='flex w-20 flex-shrink-0 items-center gap-1 text-xs font-medium text-(--linear-text-tertiary)'>
+                <Music className='h-3 w-3' aria-hidden />
                 Spotify
               </div>
               <a
                 href={entry.spotifyUrlNormalized}
                 target='_blank'
                 rel='noopener noreferrer'
-                className='text-sm text-accent hover:underline flex items-center gap-1.5 min-w-0'
+                className='flex min-w-0 items-center gap-1.5 text-sm text-(--linear-accent) hover:underline'
               >
                 <span className='truncate'>
                   {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
                 </span>
-                <ExternalLink className='h-3.5 w-3.5 flex-shrink-0' />
+                <ExternalLink
+                  className='h-3.5 w-3.5 flex-shrink-0'
+                  aria-hidden
+                />
               </a>
             </div>
           )}
@@ -212,10 +216,10 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           {/* Follower Count */}
           {entry.primarySocialFollowerCount != null && (
             <div className='flex items-start gap-3'>
-              <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium'>
+              <div className='w-20 flex-shrink-0 text-xs font-medium text-(--linear-text-tertiary)'>
                 Followers
               </div>
-              <span className='text-sm text-secondary-token tabular-nums'>
+              <span className='text-sm text-(--linear-text-secondary) tabular-nums'>
                 {entry.primarySocialFollowerCount.toLocaleString()}
               </span>
             </div>
@@ -224,17 +228,17 @@ export const WaitlistMobileCard = React.memo(function WaitlistMobileCard({
           {/* Heard About */}
           {entry.heardAbout && (
             <div className='flex items-start gap-3'>
-              <div className='w-20 flex-shrink-0 text-xs text-tertiary-token font-medium flex items-center gap-1'>
-                <MessageSquare className='h-3 w-3' />
+              <div className='flex w-20 flex-shrink-0 items-center gap-1 text-xs font-medium text-(--linear-text-tertiary)'>
+                <MessageSquare className='h-3 w-3' aria-hidden />
                 Source
               </div>
-              <span className='text-sm text-secondary-token'>
+              <span className='text-sm text-(--linear-text-secondary)'>
                 {entry.heardAbout}
               </span>
             </div>
           )}
         </div>
       )}
-    </div>
+    </ContentSurfaceCard>
   );
 });

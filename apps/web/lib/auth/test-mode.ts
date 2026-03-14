@@ -7,8 +7,7 @@ interface HeaderReader {
 }
 
 function normalizeHeaderValue(value: string | null): string | null {
-  const normalized = value?.trim();
-  return normalized ? normalized : null;
+  return value?.trim() || null;
 }
 
 /**

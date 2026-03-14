@@ -377,35 +377,98 @@ export function isPodcasterProfile(
 }
 
 // Conversion utilities
-export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
+
+type CanonicalArtistProfileShape = {
+  id: string;
+  userId: string | null;
+  username: string;
+  displayName: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  spotifyId: string | null;
+  spotifyUrl: string | null;
+  appleMusicUrl: string | null;
+  youtubeUrl: string | null;
+  appleMusicId?: string | null;
+  youtubeMusicId?: string | null;
+  deezerId?: string | null;
+  tidalId?: string | null;
+  soundcloudId?: string | null;
+  venmoHandle?: string | null;
+  location?: string | null;
+  activeSinceYear?: number | null;
+  genres?: string[] | null;
+  isPublic: boolean;
+  isVerified: boolean;
+  isFeatured: boolean;
+  marketingOptOut: boolean;
+  settings: Record<string, unknown> | null;
+  theme: Record<string, unknown> | null;
+  createdAt: string;
+};
+
+function mapCanonicalProfileToArtist(
+  profile: CanonicalArtistProfileShape
+): Artist {
   return {
     id: profile.id,
-    owner_user_id: profile.user_id || '', // Handle null user_id for unclaimed profiles
+    owner_user_id: profile.userId || '',
     handle: profile.username,
-    spotify_id: profile.spotify_id || '',
-    name: profile.display_name || profile.username,
-    image_url: profile.avatar_url || undefined,
+    spotify_id: profile.spotifyId || '',
+    name: profile.displayName || profile.username,
+    image_url: profile.avatarUrl || undefined,
     tagline: profile.bio || undefined,
     theme: profile.theme || undefined,
     settings: (profile.settings as { hide_branding?: boolean }) || {
       hide_branding: false,
     },
-    spotify_url: profile.spotify_url || undefined,
-    apple_music_url: profile.apple_music_url || undefined,
-    youtube_url: profile.youtube_url || undefined,
-    apple_music_id: profile.apple_music_id || undefined,
-    youtube_music_id: profile.youtube_music_id || undefined,
-    deezer_id: profile.deezer_id || undefined,
-    tidal_id: profile.tidal_id || undefined,
-    soundcloud_id: profile.soundcloud_id || undefined,
+    spotify_url: profile.spotifyUrl || undefined,
+    apple_music_url: profile.appleMusicUrl || undefined,
+    youtube_url: profile.youtubeUrl || undefined,
+    apple_music_id: profile.appleMusicId || undefined,
+    youtube_music_id: profile.youtubeMusicId || undefined,
+    deezer_id: profile.deezerId || undefined,
+    tidal_id: profile.tidalId || undefined,
+    soundcloud_id: profile.soundcloudId || undefined,
+    venmo_handle: profile.venmoHandle || undefined,
     location: profile.location ?? null,
-    active_since_year: profile.active_since_year ?? null,
-    published: profile.is_public,
-    is_verified: profile.is_verified,
-    is_featured: profile.is_featured,
-    marketing_opt_out: profile.marketing_opt_out,
-    created_at: profile.created_at,
+    active_since_year: profile.activeSinceYear ?? null,
+    genres: profile.genres ?? null,
+    published: profile.isPublic,
+    is_verified: profile.isVerified,
+    is_featured: profile.isFeatured,
+    marketing_opt_out: profile.marketingOptOut,
+    created_at: profile.createdAt,
   };
+}
+
+export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
+  return mapCanonicalProfileToArtist({
+    id: profile.id,
+    userId: profile.user_id,
+    username: profile.username,
+    displayName: profile.display_name,
+    avatarUrl: profile.avatar_url,
+    bio: profile.bio,
+    spotifyId: profile.spotify_id,
+    spotifyUrl: profile.spotify_url,
+    appleMusicUrl: profile.apple_music_url,
+    youtubeUrl: profile.youtube_url,
+    appleMusicId: profile.apple_music_id,
+    youtubeMusicId: profile.youtube_music_id,
+    deezerId: profile.deezer_id,
+    tidalId: profile.tidal_id,
+    soundcloudId: profile.soundcloud_id,
+    location: profile.location,
+    activeSinceYear: profile.active_since_year,
+    isPublic: profile.is_public,
+    isVerified: profile.is_verified,
+    isFeatured: profile.is_featured,
+    marketingOptOut: profile.marketing_opt_out,
+    settings: profile.settings,
+    theme: profile.theme,
+    createdAt: profile.created_at,
+  });
 }
 
 export function convertArtistToCreatorProfile(
@@ -435,34 +498,32 @@ export function convertArtistToCreatorProfile(
 export function convertDrizzleCreatorProfileToArtist(
   profile: import('@/lib/db/schema').CreatorProfile
 ): Artist {
-  return {
+  return mapCanonicalProfileToArtist({
     id: profile.id,
-    owner_user_id: profile.userId || '',
-    handle: profile.username,
-    spotify_id: profile.spotifyId || '',
-    name: profile.displayName || profile.username,
-    image_url: profile.avatarUrl || undefined,
-    tagline: profile.bio || undefined,
-    theme: profile.theme || undefined,
-    settings: (profile.settings as { hide_branding?: boolean }) || {
-      hide_branding: false,
-    },
-    spotify_url: profile.spotifyUrl || undefined,
-    apple_music_url: profile.appleMusicUrl || undefined,
-    youtube_url: profile.youtubeUrl || undefined,
-    apple_music_id: profile.appleMusicId || undefined,
-    youtube_music_id: profile.youtubeMusicId || undefined,
-    deezer_id: profile.deezerId || undefined,
-    tidal_id: profile.tidalId || undefined,
-    soundcloud_id: profile.soundcloudId || undefined,
-    venmo_handle: profile.venmoHandle || undefined,
-    location: profile.location ?? null,
-    active_since_year: profile.activeSinceYear ?? null,
-    genres: profile.genres ?? null,
-    published: profile.isPublic ?? false,
-    is_verified: profile.isVerified ?? false,
-    is_featured: profile.isFeatured ?? false,
-    marketing_opt_out: profile.marketingOptOut ?? false,
-    created_at: toISOStringSafe(profile.createdAt),
-  };
+    userId: profile.userId,
+    username: profile.username,
+    displayName: profile.displayName,
+    avatarUrl: profile.avatarUrl,
+    bio: profile.bio,
+    spotifyId: profile.spotifyId,
+    spotifyUrl: profile.spotifyUrl,
+    appleMusicUrl: profile.appleMusicUrl,
+    youtubeUrl: profile.youtubeUrl,
+    appleMusicId: profile.appleMusicId,
+    youtubeMusicId: profile.youtubeMusicId,
+    deezerId: profile.deezerId,
+    tidalId: profile.tidalId,
+    soundcloudId: profile.soundcloudId,
+    venmoHandle: profile.venmoHandle,
+    location: profile.location,
+    activeSinceYear: profile.activeSinceYear,
+    genres: profile.genres,
+    isPublic: profile.isPublic ?? false,
+    isVerified: profile.isVerified ?? false,
+    isFeatured: profile.isFeatured ?? false,
+    marketingOptOut: profile.marketingOptOut ?? false,
+    settings: (profile.settings ?? null) as Record<string, unknown> | null,
+    theme: (profile.theme ?? null) as Record<string, unknown> | null,
+    createdAt: toISOStringSafe(profile.createdAt),
+  });
 }

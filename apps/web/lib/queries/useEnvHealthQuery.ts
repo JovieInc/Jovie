@@ -1,33 +1,25 @@
 'use client';
 
 import { type QueryClient, useQuery } from '@tanstack/react-query';
-import { queryKeys } from './keys';
+import type { EnvHealthResponse } from '@/lib/contracts/api';
+import { fetchWithTimeout } from './fetch';
 
-export interface EnvHealthResponse {
-  ok: boolean;
-  status: 'ok' | 'warning' | 'error';
-  details: {
-    currentValidation: {
-      critical: string[];
-      errors: string[];
-      warnings: string[];
-    };
-  };
-}
+export type { EnvHealthResponse } from '@/lib/contracts/api';
+
+import { queryKeys } from './keys';
 
 /**
  * Query function for fetching environment health status.
  */
-async function fetchEnvHealth(): Promise<EnvHealthResponse> {
-  const response = await fetch('/api/health/env', {
+async function fetchEnvHealth({
+  signal,
+}: {
+  signal?: AbortSignal;
+}): Promise<EnvHealthResponse> {
+  return fetchWithTimeout<EnvHealthResponse>('/api/health/env', {
     cache: 'no-store',
+    signal,
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch environment health');
-  }
-
-  return response.json();
 }
 
 /**
@@ -58,7 +50,7 @@ export function useEnvHealthQuery({
   return useQuery(
     {
       queryKey: queryKeys.health.env(),
-      queryFn: fetchEnvHealth,
+      queryFn: ({ signal }) => fetchEnvHealth({ signal }),
       enabled,
       staleTime: 5 * 60 * 1000,
       gcTime: 10 * 60 * 1000,

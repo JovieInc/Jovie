@@ -13,29 +13,13 @@ import { ProfileNotificationsMenu } from '@/components/organisms/profile-notific
 import { ArtistContactsButton } from '@/components/profile/artist-contacts-button';
 import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { TipDrawer } from '@/components/profile/TipDrawer';
+import { extractVenmoUsername } from '@/components/profile/utils/venmo';
 import { Container } from '@/components/site/Container';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
 import type { ProfileShellProps } from './types';
 import { useProfileShell } from './useProfileShell';
-
-const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
-
-function extractVenmoUsername(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (ALLOWED_VENMO_HOSTS.has(u.hostname)) {
-      const parts = u.pathname.split('/').filter(Boolean);
-      if (parts[0] === 'u' && parts[1]) return parts[1];
-      if (parts[0]) return parts[0];
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 export function ProfileShell({
   artist,

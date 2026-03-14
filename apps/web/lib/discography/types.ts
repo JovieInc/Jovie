@@ -70,6 +70,7 @@ export interface ReleaseViewModel {
   profileId: string;
   id: string;
   title: string;
+  artistNames?: string[];
   releaseDate?: string;
   artworkUrl?: string;
   slug: string;
@@ -130,3 +131,10 @@ export interface TrackViewModel {
     }
   >;
 }
+
+export type AppRelease = ReleaseViewModel;
+
+export type AppTrack = TrackViewModel;
+
+/** Canonical track contract used by release sidebar and API boundary adapters */
+export type ReleaseSidebarTrack = TrackViewModel;

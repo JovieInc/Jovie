@@ -15,8 +15,11 @@ import 'server-only';
 
 import type { SpotifyArtistResult } from '@/app/api/spotify/search/route';
 import { cacheQuery } from '@/lib/db/cache';
-import { buildSpotifyArtistUrl } from '@/lib/spotify';
-import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify/client';
+import {
+  buildSpotifyArtistUrl,
+  isSpotifyAvailable,
+  spotifyClient,
+} from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 
 const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'.split('');

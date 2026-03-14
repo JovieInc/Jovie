@@ -11,6 +11,8 @@ import {
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { queryKeys } from '@/lib/queries/keys';
@@ -237,12 +239,26 @@ export function ConnectedDspList({
 
   if (isLoading) {
     return (
-      <DashboardCard variant='settings'>
-        <div className='flex items-center justify-center py-8'>
-          <Loader2 className='h-5 w-5 animate-spin text-secondary-token' />
-          <span className='ml-2 text-[13px] text-secondary-token'>
-            Loading platform connections...
-          </span>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Streaming profiles'
+          subtitle='Connect and sync your primary artist profiles across streaming platforms.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='flex items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-8 text-center'>
+            <Loader2
+              className='h-5 w-5 animate-spin text-secondary-token'
+              aria-hidden
+            />
+            <span className='text-[13px] text-secondary-token'>
+              Loading platform connections...
+            </span>
+          </ContentSurfaceCard>
         </div>
       </DashboardCard>
     );
@@ -250,11 +266,22 @@ export function ConnectedDspList({
 
   if (error) {
     return (
-      <DashboardCard variant='settings'>
-        <div className='text-center py-6'>
-          <p className='text-[13px] text-secondary-token'>
-            Failed to load platform connections. Please try again.
-          </p>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Streaming profiles'
+          subtitle='Connect and sync your primary artist profiles across streaming platforms.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='px-6 py-8 text-center bg-(--linear-bg-surface-0)'>
+            <p className='text-[13px] text-secondary-token'>
+              Failed to load platform connections. Please try again.
+            </p>
+          </ContentSurfaceCard>
         </div>
       </DashboardCard>
     );
@@ -374,32 +401,54 @@ function ConnectedDspListContent({
   );
 
   return (
-    <DashboardCard variant='settings'>
-      <div className='space-y-4'>
-        <p className='text-[13px] text-secondary-token'>
-          Connect your Spotify and Apple Music artist profiles.
-        </p>
-
-        <div className='flex flex-wrap items-center gap-2'>
-          <DspConnectionPill {...spotifyProps} />
-          <DspConnectionPill {...appleProps} />
-        </div>
-
-        {hasNoConnections && (
-          <div className='text-center py-4'>
-            <Music className='h-8 w-8 text-secondary-token/50 mx-auto mb-2' />
-            <p className='text-[13px] text-secondary-token'>
-              Click a pill above to connect your streaming profiles.
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='overflow-hidden'
+    >
+      <ContentSectionHeader
+        title='Streaming profiles'
+        subtitle='Connect and sync your primary artist profiles across streaming platforms.'
+        className='min-h-0 px-4 py-3'
+      />
+      <div className='space-y-3 px-4 py-3'>
+        <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
+          <div className='space-y-1'>
+            <p className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
+              Primary platforms
+            </p>
+            <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+              Connect your Spotify and Apple Music artist profiles.
             </p>
           </div>
-        )}
+          <div className='flex flex-wrap items-center gap-2'>
+            <DspConnectionPill {...spotifyProps} />
+            <DspConnectionPill {...appleProps} />
+          </div>
+        </ContentSurfaceCard>
 
-        {/* Non-primary DSP connections */}
-        {nonPrimaryMatches.length > 0 && (
-          <div className='border-t border-subtle pt-4'>
-            <p className='text-[11px] font-[510] text-secondary-token mb-2'>
-              Other platforms
+        {hasNoConnections ? (
+          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-10 text-center'>
+            <Music
+              className='h-8 w-8 text-(--linear-text-tertiary)'
+              aria-hidden
+            />
+            <p className='text-[13px] text-(--linear-text-secondary)'>
+              Click a platform above to connect your streaming profiles.
             </p>
+          </ContentSurfaceCard>
+        ) : null}
+
+        {nonPrimaryMatches.length > 0 ? (
+          <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
+            <div className='space-y-1'>
+              <p className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
+                Other platforms
+              </p>
+              <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+                Secondary DSP matches connected to this profile.
+              </p>
+            </div>
             <div className='flex flex-wrap items-center gap-2'>
               {nonPrimaryMatches.map(({ provider, match }) => (
                 <DspConnectionPill
@@ -414,10 +463,9 @@ function ConnectedDspListContent({
                 />
               ))}
             </div>
-          </div>
-        )}
+          </ContentSurfaceCard>
+        ) : null}
       </div>
-
       <ArtistSearchCommandPalette
         open={paletteOpen}
         onOpenChange={setPaletteOpen}
