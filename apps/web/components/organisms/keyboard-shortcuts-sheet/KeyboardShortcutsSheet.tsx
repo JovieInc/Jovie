@@ -59,12 +59,12 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
   const Icon = shortcut.icon;
 
   return (
-    <div className='group flex items-center justify-between rounded-md border border-transparent px-3 py-2 transition-colors hover:border-subtle hover:bg-surface-2/70'>
+    <div className='group flex items-center justify-between rounded-[8px] border border-transparent px-2.5 py-1.5 transition-colors hover:border-subtle/70 hover:bg-surface-1'>
       <div className='flex items-center gap-3 min-w-0'>
         {Icon && (
           <Icon className='h-4 w-4 shrink-0 text-tertiary-token' aria-hidden />
         )}
-        <span className='text-sm text-primary-token truncate'>
+        <span className='text-[13px] text-primary-token truncate'>
           {shortcut.label}
         </span>
       </div>
@@ -87,7 +87,7 @@ function ShortcutCategorySection({
 
   return (
     <section className='space-y-1'>
-      <h3 className='px-3 py-1 text-[11px] font-medium uppercase tracking-[0.08em] text-tertiary-token'>
+      <h3 className='px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tertiary-token'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
       <div className='space-y-0.5'>
@@ -167,12 +167,12 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='top-1 right-1 bottom-1 flex h-auto w-full flex-col gap-0 rounded-xl border border-subtle p-0 sm:max-w-md'
+        className='top-2 right-2 bottom-2 flex h-auto w-full flex-col gap-0 rounded-[12px] border border-subtle/90 bg-surface-0 p-0 sm:max-w-[26rem]'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
-        <div className='sticky top-0 z-10 shrink-0 border-b border-subtle bg-surface-0/95 backdrop-blur-sm'>
-          <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-4 py-3'>
+        <div className='sticky top-0 z-10 shrink-0 border-b border-subtle/80 bg-surface-0/95 backdrop-blur-md'>
+          <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-3.5 py-2.5'>
             <Button
               variant='ghost'
               size='icon'
@@ -182,7 +182,7 @@ export function KeyboardShortcutsSheet() {
             >
               <ChevronLeft className='h-4 w-4' />
             </Button>
-            <SheetTitle className='text-sm font-medium'>
+            <SheetTitle className='text-[13px] font-medium tracking-[-0.01em]'>
               Keyboard Shortcuts
             </SheetTitle>
             <Button
@@ -196,7 +196,7 @@ export function KeyboardShortcutsSheet() {
             </Button>
           </SheetHeader>
 
-          <div className='border-t border-subtle/60 px-4 py-3'>
+          <div className='border-t border-subtle/60 px-3.5 py-2.5'>
             <div className='relative'>
               <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
               <Input
@@ -205,7 +205,7 @@ export function KeyboardShortcutsSheet() {
                 placeholder='Search shortcuts'
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className='border-subtle bg-surface-2 pl-9'
+                className='border-subtle bg-surface-1 pl-9 text-[13px]'
                 inputSize='sm'
               />
               {searchQuery && (
@@ -224,7 +224,7 @@ export function KeyboardShortcutsSheet() {
         </div>
 
         {/* Shortcuts list */}
-        <div className='flex-1 overflow-y-auto px-2 py-3'>
+        <div className='flex-1 overflow-y-auto px-2 py-2.5'>
           {hasResults ? (
             <div className='space-y-4 pb-1'>
               {categoryOrder.map(category => (
