@@ -14,15 +14,6 @@ export interface SettingsLoadingSkeletonProps {
 
 /**
  * Base skeleton wrapper for settings sections.
- *
- * @example
- * ```tsx
- * <SettingsLoadingSkeleton titleWidth="w-56" descriptionWidth="w-96">
- *   <InputSkeleton />
- *   <InputSkeleton />
- *   <SettingsButtonSkeleton width="w-40" />
- * </SettingsLoadingSkeleton>
- * ```
  */
 export function SettingsLoadingSkeleton({
   titleWidth = 'w-48',
@@ -30,14 +21,14 @@ export function SettingsLoadingSkeleton({
   children,
 }: Readonly<SettingsLoadingSkeletonProps>) {
   return (
-    <div className='mx-auto max-w-2xl'>
-      <div className='space-y-8 pb-8'>
+    <div className='mx-auto max-w-3xl'>
+      <div className='space-y-6 pb-8'>
         <section className='scroll-mt-4'>
-          <div className='mb-6 space-y-2'>
-            <div className={`h-8 ${titleWidth} rounded skeleton`} />
+          <div className='mb-4 space-y-2'>
+            <div className={`h-7 ${titleWidth} rounded skeleton`} />
             <div className={`h-4 ${descriptionWidth} rounded skeleton`} />
           </div>
-          <div className='rounded-2xl bg-surface-1/40 p-6 shadow-none space-y-4'>
+          <div className='space-y-4 rounded-2xl border border-subtle/80 bg-surface-1/40 p-4 sm:p-5'>
             {children}
           </div>
         </section>
@@ -50,14 +41,14 @@ export function SettingsLoadingSkeleton({
 export function InputSkeleton({
   width = 'w-full',
 }: Readonly<{ width?: string }>) {
-  return <div className={`h-10 ${width} rounded skeleton`} />;
+  return <div className={`h-10 ${width} rounded-md skeleton`} />;
 }
 
 /** Skeleton for a button in settings context */
 export function SettingsButtonSkeleton({
   width = 'w-40',
 }: Readonly<{ width?: string }>) {
-  return <div className={`h-10 ${width} rounded skeleton`} />;
+  return <div className={`h-9 ${width} rounded-md skeleton`} />;
 }
 
 /** Skeleton for a toggle row (label + switch) */
@@ -67,9 +58,9 @@ export function ToggleRowSkeleton({
   labelWidth?: string;
 }>) {
   return (
-    <div className='flex items-center justify-between gap-4'>
+    <div className='flex items-center justify-between gap-4 rounded-xl border border-subtle/70 bg-surface-0/60 px-3 py-2.5'>
       <div className={`h-4 ${labelWidth} rounded skeleton`} />
-      <div className='h-6 w-10 rounded skeleton' />
+      <div className='h-6 w-10 rounded-full skeleton' />
     </div>
   );
 }
@@ -82,20 +73,26 @@ export function SettingsCardSkeleton({
   height?: string;
   width?: string;
 }>) {
-  return <div className={`${height} ${width} rounded-xl skeleton`} />;
+  return (
+    <div
+      className={`${height} ${width} rounded-xl border border-subtle/70 bg-surface-0/60 skeleton`}
+    />
+  );
 }
-
-// ============================================================================
-// Pre-composed skeletons for common settings pages
-// ============================================================================
 
 /** Profile settings loading skeleton */
 export function ProfileSettingsLoading() {
   return (
     <SettingsLoadingSkeleton titleWidth='w-48' descriptionWidth='w-80'>
-      <InputSkeleton />
-      <InputSkeleton />
-      <SettingsButtonSkeleton width='w-40' />
+      <div className='space-y-2'>
+        <div className='h-3 w-24 rounded skeleton' />
+        <InputSkeleton />
+      </div>
+      <div className='space-y-2'>
+        <div className='h-3 w-20 rounded skeleton' />
+        <InputSkeleton />
+      </div>
+      <SettingsButtonSkeleton width='w-32' />
     </SettingsLoadingSkeleton>
   );
 }
@@ -125,46 +122,37 @@ export function NotificationsSettingsLoading() {
 export function BrandingSettingsLoading() {
   return (
     <SettingsLoadingSkeleton titleWidth='w-56' descriptionWidth='w-96'>
-      <div className='flex items-center justify-between gap-4'>
+      <div className='flex items-center justify-between gap-4 rounded-xl border border-subtle/70 bg-surface-0/60 px-3 py-3'>
         <div className='space-y-2'>
           <div className='h-4 w-56 rounded skeleton' />
           <div className='h-4 w-80 rounded skeleton' />
         </div>
-        <div className='h-6 w-10 rounded skeleton' />
+        <div className='h-6 w-10 rounded-full skeleton' />
       </div>
       <SettingsButtonSkeleton width='w-44' />
     </SettingsLoadingSkeleton>
   );
 }
 
-// ============================================================================
-// Inline skeletons for settings sections (rendered inside DashboardCard)
-// ============================================================================
-
 /** Inline skeleton for Touring section — matches disconnected/form state shape */
 export function TouringSectionSkeleton() {
   return (
     <div className='space-y-4' aria-hidden='true'>
-      {/* Description text */}
       <div className='h-4 w-3/4 rounded skeleton' />
 
-      {/* Form fields */}
       <div className='space-y-3'>
-        {/* Artist name field */}
         <div className='space-y-1.5'>
           <div className='h-3 w-40 rounded skeleton' />
-          <div className='h-10 w-full rounded skeleton' />
+          <div className='h-10 w-full rounded-md skeleton' />
         </div>
 
-        {/* API key field */}
         <div className='space-y-1.5'>
           <div className='h-3 w-32 rounded skeleton' />
-          <div className='h-10 w-full rounded skeleton' />
+          <div className='h-10 w-full rounded-md skeleton' />
         </div>
       </div>
 
-      {/* Button */}
-      <div className='h-9 w-24 rounded skeleton' />
+      <div className='h-9 w-24 rounded-md skeleton' />
     </div>
   );
 }
@@ -173,18 +161,19 @@ export function TouringSectionSkeleton() {
 export function PixelsSectionSkeleton() {
   return (
     <div className='space-y-4' aria-hidden='true'>
-      {/* Toggle row: label + switch */}
       <div className='flex items-center justify-between'>
         <div className='h-4 w-28 rounded skeleton' />
         <div className='flex items-center gap-2'>
           <div className='h-3 w-14 rounded skeleton' />
-          <div className='h-6 w-10 rounded skeleton' />
+          <div className='h-6 w-10 rounded-full skeleton' />
         </div>
       </div>
 
-      {/* Platform cards */}
       {[1, 2, 3].map(i => (
-        <div key={i} className='space-y-3 p-4 rounded-lg border border-subtle'>
+        <div
+          key={i}
+          className='space-y-3 rounded-lg border border-subtle/70 bg-surface-0/60 p-4'
+        >
           <div className='flex items-center justify-between'>
             <div className='h-4 w-44 rounded skeleton' />
             <div className='h-3 w-24 rounded skeleton' />
@@ -192,17 +181,16 @@ export function PixelsSectionSkeleton() {
           <div className='grid gap-4 sm:grid-cols-2'>
             <div className='space-y-1.5'>
               <div className='h-3 w-20 rounded skeleton' />
-              <div className='h-10 w-full rounded skeleton' />
+              <div className='h-10 w-full rounded-md skeleton' />
             </div>
             <div className='space-y-1.5'>
               <div className='h-3 w-24 rounded skeleton' />
-              <div className='h-10 w-full rounded skeleton' />
+              <div className='h-10 w-full rounded-md skeleton' />
             </div>
           </div>
         </div>
       ))}
 
-      {/* Footer text */}
       <div className='h-3 w-3/4 rounded skeleton' />
     </div>
   );
@@ -212,16 +200,15 @@ export function PixelsSectionSkeleton() {
 export function ContactsSectionSkeleton() {
   return (
     <div className='space-y-3' aria-hidden='true'>
-      {/* Contact rows */}
-      <div className='divide-y divide-subtle'>
-        <div className='py-3 space-y-1.5'>
+      <div className='divide-y divide-subtle/70 rounded-lg border border-subtle/70 bg-surface-0/60'>
+        <div className='space-y-1.5 px-3 py-3'>
           <div className='h-3 w-20 rounded skeleton' />
           <div className='flex items-center gap-2'>
             <div className='h-4 w-32 rounded skeleton' />
             <div className='h-3 w-40 rounded skeleton' />
           </div>
         </div>
-        <div className='py-3 space-y-1.5'>
+        <div className='space-y-1.5 px-3 py-3'>
           <div className='h-3 w-24 rounded skeleton' />
           <div className='flex items-center gap-2'>
             <div className='h-4 w-28 rounded skeleton' />
