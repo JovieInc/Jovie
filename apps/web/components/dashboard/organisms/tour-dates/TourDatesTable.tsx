@@ -18,6 +18,7 @@ import {
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
+import { buildTourDateActions } from './tour-date-actions';
 
 /** Check if a date is in the past */
 function isPastDate(date: Date): boolean {
@@ -265,38 +266,7 @@ export function TourDatesTable({
 
   const getContextMenuItems = useCallback(
     (tourDate: TourDateViewModel): ContextMenuItemType[] => {
-      const items: ContextMenuItemType[] = [
-        {
-          id: 'edit',
-          label: 'Edit',
-          icon: <Icon name='PencilLine' className='h-4 w-4' />,
-          onClick: () => onEdit(tourDate),
-        },
-      ];
-
-      if (tourDate.ticketUrl) {
-        items.push({
-          id: 'open-tickets',
-          label: 'Open ticket link',
-          icon: <Icon name='ExternalLink' className='h-4 w-4' />,
-          onClick: () =>
-            globalThis.open(
-              tourDate.ticketUrl!,
-              '_blank',
-              'noopener,noreferrer'
-            ),
-        });
-      }
-
-      items.push({
-        id: 'delete',
-        label: 'Delete',
-        icon: <Icon name='Trash2' className='h-4 w-4' />,
-        onClick: () => onDelete(tourDate.id),
-        destructive: true,
-      });
-
-      return items;
+      return buildTourDateActions(tourDate, { onEdit, onDelete });
     },
     [onEdit, onDelete]
   );

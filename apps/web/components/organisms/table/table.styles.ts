@@ -27,7 +27,7 @@ export const alignment = {
 // Row Selection Colors — aligned with Linear design tokens
 export const selection = {
   unchecked:
-    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-colors duration-150',
+    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150',
   checked:
     'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)',
   selected: 'bg-(--linear-row-selected)',
@@ -122,7 +122,7 @@ export const presets = {
     'sticky top-0',
     zIndex.tableHeader,
     'bg-(--linear-app-content-surface)',
-    borders.header
+    'shadow-[inset_0_-1px_0_var(--linear-border-subtle)]'
   ),
   stickyGroupHeader: cn(
     'sticky top-0',
@@ -134,7 +134,8 @@ export const presets = {
     alignment.rowHeight,
     borders.cell,
     selection.unchecked,
-    'last:border-b-0'
+    'last:border-b-0',
+    'focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
   ),
   tableCell: cn(alignment.cellPadding, typography.cellPrimary),
   tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),

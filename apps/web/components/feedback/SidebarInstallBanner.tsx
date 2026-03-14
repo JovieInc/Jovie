@@ -90,29 +90,29 @@ export function SidebarInstallBanner() {
 
     return (
       <div className='group-data-[collapsible=icon]:hidden px-2 pb-0.5'>
-        <div className='relative rounded-[9px] border border-sidebar-border/50 bg-sidebar-accent/20 p-2 shadow-none'>
+        <div className='relative rounded-[10px] border border-sidebar-border/35 bg-sidebar-accent/10 px-2.5 py-2 shadow-none'>
           <button
             type='button'
             aria-label='Dismiss version update banner'
             onClick={dismissVersionUpdate}
-            className='absolute top-1 right-1 flex size-7 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+            className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/90 transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
           >
             <X className='size-3' />
           </button>
 
           <div className='flex items-start gap-1.5 pr-7'>
-            <RefreshCw className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon' />
+            <RefreshCw className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/80' />
             <div className='min-w-0'>
-              <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
+              <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground/90'>
                 {title}
               </p>
-              <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted'>
+              <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/90'>
                 An improved version of Jovie is available. Reload to update.
               </p>
               <button
                 type='button'
                 onClick={reload}
-                className='mt-1 inline-flex min-h-7 items-center rounded-[6px] border border-sidebar-border/50 px-2 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+                className='mt-1 inline-flex min-h-6 items-center rounded-[6px] border border-sidebar-border/35 bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/85 transition-colors duration-normal hover:bg-sidebar-accent/40 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
               >
                 Reload
               </button>
@@ -128,23 +128,23 @@ export function SidebarInstallBanner() {
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2 pb-0.5'>
-      <div className='relative rounded-[9px] border border-sidebar-border/50 bg-sidebar-accent/20 p-2 shadow-none'>
+      <div className='relative rounded-[10px] border border-sidebar-border/35 bg-sidebar-accent/10 px-2.5 py-2 shadow-none'>
         <button
           type='button'
           aria-label='Dismiss install banner'
           onClick={dismissPwa}
-          className='absolute top-1 right-1 flex size-7 items-center justify-center rounded text-sidebar-muted transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+          className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/90 transition-colors duration-normal hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
         >
           <X className='size-3' />
         </button>
 
         <div className='flex items-start gap-1.5 pr-7'>
-          <Download className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon' />
+          <Download className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/80' />
           <div className='min-w-0'>
-            <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground'>
+            <p className='text-[11px] font-medium tracking-[-0.01em] text-sidebar-item-foreground/90'>
               {TOAST_MESSAGES.PWA_INSTALL}
             </p>
-            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted'>
+            <p className='mt-0.5 text-[10px] leading-[1.35] text-sidebar-muted/90'>
               {isIOS
                 ? TOAST_MESSAGES.PWA_INSTALL_IOS
                 : TOAST_MESSAGES.PWA_INSTALL_DESCRIPTION}
@@ -153,7 +153,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={install}
-                className='mt-1 inline-flex min-h-7 items-center rounded-[6px] border border-sidebar-border/50 px-2 text-[10px] font-medium text-sidebar-item-foreground transition-colors duration-normal hover:bg-sidebar-accent-active focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+                className='mt-1 inline-flex min-h-6 items-center rounded-[6px] border border-sidebar-border/35 bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/85 transition-colors duration-normal hover:bg-sidebar-accent/40 hover:text-sidebar-item-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
               >
                 Install
               </button>

@@ -40,13 +40,7 @@ export const DrawerButton = React.forwardRef<
   return (
     <Button
       ref={ref}
-      variant={
-        tone === 'primary'
-          ? 'primary'
-          : tone === 'ghost'
-            ? 'ghost'
-            : 'secondary'
-      }
+      variant={tone}
       size={size === 'icon' ? 'icon' : 'sm'}
       className={cn(
         DRAWER_BUTTON_CLASSNAME,

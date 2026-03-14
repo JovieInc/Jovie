@@ -89,7 +89,7 @@ function ReleaseViewButtons({
   readonly className?: string;
 }) {
   return (
-    <div className={cn('flex items-center gap-1', className)}>
+    <div className={cn('flex items-center gap-0.5', className)}>
       {RELEASE_VIEW_OPTIONS.map(option => {
         const isActive = value === option.value;
 
@@ -98,6 +98,7 @@ function ReleaseViewButtons({
             key={option.value}
             onClick={() => onChange(option.value)}
             active={isActive}
+            className='h-7 rounded-[6px] px-2 text-[12px] [&_svg]:h-3 [&_svg]:w-3'
             icon={
               <Icon
                 name={option.icon}
@@ -217,7 +218,9 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              'h-7 rounded-[6px] px-1.5 [&_svg]:h-3 [&_svg]:w-3',
               compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+              compact && 'w-7',
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
               triggerClassName
             )}
@@ -309,7 +312,10 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             filters={filters}
             onFiltersChange={onFiltersChange}
             counts={counts}
-            buttonClassName={PAGE_TOOLBAR_ACTION_BUTTON_CLASS}
+            buttonClassName={cn(
+              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+              'h-7 rounded-[6px] px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+            )}
             iconOnly
           />
           <LinearStyleDisplayMenu
@@ -330,6 +336,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
+            className='h-7 w-7 rounded-[6px] px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
         </div>
       }

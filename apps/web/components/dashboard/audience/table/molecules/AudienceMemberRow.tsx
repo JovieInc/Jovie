@@ -1,8 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { cn } from '@/lib/utils';
-import type { AudienceMember } from '@/types';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
@@ -13,7 +11,9 @@ import {
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
-} from '../atoms';
+} from '@/components/organisms/table';
+import { cn } from '@/lib/utils';
+import type { AudienceMember } from '@/types';
 
 export interface AudienceMemberRowProps {
   readonly row: AudienceMember;
@@ -51,8 +51,8 @@ export function AudienceMemberRow({
       data-index={dataIndex}
       ref={measureRef}
       className={cn(
-        'group cursor-pointer border-b border-(--linear-border-subtle) transition-[background-color,border-color] duration-150 last:border-b-0 hover:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)',
-        isSelected && 'bg-(--linear-bg-surface-1)'
+        'group cursor-pointer border-b border-(--linear-border-subtle) transition-[background-color,box-shadow] duration-150 last:border-b-0 hover:bg-(--linear-row-hover) focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        isSelected && 'bg-(--linear-row-selected)'
       )}
       style={
         isVirtual

@@ -8,11 +8,9 @@ import { LogoBar } from '@/components/home/LogoBar';
 import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { ReleasesSection } from '@/components/home/ReleasesSection';
-import { ReplacesSection } from '@/components/home/ReplacesSection';
 import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -20,7 +18,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} | Turn profile visits into fans you can reach`;
   const description =
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.';
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -45,9 +43,6 @@ export async function generateMetadata(): Promise<Metadata> {
     'fan conversion',
     'smart links',
     'pre-save links',
-    'linkfire alternative',
-    'mailchimp alternative for artists',
-    'replace linktree linkfire mailchimp',
   ];
 
   return {
@@ -145,7 +140,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.',
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -212,7 +207,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and turns releases, shows, and tips into measurable growth.',
+    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -265,20 +260,6 @@ export default function HomePage() {
       />
 
       <ReleasesSection />
-
-      {FEATURE_FLAGS.SHOW_REPLACES_SECTION && (
-        <>
-          <hr
-            className='mx-auto max-w-lg border-0 h-px'
-            style={{
-              background:
-                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-            }}
-          />
-
-          <ReplacesSection />
-        </>
-      )}
 
       <hr
         className='mx-auto max-w-lg border-0 h-px'

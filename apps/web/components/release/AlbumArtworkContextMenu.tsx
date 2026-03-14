@@ -18,6 +18,7 @@ import {
 import { Download, Undo2 } from 'lucide-react';
 import { useCallback } from 'react';
 import { track } from '@/lib/analytics';
+import { useArtworkDownloadMutation } from '@/lib/queries';
 
 export interface ArtworkSize {
   readonly key: string;
@@ -76,15 +77,6 @@ export function buildArtworkSizes(
   return sizes;
 }
 
-function sanitizeFilename(title: string): string {
-  const sanitized = title
-    .replaceAll(/[^a-zA-Z0-9\s-]/g, '')
-    .replaceAll(/\s+/g, '-')
-    .toLowerCase()
-    .slice(0, 100);
-  return sanitized || 'artwork';
-}
-
 export function AlbumArtworkContextMenu({
   children,
   title,
@@ -94,41 +86,26 @@ export function AlbumArtworkContextMenu({
   canRevert = false,
   onRevert,
 }: AlbumArtworkContextMenuProps) {
+  const artworkDownload = useArtworkDownloadMutation();
+
   const handleDownload = useCallback(
-    async (size: ArtworkSize) => {
-      try {
-        track('artwork_download', {
-          releaseId,
-          size: size.key,
-        });
+    (size: ArtworkSize) => {
+      track('artwork_download', {
+        releaseId,
+        size: size.key,
+      });
 
-        const response = await fetch(size.url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-
-        const filename = sanitizeFilename(title);
-        const sizeLabel = size.key === 'original' ? '' : `-${size.key}`;
-        const contentType = response.headers.get('content-type') ?? '';
-        let ext = 'avif';
-        if (contentType.includes('jpeg') || contentType.includes('jpg'))
-          ext = 'jpg';
-        else if (contentType.includes('png')) ext = 'png';
-        else if (contentType.includes('webp')) ext = 'webp';
-        link.download = `${filename}${sizeLabel}.${ext}`;
-
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-      } catch {
-        // Fallback: open in new tab
-        globalThis.open(size.url, '_blank');
-      }
+      artworkDownload.mutate(
+        { url: size.url, title, sizeKey: size.key },
+        {
+          onError: () => {
+            // Fallback: open in new tab
+            globalThis.open(size.url, '_blank');
+          },
+        }
+      );
     },
-    [title, releaseId]
+    [title, releaseId, artworkDownload]
   );
 
   const showDownloads = allowDownloads && sizes.length > 0;
