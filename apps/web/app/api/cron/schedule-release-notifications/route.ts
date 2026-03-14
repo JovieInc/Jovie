@@ -192,7 +192,7 @@ async function scheduleNotificationsForRelease(
     }
 
     if (page.length < SUBSCRIBER_PAGE_SIZE) break;
-    lastId = page[page.length - 1].id;
+    lastId = page.at(-1)!.id;
 
     // Drain completed inserts when concurrency ceiling is reached
     if (pendingInserts.length >= INSERT_CONCURRENCY) {
