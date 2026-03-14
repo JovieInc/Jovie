@@ -1,13 +1,11 @@
 'use client';
 
-import { AlertTriangle, Copy, RefreshCcw } from 'lucide-react';
-import { useState } from 'react';
 import type { FallbackProps } from 'react-error-boundary';
-import { toast } from 'sonner';
+import { PageErrorState } from '@/components/feedback/PageErrorState';
 
 /**
  * Error fallback UI specifically for table components.
- * Shows error message with a retry button in a table-friendly layout.
+ * Delegates to PageErrorState with table-specific defaults.
  *
  * Designed to fit within table containers without breaking layout.
  */
@@ -15,93 +13,19 @@ export function TableErrorFallback({
   error,
   resetErrorBoundary,
 }: FallbackProps) {
-  const [timestamp] = useState(() => new Date());
-
-  const errorDigest = (error as Error & { digest?: string })?.digest;
-
-  const handleCopyErrorDetails = () => {
-    const details = [
-      `Error ID: ${errorDigest || 'unknown'}`,
-      `Time: ${timestamp.toISOString()}`,
-      `Context: Table`,
-      `URL: ${globalThis.location?.href ?? 'N/A'}`,
-      `User Agent: ${globalThis.navigator?.userAgent ?? 'N/A'}`,
-    ].join('\n');
-
-    navigator.clipboard
-      .writeText(details)
-      .then(() => {
-        toast.success('Error details copied to clipboard');
-      })
-      .catch(() => {
-        toast.error('Failed to copy error details');
-      });
-  };
+  const errorWithDigest = error as Error & { digest?: string };
 
   return (
-    <div
-      role='alert'
-      className='flex flex-col items-center justify-center gap-4 p-8 text-center min-h-[400px]'
-    >
-      <div className='w-full max-w-md space-y-4'>
-        <div className='flex justify-center'>
-          <div className='rounded-full bg-destructive/10 p-4'>
-            <AlertTriangle
-              className='h-8 w-8 text-destructive'
-              aria-hidden='true'
-            />
-          </div>
-        </div>
-
-        <div className='space-y-2'>
-          <h3 className='text-lg font-semibold text-primary-token'>
-            Unable to load table data
-          </h3>
-          <p className='text-sm text-secondary-token'>
-            {error?.message ||
-              'An unexpected error occurred while loading the table.'}
-          </p>
-        </div>
-
-        <button
-          type='button'
-          onClick={resetErrorBoundary}
-          className='inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 transition-colors'
-        >
-          <RefreshCcw className='h-4 w-4' aria-hidden='true' />
-          Reload table
-        </button>
-
-        <div className='mt-4 w-full space-y-1.5'>
-          {errorDigest && (
-            <p className='text-xs text-muted-foreground text-center'>
-              Error ID: {errorDigest}
-            </p>
-          )}
-
-          <button
-            type='button'
-            onClick={handleCopyErrorDetails}
-            className='inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors'
-            aria-label='Copy error details to clipboard'
-          >
-            <Copy className='h-3 w-3' aria-hidden='true' />
-            Copy Details
-          </button>
-        </div>
-
-        {process.env.NODE_ENV === 'development' && error?.message && (
-          <details className='mt-4 rounded-md bg-secondary/30 p-3 w-full max-w-md'>
-            <summary className='cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground'>
-              Developer Info (dev only)
-            </summary>
-            <pre className='mt-2 overflow-auto text-xs text-muted-foreground whitespace-pre-wrap break-words'>
-              {error.message}
-              {error.stack && `\n\n${error.stack}`}
-            </pre>
-          </details>
-        )}
-      </div>
-    </div>
+    <PageErrorState
+      title='Unable to load table data'
+      message={
+        error?.message ||
+        'An unexpected error occurred while loading the table.'
+      }
+      error={errorWithDigest}
+      actionLabel='Reload table'
+      onRetry={resetErrorBoundary}
+      extraContext={{ Context: 'Table' }}
+    />
   );
 }
