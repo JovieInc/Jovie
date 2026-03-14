@@ -87,21 +87,21 @@ export function PreviewPanel() {
         type: 'action',
         id: 'copy-url',
         label: 'Copy Jovie Profile URL',
-        icon: <Copy className='h-4 w-4' />,
+        icon: <Copy className='h-3.5 w-3.5' />,
         onClick: handleCopyUrl,
       },
       {
         type: 'action',
         id: 'download-qr',
         label: 'Download QR Code',
-        icon: <QrCode className='h-4 w-4' />,
+        icon: <QrCode className='h-3.5 w-3.5' />,
         onClick: handleDownloadQr,
       },
       {
         type: 'action',
         id: 'download-vcard',
         label: 'Download vCard',
-        icon: <Download className='h-4 w-4' />,
+        icon: <Download className='h-3.5 w-3.5' />,
         onClick: handleDownloadVcard,
       },
     ],
@@ -192,7 +192,7 @@ export function PreviewPanel() {
             {/* Hero CTA - View Jovie Profile */}
             <Button asChild variant='primary' className='w-full max-w-[360px]'>
               <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
-                <ExternalLink className='h-4 w-4 mr-2' aria-hidden='true' />
+                <ExternalLink className='h-3.5 w-3.5 mr-2' aria-hidden='true' />
                 View Jovie Profile
               </a>
             </Button>
