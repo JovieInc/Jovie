@@ -36,10 +36,9 @@ function SearchDropdownState({
   readonly tone?: 'default' | 'error';
 }) {
   return (
-    <div
-      className='p-3'
-      role={tone === 'error' ? 'alert' : 'status'}
-      aria-live={tone === 'error' ? undefined : 'polite'}
+    <output
+      className='block p-3'
+      role={tone === 'error' ? 'alert' : undefined}
       aria-atomic='true'
     >
       <DrawerSurfaceCard className='flex min-h-[64px] items-center rounded-[10px] px-3'>
@@ -52,7 +51,7 @@ function SearchDropdownState({
           {message}
         </p>
       </DrawerSurfaceCard>
-    </div>
+    </output>
   );
 }
 

@@ -40,7 +40,7 @@ export function formatReleaseArtistLine(
   }
 
   const fallback = fallbackArtistName?.trim();
-  return fallback ? fallback : null;
+  return fallback ?? null;
 }
 
 export function formatCompactReleaseArtistLine(
@@ -54,7 +54,7 @@ export function formatCompactReleaseArtistLine(
 
   if (normalizedNames.length === 0) {
     const fallback = fallbackArtistName?.trim();
-    return fallback ? fallback : null;
+    return fallback ?? null;
   }
 
   if (normalizedNames.length <= maxVisibleArtists) {

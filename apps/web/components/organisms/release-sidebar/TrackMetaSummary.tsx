@@ -99,9 +99,9 @@ export function TrackMetaSummary({
               styles.meta
             )}
           >
-            {durationMs != null ? (
+            {durationMs != null && (
               <span className='tabular-nums'>{formatDuration(durationMs)}</span>
-            ) : null}
+            )}
             {isrc ? (
               <span className='font-mono text-[9.5px] tracking-[0.02em] text-(--linear-text-tertiary)'>
                 {isrc}
@@ -111,7 +111,7 @@ export function TrackMetaSummary({
         ) : null}
       </div>
 
-      {artwork ? artwork : null}
+      {artwork ?? null}
     </div>
   );
 }

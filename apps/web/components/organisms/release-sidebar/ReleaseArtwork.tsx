@@ -61,7 +61,7 @@ export function ReleaseArtwork({
 
   const staticImage = (
     <DrawerMediaThumb
-      src={!imgError ? artworkUrl : null}
+      src={imgError ? null : artworkUrl}
       alt={altText}
       sizeClassName='h-16 w-16'
       fallback={
