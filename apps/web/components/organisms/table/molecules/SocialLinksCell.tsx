@@ -121,9 +121,14 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
     return <span className={typography.cellTertiary}>—</span>;
   }
 
-  // Use collapsed mode (circles) when there are 2+ links
-  const useCollapsedMode = filteredLinks.length >= 2;
   const visibleLinks = filteredLinks.slice(0, maxLinks);
+  const overflowCount = Math.max(filteredLinks.length - visibleLinks.length, 0);
+  const useCollapsedMode = filteredLinks.length >= 2;
+
+  const summaryLabel =
+    filterPlatformType === 'music'
+      ? `${filteredLinks.length} DSP links`
+      : `${filteredLinks.length} social links`;
 
   return (
     <CompactLinkRail
