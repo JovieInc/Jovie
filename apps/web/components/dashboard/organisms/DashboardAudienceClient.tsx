@@ -11,8 +11,7 @@ import {
 import * as React from 'react';
 import { DashboardErrorFallback } from '@/components/organisms/DashboardErrorFallback';
 import { audienceSortFields, audienceViews } from '@/lib/nuqs';
-import { useAudienceInfiniteQuery } from '@/lib/queries/audience-infinite';
-import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { QueryErrorBoundary, useAudienceInfiniteQuery } from '@/lib/queries';
 import type { TourDateForMatching } from '@/lib/utils/touring-city-match';
 import type { AudienceMember } from '@/types';
 import { AudiencePanelProvider } from './AudiencePanelContext';

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useIngestRefreshMutation } from '@/lib/queries/useIngestRefreshMutation';
+import { useIngestRefreshMutation } from '@/lib/queries';
 import type { IngestRefreshStatus } from './types';
 
 interface UseIngestRefreshOptions {

@@ -1,6 +1,6 @@
 'use client';
 
-import { usePlanGate } from '@/lib/queries/usePlanGate';
+import { usePlanGate } from '@/lib/queries';
 
 /**
  * Branding badge that shows "Made with Jovie" for free plan users.

@@ -14,7 +14,7 @@ import { getProfileUrl } from '@/constants/domains';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { useAdminCreatorsInfiniteQuery } from '@/lib/queries/admin-infinite';
+import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AdminProfileSidebar } from './AdminProfileSidebar';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';

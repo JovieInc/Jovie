@@ -2,11 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryKeys } from '@/lib/queries/keys';
-import {
-  useBillingStatusQuery,
-  useIsPro,
-} from '@/lib/queries/useBillingStatusQuery';
+import { queryKeys, useBillingStatusQuery, useIsPro } from '@/lib/queries';
 
 // Mock fetch globally
 const mockFetch = vi.fn();

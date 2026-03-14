@@ -14,10 +14,10 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
   type AdminLead,
+  queryKeys,
   useLeadsListQuery,
   useUpdateLeadStatusMutation,
 } from '@/lib/queries';
-import { queryKeys } from '@/lib/queries/keys';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },

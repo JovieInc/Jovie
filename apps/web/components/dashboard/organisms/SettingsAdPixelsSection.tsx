@@ -17,8 +17,7 @@ import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsTogg
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PixelsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
-import { usePixelSettingsMutation } from '@/lib/queries';
-import { usePixelSettingsQuery } from '@/lib/queries/usePixelSettingsQuery';
+import { usePixelSettingsMutation, usePixelSettingsQuery } from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 

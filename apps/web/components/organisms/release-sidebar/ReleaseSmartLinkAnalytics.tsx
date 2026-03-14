@@ -85,17 +85,17 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[112px]'>
+    <div className='min-h-[124px] border-t border-(--linear-border-subtle)/75 pt-3'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
-            <DrawerStatGrid>
-              <div className='space-y-1.5 pr-3'>
+            <DrawerStatGrid variant='flush' className='px-1'>
+              <div className='space-y-1.5 pr-4'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
                 <div className='h-3 w-10 rounded skeleton' />
               </div>
-              <div className='space-y-1.5 pl-3'>
+              <div className='space-y-1.5 pl-4'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
                 <div className='h-3 w-10 rounded skeleton' />
@@ -118,15 +118,15 @@ export function ReleaseSmartLinkAnalytics({
               isSwitching && 'opacity-50'
             )}
           >
-            <DrawerStatGrid>
-              <div className='pr-2.5'>
+            <DrawerStatGrid variant='flush' className='px-1'>
+              <div className='pr-4'>
                 <StatTile
                   label='Total clicks'
                   value={numberFormatter.format(totalClicks)}
                   hint='All time'
                 />
               </div>
-              <div className='pl-2.5'>
+              <div className='pl-4'>
                 <StatTile
                   label='Last 7 days'
                   value={numberFormatter.format(last7DaysClicks)}
@@ -136,9 +136,10 @@ export function ReleaseSmartLinkAnalytics({
             </DrawerStatGrid>
 
             {showEmpty && (
-              <p className='mt-2 px-1 text-[12px] leading-[17px] text-(--linear-text-secondary)'>
-                Share your smart link to start tracking clicks.
-              </p>
+              <DrawerEmptyState
+                className='mt-2 min-h-[40px] px-0'
+                message='Share your smart link to start tracking clicks.'
+              />
             )}
           </div>
         )}

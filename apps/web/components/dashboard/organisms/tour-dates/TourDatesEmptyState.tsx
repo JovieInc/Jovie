@@ -8,7 +8,7 @@ import { Icon } from '@/components/atoms/Icon';
 import {
   useConnectBandsintownMutation,
   useSaveBandsintownApiKeyMutation,
-} from '@/lib/queries/useTourDateMutations';
+} from '@/lib/queries';
 
 interface TourDatesEmptyStateProps {
   readonly profileId: string;

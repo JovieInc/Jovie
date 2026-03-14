@@ -4,7 +4,7 @@ import { useCallback, useRef, useState, useTransition } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import type { ReleaseViewModel, TrackViewModel } from '@/lib/discography/types';
 import { captureError } from '@/lib/error-tracking';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
+import { fetchWithTimeout } from '@/lib/queries';
 
 export interface UseExpandedTracksResult {
   /** Set of release IDs that are currently expanded */

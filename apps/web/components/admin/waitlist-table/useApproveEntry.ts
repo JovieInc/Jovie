@@ -5,7 +5,7 @@ import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import {
   useApproveWaitlistMutation,
   useDisapproveWaitlistMutation,
-} from '@/lib/queries/useWaitlistMutations';
+} from '@/lib/queries';
 import type { ApproveStatus } from './types';
 
 interface UseApproveEntryProps {

@@ -24,9 +24,11 @@ import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
 import { APP_ROUTES } from '@/constants/routes';
 import { captureWarning } from '@/lib/error-tracking';
-import { FetchError } from '@/lib/queries/fetch';
-import { useWaitlistSubmitMutation } from '@/lib/queries/useWaitlistMutations';
-import { useWaitlistStatusQuery } from '@/lib/queries/useWaitlistStatusQuery';
+import {
+  FetchError,
+  useWaitlistStatusQuery,
+  useWaitlistSubmitMutation,
+} from '@/lib/queries';
 
 type StepNumber = 0 | 1 | 2;
 

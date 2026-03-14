@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { QueryErrorBoundary } from '@/lib/queries';
 
 interface ReleasesClientBoundaryProps {
   readonly children: ReactNode;

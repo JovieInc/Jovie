@@ -2,14 +2,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryKeys } from '@/lib/queries/keys';
 import {
   countMatchesByStatus,
   type DspMatch,
   getBestMatchPerProvider,
   groupMatchesByProvider,
+  queryKeys,
   useDspMatchesQuery,
-} from '@/lib/queries/useDspMatchesQuery';
+} from '@/lib/queries';
 
 // Mock fetch globally
 const mockFetch = vi.fn();

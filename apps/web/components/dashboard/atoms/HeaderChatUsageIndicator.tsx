@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { memo } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
-import { useChatUsageQuery } from '@/lib/queries/useChatUsageQuery';
+import { useChatUsageQuery } from '@/lib/queries';
 
 export const HeaderChatUsageIndicator = memo(
   function HeaderChatUsageIndicator() {

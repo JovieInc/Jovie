@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui';
 import { Sparkles } from 'lucide-react';
 import { Icon } from '@/components/atoms/Icon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
+import { useGenerateInsightsMutation } from '@/lib/queries';
 
 interface InsightEmptyStateProps {
   readonly hasEnoughData?: boolean;

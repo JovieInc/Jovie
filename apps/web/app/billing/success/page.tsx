@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
-import { useBillingStatusQuery } from '@/lib/queries/useBillingStatusQuery';
+import { useBillingStatusQuery } from '@/lib/queries';
 
 function getVerificationButtonLabel(state: string): string {
   if (state === 'success') return 'Verification requested';

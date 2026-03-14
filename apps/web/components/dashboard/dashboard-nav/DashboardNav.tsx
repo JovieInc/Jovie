@@ -16,7 +16,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { useReleasesQuery } from '@/lib/queries';
 import {
   adminNavigationSections,
   artistSettingsNavigation,

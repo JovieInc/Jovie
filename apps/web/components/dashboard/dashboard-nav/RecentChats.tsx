@@ -29,8 +29,10 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
-import { useDeleteConversationMutation } from '@/lib/queries/useChatMutations';
+import {
+  useChatConversationsQuery,
+  useDeleteConversationMutation,
+} from '@/lib/queries';
 
 const MAX_RECENT_CHATS = 10;
 

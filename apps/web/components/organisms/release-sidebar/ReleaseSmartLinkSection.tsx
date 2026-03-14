@@ -21,6 +21,7 @@ export function ReleaseSmartLinkSection({
       valueClassName='text-(--linear-text-tertiary)'
       copyButtonTitle='Copy link'
       openButtonTitle='Open smart link'
+      surface='flat'
     />
   );
 }

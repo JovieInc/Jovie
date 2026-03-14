@@ -17,4 +17,4 @@ export {
   useBuildInfoQuery,
   useVersionMonitor,
   type VersionMismatchInfo,
-} from '@/lib/queries/useBuildInfoQuery';
+} from '@/lib/queries';

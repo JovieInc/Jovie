@@ -8,9 +8,27 @@
  * - ProfileHeader: rendering, schema.org markup
  */
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
 
 // --- Mock Clerk ---
 const mockUseUserSafe = vi.hoisted(() =>
@@ -135,10 +153,11 @@ describe('ClaimBanner', () => {
 
 describe('ProfileViewTracker', () => {
   const mockSendBeacon = vi.fn();
-  const mockFetch = vi.fn();
+  const mockFetch = vi.fn().mockResolvedValue(new Response('ok'));
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', mockFetch);
     Object.defineProperty(navigator, 'sendBeacon', {
       value: mockSendBeacon,
@@ -162,7 +181,9 @@ describe('ProfileViewTracker', () => {
     const { ProfileViewTracker } = await import(
       '@/components/profile/ProfileViewTracker'
     );
-    render(<ProfileViewTracker handle='testartist' artistId='artist-123' />);
+    renderWithQueryClient(
+      <ProfileViewTracker handle='testartist' artistId='artist-123' />
+    );
 
     expect(mockTrack).toHaveBeenCalledWith('profile_view', {
       handle: 'testartist',
@@ -175,7 +196,9 @@ describe('ProfileViewTracker', () => {
     const { ProfileViewTracker } = await import(
       '@/components/profile/ProfileViewTracker'
     );
-    render(<ProfileViewTracker handle='testartist' artistId='artist-123' />);
+    renderWithQueryClient(
+      <ProfileViewTracker handle='testartist' artistId='artist-123' />
+    );
 
     expect(mockSendBeacon).toHaveBeenCalledWith(
       '/api/profile/view',
@@ -190,13 +213,17 @@ describe('ProfileViewTracker', () => {
     const { ProfileViewTracker } = await import(
       '@/components/profile/ProfileViewTracker'
     );
-    render(<ProfileViewTracker handle='testartist' artistId='artist-123' />);
+    renderWithQueryClient(
+      <ProfileViewTracker handle='testartist' artistId='artist-123' />
+    );
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/profile/view', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ handle: 'testartist' }),
-      keepalive: true,
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('/api/profile/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handle: 'testartist' }),
+        keepalive: true,
+      });
     });
   });
 
@@ -204,12 +231,19 @@ describe('ProfileViewTracker', () => {
     const { ProfileViewTracker } = await import(
       '@/components/profile/ProfileViewTracker'
     );
+    const queryClient = createTestQueryClient();
     const { rerender } = render(
-      <ProfileViewTracker handle='testartist' artistId='artist-123' />
+      <QueryClientProvider client={queryClient}>
+        <ProfileViewTracker handle='testartist' artistId='artist-123' />
+      </QueryClientProvider>
     );
 
     // Re-render with same props should not track again
-    rerender(<ProfileViewTracker handle='testartist' artistId='artist-123' />);
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ProfileViewTracker handle='testartist' artistId='artist-123' />
+      </QueryClientProvider>
+    );
 
     expect(mockTrack).toHaveBeenCalledTimes(1);
     expect(mockSendBeacon).toHaveBeenCalledTimes(1);
@@ -219,7 +253,7 @@ describe('ProfileViewTracker', () => {
     const { ProfileViewTracker } = await import(
       '@/components/profile/ProfileViewTracker'
     );
-    const { container } = render(
+    const { container } = renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
 
@@ -230,7 +264,7 @@ describe('ProfileViewTracker', () => {
     const { ProfileViewTracker } = await import(
       '@/components/profile/ProfileViewTracker'
     );
-    render(
+    renderWithQueryClient(
       <ProfileViewTracker
         handle='testartist'
         artistId='artist-123'

@@ -20,7 +20,7 @@ import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useEarningsQuery } from '@/lib/queries/useEarningsQuery';
+import { useEarningsQuery } from '@/lib/queries';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
 import { generateQrCodeDataUrl, generateQrCodeSvg } from '@/lib/utils/qr-code';
 

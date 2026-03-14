@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { useUpdateVenmoMutation } from '@/lib/queries/useDashboardProfileQuery';
+import { useUpdateVenmoMutation } from '@/lib/queries';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { UseDashboardTippingReturn } from './types';
 
