@@ -42,6 +42,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 vi.mock('@/lib/utm', () => ({
   buildUTMContext: () => ({}),
   getUTMShareActionMenuItems: () => [],
+  getUTMShareContextMenuItems: () => [],
 }));
 
 describe('ReleaseTableRow', () => {
