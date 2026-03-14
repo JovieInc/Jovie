@@ -160,7 +160,7 @@ export function DashboardNav(_: DashboardNavProps) {
       ) : (
         <SidebarGroup className='mb-1'>
           <SidebarGroupLabel className='px-2 text-2xs tracking-tight text-sidebar-item-icon [font-weight:var(--font-weight-nav)]'>
-            Workspace
+            Artist
           </SidebarGroupLabel>
           <SidebarGroupContent className='space-y-0'>
             {navSections.map((section, index) => (

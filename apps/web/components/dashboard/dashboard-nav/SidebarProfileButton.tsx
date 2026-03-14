@@ -61,7 +61,7 @@ export function SidebarProfileButton({
         >
           <span
             data-sidebar-icon
-            className='flex size-5 shrink-0 items-center justify-center'
+            className='flex size-4 shrink-0 items-center justify-center'
           >
             {avatarUrl ? (
               <Avatar
@@ -72,7 +72,7 @@ export function SidebarProfileButton({
                 rounded='full'
               />
             ) : (
-              <User className='size-3.5' aria-hidden='true' />
+              <User className='size-3' aria-hidden='true' />
             )}
           </span>
           <span className='truncate group-data-[collapsible=icon]:hidden'>

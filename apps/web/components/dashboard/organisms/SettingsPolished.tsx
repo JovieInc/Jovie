@@ -1,7 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { memo, type ReactNode, useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
@@ -47,24 +45,14 @@ interface SettingsSectionGroup {
 
 interface SettingsSidebarProps {
   readonly groups: ReadonlyArray<SettingsSectionGroup>;
-  readonly onRunAll: () => void;
 }
 
-const SettingsSidebar = memo(({ groups, onRunAll }: SettingsSidebarProps) => (
-  <aside className='lg:sticky lg:top-4 lg:h-fit'>
-    <div className='rounded-2xl border border-subtle bg-surface-1 p-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:shadow-none'>
-      <Button
-        variant='secondary'
-        size='sm'
-        className='mb-2 w-full justify-start gap-2 rounded-lg'
-        onClick={onRunAll}
-      >
-        <Play className='size-3.5' aria-hidden='true' />
-        Run all
-      </Button>
+const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
+  <aside className='h-fit'>
+    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-xl border border-subtle bg-surface-1/85 p-2 shadow-none backdrop-blur-sm'>
       {groups.map(group => (
-        <div key={group.id} className='mb-3 last:mb-0'>
-          <p className='mb-1 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+        <div key={group.id} className='mb-2.5 last:mb-0'>
+          <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
             {group.label}
           </p>
           <nav aria-label={`${group.label} settings`}>
@@ -73,7 +61,7 @@ const SettingsSidebar = memo(({ groups, onRunAll }: SettingsSidebarProps) => (
                 <li key={section.id}>
                   <a
                     href={`#${section.id}`}
-                    className='flex items-center rounded-lg px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                    className='flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
                   >
                     {section.title}
                   </a>
@@ -270,15 +258,6 @@ export function SettingsPolished({
     () => sectionGroups.flatMap(group => group.sections),
     [sectionGroups]
   );
-  const handleRunAll = useCallback(() => {
-    const [firstSection] = allSections;
-    if (!firstSection) {
-      return;
-    }
-
-    const sectionEl = globalThis.document?.getElementById(firstSection.id);
-    sectionEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [allSections]);
 
   // When focusing a single section, show just that section
   if (focusSection) {
@@ -307,29 +286,36 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='grid gap-8 pb-6 sm:pb-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10'
+      className='mx-auto grid w-full max-w-5xl gap-8 pb-6 lg:grid-cols-[190px_minmax(0,720px)] lg:justify-center lg:gap-10'
       data-testid='settings-polished'
     >
-      <SettingsSidebar groups={sectionGroups} onRunAll={handleRunAll} />
+      <div className='lg:sticky lg:top-5 lg:self-start'>
+        <SettingsSidebar groups={sectionGroups} />
+      </div>
 
-      <div className='space-y-8'>
+      <div className='space-y-10'>
         {sectionGroups.map(group => (
-          <div key={group.id} className='space-y-6'>
-            <h3 className='text-[13px] font-[510] text-secondary-token'>
+          <section
+            key={group.id}
+            aria-label={`${group.label} settings group`}
+            className='rounded-2xl border border-subtle bg-surface-1 px-4 py-5 sm:px-6'
+          >
+            <h3 className='mb-5 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
               {group.label}
             </h3>
-            {group.sections.map(section => (
-              <SettingsSection
-                key={section.id}
-                id={section.id}
-                title={section.title}
-                description={section.description}
-                className='mt-6 first:mt-0'
-              >
-                {section.render()}
-              </SettingsSection>
-            ))}
-          </div>
+            <div className='space-y-7'>
+              {group.sections.map(section => (
+                <SettingsSection
+                  key={section.id}
+                  id={section.id}
+                  title={section.title}
+                  description={section.description}
+                >
+                  {section.render()}
+                </SettingsSection>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </div>

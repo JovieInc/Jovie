@@ -7,6 +7,7 @@
 
 import { APP_NAME } from '@/constants/app';
 import { getAppUrl } from '@/constants/domains';
+import { formatAmount } from '@/lib/utils/format-number';
 import { escapeHtml } from '../utils';
 
 export interface PaymentFailedTemplateData {
@@ -33,16 +34,6 @@ export interface PaymentFailedTemplateData {
  */
 export function buildBillingUrl(): string {
   return getAppUrl('/billing');
-}
-
-/**
- * Format amount for display
- */
-function formatAmount(amountCents: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amountCents / 100);
 }
 
 /**

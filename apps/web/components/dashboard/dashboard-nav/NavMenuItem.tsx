@@ -111,13 +111,12 @@ export function NavMenuItem({
 
   const innerContent = (
     <>
-      {/* Fixed-width icon container — intentionally 14px (size-3.5) to match
-         Linear's sidebar icon sizing for visual consistency */}
+      {/* Fixed-width icon container keeps sidebar glyphs optically quiet. */}
       <span
         data-sidebar-icon
-        className='flex size-3.5 shrink-0 items-center justify-center'
+        className='flex size-3 shrink-0 items-center justify-center'
       >
-        <item.icon className='size-3.5' aria-hidden='true' />
+        <item.icon className='size-3' aria-hidden='true' />
       </span>
       <span className='truncate group-data-[collapsible=icon]:hidden'>
         {item.name}
@@ -158,11 +157,11 @@ export function NavMenuItem({
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem onSelect={handleCopyLink}>
-          <Copy className='mr-2 h-4 w-4' />
+          <Copy className='mr-2 h-3.5 w-3.5' />
           Copy link
         </ContextMenuItem>
         <ContextMenuItem onSelect={handleOpenInNewTab}>
-          <ExternalLink className='mr-2 h-4 w-4' />
+          <ExternalLink className='mr-2 h-3.5 w-3.5' />
           Open in new tab
         </ContextMenuItem>
       </ContextMenuContent>
