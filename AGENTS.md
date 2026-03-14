@@ -358,6 +358,35 @@ Never mark a task complete without confirming the fix works:
 
 ---
 
+## Linear-First Workflow (Required)
+
+**All work must flow through Linear — no exceptions.** This applies to every agent (Claude Code, Codex, Cursor) and every type of work (features, bugs, refactors, ad-hoc requests).
+
+### Before starting any work
+
+1. **Find or create a Linear issue.** If the task came from a user message, discovered bug, or any source without an existing Linear issue, create one before writing code. Include a clear title and description of what needs to be done.
+2. **Set the issue to "In Progress"** when you begin work.
+
+### During work
+
+- **Update the issue status** as work progresses (In Progress → In Review → Done).
+- **Use comments** on the Linear issue to communicate progress, blockers, or decisions. This is how agents coordinate with each other and with humans.
+- **Create sub-issues** for distinct pieces of work. Agents are free to assign sub-issues to other agents (including Codex and Cursor) for faster parallel execution.
+
+### PRs must reference the Linear issue
+
+- Include the Linear issue ID in the **branch name** (e.g., `feature/JOV-123-add-widget`).
+- Include the Linear issue URL in the **PR body** (e.g., `Linear: https://linear.app/jovie/issue/JOV-123`).
+- This enables automatic linking and gives full traceability from issue → PR → deploy.
+
+### Why this matters
+
+- **Shipping visibility**: every change is tracked, so we can measure velocity and direction.
+- **Orchestration from anywhere**: work can be triaged, prioritized, and assigned from Linear regardless of which agent or human executes it.
+- **Agent coordination**: comments and sub-issues let agents communicate context, delegate sub-tasks, and avoid duplicate work.
+
+---
+
 ## Linear Issue Gating
 
 Before working on any Linear issue, check for the `human-review-required` label.
