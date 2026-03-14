@@ -42,14 +42,16 @@ export function buildTourDateActions(
   }
 
   // ── Destructive group ──
-  items.push({ type: 'separator' });
-  items.push({
-    id: 'delete',
-    label: 'Delete',
-    icon: <Icon name='Trash2' className='h-4 w-4' />,
-    onClick: () => callbacks.onDelete(tourDate.id),
-    destructive: true,
-  });
+  items.push(
+    { type: 'separator' },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: <Icon name='Trash2' className='h-4 w-4' />,
+      onClick: () => callbacks.onDelete(tourDate.id),
+      destructive: true,
+    }
+  );
 
   return items;
 }
