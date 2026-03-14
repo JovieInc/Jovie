@@ -69,6 +69,7 @@ export {
   checkSpotifyRefreshRateLimit,
   checkSpotifySearchRateLimit,
   checkTrackingRateLimit,
+  checkWrapLinkRateLimit,
   dashboardLinksLimiter,
   dspDiscoveryLimiter,
   generalLimiter,
@@ -93,6 +94,8 @@ export {
   trackingIpClicksLimiter,
   trackingIpVisitsLimiter,
   trackingVisitsLimiter,
+  wrapLinkAnonymousLimiter,
+  wrapLinkLimiter,
 } from './limiters';
 export {
   clearStore,
