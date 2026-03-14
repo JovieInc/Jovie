@@ -9,6 +9,8 @@ import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
+type ThemeValue = 'light' | 'dark' | 'system';
+
 const THEME_OPTIONS = [
   {
     value: 'light',
@@ -38,18 +40,18 @@ export function SettingsAppearanceSection() {
     useHighContrastMutation();
 
   const handleThemeChange = (newTheme: string) => {
-    const validTheme = newTheme as 'light' | 'dark' | 'system';
+    const validTheme = newTheme as ThemeValue;
     setTheme(validTheme);
     updateTheme(validTheme, isHighContrast);
   };
 
   const handleHighContrastChange = (enabled: boolean) => {
     setHighContrast(enabled);
-    const currentTheme = (theme ?? 'system') as 'light' | 'dark' | 'system';
+    const currentTheme = (theme ?? 'system') as ThemeValue;
     saveHighContrast(enabled, currentTheme);
   };
 
-  const selectedTheme = (theme ?? 'system') as 'light' | 'dark' | 'system';
+  const selectedTheme = (theme ?? 'system') as ThemeValue;
   const resolvedThemeLabel =
     resolvedTheme === 'light'
       ? 'Light'

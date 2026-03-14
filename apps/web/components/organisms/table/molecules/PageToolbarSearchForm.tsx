@@ -172,25 +172,24 @@ function CompactSearchForm(
             inputClassName='text-[13px]'
           />
           <div className='flex items-center justify-end gap-2'>
-            {showClearAction ? (
-              isRouteSearch ? (
-                <Button variant='ghost' size='sm' asChild>
-                  <Link href={clearHref!} onClick={() => onOpenChange(false)}>
-                    Clear
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  aria-label={clearAriaLabel}
-                  onClick={handleLocalClear}
-                >
+            {showClearAction && isRouteSearch && (
+              <Button variant='ghost' size='sm' asChild>
+                <Link href={clearHref!} onClick={() => onOpenChange(false)}>
                   Clear
-                </Button>
-              )
-            ) : null}
+                </Link>
+              </Button>
+            )}
+            {showClearAction && !isRouteSearch && (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                aria-label={clearAriaLabel}
+                onClick={handleLocalClear}
+              >
+                Clear
+              </Button>
+            )}
             <Button type='submit' variant='secondary' size='sm'>
               {applyLabel}
             </Button>
