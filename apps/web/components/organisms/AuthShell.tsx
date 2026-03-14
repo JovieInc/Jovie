@@ -42,12 +42,11 @@ function AuthShellInner({
   isTableRoute = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
-  const { isMobile, state } = useSidebar();
+  const { isMobile } = useSidebar();
   const rightPanel = useRightPanel();
   const previewPanelState = usePreviewPanelState();
 
-  const sidebarTrigger =
-    !isMobile && state === 'closed' ? <SidebarTrigger /> : null;
+  const sidebarTrigger = !isMobile ? <SidebarTrigger /> : null;
 
   const isInSettings = section === 'settings';
 
