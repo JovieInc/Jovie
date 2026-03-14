@@ -1,8 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { cn } from '@/lib/utils';
-import type { AudienceMember } from '@/types';
 import {
   AudienceActionsCell,
   AudienceDeviceCell,
@@ -13,7 +11,9 @@ import {
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
-} from '../atoms';
+} from '@/components/organisms/table';
+import { cn } from '@/lib/utils';
+import type { AudienceMember } from '@/types';
 
 export interface AudienceMemberRowProps {
   readonly row: AudienceMember;

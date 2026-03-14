@@ -10,12 +10,12 @@ import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
-import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
 import { AnalyticsSidebar } from '@/components/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
+  AudienceMobileCard,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
   UnifiedTable,
