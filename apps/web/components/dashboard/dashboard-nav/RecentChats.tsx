@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
   Skeleton,
 } from '@jovie/ui';
-import { Copy, Ellipsis, MessageSquare, Trash2 } from 'lucide-react';
+import { Copy, Ellipsis, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
@@ -104,11 +104,7 @@ export function RecentChats() {
 
   if (isLoading) {
     return (
-      <SidebarCollapsibleGroup
-        label='Threads'
-        defaultOpen={false}
-        icon={MessageSquare}
-      >
+      <SidebarCollapsibleGroup label='Threads' defaultOpen={false}>
         <SidebarMenu>
           {(['a', 'b', 'c'] as const).map(id => (
             <SidebarMenuItem key={`skeleton-${id}`}>
@@ -128,7 +124,7 @@ export function RecentChats() {
 
   return (
     <>
-      <SidebarCollapsibleGroup label='Threads' defaultOpen icon={MessageSquare}>
+      <SidebarCollapsibleGroup label='Threads' defaultOpen>
         <SidebarMenu>
           {conversations.map(convo => {
             const href = `${APP_ROUTES.CHAT}/${convo.id}`;
@@ -164,7 +160,7 @@ export function RecentChats() {
                   >
                     <DropdownMenuTrigger asChild>
                       <SidebarMenuAction aria-label='Thread options'>
-                        <Ellipsis aria-hidden='true' className='size-4' />
+                        <Ellipsis aria-hidden='true' className='size-3.5' />
                       </SidebarMenuAction>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent side='bottom' align='end'>
@@ -178,14 +174,14 @@ export function RecentChats() {
                           }
                         }}
                       >
-                        <Copy className='size-4' aria-hidden='true' />
+                        <Copy className='size-3.5' aria-hidden='true' />
                         Copy Session ID
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => setDeleteTarget({ id: convo.id, title })}
                         className='text-destructive focus:text-destructive'
                       >
-                        <Trash2 className='size-4' aria-hidden='true' />
+                        <Trash2 className='size-3.5' aria-hidden='true' />
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
