@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { useWrapLinkMutation } from '@/lib/queries/useWrapLinkMutation';
+import { useWrapLinkMutation } from '@/lib/queries';
 import { getCrawlerSafeLabel } from '@/lib/utils/domain-categorizer';
 import { extractDomain } from '@/lib/utils/url-parsing';
 

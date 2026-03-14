@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { useAvatarMutation } from '@/lib/queries/useProfileMutation';
+import { useAvatarMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';

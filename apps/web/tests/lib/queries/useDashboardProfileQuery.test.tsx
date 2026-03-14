@@ -2,13 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryKeys } from '@/lib/queries/keys';
 import {
   type DashboardProfile,
+  queryKeys,
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
   useUpdateVenmoMutation,
-} from '@/lib/queries/useDashboardProfileQuery';
+} from '@/lib/queries';
 
 // Mock fetch with proper isolation
 const mockFetch = vi.fn();

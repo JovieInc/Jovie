@@ -24,7 +24,7 @@ import {
   UnifiedTable,
 } from '@/components/organisms/table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { useDismissFeedbackMutation } from '@/lib/queries/useAdminFeedbackMutation';
+import { useDismissFeedbackMutation } from '@/lib/queries';
 
 interface FeedbackRow {
   id: string;

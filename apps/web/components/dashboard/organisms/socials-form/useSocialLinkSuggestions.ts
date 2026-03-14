@@ -3,9 +3,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { ProfileSuggestion } from '@/app/api/suggestions/route';
-import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
-import { createMutationFn, fetchWithTimeout } from '@/lib/queries/fetch';
-import { queryKeys } from '@/lib/queries/keys';
+import {
+  createMutationFn,
+  fetchWithTimeout,
+  queryKeys,
+  STANDARD_CACHE,
+} from '@/lib/queries';
 
 export interface SocialLinkSuggestion {
   id: string;

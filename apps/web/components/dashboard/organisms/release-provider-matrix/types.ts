@@ -3,7 +3,7 @@ import type {
   ReleaseSidebarTrack,
 } from '@/components/organisms/release-sidebar/types';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import type { PlanGateEntitlements } from '@/lib/queries/usePlanGate';
+import type { PlanGateEntitlements } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export interface ReleaseProviderMatrixProps {

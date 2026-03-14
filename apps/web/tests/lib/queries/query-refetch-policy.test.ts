@@ -13,12 +13,12 @@ vi.mock('@tanstack/react-query', () => ({
 import {
   billingStatusQueryOptions,
   useBillingStatusQuery,
-} from '@/lib/queries/useBillingStatusQuery';
-import { useBuildInfoQuery } from '@/lib/queries/useBuildInfoQuery';
-import { useEarningsQuery } from '@/lib/queries/useEarningsQuery';
-import { useImpersonationQuery } from '@/lib/queries/useImpersonationQuery';
-import { useInsightsSummaryQuery } from '@/lib/queries/useInsightsQuery';
-import { useNotificationStatusQuery } from '@/lib/queries/useNotificationStatusQuery';
+  useBuildInfoQuery,
+  useEarningsQuery,
+  useImpersonationQuery,
+  useInsightsSummaryQuery,
+  useNotificationStatusQuery,
+} from '@/lib/queries';
 
 describe('query refetch policies', () => {
   beforeEach(() => {

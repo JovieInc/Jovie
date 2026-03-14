@@ -14,10 +14,7 @@ import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { useAutoSave } from '@/lib/pacer/hooks/useAutoSave';
-import {
-  useAvatarMutation,
-  useProfileSaveMutation,
-} from '@/lib/queries/useProfileMutation';
+import { useAvatarMutation, useProfileSaveMutation } from '@/lib/queries';
 import type { SaveStatus } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 

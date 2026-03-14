@@ -1,8 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-
+import { authorizeHud } from '@/lib/auth/hud';
 import { captureError } from '@/lib/error-tracking';
-import { authorizeHud } from '@/lib/hud/auth';
 import { getHudMetrics } from '@/lib/hud/metrics';
 import { logger } from '@/lib/utils/logger';
 

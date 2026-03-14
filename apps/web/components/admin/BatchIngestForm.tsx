@@ -13,7 +13,7 @@ import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
 import {
   type BatchIngestApiResponse,
   useBatchIngestMutation,
-} from '@/lib/queries/useBatchIngestMutation';
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { parseBatchUrls } from './batch-url-utils';
 

@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Check, X } from 'lucide-react';
-import { useUpdateInsightMutation } from '@/lib/queries/useInsightsMutation';
+import { useUpdateInsightMutation } from '@/lib/queries';
 
 interface InsightActionsProps {
   readonly insightId: string;

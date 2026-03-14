@@ -23,13 +23,11 @@ import {
 } from '@/components/molecules/drawer';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
-  useConfirmDspMatchMutation,
-  useRejectDspMatchMutation,
-} from '@/lib/queries/useDspEnrichmentMutations';
-import {
   type DspMatch,
+  useConfirmDspMatchMutation,
   useDspMatchesQuery,
-} from '@/lib/queries/useDspMatchesQuery';
+  useRejectDspMatchMutation,
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 interface AppleMusicSyncBannerProps {

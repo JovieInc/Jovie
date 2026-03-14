@@ -9,7 +9,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { useAdminBulkRefreshMutation } from '@/lib/queries/useAdminBulkRefreshMutation';
+import { useAdminBulkRefreshMutation } from '@/lib/queries';
 import type { AdminCreatorProfileRow } from '../types';
 
 export interface BulkActionsParams {

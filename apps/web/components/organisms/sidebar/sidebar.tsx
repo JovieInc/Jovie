@@ -80,16 +80,16 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-normal relative h-[calc(100svh-1rem)] w-(--sidebar-width) overflow-hidden transition-[width,transform] ease-interactive',
+                'duration-normal relative h-[calc(100svh-1rem)] w-(--sidebar-width) overflow-hidden transition-[width,transform,opacity] ease-interactive motion-reduce:transition-none',
                 'group-data-[collapsible=offcanvas]:w-0',
                 state === 'closed' &&
                   collapsible === 'offcanvas' &&
                   side === 'left' &&
-                  '-translate-x-[calc(100%+0.5rem)]',
+                  '-translate-x-[calc(100%+0.5rem)] opacity-0',
                 state === 'closed' &&
                   collapsible === 'offcanvas' &&
                   side === 'right' &&
-                  'translate-x-[calc(100%+0.5rem)]',
+                  'translate-x-[calc(100%+0.5rem)] opacity-0',
                 'group-data-[side=right]:rotate-180',
                 // Prevent pointer events from leaking into content area during width transition
                 'group-data-[collapsible=icon]:pointer-events-none',
@@ -105,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto transition-transform duration-normal ease-interactive group-data-[variant=sidebar]:rounded-[18px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-sidebar-border group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto transition-[transform,border-color,box-shadow] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-[18px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-sidebar-border/90 group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

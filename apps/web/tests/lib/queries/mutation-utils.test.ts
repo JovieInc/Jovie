@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FetchError } from '@/lib/queries/fetch';
 import {
   createMutationCallbacks,
+  FetchError,
   getErrorMessage,
   handleMutationError,
   handleMutationSuccess,
-} from '@/lib/queries/mutation-utils';
+} from '@/lib/queries';
 
 // Mock sonner toast - must use factory function pattern for hoisting
 vi.mock('sonner', () => ({

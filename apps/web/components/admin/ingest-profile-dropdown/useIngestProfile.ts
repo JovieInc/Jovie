@@ -10,8 +10,7 @@ import {
   useState,
 } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
-import { useIngestProfileMutation } from '@/lib/queries/useIngestProfileMutation';
+import { useArtistSearchQuery, useIngestProfileMutation } from '@/lib/queries';
 import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
 import {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { InfoBox } from '@/components/molecules/InfoBox';
 import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
-import { useChatUsageQuery } from '@/lib/queries/useChatUsageQuery';
+import { useChatUsageQuery } from '@/lib/queries';
 
 export function ChatUsageAlert() {
   const { data, isLoading } = useChatUsageQuery({ enabled: !env.IS_E2E });

@@ -1,4 +1,4 @@
-import type { SpotifyArtistResult } from '@/lib/queries/useArtistSearchQuery';
+import type { SpotifyArtistResult } from '@/lib/queries';
 import type { PlatformInfo } from '@/lib/utils/platform-detection/types';
 import type { IngestNetworkId } from './ingest-network-options';
 

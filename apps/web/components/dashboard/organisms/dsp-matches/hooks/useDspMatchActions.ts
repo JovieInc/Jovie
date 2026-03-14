@@ -7,7 +7,7 @@ import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import {
   useConfirmDspMatchMutation,
   useRejectDspMatchMutation,
-} from '@/lib/queries/useDspEnrichmentMutations';
+} from '@/lib/queries';
 
 /**
  * Match data for the confirmation dialog.

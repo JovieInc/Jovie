@@ -23,7 +23,7 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
-import { queryKeys } from '@/lib/queries/keys';
+import { queryKeys } from '@/lib/queries';
 import { AuthShellWrapper } from '../organisms/AuthShellWrapper';
 import { DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';

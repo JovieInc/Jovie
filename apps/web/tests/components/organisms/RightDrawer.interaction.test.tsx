@@ -170,6 +170,18 @@ describe('RightDrawer', () => {
     );
   });
 
+  it('keeps the inner content container unclipped for nested menus and popovers', () => {
+    const { container } = render(
+      <RightDrawer isOpen={true} width={360} ariaLabel='Popover drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+
+    const innerContent = container.querySelector('aside > div > div');
+    expect(innerContent).toHaveClass('h-full', 'min-h-0');
+    expect(innerContent).not.toHaveClass('overflow-hidden');
+  });
+
   it('supports rapid open and close cycles without stale width state', () => {
     const { rerender } = render(
       <RightDrawer isOpen={false} width={300} ariaLabel='Rapid drawer'>

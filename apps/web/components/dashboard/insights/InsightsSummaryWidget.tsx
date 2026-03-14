@@ -4,7 +4,7 @@ import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
-import { useInsightsSummaryQuery } from '@/lib/queries/useInsightsQuery';
+import { useInsightsSummaryQuery } from '@/lib/queries';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
 
 export function InsightsSummaryWidget() {

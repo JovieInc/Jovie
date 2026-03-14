@@ -4,7 +4,7 @@ import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { useConfirmChatLinkMutation } from '@/lib/queries/useConfirmChatLinkMutation';
+import { useConfirmChatLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 interface ChatLinkConfirmationCardProps {

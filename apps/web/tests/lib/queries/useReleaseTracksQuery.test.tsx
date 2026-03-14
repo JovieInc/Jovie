@@ -2,8 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryKeys } from '@/lib/queries/keys';
-import { useReleaseTracksQuery } from '@/lib/queries/useReleaseTracksQuery';
+import { queryKeys, useReleaseTracksQuery } from '@/lib/queries';
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;

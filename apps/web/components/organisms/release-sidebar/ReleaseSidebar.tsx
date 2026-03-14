@@ -101,7 +101,7 @@ function ReleaseEntityHeader({
 
   return (
     <div className='space-y-3'>
-      <div className='flex items-start gap-3'>
+      <div className='flex items-start gap-3.5 rounded-[10px] border border-(--linear-border-subtle)/80 bg-(--linear-bg-surface-0) p-3'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -178,8 +178,8 @@ function ReleaseEntityHeader({
               platformCount={release.providers.length}
             />
           }
-          className='min-w-0 flex-1 gap-0.5'
-          bodyClassName='pt-1'
+          className='min-w-0 flex-1 gap-1.5'
+          bodyClassName='pt-0.5'
         />
       </div>
 
@@ -478,6 +478,7 @@ export function ReleaseSidebar({
             onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
             ariaLabel='Release sidebar view'
+            triggerClassName='h-8 px-3 text-[12px] font-[510]'
           />
         ) : undefined
       }

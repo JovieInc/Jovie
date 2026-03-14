@@ -15,8 +15,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { useAutoSave } from '@/lib/pacer/hooks/useAutoSave';
-import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
-import { queryKeys } from '@/lib/queries/keys';
+import { FetchError, fetchWithTimeout, queryKeys } from '@/lib/queries';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
   areLinkItemsEqual,

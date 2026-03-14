@@ -8,7 +8,7 @@ import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
-import { useAvatarUploadMutation } from '@/lib/queries/useAvatarUploadMutation';
+import { useAvatarUploadMutation } from '@/lib/queries';
 
 export interface CreatorAvatarCellProps
   extends Readonly<{
