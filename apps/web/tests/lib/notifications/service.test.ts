@@ -25,8 +25,16 @@ vi.mock('@/lib/notifications/providers/resend', () => ({
 
 vi.mock('@/lib/notifications/config', () => ({
   NOTIFICATIONS_BRAND_NAME: 'Jovie',
-  EMAIL_FROM_ADDRESS: 'notifications@notify.jov.ie',
+  EMAIL_FROM_ADDRESS: 'notifications@jov.ie',
   EMAIL_REPLY_TO: 'reply@example.com',
+}));
+
+vi.mock('@/lib/notifications/sender-policy', () => ({
+  formatSystemSender: vi.fn((displayName?: string) =>
+    displayName
+      ? `${displayName} via Jovie <notifications@jov.ie>`
+      : 'Jovie <notifications@jov.ie>'
+  ),
 }));
 
 vi.mock('@/lib/notifications/suppression', () => ({
@@ -34,10 +42,23 @@ vi.mock('@/lib/notifications/suppression', () => ({
   logDelivery: vi.fn(),
 }));
 
+vi.mock('@/lib/notifications/quota', () => ({
+  checkQuota: vi.fn(),
+  incrementQuota: vi.fn(),
+}));
+
+vi.mock('@/lib/notifications/reputation', () => ({
+  checkReputation: vi.fn(),
+  recordSend: vi.fn(),
+}));
+
 import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
+import { checkQuota } from '@/lib/notifications/quota';
+import { checkReputation } from '@/lib/notifications/reputation';
+import { formatSystemSender } from '@/lib/notifications/sender-policy';
 import {
   dismissNotification,
   sendNotification,
@@ -67,6 +88,22 @@ describe('Notification Service', () => {
     // Default mock for suppression check (not suppressed)
     vi.mocked(isEmailSuppressed).mockResolvedValue({
       suppressed: false,
+    });
+
+    vi.mocked(checkReputation).mockResolvedValue({
+      canSend: true,
+      status: 'good',
+      metrics: {
+        bounceRate: 0,
+        complaintRate: 0,
+        totalSent: 0,
+      },
+    });
+
+    vi.mocked(checkQuota).mockResolvedValue({
+      allowed: true,
+      remaining: { daily: 100, monthly: 1000 },
+      limits: { daily: 100, monthly: 1000 },
     });
 
     // Default mock for delivery logging
@@ -374,6 +411,42 @@ describe('Notification Service', () => {
       await sendNotification(message, target);
 
       expect(customProvider.sendEmail).toHaveBeenCalled();
+    });
+
+    it('uses system sender with dynamic "via Jovie" formatting', async () => {
+      const customProvider = {
+        provider: 'debug' as const,
+        sendEmail: vi.fn().mockResolvedValue({
+          channel: 'email',
+          status: 'sent',
+          provider: 'debug',
+          detail: 'debug-id',
+        }),
+      };
+
+      setEmailProvider(customProvider);
+
+      const message: NotificationMessage = {
+        id: 'release-email-1',
+        subject: 'New release',
+        text: 'Listen now',
+        category: 'marketing',
+        senderContext: {
+          creatorProfileId: 'creator-1',
+          displayName: 'Artist Name',
+          emailType: 'release_notification',
+        },
+      };
+
+      await sendNotification(message, { email: 'fan@example.com' });
+
+      expect(formatSystemSender).toHaveBeenCalledWith('Artist Name');
+      expect(customProvider.sendEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          from: 'Artist Name via Jovie <notifications@jov.ie>',
+          replyTo: 'reply@example.com',
+        })
+      );
     });
   });
 });

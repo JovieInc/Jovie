@@ -1,8 +1,4 @@
-import {
-  EMAIL_FROM_ADDRESS,
-  EMAIL_REPLY_TO,
-  NOTIFICATIONS_BRAND_NAME,
-} from '@/lib/notifications/config';
+import { EMAIL_REPLY_TO } from '@/lib/notifications/config';
 import {
   getNotificationPreferences,
   markNotificationDismissed,
@@ -10,6 +6,7 @@ import {
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import { checkQuota, incrementQuota } from '@/lib/notifications/quota';
 import { checkReputation, recordSend } from '@/lib/notifications/reputation';
+import { formatSystemSender } from '@/lib/notifications/sender-policy';
 import {
   isEmailSuppressed,
   logDelivery,
@@ -53,20 +50,10 @@ const buildErrorResult = (
 
 /**
  * Build the "From" address with dynamic sender name.
- * Implements the Laylo pattern: "Artist Name via Jovie <notifications@notify.jov.ie>"
+ * Implements the Laylo pattern: "Artist Name via Jovie <notifications@jov.ie>"
  */
 function buildFromAddress(senderContext?: SenderContext): string {
-  if (!senderContext?.displayName) {
-    return `${NOTIFICATIONS_BRAND_NAME} <${EMAIL_FROM_ADDRESS}>`;
-  }
-
-  // Sanitize display name (remove quotes and angle brackets)
-  const sanitizedName = senderContext.displayName
-    .replaceAll(/["<>]/g, '')
-    .trim()
-    .slice(0, 64); // Limit length
-
-  return `${sanitizedName} via ${NOTIFICATIONS_BRAND_NAME} <${EMAIL_FROM_ADDRESS}>`;
+  return formatSystemSender(senderContext?.displayName);
 }
 
 /**
