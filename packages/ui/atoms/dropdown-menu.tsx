@@ -55,29 +55,43 @@ const DropdownMenuSubContent = React.forwardRef<
     >;
     disablePortal?: boolean;
   }
->(({ className, portalProps, disablePortal = false, ...props }, ref) => {
-  const content = (
-    <DropdownMenuPrimitive.SubContent
-      ref={ref}
-      className={cn(
-        subMenuContentClasses,
-        DROPDOWN_TRANSFORM_ORIGIN,
-        className
-      )}
-      {...props}
-    />
-  );
+>(
+  (
+    {
+      className,
+      portalProps,
+      disablePortal = false,
+      sideOffset = 6,
+      collisionPadding = 8,
+      ...props
+    },
+    ref
+  ) => {
+    const content = (
+      <DropdownMenuPrimitive.SubContent
+        ref={ref}
+        sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
+        className={cn(
+          subMenuContentClasses,
+          DROPDOWN_TRANSFORM_ORIGIN,
+          className
+        )}
+        {...props}
+      />
+    );
 
-  if (disablePortal) {
-    return content;
+    if (disablePortal) {
+      return content;
+    }
+
+    return (
+      <DropdownMenuPrimitive.Portal {...portalProps}>
+        {content}
+      </DropdownMenuPrimitive.Portal>
+    );
   }
-
-  return (
-    <DropdownMenuPrimitive.Portal {...portalProps}>
-      {content}
-    </DropdownMenuPrimitive.Portal>
-  );
-});
+);
 DropdownMenuSubContent.displayName =
   DropdownMenuPrimitive.SubContent.displayName;
 
@@ -98,6 +112,7 @@ const DropdownMenuContent = React.forwardRef<
       <DropdownMenuPrimitive.Content
         ref={ref}
         sideOffset={sideOffset}
+        collisionPadding={8}
         className={cn(dropdownMenuContentClasses, className)}
         {...props}
       />

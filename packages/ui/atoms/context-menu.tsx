@@ -54,25 +54,43 @@ const ContextMenuSubContent = React.forwardRef<
     >;
     disablePortal?: boolean;
   }
->(({ className, portalProps, disablePortal = false, ...props }, ref) => {
-  const content = (
-    <ContextMenuPrimitive.SubContent
-      ref={ref}
-      className={cn(subMenuContentClasses, CONTEXT_TRANSFORM_ORIGIN, className)}
-      {...props}
-    />
-  );
+>(
+  (
+    {
+      className,
+      portalProps,
+      disablePortal = false,
+      sideOffset = 6,
+      collisionPadding = 8,
+      ...props
+    },
+    ref
+  ) => {
+    const content = (
+      <ContextMenuPrimitive.SubContent
+        ref={ref}
+        sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
+        className={cn(
+          subMenuContentClasses,
+          CONTEXT_TRANSFORM_ORIGIN,
+          className
+        )}
+        {...props}
+      />
+    );
 
-  if (disablePortal) {
-    return content;
+    if (disablePortal) {
+      return content;
+    }
+
+    return (
+      <ContextMenuPrimitive.Portal {...portalProps}>
+        {content}
+      </ContextMenuPrimitive.Portal>
+    );
   }
-
-  return (
-    <ContextMenuPrimitive.Portal {...portalProps}>
-      {content}
-    </ContextMenuPrimitive.Portal>
-  );
-});
+);
 ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
 
 const ContextMenuContent = React.forwardRef<
@@ -87,6 +105,7 @@ const ContextMenuContent = React.forwardRef<
   const content = (
     <ContextMenuPrimitive.Content
       ref={ref}
+      collisionPadding={8}
       className={cn(contextMenuContentClasses, className)}
       {...props}
     />

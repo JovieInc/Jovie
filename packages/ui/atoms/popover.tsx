@@ -47,6 +47,7 @@ const PopoverContent = React.forwardRef<
         ref={ref}
         align={align}
         sideOffset={sideOffset}
+        collisionPadding={8}
         className={cn(popoverContentClasses, className)}
         data-testid={testId}
         {...props}
