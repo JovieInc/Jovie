@@ -508,39 +508,42 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <DashboardHeaderActionGroup
-        trailing={
+      <div className='flex min-w-0 items-center gap-[var(--linear-app-toolbar-gap)]'>
+        <DashboardHeaderActionGroup className='min-w-0 flex-1'>
+          <HeaderSearchAction
+            searchValue={searchQuery}
+            onSearchValueChange={setSearchQuery}
+            onClearAction={() => setSearchQuery('')}
+            onApply={() => undefined}
+            placeholder='Search releases'
+            ariaLabel='Search releases'
+            submitAriaLabel='Search releases'
+            submitIcon={
+              <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
+            }
+            tooltipLabel='Search'
+          />
+          {canCreateManualReleases ? (
+            <DashboardHeaderActionButton
+              ariaLabel='Create a new release'
+              onClick={handleNewRelease}
+              icon={
+                <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
+              }
+              label='New Release'
+              iconOnly
+              tooltipLabel='New Release'
+            />
+          ) : null}
+        </DashboardHeaderActionGroup>
+        <div className='ml-auto shrink-0'>
           <DrawerToggleButton
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
           />
-        }
-      >
-        <HeaderSearchAction
-          searchValue={searchQuery}
-          onSearchValueChange={setSearchQuery}
-          onClearAction={() => setSearchQuery('')}
-          onApply={() => undefined}
-          placeholder='Search releases'
-          ariaLabel='Search releases'
-          submitAriaLabel='Search releases'
-          submitIcon={
-            <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
-          }
-          tooltipLabel='Search'
-        />
-        {canCreateManualReleases ? (
-          <DashboardHeaderActionButton
-            ariaLabel='Create a new release'
-            onClick={handleNewRelease}
-            icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
-            label='New Release'
-            iconOnly
-            tooltipLabel='New Release'
-          />
-        ) : null}
-      </DashboardHeaderActionGroup>
+        </div>
+      </div>
     ),
     [canCreateManualReleases, handleNewRelease, searchQuery]
   );
